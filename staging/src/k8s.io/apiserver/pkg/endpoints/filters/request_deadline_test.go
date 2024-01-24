@@ -94,123 +94,149 @@ func TestParseTimeout(t *testing.T) {
 }
 
 func TestWithRequestDeadline(t *testing.T) {
-	const requestTimeoutMaximum = 60 * time.Second
+	// we have three category of requests based on how long they can run:
+	//
+	// a) watch: it's a long running request, user can provide a timeout for
+	// a watch request by specifying the 'timeoutSeconds' parameter in the
+	// request URI. If not specified in the request URI, the apiserver
+	// enforces a default (derived from the server
+	// run option '--min-request-timeout'
+	//
+	// b) long-running: all other long running requests except for WATCH,
+	// no timeout is enforced by the apiserver.
+	//
+	// c) short: we call it 'short' here for lack of better terms, these
+	// are the non long-running requests, user can provide a timeout for
+	// these request(s) by specifying the 'timeout' parameter in the
+	// request URI. If not specified in the request URI, the apiserver
+	// enforces a default (derived from the server run option
+	// '--request-timeout'). A short request can not run longer than
+	// 'request-timeout' duration, the apiserver enforces this constraint.
+	shortReqDefaultTimeout := 33 * time.Second
 	tests := []struct {
 		name                     string
-		requestURL               string
-		longRunning              bool
-		hasDeadlineExpected      bool
-		deadlineExpected         time.Duration
+		timeoutSpecified         string
+		reqInfo                  *request.RequestInfo
+		timeoutExpected          time.Duration
 		handlerCallCountExpected int
 		statusCodeExpected       int
 	}{
 		{
-			name:                     "the user specifies a valid request timeout",
-			requestURL:               "/api/v1/namespaces?timeout=15s",
-			longRunning:              false,
+			name:                     "short, user specifies a valid timeout",
+			timeoutSpecified:         "timeout=15s",
+			reqInfo:                  &request.RequestInfo{Verb: "get"},
 			handlerCallCountExpected: 1,
-			hasDeadlineExpected:      true,
-			deadlineExpected:         14 * time.Second, // to account for the delay in verification
+			statusCodeExpected:       http.StatusOK,
+			timeoutExpected:          15 * time.Second,
+		},
+		{
+			name:                     "short, specified timeout is 0s, default deadline is expected to be set",
+			timeoutSpecified:         "timeout=0s",
+			reqInfo:                  &request.RequestInfo{Verb: "get"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          shortReqDefaultTimeout,
 			statusCodeExpected:       http.StatusOK,
 		},
 		{
-			name:                     "the user specifies a valid request timeout",
-			requestURL:               "/api/v1/namespaces?timeout=15s",
-			longRunning:              false,
+			name:                     "short, user does not specify any timeout, default deadline is expected to be set",
+			timeoutSpecified:         "timeout=",
+			reqInfo:                  &request.RequestInfo{Verb: "get"},
 			handlerCallCountExpected: 1,
-			hasDeadlineExpected:      true,
-			deadlineExpected:         14 * time.Second, // to account for the delay in verification
+			timeoutExpected:          shortReqDefaultTimeout,
 			statusCodeExpected:       http.StatusOK,
 		},
 		{
-			name:                     "the specified timeout is 0s, default deadline is expected to be set",
-			requestURL:               "/api/v1/namespaces?timeout=0s",
-			longRunning:              false,
+			name:                     "watch, no deadline is expected to be set",
+			timeoutSpecified:         "timeout=700s&timeoutSeconds=700",
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
 			handlerCallCountExpected: 1,
-			hasDeadlineExpected:      true,
-			deadlineExpected:         requestTimeoutMaximum - time.Second, // to account for the delay in verification
+			timeoutExpected:          0,
 			statusCodeExpected:       http.StatusOK,
 		},
 		{
-			name:                     "the user does not specify any request timeout, default deadline is expected to be set",
-			requestURL:               "/api/v1/namespaces?timeout=",
-			longRunning:              false,
-			handlerCallCountExpected: 1,
-			hasDeadlineExpected:      true,
-			deadlineExpected:         requestTimeoutMaximum - time.Second, // to account for the delay in verification
-			statusCodeExpected:       http.StatusOK,
+			name:                     "short, specified timeout is malformed, the request is aborted with HTTP 400",
+			timeoutSpecified:         "timeout=foo",
+			reqInfo:                  &request.RequestInfo{Verb: "get"},
+			handlerCallCountExpected: 0,
+			timeoutExpected:          0,
+			statusCodeExpected:       http.StatusBadRequest,
 		},
 		{
-			name:                     "the request is long running, no deadline is expected to be set",
-			requestURL:               "/api/v1/namespaces?timeout=10s",
-			longRunning:              true,
-			hasDeadlineExpected:      false,
-			handlerCallCountExpected: 1,
-			statusCodeExpected:       http.StatusOK,
-		},
-		{
-			name:               "the timeout specified is malformed, the request is aborted with HTTP 400",
-			requestURL:         "/api/v1/namespaces?timeout=foo",
-			longRunning:        false,
-			statusCodeExpected: http.StatusBadRequest,
-		},
-		{
-			name:                     "the timeout specified exceeds the maximum deadline allowed, the default deadline is used",
-			requestURL:               fmt.Sprintf("/api/v1/namespaces?timeout=%s", requestTimeoutMaximum+time.Second),
-			longRunning:              false,
+			name:                     "short, specified timeout exceeds the maximum allowed, the default deadline is used",
+			timeoutSpecified:         fmt.Sprintf("timeout=%s", shortReqDefaultTimeout+time.Second),
+			reqInfo:                  &request.RequestInfo{Verb: "get"},
 			statusCodeExpected:       http.StatusOK,
 			handlerCallCountExpected: 1,
-			hasDeadlineExpected:      true,
-			deadlineExpected:         requestTimeoutMaximum - time.Second, // to account for the delay in verification
+			timeoutExpected:          shortReqDefaultTimeout,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var (
-				callCount      int
-				hasDeadlineGot bool
-				deadlineGot    time.Duration
-			)
-			handler := http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
-				callCount++
-				deadlineGot, hasDeadlineGot = deadline(req)
-			})
-
 			fakeSink := &fakeAuditSink{}
 			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
-			withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
-				func(_ *http.Request, _ *request.RequestInfo) bool { return test.longRunning },
-				newSerializer(), requestTimeoutMaximum)
-			withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
+			longRunningFn := func(_ *http.Request, _ *request.RequestInfo) bool {
+				switch test.reqInfo.Verb {
+				case "get":
+					return false // indicates a short request
+				case "watch":
+					return true // indicates a WATCH request
+				}
+				return true // long running requests except for WATCH
+			}
+			fakeReqResolver := &fakeRequestResolver{reqInfo: test.reqInfo}
 
-			testRequest := newRequest(t, test.requestURL)
+			var handlerInvokedGot int
+			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				handlerInvokedGot++
+				ctx := r.Context()
 
-			// make sure a default request does not have any deadline set
-			remaning, ok := deadline(testRequest)
-			if ok {
-				t.Fatalf("test setup failed, expected the new HTTP request context to have no deadline but got: %s", remaning)
+				var receivedAt, deadlineGot time.Time
+				var ok bool
+				if receivedAt, ok = request.ReceivedTimestampFrom(ctx); !ok {
+					t.Errorf("expected the request context to have a received at timestamp, but got: %s", receivedAt)
+				}
+
+				deadlineGot, ok = ctx.Deadline()
+				switch {
+				case test.timeoutExpected > 0:
+					if !ok {
+						t.Errorf("expected the request context to have a deadline")
+					}
+					if timeoutGot := deadlineGot.Sub(receivedAt); test.timeoutExpected != timeoutGot {
+						t.Errorf("expected the request context to have a deadline of: %s, but got: %s", test.timeoutExpected, timeoutGot)
+					}
+				default:
+					if ok {
+						t.Errorf("did not expect the request context to have a deadline")
+					}
+				}
+			})
+
+			handler := WithRequestDeadline(h, fakeSink, fakeRuleEvaluator, longRunningFn, newSerializer(), shortReqDefaultTimeout)
+			handler = WithRequestInfo(handler, fakeReqResolver)
+			handler = WithRequestReceivedTimestamp(handler)
+			handler = WithAuditInit(handler)
+
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/ping?%s", test.timeoutSpecified), nil)
+			if err != nil {
+				t.Errorf("failed to create a new http request - %v", err)
+				return
+			}
+			// make sure the request does not have any deadline set
+			if _, ok := req.Context().Deadline(); ok {
+				t.Errorf("test setup failed, expected the new HTTP request context to have no deadline")
 			}
 
 			w := httptest.NewRecorder()
-			withDeadline.ServeHTTP(w, testRequest)
-
-			if test.handlerCallCountExpected != callCount {
-				t.Errorf("expected the request handler to be invoked %d times, but was actually invoked %d times", test.handlerCallCountExpected, callCount)
-			}
-
-			if test.hasDeadlineExpected != hasDeadlineGot {
-				t.Errorf("expected the request context to have deadline set: %t but got: %t", test.hasDeadlineExpected, hasDeadlineGot)
-			}
-
-			deadlineGot = deadlineGot.Truncate(time.Second)
-			if test.deadlineExpected != deadlineGot {
-				t.Errorf("expected a request context with a deadline of %s but got: %s", test.deadlineExpected, deadlineGot)
-			}
+			handler.ServeHTTP(w, req)
 
 			statusCodeGot := w.Result().StatusCode
 			if test.statusCodeExpected != statusCodeGot {
 				t.Errorf("expected status code %d but got: %d", test.statusCodeExpected, statusCodeGot)
+			}
+			if test.handlerCallCountExpected != handlerInvokedGot {
+				t.Errorf("expected the request handler to be invoked %d times, but was actually invoked %d times", test.handlerCallCountExpected, handlerInvokedGot)
 			}
 		})
 	}
@@ -460,9 +486,14 @@ func newSerializer() runtime.NegotiatedSerializer {
 	return serializer.NewCodecFactory(scheme).WithoutConversion()
 }
 
-type fakeRequestResolver struct{}
+type fakeRequestResolver struct {
+	reqInfo *request.RequestInfo
+}
 
 func (r fakeRequestResolver) NewRequestInfo(req *http.Request) (*request.RequestInfo, error) {
+	if r.reqInfo != nil {
+		return r.reqInfo, nil
+	}
 	return &request.RequestInfo{}, nil
 }
 
