@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -98,6 +99,7 @@ func Convert_kubeadm_LocalEtcd_To_v1beta3_LocalEtcd(in *kubeadm.LocalEtcd, out *
 // Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions converts a public NodeRegistrationOptions to private NodeRegistrationOptions.
 func Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in *NodeRegistrationOptions, out *kubeadm.NodeRegistrationOptions, s conversion.Scope) error {
 	out.KubeletExtraArgs = convertToArgs(in.KubeletExtraArgs)
+	out.ImagePullSerial = ptr.To(true)
 	return autoConvert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in, out, s)
 }
 

@@ -810,6 +810,7 @@ func autoConvert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOpti
 	out.KubeletExtraArgs = *(*[]kubeadm.Arg)(unsafe.Pointer(&in.KubeletExtraArgs))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 
@@ -825,6 +826,7 @@ func autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta4_NodeRegistrationOpti
 	out.KubeletExtraArgs = *(*[]Arg)(unsafe.Pointer(&in.KubeletExtraArgs))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 

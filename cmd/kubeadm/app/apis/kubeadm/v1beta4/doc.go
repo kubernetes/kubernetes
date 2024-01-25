@@ -40,6 +40,8 @@ limitations under the License.
 //     during cluster creation will set the same fields to `false`.
 //   - Add a `Timeouts` structure to `InitConfiguration`, `JoinConfiguration` and `ResetConfiguration“
 //     that can be used to configure various timeouts.
+//   - Add the `NodeRegistration.ImagePullSerial` field in 'InitConfiguration` and `JoinConfiguration`, which
+//     can be used to control if kubeadm pulls images serially or in parallel.
 //
 // Migration from old kubeadm config versions
 //

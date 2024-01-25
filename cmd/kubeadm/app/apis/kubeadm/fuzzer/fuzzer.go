@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -62,6 +63,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.NodeRegistration.ImagePullSerial = ptr.To(true)
 	obj.Patches = nil
 	obj.DryRun = false
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
@@ -72,6 +74,7 @@ func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.IgnorePreflightErrors = nil
+	obj.ImagePullSerial = ptr.To(true)
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
@@ -132,6 +135,7 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.NodeRegistration.ImagePullSerial = ptr.To(true)
 	obj.Patches = nil
 	obj.DryRun = false
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)

@@ -29,6 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -135,6 +136,7 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 	}
 	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
 	allErrs = append(allErrs, ValidateExtraArgs(nro.KubeletExtraArgs, fldPath.Child("kubeletExtraArgs"))...)
+	allErrs = append(allErrs, ValidateImagePullPolicy(nro.ImagePullPolicy, fldPath.Child("imagePullPolicy"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
 	return allErrs
 }
@@ -738,4 +740,16 @@ func ValidateUnmountFlags(flags []string, fldPath *field.Path) field.ErrorList {
 	}
 
 	return allErrs
+}
+
+// ValidateImagePullPolicy validates if the user specified pull policy is correct
+func ValidateImagePullPolicy(policy corev1.PullPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch policy {
+	case "", corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever:
+		return allErrs
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, policy, "invalid pull policy"))
+		return allErrs
+	}
 }
