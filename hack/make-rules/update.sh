@@ -41,6 +41,7 @@ BASH_TARGETS=(
 	update-generated-docs
 	update-openapi-spec
 	update-gofmt
+	update-golangci-lint-config
 )
 
 for t in "${BASH_TARGETS[@]}"; do
