@@ -17,9 +17,13 @@ limitations under the License.
 package mutation
 
 import (
-	"reflect"
 	"strings"
 	"testing"
+
+	celtypes "github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
+
+	"k8s.io/apiserver/pkg/cel/mutation/common"
 )
 
 // TestCELOptional is an exploration test to demonstrate how CEL optional library
@@ -28,7 +32,7 @@ func TestCELOptional(t *testing.T) {
 	for _, tc := range []struct {
 		name                 string
 		expression           string
-		expectedValue        any
+		expectedVal          ref.Val
 		expectedCompileError string
 	}{
 		{
@@ -59,16 +63,16 @@ func TestCELOptional(t *testing.T) {
 			expression: `Object{
 				?existing: optional.none()
 			}`,
-			expectedValue: map[string]any{
+			expectedVal: common.NewObjectVal(nil, map[string]ref.Val{
 				// "existing" field was not set.
-			},
+			}),
 		},
 		{
-			name:          "object of zero value, ofNonZeroValue",
-			expression:    `Object{?spec: optional.ofNonZeroValue(Object.spec{?replicas: Object{}.?replicas})}`,
-			expectedValue: map[string]any{
-				// "spec" field was not set.
-			},
+			name:        "object of zero value, ofNonZeroValue",
+			expression:  `Object{?spec: optional.ofNonZeroValue(Object.spec{?replicas: Object{}.?replicas})}`,
+			expectedVal: common.NewObjectVal(nil, map[string]ref.Val{
+				// "existing" field was not set.
+			}),
 		},
 		{
 			name:                 "access non-existing field, return none",
@@ -76,21 +80,19 @@ func TestCELOptional(t *testing.T) {
 			expectedCompileError: `undefined field 'nonExisting'`,
 		},
 		{
-			name:       "access existing field, return none",
-			expression: `Object{}.?existing`,
-			// types.OptionalNone.Value() is nil
-			expectedValue: nil,
+			name:        "access existing field, return none",
+			expression:  `Object{}.?existing`,
+			expectedVal: celtypes.OptionalNone,
 		},
 		{
-			name:       "map non-existing field, return none",
-			expression: `{"foo": 1}[?"bar"]`,
-			// types.OptionalNone.Value() is nil
-			expectedValue: nil,
+			name:        "map non-existing field, return none",
+			expression:  `{"foo": 1}[?"bar"]`,
+			expectedVal: celtypes.OptionalNone,
 		},
 		{
-			name:          "map existing field, return actual value",
-			expression:    `{"foo": 1}[?"foo"]`,
-			expectedValue: int64(1), // CEL int converts into int64
+			name:        "map existing field, return actual value",
+			expression:  `{"foo": 1}[?"foo"]`,
+			expectedVal: celtypes.OptionalOf(celtypes.Int(1)),
 		},
 		{
 			// Map has a different behavior than Object
@@ -105,14 +107,14 @@ func TestCELOptional(t *testing.T) {
 			//
 			name: "has on a map, de-sugared, non-existing field, returns false",
 			// has marco supports only the dot access syntax.
-			expression:    `has({"foo": 1}.bar)`,
-			expectedValue: false,
+			expression:  `has({"foo": 1}.bar)`,
+			expectedVal: celtypes.False,
 		},
 		{
 			name: "has on a map, de-sugared, existing field, returns true",
 			// has marco supports only the dot access syntax.
-			expression:    `has({"foo": 1}.foo)`,
-			expectedValue: true,
+			expression:  `has({"foo": 1}.foo)`,
+			expectedVal: celtypes.True,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -137,8 +139,8 @@ func TestCELOptional(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error during evaluation: %v", err)
 			}
-			if v := r.Value(); !reflect.DeepEqual(tc.expectedValue, v) {
-				t.Errorf("expected %v but got %v", tc.expectedValue, v)
+			if equals := tc.expectedVal.Equal(r); equals.Value() != true {
+				t.Errorf("expected %v but got %v", tc.expectedVal, r)
 			}
 		})
 	}
