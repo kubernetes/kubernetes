@@ -116,8 +116,6 @@ func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovide
 	switch allocatorType {
 	case RangeAllocatorType:
 		return NewCIDRRangeAllocator(ctx, kubeClient, nodeInformer, allocatorParams, nodeList)
-	case CloudAllocatorType:
-		return NewCloudCIDRAllocator(ctx, kubeClient, cloud, nodeInformer)
 	default:
 		return nil, fmt.Errorf("invalid CIDR allocator type: %v", allocatorType)
 	}
