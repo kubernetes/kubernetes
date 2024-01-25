@@ -36,4 +36,5 @@ import (
 
 	// tools like cpu
 	_ "go.uber.org/automaxprocs"
+	_ "golang.org/x/exp/cmd/apidiff"
 )
