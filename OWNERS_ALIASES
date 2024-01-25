@@ -303,6 +303,7 @@ aliases:
     - RainbowMango
     - serathius
     - dgrisonnet
+    - rexagod
   sig-instrumentation-reviewers:
     - dashpole
     - ehashman
@@ -314,6 +315,7 @@ aliases:
     - dgrisonnet
     - pohly
     - mengjiao-liu
+    - rexagod
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
@@ -511,6 +513,7 @@ aliases:
     - msau42 # Storage
     - mwielgus # Autoscaling
     - pwittrock # CLI
+    - rexagod # Instrumentation
     - saad-ali # Storage
     - seans3 # CLI
     - sergeykanzhelev # Node
