@@ -88,6 +88,11 @@ func TestCELOptional(t *testing.T) {
 			expectedValue: nil,
 		},
 		{
+			name:          "map existing field, return actual value",
+			expression:    `{"foo": 1}[?"foo"]`,
+			expectedValue: int64(1), // CEL int converts into int64
+		},
+		{
 			// Map has a different behavior than Object
 			//
 			// Quoting from
@@ -98,10 +103,16 @@ func TestCELOptional(t *testing.T) {
 			// 1. If e evaluates to a map, then has(e.f) indicates whether the string f is
 			// a key in the map (note that f must syntactically be an identifier).
 			//
-			name: "has on a map, de-sugared, return false",
+			name: "has on a map, de-sugared, non-existing field, returns false",
 			// has marco supports only the dot access syntax.
 			expression:    `has({"foo": 1}.bar)`,
 			expectedValue: false,
+		},
+		{
+			name: "has on a map, de-sugared, existing field, returns true",
+			// has marco supports only the dot access syntax.
+			expression:    `has({"foo": 1}.foo)`,
+			expectedValue: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
