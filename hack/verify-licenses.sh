@@ -46,7 +46,6 @@ function http_code() {
     curl -I -s -o /dev/null -w "%{http_code}" "$1"
 }
 
-allowed_licenses=()
 packages_flagged=()
 packages_url_missing=()
 exit_code=0
@@ -60,17 +59,15 @@ go install github.com/google/go-licenses@latest
 curl -s 'https://spdx.org/licenses/licenses.json' -o "${KUBE_TEMP}"/licenses.json
 
 echo '[INFO] Fetching current list of CNCF approved licenses...'
-while read -r L; do
-    allowed_licenses+=("${L}")
-done < <(jq -r '.licenses[] | select(.isDeprecatedLicenseId==false) .licenseId' "${KUBE_TEMP}"/licenses.json)
+jq -r '.licenses[] | select(.isDeprecatedLicenseId==false) .licenseId' /tmp/licenses.json | sort | uniq > "${KUBE_TEMP}"/licenses.txt
 
 # Scanning go-packages under the project & verifying against the CNCF approved list of licenses
 echo '[INFO] Starting license scan on go-packages...'
-go-licenses report ./... >> "${KUBE_TEMP}"/licenses.csv
+go-licenses report ./... >> "${KUBE_TEMP}"/licenses.csv 2>"${KUBE_TEMP}"/go-licenses.log
 
 echo -e 'PACKAGE_NAME  LICENSE_NAME  LICENSE_URL\n' >> "${KUBE_TEMP}"/approved_licenses.dump
 while IFS=, read -r GO_PACKAGE LICENSE_URL LICENSE_NAME; do
-    if ! printf -- "%s\n" "${allowed_licenses[@]}" | grep -q "^${LICENSE_NAME}$"; then
+    if ! grep -q "^${LICENSE_NAME}$" "${KUBE_TEMP}"/licenses.txt; then
         echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/notapproved_licenses.dump
         packages_flagged+=("${GO_PACKAGE}")
         continue
@@ -125,13 +122,13 @@ fi
 
 
 if [[ ${#packages_flagged[@]} -gt 0 ]]; then
-    kube::log::error "[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
+    echo -e "\n[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
     awk '{ printf "%-100s :  %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/notapproved_licenses.dump
     exit_code=1
 elif [[ "${exit_code}" -eq 1 ]]; then
-    kube::log::status "[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
+    echo -e "\n[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
 else
-    kube::log::status "[SUCCESS] Scan complete! All go-packages under the project are using current CNCF approved licenses!"
+    echo -e "\n[SUCCESS] Scan complete! All go-packages under the project are using current CNCF approved licenses!"
 fi
 
 exit "${exit_code}"
