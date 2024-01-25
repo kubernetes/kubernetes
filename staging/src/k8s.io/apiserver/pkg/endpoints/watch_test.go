@@ -45,8 +45,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/dynamic"
@@ -599,18 +601,6 @@ func TestWatchProtocolSelection(t *testing.T) {
 
 }
 
-type fakeTimeoutFactory struct {
-	timeoutCh chan time.Time
-	done      chan struct{}
-}
-
-func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
-	return t.timeoutCh, func() bool {
-		defer close(t.done)
-		return true
-	}
-}
-
 // serveWatch will serve a watch response according to the watcher and watchServer.
 // Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
 func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preServeErr error) http.HandlerFunc {
@@ -628,8 +618,6 @@ func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preS
 
 func TestWatchHTTPErrors(t *testing.T) {
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -646,8 +634,6 @@ func TestWatchHTTPErrors(t *testing.T) {
 		Framer:          serializer.Framer,
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
@@ -689,8 +675,6 @@ func TestWatchHTTPErrors(t *testing.T) {
 
 func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -710,8 +694,6 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		Framer:          serializer.Framer,
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	errStatus := errors.NewInternalError(fmt.Errorf("we got an error"))
@@ -750,8 +732,6 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 
 func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -768,8 +748,6 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		Framer:          serializer.Framer,
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
@@ -792,8 +770,6 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 
 func TestWatchHTTPTimeout(t *testing.T) {
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -810,17 +786,60 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Framer:          serializer.Framer,
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	timeoutSecondsWant := 900 // 15 * 60s
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	longRunningFn := func(_ *http.Request, _ *request.RequestInfo) bool { return true }
+	watchHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer watcher.Stop()
+		watchServer.HandleHTTP(w, r)
+	})
+	handler := func(inner http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			receivedAt, ok := request.ReceivedTimestampFrom(ctx)
+			if !ok {
+				t.Errorf("expected the request context to have a received at timestamp, but got: %s", receivedAt)
+			}
+			deadlineWant, ok := ctx.Deadline()
+			if !ok {
+				t.Errorf("expected the request context to have a deadline")
+			}
+			if timeoutWant, timeoutGot := time.Duration(timeoutSecondsWant)*time.Second, deadlineWant.Sub(receivedAt); timeoutWant != timeoutGot {
+				t.Errorf("expected the request context to have a deadline of: %s, but got: %s", timeoutWant, timeoutGot)
+			}
+
+			inner.ServeHTTP(w, r)
+
+			if err := ctx.Err(); err != context.Canceled {
+				t.Errorf("expected the request context to have error: %v, but got: %v", context.Canceled, err)
+			}
+		})
+	}(watchHandler)
+	handler = filters.WithRequestDeadline(handler, nil, nil, longRunningFn, nil, 60*time.Second, 600)
+	handler = filters.WithRequestInfo(handler, testRequestInfoResolver())
+	handler = filters.WithRequestReceivedTimestamp(handler)
+	handler = filters.WithAuditInit(handler)
+	handler = func(inner http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// we use a cancellable context to time out the watch request
+			ctx, cancel = context.WithCancel(context.Background())
+			r = r.WithContext(ctx)
+
+			inner.ServeHTTP(w, r)
+		})
+	}(handler)
+
+	s := httptest.NewServer(handler)
 	defer s.Close()
 
 	// Setup a client
 	dest, _ := url.Parse(s.URL)
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
-	dest.RawQuery = "watch=true"
+	dest.RawQuery = fmt.Sprintf("watch=true&timeoutSeconds=%d", timeoutSecondsWant)
 
 	req, _ := http.NewRequest("GET", dest.String(), nil)
 	client := http.Client{}
@@ -839,9 +858,9 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	}
 
 	// Timeout and check for leaks
-	close(timeoutCh)
+	cancel()
 	select {
-	case <-done:
+	case <-ctx.Done():
 		eventCh := watcher.ResultChan()
 		select {
 		case _, opened := <-eventCh:
@@ -861,6 +880,140 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	// Make sure we can't receive any more events through the timeout watch
 	err = decoder.Decode(&got)
 	if err != io.EOF {
+		t.Errorf("Unexpected non-error")
+	}
+}
+
+func TestWatchWebSocketTimeout(t *testing.T) {
+	watcher := watch.NewFake()
+
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok || info.StreamSerializer == nil {
+		t.Fatal(info)
+	}
+	serializer := info.StreamSerializer
+
+	// Setup a new watchserver
+	watchServer := &handlers.WatchServer{
+		Scope:    &handlers.RequestScope{},
+		Watching: watcher,
+
+		MediaType:       "testcase/json",
+		Framer:          serializer.Framer,
+		Encoder:         newCodec,
+		EmbeddedEncoder: newCodec,
+	}
+
+	timeoutSecondsWant := 900 // 15 * 60s
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	longRunningFn := func(_ *http.Request, _ *request.RequestInfo) bool { return true }
+	watchHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer watcher.Stop()
+		w.Header().Set("Content-Type", watchServer.MediaType)
+		ws := websocket.Handler(watchServer.HandleWS)
+		ws.ServeHTTP(w, r)
+	})
+	handler := func(inner http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			receivedAt, ok := request.ReceivedTimestampFrom(ctx)
+			if !ok {
+				t.Errorf("expected the request context to have a received at timestamp, but got: %s", receivedAt)
+			}
+			deadlineWant, ok := ctx.Deadline()
+			if !ok {
+				t.Errorf("expected the request context to have a deadline")
+			}
+			if timeoutWant, timeoutGot := time.Duration(timeoutSecondsWant)*time.Second, deadlineWant.Sub(receivedAt); timeoutWant != timeoutGot {
+				t.Errorf("expected the request context to have a deadline of: %s, but got: %s", timeoutWant, timeoutGot)
+			}
+
+			inner.ServeHTTP(w, r)
+
+			if err := ctx.Err(); err != context.Canceled {
+				t.Errorf("expected the request context to have error: %v, but got: %v", context.Canceled, err)
+			}
+		})
+	}(watchHandler)
+	handler = filters.WithRequestDeadline(handler, nil, nil, longRunningFn, nil, 60*time.Second, 600)
+	handler = filters.WithRequestInfo(handler, testRequestInfoResolver())
+	handler = filters.WithRequestReceivedTimestamp(handler)
+	handler = filters.WithAuditInit(handler)
+	handler = func(inner http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// we use a cancellable context to time out the watch request
+			ctx, cancel = context.WithCancel(context.Background())
+			r = r.WithContext(ctx)
+
+			inner.ServeHTTP(w, r)
+		})
+	}(handler)
+
+	s := httptest.NewServer(handler)
+	defer s.Close()
+
+	// Setup a client
+	dest, _ := url.Parse(s.URL)
+	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
+	dest.RawQuery = fmt.Sprintf("watch=true&timeoutSeconds=%d", timeoutSecondsWant)
+
+	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	try := func(action watch.EventType, object runtime.Object) {
+		// Send
+		watcher.Action(action, object)
+		// Test receive
+		var got watchJSON
+		err := websocket.JSON.Receive(ws, &got)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if got.Type != action {
+			t.Errorf("Unexpected type: %v", got.Type)
+		}
+		gotObj, err := runtime.Decode(codec, got.Object)
+		if err != nil {
+			t.Fatalf("Decode error: %v\n%v", err, got)
+		}
+		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+	}
+
+	// Make sure the watch has been established
+	for _, item := range watchTestTable {
+		try(item.t, item.obj)
+	}
+
+	// Timeout and check for leaks
+	cancel()
+	select {
+	case <-ctx.Done():
+		eventCh := watcher.ResultChan()
+		select {
+		case _, opened := <-eventCh:
+			if opened {
+				t.Errorf("Watcher received unexpected event")
+			}
+			if !watcher.IsStopped() {
+				t.Errorf("Watcher is not stopped")
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("Leaked watch on timeout")
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("Failed to stop watcher after %s of timeout signal", wait.ForeverTestTimeout.String())
+	}
+
+	var got watchJSON
+	err = websocket.JSON.Receive(ws, &got)
+	if err == nil {
 		t.Errorf("Unexpected non-error")
 	}
 }

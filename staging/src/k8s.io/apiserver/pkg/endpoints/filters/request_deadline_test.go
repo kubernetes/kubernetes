@@ -113,11 +113,13 @@ func TestWithRequestDeadline(t *testing.T) {
 	// '--request-timeout'). A short request can not run longer than
 	// 'request-timeout' duration, the apiserver enforces this constraint.
 	shortReqDefaultTimeout := 33 * time.Second
+	watchReqDefaultTimeout := 420 // 420s = 7m
 	tests := []struct {
 		name                     string
 		timeoutSpecified         string
 		reqInfo                  *request.RequestInfo
 		timeoutExpected          time.Duration
+		jitterExpected           bool // applies to WATCH request only
 		handlerCallCountExpected int
 		statusCodeExpected       int
 	}{
@@ -146,9 +148,9 @@ func TestWithRequestDeadline(t *testing.T) {
 			statusCodeExpected:       http.StatusOK,
 		},
 		{
-			name:                     "watch, no deadline is expected to be set",
+			name:                     "long running (not watch), no deadline is expected to be set",
 			timeoutSpecified:         "timeout=700s&timeoutSeconds=700",
-			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			reqInfo:                  &request.RequestInfo{Verb: ""}, // long-running (non WATCH)
 			handlerCallCountExpected: 1,
 			timeoutExpected:          0,
 			statusCodeExpected:       http.StatusOK,
@@ -169,6 +171,67 @@ func TestWithRequestDeadline(t *testing.T) {
 			handlerCallCountExpected: 1,
 			timeoutExpected:          shortReqDefaultTimeout,
 		},
+		{
+			name:                     "watch, user specifies a valid timeout (shorter than the default)",
+			timeoutSpecified:         fmt.Sprintf("timeoutSeconds=%d", watchReqDefaultTimeout-60),
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          time.Duration(watchReqDefaultTimeout-60) * time.Second,
+			statusCodeExpected:       http.StatusOK,
+		},
+		{
+			name:                     "watch, user specifies a valid timeout (larger than the default)",
+			timeoutSpecified:         fmt.Sprintf("timeoutSeconds=%d", watchReqDefaultTimeout+60),
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          time.Duration(watchReqDefaultTimeout+60) * time.Second,
+			statusCodeExpected:       http.StatusOK,
+		},
+		{
+			name:                     "watch, specified timeout is invalid",
+			timeoutSpecified:         "timeoutSeconds=foo",
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          time.Duration(watchReqDefaultTimeout) * time.Second,
+			jitterExpected:           true,
+			statusCodeExpected:       http.StatusOK,
+		},
+		{
+			name:                     "watch, specified timeout is empty, default is applied",
+			timeoutSpecified:         "timeoutSeconds=",
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          time.Duration(watchReqDefaultTimeout) * time.Second,
+			jitterExpected:           true,
+			statusCodeExpected:       http.StatusOK,
+		},
+		{
+			name:                     "watch, specified timeout is empty, default is applied",
+			timeoutSpecified:         "",
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          time.Duration(watchReqDefaultTimeout) * time.Second,
+			jitterExpected:           true,
+			statusCodeExpected:       http.StatusOK,
+		},
+		{
+			name:                     "watch, specified timeout is 0s",
+			timeoutSpecified:         "timeoutSeconds=0",
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          time.Duration(watchReqDefaultTimeout) * time.Second,
+			jitterExpected:           true,
+			statusCodeExpected:       http.StatusOK,
+		},
+		{
+			// TODO: this is the current behavior, should we apply the default instead?
+			name:                     "watch, specified timeout is a negative integer",
+			timeoutSpecified:         "timeoutSeconds=-5",
+			reqInfo:                  &request.RequestInfo{Verb: "watch"},
+			handlerCallCountExpected: 1,
+			timeoutExpected:          -5 * time.Second,
+			statusCodeExpected:       http.StatusOK,
+		},
 	}
 
 	for _, test := range tests {
@@ -182,7 +245,7 @@ func TestWithRequestDeadline(t *testing.T) {
 				case "watch":
 					return true // indicates a WATCH request
 				}
-				return true // long running requests except for WATCH
+				return true // long-running requests except for WATCH
 			}
 			fakeReqResolver := &fakeRequestResolver{reqInfo: test.reqInfo}
 
@@ -199,12 +262,16 @@ func TestWithRequestDeadline(t *testing.T) {
 
 				deadlineGot, ok = ctx.Deadline()
 				switch {
-				case test.timeoutExpected > 0:
+				case test.timeoutExpected != 0:
 					if !ok {
 						t.Errorf("expected the request context to have a deadline")
 					}
-					if timeoutGot := deadlineGot.Sub(receivedAt); test.timeoutExpected != timeoutGot {
+					timeoutGot := deadlineGot.Sub(receivedAt)
+					if !test.jitterExpected && test.timeoutExpected != timeoutGot {
 						t.Errorf("expected the request context to have a deadline of: %s, but got: %s", test.timeoutExpected, timeoutGot)
+					}
+					if low, high := test.timeoutExpected, 2*test.timeoutExpected; test.jitterExpected && !(timeoutGot >= low && timeoutGot < high) {
+						t.Errorf("expected the request context to have a deadline in this range[%s - %s), but got: %s", low, high, timeoutGot)
 					}
 				default:
 					if ok {
@@ -212,8 +279,7 @@ func TestWithRequestDeadline(t *testing.T) {
 					}
 				}
 			})
-
-			handler := WithRequestDeadline(h, fakeSink, fakeRuleEvaluator, longRunningFn, newSerializer(), shortReqDefaultTimeout)
+			handler := WithRequestDeadline(h, fakeSink, fakeRuleEvaluator, longRunningFn, newSerializer(), shortReqDefaultTimeout, watchReqDefaultTimeout)
 			handler = WithRequestInfo(handler, fakeReqResolver)
 			handler = WithRequestReceivedTimestamp(handler)
 			handler = WithAuditInit(handler)
@@ -258,8 +324,9 @@ func TestWithRequestDeadlineWithClock(t *testing.T) {
 
 	fakeSink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
-	withDeadline := withRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
-		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), time.Minute, fakeClock)
+	longRunningFunc := func(_ *http.Request, _ *request.RequestInfo) bool { return false }
+	parser := &timeoutParser{watchReqDefaultTimeout: 7 * time.Minute, shortReqDefaultTimeout: time.Minute}
+	withDeadline := withRequestDeadline(handler, fakeSink, fakeRuleEvaluator, longRunningFunc, newSerializer(), fakeClock, parser)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
 	testRequest := newRequest(t, "/api/v1/namespaces?timeout=1s")
@@ -288,7 +355,7 @@ func TestWithRequestDeadlineWithInvalidTimeoutIsAudited(t *testing.T) {
 	fakeSink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
-		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), time.Minute)
+		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), time.Minute, 700)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
 	testRequest := newRequest(t, "/api/v1/namespaces?timeout=foo")
@@ -324,7 +391,7 @@ func TestWithRequestDeadlineWithPanic(t *testing.T) {
 	fakeSink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
-		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), 1*time.Minute)
+		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), 1*time.Minute, 700)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 	withPanicRecovery := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
@@ -361,7 +428,7 @@ func TestWithRequestDeadlineWithRequestTimesOut(t *testing.T) {
 	fakeSink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
-		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), 1*time.Minute)
+		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), 1*time.Minute, 700)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
 	testRequest := newRequest(t, fmt.Sprintf("/api/v1/namespaces?timeout=%s", timeout))

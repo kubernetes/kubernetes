@@ -21,9 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,25 +37,98 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 const (
-	// The 'timeout' query parameter in the request URL has an invalid duration specifier
+	// The 'timeout' query parameter in the request URL has an invalid duration specified
 	invalidTimeoutInURL = "invalid timeout specified in the request URL"
 )
 
-// WithRequestDeadline determines the timeout duration applicable to the given request and sets a new context
-// with the appropriate deadline.
-// auditWrapper provides an http.Handler that audits a failed request.
-// longRunning returns true if he given request is a long running request.
-// requestTimeoutMaximum specifies the default request timeout value.
+// WithRequestDeadline determines the timeout duration applicable to the given
+// request and sets a new context with the appropriate deadline.
+//
+// auditWrapper: provides an http.Handler that audits a failed request.
+// longRunning: returns true if he given request is a long running request.
+// requestTimeout: the value obtained from the server run option
+// 'request-timeout', if specified, all requests except those which match the
+// longRunning predicate will timeout after this duration.
+// minRequestTimeout: the value obtained from the server run option
+// '--min-request-timeout', if specified (in seconds), long running requests
+// such as watch will be allocated a random timeout between this value,
+// and twice this value.
 func WithRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEvaluator, longRunning request.LongRunningRequestCheck,
-	negotiatedSerializer runtime.NegotiatedSerializer, requestTimeoutMaximum time.Duration) http.Handler {
-	return withRequestDeadline(handler, sink, policy, longRunning, negotiatedSerializer, requestTimeoutMaximum, clock.RealClock{})
+	negotiatedSerializer runtime.NegotiatedSerializer, requestTimeout time.Duration, minRequestTimeout int) http.Handler {
+	parser := &timeoutParser{
+		watchReqDefaultTimeout: time.Duration(minRequestTimeout) * time.Second,
+		shortReqDefaultTimeout: requestTimeout,
+	}
+	return withRequestDeadline(handler, sink, policy, longRunning, negotiatedSerializer, clock.RealClock{}, parser)
+}
+
+type timeoutParser struct {
+	// If specified, this is the default timeout for all requests except
+	// those which match the LongRunningRequestCheck predicate.
+	shortReqDefaultTimeout time.Duration
+
+	// If specified, by default the WATCH requests will be allocated
+	// a random timeout between this value, and twice this value.
+	watchReqDefaultTimeout time.Duration
+}
+
+// Parse determines the effective timeout duration for the given request.
+// NOTE: long running requests (which match the LongRunningRequestCheck
+// predicate) excluding WATCH are outside the scope.
+//
+// WATCH timeout:
+// a) use the value in 'timeoutSeconds' (in seconds), if specified by the user.
+// b) if the value from a is zero, then apply the default:
+// timeout = seconds(min-request-timeout) *  ( 1 + random([0.0,1.0)) )
+//
+// Short request timeout:
+// a) use the duration in 'timeout' request parameter, if specified by the user.
+// b) clamp, if the duration from a exceeds the maximum allowed timeout = max(timeout, --request-timeout)
+// c) if the value from a is zero, apply default: timeout = --request-timeout
+func (tp timeoutParser) Parse(req *http.Request, reqInfo *request.RequestInfo) (time.Duration, bool, error) {
+	if reqInfo.IsWatch() {
+		timeoutSeconds := parseWatchTimeout(req)
+		timeout := request.GetTimeoutForWatch(timeoutSeconds, tp.watchReqDefaultTimeout)
+		return timeout, true, nil
+	}
+
+	userSpecifiedTimeout, ok, err := parseTimeout(req)
+	if err != nil {
+		return 0, false, err
+	}
+	// we use the default timeout enforced by the apiserver:
+	// - if the user has specified a timeout of 0s, this implies no timeout on the user's part.
+	// - if the user has specified a timeout that exceeds the maximum deadline allowed by the apiserver.
+	timeout := tp.shortReqDefaultTimeout
+	if ok && userSpecifiedTimeout > 0 && userSpecifiedTimeout < tp.shortReqDefaultTimeout {
+		timeout = userSpecifiedTimeout
+	}
+	return timeout, true, nil
+}
+
+func parseWatchTimeout(req *http.Request) *int64 {
+	// we don't return error due to Decodeparameters failing to decode the
+	// url parameters, or an invalid value specified in 'timeoutSeconds',
+	// this is in keeping with the current (1.30) behavior.
+	opts := metainternalversion.ListOptions{}
+	if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, &opts); err != nil {
+		opts = metainternalversion.ListOptions{}
+		// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
+		if values := req.URL.Query()["timeoutSeconds"]; len(values) > 0 {
+			if ts, err := strconv.Atoi(values[0]); err == nil {
+				opts.TimeoutSeconds = ptr.To(int64(ts))
+			}
+		}
+	}
+	return opts.TimeoutSeconds
 }
 
 func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEvaluator, longRunning request.LongRunningRequestCheck,
-	negotiatedSerializer runtime.NegotiatedSerializer, requestTimeoutMaximum time.Duration, clock clock.PassiveClock) http.Handler {
+	negotiatedSerializer runtime.NegotiatedSerializer, clock clock.PassiveClock, parser *timeoutParser) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 
@@ -61,12 +137,15 @@ func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.Pol
 			handleError(w, req, http.StatusInternalServerError, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
 			return
 		}
-		if longRunning(req, requestInfo) {
+
+		// long running requests (except for WATCH requests) are
+		// outside the scope of deadline bound context.
+		if longRunning(req, requestInfo) && !requestInfo.IsWatch() {
 			handler.ServeHTTP(w, req)
 			return
 		}
 
-		userSpecifiedTimeout, ok, err := parseTimeout(req)
+		timeout, ok, err := parser.Parse(req, requestInfo)
 		if err != nil {
 			statusErr := apierrors.NewBadRequest(err.Error())
 
@@ -77,15 +156,9 @@ func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.Pol
 			failWithAudit.ServeHTTP(w, req)
 			return
 		}
-
-		timeout := requestTimeoutMaximum
-		if ok {
-			// we use the default timeout enforced by the apiserver:
-			// - if the user has specified a timeout of 0s, this implies no timeout on the user's part.
-			// - if the user has specified a timeout that exceeds the maximum deadline allowed by the apiserver.
-			if userSpecifiedTimeout > 0 && userSpecifiedTimeout < requestTimeoutMaximum {
-				timeout = userSpecifiedTimeout
-			}
+		if !ok {
+			handler.ServeHTTP(w, req)
+			return
 		}
 
 		started := clock.Now()
