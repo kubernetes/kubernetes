@@ -11,12 +11,6 @@ cloud.google.com/go/compute/metadata
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/GoogleCloudPlatform/k8s-cloud-provider v1.18.1-0.20220218231025-f11817397a1b
-## explicit; go 1.13
-github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
-github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter
-github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta
-github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock
 # github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 ## explicit
 github.com/JeffAshton/win_pdh
@@ -1003,10 +997,7 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # google.golang.org/api v0.126.0
 ## explicit; go 1.19
-google.golang.org/api/compute/v0.alpha
-google.golang.org/api/compute/v0.beta
 google.golang.org/api/compute/v1
-google.golang.org/api/container/v1
 google.golang.org/api/googleapi
 google.golang.org/api/googleapi/transport
 google.golang.org/api/internal
@@ -1017,7 +1008,6 @@ google.golang.org/api/internal/third_party/uritemplates
 google.golang.org/api/monitoring/v3
 google.golang.org/api/option
 google.golang.org/api/option/internaloption
-google.golang.org/api/tpu/v1
 google.golang.org/api/transport/http
 google.golang.org/api/transport/http/internal/propagation
 # google.golang.org/appengine v1.6.7
@@ -1141,12 +1131,6 @@ google.golang.org/protobuf/types/known/fieldmaskpb
 google.golang.org/protobuf/types/known/structpb
 google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/wrapperspb
-# gopkg.in/gcfg.v1 v1.2.3
-## explicit
-gopkg.in/gcfg.v1
-gopkg.in/gcfg.v1/scanner
-gopkg.in/gcfg.v1/token
-gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
@@ -1159,9 +1143,6 @@ gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
 gopkg.in/square/go-jose.v2/jwt
-# gopkg.in/warnings.v0 v0.1.2
-## explicit
-gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
@@ -1823,9 +1804,7 @@ k8s.io/client-go/pkg/apis/clientauthentication/v1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
 k8s.io/client-go/pkg/version
 k8s.io/client-go/plugin/pkg/client/auth
-k8s.io/client-go/plugin/pkg/client/auth/azure
 k8s.io/client-go/plugin/pkg/client/auth/exec
-k8s.io/client-go/plugin/pkg/client/auth/gcp
 k8s.io/client-go/plugin/pkg/client/auth/oidc
 k8s.io/client-go/rest
 k8s.io/client-go/rest/fake
@@ -1895,7 +1874,6 @@ k8s.io/cloud-provider/controllers/route
 k8s.io/cloud-provider/controllers/service
 k8s.io/cloud-provider/controllers/service/config
 k8s.io/cloud-provider/controllers/service/config/v1alpha1
-k8s.io/cloud-provider/credentialconfig
 k8s.io/cloud-provider/fake
 k8s.io/cloud-provider/names
 k8s.io/cloud-provider/node/helpers
@@ -2219,10 +2197,6 @@ k8s.io/kubelet/pkg/cri/streaming
 k8s.io/kubelet/pkg/cri/streaming/portforward
 k8s.io/kubelet/pkg/cri/streaming/remotecommand
 k8s.io/kubelet/pkg/types
-# k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
-## explicit; go 1.21
-k8s.io/legacy-cloud-providers/gce
-k8s.io/legacy-cloud-providers/gce/gcpcredential
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
 ## explicit; go 1.21
 k8s.io/metrics/pkg/apis/custom_metrics
