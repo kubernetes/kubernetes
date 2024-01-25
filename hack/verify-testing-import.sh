@@ -37,6 +37,7 @@ RELEASE_BIN_PKGS=(
   "${KUBE_ROOT}/cmd/kubectl"
   "${KUBE_ROOT}/cmd/kubectl-convert"
   "${KUBE_ROOT}/cmd/kubelet"
+  "${KUBE_ROOT}/cmd/kubeadm"
 )
 
 pkgs_with_testing_import=()
