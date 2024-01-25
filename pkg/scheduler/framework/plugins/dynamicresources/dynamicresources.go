@@ -332,8 +332,23 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint 
 // scheduled. When this fails, one of the registered events can trigger another
 // attempt.
 func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *framework.Status) {
-	if err := pl.foreachPodResourceClaim(pod, nil); err != nil {
-		return statusUnschedulable(klog.FromContext(ctx), err.Error())
+	logger := klog.FromContext(ctx)
+
+	claims, err := pl.podResourceClaims(pod)
+	if err != nil {
+		return statusUnschedulable(logger, err.Error())
+	}
+
+	for _, claim := range claims {
+		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeImmediate &&
+			claim.Status.Allocation == nil {
+			// This will get resolved by the resource driver.
+			return statusPending(logger, "unallocated immediate resourceclaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+		}
+		if claim.Status.DeallocationRequested {
+			// This will get resolved by the resource driver.
+			return statusPending(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+		}
 	}
 	return nil
 }
@@ -608,15 +623,6 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 
 	s.informationsForClaim = make([]informationForClaim, len(claims))
 	for index, claim := range claims {
-		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeImmediate &&
-			claim.Status.Allocation == nil {
-			// This will get resolved by the resource driver.
-			return nil, statusUnschedulable(logger, "unallocated immediate resourceclaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-		}
-		if claim.Status.DeallocationRequested {
-			// This will get resolved by the resource driver.
-			return nil, statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-		}
 		if claim.Status.Allocation != nil &&
 			!resourceclaim.CanBeReserved(claim) &&
 			!resourceclaim.IsReservedForPod(pod, claim) {
