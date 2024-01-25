@@ -62,7 +62,7 @@ go install github.com/google/go-licenses@latest
 curl -s 'https://spdx.org/licenses/licenses.json' -o "${ARTIFACTS}"/licenses.json
 
 echo '[INFO] Fetching current list of CNCF approved licenses...'
-jq -r '.licenses[] | select(.isDeprecatedLicenseId==false) .licenseId' /tmp/licenses.json | sort | uniq > "${ARTIFACTS}"/licenses.txt
+jq -r '.licenses[] | select(.isDeprecatedLicenseId==false) .licenseId' "${ARTIFACTS}"/licenses.json | sort | uniq > "${ARTIFACTS}"/licenses.txt
 
 # Scanning go-packages under the project & verifying against the CNCF approved list of licenses
 echo '[INFO] Starting license scan on go-packages...'
