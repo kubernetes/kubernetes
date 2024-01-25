@@ -70,7 +70,7 @@ const (
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
 // Node disk pressure is induced by consuming all inodes on the node.
-var _ = SIGDescribe("SeparateDiskTest InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -112,7 +112,7 @@ var _ = SIGDescribe("SeparateDiskTest InodeEviction", framework.WithSlow(), fram
 
 // ImageGCNoEviction tests that the node does not evict pods when inodes are consumed by images
 // Disk pressure is induced by pulling large images
-var _ = SIGDescribe("SeparateDiskTest ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("image-gc-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
@@ -233,7 +233,7 @@ var _ = SIGDescribe("SeparateDiskTest LocalStorageEviction", framework.WithSlow(
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
-var _ = SIGDescribe("SeparateDiskTest LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
@@ -608,6 +608,20 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 		})
 
+		ginkgo.It("all pods should be created before evictions", func(ctx context.Context) {
+			expectedLength := len(testSpecs)
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return fmt.Errorf("Error getting pods %v", err)
+				}
+				if expectedLength == len(updatedPodList.Items) {
+					return nil
+				} else {
+					return fmt.Errorf("mismatch of expected pods %d with actual pods %d", expectedLength, len(updatedPodList.Items))
+				}
+			}, pressureTimeout, evictionPollInterval).Should(gomega.Succeed())
+		})
 		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("Waiting for node to have NodeCondition: %s", expectedNodeCondition))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
