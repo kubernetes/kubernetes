@@ -1,12 +1,6 @@
 # bitbucket.org/bertimus9/systemstat v0.5.0
 ## explicit; go 1.17
 bitbucket.org/bertimus9/systemstat
-# cloud.google.com/go/compute v1.23.0
-## explicit; go 1.19
-cloud.google.com/go/compute/internal
-# cloud.google.com/go/compute/metadata v0.2.3
-## explicit; go 1.19
-cloud.google.com/go/compute/metadata
 # github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
@@ -298,8 +292,6 @@ github.com/google/cadvisor/third_party/containerd/api/types
 github.com/google/cadvisor/third_party/containerd/api/types/task
 github.com/google/cadvisor/utils
 github.com/google/cadvisor/utils/cloudinfo
-github.com/google/cadvisor/utils/cloudinfo/azure
-github.com/google/cadvisor/utils/cloudinfo/gce
 github.com/google/cadvisor/utils/cpuload
 github.com/google/cadvisor/utils/cpuload/netlink
 github.com/google/cadvisor/utils/oomparser
@@ -867,12 +859,7 @@ golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.10.0
 ## explicit; go 1.17
 golang.org/x/oauth2
-golang.org/x/oauth2/authhandler
-golang.org/x/oauth2/google
-golang.org/x/oauth2/google/internal/externalaccount
 golang.org/x/oauth2/internal
-golang.org/x/oauth2/jws
-golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.5.0
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
@@ -952,13 +939,10 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # google.golang.org/appengine v1.6.7
 ## explicit; go 1.11
-google.golang.org/appengine
 google.golang.org/appengine/internal
-google.golang.org/appengine/internal/app_identity
 google.golang.org/appengine/internal/base
 google.golang.org/appengine/internal/datastore
 google.golang.org/appengine/internal/log
-google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch

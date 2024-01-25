@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e_node/remote"
+	_ "k8s.io/kubernetes/test/e2e_node/remote/gce"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
