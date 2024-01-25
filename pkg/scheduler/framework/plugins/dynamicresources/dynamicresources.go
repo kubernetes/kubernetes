@@ -747,7 +747,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			state.unavailableClaims = sets.New[int]()
 		}
 
-		for index := range unavailableClaims {
+		for _, index := range unavailableClaims {
 			claim := state.claims[index]
 			// Deallocation makes more sense for claims with
 			// delayed allocation. Claims with immediate allocation
