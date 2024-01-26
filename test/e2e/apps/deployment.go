@@ -694,17 +694,18 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 	gomega.Expect(rss.Items).Should(gomega.BeEmpty())
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
-	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		pods, err = c.CoreV1().Pods(ns).List(ctx, options)
-		if err != nil {
-			return false, err
-		}
-		// Pods may be created by overlapping deployments right after this deployment is deleted, ignore them
-		if len(pods.Items) == 0 {
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
+	if err = wait.PollUntilContextTimeout(ctx, time.Second, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			pods, err = c.CoreV1().Pods(ns).List(ctx, options)
+			if err != nil {
+				return false, err
+			}
+			// Pods may be created by overlapping deployments right after this deployment is deleted, ignore them
+			if len(pods.Items) == 0 {
+				return true, nil
+			}
+			return false, nil
+		}); err != nil {
 		framework.Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", err, deploymentName, pods)
 	}
 }
@@ -1561,19 +1562,20 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 	var oldRSs []*appsv1.ReplicaSet
 	var d *appsv1.Deployment
 
-	pollErr := wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
-		deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		d = deployment
+	pollErr := wait.PollUntilContextTimeout(context.Background(), poll, 5*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			d = deployment
 
-		_, oldRSs, err = testutil.GetOldReplicaSets(deployment, c)
-		if err != nil {
-			return false, err
-		}
-		return len(oldRSs) == desiredRSNum, nil
-	})
+			_, oldRSs, err = testutil.GetOldReplicaSets(deployment, c)
+			if err != nil {
+				return false, err
+			}
+			return len(oldRSs) == desiredRSNum, nil
+		})
 	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
 		testutil.LogReplicaSetsOfDeployment(d, oldRSs, nil, framework.Logf)
