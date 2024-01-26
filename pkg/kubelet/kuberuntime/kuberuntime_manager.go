@@ -862,14 +862,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// We should not create a sandbox, and just kill the pod if initialization
 		// is done and there is no container to start.
 		if len(containersToStart) == 0 {
-			hasInitialized := false
-			if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-				_, _, hasInitialized = findNextInitContainerToRun(pod, podStatus)
-			} else {
-				// If there is any regular container, it means all init containers have
-				// been initialized.
-				hasInitialized = hasAnyRegularContainerCreated(pod, podStatus)
-			}
+			hasInitialized := IsPodInitialized(pod, podStatus)
 
 			if hasInitialized {
 				changes.CreateSandbox = false

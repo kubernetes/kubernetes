@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"math/rand"
 	"net/url"
 	"os"
@@ -965,6 +964,19 @@ func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStat
 	return false
 }
 
+// IsPodInitialized return true if pod has initialized
+func IsPodInitialized(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	hasInitialized := false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		_, _, hasInitialized = findNextInitContainerToRun(pod, podStatus)
+	} else {
+		// If there is any regular container, it means all init containers have
+		// been initialized.
+		hasInitialized = hasAnyRegularContainerCreated(pod, podStatus)
+	}
+	return hasInitialized
+}
+
 // computeInitContainerActions sets the actions on the given changes that need
 // to be taken for the init containers. This includes actions to initialize the
 // init containers and actions to keep restartable init containers running.
@@ -983,7 +995,35 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 		return true
 	}
 
-	podHasInitialized := util.IsPodInitialized(pod, podStatus)
+	// If any of the main containers have status and are Running, then all init containers must
+	// have been executed at some point in the past.  However, they could have been removed
+	// from the container runtime now, and if we proceed, it would appear as if they
+	// never ran and will re-execute improperly except for the restartable init containers.
+	podHasInitialized := false
+	for _, container := range pod.Spec.Containers {
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil {
+			continue
+		}
+		switch status.State {
+		case kubecontainer.ContainerStateCreated,
+			kubecontainer.ContainerStateRunning:
+			podHasInitialized = true
+		case kubecontainer.ContainerStateExited:
+			// This is a workaround for the issue that the kubelet cannot
+			// differentiate the container statuses of the previous podSandbox
+			// from the current one.
+			// If the node is rebooted, all containers will be in the exited
+			// state and the kubelet will try to recreate a new podSandbox.
+			// In this case, the kubelet should not mistakenly think that
+			// the newly created podSandbox has been initialized.
+		default:
+			// Ignore other states
+		}
+		if podHasInitialized {
+			break
+		}
+	}
 
 	// isPreviouslyInitialized indicates if the current init container is
 	// previously initialized.
