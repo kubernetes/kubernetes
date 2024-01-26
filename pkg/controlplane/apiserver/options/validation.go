@@ -104,8 +104,8 @@ func validateRequestHeaderConfig(options *Options) []error {
 	requestHeaderAllowedNames := options.Authentication.RequestHeader.AllowedNames
 
 	// Enforce 'requestheader-allowed-names' check when 'requestheader-client-ca-file'
-	// and 'client-ca-file' are the same, to prevent unauthorized privilege escalation.
-	if requestHeaderCAFile == clientCAFile && len(requestHeaderAllowedNames) == 0 {
+	// and 'client-ca-file' are the same and not empty, to prevent unauthorized privilege escalation.
+	if requestHeaderCAFile != "" && requestHeaderCAFile == clientCAFile && len(requestHeaderAllowedNames) == 0 {
 		errMsg := fmt.Errorf("when 'requestheader-client-ca-file' and 'client-ca-file' are the same, 'requestheader-allowed-names' must be specified")
 		errs = append(errs, errMsg)
 	}
