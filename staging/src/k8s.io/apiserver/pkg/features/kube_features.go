@@ -247,6 +247,7 @@ const (
 
 	// owner: @tkashem
 	// beta: v1.29
+	// GA: v1.30
 	//
 	// Allow Priority & Fairness in the API server to use a zero value for
 	// the 'nominalConcurrencyShares' field of the 'limited' section of a
@@ -315,5 +316,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 
-	ZeroLimitedNominalConcurrencyShares: {Default: false, PreRelease: featuregate.Beta},
+	ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 }
