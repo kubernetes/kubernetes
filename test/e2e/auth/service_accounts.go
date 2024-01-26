@@ -740,17 +740,18 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			3. Reconciled if modified
 	*/
 	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func(ctx context.Context) {
-		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, rootCAConfigMapName, metav1.GetOptions{})
-			if err == nil {
-				return true, nil
-			}
-			if apierrors.IsNotFound(err) {
-				ginkgo.By("root ca configmap not found, retrying")
-				return false, nil
-			}
-			return false, err
-		}))
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, wait.ForeverTestTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, rootCAConfigMapName, metav1.GetOptions{})
+				if err == nil {
+					return true, nil
+				}
+				if apierrors.IsNotFound(err) {
+					ginkgo.By("root ca configmap not found, retrying")
+					return false, nil
+				}
+				return false, err
+			}))
 		framework.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
 
 		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
