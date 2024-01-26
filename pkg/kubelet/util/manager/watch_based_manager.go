@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -315,7 +316,11 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	if !c.isStopped() {
 		item.restartReflectorIfNeeded()
 	}
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
+	err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true,
+		func(ctx context.Context) (done bool, err error) {
+			return item.hasSynced()
+		})
+	if err != nil {
 		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
 	}
 	obj, exists, err := item.store.GetByKey(c.key(namespace, name))
