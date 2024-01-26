@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -323,4 +324,42 @@ func TestParse(t *testing.T) {
 			t.Errorf("expected string value %q (%v), but got %q (%v)", test.output.StrVal, test.output, value.StrVal, value)
 		}
 	}
+}
+
+func TestIsZero(t *testing.T) {
+	tests := []struct {
+		input    *IntOrString
+		expected bool
+	}{
+		{
+			input:    nil,
+			expected: true,
+		},
+		{
+			input:    ptr.To(FromInt(0)),
+			expected: true,
+		},
+		{
+			input:    ptr.To(FromString("0")),
+			expected: true,
+		},
+		{
+			input:    ptr.To(FromString("0%")),
+			expected: true,
+		},
+		{
+			input:    ptr.To(FromInt(1)),
+			expected: false,
+		},
+		{
+			input:    ptr.To(FromString("1%")),
+			expected: false,
+		},
+	}
+	for i, tc := range tests {
+		if tc.input.IsZero() != tc.expected {
+			t.Errorf("case#%d: expected %v, but got %v for input %s", i, tc.expected, tc.input.IsZero(), tc.input.String())
+		}
+	}
+
 }
