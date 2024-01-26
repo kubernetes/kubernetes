@@ -189,10 +189,16 @@ type crdStorageMap map[types.UID]*crdInfo
 // indicating whether the update gets processed, or timed-out.
 type storageVersionUpdate struct {
 	// processedCh is closed by the storage version manager after the
-	// storage version update gets processed (either succeeded or failed).
+	// storage version update gets processed successfully.
 	// The API server will unblock and allow CR write requests if this
 	// channel is closed.
 	processedCh <-chan struct{}
+
+	// processedCh is closed by the storage version manager when it
+	// encounters an error while trying to update a storage version.
+	// The API server will block the serve 503 for CR write requests if
+	// this channel is closed.
+	errCh <-chan struct{}
 
 	// timeout is the time when the API server will unblock and allow CR
 	// write requests even if the storage version update hasn't been
@@ -218,6 +224,8 @@ func (i *crdInfo) waitForStorageVersionUpdate(ctx context.Context) error {
 	// fail ungracefully (e.g. it may happen if the CRD was deleted immediately after the
 	// first CR request establishes the underlying storage).
 	select {
+	case <-i.storageVersionUpdate.errCh:
+		return fmt.Errorf("error while waiting for CRD storage version update")
 	case <-i.storageVersionUpdate.processedCh:
 		return nil
 	case <-ctx.Done():
@@ -583,8 +591,14 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		processedCh := make(chan struct{})
+		errCh := make(chan struct{})
 		ctx := apirequest.NewContext()
-		r.storageVersionManager.UpdateStorageVersion(ctx, crd, tearDownFinishedCh, processedCh)
+		// customStorageLock will be released even if UpdateStorageVersion() fails. This is safe
+		// since we are deleting the old storage here and not creating a new one.
+		err := r.storageVersionManager.UpdateStorageVersion(ctx, crd, tearDownFinishedCh, processedCh, errCh)
+		if err != nil {
+			klog.Errorf("error updating storage version for %v: %v", crd, err)
+		}
 	}
 }
 
@@ -631,8 +645,12 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		processedCh := make(chan struct{})
+		errCh := make(chan struct{})
 		ctx := apirequest.NewContext()
-		r.storageVersionManager.UpdateStorageVersion(ctx, newCRD, tearDownFinishedCh, processedCh)
+		err := r.storageVersionManager.UpdateStorageVersion(ctx, newCRD, tearDownFinishedCh, processedCh, errCh)
+		if err != nil {
+			klog.Errorf("error updating storage version for %v: %v", newCRD, err)
+		}
 	}
 }
 
@@ -1165,13 +1183,36 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
 
-	if r.storageVersionManager != nil {
-		// spawn storage version update in background and use channels to make handlers wait
-		processedCh := make(chan struct{})
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		var processedCh, errCh chan struct{}
 		ctx := apirequest.NewContext()
-		r.storageVersionManager.UpdateStorageVersion(ctx, crd, nil, processedCh)
+		var retry int
+		retries := 3
+
+		done := false
+		for retry < retries {
+			// spawn storage version update in background and use channels to make handlers wait
+			processedCh = make(chan struct{})
+			errCh = make(chan struct{})
+			err = r.storageVersionManager.UpdateStorageVersion(ctx, crd, nil, processedCh, errCh)
+			select {
+			case <-errCh:
+				klog.Errorf("retry %d, failed to update storage version for %v : %v", retry, crd, err)
+				retry++
+				continue
+			case <-processedCh:
+				done = true
+			}
+
+			if done {
+				break
+			}
+		}
+
 		ret.storageVersionUpdate = &storageVersionUpdate{
 			processedCh: processedCh,
+			errCh:       errCh,
 			timeout:     time.Now().Add(storageVersionUpdateTimeout),
 		}
 	}

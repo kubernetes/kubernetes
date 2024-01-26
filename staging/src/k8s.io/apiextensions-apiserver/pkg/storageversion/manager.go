@@ -18,6 +18,8 @@ package storageversion
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
@@ -26,14 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
-	"k8s.io/klog/v2"
 )
 
 // Manager provides methods for updating StorageVersion for CRDs. It does
 // goroutine management to allow CRD storage version updates running in the
 // background and not blocking the caller.
 type Manager interface {
-	// EnqueueStorageVersionUpdate queues a StorageVesrion update for the given
+	// UpdateStorageVersion updates a StorageVesrion for the given
 	// CRD and returns immediately. Optionally, the caller may specify a
 	// non-nil waitCh and/or a non-nil processedCh.
 	// A non-nil waitCh will block the StorageVersion update until waitCh is
@@ -42,7 +43,7 @@ type Manager interface {
 	// processing the StorageVersion update (note that the update can either
 	// succeeded or failed).
 	UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition,
-		waitCh <-chan struct{}, processedCh chan<- struct{})
+		waitCh <-chan struct{}, processedCh chan<- struct{}, errCh chan<- struct{}) error
 }
 
 // manager implements the Manager interface.
@@ -62,7 +63,7 @@ func NewManager(client genericstorageversion.Client, apiserverID string) Manager
 	}
 }
 
-// UpdateStorageVersion queues a StorageVesrion update for the given
+// UpdateStorageVersion updates a StorageVesrion for the given
 // CRD and returns immediately. Optionally, the caller may specify a
 // non-nil waitCh and/or a non-nil processedCh.
 // A non-nil waitCh will block the StorageVersion update until waitCh is
@@ -71,27 +72,38 @@ func NewManager(client genericstorageversion.Client, apiserverID string) Manager
 // processing the StorageVersion update (note that the update can either
 // succeeded or failed).
 func (m *manager) UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition,
-	waitCh <-chan struct{}, processedCh chan<- struct{}) {
-
-	select {
-	case <-ctx.Done():
-		klog.Errorf("aborted updating CRD storage version update: %v", ctx.Err())
-		return
-	default:
-	}
+	waitCh <-chan struct{}, processedCh chan<- struct{}, errCh chan<- struct{}) error {
 
 	if waitCh != nil {
-		<-waitCh
+		done := false
+		for {
+			select {
+			case <-waitCh:
+				done = true
+			case <-ctx.Done():
+				close(errCh)
+				return fmt.Errorf("aborted updating CRD storage version update: %v", ctx.Err())
+			case <-time.After(1 * time.Minute):
+				close(errCh)
+				return fmt.Errorf("timeout waiting for waitCh to close before proceeding with storageversion update for %v", crd)
+			}
+			if done {
+				break
+			}
+		}
 	}
 
 	if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
 		utilruntime.HandleError(err)
+		close(errCh)
+		return fmt.Errorf("error while updating storage version for crd %v: %v", crd, err)
 	}
 	// close processCh after the update is done
 	if processedCh != nil {
 		close(processedCh)
 	}
 
+	return nil
 }
 
 func (m *manager) updateCRDStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {

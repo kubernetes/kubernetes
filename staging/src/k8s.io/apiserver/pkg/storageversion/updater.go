@@ -25,7 +25,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
 )
 
 // Client has the methods required to update the storage version.
@@ -126,25 +125,13 @@ func setStatusCondition(conditions *[]v1alpha1.StorageVersionCondition, newCondi
 
 // UpdateStorageVersionFor updates the storage version object for the resource.
 func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, servedVersions []string, postProcessFunc processStorageVersionFunc) error {
-	retries := 3
-	var retry int
-	var err error
-	for retry < retries {
-		err = singleUpdate(ctx, c, apiserverID, gr, encodingVersion, decodableVersions, servedVersions, postProcessFunc)
-		if err == nil {
-			return nil
-		}
-		if apierrors.IsAlreadyExists(err) || apierrors.IsConflict(err) {
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		if err != nil {
-			klog.Errorf("retry %d, failed to update storage version for %v: %v", retry, gr, err)
-			retry++
-			time.Sleep(1 * time.Second)
-		}
+	err := singleUpdate(ctx, c, apiserverID, gr, encodingVersion, decodableVersions, servedVersions, postProcessFunc)
+	if err != nil {
+		time.Sleep(1 * time.Second)
+		return err
 	}
-	return err
+
+	return nil
 }
 
 func singleUpdate(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, servedVersions []string, postProcessFunc processStorageVersionFunc) error {
