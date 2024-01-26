@@ -117,10 +117,9 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 		}
 		if limitReached {
 			return probe.Warning, fmt.Sprintf("Non fatal body truncation for %s, Response: %v", url.String(), body), nil
-		} else {
-			klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-			return probe.Success, body, nil
-		}
+		} 
+		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+		return probe.Success, body, nil	
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
 	// Note: Until https://issue.k8s.io/99425 is addressed, this user-facing failure message must not contain the response body.
