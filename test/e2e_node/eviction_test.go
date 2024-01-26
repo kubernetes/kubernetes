@@ -55,6 +55,7 @@ import (
 
 const (
 	postTestConditionMonitoringPeriod = 1 * time.Minute
+	podCreationPeriod                 = 30 * time.Second
 	evictionPollInterval              = 2 * time.Second
 	pressureDisappearTimeout          = 10 * time.Minute
 	// pressure conditions often surface after evictions because the kubelet only updates
@@ -611,7 +612,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
 			ginkgo.By("all pods should be created before evictions")
 			expectedLength := len(testSpecs)
-			gomega.Consistently(ctx, func(ctx context.Context) error {
+			gomega.Eventually(ctx, func(ctx context.Context) error {
 				updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return fmt.Errorf("Error getting pods %v", err)
@@ -621,7 +622,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				} else {
 					return fmt.Errorf("mismatch of expected pods %d with actual pods %d", expectedLength, len(updatedPodList.Items))
 				}
-			}, pressureTimeout, evictionPollInterval).Should(gomega.Succeed())
+			}, podCreationPeriod, evictionPollInterval).Should(gomega.Succeed())
 			ginkgo.By(fmt.Sprintf("Waiting for node to have NodeCondition: %s", expectedNodeCondition))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				logFunc(ctx)
