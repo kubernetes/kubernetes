@@ -413,7 +413,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings, nil)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 

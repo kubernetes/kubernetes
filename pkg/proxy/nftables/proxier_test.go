@@ -106,6 +106,12 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 
 	nft := knftables.NewFake(nftablesFamily, kubeProxyTable)
 
+	var nodeIP net.IP
+	if ipFamily == v1.IPv4Protocol {
+		nodeIP = netutils.ParseIPSloppy(testNodeIP)
+	} else {
+		nodeIP = netutils.ParseIPSloppy(testNodeIPv6)
+	}
 	p := &Proxier{
 		ipFamily:            ipFamily,
 		svcPortMap:          make(proxy.ServicePortMap),
@@ -118,8 +124,8 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		localDetector:       detectLocal,
 		hostname:            testHostname,
 		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
-		nodeIP:              netutils.ParseIPSloppy(testNodeIP),
-		nodePortAddresses:   proxyutil.NewNodePortAddresses(ipFamily, nil),
+		nodeIP:              nodeIP,
+		nodePortAddresses:   proxyutil.NewNodePortAddresses(ipFamily, nil, nodeIP),
 		networkInterfacer:   networkInterfacer,
 		staleChains:         make(map[string]time.Time),
 		serviceCIDRs:        serviceCIDRs,
@@ -304,6 +310,8 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add rule ip kube-proxy masquerading mark set mark xor 0x4000
 		add rule ip kube-proxy masquerading masquerade fully-random
 		add chain ip kube-proxy services
+		add chain ip kube-proxy service-endpoints-check
+		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
 		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
 		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
 		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
@@ -323,12 +331,15 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add rule ip kube-proxy nat-postrouting jump masquerading
 		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
 		add rule ip kube-proxy nat-prerouting jump services
+		add chain ip kube-proxy nodeport-endpoints-check
+		add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
 
 		add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
 		add chain ip kube-proxy cluster-ips-check
 		add rule ip kube-proxy cluster-ips-check ip daddr @cluster-ips reject comment "Reject traffic to invalid ports of ClusterIPs"
 		add rule ip kube-proxy cluster-ips-check ip daddr { 172.30.0.0/16 } drop comment "Drop traffic to unallocated ClusterIPs"
 
+		add set ip kube-proxy nodeport-ips { type ipv4_addr ; comment "IPs that accept NodePort traffic" ; }
 		add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
 		add chain ip kube-proxy firewall-check
 		add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
@@ -339,15 +350,11 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add map ip kube-proxy no-endpoint-services { type ipv4_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
 		add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
 
-		add chain ip kube-proxy nodeport-endpoints-check
-		add rule ip kube-proxy nodeport-endpoints-check ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @no-endpoint-nodeports
-		add chain ip kube-proxy service-endpoints-check
-		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
-
 		add map ip kube-proxy service-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
 		add map ip kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
 		add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
-		add rule ip kube-proxy services fib daddr type local ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @service-nodeports
+		add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
@@ -880,7 +887,7 @@ func TestLoadBalancer(t *testing.T) {
 }
 
 // TestNodePorts tests NodePort services under various combinations of the
-// --nodeport-addresses and --localhost-nodeports flags.
+// --nodeport-addresses flags.
 func TestNodePorts(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -891,10 +898,6 @@ func TestNodePorts(t *testing.T) {
 		// allowAltNodeIP is true if we expect NodePort traffic on the alternate
 		// node IP to be accepted
 		allowAltNodeIP bool
-
-		// expectFirewall is true if we expect firewall to be filled in with
-		// an anti-martian-packet rule
-		expectFirewall bool
 	}{
 		{
 			name: "ipv4",
@@ -902,8 +905,7 @@ func TestNodePorts(t *testing.T) {
 			family:            v1.IPv4Protocol,
 			nodePortAddresses: nil,
 
-			allowAltNodeIP: true,
-			expectFirewall: true,
+			allowAltNodeIP: false,
 		},
 		{
 			name: "ipv4, multiple nodeport-addresses",
@@ -912,7 +914,6 @@ func TestNodePorts(t *testing.T) {
 			nodePortAddresses: []string{"192.168.0.0/24", "192.168.1.0/24", "2001:db8::/64"},
 
 			allowAltNodeIP: true,
-			expectFirewall: false,
 		},
 		{
 			name: "ipv6",
@@ -920,17 +921,15 @@ func TestNodePorts(t *testing.T) {
 			family:            v1.IPv6Protocol,
 			nodePortAddresses: nil,
 
-			allowAltNodeIP: true,
-			expectFirewall: false,
+			allowAltNodeIP: false,
 		},
 		{
 			name: "ipv6, multiple nodeport-addresses",
 
 			family:            v1.IPv6Protocol,
-			nodePortAddresses: []string{"192.168.0.0/24", "192.168.1.0/24", "2001:db8::/64"},
+			nodePortAddresses: []string{"192.168.0.0/24", "192.168.1.0/24", "2001:db8::/64", "2001:db8:1::2/128"},
 
-			allowAltNodeIP: false,
-			expectFirewall: false,
+			allowAltNodeIP: true,
 		},
 	}
 
@@ -939,17 +938,20 @@ func TestNodePorts(t *testing.T) {
 			nft, fp := NewFakeProxier(tc.family)
 
 			var svcIP, epIP1, epIP2 string
+			var nodeIP string
 			if tc.family == v1.IPv4Protocol {
 				svcIP = "172.30.0.41"
 				epIP1 = "10.180.0.1"
 				epIP2 = "10.180.2.1"
+				nodeIP = testNodeIP
 			} else {
 				svcIP = "fd00:172:30::41"
 				epIP1 = "fd00:10:180::1"
 				epIP2 = "fd00:10:180::2:1"
+				nodeIP = testNodeIPv6
 			}
 			if tc.nodePortAddresses != nil {
-				fp.nodePortAddresses = proxyutil.NewNodePortAddresses(tc.family, tc.nodePortAddresses)
+				fp.nodePortAddresses = proxyutil.NewNodePortAddresses(tc.family, tc.nodePortAddresses, netutils.ParseIPSloppy(nodeIP))
 			}
 
 			makeServiceMap(fp,
@@ -989,16 +991,14 @@ func TestNodePorts(t *testing.T) {
 
 			fp.syncProxyRules()
 
-			var podIP, externalClientIP, nodeIP, altNodeIP string
+			var podIP, externalClientIP, altNodeIP string
 			if tc.family == v1.IPv4Protocol {
 				podIP = "10.0.0.2"
 				externalClientIP = testExternalClient
-				nodeIP = testNodeIP
 				altNodeIP = testNodeIPAlt
 			} else {
 				podIP = "fd00:10::2"
 				externalClientIP = "2600:5200::1"
-				nodeIP = testNodeIPv6
 				altNodeIP = testNodeIPv6Alt
 			}
 			output := net.JoinHostPort(epIP1, "80") + ", " + net.JoinHostPort(epIP2, "80")
@@ -1031,8 +1031,6 @@ func TestNodePorts(t *testing.T) {
 				},
 			})
 
-			// NodePort on altNodeIP should be allowed, unless
-			// nodePortAddressess excludes altNodeIP
 			if tc.allowAltNodeIP {
 				runPacketFlowTests(t, getLine(), nft, testNodeIPs, []packetFlowTest{
 					{
@@ -3981,13 +3979,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy nat-output jump services
 		add rule ip kube-proxy nat-postrouting jump masquerading
 		add rule ip kube-proxy nat-prerouting jump services
-		add rule ip kube-proxy nodeport-endpoints-check ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @no-endpoint-nodeports
+		add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
 		add rule ip kube-proxy reject-chain reject
 		add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
-		add rule ip kube-proxy services fib daddr type local ip daddr != 127.0.0.0/8 meta l4proto . th dport vmap @service-nodeports
-		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
-
+		add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
 		add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
+		add set ip kube-proxy nodeport-ips { type ipv4_addr ; comment "IPs that accept NodePort traffic" ; }
+		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
 
 		add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
 		add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
@@ -4059,6 +4057,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
 
@@ -4111,6 +4110,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
@@ -4144,6 +4144,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
@@ -4172,6 +4173,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
@@ -4208,6 +4210,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
@@ -4247,6 +4250,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4285,6 +4289,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4326,6 +4331,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4365,6 +4371,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy no-endpoint-services { 172.30.0.43 . tcp . 80 comment "ns3/svc3:p80" : goto reject-chain }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4400,6 +4407,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
