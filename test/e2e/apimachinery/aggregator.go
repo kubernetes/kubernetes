@@ -732,7 +732,10 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.ExpectNoError(err, "Unable to delete apiservice %s", apiServiceName)
 
 	ginkgo.By("Confirm that the generated APIService has been deleted")
-	err = wait.PollImmediate(apiServiceRetryPeriod, apiServiceRetryTimeout, checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0))
+	err = wait.PollUntilContextTimeout(ctx, apiServiceRetryPeriod, apiServiceRetryTimeout, true,
+		func(ctx context.Context) (done bool, err error) {
+			return checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0)()
+		})
 	framework.ExpectNoError(err, "failed to count the required APIServices")
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
 
