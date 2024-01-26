@@ -3287,25 +3287,18 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			},
 			previousStatus: []v1.ContainerStatus{},
 			containers:     desiredStateWithInitContainer.InitContainers,
-			expected: func() []v1.ContainerStatus {
-				if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-					return []v1.ContainerStatus{
-						waitingWithLastTerminationUnknown("init-1", 0),
-					}
-				}
-				return []v1.ContainerStatus{
-					{
-						Name: "init-1",
-						State: v1.ContainerState{
-							Terminated: &v1.ContainerStateTerminated{
-								Reason:   "Completed",
-								Message:  "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
-								ExitCode: 0,
-							},
+			expected: []v1.ContainerStatus{
+				{
+					Name: "init-1",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							Reason:   "Completed",
+							Message:  "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
+							ExitCode: 0,
 						},
 					},
-				}
-			}(),
+				},
+			},
 			hasInitContainers: true,
 			isInitContainer:   true,
 		},
