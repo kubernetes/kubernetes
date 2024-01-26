@@ -911,15 +911,16 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			// updating the ResourceClaim status, we assume that reserving
 			// will work and only do it for real during binding. If it fails at
 			// that time, some other pod was faster and we have to try again.
-		} else {
-			// Must be delayed allocation.
-			numDelayedAllocationPending++
+			continue
+		}
 
-			// Did the driver provide information that steered node
-			// selection towards a node that it can support?
-			if statusForClaim(state.podSchedulingState.schedulingCtx, pod.Spec.ResourceClaims[index].Name) != nil {
-				numClaimsWithStatusInfo++
-			}
+		// Must be delayed allocation.
+		numDelayedAllocationPending++
+
+		// Did the driver provide information that steered node
+		// selection towards a node that it can support?
+		if statusForClaim(state.podSchedulingState.schedulingCtx, pod.Spec.ResourceClaims[index].Name) != nil {
+			numClaimsWithStatusInfo++
 		}
 	}
 
