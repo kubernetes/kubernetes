@@ -100,7 +100,7 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 	}
 	defer res.Body.Close()
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
-	var limitReached = false
+	var limitReached bool
 	if err != nil {
 		if err == utilio.ErrLimitReached {
 			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
