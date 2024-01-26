@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -179,19 +180,20 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host)
 	// The device is unmounted now. If UnmountDevice was retried, GetDeviceNameFromMount
 	// won't find any mount and won't return DetachDisk below.
-	// Therefore implement our own retry mechanism here.
+	// Therefore, implement our own retry mechanism here.
 	// E.g. DetachDisk sometimes fails to flush a multipath device with "device is busy" when it was
 	// just unmounted.
 	// 2 minutes should be enough within 6 minute force detach timeout.
 	var detachError error
-	err = wait.PollImmediate(10*time.Second, 2*time.Minute, func() (bool, error) {
-		detachError = detacher.manager.DetachDisk(*unMounter, devName)
-		if detachError != nil {
-			klog.V(4).Infof("fc: failed to detach disk %s (%s): %v", devName, deviceMountPath, detachError)
-			return false, nil
-		}
-		return true, nil
-	})
+	err = wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			detachError = detacher.manager.DetachDisk(*unMounter, devName)
+			if detachError != nil {
+				klog.V(4).Infof("fc: failed to detach disk %s (%s): %v", devName, deviceMountPath, detachError)
+				return false, nil
+			}
+			return true, nil
+		})
 	if err != nil {
 		return fmt.Errorf("fc: failed to detach disk: %s: %v", devName, detachError)
 	}
