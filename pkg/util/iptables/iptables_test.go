@@ -21,6 +21,7 @@ package iptables
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -1125,14 +1126,15 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 
 	var runLock *net.UnixListener
 	// Grab the abstract @xtables socket, will retry if the socket exists
-	err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
-		runLock, err = net.ListenUnix("unix", &net.UnixAddr{Name: lockPath14x, Net: "unix"})
-		if err != nil {
-			t.Logf("Failed to lock %s: %v, will retry.", lockPath14x, err)
-			return false, nil
-		}
-		return true, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, wait.ForeverTestTimeout, true,
+		func(ctx context.Context) (done bool, err error) {
+			runLock, err = net.ListenUnix("unix", &net.UnixAddr{Name: lockPath14x, Net: "unix"})
+			if err != nil {
+				t.Logf("Failed to lock %s: %v, will retry.", lockPath14x, err)
+				return false, nil
+			}
+			return true, nil
+		})
 	if err != nil {
 		t.Fatalf("Timed out locking %s", lockPath14x)
 	}
