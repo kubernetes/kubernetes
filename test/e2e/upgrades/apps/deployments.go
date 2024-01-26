@@ -177,14 +177,15 @@ func (t *DeploymentUpgradeTest) Teardown(ctx context.Context, f *framework.Frame
 
 // waitForDeploymentRevision waits for becoming the target revision of a delopyment.
 func waitForDeploymentRevision(ctx context.Context, c clientset.Interface, d *appsv1.Deployment, targetRevision string) error {
-	err := wait.PollImmediate(poll, pollLongTimeout, func() (bool, error) {
-		deployment, err := c.AppsV1().Deployments(d.Namespace).Get(ctx, d.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		revision := deployment.Annotations[deploymentutil.RevisionAnnotation]
-		return revision == targetRevision, nil
-	})
+	err := wait.PollUntilContextTimeout(ctx, poll, pollLongTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			deployment, err := c.AppsV1().Deployments(d.Namespace).Get(ctx, d.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			revision := deployment.Annotations[deploymentutil.RevisionAnnotation]
+			return revision == targetRevision, nil
+		})
 	if err != nil {
 		return fmt.Errorf("error waiting for revision to become %q for deployment %q: %w", targetRevision, d.Name, err)
 	}
