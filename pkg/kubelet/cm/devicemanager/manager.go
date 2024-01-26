@@ -74,10 +74,10 @@ type ManagerImpl struct {
 	// allDevices holds all the devices currently registered to the device manager
 	allDevices ResourceDeviceInstances
 
-	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
+	// healthyDevices contains all the registered healthy resourceNames and their exported device IDs.
 	healthyDevices map[string]sets.Set[string]
 
-	// unhealthyDevices contains all of the unhealthy devices and their exported device IDs.
+	// unhealthyDevices contains all the unhealthy devices and their exported device IDs.
 	unhealthyDevices map[string]sets.Set[string]
 
 	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
@@ -90,7 +90,7 @@ type ManagerImpl struct {
 	// List of NUMA Nodes available on the underlying machine
 	numaNodes []int
 
-	// Store of Topology Affinties that the Device Manager can query.
+	// Store of Topology Affinities that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
 
 	// devicesToReuse contains devices that can be reused as they have been allocated to
@@ -576,7 +576,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	//    note: if we get this far the runtime is surely running. This is usually enforced at OS level by startup system services dependencies.
 
 	// First we take care of the exceptional flow (scenarios 2 and 3). In both flows, kubelet is reinitializing, and while kubelet is initializing, sources are NOT all ready.
-	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the informations we got for runtime. If we are asked to allocate devices for containers reported
+	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
 	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
 	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
 	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(podUID, contName) {
@@ -676,7 +676,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	}
 
 	// If we can't allocate all remaining devices from the set of aligned ones,
-	// then start by first allocating all of the  aligned devices (to ensure
+	// then start by first allocating all the aligned devices (to ensure
 	// that the alignment guaranteed by the TopologyManager is honored).
 	if allocateRemainingFrom(aligned) {
 		return allocated, nil
@@ -734,7 +734,7 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 		}
 	}
 
-	// Get a flat list of all of the nodes associated with available devices.
+	// Get a flat list of all the nodes associated with available devices.
 	var nodes []int
 	for node := range perNodeDevices {
 		nodes = append(nodes, node)
