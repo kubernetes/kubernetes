@@ -29,13 +29,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danwinship/knftables"
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	netutils "k8s.io/utils/net"
+	"sigs.k8s.io/knftables"
 )
 
 // getLine returns a string containing the file and line number of the caller, if

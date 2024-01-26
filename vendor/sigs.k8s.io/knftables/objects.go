@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Red Hat, Inc.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,10 +57,17 @@ func (table *Table) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 
 // Object implementation for Chain
 func (chain *Chain) validate(verb verb) error {
-	if chain.Hook == nil && (chain.Type != nil || chain.Priority != nil) {
-		return fmt.Errorf("regular chain %q must not specify Type or Priority", chain.Name)
-	} else if chain.Hook != nil && (chain.Type == nil || chain.Priority == nil) {
-		return fmt.Errorf("base chain %q must specify Type and Priority", chain.Name)
+	if chain.Hook == nil {
+		if chain.Type != nil || chain.Priority != nil {
+			return fmt.Errorf("regular chain %q must not specify Type or Priority", chain.Name)
+		}
+		if chain.Device != nil {
+			return fmt.Errorf("regular chain %q must not specify Device", chain.Name)
+		}
+	} else {
+		if chain.Type == nil || chain.Priority == nil {
+			return fmt.Errorf("base chain %q must specify Type and Priority", chain.Name)
+		}
 	}
 
 	switch verb {
@@ -95,14 +102,19 @@ func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 			fmt.Fprintf(writer, " {")
 
 			if chain.Type != nil {
+				fmt.Fprintf(writer, " type %s hook %s", *chain.Type, *chain.Hook)
+				if chain.Device != nil {
+					fmt.Fprintf(writer, " device %q", *chain.Device)
+				}
+
 				// Parse the priority to a number if we can, because older
 				// versions of nft don't accept certain named priorities
 				// in all contexts (eg, "dstnat" priority in the "output"
 				// hook).
 				if priority, err := ParsePriority(ctx.family, string(*chain.Priority)); err == nil {
-					fmt.Fprintf(writer, " type %s hook %s priority %d ;", *chain.Type, *chain.Hook, priority)
+					fmt.Fprintf(writer, " priority %d ;", priority)
 				} else {
-					fmt.Fprintf(writer, " type %s hook %s priority %s ;", *chain.Type, *chain.Hook, *chain.Priority)
+					fmt.Fprintf(writer, " priority %s ;", *chain.Priority)
 				}
 			}
 			if chain.Comment != nil && !ctx.noObjectComments {

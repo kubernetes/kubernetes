@@ -36,8 +36,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/danwinship/knftables"
-
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,6 +55,7 @@ import (
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/knftables"
 )
 
 const (

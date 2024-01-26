@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danwinship/knftables"
 	"github.com/lithammer/dedent"
 	"github.com/stretchr/testify/assert"
 
@@ -50,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/knftables"
 )
 
 // Conventions for tests using NewFakeProxier:

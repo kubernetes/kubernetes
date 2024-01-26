@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Red Hat, Inc.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -67,9 +67,9 @@ const (
 
 // Table represents an nftables table.
 type Table struct {
-	// Comment is an optional comment for the table. (Note that this can be specified
-	// on creation, but depending on the version of /sbin/nft that is available, it
-	// may not be filled in correctly in the result of a List.)
+	// Comment is an optional comment for the table. (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
+	// nft >= 1.0.8 to include comments in List() results.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
@@ -77,7 +77,8 @@ type Table struct {
 	Handle *int
 }
 
-// BaseChainType represents the "type" of a "base chain" (ie, a chain that is attached to a hook)
+// BaseChainType represents the "type" of a "base chain" (ie, a chain that is attached to a hook).
+// See https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_types
 type BaseChainType string
 
 const (
@@ -93,24 +94,52 @@ const (
 	RouteType BaseChainType = "route"
 )
 
-// BaseChainHook represents the "hook" that a base chain is attached to
+// BaseChainHook represents the "hook" that a base chain is attached to.
+// See https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_hooks
+// and https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks
 type BaseChainHook string
 
-// FIXME: document these correctly; virtually all of the existing iptables/nftables
-// documentation is slightly wrong, particular wrt locally-generated packets.
 const (
-	PreroutingHook  BaseChainHook = "prerouting"
-	InputHook       BaseChainHook = "input"
-	ForwardHook     BaseChainHook = "forward"
-	OutputHook      BaseChainHook = "output"
+	// PreroutingHook is the "prerouting" stage of packet processing, which is the
+	// first stage (after "ingress") for inbound ("input path" and "forward path")
+	// packets.
+	PreroutingHook BaseChainHook = "prerouting"
+
+	// InputHook is the "input" stage of packet processing, which happens after
+	// "prerouting" for inbound packets being delivered to an interface on this host,
+	// in this network namespace.
+	InputHook BaseChainHook = "input"
+
+	// ForwardHook is the "forward" stage of packet processing, which happens after
+	// "prerouting" for inbound packets destined for a non-local IP (i.e. on another
+	// host or in another network namespace)
+	ForwardHook BaseChainHook = "forward"
+
+	// OutputHook is the "output" stage of packet processing, which is the first stage
+	// for outbound packets, regardless of their final destination.
+	OutputHook BaseChainHook = "output"
+
+	// PostroutingHook is the "postrouting" stage of packet processing, which is the
+	// final stage (before "egress") for outbound ("forward path" and "output path")
+	// packets.
 	PostroutingHook BaseChainHook = "postrouting"
-	IngressHook     BaseChainHook = "ingress"
-	EgressHook      BaseChainHook = "egress"
+
+	// IngressHook is the "ingress" stage of packet processing, in the "netdev" family
+	// or (with kernel >= 5.10 and nft >= 0.9.7) the "inet" family.
+	IngressHook BaseChainHook = "ingress"
+
+	// EgressHook is the "egress" stage of packet processing, in the "netdev" family
+	// (with kernel >= 5.16 and nft >= 1.0.1).
+	EgressHook BaseChainHook = "egress"
 )
 
-// BaseChainPriority represents the "priority" of a base chain. In addition to the const
-// values, you can also use a signed integer value, or an arithmetic expression consisting
-// of a const value followed by "+" or "-" and an integer. Lower values run earlier.
+// BaseChainPriority represents the "priority" of a base chain. Lower values run earlier.
+// See https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_priority
+// and https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks#Priority_within_hook
+//
+// In addition to the const values, you can also use a signed integer value, or an
+// arithmetic expression consisting of a const value followed by "+" or "-" and an
+// integer.
 type BaseChainPriority string
 
 const (
@@ -166,7 +195,14 @@ type Chain struct {
 	// a regular chain. You can call ParsePriority() to convert this to a number.
 	Priority *BaseChainPriority
 
-	// Comment is an optional comment for the object.
+	// Device is the network interface that the chain is attached to; this must be set
+	// for a base chain connected to the "ingress" or "egress" hooks, and unset for
+	// all other chains.
+	Device *string
+
+	// Comment is an optional comment for the object.  (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
+	// nft >= 1.0.8 to include comments in List() results.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
@@ -243,7 +279,8 @@ type Set struct {
 	Type string
 
 	// TypeOf is the type of the set key as an nftables expression (eg "ip saddr").
-	// Either Type or TypeOf, but not both, must be non-empty.
+	// Either Type or TypeOf, but not both, must be non-empty. (Requires at least nft
+	// 0.9.4, and newer than that for some types.)
 	TypeOf string
 
 	// Flags are the set flags
@@ -268,7 +305,8 @@ type Set struct {
 	// together (only for interval sets)
 	AutoMerge *bool
 
-	// Comment is an optional comment for the object.
+	// Comment is an optional comment for the object.  (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
@@ -286,7 +324,8 @@ type Map struct {
 	Type string
 
 	// TypeOf is the type of the set key as an nftables expression (eg "ip saddr : verdict").
-	// Either Type or TypeOf, but not both, must be non-empty.
+	// Either Type or TypeOf, but not both, must be non-empty. (Requires at least nft 0.9.4,
+	// and newer than that for some types.)
 	TypeOf string
 
 	// Flags are the map flags
@@ -307,7 +346,8 @@ type Map struct {
 	// Policy is the FIXME
 	Policy *SetPolicy
 
-	// Comment is an optional comment for the object.
+	// Comment is an optional comment for the object.  (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
