@@ -46,6 +46,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -387,17 +388,17 @@ func TestParseIPTablesData(t *testing.T) {
 	}
 }
 
-func countRules(tableName utiliptables.Table, ruleData string) int {
+func countRules(logger klog.Logger, tableName utiliptables.Table, ruleData string) int {
 	dump, err := iptablestest.ParseIPTablesDump(ruleData)
 	if err != nil {
-		klog.ErrorS(err, "error parsing iptables rules")
+		logger.Error(err, "error parsing iptables rules")
 		return -1
 	}
 
 	rules := 0
 	table, err := dump.GetTable(tableName)
 	if err != nil {
-		klog.ErrorS(err, "can't find table", "table", tableName)
+		logger.Error(err, "can't find table", "table", tableName)
 		return -1
 	}
 
@@ -407,19 +408,19 @@ func countRules(tableName utiliptables.Table, ruleData string) int {
 	return rules
 }
 
-func countRulesFromMetric(tableName utiliptables.Table) int {
+func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table) int {
 	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(tableName)))
 	if err != nil {
-		klog.ErrorS(err, "metrics are not registered?")
+		logger.Error(err, "metrics are not registered?")
 		return -1
 	}
 	return int(numRulesFloat)
 }
 
-func countRulesFromLastSyncMetric(tableName utiliptables.Table) int {
+func countRulesFromLastSyncMetric(logger klog.Logger, tableName utiliptables.Table) int {
 	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesLastSync.WithLabelValues(string(tableName)))
 	if err != nil {
-		klog.ErrorS(err, "metrics are not registered?")
+		logger.Error(err, "metrics are not registered?")
 		return -1
 	}
 	return int(numRulesFloat)
@@ -1540,6 +1541,7 @@ func TestTracePacket(t *testing.T) {
 // TestOverallIPTablesRules creates a variety of services and verifies that the generated
 // rules are exactly as expected.
 func TestOverallIPTablesRules(t *testing.T) {
+	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	metrics.RegisterMetrics()
@@ -1799,8 +1801,8 @@ func TestOverallIPTablesRules(t *testing.T) {
 
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	nNatRules := countRulesFromMetric(utiliptables.TableNAT)
-	expectedNatRules := countRules(utiliptables.TableNAT, fp.iptablesData.String())
+	nNatRules := countRulesFromMetric(logger, utiliptables.TableNAT)
+	expectedNatRules := countRules(logger, utiliptables.TableNAT, fp.iptablesData.String())
 
 	if nNatRules != expectedNatRules {
 		t.Fatalf("Wrong number of nat rules: expected %d received %d", expectedNatRules, nNatRules)
@@ -4142,6 +4144,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 }
 
 func TestProxierMetricsIptablesTotalRules(t *testing.T) {
+	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 
@@ -4170,15 +4173,15 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData := fp.iptablesData.String()
 
-	nFilterRules := countRulesFromMetric(utiliptables.TableFilter)
-	expectedFilterRules := countRules(utiliptables.TableFilter, iptablesData)
+	nFilterRules := countRulesFromMetric(logger, utiliptables.TableFilter)
+	expectedFilterRules := countRules(logger, utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRules := countRulesFromMetric(utiliptables.TableNAT)
-	expectedNatRules := countRules(utiliptables.TableNAT, iptablesData)
+	nNatRules := countRulesFromMetric(logger, utiliptables.TableNAT)
+	expectedNatRules := countRules(logger, utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
 		t.Fatalf("Wrong number of nat rules: expected %d got %d\n%s", expectedNatRules, nNatRules, iptablesData)
@@ -4203,15 +4206,15 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData = fp.iptablesData.String()
 
-	nFilterRules = countRulesFromMetric(utiliptables.TableFilter)
-	expectedFilterRules = countRules(utiliptables.TableFilter, iptablesData)
+	nFilterRules = countRulesFromMetric(logger, utiliptables.TableFilter)
+	expectedFilterRules = countRules(logger, utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRules = countRulesFromMetric(utiliptables.TableNAT)
-	expectedNatRules = countRules(utiliptables.TableNAT, iptablesData)
+	nNatRules = countRulesFromMetric(logger, utiliptables.TableNAT)
+	expectedNatRules = countRules(logger, utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
 		t.Fatalf("Wrong number of nat rules: expected %d got %d\n%s", expectedNatRules, nNatRules, iptablesData)
@@ -5822,6 +5825,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 
 // Test calling syncProxyRules() multiple times with various changes
 func TestSyncProxyRulesRepeated(t *testing.T) {
+	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	metrics.RegisterMetrics()
@@ -5920,14 +5924,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	rulesSynced := countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric := countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced := countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric := countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	rulesTotal := rulesSynced
-	rulesTotalMetric := countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric := countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -5998,8 +6002,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6007,7 +6011,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We added 1 KUBE-SERVICES rule, 2 KUBE-SVC-X27LE4BHSL4DOUIK rules, and 2
 	// KUBE-SEP-BSWRHOQ77KEXZLNL rules.
 	rulesTotal += 5
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6049,8 +6053,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6058,7 +6062,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We deleted 1 KUBE-SERVICES rule, 2 KUBE-SVC-2VJB64SDSIJUP5T6 rules, and 2
 	// KUBE-SEP-UHEGFW77JX3KXTOV rules
 	rulesTotal -= 5
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6109,15 +6113,15 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	// The REJECT rule is in "filter", not NAT, so the number of NAT rules hasn't
 	// changed.
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6172,8 +6176,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6181,7 +6185,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We added 1 KUBE-SERVICES rule, 2 KUBE-SVC-4SW47YFZTEDKD3PK rules, and
 	// 2 KUBE-SEP-AYCN5HPXMIRJNJXU rules
 	rulesTotal += 5
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6231,14 +6235,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	// We rewrote existing rules but did not change the overall number of rules.
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6289,8 +6293,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6299,7 +6303,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// jumping to the new SEP chain. The other rules related to svc3 got rewritten,
 	// but that does not change the count of rules.
 	rulesTotal += 3
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6337,14 +6341,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	// (No changes)
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6447,8 +6451,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	rulesSynced = countRules(utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6456,7 +6460,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We deleted 1 KUBE-SERVICES rule, 2 KUBE-SVC-4SW47YFZTEDKD3PK rules, and 2
 	// KUBE-SEP-AYCN5HPXMIRJNJXU rules
 	rulesTotal -= 5
-	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}

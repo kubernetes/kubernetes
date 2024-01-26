@@ -105,6 +105,7 @@ const (
 
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
 func NewDualStackProxier(
+	ctx context.Context,
 	sysctl utilsysctl.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
@@ -119,14 +120,14 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, sysctl,
+	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol, sysctl,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
 		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, sysctl,
+	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol, sysctl,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
 		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
@@ -189,6 +190,8 @@ type Proxier struct {
 	// serviceCIDRs is a comma separated list of ServiceCIDRs belonging to the IPFamily
 	// which proxier is operating on, can be directly consumed by knftables.
 	serviceCIDRs string
+
+	logger klog.Logger
 }
 
 // Proxier implements proxy.Provider
@@ -197,7 +200,8 @@ var _ proxy.Provider = &Proxier{}
 // NewProxier returns a new nftables Proxier. Once a proxier is created, it will keep
 // nftables up to date in the background and will not terminate if a particular nftables
 // call fails.
-func NewProxier(ipFamily v1.IPFamily,
+func NewProxier(ctx context.Context,
+	ipFamily v1.IPFamily,
 	sysctl utilsysctl.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
@@ -211,15 +215,17 @@ func NewProxier(ipFamily v1.IPFamily,
 	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
+
 	if initOnly {
-		klog.InfoS("System initialized and --init-only specified")
+		logger.Info("System initialized and --init-only specified")
 		return nil, nil
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
-	klog.V(2).InfoS("Using nftables mark for masquerade", "ipFamily", ipFamily, "mark", masqueradeMark)
+	logger.V(2).Info("Using nftables mark for masquerade", "mark", masqueradeMark)
 
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
@@ -256,10 +262,11 @@ func NewProxier(ipFamily v1.IPFamily,
 		nodePortAddresses:   nodePortAddresses,
 		networkInterfacer:   proxyutil.RealNetwork{},
 		staleChains:         make(map[string]time.Time),
+		logger:              logger,
 	}
 
 	burstSyncs := 2
-	klog.V(2).InfoS("NFTables sync params", "ipFamily", ipFamily, "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
+	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 
 	return proxier, nil
@@ -516,11 +523,11 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		})
 		nodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
 		if err != nil {
-			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
+			proxier.logger.Error(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 		}
 		for _, ip := range nodeIPs {
 			if ip.IsLoopback() {
-				klog.ErrorS(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported", "address", ip.String())
+				proxier.logger.Error(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported", "address", ip.String())
 				continue
 			}
 			tx.Add(&knftables.Element{
@@ -642,7 +649,8 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 
 // CleanupLeftovers removes all nftables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
-func CleanupLeftovers() bool {
+func CleanupLeftovers(ctx context.Context) bool {
+	logger := klog.FromContext(ctx)
 	var encounteredError bool
 
 	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
@@ -650,10 +658,10 @@ func CleanupLeftovers() bool {
 		if err == nil {
 			tx := nft.NewTransaction()
 			tx.Delete(&knftables.Table{})
-			err = nft.Run(context.TODO(), tx)
+			err = nft.Run(ctx, tx)
 		}
 		if err != nil && !knftables.IsNotFound(err) {
-			klog.ErrorS(err, "Error cleaning up nftables rules")
+			logger.Error(err, "Error cleaning up nftables rules")
 			encounteredError = true
 		}
 	}
@@ -767,7 +775,7 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 // is observed.
 func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
+		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
 			"eventNode", node.Name, "currentNode", proxier.hostname)
 		return
 	}
@@ -782,7 +790,7 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 		proxier.nodeLabels[k] = v
 	}
 	proxier.mu.Unlock()
-	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
+	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
 
 	proxier.Sync()
 }
@@ -791,7 +799,7 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 // node object is observed.
 func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
+		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
 			"eventNode", node.Name, "currentNode", proxier.hostname)
 		return
 	}
@@ -806,7 +814,7 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 		proxier.nodeLabels[k] = v
 	}
 	proxier.mu.Unlock()
-	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
+	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
 
 	proxier.Sync()
 }
@@ -815,7 +823,7 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 // object is observed.
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	if node.Name != proxier.hostname {
-		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node",
+		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
 			"eventNode", node.Name, "currentNode", proxier.hostname)
 		return
 	}
@@ -974,7 +982,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// don't sync rules till we've received services and endpoints
 	if !proxier.isInitialized() {
-		klog.V(2).InfoS("Not syncing nftables until Services and Endpoints have been received from master")
+		proxier.logger.V(2).Info("Not syncing nftables until Services and Endpoints have been received from master")
 		return
 	}
 
@@ -986,18 +994,18 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		klog.V(2).InfoS("SyncProxyRules complete", "elapsed", time.Since(start))
+		proxier.logger.V(2).Info("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()
 
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	klog.V(2).InfoS("Syncing nftables rules")
+	proxier.logger.V(2).Info("Syncing nftables rules")
 
 	success := false
 	defer func() {
 		if !success {
-			klog.InfoS("Sync failed", "retryingTime", proxier.syncPeriod)
+			proxier.logger.Info("Sync failed", "retryingTime", proxier.syncPeriod)
 			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
 		}
 	}()
@@ -1018,13 +1026,13 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 		if deleted > 0 {
-			klog.InfoS("Deleting stale nftables chains", "numChains", deleted)
+			proxier.logger.Info("Deleting stale nftables chains", "numChains", deleted)
 			err := proxier.nftables.Run(context.TODO(), tx)
 			if err != nil {
 				// We already deleted the entries from staleChains, but if
 				// the chains still exist, they'll just get added back
 				// (with a later timestamp) at the end of the sync.
-				klog.ErrorS(err, "Unable to delete stale chains; will retry later")
+				proxier.logger.Error(err, "Unable to delete stale chains; will retry later")
 				// FIXME: metric
 			}
 		}
@@ -1082,7 +1090,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*servicePortInfo)
 		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
+			proxier.logger.Error(nil, "Failed to cast serviceInfo", "serviceName", svcName)
 			continue
 		}
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
@@ -1477,7 +1485,7 @@ func (proxier *Proxier) syncProxyRules() {
 			for _, ep := range allLocallyReachableEndpoints {
 				epInfo, ok := ep.(*endpointInfo)
 				if !ok {
-					klog.ErrorS(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
+					proxier.logger.Error(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
 					continue
 				}
 
@@ -1525,7 +1533,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, ep := range allLocallyReachableEndpoints {
 			epInfo, ok := ep.(*endpointInfo)
 			if !ok {
-				klog.ErrorS(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
+				proxier.logger.Error(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
 				continue
 			}
 
@@ -1583,7 +1591,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 	} else if !knftables.IsNotFound(err) {
-		klog.ErrorS(err, "Failed to list nftables chains: stale chains will not be deleted")
+		proxier.logger.Error(err, "Failed to list nftables chains: stale chains will not be deleted")
 	}
 
 	// OTOH, we can immediately delete any stale affinity sets
@@ -1597,11 +1605,11 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 	} else if !knftables.IsNotFound(err) {
-		klog.ErrorS(err, "Failed to list nftables sets: stale affinity sets will not be deleted")
+		proxier.logger.Error(err, "Failed to list nftables sets: stale affinity sets will not be deleted")
 	}
 
 	// Sync rules.
-	klog.V(2).InfoS("Reloading service nftables data",
+	proxier.logger.V(2).Info("Reloading service nftables data",
 		"numServices", len(proxier.svcPortMap),
 		"numEndpoints", totalEndpoints,
 	)
@@ -1611,7 +1619,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	err = proxier.nftables.Run(context.TODO(), tx)
 	if err != nil {
-		klog.ErrorS(err, "nftables sync failed")
+		proxier.logger.Error(err, "nftables sync failed")
 		metrics.IptablesRestoreFailuresTotal.Inc()
 		return
 	}
@@ -1621,7 +1629,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
 			latency := metrics.SinceInSeconds(lastChangeTriggerTime)
 			metrics.NetworkProgrammingLatency.Observe(latency)
-			klog.V(4).InfoS("Network programming", "endpoint", klog.KRef(name.Namespace, name.Name), "elapsed", latency)
+			proxier.logger.V(4).Info("Network programming", "endpoint", klog.KRef(name.Namespace, name.Name), "elapsed", latency)
 		}
 	}
 
@@ -1636,10 +1644,10 @@ func (proxier *Proxier) syncProxyRules() {
 	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
 	// will just drop those endpoints.
 	if err := proxier.serviceHealthServer.SyncServices(proxier.svcPortMap.HealthCheckNodePorts()); err != nil {
-		klog.ErrorS(err, "Error syncing healthcheck services")
+		proxier.logger.Error(err, "Error syncing healthcheck services")
 	}
 	if err := proxier.serviceHealthServer.SyncEndpoints(proxier.endpointsMap.LocalReadyEndpoints()); err != nil {
-		klog.ErrorS(err, "Error syncing healthcheck endpoints")
+		proxier.logger.Error(err, "Error syncing healthcheck endpoints")
 	}
 
 	// Finish housekeeping, clear stale conntrack entries for UDP Services
