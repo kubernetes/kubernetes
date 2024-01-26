@@ -806,7 +806,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			if err := state.updateClaimStatus(ctx, pl.clientset, index, claim); err != nil {
 				return nil, statusError(logger, err)
 			}
-			return nil, nil
+			return nil, framework.NewStatus(framework.Unschedulable, "deallocation of ResourceClaim completed")
 		}
 	}
 	return nil, framework.NewStatus(framework.Unschedulable, "still not schedulable")
