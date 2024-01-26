@@ -96,8 +96,9 @@ type WaitFlags struct {
 	PrintFlags           *genericclioptions.PrintFlags
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 
-	Timeout      time.Duration
-	ForCondition string
+	Timeout         time.Duration
+	ForCondition    string
+	WaitForCreation bool
 
 	genericiooptions.IOStreams
 }
@@ -152,6 +153,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
 	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
+	cmd.Flags().BoolVar(&flags.WaitForCreation, "wait-for-creation", flags.WaitForCreation, "Default behavior of wait command errors out when the resource does not exist. If this flag is specified, command also waits the creation of the resource, in case it doesn't exist.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -161,6 +163,10 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		return nil, err
 	}
 	builder := flags.ResourceBuilderFlags.ToBuilder(flags.RESTClientGetter, args)
+	var creationCheckerBuilder genericclioptions.ResourceFinder
+	if flags.WaitForCreation {
+		creationCheckerBuilder = flags.ResourceBuilderFlags.ToBuilder(flags.RESTClientGetter, args)
+	}
 	clientConfig, err := flags.RESTClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -180,10 +186,12 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	}
 
 	o := &WaitOptions{
-		ResourceFinder: builder,
-		DynamicClient:  dynamicClient,
-		Timeout:        effectiveTimeout,
-		ForCondition:   flags.ForCondition,
+		ResourceFinder:        builder,
+		DynamicClient:         dynamicClient,
+		Timeout:               effectiveTimeout,
+		ForCondition:          flags.ForCondition,
+		WaitForCreation:       flags.WaitForCreation,
+		CreationCheckerFinder: creationCheckerBuilder,
 
 		Printer:     printer,
 		ConditionFn: conditionFn,
@@ -299,13 +307,15 @@ type UIDMap map[ResourceLocation]types.UID
 // WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
 // command, making the logic itself easy to unit test with our existing mocks.
 type WaitOptions struct {
-	ResourceFinder genericclioptions.ResourceFinder
+	ResourceFinder        genericclioptions.ResourceFinder
+	CreationCheckerFinder genericclioptions.ResourceFinder
 	// UIDMap maps a resource location to a UID.  It is optional, but ConditionFuncs may choose to use it to make the result
 	// more reliable.  For instance, delete can look for UID consistency during delegated calls.
-	UIDMap        UIDMap
-	DynamicClient dynamic.Interface
-	Timeout       time.Duration
-	ForCondition  string
+	UIDMap          UIDMap
+	DynamicClient   dynamic.Interface
+	Timeout         time.Duration
+	ForCondition    string
+	WaitForCreation bool
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
@@ -319,6 +329,43 @@ type ConditionFunc func(ctx context.Context, info *resource.Info, o *WaitOptions
 func (o *WaitOptions) RunWait() error {
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
 	defer cancel()
+
+	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	if o.WaitForCreation && isForDelete {
+		return fmt.Errorf("--wait-for-creation cannot be used with delete condition")
+	}
+	if o.WaitForCreation && o.Timeout == 0 {
+		return fmt.Errorf("--wait-for-creation requires a timeout value greater than 0")
+	}
+
+	if o.WaitForCreation {
+		err := func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return fmt.Errorf("context deadline is exceeded while waiting for the creation of the resources")
+				default:
+					err := o.CreationCheckerFinder.Do().Visit(func(info *resource.Info, err error) error {
+						// We don't need to do anything after we assure that the resources exist. Because
+						// actual logic will be incorporated after we wait all the resources' existence.
+						return nil
+					})
+					// It is verified that all the resources exist.
+					if err == nil {
+						return nil
+					}
+					// We specifically wait for the creation of resources and all the errors
+					// other than not found means that this is something we cannot handle.
+					if !apierrors.IsNotFound(err) {
+						return err
+					}
+				}
+			}
+		}()
+		if err != nil {
+			return err
+		}
+	}
 
 	visitCount := 0
 	visitFunc := func(info *resource.Info, err error) error {
@@ -338,7 +385,6 @@ func (o *WaitOptions) RunWait() error {
 		return err
 	}
 	visitor := o.ResourceFinder.Do()
-	isForDelete := strings.ToLower(o.ForCondition) == "delete"
 	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
 		visitor.IgnoreErrors(apierrors.IsNotFound)
 	}
