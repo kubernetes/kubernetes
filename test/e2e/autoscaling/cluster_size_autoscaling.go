@@ -1767,13 +1767,14 @@ func runReplicatedPodOnEachNode(ctx context.Context, f *framework.Framework, nod
 			}
 		}
 
-		err = wait.PollImmediate(5*time.Second, podTimeout, func() (bool, error) {
-			rc, err = f.ClientSet.CoreV1().ReplicationControllers(namespace).Get(ctx, id, metav1.GetOptions{})
-			if err != nil || rc.Status.ReadyReplicas < int32((i+1)*podsPerNode) {
-				return false, nil
-			}
-			return true, nil
-		})
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, podTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				rc, err = f.ClientSet.CoreV1().ReplicationControllers(namespace).Get(ctx, id, metav1.GetOptions{})
+				if err != nil || rc.Status.ReadyReplicas < int32((i+1)*podsPerNode) {
+					return false, nil
+				}
+				return true, nil
+			})
 		if err != nil {
 			return fmt.Errorf("failed to coerce RC into spawning a pod on node %s within timeout", node.Name)
 		}
