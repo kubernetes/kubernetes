@@ -180,8 +180,9 @@ func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string,
 		celmetrics.Metrics.ObserveDefinition(context.TODO(), "active", "deny")
 	}
 
-	// Skip reconcile if the spec of the definition is unchanged
-	if info.lastReconciledValue != nil && definition != nil &&
+	// Skip reconcile if the spec of the definition is unchanged and had a
+	// successful previous sync
+	if info.configurationError == nil && info.lastReconciledValue != nil && definition != nil &&
 		apiequality.Semantic.DeepEqual(info.lastReconciledValue.Spec, definition.Spec) {
 		return nil
 	}
