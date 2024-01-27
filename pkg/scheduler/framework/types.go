@@ -53,11 +53,12 @@ const (
 	UpdateNodeLabel       // 1000
 	UpdateNodeTaint       // 10000
 	UpdateNodeCondition   // 100000
+	UpdateNodeAnnotation  // 1000000
 
-	All ActionType = 1<<iota - 1 // 111111
+	All ActionType = 1<<iota - 1 // 1111111
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.
@@ -65,6 +66,12 @@ type GVK string
 
 // Constants for GVKs.
 const (
+	// There are a couple of notes about how the scheduler notifies the events of Pods:
+	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is scheduled to a Node.
+	// - Delete: delete events could be triggered by:
+	//           - a Pod that is deleted
+	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
+	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
 	Pod                   GVK = "Pod"
 	Node                  GVK = "Node"
 	PersistentVolume      GVK = "PersistentVolume"
@@ -279,8 +286,14 @@ type WeightedAffinityTerm struct {
 	Weight int32
 }
 
+// ExtenderName is a fake plugin name put in UnschedulablePlugins when Extender rejected some Nodes.
+const ExtenderName = "Extender"
+
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
+	// NodeToStatusMap records the status of each node
+	// if they're rejected in PreFilter (via PreFilterResult) or Filter plugins.
+	// Nodes that pass PreFilter/Filter plugins are not included in this map.
 	NodeToStatusMap NodeToStatusMap
 	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]
@@ -813,13 +826,6 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 	n.updatePVCRefCounts(pod, sign > 0)
 
 	n.Generation = nextGeneration()
-}
-
-func max(a, b int64) int64 {
-	if a >= b {
-		return a
-	}
-	return b
 }
 
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {

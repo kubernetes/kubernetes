@@ -672,7 +672,7 @@ func NewProxier(
 	}
 
 	// windows listens to all node addresses
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	hcnImpl := newHcnImpl()
@@ -1008,6 +1008,10 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
 }
+
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
 
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.svcPortMap {

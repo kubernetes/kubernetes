@@ -95,12 +95,13 @@ const (
 	Unschedulable
 	// UnschedulableAndUnresolvable is used when a plugin finds a pod unschedulable and
 	// other postFilter plugins like preemption would not change anything.
+	// See the comment on PostFilter interface for more details about how PostFilter should handle this status.
 	// Plugins should return Unschedulable if it is possible that the pod can get scheduled
 	// after running other postFilter plugins.
 	// The accompanying status message should explain why the pod is unschedulable.
 	//
 	// We regard the backoff as a penalty of wasting the scheduling cycle.
-	// When the scheduling queue requeues Pods, which was rejected with Unschedulable in the last scheduling,
+	// When the scheduling queue requeues Pods, which was rejected with UnschedulableAndUnresolvable in the last scheduling,
 	// the Pod goes through backoff.
 	UnschedulableAndUnresolvable
 	// Wait is used when a Permit plugin finds a pod scheduling should wait.
@@ -287,6 +288,10 @@ func (s *Status) Equal(x *Status) bool {
 	return cmp.Equal(s.plugin, x.plugin)
 }
 
+func (s *Status) String() string {
+	return s.Message()
+}
+
 // NewStatus makes a Status out of the given arguments and returns its pointer.
 func NewStatus(code Code, reasons ...string) *Status {
 	s := &Status{
@@ -395,6 +400,9 @@ type PreFilterPlugin interface {
 	// plugins must return success or the pod will be rejected. PreFilter could optionally
 	// return a PreFilterResult to influence which nodes to evaluate downstream. This is useful
 	// for cases where it is possible to determine the subset of nodes to process in O(1) time.
+	// When PreFilterResult filters out some Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
+	// i.e., those Nodes will be out of the candidates of the preemption.
+	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
@@ -434,7 +442,17 @@ type FilterPlugin interface {
 // after a pod cannot be scheduled.
 type PostFilterPlugin interface {
 	Plugin
-	// PostFilter is called by the scheduling framework.
+	// PostFilter is called by the scheduling framework
+	// when the scheduling cycle failed at PreFilter or Filter by Unschedulable or UnschedulableAndUnresolvable.
+	// NodeToStatusMap has statuses that each Node got in the Filter phase.
+	// If this scheduling cycle failed at PreFilter, all Nodes have the status from the rejector PreFilter plugin in NodeToStatusMap.
+	// Note that the scheduling framework runs PostFilter plugins even when PreFilter returned UnschedulableAndUnresolvable.
+	// In that case, NodeToStatusMap contains all Nodes with UnschedulableAndUnresolvable.
+	//
+	// Also, ignoring Nodes with UnschedulableAndUnresolvable is the responsibility of each PostFilter plugin,
+	// meaning NodeToStatusMap obviously could have Nodes with UnschedulableAndUnresolvable
+	// and the scheduling framework does call PostFilter even when all Nodes in NodeToStatusMap are UnschedulableAndUnresolvable.
+	//
 	// A PostFilter plugin should return one of the following statuses:
 	// - Unschedulable: the plugin gets executed successfully but the pod cannot be made schedulable.
 	// - Success: the plugin gets executed successfully and the pod can be made schedulable.
@@ -458,7 +476,7 @@ type PreScorePlugin interface {
 	// the pod will be rejected
 	// When it returns Skip status, other fields in status are just ignored,
 	// and coupled Score plugin will be skipped in this scheduling cycle.
-	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
+	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*NodeInfo) *Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -634,6 +652,9 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator PodNominator)
+
+	// Close calls Close method of each plugin.
+	Close() error
 }
 
 // Handle provides data and some tools that plugins can use. It is
@@ -646,11 +667,17 @@ type Handle interface {
 	PluginsRunner
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
-	// a pod finishes "Permit" point. There is no guarantee that the information
-	// remains unchanged in the binding phase of scheduling, so plugins in the binding
-	// cycle (pre-bind/bind/post-bind/un-reserve plugin) should not use it,
-	// otherwise a concurrent read/write error might occur, they should use scheduler
-	// cache instead.
+	// a pod finishes "Permit" point.
+	//
+	// It should be used only during scheduling cycle:
+	// - There is no guarantee that the information remains unchanged in the binding phase of scheduling.
+	//   So, plugins shouldn't use it in the binding cycle (pre-bind/bind/post-bind/un-reserve plugin)
+	//   otherwise, a concurrent read/write error might occur.
+	// - There is no guarantee that the information is always up-to-date.
+	//   So, plugins shouldn't use it in QueueingHint and PreEnqueue
+	//   otherwise, they might make a decision based on stale information.
+	//
+	// Instead, they should use the resources getting from Informer created from SharedInformerFactory().
 	SnapshotSharedLister() SharedLister
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
@@ -766,12 +793,12 @@ type PodNominator interface {
 type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
-	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
+	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*NodeInfo) *Status
 	// RunScorePlugins runs the set of configured scoring plugins.
 	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) ([]NodePluginScores, *Status)
+	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*NodeInfo) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods

@@ -92,6 +92,12 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 		}
 	}
 	switch behavior {
+	case "neverTerminate":
+		// this job is being used in an upgrade job see test/e2e/upgrades/apps/job.go
+		// it should never be optimized, as it always has to restart during an upgrade
+		// and continue running
+		job.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "1000000"}
+		job.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
 	case "notTerminate":
 		job.Spec.Template.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 	case "fail":

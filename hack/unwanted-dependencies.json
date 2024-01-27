@@ -20,7 +20,6 @@
       "github.com/go-openapi/validate": "use k8s.io/kube-openapi/pkg/validation/validate instead",
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/gogo/protobuf": "unmaintained",
-      "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
@@ -55,7 +54,6 @@
       "github.com/mndrix/tap-go": "unmaintained",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/pkg/errors": "unmaintained, archive mode",
-      "github.com/rubiojr/go-vhd": "unmaintained, archive mode",
       "github.com/smartystreets/goconvey": "MPL license not in CNCF allowlist",
       "github.com/spf13/viper": "refer to #102598",
       "github.com/xeipuuv/gojsonschema": "unmaintained",
@@ -126,10 +124,6 @@
         "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
-      "github.com/golang/mock": [
-        "k8s.io/kubernetes",
-        "k8s.io/legacy-cloud-providers"
-      ],
       "github.com/google/s2a-go": [
         "cloud.google.com/go/compute",
         "google.golang.org/api"
@@ -178,19 +172,14 @@
         "github.com/containerd/fifo",
         "github.com/containerd/go-runc",
         "github.com/containerd/typeurl",
-        "github.com/go-logr/zapr",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
-        "go.uber.org/zap",
         "gotest.tools/v3",
         "k8s.io/kubectl",
         "k8s.io/kubernetes",
         "k8s.io/system-validators",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
-      "github.com/rubiojr/go-vhd": [
-        "k8s.io/legacy-cloud-providers"
       ],
       "go.opencensus.io": [
         "cloud.google.com/go/compute",
@@ -240,7 +229,6 @@
       "cloud.google.com/go/compute",
       "github.com/GoogleCloudPlatform/k8s-cloud-provider",
       "github.com/gogo/protobuf",
-      "github.com/golang/mock",
       "github.com/google/s2a-go",
       "github.com/google/shlex",
       "github.com/googleapis/enterprise-certificate-proxy",
@@ -251,7 +239,6 @@
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/pkg/errors",
-      "github.com/rubiojr/go-vhd",
       "go.opencensus.io",
       "golang.org/x/exp",
       "google.golang.org/api",

@@ -17,7 +17,7 @@ limitations under the License.
 package testingcert
 
 // You can use cfssl tool to generate certificates, please refer
-// https://github.com/coreos/etcd/tree/master/hack/tls-setup for more details.
+// https://github.com/etcd-io/etcd/tree/main/hack/tls-setup for more details.
 //
 // ca-config.json:
 //

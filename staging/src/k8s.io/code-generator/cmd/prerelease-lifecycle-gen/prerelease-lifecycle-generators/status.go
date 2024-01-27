@@ -223,7 +223,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				if ttag != nil && ttag.value == "true" {
 					klog.V(5).Infof("    tag=true")
 					if !isAPIType(t) {
-						klog.Fatalf("Type %v requests deepcopy generation but is not copyable", t)
+						klog.Fatalf("Type %v requests prerelease generation but is not an API type", t)
 					}
 					pkgNeedsGeneration = true
 					break

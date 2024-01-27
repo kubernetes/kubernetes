@@ -1,3 +1,64 @@
+## 2.15.0
+
+### Features
+
+- JUnit reports now interpret Label(owner:X) and set owner to X. [8f3bd70]
+- include cancellation reason when cancelling spec context [96e915c]
+
+### Fixes
+
+- emit output of failed go tool cover invocation so users can try to debug things for themselves [c245d09]
+- fix outline when using nodot in ginkgo v2 [dca77c8]
+- Document areas where GinkgoT() behaves differently from testing.T [dbaf18f]
+- bugfix(docs): use Unsetenv instead of Clearenv (#1337) [6f67a14]
+
+### Maintenance
+
+- Bump to go 1.20 [4fcd0b3]
+
+## 2.14.0
+
+### Features
+You can now use `GinkgoTB()` when you need an instance of `testing.TB` to pass to a library.
+
+Prior to this release table testing only supported generating individual `It`s for each test entry.  `DescribeTableSubtree` extends table testing support to entire testing subtrees - under the hood `DescrieTableSubtree` generates a new container for each entry and invokes your function to fill our the container.  See the [docs](https://onsi.github.io/ginkgo/#generating-subtree-tables) to learn more.
+
+- Introduce DescribeTableSubtree [65ec56d]
+- add GinkgoTB() to docs [4a2c832]
+- Add GinkgoTB() function (#1333) [92b6744]
+
+### Fixes
+- Fix typo in internal/suite.go (#1332) [beb9507]
+- Fix typo in docs/index.md (#1319) [4ac3a13]
+- allow wasm to compile with ginkgo present (#1311) [b2e5bc5]
+
+### Maintenance
+- Bump golang.org/x/tools from 0.16.0 to 0.16.1 (#1316) [465a8ec]
+- Bump actions/setup-go from 4 to 5 (#1313) [eab0e40]
+- Bump github/codeql-action from 2 to 3 (#1317) [fbf9724]
+- Bump golang.org/x/crypto (#1318) [3ee80ee]
+- Bump golang.org/x/tools from 0.14.0 to 0.16.0 (#1306) [123e1d5]
+- Bump github.com/onsi/gomega from 1.29.0 to 1.30.0 (#1297) [558f6e0]
+- Bump golang.org/x/net from 0.17.0 to 0.19.0 (#1307) [84ff7f3]
+
+## 2.13.2
+
+### Fixes
+- Fix file handler leak (#1309) [e2e81c8]
+- Avoid allocations with `(*regexp.Regexp).MatchString` (#1302) [3b2a2a7]
+
+## 2.13.1
+
+### Fixes
+- # 1296 fix(precompiled test guite): exec bit check omitted on Windows (#1301) [26eea01]
+
+### Maintenance
+- Bump github.com/go-logr/logr from 1.2.4 to 1.3.0 (#1291) [7161a9d]
+- Bump golang.org/x/sys from 0.13.0 to 0.14.0 (#1295) [7fc7b10]
+- Bump golang.org/x/tools from 0.12.0 to 0.14.0 (#1282) [74bbd65]
+- Bump github.com/onsi/gomega from 1.27.10 to 1.29.0 (#1290) [9373633]
+- Bump golang.org/x/net in /integration/_fixtures/version_mismatch_fixture (#1286) [6e3cf65]
+
 ## 2.13.0
 
 ### Features

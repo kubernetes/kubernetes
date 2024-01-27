@@ -48,21 +48,25 @@ type setCredentialsOptions struct {
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string
 
-	execCommand     cliflag.StringFlag
-	execAPIVersion  cliflag.StringFlag
-	execArgs        []string
-	execEnv         map[string]string
-	execEnvToRemove []string
+	execCommand            cliflag.StringFlag
+	execAPIVersion         cliflag.StringFlag
+	execInteractiveMode    cliflag.StringFlag
+	execProvideClusterInfo cliflag.Tristate
+	execArgs               []string
+	execEnv                map[string]string
+	execEnvToRemove        []string
 }
 
 const (
 	flagAuthProvider    = "auth-provider"
 	flagAuthProviderArg = "auth-provider-arg"
 
-	flagExecCommand    = "exec-command"
-	flagExecAPIVersion = "exec-api-version"
-	flagExecArg        = "exec-arg"
-	flagExecEnv        = "exec-env"
+	flagExecCommand            = "exec-command"
+	flagExecAPIVersion         = "exec-api-version"
+	flagExecArg                = "exec-arg"
+	flagExecEnv                = "exec-env"
+	flagExecInteractiveMode    = "exec-interactive-mode"
+	flagExecProvideClusterInfo = "exec-provide-cluster-info"
 )
 
 var (
@@ -104,6 +108,9 @@ var (
 
 		# Enable new exec auth plugin for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta1
+
+		# Enable new exec auth plugin for the "cluster-admin" entry with interactive mode
+		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta1 --exec-interactive-mode=Never
 
 		# Define new exec auth plugin arguments for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-arg=arg1 --exec-arg=arg2
@@ -179,6 +186,9 @@ func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *
 	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arguments for the auth provider")
 	cmd.Flags().Var(&options.execCommand, flagExecCommand, "Command for the exec credential plugin for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.execAPIVersion, flagExecAPIVersion, "API version of the exec credential plugin for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.execInteractiveMode, flagExecInteractiveMode, "InteractiveMode of the exec credentials plugin for the user entry in kubeconfig")
+	flagClusterInfo := cmd.Flags().VarPF(&options.execProvideClusterInfo, flagExecProvideClusterInfo, "", "ProvideClusterInfo of the exec credentials plugin for the user entry in kubeconfig")
+	flagClusterInfo.NoOptDefVal = "true"
 	cmd.Flags().StringSlice(flagExecArg, nil, "New arguments for the exec credential plugin command for the user entry in kubeconfig")
 	cmd.Flags().StringArray(flagExecEnv, nil, "'key=value' environment values for the exec credential plugin")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "Embed client cert/key for the user entry in kubeconfig")
@@ -304,6 +314,14 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 		// rewrite exec arguments list with new values
 		if o.execArgs != nil {
 			modifiedAuthInfo.Exec.Args = o.execArgs
+		}
+
+		if o.execInteractiveMode.Provided() {
+			modifiedAuthInfo.Exec.InteractiveMode = clientcmdapi.ExecInteractiveMode(o.execInteractiveMode.Value())
+		}
+
+		if o.execProvideClusterInfo.Provided() {
+			modifiedAuthInfo.Exec.ProvideClusterInfo = o.execProvideClusterInfo.Value()
 		}
 
 		// iterate over the existing exec env values and remove the specified
@@ -434,6 +452,15 @@ func (o setCredentialsOptions) validate() error {
 			if _, err := os.Stat(keyPath); err != nil {
 				return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagKeyFile, keyPath, err)
 			}
+		}
+	}
+
+	if o.execInteractiveMode.Provided() {
+		interactiveMode := o.execInteractiveMode.Value()
+		if interactiveMode != string(clientcmdapi.IfAvailableExecInteractiveMode) &&
+			interactiveMode != string(clientcmdapi.AlwaysExecInteractiveMode) &&
+			interactiveMode != string(clientcmdapi.NeverExecInteractiveMode) {
+			return fmt.Errorf("invalid interactive mode type, can be only IfAvailable, Never, Always")
 		}
 	}
 

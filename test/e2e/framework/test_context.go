@@ -549,9 +549,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if len(t.BearerToken) == 0 {
 		var err error
 		t.BearerToken, err = GenerateSecureToken(16)
-		if err != nil {
-			klog.Fatalf("Failed to generate bearer token: %v", err)
-		}
+		ExpectNoError(err, "Failed to generate bearer token")
 	}
 
 	// Allow 1% of nodes to be unready (statistically) - relevant for large clusters.
@@ -647,7 +645,7 @@ func listTestInformation(report ginkgo.Report) {
 				labels.Insert(spec.Labels()...)
 			}
 		}
-		fmt.Fprintf(Output, "The following labels can be used with 'gingko run --label-filter':\n%s%s\n\n", indent, strings.Join(sets.List(labels), "\n"+indent))
+		fmt.Fprintf(Output, "The following labels can be used with 'ginkgo run --label-filter':\n%s%s\n\n", indent, strings.Join(sets.List(labels), "\n"+indent))
 	}
 	if TestContext.listTests {
 		leafs := make([][]string, 0, len(report.SpecReports))

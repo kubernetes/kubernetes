@@ -903,9 +903,7 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
-			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
-		}
+		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 	})
 }
 

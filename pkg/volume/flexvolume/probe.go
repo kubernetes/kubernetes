@@ -228,6 +228,10 @@ func (prober *flexVolumeProber) updateEventsMap(eventDirAbs string, op volume.Pr
 // Each file or directory change triggers two events: one from the watch on itself, another from the watch
 // on its parent directory.
 func (prober *flexVolumeProber) addWatchRecursive(filename string) error {
+	// this may be called with an actual absolute path on Windows (with a C:\ prefix).
+	// But the prober.fs.Walk below will execute filepath.Join(fs.root, filenameAbove), which
+	// will result in an incorrect path, you can't join C:\path and C:\another\path.
+	filename = strings.TrimPrefix(filename, `C:\`)
 	addWatch := func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			if err := prober.watcher.AddWatch(path); err != nil {

@@ -26,10 +26,10 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.4.18 3.5.10
+BUNDLED_ETCD_VERSIONS?=3.4.18 3.5.11
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.5.10
+LATEST_ETCD_VERSION?=3.5.11
 
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
@@ -83,7 +83,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION := 1.20.10
+GOLANG_VERSION := 1.20.12
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -134,7 +134,7 @@ ifeq ($(ARCH),amd64)
 ifeq ($(OS),windows)
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
-		curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$$version/etcd-v$$version-windows-amd64.zip -o etcd-v$$version-windows-amd64.zip; \
+		curl -sSL --retry 5 https://github.com/etcd-io/etcd/releases/download/v$$version/etcd-v$$version-windows-amd64.zip -o etcd-v$$version-windows-amd64.zip; \
 		unzip -q -d $$etcd_release_tmp_dir etcd-v$$version-windows-amd64.zip; \
 		rm etcd-v$$version-windows-amd64.zip; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd-v$$version-windows-amd64/etcd.exe $$etcd_release_tmp_dir/etcd-v$$version-windows-amd64/etcdctl.exe $(TEMP_DIR)/; \
@@ -144,7 +144,7 @@ ifeq ($(OS),windows)
 else
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
-		curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$$version/etcd-v$$version-linux-amd64.tar.gz | tar -xz -C $$etcd_release_tmp_dir --strip-components=1; \
+		curl -sSL --retry 5 https://github.com/etcd-io/etcd/releases/download/v$$version/etcd-v$$version-linux-amd64.tar.gz | tar -xz -C $$etcd_release_tmp_dir --strip-components=1; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$version; \
@@ -168,7 +168,7 @@ else
 			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
 		fi; \
 		docker run --rm --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
-			"git clone https://github.com/coreos/etcd $$etcd_build_dir \
+			"git clone https://github.com/etcd-io/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
 			&& $(arch_prefix) GOARCH=$(ARCH) ./build.sh \

@@ -17,12 +17,10 @@ limitations under the License.
 package storage
 
 import (
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
-	"testing"
-
 	"context"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,7 +33,10 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/persistentvolume"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -190,13 +191,16 @@ func TestUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	// We need to set custom timestamp which is not the same as the one on existing PV
+	// - doing so will prevent timestamp update on phase change and custom one is used instead.
+	pvStartTimestamp = &metav1.Time{Time: pvStartTimestamp.Time.Add(time.Second)}
+
 	pvIn := &api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 		Status: api.PersistentVolumeStatus{
-			Phase: api.VolumeBound,
-			// Set the same timestamp as original PV so this won't get updated on phase change breaking DeepEqual() later in test.
+			Phase:                   api.VolumeBound,
 			LastPhaseTransitionTime: pvStartTimestamp,
 		},
 	}

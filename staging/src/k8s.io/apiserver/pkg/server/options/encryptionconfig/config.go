@@ -24,7 +24,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"sync"
@@ -38,9 +37,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
-	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
-	"k8s.io/apiserver/pkg/apis/config/validation"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
+	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
@@ -129,8 +128,8 @@ func GetKDF() bool {
 
 func init() {
 	configScheme := runtime.NewScheme()
-	utilruntime.Must(apiserverconfig.AddToScheme(configScheme))
-	utilruntime.Must(apiserverconfigv1.AddToScheme(configScheme))
+	utilruntime.Must(apiserver.AddToScheme(configScheme))
+	utilruntime.Must(apiserverv1.AddToScheme(configScheme))
 	codecs = serializer.NewCodecFactory(configScheme)
 	envelopemetrics.RegisterMetrics()
 	storagevalue.RegisterMetrics()
@@ -243,7 +242,7 @@ func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool, api
 // getTransformerOverridesAndKMSPluginHealthzCheckers creates the set of transformers and KMS healthz checks based on the given config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, config *apiserverconfig.EncryptionConfiguration, apiServerID string) (map[schema.GroupResource]storagevalue.Transformer, []healthz.HealthChecker, *kmsState, error) {
+func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, config *apiserver.EncryptionConfiguration, apiServerID string) (map[schema.GroupResource]storagevalue.Transformer, []healthz.HealthChecker, *kmsState, error) {
 	var kmsHealthChecks []healthz.HealthChecker
 	transformers, probes, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(ctx, config, apiServerID)
 	if err != nil {
@@ -264,7 +263,7 @@ type healthChecker interface {
 // getTransformerOverridesAndKMSPluginProbes creates the set of transformers and KMS probes based on the given config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apiserverconfig.EncryptionConfiguration, apiServerID string) (map[schema.GroupResource]storagevalue.Transformer, []healthChecker, *kmsState, error) {
+func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apiserver.EncryptionConfiguration, apiServerID string) (map[schema.GroupResource]storagevalue.Transformer, []healthChecker, *kmsState, error) {
 	resourceToPrefixTransformer := map[schema.GroupResource][]storagevalue.PrefixTransformer{}
 	var probes []healthChecker
 	var kmsUsed kmsState
@@ -503,7 +502,7 @@ func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.C
 }
 
 // loadConfig parses the encryption configuration file at filepath and returns the parsed config and hash of the file.
-func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfiguration, string, error) {
+func loadConfig(filepath string, reload bool) (*apiserver.EncryptionConfiguration, string, error) {
 	data, contentHash, err := loadDataAndHash(filepath)
 	if err != nil {
 		return nil, "", fmt.Errorf("error while loading file: %w", err)
@@ -513,7 +512,7 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 	if err != nil {
 		return nil, "", fmt.Errorf("error decoding encryption provider configuration file %q: %w", filepath, err)
 	}
-	config, ok := configObj.(*apiserverconfig.EncryptionConfiguration)
+	config, ok := configObj.(*apiserver.EncryptionConfiguration)
 	if !ok {
 		return nil, "", fmt.Errorf("got unexpected config type: %v", gvk)
 	}
@@ -522,15 +521,9 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 }
 
 func loadDataAndHash(filepath string) ([]byte, string, error) {
-	f, err := os.Open(filepath)
+	data, err := os.ReadFile(filepath)
 	if err != nil {
-		return nil, "", fmt.Errorf("error opening encryption provider configuration file %q: %w", filepath, err)
-	}
-	defer f.Close()
-
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return nil, "", fmt.Errorf("could not read contents: %w", err)
+		return nil, "", fmt.Errorf("error reading encryption provider configuration file %q: %w", filepath, err)
 	}
 	if len(data) == 0 {
 		return nil, "", fmt.Errorf("encryption provider configuration file %q is empty", filepath)
@@ -549,7 +542,7 @@ func GetEncryptionConfigHash(filepath string) (string, error) {
 // prefixTransformersAndProbes creates the set of transformers and KMS probes based on the given resource config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.ResourceConfiguration, apiServerID string) ([]storagevalue.PrefixTransformer, []healthChecker, *kmsState, error) {
+func prefixTransformersAndProbes(ctx context.Context, config apiserver.ResourceConfiguration, apiServerID string) ([]storagevalue.PrefixTransformer, []healthChecker, *kmsState, error) {
 	var transformers []storagevalue.PrefixTransformer
 	var probes []healthChecker
 	var kmsUsed kmsState
@@ -605,7 +598,7 @@ func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.Res
 
 type blockTransformerFunc func(cipher.Block) (storagevalue.Transformer, error)
 
-func aesPrefixTransformer(config *apiserverconfig.AESConfiguration, fn blockTransformerFunc, prefix string) (storagevalue.PrefixTransformer, error) {
+func aesPrefixTransformer(config *apiserver.AESConfiguration, fn blockTransformerFunc, prefix string) (storagevalue.PrefixTransformer, error) {
 	var result storagevalue.PrefixTransformer
 
 	if len(config.Keys) == 0 {
@@ -658,7 +651,7 @@ func aesPrefixTransformer(config *apiserverconfig.AESConfiguration, fn blockTran
 	return result, nil
 }
 
-func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) (storagevalue.PrefixTransformer, error) {
+func secretboxPrefixTransformer(config *apiserver.SecretboxConfiguration) (storagevalue.PrefixTransformer, error) {
 	var result storagevalue.PrefixTransformer
 
 	if len(config.Keys) == 0 {
@@ -736,7 +729,7 @@ func (s *kmsState) accumulate(other *kmsState) {
 // kmsPrefixTransformer creates a KMS transformer and probe based on the given KMS config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfiguration, apiServerID string) (storagevalue.PrefixTransformer, healthChecker, *kmsState, error) {
+func kmsPrefixTransformer(ctx context.Context, config *apiserver.KMSConfiguration, apiServerID string) (storagevalue.PrefixTransformer, healthChecker, *kmsState, error) {
 	kmsName := config.Name
 	switch config.APIVersion {
 	case kmsAPIVersionV1:
@@ -853,7 +846,7 @@ func primeAndProbeKMSv2(ctx context.Context, probe *kmsv2PluginProbe, kmsName st
 		})
 }
 
-func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) storagevalue.PrefixTransformer {
+func envelopePrefixTransformer(config *apiserver.KMSConfiguration, envelopeService envelope.Service, prefix string) storagevalue.PrefixTransformer {
 	baseTransformerFunc := func(block cipher.Block) (storagevalue.Transformer, error) {
 		gcm, err := aestransformer.NewGCMTransformer(block)
 		if err != nil {
@@ -902,7 +895,7 @@ func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, 
 // We use a hash instead of the raw file contents when tracking changes to avoid holding any encryption keys in memory outside of their associated transformers.
 // This hash must be used in-memory and not externalized to the process because it has no cross-release stability guarantees.
 func computeEncryptionConfigHash(data []byte) string {
-	return fmt.Sprintf("%x", sha256.Sum256(data))
+	return fmt.Sprintf("k8s:enc:unstable:1:%x", sha256.Sum256(data))
 }
 
 var _ storagevalue.ResourceTransformers = &DynamicTransformers{}

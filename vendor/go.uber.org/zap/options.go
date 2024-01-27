@@ -133,9 +133,28 @@ func IncreaseLevel(lvl zapcore.LevelEnabler) Option {
 }
 
 // OnFatal sets the action to take on fatal logs.
+//
+// Deprecated: Use [WithFatalHook] instead.
 func OnFatal(action zapcore.CheckWriteAction) Option {
+	return WithFatalHook(action)
+}
+
+// WithFatalHook sets a CheckWriteHook to run on fatal logs.
+// Zap will call this hook after writing a log statement with a Fatal level.
+//
+// For example, the following builds a logger that will exit the current
+// goroutine after writing a fatal log message, but it will not exit the
+// program.
+//
+//	zap.New(core, zap.WithFatalHook(zapcore.WriteThenGoexit))
+//
+// It is important that the provided CheckWriteHook stops the control flow at
+// the current statement to meet expectations of callers of the logger.
+// We recommend calling os.Exit or runtime.Goexit inside custom hooks at
+// minimum.
+func WithFatalHook(hook zapcore.CheckWriteHook) Option {
 	return optionFunc(func(log *Logger) {
-		log.onFatal = action
+		log.onFatal = hook
 	})
 }
 

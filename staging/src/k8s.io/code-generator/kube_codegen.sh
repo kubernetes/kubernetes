@@ -17,6 +17,10 @@
 # This presents several functions for packages which want to use kubernetes
 # code-generation tools.
 
+# These functions insist that your input IDL (commented go) files be located in
+# go packages following the pattern $input_pkg_root/$something_sans_slash/$api_version .
+# Those $something_sans_slash will be propagated into the output directory structure.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -33,7 +37,7 @@ function kube::codegen::internal::git_find() {
 function kube::codegen::internal::git_grep() {
     # We want to include modified and untracked files because this might be
     # running against code which is not tracked by git yet.
-    git grep --untracked "$@"
+    git grep --untracked "$@" ":(exclude)vendor/"
 }
 
 # Generate tagged helper code: conversions, deepcopy, and defaults
@@ -42,6 +46,7 @@ function kube::codegen::internal::git_grep() {
 #   --input-pkg-root <string>
 #     The root package under which to search for files which request code to be
 #     generated.  This must be Go package syntax, e.g.  "k8s.io/foo/bar".
+#     See note at the top about package structure below that.
 #
 #   --output-base <string>
 #     The root directory under which to emit code.  The concatenation of
@@ -118,16 +123,16 @@ function kube::codegen::gen_helpers() {
     # Deepcopy
     #
     local input_pkgs=()
-    while read -r file; do
-        dir="$(dirname "${file}")"
+    while read -r dir; do
         pkg="$(cd "${dir}" && GO111MODULE=on go list -find .)"
         input_pkgs+=("${pkg}")
     done < <(
-        ( kube::codegen::internal::git_grep -l \
+        ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:deepcopy-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | LC_ALL=C sort -u
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
+          | LC_ALL=C sort -u
     )
 
     if [ "${#input_pkgs[@]}" != 0 ]; then
@@ -143,7 +148,7 @@ function kube::codegen::gen_helpers() {
         done
         "${gobin}/deepcopy-gen" \
             -v "${v}" \
-            -O zz_generated.deepcopy \
+            --output-file-base zz_generated.deepcopy \
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
             "${input_args[@]}"
@@ -152,16 +157,16 @@ function kube::codegen::gen_helpers() {
     # Defaults
     #
     local input_pkgs=()
-    while read -r file; do
-        dir="$(dirname "${file}")"
+    while read -r dir; do
         pkg="$(cd "${dir}" && GO111MODULE=on go list -find .)"
         input_pkgs+=("${pkg}")
     done < <(
-        ( kube::codegen::internal::git_grep -l \
+        ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:defaulter-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | LC_ALL=C sort -u
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
+          | LC_ALL=C sort -u
     )
 
     if [ "${#input_pkgs[@]}" != 0 ]; then
@@ -177,7 +182,7 @@ function kube::codegen::gen_helpers() {
         done
         "${gobin}/defaulter-gen" \
             -v "${v}" \
-            -O zz_generated.defaults \
+            --output-file-base zz_generated.defaults \
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
             "${input_args[@]}"
@@ -186,16 +191,16 @@ function kube::codegen::gen_helpers() {
     # Conversions
     #
     local input_pkgs=()
-    while read -r file; do
-        dir="$(dirname "${file}")"
+    while read -r dir; do
         pkg="$(cd "${dir}" && GO111MODULE=on go list -find .)"
         input_pkgs+=("${pkg}")
     done < <(
-        ( kube::codegen::internal::git_grep -l \
+        ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:conversion-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | LC_ALL=C sort -u
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
+          | LC_ALL=C sort -u
     )
 
     if [ "${#input_pkgs[@]}" != 0 ]; then
@@ -215,7 +220,7 @@ function kube::codegen::gen_helpers() {
         done
         "${gobin}/conversion-gen" \
             -v "${v}" \
-            -O zz_generated.conversion \
+            --output-file-base zz_generated.conversion \
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
             "${extra_peer_args[@]:+"${extra_peer_args[@]}"}" \
@@ -229,6 +234,7 @@ function kube::codegen::gen_helpers() {
 #   --input-pkg-root <string>
 #     The root package under which to search for files which request openapi to
 #     be generated.  This must be Go package syntax, e.g.  "k8s.io/foo/bar".
+#     See note at the top about package structure below that.
 #
 #   --output-pkg-root <string>
 #     The root package under which generated directories and files
@@ -347,16 +353,16 @@ function kube::codegen::gen_openapi() {
     root="$(cd "${root}" && pwd -P)"
 
     local input_pkgs=( "${extra_pkgs[@]:+"${extra_pkgs[@]}"}")
-    while read -r file; do
-        dir="$(dirname "${file}")"
+    while read -r dir; do
         pkg="$(cd "${dir}" && GO111MODULE=on go list -find .)"
         input_pkgs+=("${pkg}")
     done < <(
-        ( kube::codegen::internal::git_grep -l \
+        ( kube::codegen::internal::git_grep -l --null \
             -e '+k8s:openapi-gen=' \
             ":(glob)${root}"/'**/*.go' \
             || true \
-        ) | LC_ALL=C sort -u
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
+          | LC_ALL=C sort -u
     )
 
     if [ "${#input_pkgs[@]}" != 0 ]; then
@@ -372,7 +378,7 @@ function kube::codegen::gen_openapi() {
         done
         "${gobin}/openapi-gen" \
             -v "${v}" \
-            -O zz_generated.openapi \
+            --output-file-base zz_generated.openapi \
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
             --output-package "${out_pkg_root}/${openapi_subdir}" \
@@ -396,9 +402,15 @@ function kube::codegen::gen_openapi() {
 #
 # Args:
 #   --input-pkg-root <string>
-#     The root package under which to search for types.go files which request
+#     The root package under which to search for *.go files which request
 #     clients to be generated.  This must be Go package syntax, e.g.
 #     "k8s.io/foo/bar".
+#     See note at the top about package structure below that.
+#
+#   --one-input-api <string>
+#     A specific API (a directory) under the --input-pkg-root for which to
+#     generate a client.  If this is not set, clients for all APIs under the
+#     input root will be generated (under the --output-pkg-root).
 #
 #   --output-pkg-root <string>
 #     The root package into which generated directories and files will be
@@ -435,6 +447,7 @@ function kube::codegen::gen_openapi() {
 #
 function kube::codegen::gen_client() {
     local in_pkg_root=""
+    local one_input_api=""
     local out_pkg_root=""
     local out_base="" # gengo needs the output dir must be $out_base/$out_pkg_root
     local clientset_subdir="clientset"
@@ -451,6 +464,10 @@ function kube::codegen::gen_client() {
         case "$1" in
             "--input-pkg-root")
                 in_pkg_root="$2"
+                shift 2
+                ;;
+            "--one-input-api")
+                one_input_api="/$2"
                 shift 2
                 ;;
             "--output-pkg-root")
@@ -538,8 +555,7 @@ function kube::codegen::gen_client() {
 
     local group_versions=()
     local input_pkgs=()
-    while read -r file; do
-        dir="$(dirname "${file}")"
+    while read -r dir; do
         pkg="$(cd "${dir}" && GO111MODULE=on go list -find .)"
         leaf="$(basename "${dir}")"
         if grep -E -q '^v[0-9]+((alpha|beta)[0-9]+)?$' <<< "${leaf}"; then
@@ -550,11 +566,12 @@ function kube::codegen::gen_client() {
             group_versions+=("${leaf2}/${leaf}")
         fi
     done < <(
-        ( kube::codegen::internal::git_grep -l \
+        ( kube::codegen::internal::git_grep -l --null \
             -e '+genclient' \
-            ":(glob)${in_root}"/'**/types.go' \
+            ":(glob)${in_root}${one_input_api}"/'**/*.go' \
             || true \
-        ) | LC_ALL=C sort -u
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
+          | LC_ALL=C sort -u
     )
 
     if [ "${#group_versions[@]}" == 0 ]; then

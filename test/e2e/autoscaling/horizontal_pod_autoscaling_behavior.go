@@ -178,7 +178,8 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			gomega.Expect(timeWaited).To(gomega.BeNumerically(">", waitDeadline), "waited %s, wanted to wait more than %s", timeWaited, waitDeadline)
 
 			ginkgo.By("verifying number of replicas")
-			replicas := rc.GetReplicas(ctx)
+			replicas, err := rc.GetReplicas(ctx)
+			framework.ExpectNoError(err)
 			gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 		})
 
@@ -214,7 +215,8 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			gomega.Expect(timeWaited).To(gomega.BeNumerically(">", waitDeadline), "waited %s, wanted to wait more than %s", timeWaited, waitDeadline)
 
 			ginkgo.By("verifying number of replicas")
-			replicas := rc.GetReplicas(ctx)
+			replicas, err := rc.GetReplicas(ctx)
+			framework.ExpectNoError(err)
 			gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 		})
 

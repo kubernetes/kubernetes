@@ -24,24 +24,25 @@ package exit
 
 import "os"
 
-var real = func() { os.Exit(1) }
+var _exit = os.Exit
 
-// Exit normally terminates the process by calling os.Exit(1). If the package
-// is stubbed, it instead records a call in the testing spy.
-func Exit() {
-	real()
+// With terminates the process by calling os.Exit(code). If the package is
+// stubbed, it instead records a call in the testing spy.
+func With(code int) {
+	_exit(code)
 }
 
 // A StubbedExit is a testing fake for os.Exit.
 type StubbedExit struct {
 	Exited bool
-	prev   func()
+	Code   int
+	prev   func(code int)
 }
 
 // Stub substitutes a fake for the call to os.Exit(1).
 func Stub() *StubbedExit {
-	s := &StubbedExit{prev: real}
-	real = s.exit
+	s := &StubbedExit{prev: _exit}
+	_exit = s.exit
 	return s
 }
 
@@ -56,9 +57,10 @@ func WithStub(f func()) *StubbedExit {
 
 // Unstub restores the previous exit function.
 func (se *StubbedExit) Unstub() {
-	real = se.prev
+	_exit = se.prev
 }
 
-func (se *StubbedExit) exit() {
+func (se *StubbedExit) exit(code int) {
 	se.Exited = true
+	se.Code = code
 }

@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -1459,6 +1460,76 @@ func TestValidateExtraArgs(t *testing.T) {
 
 	for _, tc := range tests {
 		actual := ValidateExtraArgs(tc.args, nil)
+		if len(actual) != tc.expectedErrors {
+			t.Errorf("case %q:\n\t expected errors: %v\n\t got: %v\n\t errors: %v", tc.name, tc.expectedErrors, len(actual), actual)
+		}
+	}
+}
+
+func TestValidateUnmountFlags(t *testing.T) {
+	var tests = []struct {
+		name           string
+		flags          []string
+		expectedErrors int
+	}{
+		{
+			name:           "nil input",
+			flags:          nil,
+			expectedErrors: 0,
+		},
+		{
+			name: "all valid flags",
+			flags: []string{
+				kubeadmapi.UnmountFlagMNTForce,
+				kubeadmapi.UnmountFlagMNTDetach,
+				kubeadmapi.UnmountFlagMNTExpire,
+				kubeadmapi.UnmountFlagUmountNoFollow,
+			},
+			expectedErrors: 0,
+		},
+		{
+			name: "invalid two flags",
+			flags: []string{
+				"foo",
+				"bar",
+			},
+			expectedErrors: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateUnmountFlags(tc.flags, nil)
+		if len(actual) != tc.expectedErrors {
+			t.Errorf("case %q:\n\t expected errors: %v\n\t got: %v\n\t errors: %v", tc.name, tc.expectedErrors, len(actual), actual)
+		}
+	}
+}
+
+func TestPullPolicy(t *testing.T) {
+	var tests = []struct {
+		name           string
+		policy         string
+		expectedErrors int
+	}{
+		{
+			name:           "empty policy causes no errors", // gets defaulted
+			policy:         "",
+			expectedErrors: 0,
+		},
+		{
+			name:           "invalid policy",
+			policy:         "foo",
+			expectedErrors: 1,
+		},
+		{
+			name:           "valid policy",
+			policy:         "IfNotPresent",
+			expectedErrors: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateImagePullPolicy(corev1.PullPolicy(tc.policy), nil)
 		if len(actual) != tc.expectedErrors {
 			t.Errorf("case %q:\n\t expected errors: %v\n\t got: %v\n\t errors: %v", tc.name, tc.expectedErrors, len(actual), actual)
 		}

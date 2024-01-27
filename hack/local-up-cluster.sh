@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_VERBOSE=${KUBE_VERBOSE:-1}
+if (( KUBE_VERBOSE > 4 )); then
+  set -x
+fi
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # This script builds and runs a local kubernetes cluster. You may need to run
@@ -52,7 +57,7 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.3.0"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.4.0"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -125,7 +130,20 @@ DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
 # START_MODE can be 'all', 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
-START_MODE=${START_MODE:-"all"}
+if [[ -z "${START_MODE:-}" ]]; then
+    case "$(uname -s)" in
+      Darwin)
+        START_MODE=nokubelet,nokubeproxy
+        ;;
+      Linux)
+        START_MODE=all
+        ;;
+      *)
+        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+        exit 1
+        ;;
+    esac
+fi
 
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
@@ -187,7 +205,14 @@ do
 done
 
 if [ -z "${GO_OUT}" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
+    binaries_to_build="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kube-scheduler"
+    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
+      binaries_to_build="${binaries_to_build} cmd/kubelet"
+    fi
+    if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
+      binaries_to_build="${binaries_to_build} cmd/kube-proxy"
+    fi
+    make -C "${KUBE_ROOT}" WHAT="${binaries_to_build}"
 else
     echo "skipped the build because GO_OUT was set (${GO_OUT})"
 fi
@@ -1178,25 +1203,26 @@ function install_cni {
     host_arch=$(detect_arch)
   fi
 
-  cni_plugin_sha=CNI_PLUGINS_${host_arch^^}_SHA256SUM
-  cni_plugin_tarball="${CNI_PLUGINS_VERSION}/cni-plugins-linux-${host_arch}-${CNI_PLUGINS_VERSION}.tgz"
-  cni_plugins_url="${CNI_PLUGINS_URL}/${cni_plugin_tarball}"
+  cni_plugin_tarball="cni-plugins-linux-${host_arch}-${CNI_PLUGINS_VERSION}.tgz"
+  cni_plugins_url="${CNI_PLUGINS_URL}/${CNI_PLUGINS_VERSION}/${cni_plugin_tarball}"
+  cni_plugin_sha_url="${cni_plugins_url}.sha256"
 
-  echo "Installing CNI plugin binaries ..." \
-    && curl -sSL --retry 5 --output "${TMP_DIR}"/cni."${host_arch}".tgz "${cni_plugins_url}" \
-    && echo "${!cni_plugin_sha} ${TMP_DIR}/cni.${host_arch}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
-    && sha256sum --ignore-missing -c "${TMP_DIR}"/cni.sha256 \
-    && rm -f "${TMP_DIR}"/cni.sha256 \
-    && sudo mkdir -p /opt/cni/bin \
-    && sudo tar -C /opt/cni/bin -xzvf "${TMP_DIR}"/cni."${host_arch}".tgz \
-    && rm -rf "${TMP_DIR}"/cni."${host_arch}".tgz \
-    && sudo find /opt/cni/bin -type f -not \( \
-         -iname host-local \
-         -o -iname bridge \
-         -o -iname portmap \
-         -o -iname loopback \
-      \) \
-      -delete
+  echo "Installing CNI plugin binaries ..." &&
+    cd "${TMP_DIR}" &&
+    curl -sSL --retry 5 -o "${cni_plugin_tarball}" "${cni_plugins_url}" &&
+    curl -sSL --retry 5 -o "${cni_plugin_tarball}.sha256" "${cni_plugin_sha_url}" &&
+    sha256sum -c "${cni_plugin_tarball}.sha256" &&
+    rm -f "${cni_plugin_tarball}.sha256" &&
+    sudo mkdir -p /opt/cni/bin &&
+    sudo tar -C /opt/cni/bin -xzvf "${cni_plugin_tarball}" &&
+    rm -rf "${cni_plugin_tarball}" &&
+    sudo find /opt/cni/bin -type f -not \( \
+        -iname host-local \
+        -o -iname bridge \
+        -o -iname portmap \
+        -o -iname loopback \
+        \) \
+        -delete
 
   # containerd 1.4.12 installed by docker in kubekins supports CNI version 0.4.0
   echo "Configuring cni"
@@ -1282,6 +1308,9 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # let's log it where we can grab it later
   echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
 
+  echo "stopping docker"
+  service docker stop
+
   # bump up things
   refresh_docker_containerd_runc
 
@@ -1290,8 +1319,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   containerd --version
   runc --version
 
-  echo "restarting docker"
-  service docker restart
+  echo "starting docker"
+  service docker start
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
@@ -1318,7 +1347,7 @@ if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup INT
 fi
 
-KUBECTL=${KUBECTL:-"${GO_OUT}/kubectl"}
+KUBECTL=$(kube::util::find-binary "kubectl")
 
 echo "Starting services now!"
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
@@ -1385,8 +1414,8 @@ if [[ "${ENABLE_DAEMON}" = false ]]; then
 fi
 
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
-  cluster/kubectl.sh config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
-  cluster/kubectl.sh config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
-  cluster/kubectl.sh config set-context local --cluster=local --user=myself
-  cluster/kubectl.sh config use-context local
+  ${KUBECTL} config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
+  ${KUBECTL} config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
+  ${KUBECTL} config set-context local --cluster=local --user=myself
+  ${KUBECTL} config use-context local
 fi

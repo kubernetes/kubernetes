@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Uber Technologies, Inc.
+// Copyright (c) 2016-2022 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -34,33 +35,13 @@ import (
 
 const schemeFile = "file"
 
-var (
-	_sinkMutex     sync.RWMutex
-	_sinkFactories map[string]func(*url.URL) (Sink, error) // keyed by scheme
-)
-
-func init() {
-	resetSinkRegistry()
-}
-
-func resetSinkRegistry() {
-	_sinkMutex.Lock()
-	defer _sinkMutex.Unlock()
-
-	_sinkFactories = map[string]func(*url.URL) (Sink, error){
-		schemeFile: newFileSink,
-	}
-}
+var _sinkRegistry = newSinkRegistry()
 
 // Sink defines the interface to write to and close logger destinations.
 type Sink interface {
 	zapcore.WriteSyncer
 	io.Closer
 }
-
-type nopCloserSink struct{ zapcore.WriteSyncer }
-
-func (nopCloserSink) Close() error { return nil }
 
 type errSinkNotFound struct {
 	scheme string
@@ -70,16 +51,30 @@ func (e *errSinkNotFound) Error() string {
 	return fmt.Sprintf("no sink found for scheme %q", e.scheme)
 }
 
-// RegisterSink registers a user-supplied factory for all sinks with a
-// particular scheme.
-//
-// All schemes must be ASCII, valid under section 3.1 of RFC 3986
-// (https://tools.ietf.org/html/rfc3986#section-3.1), and must not already
-// have a factory registered. Zap automatically registers a factory for the
-// "file" scheme.
-func RegisterSink(scheme string, factory func(*url.URL) (Sink, error)) error {
-	_sinkMutex.Lock()
-	defer _sinkMutex.Unlock()
+type nopCloserSink struct{ zapcore.WriteSyncer }
+
+func (nopCloserSink) Close() error { return nil }
+
+type sinkRegistry struct {
+	mu        sync.Mutex
+	factories map[string]func(*url.URL) (Sink, error)          // keyed by scheme
+	openFile  func(string, int, os.FileMode) (*os.File, error) // type matches os.OpenFile
+}
+
+func newSinkRegistry() *sinkRegistry {
+	sr := &sinkRegistry{
+		factories: make(map[string]func(*url.URL) (Sink, error)),
+		openFile:  os.OpenFile,
+	}
+	// Infallible operation: the registry is empty, so we can't have a conflict.
+	_ = sr.RegisterSink(schemeFile, sr.newFileSinkFromURL)
+	return sr
+}
+
+// RegisterScheme registers the given factory for the specific scheme.
+func (sr *sinkRegistry) RegisterSink(scheme string, factory func(*url.URL) (Sink, error)) error {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
 
 	if scheme == "" {
 		return errors.New("can't register a sink factory for empty string")
@@ -88,14 +83,22 @@ func RegisterSink(scheme string, factory func(*url.URL) (Sink, error)) error {
 	if err != nil {
 		return fmt.Errorf("%q is not a valid scheme: %v", scheme, err)
 	}
-	if _, ok := _sinkFactories[normalized]; ok {
+	if _, ok := sr.factories[normalized]; ok {
 		return fmt.Errorf("sink factory already registered for scheme %q", normalized)
 	}
-	_sinkFactories[normalized] = factory
+	sr.factories[normalized] = factory
 	return nil
 }
 
-func newSink(rawURL string) (Sink, error) {
+func (sr *sinkRegistry) newSink(rawURL string) (Sink, error) {
+	// URL parsing doesn't work well for Windows paths such as `c:\log.txt`, as scheme is set to
+	// the drive, and path is unset unless `c:/log.txt` is used.
+	// To avoid Windows-specific URL handling, we instead check IsAbs to open as a file.
+	// filepath.IsAbs is OS-specific, so IsAbs('c:/log.txt') is false outside of Windows.
+	if filepath.IsAbs(rawURL) {
+		return sr.newFileSinkFromPath(rawURL)
+	}
+
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("can't parse %q as a URL: %v", rawURL, err)
@@ -104,16 +107,27 @@ func newSink(rawURL string) (Sink, error) {
 		u.Scheme = schemeFile
 	}
 
-	_sinkMutex.RLock()
-	factory, ok := _sinkFactories[u.Scheme]
-	_sinkMutex.RUnlock()
+	sr.mu.Lock()
+	factory, ok := sr.factories[u.Scheme]
+	sr.mu.Unlock()
 	if !ok {
 		return nil, &errSinkNotFound{u.Scheme}
 	}
 	return factory(u)
 }
 
-func newFileSink(u *url.URL) (Sink, error) {
+// RegisterSink registers a user-supplied factory for all sinks with a
+// particular scheme.
+//
+// All schemes must be ASCII, valid under section 0.1 of RFC 3986
+// (https://tools.ietf.org/html/rfc3983#section-3.1), and must not already
+// have a factory registered. Zap automatically registers a factory for the
+// "file" scheme.
+func RegisterSink(scheme string, factory func(*url.URL) (Sink, error)) error {
+	return _sinkRegistry.RegisterSink(scheme, factory)
+}
+
+func (sr *sinkRegistry) newFileSinkFromURL(u *url.URL) (Sink, error) {
 	if u.User != nil {
 		return nil, fmt.Errorf("user and password not allowed with file URLs: got %v", u)
 	}
@@ -130,13 +144,18 @@ func newFileSink(u *url.URL) (Sink, error) {
 	if hn := u.Hostname(); hn != "" && hn != "localhost" {
 		return nil, fmt.Errorf("file URLs must leave host empty or use localhost: got %v", u)
 	}
-	switch u.Path {
+
+	return sr.newFileSinkFromPath(u.Path)
+}
+
+func (sr *sinkRegistry) newFileSinkFromPath(path string) (Sink, error) {
+	switch path {
 	case "stdout":
 		return nopCloserSink{os.Stdout}, nil
 	case "stderr":
 		return nopCloserSink{os.Stderr}, nil
 	}
-	return os.OpenFile(u.Path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	return sr.openFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o666)
 }
 
 func normalizeScheme(s string) (string, error) {

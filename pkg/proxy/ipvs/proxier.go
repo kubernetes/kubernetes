@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -253,7 +256,7 @@ type Proxier struct {
 	iptables       utiliptables.Interface
 	ipvs           utilipvs.Interface
 	ipset          utilipset.Interface
-	exec           utilexec.Interface
+	conntrack      conntrack.Interface
 	masqueradeAll  bool
 	masqueradeMark string
 	localDetector  proxyutiliptables.LocalTrafficDetector
@@ -410,7 +413,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings, nil)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
@@ -430,7 +433,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		iptables:              ipt,
 		masqueradeAll:         masqueradeAll,
 		masqueradeMark:        masqueradeMark,
-		exec:                  exec,
+		conntrack:             conntrack.NewExec(exec),
 		localDetector:         localDetector,
 		hostname:              hostname,
 		nodeIP:                nodeIP,
@@ -489,10 +492,8 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 
-	safeIpset := newSafeIpset(ipset)
-
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
+	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, ipset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol], recorder,
@@ -501,7 +502,7 @@ func NewDualStackProxier(
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, safeIpset, sysctl,
+	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, ipset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol], recorder,
@@ -891,6 +892,10 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 func (proxier *Proxier) OnNodeSynced() {
 }
 
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
+
 // This is where all of the ipvs calls happen.
 func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
@@ -1096,10 +1101,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture externalIPs.
-		for _, externalIP := range svcInfo.ExternalIPStrings() {
+		for _, externalIP := range svcInfo.ExternalIPs() {
 			// ipset call
 			entry := &utilipset.Entry{
-				IP:       externalIP,
+				IP:       externalIP.String(),
 				Port:     svcInfo.Port(),
 				Protocol: protocol,
 				SetType:  utilipset.HashIPPort,
@@ -1122,7 +1127,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// ipvs call
 			serv := &utilipvs.VirtualServer{
-				Address:   netutils.ParseIPSloppy(externalIP),
+				Address:   externalIP,
 				Port:      uint16(svcInfo.Port()),
 				Protocol:  string(svcInfo.Protocol()),
 				Scheduler: proxier.ipvsScheduler,
@@ -1151,10 +1156,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerVIPStrings() {
+		for _, ingress := range svcInfo.LoadBalancerVIPs() {
 			// ipset call
 			entry = &utilipset.Entry{
-				IP:       ingress,
+				IP:       ingress.String(),
 				Port:     svcInfo.Port(),
 				Protocol: protocol,
 				SetType:  utilipset.HashIPPort,
@@ -1186,13 +1191,13 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				proxier.ipsetList[kubeLoadBalancerFWSet].activeEntries.Insert(entry.String())
 				allowFromNode := false
-				for _, src := range svcInfo.LoadBalancerSourceRanges() {
+				for _, cidr := range svcInfo.LoadBalancerSourceRanges() {
 					// ipset call
 					entry = &utilipset.Entry{
-						IP:       ingress,
+						IP:       ingress.String(),
 						Port:     svcInfo.Port(),
 						Protocol: protocol,
-						Net:      src,
+						Net:      cidr.String(),
 						SetType:  utilipset.HashIPPortNet,
 					}
 					// enumerate all white list source cidr
@@ -1202,8 +1207,6 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 					proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
 
-					// ignore error because it has been validated
-					_, cidr, _ := netutils.ParseCIDRSloppy(src)
 					if cidr.Contains(proxier.nodeIP) {
 						allowFromNode = true
 					}
@@ -1213,10 +1216,10 @@ func (proxier *Proxier) syncProxyRules() {
 				// Need to add the following rule to allow request on host.
 				if allowFromNode {
 					entry = &utilipset.Entry{
-						IP:       ingress,
+						IP:       ingress.String(),
 						Port:     svcInfo.Port(),
 						Protocol: protocol,
-						IP2:      ingress,
+						IP2:      ingress.String(),
 						SetType:  utilipset.HashIPPortIP,
 					}
 					// enumerate all white list source ip
@@ -1233,7 +1236,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			// ipvs call
 			serv := &utilipvs.VirtualServer{
-				Address:   netutils.ParseIPSloppy(ingress),
+				Address:   ingress,
 				Port:      uint16(svcInfo.Port()),
 				Protocol:  string(svcInfo.Protocol()),
 				Scheduler: proxier.ipvsScheduler,
@@ -1483,7 +1486,7 @@ func (proxier *Proxier) syncProxyRules() {
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
 
 	// Finish housekeeping, clear stale conntrack entries for UDP Services
-	conntrack.CleanStaleEntries(proxier.ipFamily == v1.IPv6Protocol, proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
+	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed
@@ -1677,6 +1680,9 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name, "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
+		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name, "dst,dst", "-j", "RETURN")
+	proxier.filterRules.Write(
+		"-A", string(kubeIPVSFilterChain),
 		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
@@ -1865,7 +1871,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	// Create new endpoints
-	for _, ep := range sets.List(newEndpoints) {
+	for _, ep := range newEndpoints.UnsortedList() {
 		ip, port, err := net.SplitHostPort(ep)
 		if err != nil {
 			klog.ErrorS(err, "Failed to parse endpoint", "endpoint", ep)

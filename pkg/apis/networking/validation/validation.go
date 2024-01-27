@@ -32,7 +32,7 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -593,7 +593,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		return allErrs
 	}
 
-	scope := utilpointer.StringDeref(params.Scope, "")
+	scope := ptr.Deref(params.Scope, "")
 
 	if !supportedIngressClassParametersReferenceScopes.Has(scope) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,

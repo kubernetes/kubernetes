@@ -435,17 +435,6 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		t.Run("inconsistent", func(t *testing.T) {
-			ctx := context.Background()
-			defer func() { fakeHTTP.req = nil }()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
-			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
-			testContainer.Lifecycle = httpLifeCycle
-			_ = m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod, nil)
-			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
-				t.Errorf("HTTP Prestop hook was not invoked")
-			}
-		})
 		t.Run("consistent", func(t *testing.T) {
 			ctx := context.Background()
 			defer func() { fakeHTTP.req = nil }()

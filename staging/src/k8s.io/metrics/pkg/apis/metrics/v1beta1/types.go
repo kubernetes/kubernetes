@@ -76,6 +76,7 @@ type PodMetrics struct {
 	Window    metav1.Duration `json:"window" protobuf:"bytes,3,opt,name=window"`
 
 	// Metrics for all containers are collected within the same time window.
+	// +listType=atomic
 	Containers []ContainerMetrics `json:"containers" protobuf:"bytes,4,rep,name=containers"`
 }
 

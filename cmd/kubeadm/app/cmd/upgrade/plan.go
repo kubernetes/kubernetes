@@ -36,6 +36,7 @@ import (
 
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
@@ -45,6 +46,12 @@ import (
 type planFlags struct {
 	*applyPlanFlags
 }
+
+var upgradePlanLongDesc = cmdutil.LongDesc(`
+	Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.
+	This command can only run on the control plane nodes where the kubeconfig file "admin.conf" exists.
+	To skip the internet check, pass in the optional [version] parameter.
+`)
 
 // newCmdPlan returns the cobra command for `kubeadm upgrade plan`
 func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
@@ -56,7 +63,8 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "plan [version] [flags]",
-		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter",
+		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.",
+		Long:  upgradePlanLongDesc,
 		RunE: func(_ *cobra.Command, args []string) error {
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {

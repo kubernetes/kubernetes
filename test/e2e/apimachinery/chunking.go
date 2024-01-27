@@ -191,7 +191,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		opts.Continue = inconsistentToken
 		list, err = client.List(ctx, opts)
 		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given inconsistent continue token %s and limit: %d", ns, opts.Continue, opts.Limit)
-		framework.ExpectNotEqual(list.ResourceVersion, firstRV)
+		gomega.Expect(list.ResourceVersion).ToNot(gomega.Equal(firstRV))
 		gomega.Expect(len(list.Items)).To(gomega.BeNumerically("==", opts.Limit))
 		found := int(oneTenth)
 

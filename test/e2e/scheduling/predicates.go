@@ -829,7 +829,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		ginkgo.By("Expect all pods stay in pending state")
 		podList, err := e2epod.WaitForNumberOfPods(ctx, cs, ns, replicas, time.Minute)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(cs, ns, replicas, time.Minute))
+		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(ctx, cs, ns, replicas, time.Minute))
 
 		ginkgo.By("Remove one scheduling gate")
 		want := []v1.PodSchedulingGate{{Name: "bar"}}
@@ -843,8 +843,8 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}
 
 		ginkgo.By("Expect all pods carry one scheduling gate and are still in pending state")
-		framework.ExpectNoError(e2epod.WaitForPodsWithSchedulingGates(cs, ns, replicas, time.Minute, want))
-		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(cs, ns, replicas, time.Minute))
+		framework.ExpectNoError(e2epod.WaitForPodsWithSchedulingGates(ctx, cs, ns, replicas, time.Minute, want))
+		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(ctx, cs, ns, replicas, time.Minute))
 
 		ginkgo.By("Remove the remaining scheduling gates")
 		for _, pod := range pods {
@@ -855,7 +855,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}
 
 		ginkgo.By("Expect all pods are scheduled and running")
-		framework.ExpectNoError(e2epod.WaitForPodsRunning(cs, ns, replicas, time.Minute))
+		framework.ExpectNoError(e2epod.WaitForPodsRunning(ctx, cs, ns, replicas, time.Minute))
 	})
 })
 
