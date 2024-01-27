@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
@@ -103,6 +104,11 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	clusterConfig := data.Cfg().ClusterConfiguration
 	if features.Enabled(clusterConfig.FeatureGates, features.WaitForAllControlPlaneComponents) {
 		waitForControlPlaneComponentsFunc = func() error {
+			if data.DryRun() {
+				fmt.Println("[dryrun] Would wait for the control plane components to be ready")
+				return nil
+			}
+
 			return controlplane.WaitForControlPlaneComponents(
 				controlplane.ControlPlaneComponents,
 				data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration,

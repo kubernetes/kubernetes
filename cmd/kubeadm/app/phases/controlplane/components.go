@@ -35,6 +35,7 @@ import (
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -101,7 +102,7 @@ func WaitForControlPlaneComponents(componentNames []string, timeout time.Duratio
 
 		pods := &v1.PodList{}
 		if err := json.Unmarshal(data, pods); err != nil {
-			fmt.Printf("[kubelet client] Error parsing pods from response body [%v]\n", err)
+			fmt.Printf("[kubelet client] Error parsing pods from response body: %q\n", data)
 			return false, nil
 		}
 
@@ -150,6 +151,13 @@ func getKubeletEndpoint(configFile string) (string, error) {
 
 	if err := yaml.Unmarshal(data, config); err != nil {
 		return "", err
+	}
+
+	if config.Authorization.Mode == kubeletconfig.KubeletAuthorizationModeWebhook {
+		// make sure cluster admins role binding is created, thus request to kubelet will pass server authorization
+		if _, err := kubeconfig.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil); err != nil {
+			return "", err
+		}
 	}
 
 	kubeletPort := config.Port
