@@ -473,6 +473,7 @@ func TestPlugin(t *testing.T) {
 								Obj()
 						},
 					},
+					status: framework.NewStatus(framework.Unschedulable, `deallocation of ResourceClaim completed`),
 				},
 			},
 		},
