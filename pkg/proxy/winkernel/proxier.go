@@ -593,7 +593,7 @@ type Proxier struct {
 	// with some partial data after kube-proxy restart.
 	endpointSlicesSynced bool
 	servicesSynced       bool
-	initialized          int32
+	initialized          atomic.Int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	// These are effectively const and do not need the mutex to be held.
 	clusterCIDR string
@@ -934,11 +934,11 @@ func (proxier *Proxier) setInitialized(value bool) {
 	if value {
 		initialized = 1
 	}
-	atomic.StoreInt32(&proxier.initialized, initialized)
+	proxier.initialized.Store(initialized)
 }
 
 func (proxier *Proxier) isInitialized() bool {
-	return atomic.LoadInt32(&proxier.initialized) > 0
+	return proxier.initialized.Load() > 0
 }
 
 // OnServiceAdd is called whenever creation of new service object
