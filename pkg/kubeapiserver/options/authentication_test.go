@@ -231,13 +231,33 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "overlapping client-ca and requestheader-client-ca-file without requestheader-allowed-names",
 			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{
-				ClientCA: "same-ca-file",
+				ClientCA: "/etc/kubernetes/pki/ca.crt",
 			},
 			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
-				ClientCAFile: "same-ca-file",
+				ClientCAFile: "/etc/kubernetes/pki/ca.crt",
 				AllowedNames: []string{}, // Empty on purpose
 			},
 			expectErr: "when 'requestheader-client-ca-file' and 'client-ca-file' are the same, 'requestheader-allowed-names' must be specified",
+		},
+		{
+			name: "overlapping client-ca and requestheader-client-ca-file with requestheader-allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{
+				ClientCA: "/etc/kubernetes/pki/ca.crt",
+			},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+				AllowedNames: []string{"foo"},
+			},
+		},
+		{
+			name: "different client-ca and requestheader-client-ca-file without requestheader-allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{
+				ClientCA: "/etc/kubernetes/pki/ca.crt",
+			},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile: "/etc/kubernetes/pki/requestheader-ca.crt",
+				AllowedNames: []string{},
+			},
 		},
 	}
 
