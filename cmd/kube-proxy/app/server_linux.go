@@ -172,7 +172,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		if dualStack {
 			ipt, _ := getIPTables(s.PrimaryIPFamily)
 
-			localDetectors = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
+			localDetectors = getDualStackLocalDetectorTuple(logger, config, s.podCIDRs)
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewDualStackProxier(
@@ -196,7 +196,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
 			_, iptInterface := getIPTables(s.PrimaryIPFamily)
-			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config, s.podCIDRs)
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
@@ -236,7 +236,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			ipt, _ := getIPTables(s.PrimaryIPFamily)
 
 			// Always ordered to match []ipt
-			localDetectors = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
+			localDetectors = getDualStackLocalDetectorTuple(logger, config, s.podCIDRs)
 
 			proxier, err = ipvs.NewDualStackProxier(
 				ctx,
@@ -265,7 +265,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			)
 		} else {
 			_, iptInterface := getIPTables(s.PrimaryIPFamily)
-			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config, s.podCIDRs)
 
 			proxier, err = ipvs.NewProxier(
 				ctx,
@@ -301,7 +301,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		logger.Info("Using nftables Proxier")
 
 		if dualStack {
-			localDetectors = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
+			localDetectors = getDualStackLocalDetectorTuple(logger, config, s.podCIDRs)
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewDualStackProxier(
@@ -321,7 +321,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack
-			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config, s.podCIDRs)
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewProxier(
@@ -484,8 +484,8 @@ func detectNumCPU() int {
 	return numCPU
 }
 
-func getLocalDetector(logger klog.Logger, ipFamily v1.IPFamily, mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) proxyutil.LocalTrafficDetector {
-	switch mode {
+func getLocalDetector(logger klog.Logger, ipFamily v1.IPFamily, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) proxyutil.LocalTrafficDetector {
+	switch config.DetectLocalMode {
 	case proxyconfigapi.LocalModeClusterCIDR:
 		// LocalModeClusterCIDR is the default if --detect-local-mode wasn't passed,
 		// but --cluster-cidr is optional.
@@ -521,10 +521,10 @@ func getLocalDetector(logger klog.Logger, ipFamily v1.IPFamily, mode proxyconfig
 	return proxyutil.NewNoOpLocalDetector()
 }
 
-func getDualStackLocalDetectorTuple(logger klog.Logger, mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) [2]proxyutil.LocalTrafficDetector {
+func getDualStackLocalDetectorTuple(logger klog.Logger, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) [2]proxyutil.LocalTrafficDetector {
 	return [2]proxyutil.LocalTrafficDetector{
-		getLocalDetector(logger, v1.IPv4Protocol, mode, config, nodePodCIDRs),
-		getLocalDetector(logger, v1.IPv6Protocol, mode, config, nodePodCIDRs),
+		getLocalDetector(logger, v1.IPv4Protocol, config, nodePodCIDRs),
+		getLocalDetector(logger, v1.IPv6Protocol, config, nodePodCIDRs),
 	}
 }
 
