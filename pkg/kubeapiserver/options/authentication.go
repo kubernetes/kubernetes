@@ -269,6 +269,26 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 
 	if o.RequestHeader != nil {
 		allErrors = append(allErrors, o.RequestHeader.Validate()...)
+		if o.ClientCert != nil {
+			// Enforce 'requestheader-allowed-names' check when 'requestheader-client-ca-file'
+			// and 'client-ca-file' are the same and not empty, to prevent unauthorized privilege escalation.
+			// TODO: Add an unit test for this.
+			clientCA := strings.TrimSpace(o.ClientCert.ClientCA)
+			requestHeaderClientCA := strings.TrimSpace(o.RequestHeader.ClientCAFile)
+			if len(clientCA) != 0 && clientCA == requestHeaderClientCA {
+				numValidNames := 0
+				for _, allowedName := range o.RequestHeader.AllowedNames {
+					if len(strings.TrimSpace(allowedName)) != 0 {
+						numValidNames++
+					}
+				}
+
+				if numValidNames == 0 {
+					errMsg := fmt.Errorf("when 'requestheader-client-ca-file' and 'client-ca-file' are the same, 'requestheader-allowed-names' must be specified")
+					allErrors = append(allErrors, errMsg)
+				}
+			}
+		}
 	}
 
 	return allErrors

@@ -96,22 +96,22 @@ func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error 
 	return err
 }
 
-func validateRequestHeaderConfig(options *Options) []error {
-	var errs []error
+// func validateRequestHeaderConfig(options *Options) []error {
+// 	var errs []error
 
-	requestHeaderCAFile := options.Authentication.RequestHeader.ClientCAFile
-	clientCAFile := options.Authentication.ClientCert.ClientCA
-	requestHeaderAllowedNames := options.Authentication.RequestHeader.AllowedNames
+// 	requestHeaderCAFile := options.Authentication.RequestHeader.ClientCAFile
+// 	clientCAFile := options.Authentication.ClientCert.ClientCA
+// 	requestHeaderAllowedNames := options.Authentication.RequestHeader.AllowedNames
 
-	// Enforce 'requestheader-allowed-names' check when 'requestheader-client-ca-file'
-	// and 'client-ca-file' are the same and not empty, to prevent unauthorized privilege escalation.
-	if requestHeaderCAFile != "" && requestHeaderCAFile == clientCAFile && len(requestHeaderAllowedNames) == 0 {
-		errMsg := fmt.Errorf("when 'requestheader-client-ca-file' and 'client-ca-file' are the same, 'requestheader-allowed-names' must be specified")
-		errs = append(errs, errMsg)
-	}
+// 	// Enforce 'requestheader-allowed-names' check when 'requestheader-client-ca-file'
+// 	// and 'client-ca-file' are the same and not empty, to prevent unauthorized privilege escalation.
+// 	if requestHeaderCAFile != "" && requestHeaderCAFile == clientCAFile && len(requestHeaderAllowedNames) == 0 {
+// 		errMsg := fmt.Errorf("when 'requestheader-client-ca-file' and 'client-ca-file' are the same, 'requestheader-allowed-names' must be specified")
+// 		errs = append(errs, errMsg)
+// 	}
 
-	return errs
-}
+// 	return errs
+// }
 
 // Validate checks Options and return a slice of found errs.
 func (s *Options) Validate() []error {
@@ -129,7 +129,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFeature()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
-	errs = append(errs, validateRequestHeaderConfig(s)...)
+	// errs = append(errs, validateRequestHeaderConfig(s)...)
 
 	return errs
 }

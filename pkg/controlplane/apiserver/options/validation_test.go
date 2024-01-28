@@ -162,79 +162,79 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 	}
 }
 
-func TestValidateRequestHeaderConfig(t *testing.T) {
-	testCases := []struct {
-		name                 string
-		options              *Options
-		expectErrors         bool
-		errorMessageContains string
-	}{
-		{
-			name: "Same CA Files Without Allowed Names",
-			options: &Options{
-				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
-					RequestHeader: &genericoptions.RequestHeaderAuthenticationOptions{
-						ClientCAFile: "/etc/kubernetes/pki/ca.crt",
-						AllowedNames: []string{},
-					},
-					ClientCert: &genericoptions.ClientCertAuthenticationOptions{
-						ClientCA: "/etc/kubernetes/pki/ca.crt",
-					},
-				},
-			},
-			expectErrors:         true,
-			errorMessageContains: "'requestheader-allowed-names' must be specified",
-		},
-		{
-			name: "Same CA Files With Allowed Names",
-			options: &Options{
-				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
-					RequestHeader: &genericoptions.RequestHeaderAuthenticationOptions{
-						ClientCAFile: "/etc/kubernetes/pki/ca.crt",
-						AllowedNames: []string{"foo"},
-					},
-					ClientCert: &genericoptions.ClientCertAuthenticationOptions{
-						ClientCA: "/etc/kubernetes/pki/ca.crt",
-					},
-				},
-			},
-			expectErrors: false,
-		},
-		{
-			name: "Different CA Files",
-			options: &Options{
-				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
-					RequestHeader: &genericoptions.RequestHeaderAuthenticationOptions{
-						ClientCAFile: "/etc/kubernetes/pki/requestheader-ca.crt",
-						AllowedNames: []string{},
-					},
-					ClientCert: &genericoptions.ClientCertAuthenticationOptions{
-						ClientCA: "/etc/kubernetes/pki/ca.crt",
-					},
-				},
-			},
-			expectErrors: false,
-		},
-	}
+// func TestValidateRequestHeaderConfig(t *testing.T) {
+// 	testCases := []struct {
+// 		name                 string
+// 		options              *Options
+// 		expectErrors         bool
+// 		errorMessageContains string
+// 	}{
+// 		{
+// 			name: "Same CA Files Without Allowed Names",
+// 			options: &Options{
+// 				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
+// 					RequestHeader: &genericoptions.RequestHeaderAuthenticationOptions{
+// 						ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+// 						AllowedNames: []string{},
+// 					},
+// 					ClientCert: &genericoptions.ClientCertAuthenticationOptions{
+// 						ClientCA: "/etc/kubernetes/pki/ca.crt",
+// 					},
+// 				},
+// 			},
+// 			expectErrors:         true,
+// 			errorMessageContains: "'requestheader-allowed-names' must be specified",
+// 		},
+// 		{
+// 			name: "Same CA Files With Allowed Names",
+// 			options: &Options{
+// 				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
+// 					RequestHeader: &genericoptions.RequestHeaderAuthenticationOptions{
+// 						ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+// 						AllowedNames: []string{"foo"},
+// 					},
+// 					ClientCert: &genericoptions.ClientCertAuthenticationOptions{
+// 						ClientCA: "/etc/kubernetes/pki/ca.crt",
+// 					},
+// 				},
+// 			},
+// 			expectErrors: false,
+// 		},
+// 		{
+// 			name: "Different CA Files",
+// 			options: &Options{
+// 				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
+// 					RequestHeader: &genericoptions.RequestHeaderAuthenticationOptions{
+// 						ClientCAFile: "/etc/kubernetes/pki/requestheader-ca.crt",
+// 						AllowedNames: []string{},
+// 					},
+// 					ClientCert: &genericoptions.ClientCertAuthenticationOptions{
+// 						ClientCA: "/etc/kubernetes/pki/ca.crt",
+// 					},
+// 				},
+// 			},
+// 			expectErrors: false,
+// 		},
+// 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			errs := validateRequestHeaderConfig(tc.options)
-			gotError := len(errs) > 0
+// 	for _, tc := range testCases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			errs := validateRequestHeaderConfig(tc.options)
+// 			gotError := len(errs) > 0
 
-			if gotError != tc.expectErrors {
-				t.Errorf("%s: expected error: %v, got: %v, errors: %+v", tc.name, tc.expectErrors, gotError, errs)
-			}
+// 			if gotError != tc.expectErrors {
+// 				t.Errorf("%s: expected error: %v, got: %v, errors: %+v", tc.name, tc.expectErrors, gotError, errs)
+// 			}
 
-			if tc.expectErrors && gotError {
-				errMessage := errs[0].Error()
-				if !strings.Contains(errMessage, tc.errorMessageContains) {
-					t.Errorf("%s: expected error message to contain '%s', got '%s'", tc.name, tc.errorMessageContains, errMessage)
-				}
-			}
-		})
-	}
-}
+// 			if tc.expectErrors && gotError {
+// 				errMessage := errs[0].Error()
+// 				if !strings.Contains(errMessage, tc.errorMessageContains) {
+// 					t.Errorf("%s: expected error message to contain '%s', got '%s'", tc.name, tc.errorMessageContains, errMessage)
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
 func TestValidateUnknownVersionInteroperabilityProxyFeature(t *testing.T) {
 	const conflict = "UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled"
