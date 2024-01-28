@@ -266,17 +266,17 @@ func commentToConformanceData(comment string) *ConformanceData {
 		if len(line) == 0 {
 			continue
 		}
-		if sline := regexp.MustCompile("^Testname\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+		if sline := regexp.MustCompile(`^Testname\s*:\s*`).Split(line, -1); len(sline) == 2 {
 			curLine = "Testname"
 			cd.TestName = sline[1]
 			continue
 		}
-		if sline := regexp.MustCompile("^Release\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+		if sline := regexp.MustCompile(`^Release\s*:\s*`).Split(line, -1); len(sline) == 2 {
 			curLine = "Release"
 			cd.Release = sline[1]
 			continue
 		}
-		if sline := regexp.MustCompile("^Description\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+		if sline := regexp.MustCompile(`^Description\s*:\s*`).Split(line, -1); len(sline) == 2 {
 			curLine = "Description"
 			descLines = append(descLines, sline[1])
 			continue

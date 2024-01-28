@@ -59,7 +59,7 @@ const (
 
 // TODO support other ports besides 80
 var (
-	portForwardRegexp = regexp.MustCompile("Forwarding from (127.0.0.1|\\[::1\\]):([0-9]+) -> 80")
+	portForwardRegexp = regexp.MustCompile(`Forwarding from (127.0.0.1|\[::1\]):([0-9]+) -> 80`)
 )
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bindAddress string) *v1.Pod {
