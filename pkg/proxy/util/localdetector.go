@@ -17,8 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-
 	netutils "k8s.io/utils/net"
 )
 
@@ -77,15 +75,11 @@ func NewNoOpLocalDetector() LocalTrafficDetector {
 }
 
 // NewDetectLocalByCIDR returns a LocalTrafficDetector that considers traffic from the
-// provided cidr to be from a local pod, and other traffic to be non-local.
-func NewDetectLocalByCIDR(cidr string) (LocalTrafficDetector, error) {
-	_, parsed, err := netutils.ParseCIDRSloppy(cidr)
-	if err != nil {
-		return nil, err
-	}
-
+// provided cidr to be from a local pod, and other traffic to be non-local. cidr is
+// assumed to be valid.
+func NewDetectLocalByCIDR(cidr string) LocalTrafficDetector {
 	nftFamily := "ip"
-	if netutils.IsIPv6CIDR(parsed) {
+	if netutils.IsIPv6CIDRString(cidr) {
 		nftFamily = "ip6"
 	}
 
@@ -94,35 +88,29 @@ func NewDetectLocalByCIDR(cidr string) (LocalTrafficDetector, error) {
 		ifNotLocal:    []string{"!", "-s", cidr},
 		ifLocalNFT:    []string{nftFamily, "saddr", cidr},
 		ifNotLocalNFT: []string{nftFamily, "saddr", "!=", cidr},
-	}, nil
+	}
 }
 
 // NewDetectLocalByBridgeInterface returns a LocalTrafficDetector that considers traffic
 // from interfaceName to be from a local pod, and traffic from other interfaces to be
 // non-local.
-func NewDetectLocalByBridgeInterface(interfaceName string) (LocalTrafficDetector, error) {
-	if len(interfaceName) == 0 {
-		return nil, fmt.Errorf("no bridge interface name set")
-	}
+func NewDetectLocalByBridgeInterface(interfaceName string) LocalTrafficDetector {
 	return &detectLocal{
 		ifLocal:       []string{"-i", interfaceName},
 		ifNotLocal:    []string{"!", "-i", interfaceName},
 		ifLocalNFT:    []string{"iif", interfaceName},
 		ifNotLocalNFT: []string{"iif", "!=", interfaceName},
-	}, nil
+	}
 }
 
 // NewDetectLocalByInterfaceNamePrefix returns a LocalTrafficDetector that considers
 // traffic from interfaces starting with interfacePrefix to be from a local pod, and
 // traffic from other interfaces to be non-local.
-func NewDetectLocalByInterfaceNamePrefix(interfacePrefix string) (LocalTrafficDetector, error) {
-	if len(interfacePrefix) == 0 {
-		return nil, fmt.Errorf("no interface prefix set")
-	}
+func NewDetectLocalByInterfaceNamePrefix(interfacePrefix string) LocalTrafficDetector {
 	return &detectLocal{
 		ifLocal:       []string{"-i", interfacePrefix + "+"},
 		ifNotLocal:    []string{"!", "-i", interfacePrefix + "+"},
 		ifLocalNFT:    []string{"iif", interfacePrefix + "*"},
 		ifNotLocalNFT: []string{"iif", "!=", interfacePrefix + "*"},
-	}, nil
+	}
 }

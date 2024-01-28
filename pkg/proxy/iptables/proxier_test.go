@@ -93,7 +93,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		ipfamily = v1.IPv6Protocol
 		podCIDR = "fd00:10::/64"
 	}
-	detectLocal, _ := proxyutil.NewDetectLocalByCIDR(podCIDR)
+	detectLocal := proxyutil.NewDetectLocalByCIDR(podCIDR)
 
 	networkInterfacer := proxyutiltest.NewFakeNetwork()
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
