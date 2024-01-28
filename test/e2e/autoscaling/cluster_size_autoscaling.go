@@ -1844,10 +1844,7 @@ type scaleUpStatus struct {
 // Try to get timestamp from status.
 // Status configmap is not parsing-friendly, so evil regexpery follows.
 func getStatusTimestamp(status string) (time.Time, error) {
-	timestampMatcher, err := regexp.Compile(`Cluster-autoscaler status at \s*([0-9\-]+ [0-9]+:[0-9]+:[0-9]+\.[0-9]+ \+[0-9]+ [A-Za-z]+)`)
-	if err != nil {
-		return time.Time{}, err
-	}
+	timestampMatcher := regexp.MustCompile(`Cluster-autoscaler status at \s*([0-9\-]+ [0-9]+:[0-9]+:[0-9]+\.[0-9]+ \+[0-9]+ [A-Za-z]+)`)
 
 	timestampMatch := timestampMatcher.FindStringSubmatch(status)
 	if len(timestampMatch) < 2 {
@@ -1878,10 +1875,7 @@ func getScaleUpStatus(ctx context.Context, c clientset.Interface) (*scaleUpStatu
 		return nil, err
 	}
 
-	matcher, err := regexp.Compile(`s*ScaleUp:\s*([A-Za-z]+)\s*\(ready=([0-9]+)\s*cloudProviderTarget=([0-9]+)\s*\)`)
-	if err != nil {
-		return nil, err
-	}
+	matcher := regexp.MustCompile(`s*ScaleUp:\s*([A-Za-z]+)\s*\(ready=([0-9]+)\s*cloudProviderTarget=([0-9]+)\s*\)`)
 	matches := matcher.FindAllStringSubmatch(status, -1)
 	if len(matches) < 1 {
 		return nil, fmt.Errorf("Failed to parse CA status configmap, raw status: %v", status)
