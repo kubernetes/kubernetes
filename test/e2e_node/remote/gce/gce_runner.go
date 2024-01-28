@@ -80,14 +80,14 @@ func init() {
 	flag.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
 }
 
-const (
-	defaultGCEMachine = "e2-standard-2"
-)
-
 type GCERunner struct {
 	cfg       remote.Config
 	gceImages *internalGCEImageConfig
 }
+
+const (
+	defaultGCEMachine = "e2-standard-2"
+)
 
 func NewGCERunner(cfg remote.Config) remote.Runner {
 	if cfg.InstanceNamePrefix == "" {
@@ -470,6 +470,9 @@ func (g *GCERunner) testGCEImage(suite remote.TestSuite, archivePath string, ima
 	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
 	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
 	contents, err := g.getSerialOutput(host)
+	if err != nil {
+		klog.Errorf("Failed to get serial Output from node %q : %v", host, err)
+	}
 	logFilename := "serial-1.log"
 	err = remote.WriteLog(host, logFilename, contents)
 	if err != nil {
@@ -482,7 +485,7 @@ func (g *GCERunner) testGCEImage(suite remote.TestSuite, archivePath string, ima
 func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, error) {
 	data, err := runGCPCommand("compute", "project-info", "describe", "--format=json", "--project="+*project)
 	if err != nil {
-		return "", fmt.Errorf("failed to get project info for %q: %w", project, err)
+		return "", fmt.Errorf("failed to get project info for %q: %w", *project, err)
 	}
 
 	var p projectInfo
@@ -506,7 +509,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 
 	createArgs := []string{"compute", "instances", "create"}
 	createArgs = append(createArgs, name)
-	createArgs = append(createArgs, "--machine-type="+imageConfig.machine)
+	createArgs = append(createArgs, "--machine-type="+g.machineType(imageConfig.machine))
 	createArgs = append(createArgs, "--create-disk="+strings.Join(diskArgs, ","))
 	createArgs = append(createArgs, "--service-account="+serviceAccount)
 	if *preemptibleInstances {
@@ -552,7 +555,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		_, err := runGCPCommandWithZone(createArgs...)
 		if err != nil {
 			fmt.Println(err)
-			return "", fmt.Errorf("failed to create instance in project %q: %w", project, err)
+			return "", fmt.Errorf("failed to create instance in project %q: %w", *project, err)
 		}
 	}
 
@@ -568,7 +571,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 			continue
 		}
 		if strings.ToUpper(instance.Status) != "RUNNING" {
-			err = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
+			_ = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
 			continue
 		}
 		externalIP := g.getExternalIP(instance)
@@ -580,12 +583,12 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		output, err = remote.SSH(name, "sh", "-c",
 			"'systemctl list-units  --type=service  --state=running | grep -e containerd -e crio'")
 		if err != nil {
-			err = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
+			_ = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
 			continue
 		}
 		if !strings.Contains(output, "containerd.service") &&
 			!strings.Contains(output, "crio.service") {
-			err = fmt.Errorf("instance %s not running containerd/crio daemon: %s", name, output)
+			_ = fmt.Errorf("instance %s not running containerd/crio daemon: %s", name, output)
 			continue
 		}
 		instanceRunning = true
@@ -632,10 +635,6 @@ func (g *GCERunner) isCloudInitUsed(metadata *gceMetadata) bool {
 		}
 	}
 	return false
-}
-
-func (g *GCERunner) sourceImage(image, imageProject string) string {
-	return fmt.Sprintf("projects/%s/global/images/%s", imageProject, image)
 }
 
 func (g *GCERunner) imageToInstanceName(imageConfig *internalGCEImage) string {
@@ -723,7 +722,7 @@ func (g *GCERunner) machineType(machine string) string {
 	} else {
 		ret = defaultGCEMachine
 	}
-	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, ret)
+	return ret
 }
 
 func (g *GCERunner) rebootInstance(instance *gceInstance) error {

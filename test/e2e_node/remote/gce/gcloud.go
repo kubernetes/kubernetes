@@ -25,7 +25,7 @@ import (
 type gceImage struct {
 	CreationTimestamp string `json:"creationTimestamp"`
 	Family            string `json:"family"`
-	Id                string `json:"id"`
+	ID                string `json:"id"`
 	Name              string `json:"name"`
 }
 
@@ -54,7 +54,7 @@ type gceInstance struct {
 	CreationTimestamp       string                 `json:"creationTimestamp"`
 	Description             string                 `json:"description"`
 	Fingerprint             string                 `json:"fingerprint"`
-	Id                      string                 `json:"id"`
+	ID                      string                 `json:"id"`
 	KeyRevocationActionType string                 `json:"keyRevocationActionType"`
 	Kind                    string                 `json:"kind"`
 	LabelFingerprint        string                 `json:"labelFingerprint"`
@@ -78,7 +78,7 @@ type projectInfo struct {
 	CreationTimestamp     string `json:"creationTimestamp"`
 	DefaultNetworkTier    string `json:"defaultNetworkTier"`
 	DefaultServiceAccount string `json:"defaultServiceAccount"`
-	Id                    string `json:"id"`
+	ID                    string `json:"id"`
 }
 
 func runGCPCommandWithZone(args ...string) ([]byte, error) {
@@ -111,7 +111,7 @@ func runGCPCommandNoProject(args ...string) ([]byte, error) {
 		} else {
 			message = fmt.Sprintf("%v", err)
 		}
-		return nil, fmt.Errorf("Unable to run gcloud command\n %s \n %w", message, err)
+		return nil, fmt.Errorf("unable to run gcloud command\n %s \n %w", message, err)
 	}
 	return bytes, nil
 }
@@ -119,7 +119,7 @@ func runGCPCommandNoProject(args ...string) ([]byte, error) {
 func getGCEInstance(host string) (*gceInstance, error) {
 	data, err := runGCPCommandWithZone("compute", "instances", "describe", host, "--format=json")
 	if err != nil {
-		return nil, fmt.Errorf("failed to describe instance in project %q: %w", project, err)
+		return nil, fmt.Errorf("failed to describe instance in project %q: %w", *project, err)
 	}
 
 	var gceHost gceInstance
@@ -133,7 +133,7 @@ func getGCEInstance(host string) (*gceInstance, error) {
 func (g *GCERunner) getSerialOutput(host string) (string, error) {
 	data, err := runGCPCommandWithZone("compute", "instances", "get-serial-port-output", "--port=1", host)
 	if err != nil {
-		return "", fmt.Errorf("failed to describe instance in project %q: %w", project, err)
+		return "", fmt.Errorf("failed to describe instance in project %q: %w", *project, err)
 	}
 	return string(data), nil
 }
