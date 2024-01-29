@@ -968,7 +968,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			// when Evented PLEG is in use, don't restart
 			// for Generic PLEG, restart as is
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus, !pleg.IsEventedPLEGInUse()) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				klog.V(3).InfoS("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
