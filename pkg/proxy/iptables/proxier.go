@@ -107,7 +107,7 @@ func NewDualStackProxier(
 	masqueradeAll bool,
 	localhostNodePorts bool,
 	masqueradeBit int,
-	localDetectors [2]proxyutil.LocalTrafficDetector,
+	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
@@ -117,15 +117,17 @@ func NewDualStackProxier(
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit,
+		localDetectors[v1.IPv4Protocol], hostname, nodeIPs[v1.IPv4Protocol],
+		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit,
+		localDetectors[v1.IPv6Protocol], hostname, nodeIPs[v1.IPv6Protocol],
+		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
