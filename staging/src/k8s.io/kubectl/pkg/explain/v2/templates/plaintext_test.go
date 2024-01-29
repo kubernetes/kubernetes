@@ -713,7 +713,6 @@ func TestPlaintext(t *testing.T) {
 			} else {
 				outputErr = tmpl.ExecuteTemplate(buf, tcase.Subtemplate, tcase.Context)
 			}
-			fmt.Println(outputErr)
 
 			output := buf.String()
 			for _, check := range tcase.Checks {
