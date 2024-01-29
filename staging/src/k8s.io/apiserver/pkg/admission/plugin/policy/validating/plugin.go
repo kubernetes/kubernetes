@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
@@ -42,6 +41,17 @@ import (
 const (
 	// PluginName indicates the name of admission plug-in
 	PluginName = "ValidatingAdmissionPolicy"
+)
+
+var (
+	compositionEnvTemplate *cel.CompositionEnv = func() *cel.CompositionEnv {
+		compositionEnvTemplate, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+		if err != nil {
+			panic(err)
+		}
+
+		return compositionEnvTemplate
+	}()
 )
 
 // Register registers a plugin
@@ -110,13 +120,8 @@ func compilePolicy(policy *Policy) Validator {
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
 
-	filterCompiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
-	if err == nil {
-		filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
-	} else {
-		//!TODO: return a validator that always fails with internal error?
-		utilruntime.HandleError(err)
-	}
+	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
+	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 
 	if len(matchConditions) > 0 {
 		matchExpressionAccessors := make([]cel.ExpressionAccessor, len(matchConditions))
