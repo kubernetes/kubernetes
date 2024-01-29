@@ -907,7 +907,7 @@ func (s *ProxyServer) Run() error {
 	if s.Config.ServiceProxyName == "" {
 		proxyName, err = labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
 	} else {
-		klog.InfoS("Will only serve", "service.kubernetes.io/service-proxy-name", s.Config.ServiceProxyName)
+		s.logger.Info("Will only serve", "service.kubernetes.io/service-proxy-name", s.Config.ServiceProxyName)
 		proxyName, err = labels.NewRequirement(apis.LabelServiceProxyName, selection.Equals, []string{s.Config.ServiceProxyName})
 	}
 	if err != nil {
