@@ -23,6 +23,7 @@ import (
 	"net"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,6 +72,11 @@ func WardleVersionToKubeVersion(ver *version.Version) *version.Version {
 		return kubeVer
 	}
 	return mappedVer
+}
+
+// AddFlags adds the apiextensions-apiserver flags to the flagset.
+func (o WardleServerOptions) AddFlags(fs *pflag.FlagSet) {
+	o.RecommendedOptions.AddFlags(fs)
 }
 
 // NewWardleServerOptions returns a new WardleServerOptions
@@ -200,7 +206,6 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(sampleopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "Wardle"
 	serverConfig.OpenAPIConfig.Info.Version = "0.1"
