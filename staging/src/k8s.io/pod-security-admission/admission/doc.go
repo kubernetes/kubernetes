@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package admission contains PodSecurity admission logic
-package admission
+package admission // import "k8s.io/pod-security-admission/admission"

@@ -25,6 +25,7 @@ import (
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "honnef.co/go/tools/cmd/staticcheck"
 	_ "sigs.k8s.io/logtools/logcheck"
+	_ "github.com/jcchavezs/porto/cmd/porto"
 
 	// benchmarking tools
 	_ "github.com/cespare/prettybench"
