@@ -109,7 +109,7 @@ Takes dictionary as argument with keys:
         {{- $subschema := index $resolved.properties (first $.FieldPath) -}}
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
-            FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
+            FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{ template "extractEnum" (dict "schema" $subschema "Document" $.Document) }}{{"\n"}}
             {{- "\n" -}}
         {{- end -}}
         {{- template "output" (set $nextContext "history" (dict) "FieldPath" (slice $.FieldPath 1) "schema" $subschema ) -}}
@@ -201,7 +201,7 @@ Takes dictionary as argument with keys:
     {{- $level := or $.level 0 -}}
     {{- $indentAmount := mul $level 2 -}}
     {{- $fieldSchema := index $.schema.properties $.name -}}
-    {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
+    {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>{{ template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document) }}
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
     {{- "\n" -}}
     {{- if not $.short -}}
@@ -279,5 +279,28 @@ Takes dictionary as argument with keys:
         {{- end -}}
     {{- else -}}
         {{- fail "expected schema argument to subtemplate 'typeguess'" -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* Check if there is any enum returns it in this format e.g.:
+
+        (enum: !=, =, =~, !~)
+
+    Can change the style of enum in future by modifying this function
+
+Takes dictionary as argument with keys:
+    schema: openapiv3 JSON schema
+    Document: openapi document
+*/ -}}
+{{- define "extractEnum" -}}
+    {{- with $.schema -}}
+        {{- if .enum -}}
+            {{- " (enum: " -}}
+            {{- range $index, $element := .enum -}}
+                {{- if gt $index 0 -}} {{- ", " -}} {{- end -}}
+                {{- $element -}}
+            {{- end -}}
+            {{- ")" -}}
+        {{- end -}}
     {{- end -}}
 {{- end -}}

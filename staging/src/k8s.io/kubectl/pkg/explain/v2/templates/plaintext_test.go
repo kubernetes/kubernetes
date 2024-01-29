@@ -648,6 +648,51 @@ func TestPlaintext(t *testing.T) {
 				checkEquals("          thefield\t<string> -required-\n"),
 			},
 		},
+		{
+			// show that extractEnum can skip empty enum slice
+			Name:        "Enum",
+			Subtemplate: "extractEnum",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"enum": []string{},
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// show that extractEnum can extract string enum and style it
+			Name:        "Enum",
+			Subtemplate: "extractEnum",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"enum": []string{"!=", "!", "=="},
+				},
+			},
+			Checks: []check{
+				checkEquals(" (enum: !=, !, ==)"),
+			},
+		},
+		{
+			// show that extractEnum can extract integer enum and style it
+			Name:        "Enum",
+			Subtemplate: "extractEnum",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"enum": []int{1, 2, 3},
+				},
+			},
+			Checks: []check{
+				checkEquals(" (enum: 1, 2, 3)"),
+			},
+		},
 	}
 
 	tmpl, err := v2.WithBuiltinTemplateFuncs(template.New("")).Parse(plaintextSource)
@@ -668,6 +713,7 @@ func TestPlaintext(t *testing.T) {
 			} else {
 				outputErr = tmpl.ExecuteTemplate(buf, tcase.Subtemplate, tcase.Context)
 			}
+			fmt.Println(outputErr)
 
 			output := buf.String()
 			for _, check := range tcase.Checks {
