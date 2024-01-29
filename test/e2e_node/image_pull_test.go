@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,13 +35,13 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// This test needs to run in serial to prevent caching of the images by other tests
+// and to prevent the wait time of image pulls to be increased by other images
 var _ = SIGDescribe("Pull Image", framework.WithSerial(), nodefeature.MaxParallelImagePull, func() {
 
 	f := framework.NewDefaultFramework("parallel-pull-image-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
-	httpdNewImage := imageutils.GetE2EImage(imageutils.HttpdNew)
 	var testpod, testpod2 *v1.Pod
 
 	ginkgo.Context("parallel image pull with MaxParallelImagePulls=5", func() {
@@ -52,38 +52,7 @@ var _ = SIGDescribe("Pull Image", framework.WithSerial(), nodefeature.MaxParalle
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			testpod = &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "httpd",
-					Namespace: f.Namespace.Name,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Name:            "httpd",
-						Image:           httpdImage,
-						ImagePullPolicy: v1.PullAlways,
-					}},
-					RestartPolicy: v1.RestartPolicyNever,
-				},
-			}
-			testpod2 = &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "httpd2",
-					Namespace: f.Namespace.Name,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Name:            "httpd-new",
-						Image:           httpdNewImage,
-						ImagePullPolicy: v1.PullAlways,
-					}},
-					RestartPolicy: v1.RestartPolicyNever,
-				},
-			}
-
-			ginkgo.By("cleanup images")
-			_ = RemoveImage(testpod.Spec.Containers[0].Image)
-			_ = RemoveImage(testpod2.Spec.Containers[0].Image)
+			testpod, testpod2 = prepareAndCleanup(ctx, f)
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("cleanup pods")
@@ -102,15 +71,15 @@ var _ = SIGDescribe("Pull Image", framework.WithSerial(), nodefeature.MaxParalle
 
 			pod := e2epod.NewPodClient(f).Create(ctx, testpod)
 			pod2 := e2epod.NewPodClient(f).Create(ctx, testpod2)
-			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
-				if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodFailed {
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Running", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+				if pod.Status.Phase == v1.PodRunning {
 					return true, nil
 				}
 				return false, nil
 			})
 			framework.ExpectNoError(err)
-			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod2.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
-				if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodFailed {
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod2.Name, "Running", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+				if pod.Status.Phase == v1.PodRunning {
 					return true, nil
 				}
 				return false, nil
@@ -160,43 +129,10 @@ var _ = SIGDescribe("Pull Image", framework.WithSerial(), nodefeature.MaxParalle
 			initialConfig.MaxParallelImagePulls = ptr.To[int32](1)
 		})
 
-		httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
-		httpdNewImage := imageutils.GetE2EImage(imageutils.HttpdNew)
 		var testpod, testpod2 *v1.Pod
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			testpod = &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "httpd",
-					Namespace: f.Namespace.Name,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Name:            "httpd",
-						Image:           httpdImage,
-						ImagePullPolicy: v1.PullAlways,
-					}},
-					RestartPolicy: v1.RestartPolicyNever,
-				},
-			}
-			testpod2 = &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "httpd2",
-					Namespace: f.Namespace.Name,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Name:            "httpd-new",
-						Image:           httpdNewImage,
-						ImagePullPolicy: v1.PullAlways,
-					}},
-					RestartPolicy: v1.RestartPolicyNever,
-				},
-			}
-
-			ginkgo.By("cleanup images")
-			_ = RemoveImage(testpod.Spec.Containers[0].Image)
-			_ = RemoveImage(testpod2.Spec.Containers[0].Image)
+			testpod, testpod2 = prepareAndCleanup(ctx, f)
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -259,6 +195,44 @@ var _ = SIGDescribe("Pull Image", framework.WithSerial(), nodefeature.MaxParalle
 
 	})
 })
+
+func prepareAndCleanup(ctx context.Context, f *framework.Framework) (testpod *v1.Pod, testpod2 *v1.Pod) {
+	httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
+	httpdNewImage := imageutils.GetE2EImage(imageutils.HttpdNew)
+	testpod = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "httpd",
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:            "httpd",
+				Image:           httpdImage,
+				ImagePullPolicy: v1.PullAlways,
+			}},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	testpod2 = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "httpd2",
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:            "httpd-new",
+				Image:           httpdNewImage,
+				ImagePullPolicy: v1.PullAlways,
+			}},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+
+	ginkgo.By("cleanup images")
+	_ = RemoveImage(ctx, testpod.Spec.Containers[0].Image)
+	_ = RemoveImage(ctx, testpod2.Spec.Containers[0].Image)
+	return
+}
 
 type pulledStruct struct {
 	pulledDuration               time.Duration
