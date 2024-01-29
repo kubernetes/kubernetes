@@ -101,7 +101,7 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 	defer res.Body.Close()
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
 	if err != nil {
-		if err == utilio.ErrLimitReached {
+		if errors.Is(err, utilio.ErrLimitReached) {
 			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
 		} else {
 			return probe.Failure, "", err
@@ -113,7 +113,7 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
 			return probe.Warning, fmt.Sprintf("Probe terminated redirects, Response body: %v", body), nil
 		}
-		if err == utilio.ErrLimitReached {
+		if errors.Is(err, utilio.ErrLimitReached) {
 			return probe.Warning, fmt.Sprintf("Non fatal body truncation for %s", url.String()), nil
 		}
 		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
