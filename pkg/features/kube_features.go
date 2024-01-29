@@ -749,6 +749,7 @@ const (
 	// owner: @alexanderConstantinescu
 	// kep: http://kep.k8s.io/3458
 	// beta: v1.27
+	// GA: v1.30
 	//
 	// Enables less load balancer re-configurations by the service controller
 	// (KCCM) as an effect of changing node state.
@@ -1113,7 +1114,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
 
-	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.Beta},
+	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30, remove in 1.31
 
 	StatefulSetAutoDeletePVC: {Default: true, PreRelease: featuregate.Beta},
 
