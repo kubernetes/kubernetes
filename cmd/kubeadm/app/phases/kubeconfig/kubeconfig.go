@@ -694,7 +694,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 			); err != nil {
 				lastError = err
 				if apierrors.IsAlreadyExists(err) {
-					klog.V(5).Infof("ClusterRoleBinding  %s already exists.", kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding)
+					klog.V(5).Infof("ClusterRoleBinding %s already exists.", kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding)
 					return true, nil
 				}
 				// Retry on any other type of error.
