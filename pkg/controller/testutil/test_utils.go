@@ -90,7 +90,7 @@ type FakeLegacyHandler struct {
 func (m *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	updatedNodesCopy := make([]*v1.Node, len(m.UpdatedNodes), len(m.UpdatedNodes))
+	updatedNodesCopy := make([]*v1.Node, len(m.UpdatedNodes))
 	copy(updatedNodesCopy, m.UpdatedNodes)
 	return updatedNodesCopy
 }
@@ -336,7 +336,7 @@ func (m *FakeNodeHandler) Patch(ctx context.Context, name string, pt types.Patch
 			klog.FromContext(ctx).Error(err, "")
 			return nil, nil
 		}
-	case types.StrategicMergePatchType:
+	case types.StrategicMergePatchType, types.ApplyPatchType:
 		if patchedObjJS, err = strategicpatch.StrategicMergePatch(originalObjJS, data, originalNode); err != nil {
 			klog.FromContext(ctx).Error(err, "")
 			return nil, nil
@@ -373,7 +373,7 @@ func (m *FakeNodeHandler) Apply(ctx context.Context, node *v1apply.NodeApplyConf
 	}
 	name := node.Name
 	if name == nil {
-		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+		return nil, fmt.Errorf("node.Name must be provided to Apply")
 	}
 
 	return m.Patch(ctx, *name, types.ApplyPatchType, data, patchOpts)
@@ -388,7 +388,7 @@ func (m *FakeNodeHandler) ApplyStatus(ctx context.Context, node *v1apply.NodeApp
 	}
 	name := node.Name
 	if name == nil {
-		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+		return nil, fmt.Errorf("node.Name must be provided to Apply")
 	}
 
 	return m.Patch(ctx, *name, types.ApplyPatchType, data, patchOpts, "status")
