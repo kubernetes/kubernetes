@@ -100,11 +100,9 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 	}
 	defer res.Body.Close()
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
-	var limitReached bool
 	if err != nil {
 		if err == utilio.ErrLimitReached {
 			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
-			limitReached = true
 		} else {
 			return probe.Failure, "", err
 		}
@@ -115,11 +113,11 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
 			return probe.Warning, fmt.Sprintf("Probe terminated redirects, Response body: %v", body), nil
 		}
-		if limitReached {
-			return probe.Warning, fmt.Sprintf("Non fatal body truncation for %s, Response: %v", url.String(), body), nil
-		} 
+		if err == utilio.ErrLimitReached {
+			return probe.Warning, fmt.Sprintf("Non fatal body truncation for %s", url.String()), nil
+		}
 		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-		return probe.Success, body, nil	
+		return probe.Success, body, nil
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
 	// Note: Until https://issue.k8s.io/99425 is addressed, this user-facing failure message must not contain the response body.

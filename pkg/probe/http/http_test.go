@@ -573,7 +573,7 @@ func TestHTTPProbeChecker_PayloadTruncatedAndTimeout(t *testing.T) {
 		result, body, err := prober.Probe(req, 1*time.Second)
 		assert.NoError(t, err)
 		assert.Equal(t, probe.Warning, result)
-		assert.Contains(t, body, string(truncatedPayload))
+		assert.NotContains(t, body, string(truncatedPayload))
 	})
 }
 
