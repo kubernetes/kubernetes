@@ -53,6 +53,9 @@ var _ = SIGDescribe("Pull Image", framework.WithSerial(), nodefeature.MaxParalle
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			testpod, testpod2 = prepareAndCleanup(ctx, f)
+			node := getNodeName(ctx, f)
+			testpod.Spec.NodeName = node
+			testpod2.Spec.NodeName = node		
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("cleanup pods")
@@ -65,9 +68,7 @@ var _ = SIGDescribe("Pull Image", framework.WithSerial(), nodefeature.MaxParalle
 		})
 
 		ginkgo.It("should pull immediately if no more than 5 pods", func(ctx context.Context) {
-			node := getNodeName(ctx, f)
-			testpod.Spec.NodeName = node
-			testpod2.Spec.NodeName = node
+
 
 			pod := e2epod.NewPodClient(f).Create(ctx, testpod)
 			pod2 := e2epod.NewPodClient(f).Create(ctx, testpod2)
