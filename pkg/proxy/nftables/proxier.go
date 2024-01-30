@@ -215,6 +215,11 @@ func NewProxier(ctx context.Context,
 ) (*Proxier, error) {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
 
+	nft, err := getNFTablesInterface(ipFamily)
+	if err != nil {
+		return nil, err
+	}
+
 	if initOnly {
 		logger.Info("System initialized and --init-only specified")
 		return nil, nil
@@ -228,17 +233,6 @@ func NewProxier(ctx context.Context,
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
-
-	var nftablesFamily knftables.Family
-	if ipFamily == v1.IPv4Protocol {
-		nftablesFamily = knftables.IPv4Family
-	} else {
-		nftablesFamily = knftables.IPv6Family
-	}
-	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
-	if err != nil {
-		return nil, err
-	}
 
 	proxier := &Proxier{
 		ipFamily:            ipFamily,
@@ -268,6 +262,31 @@ func NewProxier(ctx context.Context,
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 
 	return proxier, nil
+}
+
+// Create a knftables.Interface and check if we can use the nftables proxy mode on this host.
+func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
+	var nftablesFamily knftables.Family
+	if ipFamily == v1.IPv4Protocol {
+		nftablesFamily = knftables.IPv4Family
+	} else {
+		nftablesFamily = knftables.IPv6Family
+	}
+
+	// We require (or rather, knftables.New does) that the nft binary be version 1.0.1
+	// or later, because versions before that would always attempt to parse the entire
+	// nft ruleset at startup, even if you were only operating on a single table.
+	// That's bad, because in some cases, new versions of nft have added new rule
+	// types in ways that triggered bugs in older versions of nft, causing them to
+	// crash. Thus, if kube-proxy used nft < 1.0.1, it could potentially get locked
+	// out of its rules because of something some other component had done in a
+	// completely different table.
+	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
+	if err != nil {
+		return nil, err
+	}
+
+	return nft, nil
 }
 
 // internal struct for string service information
