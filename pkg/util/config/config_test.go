@@ -62,23 +62,11 @@ func TestMergeInvoked(t *testing.T) {
 	mux.ChannelWithContext(ctx, "one") <- "test"
 }
 
-func TestMergeFuncInvoked(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+// mergeFunc implements the Merger interface
+type mergeFunc func(source string, update interface{}) error
 
-	ch := make(chan bool)
-	mux := NewMux(MergeFunc(func(source string, update interface{}) error {
-		if source != "one" {
-			t.Errorf("Expected %s, Got %s", "one", source)
-		}
-		if update.(string) != "test" {
-			t.Errorf("Expected %s, Got %s", "test", update)
-		}
-		ch <- true
-		return nil
-	}))
-	mux.ChannelWithContext(ctx, "one") <- "test"
-	<-ch
+func (f mergeFunc) Merge(source string, update interface{}) error {
+	return f(source, update)
 }
 
 func TestSimultaneousMerge(t *testing.T) {
@@ -86,7 +74,7 @@ func TestSimultaneousMerge(t *testing.T) {
 	defer cancel()
 
 	ch := make(chan bool, 2)
-	mux := NewMux(MergeFunc(func(source string, update interface{}) error {
+	mux := NewMux(mergeFunc(func(source string, update interface{}) error {
 		switch source {
 		case "one":
 			if update.(string) != "test" {
@@ -106,28 +94,6 @@ func TestSimultaneousMerge(t *testing.T) {
 	source2 := mux.ChannelWithContext(ctx, "two")
 	source <- "test"
 	source2 <- "test2"
-	<-ch
-	<-ch
-}
-
-func TestBroadcaster(t *testing.T) {
-	b := NewBroadcaster()
-	b.Notify(struct{}{})
-
-	ch := make(chan bool, 2)
-	b.Add(ListenerFunc(func(object interface{}) {
-		if object != "test" {
-			t.Errorf("Expected %s, Got %s", "test", object)
-		}
-		ch <- true
-	}))
-	b.Add(ListenerFunc(func(object interface{}) {
-		if object != "test" {
-			t.Errorf("Expected %s, Got %s", "test", object)
-		}
-		ch <- true
-	}))
-	b.Notify("test")
 	<-ch
 	<-ch
 }
