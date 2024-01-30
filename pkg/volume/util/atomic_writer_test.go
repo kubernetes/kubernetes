@@ -133,7 +133,7 @@ func TestPathsToRemove(t *testing.T) {
 		name     string
 		payload1 map[string]FileProjection
 		payload2 map[string]FileProjection
-		expected sets.String
+		expected sets.Set[string]
 	}{
 		{
 			name: "simple",
@@ -144,7 +144,7 @@ func TestPathsToRemove(t *testing.T) {
 			payload2: map[string]FileProjection{
 				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
-			expected: sets.NewString("bar.txt"),
+			expected: sets.New[string]("bar.txt"),
 		},
 		{
 			name: "simple 2",
@@ -155,7 +155,7 @@ func TestPathsToRemove(t *testing.T) {
 			payload2: map[string]FileProjection{
 				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
-			expected: sets.NewString("zip/bar.txt", "zip"),
+			expected: sets.New[string]("zip/bar.txt", "zip"),
 		},
 		{
 			name: "subdirs 1",
@@ -166,7 +166,7 @@ func TestPathsToRemove(t *testing.T) {
 			payload2: map[string]FileProjection{
 				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
-			expected: sets.NewString("zip/zap/bar.txt", "zip", "zip/zap"),
+			expected: sets.New[string]("zip/zap/bar.txt", "zip", "zip/zap"),
 		},
 		{
 			name: "subdirs 2",
@@ -177,7 +177,7 @@ func TestPathsToRemove(t *testing.T) {
 			payload2: map[string]FileProjection{
 				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
-			expected: sets.NewString("zip/1/2/3/4/bar.txt", "zip", "zip/1", "zip/1/2", "zip/1/2/3", "zip/1/2/3/4"),
+			expected: sets.New[string]("zip/1/2/3/4/bar.txt", "zip", "zip/1", "zip/1/2", "zip/1/2/3", "zip/1/2/3/4"),
 		},
 		{
 			name: "subdirs 3",
@@ -189,7 +189,7 @@ func TestPathsToRemove(t *testing.T) {
 			payload2: map[string]FileProjection{
 				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
-			expected: sets.NewString("zip/1/2/3/4/bar.txt", "zip", "zip/1", "zip/1/2", "zip/1/2/3", "zip/1/2/3/4", "zap", "zap/a", "zap/a/b", "zap/a/b/c", "zap/a/b/c/bar.txt"),
+			expected: sets.New[string]("zip/1/2/3/4/bar.txt", "zip", "zip/1", "zip/1/2", "zip/1/2/3", "zip/1/2/3/4", "zap", "zap/a", "zap/a/b", "zap/a/b/c", "zap/a/b/c/bar.txt"),
 		},
 		{
 			name: "subdirs 4",
@@ -203,7 +203,7 @@ func TestPathsToRemove(t *testing.T) {
 				"foo.txt":           {Mode: 0644, Data: []byte("foo")},
 				"zap/1/2/magic.txt": {Mode: 0644, Data: []byte("indigo")},
 			},
-			expected: sets.NewString("zap/1/2/3/4/bar.txt", "zap/1/2/3", "zap/1/2/3/4", "zap/1/2/3/4/bar.txt", "zap/1/2/c", "zap/1/2/c/bar.txt"),
+			expected: sets.New[string]("zap/1/2/3/4/bar.txt", "zap/1/2/3", "zap/1/2/3/4", "zap/1/2/3/4/bar.txt", "zap/1/2/c", "zap/1/2/c/bar.txt"),
 		},
 		{
 			name: "subdirs 5",
@@ -216,7 +216,7 @@ func TestPathsToRemove(t *testing.T) {
 				"foo.txt":           {Mode: 0644, Data: []byte("foo")},
 				"zap/1/2/magic.txt": {Mode: 0644, Data: []byte("indigo")},
 			},
-			expected: sets.NewString("zap/1/2/3/4/bar.txt", "zap/1/2/3", "zap/1/2/3/4", "zap/1/2/3/4/bar.txt", "zap/1/2/c", "zap/1/2/c/bar.txt"),
+			expected: sets.New[string]("zap/1/2/3/4/bar.txt", "zap/1/2/3", "zap/1/2/3/4", "zap/1/2/3/4/bar.txt", "zap/1/2/c", "zap/1/2/c/bar.txt"),
 		},
 	}
 
@@ -818,7 +818,7 @@ func TestValidatePayload(t *testing.T) {
 	cases := []struct {
 		name     string
 		payload  map[string]FileProjection
-		expected sets.String
+		expected sets.Set[string]
 		valid    bool
 	}{
 		{
@@ -828,7 +828,7 @@ func TestValidatePayload(t *testing.T) {
 				"bar": {},
 			},
 			valid:    true,
-			expected: sets.NewString("foo", "bar"),
+			expected: sets.New[string]("foo", "bar"),
 		},
 		{
 			name: "payload with path length > 4096 is invalid",
@@ -871,11 +871,11 @@ func TestValidatePayload(t *testing.T) {
 				"foo////bar": {},
 			},
 			valid:    true,
-			expected: sets.NewString("foo/bar"),
+			expected: sets.New[string]("foo/bar"),
 		},
 	}
-	getPayloadPaths := func(payload map[string]FileProjection) sets.String {
-		paths := sets.NewString()
+	getPayloadPaths := func(payload map[string]FileProjection) sets.Set[string] {
+		paths := sets.New[string]()
 		for path := range payload {
 			paths.Insert(path)
 		}

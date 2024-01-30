@@ -96,7 +96,7 @@ func (c *PodConfig) Channel(ctx context.Context, source string) chan<- interface
 
 // SeenAllSources returns true if seenSources contains all sources in the
 // config, and also this config has received a SET message from each source.
-func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
+func (c *PodConfig) SeenAllSources(seenSources sets.Set[string]) bool {
 	if c.pods == nil {
 		return false
 	}
