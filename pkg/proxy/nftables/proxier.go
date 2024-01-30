@@ -40,6 +40,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -284,6 +286,22 @@ func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
 	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
 	if err != nil {
 		return nil, err
+	}
+
+	// Likewise, we want to ensure that the host filesystem has nft >= 1.0.1, so that
+	// it's not possible that *our* rules break *the system's* nft. (In particular, we
+	// know that if kube-proxy uses nft >= 1.0.3 and the system has nft <= 0.9.8, that
+	// the system nft will become completely unusable.) Unfortunately, we can't easily
+	// figure out the version of nft installed on the host filesystem, so instead, we
+	// check the kernel version, under the assumption that the distro will have an nft
+	// binary that supports the same features as its kernel does, and so kernel 5.13
+	// or later implies nft 1.0.1 or later. https://issues.k8s.io/122743
+	kernelVersion, err := utilkernel.GetVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not check kernel version: %w", err)
+	}
+	if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.NFTablesKubeProxyKernelVersion)) {
+		return nil, fmt.Errorf("kube-proxy in nftables mode requires kernel %s or later", utilkernel.NFTablesKubeProxyKernelVersion)
 	}
 
 	return nft, nil
