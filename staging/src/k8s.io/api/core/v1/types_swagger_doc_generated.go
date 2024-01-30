@@ -1010,8 +1010,8 @@ func (LimitRangeSpec) SwaggerDoc() map[string]string {
 
 var map_LinuxContainerUser = map[string]string{
 	"":                   "LinuxContainerUser represents user identity information in Linux containers",
-	"uid":                "Uid is the primary uid of the first process in the container",
-	"gid":                "Gid is the primary gid of the first process in the container",
+	"uid":                "UID is the primary uid of the first process in the container",
+	"gid":                "GID is the primary gid of the first process in the container",
 	"supplementalGroups": "SupplementalGroups are the supplemental groups attached to the first process in the container",
 }
 

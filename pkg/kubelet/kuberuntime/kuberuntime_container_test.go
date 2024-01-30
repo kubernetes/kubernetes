@@ -415,8 +415,8 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 			},
 			expected: &kubecontainer.ContainerUser{
 				Linux: &kubecontainer.LinuxContainerUser{
-					Uid:                0,
-					Gid:                0,
+					UID:                0,
+					GID:                0,
 					SupplementalGroups: []int64{10},
 				},
 			},

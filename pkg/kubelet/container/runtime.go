@@ -385,10 +385,10 @@ type ContainerUser struct {
 
 // LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUser struct {
-	// Uid is the primary uid of the first process in the container
-	Uid int64
-	// Gid is the primary gid of the first process in the container
-	Gid int64
+	// UID is the primary uid of the first process in the container
+	UID int64
+	// GID is the primary gid of the first process in the container
+	GID int64
 	// SupplementalGroups are the supplemental groups attached to the first process in the container
 	SupplementalGroups []int64
 }

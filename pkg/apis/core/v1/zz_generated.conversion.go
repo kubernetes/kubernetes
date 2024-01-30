@@ -4546,8 +4546,8 @@ func Convert_core_LimitRangeSpec_To_v1_LimitRangeSpec(in *core.LimitRangeSpec, o
 }
 
 func autoConvert_v1_LinuxContainerUser_To_core_LinuxContainerUser(in *v1.LinuxContainerUser, out *core.LinuxContainerUser, s conversion.Scope) error {
-	out.Uid = in.Uid
-	out.Gid = in.Gid
+	out.UID = in.UID
+	out.GID = in.GID
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	return nil
 }
@@ -4558,8 +4558,8 @@ func Convert_v1_LinuxContainerUser_To_core_LinuxContainerUser(in *v1.LinuxContai
 }
 
 func autoConvert_core_LinuxContainerUser_To_v1_LinuxContainerUser(in *core.LinuxContainerUser, out *v1.LinuxContainerUser, s conversion.Scope) error {
-	out.Uid = in.Uid
-	out.Gid = in.Gid
+	out.UID = in.UID
+	out.GID = in.GID
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	return nil
 }

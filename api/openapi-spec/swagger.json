@@ -7289,7 +7289,7 @@
       "description": "LinuxContainerUser represents user identity information in Linux containers",
       "properties": {
         "gid": {
-          "description": "Gid is the primary gid of the first process in the container",
+          "description": "GID is the primary gid of the first process in the container",
           "format": "int64",
           "type": "integer"
         },
@@ -7303,11 +7303,15 @@
           "x-kubernetes-list-type": "atomic"
         },
         "uid": {
-          "description": "Uid is the primary uid of the first process in the container",
+          "description": "UID is the primary uid of the first process in the container",
           "format": "int64",
           "type": "integer"
         }
       },
+      "required": [
+        "uid",
+        "gid"
+      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.LoadBalancerIngress": {

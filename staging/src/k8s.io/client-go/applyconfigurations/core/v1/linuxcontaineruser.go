@@ -21,8 +21,8 @@ package v1
 // LinuxContainerUserApplyConfiguration represents an declarative configuration of the LinuxContainerUser type for use
 // with apply.
 type LinuxContainerUserApplyConfiguration struct {
-	Uid                *int64  `json:"uid,omitempty"`
-	Gid                *int64  `json:"gid,omitempty"`
+	UID                *int64  `json:"uid,omitempty"`
+	GID                *int64  `json:"gid,omitempty"`
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 }
 
@@ -32,19 +32,19 @@ func LinuxContainerUser() *LinuxContainerUserApplyConfiguration {
 	return &LinuxContainerUserApplyConfiguration{}
 }
 
-// WithUid sets the Uid field in the declarative configuration to the given value
+// WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Uid field is set to the value of the last call.
-func (b *LinuxContainerUserApplyConfiguration) WithUid(value int64) *LinuxContainerUserApplyConfiguration {
-	b.Uid = &value
+// If called multiple times, the UID field is set to the value of the last call.
+func (b *LinuxContainerUserApplyConfiguration) WithUID(value int64) *LinuxContainerUserApplyConfiguration {
+	b.UID = &value
 	return b
 }
 
-// WithGid sets the Gid field in the declarative configuration to the given value
+// WithGID sets the GID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Gid field is set to the value of the last call.
-func (b *LinuxContainerUserApplyConfiguration) WithGid(value int64) *LinuxContainerUserApplyConfiguration {
-	b.Gid = &value
+// If called multiple times, the GID field is set to the value of the last call.
+func (b *LinuxContainerUserApplyConfiguration) WithGID(value int64) *LinuxContainerUserApplyConfiguration {
+	b.GID = &value
 	return b
 }
 

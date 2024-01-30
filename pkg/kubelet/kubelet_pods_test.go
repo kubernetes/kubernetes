@@ -4887,8 +4887,8 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		"linux user, SupplementalGroupsPolicy is disabled": {
 			testPodStaus(&kubecontainer.ContainerUser{
 				Linux: &kubecontainer.LinuxContainerUser{
-					Uid:                0,
-					Gid:                0,
+					UID:                0,
+					GID:                0,
 					SupplementalGroups: []int64{10},
 				},
 			}),
@@ -4908,16 +4908,16 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		"linux user, SupplementalGroupsPolicy is enabled": {
 			testPodStaus(&kubecontainer.ContainerUser{
 				Linux: &kubecontainer.LinuxContainerUser{
-					Uid:                0,
-					Gid:                0,
+					UID:                0,
+					GID:                0,
 					SupplementalGroups: []int64{10},
 				},
 			}),
 			true,
 			expectedContainerStatuses(&v1.ContainerUser{
 				Linux: &v1.LinuxContainerUser{
-					Uid:                0,
-					Gid:                0,
+					UID:                0,
+					GID:                0,
 					SupplementalGroups: []int64{10},
 				},
 			}),

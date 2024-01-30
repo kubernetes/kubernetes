@@ -451,8 +451,8 @@ func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.Co
 	user := &kubecontainer.ContainerUser{}
 	if statusUser.GetLinux() != nil {
 		user.Linux = &kubecontainer.LinuxContainerUser{
-			Uid:                statusUser.GetLinux().GetUid(),
-			Gid:                statusUser.GetLinux().GetGid(),
+			UID:                statusUser.GetLinux().GetUid(),
+			GID:                statusUser.GetLinux().GetGid(),
 			SupplementalGroups: statusUser.GetLinux().GetSupplementalGroups(),
 		}
 	}

@@ -22182,14 +22182,16 @@ func schema_k8sio_api_core_v1_LinuxContainerUser(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Uid is the primary uid of the first process in the container",
+							Description: "UID is the primary uid of the first process in the container",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"gid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Gid is the primary gid of the first process in the container",
+							Description: "GID is the primary gid of the first process in the container",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -22215,6 +22217,7 @@ func schema_k8sio_api_core_v1_LinuxContainerUser(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"uid", "gid"},
 			},
 		},
 	}

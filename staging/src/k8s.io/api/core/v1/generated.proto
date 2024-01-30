@@ -2240,10 +2240,10 @@ message LimitRangeSpec {
 
 // LinuxContainerUser represents user identity information in Linux containers
 message LinuxContainerUser {
-  // Uid is the primary uid of the first process in the container
+  // UID is the primary uid of the first process in the container
   optional int64 uid = 1;
 
-  // Gid is the primary gid of the first process in the container
+  // GID is the primary gid of the first process in the container
   optional int64 gid = 2;
 
   // SupplementalGroups are the supplemental groups attached to the first process in the container

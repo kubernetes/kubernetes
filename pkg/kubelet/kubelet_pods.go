@@ -2033,8 +2033,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		user := &v1.ContainerUser{}
 		if cStatus.User.Linux != nil {
 			user.Linux = &v1.LinuxContainerUser{
-				Uid:                cStatus.User.Linux.Uid,
-				Gid:                cStatus.User.Linux.Gid,
+				UID:                cStatus.User.Linux.UID,
+				GID:                cStatus.User.Linux.GID,
 				SupplementalGroups: cStatus.User.Linux.SupplementalGroups,
 			}
 		}

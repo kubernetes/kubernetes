@@ -3008,10 +3008,10 @@ type ContainerUser struct {
 
 // LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUser struct {
-	// Uid is the primary uid of the first process in the container
-	Uid int64 `json:"uid,omitempty" protobuf:"varint,1,name=uid"`
-	// Gid is the primary gid of the first process in the container
-	Gid int64 `json:"gid,omitempty" protobuf:"varint,2,name=gid"`
+	// UID is the primary uid of the first process in the container
+	UID int64 `json:"uid" protobuf:"varint,1,name=uid"`
+	// GID is the primary gid of the first process in the container
+	GID int64 `json:"gid" protobuf:"varint,2,name=gid"`
 	// SupplementalGroups are the supplemental groups attached to the first process in the container
 	// +optional
 	// +listType=atomic

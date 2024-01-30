@@ -5554,6 +5554,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: gid
       type:
         scalar: numeric
+      default: 0
     - name: supplementalGroups
       type:
         list:
@@ -5563,6 +5564,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: uid
       type:
         scalar: numeric
+      default: 0
 - name: io.k8s.api.core.v1.LoadBalancerIngress
   map:
     fields:
