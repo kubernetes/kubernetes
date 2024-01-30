@@ -299,7 +299,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
-	return strings.Replace(template, " "+strings.Title(verbType), " "+name, -1)
+	//nolint:staticcheck
+	// TODO: convert this to use golang.org/x/text/cases
+	return strings.ReplaceAll(template, " "+strings.Title(verbType), " "+name)
 }
 
 // template for the struct that implements the type's interface

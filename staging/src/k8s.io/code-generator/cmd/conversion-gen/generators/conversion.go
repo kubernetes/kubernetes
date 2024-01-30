@@ -273,7 +273,8 @@ func GetTargets(context *generator.Context, arguments *args.GeneratorArgs) []gen
 	}
 
 	// Make sure explicit peer-packages are added.
-	peers := append(customArgs.BasePeerDirs, customArgs.ExtraPeerDirs...)
+	peers := customArgs.BasePeerDirs
+	peers = append(peers, customArgs.ExtraPeerDirs...)
 	if expanded, err := context.FindPackages(peers...); err != nil {
 		klog.Fatalf("cannot find peer packages: %v", err)
 	} else {
@@ -547,7 +548,8 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 }
 
 func getExplicitFromTypes(t *types.Type) []types.Name {
-	comments := append(t.SecondClosestCommentLines, t.CommentLines...)
+	comments := t.SecondClosestCommentLines
+	comments = append(comments, t.CommentLines...)
 	paths := extractExplicitFromTag(comments)
 	result := []types.Name{}
 	for _, path := range paths {
@@ -688,10 +690,7 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	}
 	// sort by name of the conversion function
 	sort.Slice(pairs, func(i, j int) bool {
-		if g.manualConversions[pairs[i]].Name.Name < g.manualConversions[pairs[j]].Name.Name {
-			return true
-		}
-		return false
+		return g.manualConversions[pairs[i]].Name.Name < g.manualConversions[pairs[j]].Name.Name
 	})
 	for _, pair := range pairs {
 		args := argsFromType(pair.inType, pair.outType).With("Scope", types.Ref(conversionPackagePath, "Scope")).With("fn", g.manualConversions[pair])
@@ -725,7 +724,7 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 		}
 		switch {
 		case inType.Name.Package == "net/url" && inType.Name.Name == "Values":
-			g.generateFromUrlValues(inType, t, sw)
+			g.generateFromURLValues(inType, t, sw)
 		default:
 			klog.Errorf("Not supported input type: %#v", inType.Name)
 		}
@@ -1081,7 +1080,7 @@ func (g *genConversion) doUnknown(inType, outType *types.Type, sw *generator.Sni
 	sw.Do("// FIXME: Type $.|raw$ is unsupported.\n", inType)
 }
 
-func (g *genConversion) generateFromUrlValues(inType, outType *types.Type, sw *generator.SnippetWriter) {
+func (g *genConversion) generateFromURLValues(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	args := generator.Args{
 		"inType":  inType,
 		"outType": outType,

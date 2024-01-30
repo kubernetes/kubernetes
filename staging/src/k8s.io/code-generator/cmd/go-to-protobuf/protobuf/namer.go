@@ -87,8 +87,8 @@ func (n *protobufNamer) GoNameToProtoName(name types.Name) types.Name {
 }
 
 func protoSafePackage(name string) string {
-	pkg := strings.Replace(name, "/", ".", -1)
-	return strings.Replace(pkg, "-", "_", -1)
+	pkg := strings.ReplaceAll(name, "/", ".")
+	return strings.ReplaceAll(pkg, "-", "_")
 }
 
 type typeNameSet map[types.Name]*protobufPackage

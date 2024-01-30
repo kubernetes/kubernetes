@@ -258,7 +258,8 @@ func Run(g *Generator) {
 	// Alternately, we could generate into a temp path and then move the
 	// resulting file back to the input dir, but that seems brittle in other
 	// ways.
-	args := append(searchArgs, fmt.Sprintf("--gogo_out=%s", g.OutputDir))
+	args := searchArgs
+	args = append(args, fmt.Sprintf("--gogo_out=%s", g.OutputDir))
 
 	buf := &bytes.Buffer{}
 	if len(g.Conditional) > 0 {
@@ -391,9 +392,9 @@ func importOrder(deps map[string][]string) ([]string, error) {
 	if len(remainingNodes) > 0 {
 		return nil, fmt.Errorf("cycle: remaining nodes: %#v, remaining edges: %#v", remainingNodes, graph)
 	}
-	//for _, n := range sorted {
-	//	fmt.Println("topological order", n)
-	//}
+	// for _, n := range sorted {
+	// 	 fmt.Println("topological order", n)
+	// }
 	return sorted, nil
 }
 
@@ -451,7 +452,5 @@ func (o positionOrder) Less(i, j int) bool {
 }
 
 func (o positionOrder) Swap(i, j int) {
-	x := o.elements[i]
-	o.elements[i] = o.elements[j]
-	o.elements[j] = x
+	o.elements[i], o.elements[j] = o.elements[j], o.elements[i]
 }

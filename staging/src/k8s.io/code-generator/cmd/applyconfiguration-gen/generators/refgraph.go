@@ -171,9 +171,5 @@ func requiresApplyConfiguration(t *types.Type) bool {
 			hasJSONTaggedMembers = true
 		}
 	}
-	if !hasJSONTaggedMembers {
-		return false
-	}
-
-	return true
+	return hasJSONTaggedMembers
 }

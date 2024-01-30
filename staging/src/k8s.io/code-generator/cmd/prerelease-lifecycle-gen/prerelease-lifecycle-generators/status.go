@@ -109,7 +109,7 @@ func extractReplacementTag(t *types.Type) (group, version, kind string, hasRepla
 	}
 	// If there are multiple values, abort.
 	if len(tagVals) > 1 {
-		return "", "", "", false, fmt.Errorf("Found %d %s tags: %q", len(tagVals), replacementTagName, tagVals)
+		return "", "", "", false, fmt.Errorf("found %d %s tags: %q", len(tagVals), replacementTagName, tagVals)
 	}
 	tagValue := tagVals[0]
 	parts := strings.Split(tagValue, ",")
