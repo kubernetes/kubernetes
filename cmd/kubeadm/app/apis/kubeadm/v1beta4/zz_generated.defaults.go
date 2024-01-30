@@ -33,6 +33,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*InitConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*JoinConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&ResetConfiguration{}, func(obj interface{}) { SetObjectDefaults_ResetConfiguration(obj.(*ResetConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&UpgradeConfiguration{}, func(obj interface{}) { SetObjectDefaults_UpgradeConfiguration(obj.(*UpgradeConfiguration)) })
 	return nil
 }
 
@@ -86,4 +87,8 @@ func SetObjectDefaults_ResetConfiguration(in *ResetConfiguration) {
 	if in.Timeouts != nil {
 		SetDefaults_Timeouts(in.Timeouts)
 	}
+}
+
+func SetObjectDefaults_UpgradeConfiguration(in *UpgradeConfiguration) {
+	SetDefaults_UpgradeConfiguration(in)
 }

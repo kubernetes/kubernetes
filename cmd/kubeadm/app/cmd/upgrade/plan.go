@@ -27,14 +27,17 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -64,13 +67,16 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		Use:   "plan [version] [flags]",
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.",
 		Long:  upgradePlanLongDesc,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
 				return errors.Wrap(err, "could not construct output printer")
 			}
 
-			return runPlan(flags, args, printer)
+			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+				return err
+			}
+			return runPlan(cmd.Flags(), flags, args, printer)
 		},
 	}
 
@@ -91,29 +97,41 @@ func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapiv
 }
 
 // runPlan takes care of outputting available versions to upgrade to for the user
-func runPlan(flags *planFlags, args []string, printer output.Printer) error {
+func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer output.Printer) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infoln("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/plan] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, false, false, printer, loadConfig)
+	client, versionGetter, initCfg, upgradeCfg, err := enforceRequirements(flagSet, flags.applyPlanFlags, args, false, false, printer)
 	if err != nil {
 		return err
 	}
 
 	// Currently this is the only method we have for distinguishing
 	// external etcd vs static pod etcd
-	isExternalEtcd := cfg.Etcd.External != nil
+	isExternalEtcd := initCfg.Etcd.External != nil
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, client, constants.GetStaticPodDirectory(), printer)
+
+	// flags are respected while keeping the configuration file not changed.
+	allowRCUpgrades, ok := cmdutil.ValueFromFlagsOrConfig(flagSet, options.AllowRCUpgrades, upgradeCfg.Plan.AllowRCUpgrades, &flags.allowRCUpgrades).(*bool)
+	if !ok {
+		return cmdutil.TypeMismatchErr("allowRCUpgrades", "bool")
+	}
+
+	allowExperimentalUpgrades, ok := cmdutil.ValueFromFlagsOrConfig(flagSet, options.AllowExperimentalUpgrades, upgradeCfg.Plan.AllowExperimentalUpgrades, &flags.allowExperimentalUpgrades).(*bool)
+	if !ok {
+		return cmdutil.TypeMismatchErr("allowExperimentalUpgrades", "bool")
+	}
+
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, isExternalEtcd, client, constants.GetStaticPodDirectory(), printer)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
 
 	// Fetch the current state of the component configs
 	klog.V(1).Infoln("[upgrade/plan] analysing component config version states")
-	configVersionStates, err := componentconfigs.GetVersionStates(&cfg.ClusterConfiguration, client)
+	configVersionStates, err := componentconfigs.GetVersionStates(&initCfg.ClusterConfiguration, client)
 	if err != nil {
 		return errors.WithMessage(err, "[upgrade/versions] FATAL")
 	}
