@@ -176,7 +176,7 @@ func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
-	retries := int(DefaultObservationTimeout.Seconds() / 10)
+	retries := int(framework.DefaultObservationTimeout.Seconds() / 10)
 	for attempt := 0; attempt < retries; attempt++ {
 		// Check the pod's current state and verify that restartCount is present.
 		ginkgo.By("checking the pod's current state and verifying that restartCount is present")

@@ -139,7 +139,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -156,7 +156,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -171,7 +171,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -186,7 +186,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -201,8 +201,8 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		// ~2 minutes backoff timeouts + 4 minutes defaultObservationTimeout + 2 minutes for each pod restart
-		RunLivenessTest(ctx, f, pod, 5, 2*time.Minute+defaultObservationTimeout+4*2*time.Minute)
+		// ~2 minutes backoff timeouts + 4 minutes framework.DefaultObservationTimeout + 2 minutes for each pod restart
+		RunLivenessTest(ctx, f, pod, 5, 2*time.Minute+framework.DefaultObservationTimeout+4*2*time.Minute)
 	})
 
 	/*
@@ -218,7 +218,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    5, // to accommodate nodes which are slow in bringing up containers.
 		}
 		pod := testWebServerPodSpec(nil, livenessProbe, "test-webserver", 80)
-		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -235,7 +235,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -269,7 +269,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -284,7 +284,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -299,7 +299,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 		// Expect an event of type "ProbeWarning".
 		expectedEvent := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -337,7 +337,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    3,
 		}
 		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -366,7 +366,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    60,
 		}
 		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -395,7 +395,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    60,
 		}
 		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -478,9 +478,9 @@ var _ = SIGDescribe("Probing container", func() {
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		// add defaultObservationTimeout(4min) more for kubelet syncing information
+		// add framework.DefaultObservationTimeout(4min) more for kubelet syncing information
 		// to apiserver
-		RunLivenessTest(ctx, f, pod, 1, time.Second*40+defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40+framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -513,9 +513,9 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		// add defaultObservationTimeout(4min) more for kubelet syncing information
+		// add framework.DefaultObservationTimeout(4min) more for kubelet syncing information
 		// to apiserver
-		RunLivenessTest(ctx, f, pod, 1, time.Second*40+defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40+framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -537,7 +537,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
-		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -558,7 +558,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
-		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	ginkgo.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe", func(ctx context.Context) {
@@ -822,7 +822,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := busyBoxSidecarPodSpec(nil, livenessProbe, cmd)
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -841,7 +841,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := busyBoxSidecarPodSpec(nil, livenessProbe, cmd)
-		RunSidecarLivenessTest(ctx, f, pod, 0, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -861,7 +861,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := livenessSidecarPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -880,7 +880,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := livenessSidecarPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunSidecarLivenessTest(ctx, f, pod, 0, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -902,8 +902,8 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := livenessSidecarPodSpec(f.Namespace.Name, nil, livenessProbe)
-		// ~2 minutes backoff timeouts + 4 minutes defaultObservationTimeout + 2 minutes for each pod restart
-		RunSidecarLivenessTest(ctx, f, pod, 5, 2*time.Minute+DefaultObservationTimeout+4*2*time.Minute)
+		// ~2 minutes backoff timeouts + 4 minutes framework.DefaultObservationTimeout + 2 minutes for each pod restart
+		RunSidecarLivenessTest(ctx, f, pod, 5, 2*time.Minute+framework.DefaultObservationTimeout+4*2*time.Minute)
 	})
 
 	/*
@@ -921,7 +921,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    5, // to accommodate nodes which are slow in bringing up containers.
 		}
 		pod := testWebServerSidecarPodSpec(nil, livenessProbe, "test-webserver", 80)
-		RunSidecarLivenessTest(ctx, f, pod, 0, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -940,7 +940,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := busyBoxSidecarPodSpec(nil, livenessProbe, cmd)
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -980,7 +980,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := busyBoxSidecarPodSpec(nil, livenessProbe, cmd)
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -999,7 +999,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := livenessSidecarPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -1017,7 +1017,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := livenessSidecarPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunSidecarLivenessTest(ctx, f, pod, 0, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 		// Expect an event of type "ProbeWarning".
 		expectedEvent := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -1057,7 +1057,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    3,
 		}
 		pod := startupSidecarPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -1087,7 +1087,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    60,
 		}
 		pod := startupSidecarPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunSidecarLivenessTest(ctx, f, pod, 0, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -1120,7 +1120,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    60,
 		}
 		pod := startupSidecarPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -1210,9 +1210,9 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		// add defaultObservationTimeout(4min) more for kubelet syncing information
+		// add framework.DefaultObservationTimeout(4min) more for kubelet syncing information
 		// to apiserver
-		RunSidecarLivenessTest(ctx, f, pod, 1, time.Second*40+defaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, time.Second*40+framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -1247,9 +1247,9 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		// add defaultObservationTimeout(4min) more for kubelet syncing information
+		// add framework.DefaultObservationTimeout(4min) more for kubelet syncing information
 		// to apiserver
-		RunSidecarLivenessTest(ctx, f, pod, 1, time.Second*40+defaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, time.Second*40+framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -1272,7 +1272,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := gRPCServerSidecarPodSpec(nil, livenessProbe, "agnhost")
-		RunSidecarLivenessTest(ctx, f, pod, 0, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 0, framework.DefaultObservationTimeout)
 	})
 
 	/*
@@ -1294,7 +1294,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 			FailureThreshold:    1,
 		}
 		pod := gRPCServerSidecarPodSpec(nil, livenessProbe, "agnhost")
-		RunSidecarLivenessTest(ctx, f, pod, 1, DefaultObservationTimeout)
+		RunSidecarLivenessTest(ctx, f, pod, 1, framework.DefaultObservationTimeout)
 	})
 
 	ginkgo.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe", func(ctx context.Context) {
