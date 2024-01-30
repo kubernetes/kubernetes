@@ -4771,24 +4771,6 @@ func ValidateHostSysctl(sysctl string, securityContext *core.PodSecurityContext,
 	return nil
 }
 
-var supportedSupplementalGroupsPolicy = sets.NewString(string(core.SupplementalGroupsPolicyMerge), string(core.SupplementalGroupsPolicyStrict))
-
-func validateSupplementalGroupsPolicy(supplementalGroupsPolicy *core.SupplementalGroupsPolicy, podOs *core.PodOS, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-		if supplementalGroupsPolicy != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath, "must not set when SupplementalGroupsPolicy feature gate is disabled"))
-		}
-		return allErrs
-	}
-
-	if supplementalGroupsPolicy != nil && !supportedSupplementalGroupsPolicy.Has(string(*supplementalGroupsPolicy)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath, supplementalGroupsPolicy, supportedSupplementalGroupsPolicy.List()))
-	}
-	return allErrs
-}
-
 // validatePodSpecSecurityContext verifies the SecurityContext of a PodSpec,
 // whether that is defined in a Pod or in an embedded PodSpec (e.g. a
 // Deployment's pod template).
@@ -4830,8 +4812,6 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 
 		allErrs = append(allErrs, validateSeccompProfileField(securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
-
-		allErrs = append(allErrs, validateSupplementalGroupsPolicy(securityContext.SupplementalGroupsPolicy, spec.OS, fldPath.Child("supplementalGroupsPolicy"))...)
 	}
 
 	return allErrs
@@ -5146,14 +5126,6 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 // ValidateContainerStateTransition test to if any illegal container state transitions are being attempted
 func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldpath *field.Path, restartPolicy core.RestartPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-		for i, newStatus := range newStatuses {
-			if newStatus.User != nil {
-				allErrs = append(allErrs, field.Forbidden(fldpath.Index(i).Child("user"), "must not set when SupplementalGroupsPolicy feature gate is disabled"))
-			}
-		}
-	}
 
 	// If we should always restart, containers are allowed to leave the terminated state
 	if restartPolicy == core.RestartPolicyAlways {
