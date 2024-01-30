@@ -261,3 +261,13 @@ func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerSt
 	}
 	return nil
 }
+
+// GetRestartCount takes a pointer to a v1.Pod object as input and calculates
+// the total restart count for all containers within that pod.
+func GetRestartCount(p *v1.Pod) int {
+	count := 0
+	for _, containerStatus := range p.Status.ContainerStatuses {
+		count += int(containerStatus.RestartCount)
+	}
+	return count
+}

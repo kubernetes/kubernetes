@@ -39,7 +39,6 @@ const (
 	numTestPods                  = 1
 	numContainers                = 400
 	containerPort                = 2000
-	defaultObservationTimeout    = time.Minute * 4
 )
 
 type containerConfig struct {
@@ -53,7 +52,7 @@ var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
-		Release: v1.28
+		Release: v1.30
 		Testname: Pod liveness probe stress test, using http endpoint, no restart
 		Description: A Pod is created with MANY containers with liveness probe on http endpoint /. Liveness probe MUST not fail to check health and the restart count should remain 0 for all containers.
 	*/
@@ -158,19 +157,11 @@ func tcpSocketHandler(port int) v1.ProbeHandler {
 	}
 }
 
-func getRestartCount(p *v1.Pod) int {
-	count := 0
-	for _, containerStatus := range p.Status.ContainerStatuses {
-		count += int(containerStatus.RestartCount)
-	}
-	return count
-}
-
 // runLivenessTest verifies the number of restarts.
 func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	podClient := e2epod.NewPodClient(f)
 	ns := f.Namespace.Name
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	gomega.Expect(len(pod.Spec.Containers)).To(gomega.BeNumerically("==", numContainers))
 	// At the end of the test, clean up by removing the pod.
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("deleting the pod")
@@ -184,17 +175,19 @@ func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
-	deadline := time.Now().Add(defaultObservationTimeout)
-	for start := time.Now(); time.Now().Before(deadline); time.Sleep(10 * time.Second) {
+	retries := int(DefaultObservationTimeout.Seconds() / 10)
+	for attempt := 0; attempt < retries; attempt++ {
 		// Check the pod's current state and verify that restartCount is present.
 		ginkgo.By("checking the pod's current state and verifying that restartCount is present")
 		pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
-		restartCount := getRestartCount(pod)
+		restartCount := e2epod.GetRestartCount(pod)
 
 		if restartCount != 0 {
-			framework.Failf("Restart count of pod %s/%s is now %d (%v elapsed)",
-				ns, pod.Name, restartCount, time.Since(start))
+			framework.Failf("Restart count of pod %s/%s is now %d (attempt %d)",
+				ns, pod.Name, restartCount, attempt+1)
 		}
+
+		time.Sleep(10 * time.Second)
 	}
 }
