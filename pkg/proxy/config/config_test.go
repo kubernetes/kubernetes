@@ -32,7 +32,7 @@ import (
 	informers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type sortedServices []*v1.Service
@@ -345,7 +345,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"2.2.2.2"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	endpoints2 := &discoveryv1.EndpointSlice{
 		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
@@ -355,7 +355,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"4.4.4.4"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints1)
 	fakeWatch.Add(endpoints2)
@@ -391,7 +391,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"2.2.2.2"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	endpoints2 := &discoveryv1.EndpointSlice{
 		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
@@ -401,7 +401,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"4.4.4.4"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints1)
 	fakeWatch.Add(endpoints2)
@@ -419,7 +419,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"6.6.6.6"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints3)
 	endpoints = []*discoveryv1.EndpointSlice{endpoints2, endpoints1, endpoints3}
@@ -433,7 +433,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		Endpoints: []discoveryv1.Endpoint{{
 			Addresses: []string{"7.7.7.7"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Modify(endpoints1v2)
 	endpoints = []*discoveryv1.EndpointSlice{endpoints2, endpoints1v2, endpoints3}

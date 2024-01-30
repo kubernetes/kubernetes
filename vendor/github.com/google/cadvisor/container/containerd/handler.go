@@ -126,7 +126,14 @@ func newContainerdContainerHandler(
 		Aliases:   []string{id, name},
 	}
 
-	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), includedMetrics)
+	// Containers that don't have their own network -- this includes
+	// containers running in Kubernetes pods that use the network of the
+	// infrastructure container -- does not need their stats to be
+	// reported. This stops metrics being reported multiple times for each
+	// container in a pod.
+	metrics := common.RemoveNetMetrics(includedMetrics, cntr.Labels["io.cri-containerd.kind"] != "sandbox")
+
+	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), metrics)
 
 	handler := &containerdContainerHandler{
 		machineInfoFactory:  machineInfoFactory,
@@ -134,7 +141,7 @@ func newContainerdContainerHandler(
 		fsInfo:              fsInfo,
 		envs:                make(map[string]string),
 		labels:              cntr.Labels,
-		includedMetrics:     includedMetrics,
+		includedMetrics:     metrics,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
 	}
@@ -164,22 +171,12 @@ func (h *containerdContainerHandler) ContainerReference() (info.ContainerReferen
 	return h.reference, nil
 }
 
-func (h *containerdContainerHandler) needNet() bool {
-	// Since containerd does not handle networking ideally we need to return based
-	// on includedMetrics list. Here the assumption is the presence of cri-containerd
-	// label
-	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
-		//TODO change it to exported cri-containerd constants
-		return h.labels["io.cri-containerd.kind"] == "sandbox"
-	}
-	return false
-}
-
 func (h *containerdContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	// TODO: Since we dont collect disk usage stats for containerd, we set hasFilesystem
 	// to false. Revisit when we support disk usage stats for containerd
 	hasFilesystem := false
-	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, h.needNet(), hasFilesystem)
+	hasNet := h.includedMetrics.Has(container.NetworkUsageMetrics)
+	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, hasNet, hasFilesystem)
 	spec.Labels = h.labels
 	spec.Envs = h.envs
 	spec.Image = h.image
@@ -203,13 +200,6 @@ func (h *containerdContainerHandler) GetStats() (*info.ContainerStats, error) {
 	stats, err := h.libcontainerHandler.GetStats()
 	if err != nil {
 		return stats, err
-	}
-	// Clean up stats for containers that don't have their own network - this
-	// includes containers running in Kubernetes pods that use the network of the
-	// infrastructure container. This stops metrics being reported multiple times
-	// for each container in a pod.
-	if !h.needNet() {
-		stats.Network = info.NetworkStats{}
 	}
 
 	// Get filesystem stats.

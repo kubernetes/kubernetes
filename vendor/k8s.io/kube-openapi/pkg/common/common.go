@@ -22,7 +22,6 @@ import (
 
 	"github.com/emicklei/go-restful/v3"
 
-	"k8s.io/kube-openapi/pkg/openapiconv"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -170,43 +169,6 @@ type OpenAPIV3Config struct {
 
 	// DefaultSecurity for all operations.
 	DefaultSecurity []map[string][]string
-}
-
-// ConvertConfigToV3 converts a Config object to an OpenAPIV3Config object
-func ConvertConfigToV3(config *Config) *OpenAPIV3Config {
-	if config == nil {
-		return nil
-	}
-
-	v3Config := &OpenAPIV3Config{
-		Info:                           config.Info,
-		IgnorePrefixes:                 config.IgnorePrefixes,
-		GetDefinitions:                 config.GetDefinitions,
-		GetOperationIDAndTags:          config.GetOperationIDAndTags,
-		GetOperationIDAndTagsFromRoute: config.GetOperationIDAndTagsFromRoute,
-		GetDefinitionName:              config.GetDefinitionName,
-		Definitions:                    config.Definitions,
-		SecuritySchemes:                make(spec3.SecuritySchemes),
-		DefaultSecurity:                config.DefaultSecurity,
-		DefaultResponse:                openapiconv.ConvertResponse(config.DefaultResponse, []string{"application/json"}),
-
-		CommonResponses:     make(map[int]*spec3.Response),
-		ResponseDefinitions: make(map[string]*spec3.Response),
-	}
-
-	if config.SecurityDefinitions != nil {
-		for s, securityScheme := range *config.SecurityDefinitions {
-			v3Config.SecuritySchemes[s] = openapiconv.ConvertSecurityScheme(securityScheme)
-		}
-	}
-	for k, commonResponse := range config.CommonResponses {
-		v3Config.CommonResponses[k] = openapiconv.ConvertResponse(&commonResponse, []string{"application/json"})
-	}
-
-	for k, responseDefinition := range config.ResponseDefinitions {
-		v3Config.ResponseDefinitions[k] = openapiconv.ConvertResponse(&responseDefinition, []string{"application/json"})
-	}
-	return v3Config
 }
 
 type typeInfo struct {

@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/reporters"
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,8 +37,7 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
-// This must be line #39.
+// This must be line #40.
 
 // This is included in a stack backtrace.
 func failHelper(msg string) {
@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("log", func() {
 	})
 	ginkgo.AfterEach(func() {
 		framework.Logf("after")
-		framework.ExpectEqual(true, false, "true is never false either")
+		gomega.Expect(true).To(gomega.BeFalse(), "true is never false either")
 	})
 	ginkgo.It("fails", func() {
 		func() {
@@ -58,14 +58,14 @@ var _ = ginkgo.Describe("log", func() {
 		}()
 	})
 	ginkgo.It("asserts", func() {
-		framework.ExpectEqual(false, true, "false is never true")
+		gomega.Expect(false).To(gomega.BeTrue(), "false is never true")
 	})
 	ginkgo.It("error", func() {
 		err := errors.New("an error with a long, useless description")
 		framework.ExpectNoError(err, "hard-coded error")
 	})
 	ginkgo.It("equal", func() {
-		framework.ExpectEqual(0, 1, "of course it's not equal...")
+		gomega.Expect(0).To(gomega.Equal(1), "of course it's not equal...")
 	})
 	ginkgo.It("fails with helper", func() {
 		failHelper("I'm failing with helper.")
@@ -109,8 +109,7 @@ INFO: after
 [FAILED] true is never false either
 Expected
     <bool>: true
-to equal
-    <bool>: false
+to be false
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -123,8 +122,7 @@ In [AfterEach] at: log_test.go:53 <time>
 						Description: `[FAILED] false is never true
 Expected
     <bool>: false
-to equal
-    <bool>: true
+to be true
 In [It] at: log_test.go:61 <time>
 
 There were additional failures detected after the initial failure. These are visible in the timeline
@@ -137,8 +135,7 @@ INFO: before
 [FAILED] false is never true
 Expected
     <bool>: false
-to equal
-    <bool>: true
+to be true
 In [It] at: log_test.go:61 <time>
 < Exit [It] asserts - log_test.go:60 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
@@ -146,8 +143,7 @@ INFO: after
 [FAILED] true is never false either
 Expected
     <bool>: true
-to equal
-    <bool>: false
+to be false
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -181,8 +177,7 @@ INFO: after
 [FAILED] true is never false either
 Expected
     <bool>: true
-to equal
-    <bool>: false
+to be false
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -218,8 +213,7 @@ INFO: after
 [FAILED] true is never false either
 Expected
     <bool>: true
-to equal
-    <bool>: false
+to be false
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -247,8 +241,7 @@ INFO: after
 [FAILED] true is never false either
 Expected
     <bool>: true
-to equal
-    <bool>: false
+to be false
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,
@@ -261,8 +254,7 @@ In [AfterEach] at: log_test.go:53 <time>
 						Description: `[FAILED] true is never false either
 Expected
     <bool>: true
-to equal
-    <bool>: false
+to be false
 In [AfterEach] at: log_test.go:53 <time>
 `,
 					},
@@ -278,8 +270,7 @@ INFO: after
 [FAILED] true is never false either
 Expected
     <bool>: true
-to equal
-    <bool>: false
+to be false
 In [AfterEach] at: log_test.go:53 <time>
 < Exit [AfterEach] log - log_test.go:51 <time>
 `,

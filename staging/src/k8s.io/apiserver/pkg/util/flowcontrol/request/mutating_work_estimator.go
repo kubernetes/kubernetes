@@ -25,25 +25,33 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
-func newMutatingWorkEstimator(countFn watchCountGetterFunc, config *WorkEstimatorConfig) WorkEstimatorFunc {
+func newMutatingWorkEstimator(countFn watchCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
 	estimator := &mutatingWorkEstimator{
-		config:  config,
-		countFn: countFn,
+		config:     config,
+		countFn:    countFn,
+		maxSeatsFn: maxSeatsFn,
 	}
 	return estimator.estimate
 }
 
 type mutatingWorkEstimator struct {
-	config  *WorkEstimatorConfig
-	countFn watchCountGetterFunc
+	config     *WorkEstimatorConfig
+	countFn    watchCountGetterFunc
+	maxSeatsFn maxSeatsFunc
 }
 
 func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
+	minSeats := e.config.MinimumSeats
+	maxSeats := e.maxSeatsFn(priorityLevelName)
+	if maxSeats == 0 || maxSeats > e.config.MaximumSeatsLimit {
+		maxSeats = e.config.MaximumSeatsLimit
+	}
+
 	// TODO(wojtekt): Remove once we tune the algorithm to not fail
 	// scalability tests.
 	if !e.config.Enabled {
 		return WorkEstimate{
-			InitialSeats: 1,
+			InitialSeats: minSeats,
 		}
 	}
 
@@ -52,15 +60,15 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 		// no RequestInfo should never happen, but to be on the safe side
 		// let's return a large value.
 		return WorkEstimate{
-			InitialSeats:      1,
-			FinalSeats:        e.config.MaximumSeats,
+			InitialSeats:      minSeats,
+			FinalSeats:        maxSeats,
 			AdditionalLatency: e.config.eventAdditionalDuration(),
 		}
 	}
 
 	if isRequestExemptFromWatchEvents(requestInfo) {
 		return WorkEstimate{
-			InitialSeats:      e.config.MinimumSeats,
+			InitialSeats:      minSeats,
 			FinalSeats:        0,
 			AdditionalLatency: time.Duration(0),
 		}
@@ -126,8 +134,8 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 		//
 		// TODO: Confirm that the current cap of maximumSeats allow us to
 		//   achieve the above.
-		if finalSeats > e.config.MaximumSeats {
-			finalSeats = e.config.MaximumSeats
+		if finalSeats > maxSeats {
+			finalSeats = maxSeats
 		}
 		additionalLatency = finalWork.DurationPerSeat(float64(finalSeats))
 	}

@@ -93,9 +93,10 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	t.Cleanup(func() { server.Terminate(t) })
 
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, "")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -456,9 +457,10 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	t.Cleanup(func() { server.Terminate(t) })
 
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -582,9 +584,10 @@ func TestApiserverShutdown(t *testing.T) {
 	t.Cleanup(func() { server.Terminate(t) })
 
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, "")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}

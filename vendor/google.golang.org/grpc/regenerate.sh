@@ -57,7 +57,8 @@ LEGACY_SOURCES=(
   ${WORKDIR}/grpc-proto/grpc/health/v1/health.proto
   ${WORKDIR}/grpc-proto/grpc/lb/v1/load_balancer.proto
   profiling/proto/service.proto
-  reflection/grpc_reflection_v1alpha/reflection.proto
+  ${WORKDIR}/grpc-proto/grpc/reflection/v1alpha/reflection.proto
+  ${WORKDIR}/grpc-proto/grpc/reflection/v1/reflection.proto
 )
 
 # Generates only the new gRPC Service symbols
@@ -118,9 +119,5 @@ mv ${WORKDIR}/out/google.golang.org/grpc/lookup/grpc_lookup_v1/* ${WORKDIR}/out/
 # grpc_testing_not_regenerate/*.pb.go are not re-generated,
 # see grpc_testing_not_regenerate/README.md for details.
 rm ${WORKDIR}/out/google.golang.org/grpc/reflection/grpc_testing_not_regenerate/*.pb.go
-
-# grpc/testing does not have a go_package option.
-mv ${WORKDIR}/out/grpc/testing/*.pb.go interop/grpc_testing/
-mv ${WORKDIR}/out/grpc/core/*.pb.go interop/grpc_testing/core/
 
 cp -R ${WORKDIR}/out/google.golang.org/grpc/* .

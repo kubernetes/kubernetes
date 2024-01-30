@@ -46,7 +46,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 	)
 
 	f := framework.NewDefaultFramework("pv")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/imdario/mergo"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -177,7 +179,7 @@ func TestCAOverridesCAData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create tempfile: %v", err)
 	}
-	defer os.Remove(file.Name())
+	defer utiltesting.CloseAndRemove(t, file)
 
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
@@ -312,8 +314,7 @@ func TestModifyContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath.Name())
-
+	defer utiltesting.CloseAndRemove(t, tempPath)
 	pathOptions := NewDefaultPathOptions()
 	config := createValidTestConfig()
 
@@ -498,7 +499,7 @@ func TestBasicTokenFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
@@ -534,7 +535,7 @@ func TestPrecedenceTokenFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
@@ -923,7 +924,7 @@ users:
 	if err != nil {
 		t.Error(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer utiltesting.CloseAndRemove(t, tmpfile)
 	if err := os.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
 		t.Error(err)
 	}
@@ -1010,5 +1011,70 @@ func TestCleanANSIEscapeCodes(t *testing.T) {
 				t.Errorf("expected %q, actual %q", test.out, actualOut)
 			}
 		})
+	}
+}
+
+func TestMergeRawConfigDoOverride(t *testing.T) {
+	const (
+		server         = "https://anything.com:8080"
+		token          = "the-token"
+		modifiedServer = "http://localhost:8081"
+		modifiedToken  = "modified-token"
+	)
+	config := createValidTestConfig()
+
+	// add another context which to modify with overrides
+	config.Clusters["modify"] = &clientcmdapi.Cluster{
+		Server: server,
+	}
+	config.AuthInfos["modify"] = &clientcmdapi.AuthInfo{
+		Token: token,
+	}
+	config.Contexts["modify"] = &clientcmdapi.Context{
+		Cluster:   "modify",
+		AuthInfo:  "modify",
+		Namespace: "modify",
+	}
+
+	// create overrides for the modify context
+	overrides := &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: modifiedServer,
+		},
+		Context: clientcmdapi.Context{
+			Namespace: "foobar",
+			Cluster:   "modify",
+			AuthInfo:  "modify",
+		},
+		AuthInfo: clientcmdapi.AuthInfo{
+			Token: modifiedToken,
+		},
+		CurrentContext: "modify",
+	}
+
+	cut := NewDefaultClientConfig(*config, overrides)
+	act, err := cut.MergedRawConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// ensure overrides were applied to "modify"
+	actContext := act.CurrentContext
+	if actContext != "modify" {
+		t.Errorf("Expected context %v, got %v", "modify", actContext)
+	}
+	if act.Clusters[actContext].Server != "http://localhost:8081" {
+		t.Errorf("Expected server %v, got %v", "http://localhost:8081", act.Clusters[actContext].Server)
+	}
+	if act.Contexts[actContext].Namespace != "foobar" {
+		t.Errorf("Expected namespace %v, got %v", "foobar", act.Contexts[actContext].Namespace)
+	}
+
+	// ensure context "clean" was not touched
+	if act.Clusters["clean"].Server != config.Clusters["clean"].Server {
+		t.Errorf("Expected server %v, got %v", config.Clusters["clean"].Server, act.Clusters["clean"].Server)
+	}
+	if act.Contexts["clean"].Namespace != config.Contexts["clean"].Namespace {
+		t.Errorf("Expected namespace %v, got %v", config.Contexts["clean"].Namespace, act.Contexts["clean"].Namespace)
 	}
 }

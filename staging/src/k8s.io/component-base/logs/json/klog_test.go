@@ -66,49 +66,49 @@ func TestKlogIntegration(t *testing.T) {
 			fun: func() {
 				klog.Info("test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "V(1).Info",
 			fun: func() {
 				klog.V(1).Info("test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":1}`,
 		},
 		{
 			name: "Infof",
 			fun: func() {
 				klog.Infof("test %d", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "V(1).Infof",
 			fun: func() {
 				klog.V(1).Infof("test %d", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":1}`,
 		},
 		{
 			name: "Infoln",
 			fun: func() {
 				klog.Infoln("test", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "V(1).Infoln",
 			fun: func() {
 				klog.V(1).Infoln("test", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":1}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":1}`,
 		},
 		{
 			name: "InfoDepth",
 			fun: func() {
 				klog.InfoDepth(1, "test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "InfoS",
@@ -168,56 +168,56 @@ func TestKlogIntegration(t *testing.T) {
 			fun: func() {
 				klog.Warning("test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "WarningDepth",
 			fun: func() {
 				klog.WarningDepth(1, "test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "Warningln",
 			fun: func() {
 				klog.Warningln("test", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "Warningf",
 			fun: func() {
 				klog.Warningf("test %d", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n","v":0}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1","v":0}`,
 		},
 		{
 			name: "Error",
 			fun: func() {
 				klog.Error("test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1"}`,
 		},
 		{
 			name: "ErrorDepth",
 			fun: func() {
 				klog.ErrorDepth(1, "test ", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1"}`,
 		},
 		{
 			name: "Errorln",
 			fun: func() {
 				klog.Errorln("test", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1"}`,
 		},
 		{
 			name: "Errorf",
 			fun: func() {
 				klog.Errorf("test %d", 1)
 			},
-			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1\n"}`,
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test 1"}`,
 		},
 		{
 			name: "ErrorS",

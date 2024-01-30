@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,14 +37,14 @@ import (
 
 var _ = SIGDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
 		Testname: Secrets, pod environment field
 		Description: Create a secret. Create a Pod with Container that declares a environment variable which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
-	framework.ConformanceIt("should be consumable from pods in env vars [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in env vars", f.WithNodeConformance(), func(ctx context.Context) {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
@@ -92,7 +93,7 @@ var _ = SIGDescribe("Secrets", func() {
 		Testname: Secrets, pod environment from source
 		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
-	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable via the environment", f.WithNodeConformance(), func(ctx context.Context) {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
@@ -139,7 +140,7 @@ var _ = SIGDescribe("Secrets", func() {
 	*/
 	framework.ConformanceIt("should fail to create secret due to empty secret key", func(ctx context.Context) {
 		secret, err := createEmptyKeySecretForTest(ctx, f)
-		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
 
 	/*
@@ -177,7 +178,7 @@ var _ = SIGDescribe("Secrets", func() {
 			LabelSelector: "testsecret-constant=true",
 		})
 		framework.ExpectNoError(err, "failed to list secrets")
-		framework.ExpectNotEqual(len(secretsList.Items), 0, "no secrets found")
+		gomega.Expect(secretsList.Items).ToNot(gomega.BeEmpty(), "no secrets found")
 
 		foundCreatedSecret := false
 		var secretCreatedName string
@@ -211,7 +212,7 @@ var _ = SIGDescribe("Secrets", func() {
 		secretDecodedstring, err := base64.StdEncoding.DecodeString(string(secret.Data["key"]))
 		framework.ExpectNoError(err, "failed to decode secret from Base64")
 
-		framework.ExpectEqual(string(secretDecodedstring), "value1", "found secret, but the data wasn't updated from the patch")
+		gomega.Expect(string(secretDecodedstring)).To(gomega.Equal("value1"), "found secret, but the data wasn't updated from the patch")
 
 		ginkgo.By("deleting the secret using a LabelSelector")
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{

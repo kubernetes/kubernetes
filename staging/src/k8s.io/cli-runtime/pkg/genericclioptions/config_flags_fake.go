@@ -66,7 +66,7 @@ func (f *TestConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
 	}
 	if f.discoveryClient != nil {
 		mapper := restmapper.NewDeferredDiscoveryRESTMapper(f.discoveryClient)
-		expander := restmapper.NewShortcutExpander(mapper, f.discoveryClient)
+		expander := restmapper.NewShortcutExpander(mapper, f.discoveryClient, nil)
 		return expander, nil
 	}
 	return nil, fmt.Errorf("no restmapper")

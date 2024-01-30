@@ -23,7 +23,7 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-// Cgroup models one line from /proc/[pid]/cgroup. Each Cgroup struct describes the the placement of a PID inside a
+// Cgroup models one line from /proc/[pid]/cgroup. Each Cgroup struct describes the placement of a PID inside a
 // specific control hierarchy. The kernel has two cgroup APIs, v1 and v2. v1 has one hierarchy per available resource
 // controller, while v2 has one unified hierarchy shared by all controllers. Regardless of v1 or v2, all hierarchies
 // contain all running processes, so the question answerable with a Cgroup struct is 'where is this process in

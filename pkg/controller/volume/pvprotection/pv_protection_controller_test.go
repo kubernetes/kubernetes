@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -227,7 +226,7 @@ func TestPVProtectionController(t *testing.T) {
 				break
 			}
 			if ctrl.queue.Len() > 0 {
-				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
+				logger.V(5).Info("Non-empty events queue, processing one", "test", test.name, "queueLength", ctrl.queue.Len())
 				ctrl.processNextWorkItem(context.TODO())
 			}
 			if ctrl.queue.Len() > 0 {
@@ -238,7 +237,7 @@ func TestPVProtectionController(t *testing.T) {
 			if currentActionCount < len(test.expectedActions) {
 				// Do not log evey wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
-					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
+					logger.V(5).Info("Waiting for the remaining actions", "test", test.name, "currentActionCount", currentActionCount, "expectedActionCount", len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
 				}
 				// The test expected more to happen, wait for the actions.

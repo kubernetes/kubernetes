@@ -72,10 +72,27 @@ func TestDeletePods(t *testing.T) {
 						newPod := newPodMap[name]
 						return &newPod, nil
 					}
-					return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
-
+					return &corev1.Pod{}, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
 				}
-				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+				return &corev1.Pod{}, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+			},
+		},
+		{
+			description:       "Pod found with same name but different UID",
+			interval:          100 * time.Millisecond,
+			timeout:           10 * time.Second,
+			expectPendingPods: false,
+			expectError:       false,
+			expectedError:     nil,
+			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
+				// Return a pod with the same name, but different UID
+				return &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      name,
+						UID:       "SOME_OTHER_UID",
+					},
+				}, nil
 			},
 		},
 		{
@@ -90,7 +107,7 @@ func TestDeletePods(t *testing.T) {
 				if oldPod, found := oldPodMap[name]; found {
 					return &oldPod, nil
 				}
-				return nil, fmt.Errorf("%q: not found", name)
+				return &corev1.Pod{}, fmt.Errorf("%q: not found", name)
 			},
 		},
 		{
@@ -106,7 +123,7 @@ func TestDeletePods(t *testing.T) {
 				if oldPod, found := oldPodMap[name]; found {
 					return &oldPod, nil
 				}
-				return nil, fmt.Errorf("%q: not found", name)
+				return &corev1.Pod{}, fmt.Errorf("%q: not found", name)
 			},
 		},
 		{
@@ -123,7 +140,7 @@ func TestDeletePods(t *testing.T) {
 					oldPod.ObjectMeta.SetDeletionTimestamp(dTime)
 					return &oldPod, nil
 				}
-				return nil, fmt.Errorf("%q: not found", name)
+				return &corev1.Pod{}, fmt.Errorf("%q: not found", name)
 			},
 		},
 		{
@@ -134,7 +151,7 @@ func TestDeletePods(t *testing.T) {
 			expectError:       true,
 			expectedError:     nil,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
-				return nil, errors.New("This is a random error for testing")
+				return &corev1.Pod{}, errors.New("This is a random error for testing")
 			},
 		},
 	}
@@ -331,6 +348,39 @@ func TestDeleteOrEvict(t *testing.T) {
 			h := &Helper{
 				Out:                os.Stdout,
 				GracePeriodSeconds: 10,
+				OnPodDeletionOrEvictionStarted: func(pod *corev1.Pod, usingEviction bool) {
+					if tc.evictionSupported && !tc.disableEviction {
+						if !usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionStarted callback failed while evicting; actual\n\t%v\nexpected\n\t%v", tc.description, usingEviction, !usingEviction)
+						}
+					} else if tc.evictionSupported && tc.disableEviction {
+						if usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionStarted callback failed while deleting; actual\n\t%v\nexpected\n\t%v", tc.description, !usingEviction, usingEviction)
+						}
+					}
+				},
+				OnPodDeletedOrEvicted: func(pod *corev1.Pod, usingEviction bool) {
+					if tc.evictionSupported && !tc.disableEviction {
+						if !usingEviction {
+							t.Errorf("%s: OnPodDeletedOrEvicted callback failed while evicting; actual\n\t%v\nexpected\n\t%v", tc.description, usingEviction, !usingEviction)
+						}
+					} else if tc.evictionSupported && tc.disableEviction {
+						if usingEviction {
+							t.Errorf("%s: OnPodDeletedOrEvicted callback failed while deleting; actual\n\t%v\nexpected\n\t%v", tc.description, !usingEviction, usingEviction)
+						}
+					}
+				},
+				OnPodDeletionOrEvictionFinished: func(pod *corev1.Pod, usingEviction bool, err error) {
+					if tc.evictionSupported && !tc.disableEviction {
+						if !usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionFinished callback failed while evicting; actual\n\t%v\nexpected\n\t%v", tc.description, usingEviction, !usingEviction)
+						}
+					} else if tc.evictionSupported && tc.disableEviction {
+						if usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionFinished callback failed while deleting; actual\n\t%v\nexpected\n\t%v", tc.description, !usingEviction, usingEviction)
+						}
+					}
+				},
 			}
 
 			// Create 4 pods, and try to remove the first 2

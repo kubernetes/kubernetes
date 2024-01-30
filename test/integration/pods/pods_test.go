@@ -844,6 +844,63 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 			},
 			enableSchedulingGates: true,
 		},
+		{
+			name: "addition to nodeAffinity is allowed for gated pods with nil affinity",
+			create: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			update: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			enableSchedulingGates: true,
+		},
 	}
 	for _, tc := range cases {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tc.enableSchedulingGates)()

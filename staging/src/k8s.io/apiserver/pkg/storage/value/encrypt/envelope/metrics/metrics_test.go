@@ -36,6 +36,8 @@ const (
 	testKeyHash2              = "sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
 	testKeyHash3              = "sha256:4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
 	testProviderNameForMetric = "providerName"
+	testAPIServerID           = "testAPIServerID"
+	testAPIServerIDHash       = "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"
 )
 
 var (
@@ -204,6 +206,7 @@ func TestRecordKeyID_Serial(t *testing.T) {
 		metrics            []string
 		providerName       string
 		transformationType string
+		apiServerID        string
 		want               string
 	}{
 		{
@@ -214,11 +217,12 @@ func TestRecordKeyID_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, testKeyHash1, testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, testKeyHash1, testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total more labels",
@@ -228,12 +232,13 @@ func TestRecordKeyID_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
         	# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-        	apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-        	apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
+        	apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+        	apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testAPIServerIDHash, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total same labels",
@@ -243,12 +248,13 @@ func TestRecordKeyID_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
-			`, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
+			`, testAPIServerIDHash, testKeyHash1, testProviderNameForMetric, FromStorageLabel, testAPIServerIDHash, testKeyHash2, testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total exceeds limit, remove first label, and empty keyID",
@@ -258,12 +264,29 @@ func TestRecordKeyID_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        testAPIServerID,
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, testKeyHash2, testProviderNameForMetric, FromStorageLabel, "", testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 2
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, testKeyHash2, testProviderNameForMetric, FromStorageLabel, testAPIServerIDHash, "", testProviderNameForMetric, FromStorageLabel),
+		},
+		{
+			desc:  "keyIDHash total exceeds limit, remove first label, empty keyID, and empty testAPIServerID",
+			keyID: "",
+			metrics: []string{
+				"apiserver_envelope_encryption_key_id_hash_total",
+			},
+			providerName:       testProviderNameForMetric,
+			transformationType: FromStorageLabel,
+			apiServerID:        "",
+			want: fmt.Sprintf(`
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
+			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, testAPIServerIDHash, "", testProviderNameForMetric, FromStorageLabel, "", "", testProviderNameForMetric, FromStorageLabel),
 		},
 		{
 			desc:  "keyIDHash total exceeds limit 2, remove first label",
@@ -273,12 +296,13 @@ func TestRecordKeyID_Serial(t *testing.T) {
 			},
 			providerName:       testProviderNameForMetric,
 			transformationType: FromStorageLabel,
+			apiServerID:        "",
 			want: fmt.Sprintf(`
-			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+			# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 			# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-			`, "", testProviderNameForMetric, FromStorageLabel, testKeyHash1, testProviderNameForMetric, FromStorageLabel),
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+			`, "", "", testProviderNameForMetric, FromStorageLabel, "", testKeyHash1, testProviderNameForMetric, FromStorageLabel),
 		},
 	}
 
@@ -289,7 +313,7 @@ func TestRecordKeyID_Serial(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			RecordKeyID(tt.transformationType, tt.providerName, tt.keyID)
+			RecordKeyID(tt.transformationType, tt.providerName, tt.keyID, tt.apiServerID)
 			// We are not resetting the metric here as each test is not independent in order to validate the behavior
 			// when the metric labels exceed the limit to ensure the labels are not unbounded.
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
@@ -313,12 +337,14 @@ func TestRecordKeyIDLRUKey(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			keyID := rand.String(32)
+			apiServerID := rand.String(32)
 			key := metricLabels{
 				transformationType: rand.String(32),
 				providerName:       rand.String(32),
 				keyIDHash:          getHash(keyID),
+				apiServerIDHash:    getHash(apiServerID),
 			}
-			RecordKeyID(key.transformationType, key.providerName, keyID)
+			RecordKeyID(key.transformationType, key.providerName, keyID, apiServerID)
 		}()
 	}
 	wg.Wait()
@@ -359,11 +385,13 @@ func TestRecordKeyIDFromStatus(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			keyID := rand.String(32)
+			apiServerID := rand.String(32)
 			key := metricLabels{
-				providerName: rand.String(32),
-				keyIDHash:    getHash(keyID),
+				providerName:    rand.String(32),
+				keyIDHash:       getHash(keyID),
+				apiServerIDHash: getHash(apiServerID),
 			}
-			RecordKeyIDFromStatus(key.providerName, keyID)
+			RecordKeyIDFromStatus(key.providerName, keyID, apiServerID)
 		}()
 	}
 	wg.Wait()

@@ -56,8 +56,14 @@ func (rc *reconciler) reconcileNew() {
 		rc.cleanOrphanVolumes()
 	}
 
-	if len(rc.volumesNeedDevicePath) != 0 {
-		rc.updateReconstructedDevicePaths()
+	if len(rc.volumesNeedUpdateFromNodeStatus) != 0 {
+		rc.updateReconstructedFromNodeStatus()
+	}
+	if len(rc.volumesNeedUpdateFromNodeStatus) == 0 {
+		// ASW is fully populated only after both devicePaths and uncertain volume attach-ability
+		// were reconstructed from the API server.
+		// This will start reconciliation of node.status.volumesInUse.
+		rc.updateLastSyncTime()
 	}
 
 	if len(rc.volumesNeedReportedInUse) != 0 && rc.populatorHasAddedPods() {

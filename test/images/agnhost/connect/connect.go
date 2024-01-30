@@ -111,7 +111,7 @@ func connectSCTP(dest string, timeout time.Duration) {
 	}
 
 	timeoutCh := time.After(timeout)
-	errCh := make(chan (error))
+	errCh := make(chan error)
 
 	go func() {
 		conn, err := sctp.DialSCTP("sctp", nil, addr)

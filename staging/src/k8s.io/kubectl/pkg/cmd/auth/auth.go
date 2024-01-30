@@ -29,7 +29,7 @@ func NewCmdAuth(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 	cmds := &cobra.Command{
 		Use:   "auth",
 		Short: "Inspect authorization",
-		Long:  `Inspect authorization`,
+		Long:  `Inspect authorization.`,
 		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 

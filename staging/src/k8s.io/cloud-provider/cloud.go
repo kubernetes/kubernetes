@@ -98,6 +98,8 @@ func DefaultLoadBalancerName(service *v1.Service) string {
 }
 
 // GetInstanceProviderID builds a ProviderID for a node in a cloud.
+// Note that if the instance does not exist, we must return ("", cloudprovider.InstanceNotFound)
+// cloudprovider.InstanceNotFound should NOT be returned for instances that exist but are stopped/sleeping
 func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
@@ -108,8 +110,11 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 		if err == NotImplemented {
 			return "", err
 		}
+		if err == InstanceNotFound {
+			return "", err
+		}
 
-		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
+		return "", fmt.Errorf("failed to get instance ID from cloud provider: %w", err)
 	}
 	return cloud.ProviderName() + "://" + instanceID, nil
 }
@@ -285,6 +290,7 @@ type Zones interface {
 }
 
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
+// DEPRECATED: PVLabeler is deprecated in favor of CSI topology feature.
 type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
 }

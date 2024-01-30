@@ -59,6 +59,7 @@ const (
 	maxBackoffDelay   = 3 * time.Second
 	baseBackoffDelay  = 100 * time.Millisecond
 	connectionTimeout = 2 * time.Second
+	maxMsgSize        = 16 * 1024 * 1024 // 16MB
 )
 
 // Client creates a containerd client
@@ -82,6 +83,7 @@ func Client(address, namespace string) (ContainerdClient, error) {
 			grpc.WithContextDialer(dialer.ContextDialer),
 			grpc.WithBlock(),
 			grpc.WithConnectParams(connParams),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 		}
 		unary, stream := newNSInterceptors(namespace)
 		gopts = append(gopts,

@@ -719,6 +719,8 @@ func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
 		aElemType := a.Elem()
 		bElemType := b.Elem()
 		assertEqualTypes(t, path, aElemType, bElemType)
+	case reflect.String:
+		// string types are equal
 
 	default:
 		fatalTypeError(t, path, a, b, "unhandled kind")

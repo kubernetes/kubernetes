@@ -20,23 +20,25 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestBuildArgumentListFromMap(t *testing.T) {
+func TestArgumentsToCommand(t *testing.T) {
 	var tests = []struct {
 		name      string
-		base      map[string]string
-		overrides map[string]string
+		base      []kubeadmapi.Arg
+		overrides []kubeadmapi.Arg
 		expected  []string
 	}{
 		{
 			name: "override an argument from the base",
-			base: map[string]string{
-				"admission-control": "NamespaceLifecycle",
-				"allow-privileged":  "true",
+			base: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle"},
+				{Name: "allow-privileged", Value: "true"},
 			},
-			overrides: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
@@ -44,12 +46,43 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "add an argument that is not in base",
-			base: map[string]string{
-				"allow-privileged": "true",
+			name: "override an argument from the base and add duplicate",
+			base: []kubeadmapi.Arg{
+				{Name: "token-auth-file", Value: "/token"},
+				{Name: "tls-sni-cert-key", Value: "/some/path/"},
 			},
-			overrides: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
+			overrides: []kubeadmapi.Arg{
+				{Name: "tls-sni-cert-key", Value: "/some/new/path"},
+				{Name: "tls-sni-cert-key", Value: "/some/new/path/subpath"},
+			},
+			expected: []string{
+				"--tls-sni-cert-key=/some/new/path",
+				"--tls-sni-cert-key=/some/new/path/subpath",
+				"--token-auth-file=/token",
+			},
+		},
+		{
+			name: "override all duplicate arguments from base",
+			base: []kubeadmapi.Arg{
+				{Name: "token-auth-file", Value: "/token"},
+				{Name: "tls-sni-cert-key", Value: "foo"},
+				{Name: "tls-sni-cert-key", Value: "bar"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "tls-sni-cert-key", Value: "/some/new/path"},
+			},
+			expected: []string{
+				"--tls-sni-cert-key=/some/new/path",
+				"--token-auth-file=/token",
+			},
+		},
+		{
+			name: "add an argument that is not in base",
+			base: []kubeadmapi.Arg{
+				{Name: "allow-privileged", Value: "true"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
@@ -58,12 +91,12 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 		},
 		{
 			name: "allow empty strings in base",
-			base: map[string]string{
-				"allow-privileged":                   "true",
-				"something-that-allows-empty-string": "",
+			base: []kubeadmapi.Arg{
+				{Name: "allow-privileged", Value: "true"},
+				{Name: "something-that-allows-empty-string", Value: ""},
 			},
-			overrides: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
@@ -73,13 +106,13 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 		},
 		{
 			name: "allow empty strings in overrides",
-			base: map[string]string{
-				"allow-privileged":                   "true",
-				"something-that-allows-empty-string": "foo",
+			base: []kubeadmapi.Arg{
+				{Name: "allow-privileged", Value: "true"},
+				{Name: "something-that-allows-empty-string", Value: "foo"},
 			},
-			overrides: map[string]string{
-				"admission-control":                  "NamespaceLifecycle,LimitRanger",
-				"something-that-allows-empty-string": "",
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
+				{Name: "something-that-allows-empty-string", Value: ""},
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
@@ -91,19 +124,19 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual := BuildArgumentListFromMap(rt.base, rt.overrides)
+			actual := ArgumentsToCommand(rt.base, rt.overrides)
 			if !reflect.DeepEqual(actual, rt.expected) {
-				t.Errorf("failed BuildArgumentListFromMap:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+				t.Errorf("failed ArgumentsToCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 			}
 		})
 	}
 }
 
-func TestParseArgumentListToMap(t *testing.T) {
+func TestArgumentsFromCommand(t *testing.T) {
 	var tests = []struct {
-		name        string
-		args        []string
-		expectedMap map[string]string
+		name     string
+		args     []string
+		expected []kubeadmapi.Arg
 	}{
 		{
 			name: "normal case",
@@ -111,9 +144,9 @@ func TestParseArgumentListToMap(t *testing.T) {
 				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
 			},
-			expectedMap: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
-				"allow-privileged":  "true",
+			expected: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
+				{Name: "allow-privileged", Value: "true"},
 			},
 		},
 		{
@@ -123,10 +156,10 @@ func TestParseArgumentListToMap(t *testing.T) {
 				"--allow-privileged=true",
 				"--feature-gates=EnableFoo=true,EnableBar=false",
 			},
-			expectedMap: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
-				"allow-privileged":  "true",
-				"feature-gates":     "EnableFoo=true,EnableBar=false",
+			expected: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
+				{Name: "allow-privileged", Value: "true"},
+				{Name: "feature-gates", Value: "EnableFoo=true,EnableBar=false"},
 			},
 		},
 		{
@@ -137,75 +170,32 @@ func TestParseArgumentListToMap(t *testing.T) {
 				"--allow-privileged=true",
 				"--feature-gates=EnableFoo=true,EnableBar=false",
 			},
-			expectedMap: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
-				"allow-privileged":  "true",
-				"feature-gates":     "EnableFoo=true,EnableBar=false",
+			expected: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
+				{Name: "allow-privileged", Value: "true"},
+				{Name: "feature-gates", Value: "EnableFoo=true,EnableBar=false"},
+			},
+		},
+		{
+			name: "allow duplicate args",
+			args: []string{
+				"--admission-control=NamespaceLifecycle,LimitRanger",
+				"--tls-sni-cert-key=/some/path",
+				"--tls-sni-cert-key=/some/path/subpath",
+			},
+			expected: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle,LimitRanger"},
+				{Name: "tls-sni-cert-key", Value: "/some/path"},
+				{Name: "tls-sni-cert-key", Value: "/some/path/subpath"},
 			},
 		},
 	}
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualMap := ParseArgumentListToMap(rt.args)
-			if !reflect.DeepEqual(actualMap, rt.expectedMap) {
-				t.Errorf("failed ParseArgumentListToMap:\nexpected:\n%v\nsaw:\n%v", rt.expectedMap, actualMap)
-			}
-		})
-	}
-}
-
-func TestReplaceArgument(t *testing.T) {
-	var tests = []struct {
-		name         string
-		args         []string
-		mutateFunc   func(map[string]string) map[string]string
-		expectedArgs []string
-	}{
-		{
-			name: "normal case",
-			args: []string{
-				"kube-apiserver",
-				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--allow-privileged=true",
-			},
-			mutateFunc: func(argMap map[string]string) map[string]string {
-				argMap["admission-control"] = "NamespaceLifecycle,LimitRanger,ResourceQuota"
-				return argMap
-			},
-			expectedArgs: []string{
-				"kube-apiserver",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ResourceQuota",
-				"--allow-privileged=true",
-			},
-		},
-		{
-			name: "another normal case",
-			args: []string{
-				"kube-apiserver",
-				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--allow-privileged=true",
-			},
-			mutateFunc: func(argMap map[string]string) map[string]string {
-				argMap["new-arg-here"] = "foo"
-				return argMap
-			},
-			expectedArgs: []string{
-				"kube-apiserver",
-				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--allow-privileged=true",
-				"--new-arg-here=foo",
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		t.Run(rt.name, func(t *testing.T) {
-			actualArgs := ReplaceArgument(rt.args, rt.mutateFunc)
-			sort.Strings(actualArgs)
-			sort.Strings(rt.expectedArgs)
-			if !reflect.DeepEqual(actualArgs, rt.expectedArgs) {
-				t.Errorf("failed ReplaceArgument:\nexpected:\n%v\nsaw:\n%v", rt.expectedArgs, actualArgs)
+			actual := ArgumentsFromCommand(rt.args)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				t.Errorf("failed ArgumentsFromCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 			}
 		})
 	}
@@ -236,7 +226,7 @@ func TestRoundtrip(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			// These two methods should be each other's opposite functions, test that by chaining the methods and see if you get the same result back
-			actual := BuildArgumentListFromMap(ParseArgumentListToMap(rt.args), map[string]string{})
+			actual := ArgumentsToCommand(ArgumentsFromCommand(rt.args), []kubeadmapi.Arg{})
 			sort.Strings(actual)
 			sort.Strings(rt.args)
 

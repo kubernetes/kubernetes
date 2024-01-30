@@ -32,22 +32,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 type planFlags struct {
 	*applyPlanFlags
 }
+
+var upgradePlanLongDesc = cmdutil.LongDesc(`
+	Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.
+	This command can only run on the control plane nodes where the kubeconfig file "admin.conf" exists.
+	To skip the internet check, pass in the optional [version] parameter.
+`)
 
 // newCmdPlan returns the cobra command for `kubeadm upgrade plan`
 func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
@@ -59,7 +63,8 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "plan [version] [flags]",
-		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter",
+		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.",
+		Long:  upgradePlanLongDesc,
 		RunE: func(_ *cobra.Command, args []string) error {
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
@@ -268,7 +273,7 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 
 	// Fetch the current state of the component configs
 	klog.V(1).Infoln("[upgrade/plan] analysing component config version states")
-	configVersionStates, err := getComponentConfigVersionStates(&cfg.ClusterConfiguration, client, flags.cfgPath)
+	configVersionStates, err := componentconfigs.GetVersionStates(&cfg.ClusterConfiguration, client)
 	if err != nil {
 		return errors.WithMessage(err, "[upgrade/versions] FATAL")
 	}
@@ -350,24 +355,6 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha
 	}
 
 	return &outputapiv1alpha2.UpgradePlan{Components: components}, unstableVersionFlag, nil
-}
-
-func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, cfgPath string) ([]outputapiv1alpha2.ComponentConfigVersionState, error) {
-	docmap := kubeadmapi.DocumentMap{}
-
-	if cfgPath != "" {
-		bytes, err := os.ReadFile(cfgPath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to read config file %q", cfgPath)
-		}
-
-		docmap, err = kubeadmutil.SplitYAMLDocuments(bytes)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return componentconfigs.GetVersionStates(cfg, client, docmap)
 }
 
 // printUpgradePlan prints a UX-friendly overview of what versions are available to upgrade to

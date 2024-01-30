@@ -39,7 +39,7 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					Ports: []v1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -69,7 +69,7 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					Ports: []v1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},

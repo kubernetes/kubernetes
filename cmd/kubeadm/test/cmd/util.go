@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"testing"
@@ -50,8 +51,9 @@ func RunCmd(command string, args ...string) (string, string, int, error) {
 }
 
 // RunSubCommand is a utility function for kubeadm testing that executes a Cobra sub command
-func RunSubCommand(t *testing.T, subCmds []*cobra.Command, command string, args ...string) error {
+func RunSubCommand(t *testing.T, subCmds []*cobra.Command, command string, output io.Writer, args ...string) error {
 	subCmd := getSubCommand(t, subCmds, command)
+	subCmd.SetOut(output)
 	subCmd.SetArgs(args)
 	if err := subCmd.Execute(); err != nil {
 		return err

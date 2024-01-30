@@ -34,33 +34,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type gcm struct {
-	aead      cipher.AEAD
-	nonceFunc func([]byte) error
-}
+// commonSize is the length of various security sensitive byte slices such as encryption keys.
+// Do not change this value.  It would be a backward incompatible change.
+const commonSize = 32
 
-// NewGCMTransformer takes the given block cipher and performs encryption and decryption on the given data.
-// It implements AEAD encryption of the provided values given a cipher.Block algorithm.
-// The authenticated data provided as part of the value.Context method must match when the same
-// value is set to and loaded from storage. In order to ensure that values cannot be copied by
-// an attacker from a location under their control, use characteristics of the storage location
-// (such as the etcd key) as part of the authenticated data.
-//
-// Because this mode requires a generated IV and IV reuse is a known weakness of AES-GCM, keys
-// must be rotated before a birthday attack becomes feasible. NIST SP 800-38D
-// (http://csrc.nist.gov/publications/nistpubs/800-38D/SP-800-38D.pdf) recommends using the same
-// key with random 96-bit nonces (the default nonce length) no more than 2^32 times, and
-// therefore transformers using this implementation *must* ensure they allow for frequent key
-// rotation. Future work should include investigation of AES-GCM-SIV as an alternative to
-// random nonces.
-func NewGCMTransformer(block cipher.Block) (value.Transformer, error) {
-	aead, err := newGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	return &gcm{aead: aead, nonceFunc: randomNonce}, nil
-}
+const keySizeCounterNonceGCM = commonSize
 
 // NewGCMTransformerWithUniqueKeyUnsafe is the same as NewGCMTransformer but is unsafe for general
 // use because it makes assumptions about the key underlying the block cipher.  Specifically,
@@ -78,7 +56,7 @@ func NewGCMTransformer(block cipher.Block) (value.Transformer, error) {
 // it can be passed to NewGCMTransformer(aes.NewCipher(key)) to construct a transformer capable
 // of decrypting values encrypted by this transformer (that transformer must not be used for encryption).
 func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
-	key, err := generateKey(32)
+	key, err := GenerateKey(keySizeCounterNonceGCM)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -126,17 +104,6 @@ func newGCMTransformerWithUniqueKeyUnsafe(block cipher.Block, nonceGen *nonceGen
 	return &gcm{aead: aead, nonceFunc: nonceFunc}, nil
 }
 
-func newGCM(block cipher.Block) (cipher.AEAD, error) {
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-	if nonceSize := aead.NonceSize(); nonceSize != 12 { // all data in etcd will be broken if this ever changes
-		return nil, fmt.Errorf("crypto/cipher.NewGCM returned unexpected nonce size: %d", nonceSize)
-	}
-	return aead, nil
-}
-
 func randomNonce(b []byte) error {
 	_, err := rand.Read(b)
 	return err
@@ -164,8 +131,8 @@ func die(msg string) {
 	klog.FatalDepth(1, msg)
 }
 
-// generateKey generates a random key using system randomness.
-func generateKey(length int) (key []byte, err error) {
+// GenerateKey generates a random key using system randomness.
+func GenerateKey(length int) (key []byte, err error) {
 	defer func(start time.Time) {
 		value.RecordDataKeyGeneration(start, err)
 	}(time.Now())
@@ -175,6 +142,45 @@ func generateKey(length int) (key []byte, err error) {
 	}
 
 	return key, nil
+}
+
+// NewGCMTransformer takes the given block cipher and performs encryption and decryption on the given data.
+// It implements AEAD encryption of the provided values given a cipher.Block algorithm.
+// The authenticated data provided as part of the value.Context method must match when the same
+// value is set to and loaded from storage. In order to ensure that values cannot be copied by
+// an attacker from a location under their control, use characteristics of the storage location
+// (such as the etcd key) as part of the authenticated data.
+//
+// Because this mode requires a generated IV and IV reuse is a known weakness of AES-GCM, keys
+// must be rotated before a birthday attack becomes feasible. NIST SP 800-38D
+// (http://csrc.nist.gov/publications/nistpubs/800-38D/SP-800-38D.pdf) recommends using the same
+// key with random 96-bit nonces (the default nonce length) no more than 2^32 times, and
+// therefore transformers using this implementation *must* ensure they allow for frequent key
+// rotation. Future work should include investigation of AES-GCM-SIV as an alternative to
+// random nonces.
+func NewGCMTransformer(block cipher.Block) (value.Transformer, error) {
+	aead, err := newGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gcm{aead: aead, nonceFunc: randomNonce}, nil
+}
+
+func newGCM(block cipher.Block) (cipher.AEAD, error) {
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if nonceSize := aead.NonceSize(); nonceSize != 12 { // all data in etcd will be broken if this ever changes
+		return nil, fmt.Errorf("crypto/cipher.NewGCM returned unexpected nonce size: %d", nonceSize)
+	}
+	return aead, nil
+}
+
+type gcm struct {
+	aead      cipher.AEAD
+	nonceFunc func([]byte) error
 }
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {

@@ -32,9 +32,9 @@ func (matcher *BeAnExistingFileMatcher) Match(actual interface{}) (success bool,
 }
 
 func (matcher *BeAnExistingFileMatcher) FailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, fmt.Sprintf("to exist"))
+	return format.Message(actual, "to exist")
 }
 
 func (matcher *BeAnExistingFileMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, fmt.Sprintf("not to exist"))
+	return format.Message(actual, "not to exist")
 }

@@ -52,6 +52,8 @@ var (
 	NodeAllocatableChange = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeAllocatable, Label: "NodeAllocatableChange"}
 	// NodeLabelChange is the event when node label is changed.
 	NodeLabelChange = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel, Label: "NodeLabelChange"}
+	// NodeAnnotationChange is the event when node annotation is changed.
+	NodeAnnotationChange = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeAnnotation, Label: "NodeAnnotationChange"}
 	// NodeTaintChange is the event when node taint is changed.
 	NodeTaintChange = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint, Label: "NodeTaintChange"}
 	// NodeConditionChange is the event when node condition is changed.

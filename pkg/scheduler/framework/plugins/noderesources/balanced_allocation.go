@@ -62,7 +62,7 @@ func (s *balancedAllocationPreScoreState) Clone() framework.StateData {
 }
 
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
-func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	state := &balancedAllocationPreScoreState{
 		podRequests: ba.calculatePodResourceRequestList(pod, ba.resources),
 	}
@@ -114,7 +114,7 @@ func (ba *BalancedAllocation) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewBalancedAllocation initializes a new plugin and returns it.
-func NewBalancedAllocation(baArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := baArgs.(*config.NodeResourcesBalancedAllocationArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesBalancedAllocationArgs, got %T", baArgs)

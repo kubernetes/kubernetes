@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -681,7 +681,7 @@ func TestPodDeletionCost(t *testing.T) {
 			// Change RS's number of replics to 1
 			rsClient := c.AppsV1().ReplicaSets(ns.Name)
 			updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
-				rs.Spec.Replicas = pointer.Int32(1)
+				rs.Spec.Replicas = ptr.To[int32](1)
 			})
 
 			// Poll until ReplicaSet is downscaled to 1.

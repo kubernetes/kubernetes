@@ -51,6 +51,10 @@ EXT_APIS_PKG="$4"
 GROUPS_WITH_VERSIONS="$5"
 shift 5
 
+echo "WARNING: $(basename "$0") is deprecated."
+echo "WARNING: Please use k8s.io/code-generator/kube_codegen.sh instead."
+echo
+
 if [ "${GENS}" = "all" ] || grep -qw "all" <<<"${GENS}"; then
     ALL="client,conversion,deepcopy,defaulter,informer,lister,openapi"
     echo "WARNING: Specifying \"all\" as a generator is deprecated."
@@ -115,6 +119,9 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
     GROUP_VERSIONS+=("${G}/${V}")
   done
 done
+
+CLIENTSET_PKG="${CLIENTSET_PKG_NAME:-clientset}"
+CLIENTSET_NAME="${CLIENTSET_NAME_VERSIONED:-versioned}"
 
 if grep -qw "deepcopy" <<<"${GENS}"; then
   # Nuke existing files
@@ -183,9 +190,6 @@ if grep -qw "applyconfiguration" <<<"${GENS}"; then
 fi
 
 if grep -qw "client" <<<"${GENS}"; then
-  CLIENTSET_PKG="${CLIENTSET_PKG_NAME:-clientset}"
-  CLIENTSET_NAME="${CLIENTSET_NAME_VERSIONED:-versioned}"
-
   # Nuke existing files
   root="$(GO111MODULE=on go list -f '{{.Dir}}' "${OUTPUT_PKG}/${CLIENTSET_PKG}/${CLIENTSET_NAME}" 2>/dev/null || true)"
   if [ -n "${root}" ]; then

@@ -22,13 +22,10 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -82,34 +79,6 @@ func SkipUnlessFeatureGateEnabled(gate featuregate.Feature) {
 	}
 	if !featureGate.Enabled(gate) {
 		skipInternalf(1, "Only supported when %v feature is enabled", gate)
-	}
-}
-
-// SkipIfFeatureGateEnabled skips if the feature is enabled.
-//
-// Beware that this only works in test suites that have a --feature-gate
-// parameter and call InitFeatureGates. In test/e2e, the `Feature: XYZ` tag
-// has to be used instead and invocations have to make sure that they
-// only run tests that work with the given test cluster.
-func SkipIfFeatureGateEnabled(gate featuregate.Feature) {
-	if featureGate == nil {
-		framework.Failf("Feature gate checking is not enabled, don't use SkipFeatureGateEnabled(%v). Instead use the Feature tag.", gate)
-	}
-	if featureGate.Enabled(gate) {
-		skipInternalf(1, "Only supported when %v feature is disabled", gate)
-	}
-}
-
-// SkipIfMissingResource skips if the gvr resource is missing.
-func SkipIfMissingResource(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
-	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(ctx, metav1.ListOptions{})
-	if err != nil {
-		// not all resources support list, so we ignore those
-		if apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
-			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
-		}
-		framework.Failf("Unexpected error getting %v: %v", gvr, err)
 	}
 }
 
@@ -228,16 +197,6 @@ var AppArmorDistros = []string{"gci", "ubuntu"}
 // SkipIfAppArmorNotSupported skips if the AppArmor is not supported by the node OS distro.
 func SkipIfAppArmorNotSupported() {
 	SkipUnlessNodeOSDistroIs(AppArmorDistros...)
-}
-
-// RunIfSystemSpecNameIs runs if the system spec name is included in the names.
-func RunIfSystemSpecNameIs(names ...string) {
-	for _, name := range names {
-		if name == framework.TestContext.SystemSpecName {
-			return
-		}
-	}
-	skipInternalf(1, "Skipped because system spec name %q is not in %v", framework.TestContext.SystemSpecName, names)
 }
 
 // SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem run if the component run as pods and client can delete them

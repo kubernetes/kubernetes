@@ -107,7 +107,7 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 func SetDefaults_APIServer(obj *APIServer) {
 	if obj.TimeoutForControlPlane == nil {
 		obj.TimeoutForControlPlane = &metav1.Duration{
-			Duration: constants.DefaultControlPlaneTimeout,
+			Duration: constants.ControlPlaneComponentHealthCheckTimeout,
 		}
 	}
 }
@@ -135,6 +135,7 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
 }
 
+// SetDefaults_JoinControlPlane assigns default values for a joining control plane node
 func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
 	if obj != nil {
 		SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
@@ -181,23 +182,7 @@ func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 	}
 
 	for i := range obj.BootstrapTokens {
-		SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
-	}
-}
-
-// SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
-func SetDefaults_BootstrapToken(bt *bootstraptokenv1.BootstrapToken) {
-	if bt.TTL == nil {
-		bt.TTL = &metav1.Duration{
-			Duration: constants.DefaultTokenDuration,
-		}
-	}
-	if len(bt.Usages) == 0 {
-		bt.Usages = constants.DefaultTokenUsages
-	}
-
-	if len(bt.Groups) == 0 {
-		bt.Groups = constants.DefaultTokenGroups
+		bootstraptokenv1.SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
 	}
 }
 

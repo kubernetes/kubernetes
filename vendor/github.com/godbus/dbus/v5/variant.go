@@ -49,7 +49,7 @@ func ParseVariant(s string, sig Signature) (Variant, error) {
 }
 
 // format returns a formatted version of v and whether this string can be parsed
-// unambigously.
+// unambiguously.
 func (v Variant) format() (string, bool) {
 	switch v.sig.str[0] {
 	case 'b', 'i':

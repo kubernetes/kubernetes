@@ -38,7 +38,7 @@ type SpanExporter interface {
 	// must never be done outside of a new major release.
 
 	// Shutdown notifies the exporter of a pending halt to operations. The
-	// exporter is expected to preform any cleanup or synchronization it
+	// exporter is expected to perform any cleanup or synchronization it
 	// requires while honoring all timeouts and cancellations contained in
 	// the passed context.
 	Shutdown(ctx context.Context) error

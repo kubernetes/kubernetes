@@ -78,7 +78,7 @@ type pvcval struct{}
 type PVCMap map[types.NamespacedName]pvcval
 
 // PersistentVolumeConfig is consumed by MakePersistentVolume() to generate a PV object
-// for varying storage options (NFS, ceph, glusterFS, etc.).
+// for varying storage options (NFS, ceph, etc.).
 // (+optional) prebind holds a pre-bound PVC
 // Example pvSource:
 //
@@ -297,7 +297,7 @@ func DeletePVCandValidatePVGroup(ctx context.Context, c clientset.Interface, tim
 func createPV(ctx context.Context, c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var resultPV *v1.PersistentVolume
 	var lastCreateErr error
-	err := wait.PollImmediateWithContext(ctx, 29*time.Second, timeouts.PVCreate, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextTimeout(ctx, 29*time.Second, timeouts.PVCreate, true, func(ctx context.Context) (done bool, err error) {
 		resultPV, lastCreateErr = c.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
 		if lastCreateErr != nil {
 			// If we hit a quota problem, we are not done and should retry again.  This happens to be the quota failure string for GCP.
@@ -648,7 +648,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 		Spec: v1.PersistentVolumeClaimSpec{
 			Selector:    cfg.Selector,
 			AccessModes: cfg.AccessModes,
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: resource.MustParse(cfg.ClaimSize),
 				},

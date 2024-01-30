@@ -232,13 +232,13 @@ func newTestController(ctx context.Context, kubeClient clientset.Interface, info
 		ClassInformer:             informerFactory.Storage().V1().StorageClasses(),
 		PodInformer:               informerFactory.Core().V1().Pods(),
 		NodeInformer:              informerFactory.Core().V1().Nodes(),
-		EventRecorder:             record.NewFakeRecorder(1000),
 		EnableDynamicProvisioning: enableDynamicProvisioning,
 	}
 	ctrl, err := NewController(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct persistentvolume controller: %v", err)
 	}
+	ctrl.eventRecorder = record.NewFakeRecorder(1000)
 	ctrl.volumeListerSynced = alwaysReady
 	ctrl.claimListerSynced = alwaysReady
 	ctrl.classListerSynced = alwaysReady
@@ -457,7 +457,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
 				},

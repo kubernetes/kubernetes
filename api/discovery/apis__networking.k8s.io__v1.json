@@ -1,0 +1,75 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "networking.k8s.io/v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "IngressClass",
+      "name": "ingressclasses",
+      "namespaced": false,
+      "singularName": "ingressclass",
+      "storageVersionHash": "l/iqIbDgFyQ=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Ingress",
+      "name": "ingresses",
+      "namespaced": true,
+      "shortNames": [
+        "ing"
+      ],
+      "singularName": "ingress",
+      "storageVersionHash": "39NQlfNR+bo=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Ingress",
+      "name": "ingresses/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "NetworkPolicy",
+      "name": "networkpolicies",
+      "namespaced": true,
+      "shortNames": [
+        "netpol"
+      ],
+      "singularName": "networkpolicy",
+      "storageVersionHash": "YpfwF18m1G8=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}

@@ -47,12 +47,14 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -69,7 +71,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	var aggrclient *aggregatorclient.Clientset
 
 	f := framework.NewDefaultFramework("aggregator")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
@@ -251,7 +253,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Port:   intstr.FromInt(443),
+						Port:   intstr.FromInt32(443),
 						Path:   "/readyz",
 					},
 				},
@@ -300,7 +302,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       aggregatorServicePort,
-					TargetPort: intstr.FromInt(443),
+					TargetPort: intstr.FromInt32(443),
 				},
 			},
 		},
@@ -436,9 +438,10 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	if err := result.Into(u); err != nil {
 		framework.ExpectNoError(err, "reading created response")
 	}
-	framework.ExpectEqual(u.GetAPIVersion(), apiServiceGroupName+"/"+apiServiceVersion)
-	framework.ExpectEqual(u.GetKind(), "Flunder")
-	framework.ExpectEqual(u.GetName(), flunderName)
+
+	gomega.Expect(u.GetAPIVersion()).To(gomega.Equal(apiServiceGroupName + "/" + apiServiceVersion))
+	gomega.Expect(u.GetKind()).To(gomega.Equal("Flunder"))
+	gomega.Expect(u.GetName()).To(gomega.Equal(flunderName))
 
 	pods, err := client.CoreV1().Pods(n.namespace).List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting pods for flunders service")
@@ -516,7 +519,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	var jr *apiregistrationv1.APIService
 	err = json.Unmarshal([]byte(statusContent), &jr)
 	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
-	framework.ExpectEqual(jr.Status.Conditions[0].Message, "all checks passed", "The Message returned was %v", jr.Status.Conditions[0].Message)
+	gomega.Expect(jr.Status.Conditions[0].Message).To(gomega.Equal("all checks passed"), "The Message returned was %v", jr.Status.Conditions[0].Message)
 
 	ginkgo.By("kubectl patch apiservice " + apiServiceName + " -p '{\"spec\":{\"versionPriority\": 400}}'")
 	patchContent, err := restClient.Patch(types.MergePatchType).
@@ -527,7 +530,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.ExpectNoError(err, "Patch failed for .../apiservices/"+apiServiceName+". Error: %v", err)
 	err = json.Unmarshal([]byte(patchContent), &jr)
 	framework.ExpectNoError(err, "Failed to process patchContent: %v | err: %v ", string(patchContent), err)
-	framework.ExpectEqual(jr.Spec.VersionPriority, int32(400), "The VersionPriority returned was %d", jr.Spec.VersionPriority)
+	gomega.Expect(jr.Spec.VersionPriority).To(gomega.Equal(int32(400)), "The VersionPriority returned was %d", jr.Spec.VersionPriority)
 
 	ginkgo.By("List APIServices")
 	listApiservices, err := restClient.Get().
@@ -557,7 +560,6 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	ginkgo.By("Adding a label to the APIService")
 	apiServiceClient := aggrclient.ApiregistrationV1().APIServices()
 	apiServiceLabel := map[string]string{"e2e-apiservice": "patched"}
-	apiServiceLabelSelector := labels.SelectorFromSet(apiServiceLabel).String()
 	apiServicePatch, err := json.Marshal(map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"labels": apiServiceLabel,
@@ -616,7 +618,9 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 			framework.Logf("Observed APIService %v with Labels: %v & Condition: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
 		}
 	}
-	framework.ExpectEqual(foundUpdatedStatusCondition, true, "The updated status condition was not found. %#v", wardle.Status.Conditions)
+	if !foundUpdatedStatusCondition {
+		framework.Failf("The updated status condition was not found in:\n%s", format.Object(wardle.Status.Conditions, 1))
+	}
 	framework.Logf("Found updated status condition for %s", wardle.ObjectMeta.Name)
 
 	ginkgo.By(fmt.Sprintf("Replace APIService %s", apiServiceName))
@@ -632,11 +636,11 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 		return err
 	})
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(updatedApiService.Labels[apiServiceName], "updated", "should have the updated label but have %q", updatedApiService.Labels[apiServiceName])
+	gomega.Expect(updatedApiService.Labels).To(gomega.HaveKeyWithValue(apiServiceName, "updated"), "should have the updated label but have %q", updatedApiService.Labels[apiServiceName])
 	framework.Logf("Found updated apiService label for %q", apiServiceName)
 
 	// kubectl delete flunder test-flunder
-	ginkgo.By(fmt.Sprintf("Delete APIService %q", flunderName))
+	ginkgo.By(fmt.Sprintf("Delete flunders resource %q", flunderName))
 	err = dynamicClient.Delete(ctx, flunderName, metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(ctx, f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
@@ -714,9 +718,12 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 			framework.Logf("Observed APIService %v with Labels: %v & Conditions: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
 		}
 	}
-	framework.ExpectEqual(foundPatchedStatusCondition, true, "The patched status condition was not found. %#v", wardle.Status.Conditions)
+	if !foundPatchedStatusCondition {
+		framework.Failf("The patched status condition was not found in:\n%s", format.Object(wardle.Status.Conditions, 1))
+	}
 	framework.Logf("Found patched status condition for %s", wardle.ObjectMeta.Name)
 
+	apiServiceLabelSelector := labels.SelectorFromSet(updatedApiService.Labels).String()
 	ginkgo.By(fmt.Sprintf("APIService deleteCollection with labelSelector: %q", apiServiceLabelSelector))
 
 	err = aggrclient.ApiregistrationV1().APIServices().DeleteCollection(ctx,

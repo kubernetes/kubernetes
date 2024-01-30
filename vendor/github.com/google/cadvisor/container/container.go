@@ -35,6 +35,7 @@ const (
 	ContainerTypeCrio
 	ContainerTypeContainerd
 	ContainerTypeMesos
+	ContainerTypePodman
 )
 
 // Interface for container operation handlers.

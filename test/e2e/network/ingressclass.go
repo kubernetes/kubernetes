@@ -29,23 +29,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
+var _ = common.SIGDescribe("IngressClass", feature.Ingress, func() {
 	f := framework.NewDefaultFramework("ingressclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should set default value on new IngressClass [Serial]", func(ctx context.Context) {
+	f.It("should set default value on new IngressClass", f.WithSerial(), func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
@@ -82,7 +84,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should not set default value if no default IngressClass [Serial]", func(ctx context.Context) {
+	f.It("should not set default value if no default IngressClass", f.WithSerial(), func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", false, f.UniqueName)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
@@ -116,7 +118,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default[Serial]", func(ctx context.Context) {
+	f.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default", f.WithSerial(), func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
@@ -164,7 +166,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should allow IngressClass to have Namespace-scoped parameters [Serial]", func(ctx context.Context) {
+	f.It("should allow IngressClass to have Namespace-scoped parameters", f.WithSerial(), func(ctx context.Context) {
 		ingressClass := &networkingv1.IngressClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ingressclass1",
@@ -249,7 +251,7 @@ func deleteIngressClass(ctx context.Context, cs clientset.Interface, name string
 
 var _ = common.SIGDescribe("IngressClass API", func() {
 	f := framework.NewDefaultFramework("ingressclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
@@ -263,7 +265,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		- The ingressclasses resource MUST exist in the /apis/networking.k8s.io/v1 discovery document.
 		- The ingressclass resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt(" should support creating IngressClass API operations", func(ctx context.Context) {
+	framework.ConformanceIt("should support creating IngressClass API operations", func(ctx context.Context) {
 
 		// Setup
 		icClient := f.ClientSet.NetworkingV1().IngressClasses()
@@ -334,13 +336,13 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		ginkgo.By("getting")
 		gottenIC, err := icClient.Get(ctx, ingressClass1.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenIC.UID, ingressClass1.UID)
-		framework.ExpectEqual(gottenIC.UID, ingressClass1.UID)
+		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
+		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
 
 		ginkgo.By("listing")
 		ics, err := icClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=generic"})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(ics.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
@@ -350,14 +352,14 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		ginkgo.By("patching")
 		patchedIC, err := icClient.Patch(ctx, ingressClass1.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedIC.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedIC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		icToUpdate := patchedIC.DeepCopy()
 		icToUpdate.Annotations["updated"] = "true"
 		updatedIC, err := icClient.Update(ctx, icToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedIC.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedIC.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
@@ -366,7 +368,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 				if !ok {
 					framework.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedIngress, isIngress := evt.Object.(*networkingv1.IngressClass)
 				if !isIngress {
 					framework.Failf("expected Ingress, got %T", evt.Object)
@@ -393,14 +395,14 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		}
 		ics, err = icClient.List(ctx, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(ics.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = icClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		ics, err = icClient.List(ctx, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(ics.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
 })

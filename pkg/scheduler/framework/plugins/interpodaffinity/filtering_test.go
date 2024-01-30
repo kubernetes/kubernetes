@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
@@ -537,7 +538,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, namespaces)
@@ -948,7 +950,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot,
@@ -1223,7 +1226,8 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
 			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
 				snapshot := cache.NewSnapshot(pods, test.nodes)
-				ctx, cancel := context.WithCancel(context.Background())
+				_, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, nil)
 				cycleState := framework.NewCycleState()

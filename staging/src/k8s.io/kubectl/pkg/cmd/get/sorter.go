@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/utils/integer"
 
 	"github.com/fvbommel/sortorder"
 )
@@ -206,7 +205,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 		return true, nil
 	case reflect.Array, reflect.Slice:
 		// note: the length of i and j may be different
-		for idx := 0; idx < integer.IntMin(i.Len(), j.Len()); idx++ {
+		for idx := 0; idx < min(i.Len(), j.Len()); idx++ {
 			less, err := isLess(i.Index(idx), j.Index(idx))
 			if err != nil || !less {
 				return less, err

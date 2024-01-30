@@ -185,9 +185,7 @@ func TestExplainOpenAPIV3(t *testing.T) {
 	}
 	cases = append(cases, explainV2Cases...)
 
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ExplainOpenapiV3}, t, func(t *testing.T) {
-		runExplainTestCases(t, cases)
-	})
+	runExplainTestCases(t, cases)
 }
 
 func runExplainTestCases(t *testing.T, cases []explainTestCase) {
@@ -276,4 +274,45 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 
 		buf.Reset()
 	}
+}
+
+// OpenAPI V2 specifications retrieval -- should never be called.
+func panicOpenAPISchemaFn() (openapi.Resources, error) {
+	panic("should never be called")
+}
+
+// OpenAPI V3 specifications retrieval does *not* retrieve V2 specifications.
+func TestExplainOpenAPIV3DoesNotLoadOpenAPIV2Specs(t *testing.T) {
+	// Set up OpenAPI V3 specifications endpoint for explain.
+	fakeServer, err := clienttestutil.NewFakeOpenAPIV3Server(filepath.Join(testDataPath, "openapi", "v3"))
+	if err != nil {
+		t.Fatalf("error starting fake openapi server: %v", err.Error())
+	}
+	defer fakeServer.HttpServer.Close()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	tf.OpenAPIV3ClientFunc = func() (openapiclient.Client, error) {
+		fakeDiscoveryClient := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: fakeServer.HttpServer.URL})
+		return fakeDiscoveryClient.OpenAPIV3(), nil
+	}
+	// OpenAPI V2 specifications retrieval will panic if called.
+	tf.OpenAPISchemaFunc = panicOpenAPISchemaFn
+
+	// Explain the following resources, validating the command does not panic.
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
+	resources := []string{"pods", "services", "endpoints", "configmaps"}
+	for _, resource := range resources {
+		cmd.Run(cmd, []string{resource})
+	}
+	// Verify retrieving OpenAPI V2 specifications will panic.
+	defer func() {
+		if panicErr := recover(); panicErr == nil {
+			t.Fatal("expecting panic for openapi v2 retrieval")
+		}
+	}()
+	// Set OpenAPI V2 output flag for explain.
+	if err := cmd.Flags().Set("output", "plaintext-openapiv2"); err != nil {
+		t.Fatal(err)
+	}
+	cmd.Run(cmd, []string{"pods"})
 }

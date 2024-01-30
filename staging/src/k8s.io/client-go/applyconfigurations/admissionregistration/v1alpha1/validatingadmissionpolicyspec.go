@@ -31,6 +31,7 @@ type ValidatingAdmissionPolicySpecApplyConfiguration struct {
 	FailurePolicy    *admissionregistrationv1alpha1.FailurePolicyType `json:"failurePolicy,omitempty"`
 	AuditAnnotations []AuditAnnotationApplyConfiguration              `json:"auditAnnotations,omitempty"`
 	MatchConditions  []MatchConditionApplyConfiguration               `json:"matchConditions,omitempty"`
+	Variables        []VariableApplyConfiguration                     `json:"variables,omitempty"`
 }
 
 // ValidatingAdmissionPolicySpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicySpec type for use with
@@ -98,6 +99,19 @@ func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithMatchConditions(va
 			panic("nil value passed to WithMatchConditions")
 		}
 		b.MatchConditions = append(b.MatchConditions, *values[i])
+	}
+	return b
+}
+
+// WithVariables adds the given value to the Variables field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Variables field.
+func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithVariables(values ...*VariableApplyConfiguration) *ValidatingAdmissionPolicySpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVariables")
+		}
+		b.Variables = append(b.Variables, *values[i])
 	}
 	return b
 }

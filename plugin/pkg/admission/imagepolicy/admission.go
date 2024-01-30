@@ -46,6 +46,7 @@ import (
 
 // PluginName indicates name of admission plugin.
 const PluginName = "ImagePolicyWebhook"
+const ephemeralcontainers = "ephemeralcontainers"
 
 // AuditKeyPrefix is used as the prefix for all audit keys handled by this
 // pluggin. Some well known suffixes are listed below.
@@ -132,8 +133,9 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 
 // Validate makes an admission decision based on the request attributes
 func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	// Ignore all calls to subresources or resources other than pods.
-	if attributes.GetSubresource() != "" || attributes.GetResource().GroupResource() != api.Resource("pods") {
+	// Ignore all calls to subresources other than ephemeralcontainers or calls to resources other than pods.
+	subresource := attributes.GetSubresource()
+	if (subresource != "" && subresource != ephemeralcontainers) || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 
@@ -144,13 +146,21 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 
 	// Build list of ImageReviewContainerSpec
 	var imageReviewContainerSpecs []v1alpha1.ImageReviewContainerSpec
-	containers := make([]api.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
-	containers = append(containers, pod.Spec.Containers...)
-	containers = append(containers, pod.Spec.InitContainers...)
-	for _, c := range containers {
-		imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
-			Image: c.Image,
-		})
+	if subresource == "" {
+		containers := make([]api.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
+		containers = append(containers, pod.Spec.Containers...)
+		containers = append(containers, pod.Spec.InitContainers...)
+		for _, c := range containers {
+			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
+				Image: c.Image,
+			})
+		}
+	} else if subresource == ephemeralcontainers {
+		for _, c := range pod.Spec.EphemeralContainers {
+			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
+				Image: c.Image,
+			})
+		}
 	}
 	imageReview := v1alpha1.ImageReview{
 		Spec: v1alpha1.ImageReviewSpec{

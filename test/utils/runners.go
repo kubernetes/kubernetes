@@ -134,6 +134,7 @@ type RCConfig struct {
 	PriorityClassName             string
 	TerminationGracePeriodSeconds *int64
 	Lifecycle                     *v1.Lifecycle
+	SchedulerName                 string
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -615,7 +616,8 @@ func (config *RCConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
-					Affinity: config.Affinity,
+					SchedulerName: config.SchedulerName,
+					Affinity:      config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:            config.Name,
@@ -1502,7 +1504,7 @@ func makeUnboundPersistentVolumeClaim(storageClass string) *v1.PersistentVolumeC
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
 			StorageClassName: &storageClass,
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
 				},

@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -37,7 +39,7 @@ import (
 
 var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-validation-expressions")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var apiExtensionClient *clientset.Clientset
 	ginkgo.BeforeEach(func() {
@@ -149,7 +151,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 				"y": int64(0),
 			},
 		}}, metav1.CreateOptions{})
-		framework.ExpectError(err, "validation rules not satisfied")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "validation rules not satisfied")
 		expectedErrMsg := "failed rule"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -174,7 +176,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithInvalidValidationRule, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-		framework.ExpectError(err, "creating CustomResourceDefinition with a validation rule that refers to a property that do not exist")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "creating CustomResourceDefinition with a validation rule that refers to a property that do not exist")
 		expectedErrMsg := "undefined field 'z'"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -196,7 +198,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithSyntaxErrorRule, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that contains a syntax error")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "creating a CustomResourceDefinition with a validation rule that contains a syntax error")
 		expectedErrMsg := "Syntax error"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
@@ -229,7 +231,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithExpensiveRule, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that exceeds the cost limit")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "creating a CustomResourceDefinition with a validation rule that exceeds the cost limit")
 		expectedErrMsg := "exceeds budget"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
@@ -259,7 +261,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 				"largeArray": genLargeArray(725, 20),
 			},
 		}}, metav1.CreateOptions{})
-		framework.ExpectError(err, "custom resource creation should be prohibited by runtime cost limit")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "custom resource creation should be prohibited by runtime cost limit")
 		expectedErrMsg := "call cost exceeds limit"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -319,7 +321,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 				"num": int64(9),
 			},
 		}}, metav1.UpdateOptions{})
-		framework.ExpectError(err, "custom resource update should be prohibited by transition rule")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "custom resource update should be prohibited by transition rule")
 		expectedErrMsg := "failed rule"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())

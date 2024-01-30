@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"net"
 	"net/netip"
+	"sync/atomic"
 	"time"
 
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
@@ -58,6 +59,9 @@ type Allocator struct {
 	client          networkingv1alpha1client.NetworkingV1alpha1Interface
 	ipAddressLister networkingv1alpha1listers.IPAddressLister
 	ipAddressSynced cache.InformerSynced
+	// ready indicates if the allocator is able to allocate new IP addresses.
+	// This is required because it depends on the ServiceCIDR to be ready.
+	ready atomic.Bool
 
 	// metrics is a metrics recorder that can be disabled
 	metrics     metricsRecorderInterface
@@ -133,7 +137,7 @@ func NewIPAllocator(
 		metricLabel:     cidr.String(),
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
-
+	a.ready.Store(true)
 	return a, nil
 }
 
@@ -185,8 +189,8 @@ func (a *Allocator) AllocateService(svc *api.Service, ip net.IP) error {
 }
 
 func (a *Allocator) allocateService(svc *api.Service, ip net.IP, dryRun bool) error {
-	if !a.ipAddressSynced() {
-		return fmt.Errorf("allocator not ready")
+	if !a.ready.Load() || !a.ipAddressSynced() {
+		return ErrNotReady
 	}
 	addr, err := netip.ParseAddr(ip.String())
 	if err != nil {
@@ -227,8 +231,8 @@ func (a *Allocator) AllocateNextService(svc *api.Service) (net.IP, error) {
 // falls back to the lower subnet.
 // It starts allocating from a random IP within each range.
 func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, error) {
-	if !a.ipAddressSynced() {
-		return nil, fmt.Errorf("allocator not ready")
+	if !a.ready.Load() || !a.ipAddressSynced() {
+		return nil, ErrNotReady
 	}
 	if dryRun {
 		// Don't bother finding a free value. It's racy and not worth the
@@ -348,9 +352,6 @@ func (a *Allocator) Release(ip net.IP) error {
 }
 
 func (a *Allocator) release(ip net.IP, dryRun bool) error {
-	if !a.ipAddressSynced() {
-		return fmt.Errorf("allocator not ready")
-	}
 	if dryRun {
 		return nil
 	}
@@ -403,7 +404,7 @@ func (a *Allocator) IPFamily() api.IPFamily {
 	return a.family
 }
 
-// for testing
+// for testing, it assumes this is the allocator is unique for the ipFamily
 func (a *Allocator) Used() int {
 	ipLabelSelector := labels.Set(map[string]string{
 		networkingv1alpha1.LabelIPAddressFamily: string(a.IPFamily()),
@@ -416,7 +417,7 @@ func (a *Allocator) Used() int {
 	return len(ips)
 }
 
-// for testing
+// for testing, it assumes this is the allocator is unique for the ipFamily
 func (a *Allocator) Free() int {
 	return int(a.size) - a.Used()
 }
@@ -484,11 +485,21 @@ func (dry dryRunAllocator) EnableMetrics() {
 // TODO: move it to k8s.io/utils/net, this is the same as current AddIPOffset()
 // but using netip.Addr instead of net.IP
 func addOffsetAddress(address netip.Addr, offset uint64) (netip.Addr, error) {
-	addressBig := big.NewInt(0).SetBytes(address.AsSlice())
-	r := big.NewInt(0).Add(addressBig, big.NewInt(int64(offset)))
-	addr, ok := netip.AddrFromSlice(r.Bytes())
+	addressBytes := address.AsSlice()
+	addressBig := big.NewInt(0).SetBytes(addressBytes)
+	r := big.NewInt(0).Add(addressBig, big.NewInt(int64(offset))).Bytes()
+	// r must be 4 or 16 bytes depending of the ip family
+	// bigInt conversion to bytes will not take this into consideration
+	// and drop the leading zeros, so we have to take this into account.
+	lenDiff := len(addressBytes) - len(r)
+	if lenDiff > 0 {
+		r = append(make([]byte, lenDiff), r...)
+	} else if lenDiff < 0 {
+		return netip.Addr{}, fmt.Errorf("invalid address %v", r)
+	}
+	addr, ok := netip.AddrFromSlice(r)
 	if !ok {
-		return netip.Addr{}, fmt.Errorf("invalid address %v", r.Bytes())
+		return netip.Addr{}, fmt.Errorf("invalid address %v", r)
 	}
 	return addr, nil
 }
@@ -561,6 +572,5 @@ func serviceToRef(svc *api.Service) *networkingv1alpha1.ParentReference {
 		Resource:  "services",
 		Namespace: svc.Namespace,
 		Name:      svc.Name,
-		UID:       svc.UID,
 	}
 }

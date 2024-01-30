@@ -143,6 +143,8 @@ status:
         - 3
         uid: 1
   hostIP: hostIPValue
+  hostIPs:
+  - ip: ipValue
   initContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -203,4 +205,7 @@ status:
   qosClass: qosClassValue
   reason: reasonValue
   resize: resizeValue
+  resourceClaimStatuses:
+  - name: nameValue
+    resourceClaimName: resourceClaimNameValue
   startTime: "2007-01-01T01:01:01Z"

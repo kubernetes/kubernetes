@@ -62,7 +62,7 @@ type dnsTestCommon struct {
 
 func newDNSTestCommon() dnsTestCommon {
 	framework := framework.NewDefaultFramework("dns-config-map")
-	framework.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	framework.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	return dnsTestCommon{
 		f:  framework,
 		ns: "kube-system",
@@ -222,7 +222,7 @@ func (t *dnsTestCommon) createUtilPodLabel(ctx context.Context, baseName string)
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
-					TargetPort: intstr.FromInt(servicePort),
+					TargetPort: intstr.FromInt32(servicePort),
 				},
 			},
 		},
@@ -456,7 +456,7 @@ func assertFilesExist(ctx context.Context, fileNames []string, fileDir string, p
 func assertFilesContain(ctx context.Context, fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.PollImmediateWithContext(ctx, time.Second*5, time.Second*600, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second*5, time.Second*600, true, func(ctx context.Context) (bool, error) {
 		failed = []string{}
 
 		ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
@@ -487,9 +487,17 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 			return true, nil
 		}
 		framework.Logf("Lookups using %s/%s failed for: %v\n", pod.Namespace, pod.Name, failed)
+
+		// grab logs from all the containers
+		for _, container := range pod.Spec.Containers {
+			logs, err := e2epod.GetPodLogs(ctx, client, pod.Namespace, pod.Name, container.Name)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs for %s: %s", container.Name, logs)
+		}
+
 		return false, nil
 	}))
-	framework.ExpectEqual(len(failed), 0)
+	gomega.Expect(failed).To(gomega.BeEmpty())
 }
 
 func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod, fileNames []string) {

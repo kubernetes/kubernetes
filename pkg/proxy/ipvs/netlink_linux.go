@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
 
 	"github.com/vishvananda/netlink"
@@ -135,7 +135,7 @@ func (h *netlinkHandle) GetAllLocalAddresses() (sets.Set[string], error) {
 	if err != nil {
 		return nil, fmt.Errorf("Could not get addresses: %v", err)
 	}
-	return utilproxy.AddressSet(h.isValidForSet, addr), nil
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
 }
 
 // GetLocalAddresses return all local addresses for an interface.
@@ -150,7 +150,7 @@ func (h *netlinkHandle) GetLocalAddresses(dev string) (sets.Set[string], error) 
 	if err != nil {
 		return nil, fmt.Errorf("Can't get addresses from %s: %v", ifi.Name, err)
 	}
-	return utilproxy.AddressSet(h.isValidForSet, addr), nil
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
 }
 
 func (h *netlinkHandle) isValidForSet(ip net.IP) bool {
@@ -190,5 +190,5 @@ func (h *netlinkHandle) GetAllLocalAddressesExcept(dev string) (sets.Set[string]
 		}
 		addr = append(addr, ifadr...)
 	}
-	return utilproxy.AddressSet(h.isValidForSet, addr), nil
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
 }

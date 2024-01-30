@@ -61,6 +61,8 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: eventClient})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "portallocator-repair-controller")
 
+	registerMetrics()
+
 	return &Repair{
 		interval:      interval,
 		serviceClient: serviceClient,
@@ -89,7 +91,13 @@ func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
 
 // runOnce verifies the state of the port allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) runOnce() error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, c.doRunOnce)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := c.doRunOnce()
+		if err != nil {
+			nodePortRepairReconcileErrors.Inc()
+		}
+		return err
+	})
 }
 
 // doRunOnce verifies the state of the port allocations and returns an error if an unrecoverable problem occurs.
@@ -153,23 +161,28 @@ func (c *Repair) doRunOnce() error {
 					stored.Release(port)
 				} else {
 					// doesn't seem to be allocated
+					nodePortRepairPortErrors.WithLabelValues("repair").Inc()
 					c.recorder.Eventf(svc, nil, corev1.EventTypeWarning, "PortNotAllocated", "PortAllocation", "Port %d is not allocated; repairing", port)
 					runtime.HandleError(fmt.Errorf("the node port %d for service %s/%s is not allocated; repairing", port, svc.Name, svc.Namespace))
 				}
 				delete(c.leaks, port) // it is used, so it can't be leaked
 			case portallocator.ErrAllocated:
 				// port is duplicate, reallocate
+				nodePortRepairPortErrors.WithLabelValues("duplicate").Inc()
 				c.recorder.Eventf(svc, nil, corev1.EventTypeWarning, "PortAlreadyAllocated", "PortAllocation", "Port %d was assigned to multiple services; please recreate service", port)
 				runtime.HandleError(fmt.Errorf("the node port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
 			case err.(*portallocator.ErrNotInRange):
 				// port is out of range, reallocate
+				nodePortRepairPortErrors.WithLabelValues("outOfRange").Inc()
 				c.recorder.Eventf(svc, nil, corev1.EventTypeWarning, "PortOutOfRange", "PortAllocation", "Port %d is not within the port range %s; please recreate service", port, c.portRange)
 				runtime.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %s; please recreate", port, svc.Name, svc.Namespace, c.portRange))
 			case portallocator.ErrFull:
 				// somehow we are out of ports
+				nodePortRepairPortErrors.WithLabelValues("full").Inc()
 				c.recorder.Eventf(svc, nil, corev1.EventTypeWarning, "PortRangeFull", "PortAllocation", "Port range %s is full; you must widen the port range in order to create new services", c.portRange)
 				return fmt.Errorf("the port range %s is full; you must widen the port range in order to create new services", c.portRange)
 			default:
+				nodePortRepairPortErrors.WithLabelValues("unknown").Inc()
 				c.recorder.Eventf(svc, nil, corev1.EventTypeWarning, "UnknownError", "PortAllocation", "Unable to allocate port %d due to an unknown error", port)
 				return fmt.Errorf("unable to allocate port %d for service %s/%s due to an unknown error, exiting: %v", port, svc.Name, svc.Namespace, err)
 			}
@@ -189,9 +202,11 @@ func (c *Repair) doRunOnce() error {
 			// pretend it is still in use until count expires
 			c.leaks[port] = count - 1
 			if err := rebuilt.Allocate(port); err != nil {
+				// do not increment the metric here, if it is a leak it will be detected once the counter gets to 0
 				runtime.HandleError(fmt.Errorf("the node port %d may have leaked, but can not be allocated: %v", port, err))
 			}
 		default:
+			nodePortRepairPortErrors.WithLabelValues("leak").Inc()
 			// do not add it to the rebuilt set, which means it will be available for reuse
 			runtime.HandleError(fmt.Errorf("the node port %d appears to have leaked: cleaning up", port))
 		}

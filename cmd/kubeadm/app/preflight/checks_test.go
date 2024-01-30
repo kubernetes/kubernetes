@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
@@ -195,7 +197,7 @@ func TestFileExistingCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 	var tests = []struct {
 		name          string
 		check         FileExistingCheck
@@ -234,7 +236,7 @@ func TestFileAvailableCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 	var tests = []struct {
 		name          string
 		check         FileAvailableCheck
@@ -461,8 +463,8 @@ func TestConfigRootCAs(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed creating temp CA file\n\tactual:%v", err)
 	}
-	defer os.Remove(f.Name())
-	if err := os.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, f)
+	if _, err := f.Write([]byte(externalEtcdRootCAFileContent)); err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
@@ -490,8 +492,8 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	defer os.Remove(certFile.Name())
-	if err := os.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, certFile)
+	if _, err := certFile.Write([]byte(externalEtcdCertFileContent)); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp CertFile file %s\n\tactual:%v",
 			certFile.Name(),
@@ -506,8 +508,8 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	defer os.Remove(keyFile.Name())
-	if err := os.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, keyFile)
+	if _, err := keyFile.Write([]byte(externalEtcdKeyFileContent)); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp KeyFile file %s\n\tactual:%v",
 			keyFile.Name(),
@@ -864,9 +866,11 @@ func TestImagePullCheck(t *testing.T) {
 		},
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// Test case1: pull only img3
+			func() ([]byte, []byte, error) { return []byte("pause"), nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			// Test case 2: fail to pull image2 and image3
 			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
+			func() ([]byte, []byte, error) { return []byte("pause"), nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
@@ -901,6 +905,8 @@ func TestImagePullCheck(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
@@ -912,8 +918,10 @@ func TestImagePullCheck(t *testing.T) {
 
 	check := ImagePullCheck{
 		runtime:         containerRuntime,
+		sandboxImage:    "pause",
 		imageList:       []string{"img1", "img2", "img3"},
 		imagePullPolicy: corev1.PullIfNotPresent,
+		imagePullSerial: true,
 	}
 	warnings, errors := check.Check()
 	if len(warnings) != 0 {
@@ -934,8 +942,10 @@ func TestImagePullCheck(t *testing.T) {
 	// Test with unknown policy
 	check = ImagePullCheck{
 		runtime:         containerRuntime,
+		sandboxImage:    "pause",
 		imageList:       []string{"img1", "img2", "img3"},
 		imagePullPolicy: "",
+		imagePullSerial: true,
 	}
 	_, errors = check.Check()
 	if len(errors) != 1 {
@@ -1069,10 +1079,12 @@ func TestJoinIPCheck(t *testing.T) {
 	if _, err := isPrivileged.Check(); err != nil {
 		t.Skip("not a privileged user")
 	}
+
+	opts := configutil.LoadOrDefaultConfigurationOptions{
+		SkipCRIDetect: true,
+	}
+
 	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
-		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: constants.UnknownCRISocket,
-		},
 		Discovery: kubeadmapiv1.Discovery{
 			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
 				Token:                    configutil.PlaceholderToken.Token.String(),
@@ -1080,7 +1092,7 @@ func TestJoinIPCheck(t *testing.T) {
 				UnsafeSkipCAVerification: true,
 			},
 		},
-	})
+	}, opts)
 	if err != nil {
 		t.Fatalf("unexpected failure when defaulting JoinConfiguration: %v", err)
 	}

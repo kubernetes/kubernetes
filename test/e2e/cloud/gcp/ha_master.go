@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -160,9 +161,9 @@ func waitForMasters(ctx context.Context, masterPrefix string, c clientset.Interf
 	return fmt.Errorf("timeout waiting %v for the number of masters to be %d", timeout, size)
 }
 
-var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
+var _ = SIGDescribe("HA-master", feature.HAMaster, func() {
 	f := framework.NewDefaultFramework("ha-master")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var ns string
 	var additionalReplicaZones []string
@@ -227,7 +228,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		verifyRCs(ctx, c, ns, existingRCs)
 	}
 
-	ginkgo.It("survive addition/removal replicas same zone [Serial][Disruptive]", func(ctx context.Context) {
+	f.It("survive addition/removal replicas same zone", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
 		zone := framework.TestContext.CloudConfig.Zone
 		step(ctx, None, "")
 		numAdditionalReplicas := 2
@@ -239,7 +240,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		}
 	})
 
-	ginkgo.It("survive addition/removal replicas different zones [Serial][Disruptive]", func(ctx context.Context) {
+	f.It("survive addition/removal replicas different zones", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
 		zone := framework.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)
@@ -257,7 +258,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		}
 	})
 
-	ginkgo.It("survive addition/removal replicas multizone workers [Serial][Disruptive]", func(ctx context.Context) {
+	f.It("survive addition/removal replicas multizone workers", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
 		zone := framework.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)

@@ -48,6 +48,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+func init() {
+	registerMetrics()
+}
+
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
 // primaryKey and secondaryKey are keys of labels to reconcile.
 //   - If both keys exist, but their values don't match. Use the value from the
@@ -489,6 +493,8 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 			return err
 		}
 
+		removeCloudProviderTaintDelay.Observe(time.Since(newNode.ObjectMeta.CreationTimestamp.Time).Seconds())
+
 		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 		// So that users do not see any significant delay in IP addresses being filled into the node
 		cnc.updateNodeAddress(ctx, newNode, instanceMetadata)
@@ -501,6 +507,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 	}
 
 	cnc.recorder.Event(copyNode, v1.EventTypeNormal, "Synced", "Node synced successfully")
+	initialNodeSyncDelay.Observe(time.Since(curNode.ObjectMeta.CreationTimestamp.Time).Seconds())
 	return nil
 }
 

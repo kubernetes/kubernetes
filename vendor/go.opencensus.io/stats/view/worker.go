@@ -33,6 +33,7 @@ func init() {
 	defaultWorker = NewMeter().(*worker)
 	go defaultWorker.start()
 	internal.DefaultRecorder = record
+	internal.MeasurementRecorder = recordMeasurement
 }
 
 type measureRef struct {
@@ -199,11 +200,21 @@ func record(tags *tag.Map, ms interface{}, attachments map[string]interface{}) {
 	defaultWorker.Record(tags, ms, attachments)
 }
 
+func recordMeasurement(tags *tag.Map, ms []stats.Measurement, attachments map[string]interface{}) {
+	defaultWorker.recordMeasurement(tags, ms, attachments)
+}
+
 // Record records a set of measurements ms associated with the given tags and attachments.
 func (w *worker) Record(tags *tag.Map, ms interface{}, attachments map[string]interface{}) {
+	w.recordMeasurement(tags, ms.([]stats.Measurement), attachments)
+}
+
+// recordMeasurement records a set of measurements ms associated with the given tags and attachments.
+// This is the same as Record but without an interface{} type to avoid allocations
+func (w *worker) recordMeasurement(tags *tag.Map, ms []stats.Measurement, attachments map[string]interface{}) {
 	req := &recordReq{
 		tm:          tags,
-		ms:          ms.([]stats.Measurement),
+		ms:          ms,
 		attachments: attachments,
 		t:           time.Now(),
 	}
@@ -219,6 +230,11 @@ func (w *worker) Record(tags *tag.Map, ms interface{}, attachments map[string]in
 // lower than 1 minute. Consult each exporter per your needs.
 func SetReportingPeriod(d time.Duration) {
 	defaultWorker.SetReportingPeriod(d)
+}
+
+// Stop stops the default worker.
+func Stop() {
+	defaultWorker.Stop()
 }
 
 // SetReportingPeriod sets the interval between reporting aggregated views in
@@ -281,7 +297,7 @@ func (w *worker) start() {
 		case <-w.quit:
 			w.timer.Stop()
 			close(w.c)
-			w.done <- true
+			close(w.done)
 			return
 		}
 	}
@@ -290,8 +306,11 @@ func (w *worker) start() {
 func (w *worker) Stop() {
 	prodMgr := metricproducer.GlobalManager()
 	prodMgr.DeleteProducer(w)
-
-	w.quit <- true
+	select {
+	case <-w.quit:
+	default:
+		close(w.quit)
+	}
 	<-w.done
 }
 

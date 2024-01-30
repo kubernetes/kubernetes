@@ -40,9 +40,9 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-var _ = SIGDescribe("Summary API [NodeConformance]", func() {
+var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("summary-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if !ginkgo.CurrentSpecReport().Failed() {
@@ -110,8 +110,9 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
-						"MajorPageFaults": bounded(0, 100000),
+						"MajorPageFaults": bounded(0, 1e9),
 					}),
+					"Swap":               swapExpectation(memoryLimit),
 					"Accelerators":       gomega.BeEmpty(),
 					"Rootfs":             gomega.BeNil(),
 					"Logs":               gomega.BeNil(),
@@ -119,12 +120,12 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				})
 			}
 			expectedPageFaultsUpperBound := 1000000
-			expectedMajorPageFaultsUpperBound := 15
+			expectedMajorPageFaultsUpperBound := 1e9
 			if IsCgroup2UnifiedMode() {
 				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
 				// above for the container.
 				expectedPageFaultsUpperBound = 1e9
-				expectedMajorPageFaultsUpperBound = 100000
+				expectedMajorPageFaultsUpperBound = 1e9
 			}
 
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -157,7 +158,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"WorkingSetBytes": bounded(100*e2evolume.Kb, memoryLimit),
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1e9),
-					"MajorPageFaults": bounded(0, 100000),
+					"MajorPageFaults": bounded(0, 1e9),
 				})
 				systemContainers["misc"] = miscContExpectations
 			}
@@ -183,6 +184,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
 							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
+						"Swap":         swapExpectation(memoryLimit),
 						"Accelerators": gomega.BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
@@ -230,6 +232,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
+				"Swap": swapExpectation(memoryLimit),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
 						"Name":              gomega.Equal("test-empty-dir"),
@@ -278,8 +281,9 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
-						"MajorPageFaults": bounded(0, 100000),
+						"MajorPageFaults": bounded(0, 1e9),
 					}),
+					"Swap": swapExpectation(memoryLimit),
 					// TODO(#28407): Handle non-eth0 network interface names.
 					"Network": ptrMatchAllFields(gstruct.Fields{
 						"Time": recent(maxStatsAge),
@@ -304,6 +308,16 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					}),
 					"Runtime": ptrMatchAllFields(gstruct.Fields{
 						"ImageFs": ptrMatchAllFields(gstruct.Fields{
+							"Time":           recent(maxStatsAge),
+							"AvailableBytes": fsCapacityBounds,
+							"CapacityBytes":  fsCapacityBounds,
+							// we assume we are not running tests on machines more than 10tb of disk
+							"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
+							"InodesFree": bounded(1e4, 1e8),
+							"Inodes":     bounded(1e4, 1e8),
+							"InodesUsed": bounded(0, 1e8),
+						}),
+						"ContainerFs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
@@ -408,6 +422,27 @@ func bounded(lower, upper interface{}) types.GomegaMatcher {
 	return gstruct.PointTo(gomega.And(
 		gomega.BeNumerically(">=", lower),
 		gomega.BeNumerically("<=", upper)))
+}
+
+func swapExpectation(upper interface{}) types.GomegaMatcher {
+	// Size after which we consider memory to be "unlimited". This is not
+	// MaxInt64 due to rounding by the kernel.
+	const maxMemorySize = uint64(1 << 62)
+
+	swapBytesMatcher := gomega.Or(
+		gomega.BeNil(),
+		bounded(0, upper),
+		gstruct.PointTo(gomega.BeNumerically(">=", maxMemorySize)),
+	)
+
+	return gomega.Or(
+		gomega.BeNil(),
+		ptrMatchAllFields(gstruct.Fields{
+			"Time":               recent(maxStatsAge),
+			"SwapUsageBytes":     swapBytesMatcher,
+			"SwapAvailableBytes": swapBytesMatcher,
+		}),
+	)
 }
 
 func recent(d time.Duration) types.GomegaMatcher {

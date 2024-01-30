@@ -155,8 +155,12 @@ func TestJSONFormatRegister(t *testing.T) {
 			err := mutable.SetFromMap(map[string]bool{string(logsapi.ContextualLogging): tc.contextualLogging})
 			require.NoError(t, err)
 			featureGate = mutable
+			defer func() {
+				if err := logsapi.ResetForTest(featureGate); err != nil {
+					t.Errorf("Unexpected error while resetting the logging configuration: %v", err)
+				}
+			}()
 			errs := logsapi.ValidateAndApply(c, featureGate)
-			defer klog.ClearLogger()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
 

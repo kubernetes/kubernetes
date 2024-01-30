@@ -23,6 +23,7 @@ spec:
     resources:
       requests:
         cpu: {{ cpurequest }}
+        memory: {{ memoryrequest }}
     command:
     - /bin/sh
     - -c
@@ -30,6 +31,8 @@ spec:
     {{container_env}}
     {{kube_cache_mutation_detector_env_name}}
       {{kube_cache_mutation_detector_env_value}}
+    {{kube_watchlist_inconsistency_detector_env_name}}
+      {{kube_watchlist_inconsistency_detector_env_value}}
     securityContext:
       privileged: true
     volumeMounts:

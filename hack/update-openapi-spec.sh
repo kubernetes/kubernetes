@@ -22,11 +22,13 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+DISCOVERY_ROOT_DIR="${KUBE_ROOT}/api/discovery"
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::util::require-jq
 kube::golang::setup_env
+kube::etcd::install
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
@@ -44,8 +46,6 @@ function cleanup()
 }
 
 trap cleanup EXIT SIGINT
-
-kube::golang::setup_env
 
 TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -96,6 +96,12 @@ if ! kube::util::wait_for_url "https://${API_HOST}:${API_PORT}/healthz" "apiserv
   exit 1
 fi
 
+kube::log::status "Updating aggregated discovery"
+
+rm -fr "${DISCOVERY_ROOT_DIR}"
+mkdir -p "${DISCOVERY_ROOT_DIR}"
+curl -kfsS -H 'Authorization: Bearer dummy_token' -H 'Accept: application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList' "https://${API_HOST}:${API_PORT}/apis" | jq -S . > "${DISCOVERY_ROOT_DIR}/aggregated_v2beta1.json"
+
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"
 
 rm -f "${OPENAPI_ROOT_DIR}/swagger.json"
@@ -116,7 +122,7 @@ curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' \
   "https://${API_HOST}:${API_PORT}/openapi/v3" \
   | jq -r '.paths | to_entries | .[].key' \
   | while read -r group; do
-    kube::log::status "Updating OpenAPI spec for group ${group}"
+    kube::log::status "Updating OpenAPI spec and discovery for group ${group}"
     OPENAPI_FILENAME="${group}_openapi.json"
     OPENAPI_FILENAME_ESCAPED="${OPENAPI_FILENAME//\//__}"
     OPENAPI_PATH="${OPENAPI_ROOT_DIR}/v3/${OPENAPI_FILENAME_ESCAPED}"
@@ -124,6 +130,13 @@ curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' \
       "https://${API_HOST}:${API_PORT}/openapi/v3/{$group}" \
       | jq -S '.info.version="unversioned"' \
       > "$OPENAPI_PATH"
+
+    if [[ "${group}" == "api"* ]]; then
+      DISCOVERY_FILENAME="${group}.json"
+      DISCOVERY_FILENAME_ESCAPED="${DISCOVERY_FILENAME//\//__}"
+      DISCOVERY_PATH="${DISCOVERY_ROOT_DIR}/${DISCOVERY_FILENAME_ESCAPED}"
+      curl -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/{$group}" | jq -S . > "$DISCOVERY_PATH"
+    fi
 done
 
 kube::log::status "SUCCESS"

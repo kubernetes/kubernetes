@@ -64,7 +64,7 @@ func GetDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.Sto
 		return defaultClasses[i].CreationTimestamp.UnixNano() > defaultClasses[j].CreationTimestamp.UnixNano()
 	})
 	if len(defaultClasses) > 1 {
-		klog.V(4).Infof("%d default StorageClasses were found, choosing the newest: %s", len(defaultClasses), defaultClasses[0].Name)
+		klog.V(4).Infof("%d default StorageClasses were found, choosing: %s", len(defaultClasses), defaultClasses[0].Name)
 	}
 
 	return defaultClasses[0], nil

@@ -187,7 +187,7 @@ func parseLiteralSource(source string) (keyName, value string, err error) {
 // removeQuotes removes the surrounding quotes from the provided string only if it is surrounded on both sides
 // rather than blindly trimming all quotation marks on either side.
 func removeQuotes(str string) string {
-	if len(str) == 0 || str[0] != str[len(str)-1] {
+	if len(str) < 2 || str[0] != str[len(str)-1] {
 		return str
 	}
 	if str[0] == '"' || str[0] == '\'' {

@@ -54,7 +54,7 @@ const (
 	loadBalancerCreateTimeoutDefault = 15 * time.Minute
 	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
 	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
-	loadBalancerCreateTimeoutLarge = 45 * time.Minute
+	loadBalancerCreateTimeoutLarge = 60 * time.Minute
 
 	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
 	// be targeted by load balancers.

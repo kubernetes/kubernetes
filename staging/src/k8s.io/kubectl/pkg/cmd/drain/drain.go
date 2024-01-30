@@ -31,6 +31,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/kubectl/pkg/scheme"
@@ -138,10 +139,10 @@ var (
 		![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)`))
 
 	drainExample = templates.Examples(i18n.T(`
-		# Drain node "foo", even if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set on it
+		# Drain node "foo", even if there are pods not managed by a replication controller, replica set, job, daemon set, or stateful set on it
 		kubectl drain foo --force
 
-		# As above, but abort if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set, and use a grace period of 15 minutes
+		# As above, but abort if there are pods not managed by a replication controller, replica set, job, daemon set, or stateful set, and use a grace period of 15 minutes
 		kubectl drain foo --grace-period=900`))
 )
 
@@ -156,24 +157,53 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericiooptions.IOStreams)
 			ChunkSize:          cmdutil.DefaultChunkSize,
 		},
 	}
-	o.drainer.OnPodDeletedOrEvicted = o.onPodDeletedOrEvicted
+	o.drainer.OnPodDeletionOrEvictionFinished = o.onPodDeletionOrEvictionFinished
+	o.drainer.OnPodDeletionOrEvictionStarted = o.onPodDeletionOrEvictionStarted
 	return o
 }
 
-// onPodDeletedOrEvicted is called by drain.Helper, when the pod has been deleted or evicted
-func (o *DrainCmdOptions) onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
+// onPodDeletionOrEvictionFinished is called by drain.Helper, when eviction/deletetion of the pod is finished
+func (o *DrainCmdOptions) onPodDeletionOrEvictionFinished(pod *corev1.Pod, usingEviction bool, err error) {
 	var verbStr string
 	if usingEviction {
-		verbStr = "evicted"
+		if err != nil {
+			verbStr = "eviction failed"
+		} else {
+			verbStr = "evicted"
+		}
 	} else {
-		verbStr = "deleted"
+		if err != nil {
+			verbStr = "deletion failed"
+		} else {
+			verbStr = "deleted"
+		}
 	}
 	printObj, err := o.ToPrinter(verbStr)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "error building printer: %v\n", err)
 		fmt.Fprintf(o.Out, "pod %s/%s %s\n", pod.Namespace, pod.Name, verbStr)
 	} else {
-		printObj(pod, o.Out)
+		_ = printObj(pod, o.Out)
+	}
+}
+
+// onPodDeletionOrEvictionStarted is called by drain.Helper, when eviction/deletion of the pod is started
+func (o *DrainCmdOptions) onPodDeletionOrEvictionStarted(pod *corev1.Pod, usingEviction bool) {
+	if !klog.V(2).Enabled() {
+		return
+	}
+	var verbStr string
+	if usingEviction {
+		verbStr = "eviction started"
+	} else {
+		verbStr = "deletion started"
+	}
+	printObj, err := o.ToPrinter(verbStr)
+	if err != nil {
+		fmt.Fprintf(o.ErrOut, "error building printer: %v\n", err)
+		fmt.Fprintf(o.Out, "pod %s/%s %s\n", pod.Namespace, pod.Name, verbStr)
+	} else {
+		_ = printObj(pod, o.Out)
 	}
 }
 

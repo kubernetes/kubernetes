@@ -164,7 +164,7 @@ func TestNewInvalid(t *testing.T) {
 			`Kind "name" is invalid: field[0].name: Not found: "bar"`,
 		},
 		{
-			field.NotSupported(field.NewPath("field[0].name"), "bar", nil),
+			field.NotSupported[string](field.NewPath("field[0].name"), "bar", nil),
 			&metav1.StatusDetails{
 				Kind: "Kind",
 				Name: "name",

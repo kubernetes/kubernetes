@@ -21,8 +21,8 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// valueValidator validates the values it applies to.
-type valueValidator interface {
+// ValueValidator validates the values it applies to.
+type ValueValidator interface {
 	// SetPath sets the exact path of the validator prior to calling Validate.
 	// The exact path contains the map keys and array indices to locate the
 	// value to be validated from the root data element.

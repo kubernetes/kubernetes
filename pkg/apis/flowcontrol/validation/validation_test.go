@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol/internalbootstrap"
 	"k8s.io/utils/pointer"
 )
 
@@ -743,9 +744,63 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Type: flowcontrol.LimitResponseTypeReject},
 		},
 	}
+
+	badExemptSpec1 := flowcontrol.PriorityLevelConfigurationSpec{
+		Type: flowcontrol.PriorityLevelEnablementExempt,
+		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+			NominalConcurrencyShares: pointer.Int32(-1),
+			LendablePercent:          pointer.Int32(101),
+		},
+	}
+	badExemptSpec2 := flowcontrol.PriorityLevelConfigurationSpec{
+		Type: flowcontrol.PriorityLevelEnablementExempt,
+		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+			NominalConcurrencyShares: pointer.Int32(-1),
+			LendablePercent:          pointer.Int32(-1),
+		},
+	}
+
+	badExemptSpec3 := flowcontrol.PriorityLevelConfigurationSpec{
+		Type:   flowcontrol.PriorityLevelEnablementExempt,
+		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{},
+		Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+			NominalConcurrencyShares: 42,
+			LimitResponse: flowcontrol.LimitResponse{
+				Type: flowcontrol.LimitResponseTypeReject},
+		},
+	}
+
+	validChangesInExemptFieldOfExemptPLFn := func() flowcontrol.PriorityLevelConfigurationSpec {
+		have, _ := internalbootstrap.MandatoryPriorityLevelConfigurations[flowcontrol.PriorityLevelConfigurationNameExempt]
+		return flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementExempt,
+			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+				NominalConcurrencyShares: pointer.Int32(*have.Spec.Exempt.NominalConcurrencyShares + 10),
+				LendablePercent:          pointer.Int32(*have.Spec.Exempt.LendablePercent + 10),
+			},
+		}
+	}
+
+	exemptTypeRepurposed := &flowcontrol.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+		},
+		Spec: flowcontrol.PriorityLevelConfigurationSpec{
+			// changing the type from exempt to limited
+			Type:   flowcontrol.PriorityLevelEnablementLimited,
+			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{},
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: 42,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject},
+			},
+		},
+	}
+
 	testCases := []struct {
 		name                       string
 		priorityLevelConfiguration *flowcontrol.PriorityLevelConfiguration
+		requestGV                  *schema.GroupVersion
 		expectedErrors             field.ErrorList
 	}{{
 		name: "exempt should work",
@@ -755,6 +810,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			},
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementExempt,
+				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+					NominalConcurrencyShares: pointer.Int32(0),
+					LendablePercent:          pointer.Int32(0),
+				},
 			},
 		},
 		expectedErrors: field.ErrorList{},
@@ -768,7 +827,75 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		},
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
-			field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' must equal the fixed value"),
+			field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
+		},
+	}, {
+		name: "exempt priority level should have appropriate values for Exempt field",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+			},
+			Spec: badExemptSpec1,
+		},
+		expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("nominalConcurrencyShares"), int32(-1), "must be a non-negative integer"),
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("lendablePercent"), int32(101), "must be between 0 and 100, inclusive"),
+		},
+	}, {
+		name: "exempt priority level should have appropriate values for Exempt field",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+			},
+			Spec: badExemptSpec2,
+		},
+		expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("nominalConcurrencyShares"), int32(-1), "must be a non-negative integer"),
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("lendablePercent"), int32(-1), "must be between 0 and 100, inclusive"),
+		},
+	}, {
+		name:                       "admins are not allowed to repurpose the 'exempt' pl to a limited type",
+		priorityLevelConfiguration: exemptTypeRepurposed,
+		expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
+			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
+			field.Invalid(field.NewPath("spec"), exemptTypeRepurposed.Spec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
+		},
+	}, {
+		name: "admins are not allowed to change any field of the 'exempt' pl except 'Exempt'",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+			},
+			Spec: badExemptSpec3,
+		},
+		expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("spec"), badExemptSpec3, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
+			field.Forbidden(field.NewPath("spec").Child("limited"), "must be nil if the type is not Limited"),
+		},
+	}, {
+		name: "admins are allowed to change the Exempt field of the 'exempt' pl",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+			},
+			Spec: validChangesInExemptFieldOfExemptPLFn(),
+		},
+		expectedErrors: field.ErrorList{},
+	}, {
+		name: "limited must not set exempt priority level configuration for borrowing",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "broken-limited",
+			},
+			Spec: flowcontrol.PriorityLevelConfigurationSpec{
+				Type:   flowcontrol.PriorityLevelEnablementLimited,
+				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{},
+			},
+		},
+		expectedErrors: field.ErrorList{
+			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
+			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited"),
 		},
 	}, {
 		name: "limited requires more details",
@@ -979,10 +1106,37 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "should not be greater than queues (7)"),
 		},
+	}, {
+		name: "the roundtrip annotation is forbidden",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "with-forbidden-annotation",
+				Annotations: map[string]string{
+					flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
+				},
+			},
+			Spec: flowcontrol.PriorityLevelConfigurationSpec{
+				Type: flowcontrol.PriorityLevelEnablementLimited,
+				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+					NominalConcurrencyShares: 42,
+					LimitResponse: flowcontrol.LimitResponse{
+						Type: flowcontrol.LimitResponseTypeReject},
+				},
+			},
+		},
+		// the internal object should never have the round trip annotation
+		requestGV: &schema.GroupVersion{},
+		expectedErrors: field.ErrorList{
+			field.Forbidden(field.NewPath("metadata").Child("annotations"), fmt.Sprintf("annotation '%s' is forbidden", flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)),
+		},
 	}}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			errs := ValidatePriorityLevelConfiguration(testCase.priorityLevelConfiguration, flowcontrolv1beta3.SchemeGroupVersion)
+			gv := flowcontrolv1beta3.SchemeGroupVersion
+			if testCase.requestGV != nil {
+				gv = *testCase.requestGV
+			}
+			errs := ValidatePriorityLevelConfiguration(testCase.priorityLevelConfiguration, gv, PriorityLevelValidationOptions{})
 			if !assert.ElementsMatch(t, testCase.expectedErrors, errs) {
 				t.Logf("mismatch: %v", cmp.Diff(testCase.expectedErrors, errs))
 			}
@@ -1142,48 +1296,73 @@ func TestValidateNonResourceURLPath(t *testing.T) {
 }
 
 func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
-	errExpectedFn := func(fieldName string) field.ErrorList {
+	errExpectedFn := func(fieldName string, v int32, msg string) field.ErrorList {
 		return field.ErrorList{
-			field.Invalid(field.NewPath("spec").Child("limited").Child(fieldName), int32(0), "must be positive"),
+			field.Invalid(field.NewPath("spec").Child("limited").Child(fieldName), int32(v), msg),
 		}
 	}
 
 	tests := []struct {
 		requestVersion    schema.GroupVersion
+		allowZero         bool
 		concurrencyShares int32
 		errExpected       field.ErrorList
 	}{{
-		requestVersion:    flowcontrolv1alpha1.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares"),
-	}, {
 		requestVersion:    flowcontrolv1beta1.SchemeGroupVersion,
 		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares"),
+		errExpected:       errExpectedFn("assuredConcurrencyShares", 0, "must be positive"),
 	}, {
 		requestVersion:    flowcontrolv1beta2.SchemeGroupVersion,
 		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares"),
+		errExpected:       errExpectedFn("assuredConcurrencyShares", 0, "must be positive"),
 	}, {
 		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
 		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares"),
+		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
 	}, {
-		// let's simulate a post v1beta3 version, we expect the
-		// error to return the new field introduced in v1beta3.
-		requestVersion:    schema.GroupVersion{Group: flowcontrolv1beta3.GroupName, Version: "v1"},
+		requestVersion:    flowcontrolv1.SchemeGroupVersion,
 		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares"),
+		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
+	}, {
+		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
+		concurrencyShares: 100,
+		errExpected:       nil,
+	}, {
+		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
+		allowZero:         true,
+		concurrencyShares: 0,
+		errExpected:       nil,
+	}, {
+		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
+		allowZero:         true,
+		concurrencyShares: -1,
+		errExpected:       errExpectedFn("nominalConcurrencyShares", -1, "must be a non-negative integer"),
+	}, {
+		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
+		allowZero:         true,
+		concurrencyShares: 1,
+		errExpected:       nil,
+	}, {
+		requestVersion:    flowcontrolv1.SchemeGroupVersion,
+		allowZero:         true,
+		concurrencyShares: 0,
+		errExpected:       nil,
+	}, {
+		requestVersion:    flowcontrolv1.SchemeGroupVersion,
+		allowZero:         true,
+		concurrencyShares: -1,
+		errExpected:       errExpectedFn("nominalConcurrencyShares", -1, "must be a non-negative integer"),
+	}, {
+		requestVersion:    flowcontrolv1.SchemeGroupVersion,
+		allowZero:         true,
+		concurrencyShares: 1,
+		errExpected:       nil,
 	}, {
 		// this should never really happen in real life, the request
 		// context should always contain the request {group, version}
 		requestVersion:    schema.GroupVersion{},
 		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares"),
-	}, {
-		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		concurrencyShares: 100,
-		errExpected:       nil,
+		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
 	}}
 
 	for _, test := range tests {
@@ -1196,7 +1375,7 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 			}
 			specPath := field.NewPath("spec").Child("limited")
 
-			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath)
+			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath, PriorityLevelValidationOptions{AllowZeroLimitedNominalConcurrencyShares: test.allowZero})
 			if !cmp.Equal(test.errExpected, errGot) {
 				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
 			}
@@ -1274,7 +1453,7 @@ func TestValidateLimitedPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 			}
 			specPath := field.NewPath("spec").Child("limited")
 
-			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, flowcontrolv1beta3.SchemeGroupVersion, specPath)
+			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, flowcontrolv1.SchemeGroupVersion, specPath, PriorityLevelValidationOptions{})
 			if !cmp.Equal(test.errExpected, errGot) {
 				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
 			}

@@ -18,7 +18,6 @@ package cache
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -89,8 +88,8 @@ func TestGetNodeImageStates(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			imageStates := getNodeImageStates(test.node, test.imageExistenceMap)
-			if !reflect.DeepEqual(test.expected, imageStates) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, imageStates)
+			if diff := cmp.Diff(test.expected, imageStates); diff != "" {
+				t.Errorf("Unexpected imageStates (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -177,8 +176,8 @@ func TestCreateImageExistenceMap(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			imageMap := createImageExistenceMap(test.nodes)
-			if !reflect.DeepEqual(test.expected, imageMap) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, imageMap)
+			if diff := cmp.Diff(test.expected, imageMap); diff != "" {
+				t.Errorf("Unexpected imageMap (-want, +got):\n%s", diff)
 			}
 		})
 	}

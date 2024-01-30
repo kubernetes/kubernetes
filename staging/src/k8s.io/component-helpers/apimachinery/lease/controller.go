@@ -65,9 +65,8 @@ type controller struct {
 	latestLease *coordinationv1.Lease
 
 	// newLeasePostProcessFunc allows customizing a lease object (e.g. setting OwnerReference)
-	// before every time the lease is created/refreshed(updated). Note that an error will block
-	// a lease CREATE, causing the controller to retry next time, but an error won't block a
-	// lease UPDATE.
+	// before every time the lease is created/refreshed(updated).
+	// Note that an error will block the lease operation.
 	newLeasePostProcessFunc ProcessLeaseFunc
 }
 
@@ -184,17 +183,21 @@ func (c *controller) ensureLease(ctx context.Context) (*coordinationv1.Lease, bo
 // call this once you're sure the lease has been created
 func (c *controller) retryUpdateLease(ctx context.Context, base *coordinationv1.Lease) error {
 	for i := 0; i < maxUpdateRetries; i++ {
-		leaseToUpdate, _ := c.newLease(base)
-		lease, err := c.leaseClient.Update(ctx, leaseToUpdate, metav1.UpdateOptions{})
-		if err == nil {
-			c.latestLease = lease
-			return nil
-		}
-		klog.FromContext(ctx).Error(err, "Failed to update lease")
-		// OptimisticLockError requires getting the newer version of lease to proceed.
-		if apierrors.IsConflict(err) {
-			base, _ = c.backoffEnsureLease(ctx)
-			continue
+		leaseToUpdate, err := c.newLease(base)
+		if err != nil {
+			klog.FromContext(ctx).Error(err, "Failed to prepare lease")
+		} else {
+			lease, err := c.leaseClient.Update(ctx, leaseToUpdate, metav1.UpdateOptions{})
+			if err == nil {
+				c.latestLease = lease
+				return nil
+			}
+			klog.FromContext(ctx).Error(err, "Failed to update lease")
+			// OptimisticLockError requires getting the newer version of lease to proceed.
+			if apierrors.IsConflict(err) {
+				base, _ = c.backoffEnsureLease(ctx)
+				continue
+			}
 		}
 		if i > 0 && c.onRepeatedHeartbeatFailure != nil {
 			c.onRepeatedHeartbeatFailure()

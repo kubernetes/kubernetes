@@ -142,16 +142,6 @@ type AuditWebhookOptions struct {
 	GroupVersionString string
 }
 
-// AuditDynamicOptions control the configuration of dynamic backends for audit events
-type AuditDynamicOptions struct {
-	// Enabled tells whether the dynamic audit capability is enabled.
-	Enabled bool
-
-	// Configuration for batching backend. This is currently only used as an override
-	// for integration tests
-	BatchConfig *pluginbuffered.BatchConfig
-}
-
 func NewAuditOptions() *AuditOptions {
 	return &AuditOptions{
 		WebhookOptions: AuditWebhookOptions{

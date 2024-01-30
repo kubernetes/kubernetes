@@ -53,34 +53,34 @@ func (r *ClientDiscoveryResolver) ResolveSchema(gvk schema.GroupVersionKind) (*s
 	if err != nil {
 		return nil, err
 	}
-	s, err := resolveType(resp, gvk)
+	ref, err := resolveRef(resp, gvk)
 	if err != nil {
 		return nil, err
 	}
-	s, err = populateRefs(func(ref string) (*spec.Schema, bool) {
+	s, err := PopulateRefs(func(ref string) (*spec.Schema, bool) {
 		s, ok := resp.Components.Schemas[strings.TrimPrefix(ref, refPrefix)]
 		return s, ok
-	}, s)
+	}, ref)
 	if err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-func resolveType(resp *schemaResponse, gvk schema.GroupVersionKind) (*spec.Schema, error) {
-	for _, s := range resp.Components.Schemas {
+func resolveRef(resp *schemaResponse, gvk schema.GroupVersionKind) (string, error) {
+	for ref, s := range resp.Components.Schemas {
 		var gvks []schema.GroupVersionKind
 		err := s.Extensions.GetObject(extGVK, &gvks)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		for _, g := range gvks {
 			if g == gvk {
-				return s, nil
+				return ref, nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("cannot resolve group version kind %q: %w", gvk, ErrSchemaNotFound)
+	return "", fmt.Errorf("cannot resolve group version kind %q: %w", gvk, ErrSchemaNotFound)
 }
 
 func resourcePathFromGV(gv schema.GroupVersion) string {

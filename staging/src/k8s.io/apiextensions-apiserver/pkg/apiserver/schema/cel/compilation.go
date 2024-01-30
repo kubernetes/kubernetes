@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common/types"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -48,9 +49,8 @@ const (
 type CompilationResult struct {
 	Program cel.Program
 	Error   *apiservercel.Error
-	// If true, the compiled expression contains a reference to the identifier "oldSelf", and its corresponding rule
-	// is implicitly a transition rule.
-	TransitionRule bool
+	// If true, the compiled expression contains a reference to the identifier "oldSelf".
+	UsesOldSelf bool
 	// Represents the worst-case cost of the compiled expression in terms of CEL's cost units, as used by cel.EstimateCost.
 	MaxCost uint64
 	// MaxCardinality represents the worse case number of times this validation rule could be invoked if contained under an
@@ -65,6 +65,8 @@ type CompilationResult struct {
 	// MessageExpressionMaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
 	// as used by cel.EstimateCost.
 	MessageExpressionMaxCost uint64
+	// NormalizedRuleFieldPath represents the relative fieldPath specified by user after normalization.
+	NormalizedRuleFieldPath string
 }
 
 // EnvLoader delegates the decision of which CEL environment to use for each expression.
@@ -125,7 +127,7 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 	}
 	celRules := s.Extensions.XValidations
 
-	envSet, err := prepareEnvSet(baseEnvSet, declType)
+	oldSelfEnvSet, optionalOldSelfEnvSet, err := prepareEnvSet(baseEnvSet, declType)
 	if err != nil {
 		return nil, err
 	}
@@ -134,15 +136,20 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 	compResults := make([]CompilationResult, len(celRules))
 	maxCardinality := maxCardinality(declType.MinSerializedSize)
 	for i, rule := range celRules {
-		compResults[i] = compileRule(rule, envSet, envLoader, estimator, maxCardinality, perCallLimit)
+		ruleEnvSet := oldSelfEnvSet
+		if rule.OptionalOldSelf != nil && *rule.OptionalOldSelf {
+			ruleEnvSet = optionalOldSelfEnvSet
+		}
+		compResults[i] = compileRule(s, rule, ruleEnvSet, envLoader, estimator, maxCardinality, perCallLimit)
 	}
 
 	return compResults, nil
 }
 
-func prepareEnvSet(baseEnvSet *environment.EnvSet, declType *apiservercel.DeclType) (*environment.EnvSet, error) {
+func prepareEnvSet(baseEnvSet *environment.EnvSet, declType *apiservercel.DeclType) (oldSelfEnvSet *environment.EnvSet, optionalOldSelfEnvSet *environment.EnvSet, err error) {
 	scopedType := declType.MaybeAssignTypeName(generateUniqueSelfTypeName())
-	return baseEnvSet.Extend(
+
+	oldSelfEnvSet, err = baseEnvSet.Extend(
 		environment.VersionedOptions{
 			// Feature epoch was actually 1.23, but we artificially set it to 1.0 because these
 			// options should always be present.
@@ -161,9 +168,37 @@ func prepareEnvSet(baseEnvSet *environment.EnvSet, declType *apiservercel.DeclTy
 			},
 		},
 	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	optionalOldSelfEnvSet, err = baseEnvSet.Extend(
+		environment.VersionedOptions{
+			// Feature epoch was actually 1.23, but we artificially set it to 1.0 because these
+			// options should always be present.
+			IntroducedVersion: version.MajorMinor(1, 0),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(ScopedVarName, scopedType.CelType()),
+			},
+			DeclTypes: []*apiservercel.DeclType{
+				scopedType,
+			},
+		},
+		environment.VersionedOptions{
+			IntroducedVersion: version.MajorMinor(1, 24),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(OldScopedVarName, types.NewOptionalType(scopedType.CelType())),
+			},
+		},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return oldSelfEnvSet, optionalOldSelfEnvSet, nil
 }
 
-func compileRule(rule apiextensions.ValidationRule, envSet *environment.EnvSet, envLoader EnvLoader, estimator *library.CostEstimator, maxCardinality uint64, perCallLimit uint64) (compilationResult CompilationResult) {
+func compileRule(s *schema.Structural, rule apiextensions.ValidationRule, envSet *environment.EnvSet, envLoader EnvLoader, estimator *library.CostEstimator, maxCardinality uint64, perCallLimit uint64) (compilationResult CompilationResult) {
 	if len(strings.TrimSpace(rule.Rule)) == 0 {
 		// include a compilation result, but leave both program and error nil per documented return semantics of this
 		// function
@@ -188,7 +223,7 @@ func compileRule(rule apiextensions.ValidationRule, envSet *environment.EnvSet, 
 	}
 	for _, ref := range checkedExpr.ReferenceMap {
 		if ref.Name == OldScopedVarName {
-			compilationResult.TransitionRule = true
+			compilationResult.UsesOldSelf = true
 			break
 		}
 	}
@@ -245,6 +280,12 @@ func compileRule(rule apiextensions.ValidationRule, envSet *environment.EnvSet, 
 		}
 		compilationResult.MessageExpression = msgProg
 		compilationResult.MessageExpressionMaxCost = costEst.Max
+	}
+	if rule.FieldPath != "" {
+		validFieldPath, err := ValidFieldPath(rule.FieldPath, s)
+		if err == nil {
+			compilationResult.NormalizedRuleFieldPath = validFieldPath.String()
+		}
 	}
 	return
 }

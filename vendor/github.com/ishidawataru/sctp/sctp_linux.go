@@ -1,4 +1,18 @@
 // +build linux,!386
+// Copyright 2019 Wataru Ishida. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package sctp
 
@@ -8,6 +22,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"unsafe"
+	"runtime"
 )
 
 func setsockopt(fd int, optname, optval, optlen uintptr) (uintptr, uintptr, error) {
@@ -26,6 +41,9 @@ func setsockopt(fd int, optname, optval, optlen uintptr) (uintptr, uintptr, erro
 }
 
 func getsockopt(fd int, optname, optval, optlen uintptr) (uintptr, uintptr, error) {
+	if runtime.GOARCH == "s390x" {
+		optlen = uintptr(unsafe.Pointer(&optlen))
+	}
 	// FIXME: syscall.SYS_GETSOCKOPT is undefined on 386
 	r0, r1, errno := syscall.Syscall6(syscall.SYS_GETSOCKOPT,
 		uintptr(fd),
@@ -38,6 +56,23 @@ func getsockopt(fd int, optname, optval, optlen uintptr) (uintptr, uintptr, erro
 		return r0, r1, errno
 	}
 	return r0, r1, nil
+}
+
+type rawConn struct {
+	sockfd int
+}
+
+func (r rawConn) Control(f func(fd uintptr)) error {
+	f(uintptr(r.sockfd))
+	return nil
+}
+
+func (r rawConn) Read(f func(fd uintptr) (done bool)) error {
+	panic("not implemented")
+}
+
+func (r rawConn) Write(f func(fd uintptr) (done bool)) error {
+	panic("not implemented")
 }
 
 func (c *SCTPConn) SCTPWrite(b []byte, info *SndRcvInfo) (int, error) {
@@ -137,6 +172,11 @@ func ListenSCTP(net string, laddr *SCTPAddr) (*SCTPListener, error) {
 
 // ListenSCTPExt - start listener on specified address/port with given SCTP options
 func ListenSCTPExt(network string, laddr *SCTPAddr, options InitMsg) (*SCTPListener, error) {
+	return listenSCTPExtConfig(network, laddr, options, nil)
+}
+
+// listenSCTPExtConfig - start listener on specified address/port with given SCTP options and socket configuration
+func listenSCTPExtConfig(network string, laddr *SCTPAddr, options InitMsg, control func(network, address string, c syscall.RawConn) error) (*SCTPListener, error) {
 	af, ipv6only := favoriteAddrFamily(network, laddr, nil, "listen")
 	sock, err := syscall.Socket(
 		af,
@@ -156,6 +196,12 @@ func ListenSCTPExt(network string, laddr *SCTPAddr, options InitMsg) (*SCTPListe
 	if err = setDefaultSockopts(sock, af, ipv6only); err != nil {
 		return nil, err
 	}
+	if control != nil {
+		rc := rawConn{sockfd: sock}
+		if err = control(network, laddr.String(), rc); err != nil {
+			return nil, err
+		}
+	}
 	err = setInitOpts(sock, options)
 	if err != nil {
 		return nil, err
@@ -170,7 +216,7 @@ func ListenSCTPExt(network string, laddr *SCTPAddr, options InitMsg) (*SCTPListe
 				laddr.IPAddrs = append(laddr.IPAddrs, net.IPAddr{IP: net.IPv6zero})
 			}
 		}
-		err := SCTPBind(sock, laddr, SCTP_BINDX_ADD_ADDR)
+		err = SCTPBind(sock, laddr, SCTP_BINDX_ADD_ADDR)
 		if err != nil {
 			return nil, err
 		}
@@ -207,6 +253,11 @@ func DialSCTP(net string, laddr, raddr *SCTPAddr) (*SCTPConn, error) {
 
 // DialSCTPExt - same as DialSCTP but with given SCTP options
 func DialSCTPExt(network string, laddr, raddr *SCTPAddr, options InitMsg) (*SCTPConn, error) {
+	return dialSCTPExtConfig(network, laddr, raddr, options, nil)
+}
+
+// dialSCTPExtConfig - same as DialSCTP but with given SCTP options and socket configuration
+func dialSCTPExtConfig(network string, laddr, raddr *SCTPAddr, options InitMsg, control func(network, address string, c syscall.RawConn) error) (*SCTPConn, error) {
 	af, ipv6only := favoriteAddrFamily(network, laddr, raddr, "dial")
 	sock, err := syscall.Socket(
 		af,
@@ -226,6 +277,12 @@ func DialSCTPExt(network string, laddr, raddr *SCTPAddr, options InitMsg) (*SCTP
 	if err = setDefaultSockopts(sock, af, ipv6only); err != nil {
 		return nil, err
 	}
+	if control != nil {
+		rc := rawConn{sockfd: sock}
+		if err = control(network, laddr.String(), rc); err != nil {
+			return nil, err
+		}
+	}
 	err = setInitOpts(sock, options)
 	if err != nil {
 		return nil, err
@@ -239,7 +296,7 @@ func DialSCTPExt(network string, laddr, raddr *SCTPAddr, options InitMsg) (*SCTP
 				laddr.IPAddrs = append(laddr.IPAddrs, net.IPAddr{IP: net.IPv6zero})
 			}
 		}
-		err := SCTPBind(sock, laddr, SCTP_BINDX_ADD_ADDR)
+		err = SCTPBind(sock, laddr, SCTP_BINDX_ADD_ADDR)
 		if err != nil {
 			return nil, err
 		}

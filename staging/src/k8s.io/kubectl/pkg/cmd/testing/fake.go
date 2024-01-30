@@ -483,6 +483,7 @@ func (f *TestFactory) Cleanup() {
 		return
 	}
 
+	f.tempConfigFile.Close()
 	os.Remove(f.tempConfigFile.Name())
 }
 
@@ -640,7 +641,7 @@ func testRESTMapper() meta.RESTMapper {
 	}
 
 	fakeDs := NewFakeCachedDiscoveryClient()
-	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
+	expander := restmapper.NewShortcutExpander(mapper, fakeDs, nil)
 	return expander
 }
 

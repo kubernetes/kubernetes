@@ -38,7 +38,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 
 // AddFlags add the generator flags to the flag set.
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	pflag.CommandLine.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
+	fs.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
 }
 

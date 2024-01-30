@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestValidateResourceRequirements(t *testing.T) {
@@ -158,7 +159,7 @@ func validateNamesAndValuesInDescription(t *testing.T, r v1.ResourceList, errs f
 func TestValidateContainerResourceName(t *testing.T) {
 	successCase := []struct {
 		name         string
-		ResourceName string
+		ResourceName core.ResourceName
 	}{{
 		name:         "CPU resource",
 		ResourceName: "cpu",
@@ -177,7 +178,7 @@ func TestValidateContainerResourceName(t *testing.T) {
 	}}
 	for _, tc := range successCase {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) != 0 {
+			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(string(tc.ResourceName))); len(errs) != 0 {
 				t.Errorf("unexpected error: %v", errs)
 			}
 		})
@@ -185,7 +186,7 @@ func TestValidateContainerResourceName(t *testing.T) {
 
 	errorCase := []struct {
 		name         string
-		ResourceName string
+		ResourceName core.ResourceName
 	}{{
 		name:         "Invalid standard resource",
 		ResourceName: "cpu-core",
@@ -198,7 +199,7 @@ func TestValidateContainerResourceName(t *testing.T) {
 	}}
 	for _, tc := range errorCase {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) == 0 {
+			if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(string(tc.ResourceName))); len(errs) == 0 {
 				t.Errorf("expected error")
 			}
 		})

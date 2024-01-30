@@ -35,7 +35,7 @@ import (
 
 var _ = SIGDescribe("SelfSubjectReview", func() {
 	f := framework.NewDefaultFramework("selfsubjectreviews")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 			Release: v1.28

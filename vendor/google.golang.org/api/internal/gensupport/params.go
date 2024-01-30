@@ -37,7 +37,7 @@ func (u URLParams) SetMulti(key string, values []string) {
 	u[key] = values
 }
 
-// Encode encodes the values into ``URL encoded'' form
+// Encode encodes the values into “URL encoded” form
 // ("bar=baz&foo=quux") sorted by key.
 func (u URLParams) Encode() string {
 	return url.Values(u).Encode()

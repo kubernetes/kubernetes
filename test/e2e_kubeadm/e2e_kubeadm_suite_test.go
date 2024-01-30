@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 
@@ -42,6 +43,10 @@ func TestMain(m *testing.M) {
 	framework.RegisterClusterFlags(flag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+	if pflag.CommandLine.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", pflag.CommandLine.Args())
+		os.Exit(1)
+	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	os.Exit(m.Run())
 }

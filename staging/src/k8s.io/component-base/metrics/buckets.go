@@ -33,6 +33,16 @@ func ExponentialBuckets(start, factor float64, count int) []float64 {
 	return prometheus.ExponentialBuckets(start, factor, count)
 }
 
+// ExponentialBucketsRange creates 'count' buckets, where the lowest bucket is
+// 'min' and the highest bucket is 'max'. The final +Inf bucket is not counted
+// and not included in the returned slice. The returned slice is meant to be
+// used for the Buckets field of HistogramOpts.
+//
+// The function panics if 'count' is 0 or negative, if 'min' is 0 or negative.
+func ExponentialBucketsRange(min, max float64, count int) []float64 {
+	return prometheus.ExponentialBucketsRange(min, max, count)
+}
+
 // MergeBuckets merges buckets together
 func MergeBuckets(buckets ...[]float64) []float64 {
 	result := make([]float64, 1)

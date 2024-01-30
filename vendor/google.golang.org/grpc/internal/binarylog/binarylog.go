@@ -28,8 +28,13 @@ import (
 	"google.golang.org/grpc/internal/grpcutil"
 )
 
-// Logger is the global binary logger. It can be used to get binary logger for
-// each method.
+var grpclogLogger = grpclog.Component("binarylog")
+
+// Logger specifies MethodLoggers for method names with a Log call that
+// takes a context.
+//
+// This is used in the 1.0 release of gcp/observability, and thus must not be
+// deleted or changed.
 type Logger interface {
 	GetMethodLogger(methodName string) MethodLogger
 }
@@ -39,8 +44,6 @@ type Logger interface {
 //
 // It is used to get a MethodLogger for each individual method.
 var binLogger Logger
-
-var grpclogLogger = grpclog.Component("binarylog")
 
 // SetLogger sets the binary logger.
 //

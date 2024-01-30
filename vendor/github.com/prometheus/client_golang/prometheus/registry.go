@@ -21,18 +21,17 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
 
-	"github.com/cespare/xxhash/v2"
-	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/golang/protobuf/proto"
-	"github.com/prometheus/common/expfmt"
-
-	dto "github.com/prometheus/client_model/go"
-
 	"github.com/prometheus/client_golang/prometheus/internal"
+
+	"github.com/cespare/xxhash/v2"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -933,6 +932,10 @@ func checkMetricConsistency(
 		h.WriteString(lp.GetValue())
 		h.Write(separatorByteSlice)
 	}
+	if dtoMetric.TimestampMs != nil {
+		h.WriteString(strconv.FormatInt(*(dtoMetric.TimestampMs), 10))
+		h.Write(separatorByteSlice)
+	}
 	hSum := h.Sum64()
 	if _, exists := metricHashes[hSum]; exists {
 		return fmt.Errorf(
@@ -962,7 +965,7 @@ func checkDescConsistency(
 	copy(lpsFromDesc, desc.constLabelPairs)
 	for _, l := range desc.variableLabels {
 		lpsFromDesc = append(lpsFromDesc, &dto.LabelPair{
-			Name: proto.String(l),
+			Name: proto.String(l.Name),
 		})
 	}
 	if len(lpsFromDesc) != len(dtoMetric.Label) {

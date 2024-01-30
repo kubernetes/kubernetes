@@ -17,6 +17,8 @@ limitations under the License.
 package cadvisor
 
 import (
+	"strings"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
@@ -25,10 +27,12 @@ import (
 )
 
 const (
-	// CrioSocket is the path to the CRI-O socket.
+	// CrioSocketSuffix is the path to the CRI-O socket.
 	// Please keep this in sync with the one in:
 	// github.com/google/cadvisor/tree/master/container/crio/client.go
-	CrioSocket = "/var/run/crio/crio.sock"
+	// Note that however we only match on the suffix, as /var/run is often a
+	// symlink to /run, so the user can specify either path.
+	CrioSocketSuffix = "run/crio/crio.sock"
 )
 
 // CapacityFromMachineInfo returns the capacity of the resources from the machine info.
@@ -69,5 +73,5 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 // be removed. Related issue:
 // https://github.com/kubernetes/kubernetes/issues/51798
 func UsingLegacyCadvisorStats(runtimeEndpoint string) bool {
-	return runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
+	return strings.HasSuffix(runtimeEndpoint, CrioSocketSuffix)
 }

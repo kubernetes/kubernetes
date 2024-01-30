@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 )
@@ -34,7 +35,25 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 		expected runtime.Object
 	}{
 		{
-			name: "LendablePercent is not specified, should default to zero",
+			name: "Defaulting for Exempt",
+			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type:   flowcontrolv1beta3.PriorityLevelEnablementExempt,
+					Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{},
+				},
+			},
+			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
+					Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
+						NominalConcurrencyShares: pointer.Int32(0),
+						LendablePercent:          pointer.Int32(0),
+					},
+				},
+			},
+		},
+		{
+			name: "LendablePercent is not specified in Limited, should default to zero",
 			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
@@ -51,6 +70,172 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 5,
+						LendablePercent:          pointer.Int32(0),
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Defaulting for queuing configuration",
+			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 5,
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type:    flowcontrolv1beta3.LimitResponseTypeQueue,
+							Queuing: &flowcontrolv1beta3.QueuingConfiguration{},
+						},
+					},
+				},
+			},
+			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 5,
+						LendablePercent:          pointer.Int32(0),
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeQueue,
+							Queuing: &flowcontrolv1beta3.QueuingConfiguration{
+								HandSize:         PriorityLevelConfigurationDefaultHandSize,
+								Queues:           PriorityLevelConfigurationDefaultQueues,
+								QueueLengthLimit: PriorityLevelConfigurationDefaultQueueLengthLimit,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "NominalConcurrencyShares is 0, roundtrip annotation is not set, default value should be applied",
+			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 0,
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: PriorityLevelConfigurationDefaultNominalConcurrencyShares,
+						LendablePercent:          pointer.Int32(0),
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "NominalConcurrencyShares is 0, roundtrip annotation is set, default value should not be applied",
+			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
+					},
+				},
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 0,
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
+					},
+				},
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 0,
+						LendablePercent:          pointer.Int32(0),
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "NominalConcurrencyShares is 0, roundtrip annotation is set with a non-empty string, default value should not be applied",
+			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
+					},
+				},
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 0,
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
+					},
+				},
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 0,
+						LendablePercent:          pointer.Int32(0),
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "NominalConcurrencyShares is positive, roundtrip annotation is set, annotation should be ignored",
+			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
+					},
+				},
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 1,
+						LimitResponse: flowcontrolv1beta3.LimitResponse{
+							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						},
+					},
+				},
+			},
+			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey: "",
+					},
+				},
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+						NominalConcurrencyShares: 1,
 						LendablePercent:          pointer.Int32(0),
 						LimitResponse: flowcontrolv1beta3.LimitResponse{
 							Type: flowcontrolv1beta3.LimitResponseTypeReject,

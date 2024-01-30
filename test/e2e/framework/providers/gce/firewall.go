@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -88,165 +91,6 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 		},
 	}
 	return &fw
-}
-
-// GetInstancePrefix returns the INSTANCE_PREFIX env we set for e2e cluster.
-// From cluster/gce/config-test.sh, master name is set up using below format:
-// MASTER_NAME="${INSTANCE_PREFIX}-master"
-func GetInstancePrefix(masterName string) (string, error) {
-	if !strings.HasSuffix(masterName, "-master") {
-		return "", fmt.Errorf("unexpected master name format: %v", masterName)
-	}
-	return masterName[:len(masterName)-7], nil
-}
-
-// GetClusterName returns the CLUSTER_NAME env we set for e2e cluster.
-// From cluster/gce/config-test.sh, cluster name is set up using below format:
-// CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
-func GetClusterName(instancePrefix string) string {
-	return instancePrefix
-}
-
-// GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
-// From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
-func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange string) []*compute.Firewall {
-	instancePrefix, err := GetInstancePrefix(masterName)
-	framework.ExpectNoError(err)
-	clusterName := GetClusterName(instancePrefix)
-
-	fws := []*compute.Firewall{}
-	fws = append(fws, &compute.Firewall{
-		Name:         clusterName + "-default-internal-master",
-		SourceRanges: []string{"10.0.0.0/8"},
-		TargetTags:   []string{masterTag},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"1-2379"},
-			},
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"2382-65535"},
-			},
-			{
-				IPProtocol: "udp",
-				Ports:      []string{"1-65535"},
-			},
-			{
-				IPProtocol: "icmp",
-			},
-		},
-	})
-	fws = append(fws, &compute.Firewall{
-		Name:         clusterName + "-default-internal-node",
-		SourceRanges: []string{"10.0.0.0/8"},
-		TargetTags:   []string{nodeTag},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"1-65535"},
-			},
-			{
-				IPProtocol: "udp",
-				Ports:      []string{"1-65535"},
-			},
-			{
-				IPProtocol: "icmp",
-			},
-		},
-	})
-	fws = append(fws, &compute.Firewall{
-		Name:         network + "-default-ssh",
-		SourceRanges: []string{"0.0.0.0/0"},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"22"},
-			},
-		},
-	})
-	fws = append(fws, &compute.Firewall{
-		Name:       masterName + "-etcd",
-		SourceTags: []string{masterTag},
-		TargetTags: []string{masterTag},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"2380"},
-			},
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"2381"},
-			},
-		},
-	})
-	fws = append(fws, &compute.Firewall{
-		Name:         masterName + "-https",
-		SourceRanges: []string{"0.0.0.0/0"},
-		TargetTags:   []string{masterTag},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"443"},
-			},
-		},
-	})
-	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-all",
-		SourceRanges: []string{clusterIPRange},
-		TargetTags:   []string{nodeTag},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-			},
-			{
-				IPProtocol: "udp",
-			},
-			{
-				IPProtocol: "icmp",
-			},
-			{
-				IPProtocol: "esp",
-			},
-			{
-				IPProtocol: "ah",
-			},
-			{
-				IPProtocol: "sctp",
-			},
-		},
-	})
-	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-http-alt",
-		SourceRanges: []string{"0.0.0.0/0"},
-		TargetTags:   []string{nodeTag},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"80"},
-			},
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"8080"},
-			},
-		},
-	})
-	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-nodeports",
-		SourceRanges: []string{"0.0.0.0/0"},
-		TargetTags:   []string{nodeTag},
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"30000-32767"},
-			},
-			{
-				IPProtocol: "udp",
-				Ports:      []string{"30000-32767"},
-			},
-		},
-	})
-	return fws
 }
 
 // PackProtocolsPortsFromFirewall packs protocols and ports in an unified way for verification.
@@ -365,10 +209,6 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 	if res.Name != exp.Name {
 		return fmt.Errorf("incorrect name: %v, expected %v", res.Name, exp.Name)
 	}
-	// Sample Network value: https://www.googleapis.com/compute/v1/projects/{project-id}/global/networks/e2e
-	if !strings.HasSuffix(res.Network, "/"+network) {
-		return fmt.Errorf("incorrect network: %v, expected ends with: %v", res.Network, "/"+network)
-	}
 
 	actualPorts := PackProtocolsPortsFromFirewall(res.Allowed)
 	expPorts := PackProtocolsPortsFromFirewall(exp.Allowed)
@@ -410,7 +250,7 @@ func WaitForFirewallRule(ctx context.Context, gceCloud *gcecloud.Cloud, fwName s
 		return true, nil
 	}
 
-	if err := wait.PollImmediateWithContext(ctx, 5*time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, condition); err != nil {
 		return nil, fmt.Errorf("error waiting for firewall %v exist=%v", fwName, exist)
 	}
 	return fw, nil

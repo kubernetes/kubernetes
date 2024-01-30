@@ -180,5 +180,8 @@ func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
 	if lhs.Hostname != rhs.Hostname {
 		return false
 	}
+	if lhs.IPMode != rhs.IPMode {
+		return false
+	}
 	return true
 }

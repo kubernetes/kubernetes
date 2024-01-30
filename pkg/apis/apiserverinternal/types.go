@@ -70,6 +70,10 @@ type ServerStorageVersion struct {
 	// The API server can decode objects encoded in these versions.
 	// The encodingVersion must be included in the decodableVersions.
 	DecodableVersions []string
+
+	// The API server can serve these versions.
+	// DecodableVersions must include all ServedVersions.
+	ServedVersions []string
 }
 
 // StorageVersionConditionType Indicates the storage version condition type

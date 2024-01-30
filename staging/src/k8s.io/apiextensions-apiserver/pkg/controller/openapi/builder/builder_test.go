@@ -44,42 +44,30 @@ func TestNewBuilder(t *testing.T) {
 		wantedSchema      string
 		wantedItemsSchema string
 
-		v2                                            bool // produce OpenAPIv2
-		skipFilterSchemaForKubectlOpenAPIV2Validation bool // produce OpenAPIv2 without going through the ToStructuralOpenAPIV2 path
+		v2 bool // produce OpenAPIv2
 	}{
 		{
 			"nil",
 			"",
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`, `{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 		},
 		{"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 		},
 		{"type only",
 			`{"type":"object"}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 		},
 		{"preserve unknown at root v2",
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
-			true,
-			false,
-		},
-		{"preserve unknown at root v3",
-			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
-			`{"type":"object","x-kubernetes-preserve-unknown-fields":true,"properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
-			true,
 			true,
 		},
 		{"with extensions",
@@ -184,174 +172,6 @@ func TestNewBuilder(t *testing.T) {
 }`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
-		},
-		{"with extensions as v3 schema",
-			`
-{
-  "type":"object",
-  "properties": {
-    "int-or-string-1": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"type":"integer"},
-        {"type":"string"}
-      ]
-    },
-    "int-or-string-2": {
-      "x-kubernetes-int-or-string": true,
-      "allOf": [{
-        "anyOf": [
-          {"type":"integer"},
-          {"type":"string"}
-        ]
-      }, {
-        "anyOf": [
-          {"minimum": 42.0}
-        ]
-      }]
-    },
-    "int-or-string-3": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"type":"integer"},
-        {"type":"string"}
-      ],
-      "allOf": [{
-        "anyOf": [
-          {"minimum": 42.0}
-        ]
-      }]
-    },
-    "int-or-string-4": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"minimum": 42.0}
-      ]
-    },
-    "int-or-string-5": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"minimum": 42.0}
-      ],
-      "allOf": [
-        {"minimum": 42.0}
-      ]
-    },
-    "int-or-string-6": {
-      "x-kubernetes-int-or-string": true
-    },
-    "preserve-unknown-fields": {
-      "x-kubernetes-preserve-unknown-fields": true
-    },
-    "embedded-object": {
-      "x-kubernetes-embedded-resource": true,
-      "x-kubernetes-preserve-unknown-fields": true,
-      "type": "object"
-    }
-  }
-}`,
-			`
-{
-  "type":"object",
-  "properties": {
-    "apiVersion": {"type":"string"},
-    "kind": {"type":"string"},
-    "metadata": {"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},
-    "int-or-string-1": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"type":"integer"},
-        {"type":"string"}
-      ]
-    },
-    "int-or-string-2": {
-      "x-kubernetes-int-or-string": true,
-      "allOf": [{
-        "anyOf": [
-          {"type":"integer"},
-          {"type":"string"}
-        ]
-      }, {
-        "anyOf": [
-          {"minimum": 42.0}
-        ]
-      }]
-    },
-    "int-or-string-3": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"type":"integer"},
-        {"type":"string"}
-      ],
-      "allOf": [{
-        "anyOf": [
-          {"minimum": 42.0}
-        ]
-      }]
-    },
-    "int-or-string-4": {
-      "x-kubernetes-int-or-string": true,
-      "allOf": [{
-        "anyOf": [
-          {"type":"integer"},
-          {"type":"string"}
-        ]
-      }],
-      "anyOf": [
-        {"minimum": 42.0}
-      ]
-    },
-    "int-or-string-5": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"minimum": 42.0}
-      ],
-      "allOf": [{
-        "anyOf": [
-          {"type":"integer"},
-          {"type":"string"}
-        ]
-      }, {
-        "minimum": 42.0
-      }]
-    },
-    "int-or-string-6": {
-      "x-kubernetes-int-or-string": true,
-      "anyOf": [
-        {"type":"integer"},
-        {"type":"string"}
-      ]
-    },
-    "preserve-unknown-fields": {
-      "x-kubernetes-preserve-unknown-fields": true
-    },
-    "embedded-object": {
-      "x-kubernetes-embedded-resource": true,
-      "x-kubernetes-preserve-unknown-fields": true,
-      "type": "object",
-      "required":["kind","apiVersion"],
-      "properties":{
-        "apiVersion":{
-          "description":"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type":"string"
-        },
-        "kind":{
-          "description":"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type":"string"
-        },
-        "metadata":{
-          "description":"Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-          "$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
-        }
-      }
-    }
-  },
-  "x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]
-}`,
-			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
-			true,
-			true,
 		},
 	}
 	for _, tt := range tests {
@@ -391,7 +211,7 @@ func TestNewBuilder(t *testing.T) {
 					},
 					Scope: apiextensionsv1.NamespaceScoped,
 				},
-			}, "v1", schema, Options{V2: tt.v2, SkipFilterSchemaForKubectlOpenAPIV2Validation: tt.skipFilterSchemaForKubectlOpenAPIV2Validation})
+			}, "v1", schema, Options{V2: tt.v2})
 
 			var wantedSchema, wantedItemsSchema spec.Schema
 			if err := json.Unmarshal([]byte(tt.wantedSchema), &wantedSchema); err != nil {
@@ -520,7 +340,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 				hasNamespaceParam := false
 				hasNameParam := false
 				for _, param := range path.Parameters {
-					if param.In == "path" && param.Name == "namespace" {
+					if strings.HasPrefix(param.Ref.String(), "#/parameters/namespace-") {
 						hasNamespaceParam = true
 					}
 					if param.In == "path" && param.Name == "name" {
@@ -613,13 +433,6 @@ func TestBuildOpenAPIV2(t *testing.T) {
 			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true},
-		},
-		{
-			"v3",
-			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
-			nil,
-			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, SkipFilterSchemaForKubectlOpenAPIV2Validation: true},
 		},
 	}
 	for _, tt := range tests {

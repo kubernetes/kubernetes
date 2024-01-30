@@ -60,6 +60,7 @@ func InitCustomReadWriteOncePodTestSuite(patterns []storageframework.TestPattern
 		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "read-write-once-pod",
 			TestPatterns: patterns,
+			TestTags:     []interface{}{framework.WithLabel("MinimumKubeletVersion:1.27")},
 		},
 	}
 }
@@ -92,7 +93,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("read-write-once-pod", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		l = readWriteOncePodTest{}

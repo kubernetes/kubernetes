@@ -50,7 +50,7 @@ import (
 
 const (
 	// resource monitoring
-	cadvisorImageName = "gcr.io/cadvisor/cadvisor:v0.43.0"
+	cadvisorImageName = "gcr.io/cadvisor/cadvisor:v0.47.2"
 	cadvisorPodName   = "cadvisor"
 	cadvisorPort      = 8090
 	// housekeeping interval of Cadvisor (second)

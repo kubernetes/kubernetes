@@ -56,6 +56,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -90,9 +91,9 @@ const (
 	gmsaSharedFolder = "write_test"
 )
 
-var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
+var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framework.WithSlow(), skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("GMSA support", func() {
 		ginkgo.It("works end to end", func(ctx context.Context) {
@@ -220,7 +221,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 
 		})
 	})
-})
+}))
 
 func isValidOutput(output string) bool {
 	return strings.Contains(output, expectedQueryOutput) &&
@@ -321,8 +322,8 @@ func deployGmsaWebhook(ctx context.Context, f *framework.Framework) error {
 	bindClusterRBACRoleToServiceAccount(ctx, f, s, "cluster-admin")
 
 	installSteps := []string{
-		"echo \"@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing/\" >> /etc/apk/repositories",
-		"&& apk add kubectl@testing gettext openssl",
+		"echo \"@community http://dl-cdn.alpinelinux.org/alpine/edge/community/\" >> /etc/apk/repositories",
+		"&& apk add kubectl@community gettext openssl",
 		"&& apk add --update coreutils",
 		fmt.Sprintf("&& curl %s > gmsa.sh", gmsaWebhookDeployScriptURL),
 		"&& chmod +x gmsa.sh",

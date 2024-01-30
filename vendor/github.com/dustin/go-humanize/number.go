@@ -73,7 +73,7 @@ func FormatFloat(format string, n float64) string {
 	if n > math.MaxFloat64 {
 		return "Infinity"
 	}
-	if n < -math.MaxFloat64 {
+	if n < (0.0 - math.MaxFloat64) {
 		return "-Infinity"
 	}
 

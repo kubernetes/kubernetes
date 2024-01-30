@@ -11,8 +11,9 @@ import (
 )
 
 type HaveHTTPBodyMatcher struct {
-	Expected   interface{}
-	cachedBody []byte
+	Expected       interface{}
+	cachedResponse interface{}
+	cachedBody     []byte
 }
 
 func (matcher *HaveHTTPBodyMatcher) Match(actual interface{}) (bool, error) {
@@ -73,7 +74,7 @@ func (matcher *HaveHTTPBodyMatcher) NegatedFailureMessage(actual interface{}) (m
 // the Reader is closed and it is not readable again in FailureMessage()
 // or NegatedFailureMessage()
 func (matcher *HaveHTTPBodyMatcher) body(actual interface{}) ([]byte, error) {
-	if matcher.cachedBody != nil {
+	if matcher.cachedResponse == actual && matcher.cachedBody != nil {
 		return matcher.cachedBody, nil
 	}
 
@@ -91,8 +92,10 @@ func (matcher *HaveHTTPBodyMatcher) body(actual interface{}) ([]byte, error) {
 
 	switch a := actual.(type) {
 	case *http.Response:
+		matcher.cachedResponse = a
 		return body(a)
 	case *httptest.ResponseRecorder:
+		matcher.cachedResponse = a
 		return body(a.Result())
 	default:
 		return nil, fmt.Errorf("HaveHTTPBody matcher expects *http.Response or *httptest.ResponseRecorder. Got:\n%s", format.Object(actual, 1))

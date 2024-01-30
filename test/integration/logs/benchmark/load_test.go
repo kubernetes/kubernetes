@@ -194,6 +194,11 @@ func TestData(t *testing.T) {
 					InfoStream:  &buffer,
 				}
 				klog.SetOutput(&buffer)
+				defer func() {
+					if err := logsapi.ResetForTest(nil); err != nil {
+						t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+					}
+				}()
 				if err := logsapi.ValidateAndApplyWithOptions(c, &o, nil); err != nil {
 					t.Fatalf("Unexpected error configuring logging: %v", err)
 				}

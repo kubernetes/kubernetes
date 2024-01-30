@@ -40,11 +40,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo/v2"
@@ -59,10 +61,10 @@ const (
 )
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", func() {
+var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceManager, nodefeature.DeviceManager, func() {
 	checkpointFullPath := filepath.Join(devicePluginDir, checkpointName)
 	f := framework.NewDefaultFramework("devicemanager-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With SRIOV devices in the system", func() {
 		// this test wants to reproduce what happened in https://github.com/kubernetes/kubernetes/issues/102880
@@ -319,7 +321,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 		   12. Delete the sample device plugin pod.
 		   13. Remove `/var/lib/kubelet/device-plugins/sample/` and its content, the directory created to control registration
 	*/
-	ginkgo.Context("With sample device plugin [Serial] [Disruptive]", func() {
+	f.Context("With sample device plugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var deviceCount int = 2
 		var devicePluginPod *v1.Pod
 		var triggerPathFile, triggerPathDir string
@@ -721,11 +723,14 @@ func hasFailed(hasFailed bool) types.GomegaMatcher {
 	}).WithTemplate("expected Pod failed {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(hasFailed)
 }
 
-func getPod(ctx context.Context, f *framework.Framework, podName string) (bool, error) {
+func getPodByName(ctx context.Context, f *framework.Framework, podName string) (*v1.Pod, error) {
+	return e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+}
 
-	pod, err := e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+func getPod(ctx context.Context, f *framework.Framework, podName string) (bool, error) {
+	pod, err := getPodByName(ctx, f, podName)
 	if err != nil {
-		return false, fmt.Errorf("expected node to get pod=%q got err=%q", pod.Name, err)
+		return false, err
 	}
 
 	expectedStatusReason := "UnexpectedAdmissionError"

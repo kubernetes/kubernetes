@@ -27,6 +27,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/discovery"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/rest"
@@ -122,6 +124,9 @@ type ConfigFlags struct {
 	// Allows increasing qps used for discovery, this is useful
 	// in clusters with many registered resources
 	discoveryQPS float32
+	// Allows all possible warnings are printed in a standardized
+	// format.
+	warningPrinter *printers.WarningPrinter
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -332,7 +337,11 @@ func (f *ConfigFlags) toRESTMapper() (meta.RESTMapper, error) {
 	}
 
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
+	expander := restmapper.NewShortcutExpander(mapper, discoveryClient, func(a string) {
+		if f.warningPrinter != nil {
+			f.warningPrinter.Print(a)
+		}
+	})
 	return expander, nil
 }
 
@@ -425,6 +434,12 @@ func (f *ConfigFlags) WithDiscoveryQPS(discoveryQPS float32) *ConfigFlags {
 // WithWrapConfigFn allows providing a wrapper function for the client Config.
 func (f *ConfigFlags) WithWrapConfigFn(wrapConfigFn func(*rest.Config) *rest.Config) *ConfigFlags {
 	f.WrapConfigFn = wrapConfigFn
+	return f
+}
+
+// WithWarningPrinter initializes WarningPrinter with the given IOStreams
+func (f *ConfigFlags) WithWarningPrinter(ioStreams genericiooptions.IOStreams) *ConfigFlags {
+	f.warningPrinter = printers.NewWarningPrinter(ioStreams.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(ioStreams.ErrOut)})
 	return f
 }
 

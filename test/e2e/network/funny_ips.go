@@ -74,7 +74,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 	)
 
 	f := framework.NewDefaultFramework("funny-ips")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		if framework.TestContext.ClusterIsIPv6() {
@@ -106,7 +106,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 			svc.Spec.ClusterIP = clusterIPZero // IP with a leading zero
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
+				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
 			}
 		})
 		framework.ExpectNoError(err)

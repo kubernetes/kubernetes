@@ -60,7 +60,7 @@ const (
 //	quota_test.go:100: Took 4.196205966s to scale up without quota
 //	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -82,6 +82,7 @@ func TestQuota(t *testing.T) {
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
+		logger,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
@@ -290,7 +291,7 @@ plugins:
 		t.Fatal(err)
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -312,6 +313,7 @@ plugins:
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
+		logger,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
@@ -417,7 +419,7 @@ plugins:
 		t.Fatal(err)
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -439,6 +441,7 @@ plugins:
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
+		logger,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
@@ -591,7 +594,7 @@ func newService(name string, svcType v1.ServiceType, allocateNodePort bool) *v1.
 			AllocateLoadBalancerNodePorts: allocateNPs,
 			Ports: []v1.ServicePort{{
 				Port:       int32(80),
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}

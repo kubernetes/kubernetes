@@ -247,3 +247,53 @@ type MergeOptions struct {
 	// source list to destination or append.
 	ListIncreaseDirection MergeOptionsListIncreaseDirection
 }
+
+// Since ObjectMeta and TypeMeta are stable, we manually create DeepCopy funcs for ResourceMeta and ObjectMeta.
+// For TypeMeta and NameMeta no DeepCopy funcs are required, as they only contain basic types.
+
+// DeepCopyInto copies the receiver, writing into out. in must be non-nil.
+func (in *ObjectMeta) DeepCopyInto(out *ObjectMeta) {
+	*out = *in
+	out.NameMeta = in.NameMeta
+	if in.Labels != nil {
+		in, out := &in.Labels, &out.Labels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+}
+
+// DeepCopy copies the receiver, creating a new ObjectMeta.
+func (in *ObjectMeta) DeepCopy() *ObjectMeta {
+	if in == nil {
+		return nil
+	}
+	out := new(ObjectMeta)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies the receiver, writing into out. in must be non-nil.
+func (in *ResourceMeta) DeepCopyInto(out *ResourceMeta) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+}
+
+// DeepCopy copies the receiver, creating a new ResourceMeta.
+func (in *ResourceMeta) DeepCopy() *ResourceMeta {
+	if in == nil {
+		return nil
+	}
+	out := new(ResourceMeta)
+	in.DeepCopyInto(out)
+	return out
+}

@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -54,7 +57,6 @@ func setupAllocator(ctx context.Context, kubeConfig *restclient.Config, config *
 	ipamController, err := nodeipam.NewNodeIpamController(
 		ctx,
 		sharedInformer.Core().V1().Nodes(),
-		sharedInformer.Networking().V1alpha1().ClusterCIDRs(),
 		config.Cloud, clientSet, []*net.IPNet{clusterCIDR}, serviceCIDR, nil,
 		[]int{subnetMaskSize}, config.AllocatorType,
 	)

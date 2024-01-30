@@ -19,6 +19,18 @@ rules:
       - get
       - list
       - watch
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+    resourceNames:
+      - metrics-server-v0.6.3
+    verbs:
+      - get
+      - patch
+  - nonResourceURLs:
+    - /metrics
+    verbs:
+      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

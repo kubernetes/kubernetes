@@ -69,11 +69,13 @@ message NonResourceAttributes {
 // NonResourceRule holds information that describes a rule for the non-resource
 message NonResourceRule {
   // Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  "*" means all.
+  // +listType=atomic
   repeated string verbs = 1;
 
   // NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full,
   // final step in the path.  "*" means all.
   // +optional
+  // +listType=atomic
   repeated string nonResourceURLs = 2;
 }
 
@@ -115,20 +117,24 @@ message ResourceAttributes {
 // may contain duplicates, and possibly be incomplete.
 message ResourceRule {
   // Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  "*" means all.
+  // +listType=atomic
   repeated string verbs = 1;
 
   // APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
   // the enumerated resources in any API group will be allowed.  "*" means all.
   // +optional
+  // +listType=atomic
   repeated string apiGroups = 2;
 
   // Resources is a list of resources this rule applies to.  "*" means all in the specified apiGroups.
   //  "*/foo" represents the subresource 'foo' for all resources in the specified apiGroups.
   // +optional
+  // +listType=atomic
   repeated string resources = 3;
 
   // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.
   // +optional
+  // +listType=atomic
   repeated string resourceNames = 4;
 }
 
@@ -220,6 +226,7 @@ message SubjectAccessReviewSpec {
 
   // Groups is the groups you're testing for.
   // +optional
+  // +listType=atomic
   repeated string group = 4;
 
   // Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
@@ -262,10 +269,12 @@ message SubjectAccessReviewStatus {
 message SubjectRulesReviewStatus {
   // ResourceRules is the list of actions the subject is allowed to perform on resources.
   // The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+  // +listType=atomic
   repeated ResourceRule resourceRules = 1;
 
   // NonResourceRules is the list of actions the subject is allowed to perform on non-resources.
   // The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+  // +listType=atomic
   repeated NonResourceRule nonResourceRules = 2;
 
   // Incomplete is true when the rules returned by this call are incomplete. This is most commonly

@@ -68,6 +68,8 @@
       ]
     },
     "backoffLimit": 7,
+    "backoffLimitPerIndex": 12,
+    "maxFailedIndexes": 13,
     "selector": {
       "matchLabels": {
         "matchLabelsKey": "matchLabelsValue"
@@ -365,6 +367,26 @@
                     "audience": "audienceValue",
                     "expirationSeconds": 2,
                     "path": "pathValue"
+                  },
+                  "clusterTrustBundle": {
+                    "name": "nameValue",
+                    "signerName": "signerNameValue",
+                    "labelSelector": {
+                      "matchLabels": {
+                        "matchLabelsKey": "matchLabelsValue"
+                      },
+                      "matchExpressions": [
+                        {
+                          "key": "keyValue",
+                          "operator": "operatorValue",
+                          "values": [
+                            "valuesValue"
+                          ]
+                        }
+                      ]
+                    },
+                    "optional": true,
+                    "path": "pathValue"
                   }
                 }
               ],
@@ -477,12 +499,7 @@
                     },
                     "requests": {
                       "requestsKey": "0"
-                    },
-                    "claims": [
-                      {
-                        "name": "nameValue"
-                      }
-                    ]
+                    }
                   },
                   "volumeName": "volumeNameValue",
                   "storageClassName": "storageClassNameValue",
@@ -497,7 +514,8 @@
                     "kind": "kindValue",
                     "name": "nameValue",
                     "namespace": "namespaceValue"
-                  }
+                  },
+                  "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
             }
@@ -582,6 +600,7 @@
                 "restartPolicy": "restartPolicyValue"
               }
             ],
+            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -719,6 +738,9 @@
                 "tcpSocket": {
                   "port": "portValue",
                   "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
                 }
               },
               "preStop": {
@@ -742,6 +764,9 @@
                 "tcpSocket": {
                   "port": "portValue",
                   "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
                 }
               }
             },
@@ -865,6 +890,7 @@
                 "restartPolicy": "restartPolicyValue"
               }
             ],
+            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1002,6 +1028,9 @@
                 "tcpSocket": {
                   "port": "portValue",
                   "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
                 }
               },
               "preStop": {
@@ -1025,6 +1054,9 @@
                 "tcpSocket": {
                   "port": "portValue",
                   "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
                 }
               }
             },
@@ -1148,6 +1180,7 @@
                 "restartPolicy": "restartPolicyValue"
               }
             ],
+            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1285,6 +1318,9 @@
                 "tcpSocket": {
                   "port": "portValue",
                   "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
                 }
               },
               "preStop": {
@@ -1308,6 +1344,9 @@
                 "tcpSocket": {
                   "port": "portValue",
                   "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
                 }
               }
             },
@@ -1494,7 +1533,13 @@
                       ]
                     }
                   ]
-                }
+                },
+                "matchLabelKeys": [
+                  "matchLabelKeysValue"
+                ],
+                "mismatchLabelKeys": [
+                  "mismatchLabelKeysValue"
+                ]
               }
             ],
             "preferredDuringSchedulingIgnoredDuringExecution": [
@@ -1532,7 +1577,13 @@
                         ]
                       }
                     ]
-                  }
+                  },
+                  "matchLabelKeys": [
+                    "matchLabelKeysValue"
+                  ],
+                  "mismatchLabelKeys": [
+                    "mismatchLabelKeysValue"
+                  ]
                 }
               }
             ]
@@ -1571,7 +1622,13 @@
                       ]
                     }
                   ]
-                }
+                },
+                "matchLabelKeys": [
+                  "matchLabelKeysValue"
+                ],
+                "mismatchLabelKeys": [
+                  "mismatchLabelKeysValue"
+                ]
               }
             ],
             "preferredDuringSchedulingIgnoredDuringExecution": [
@@ -1609,7 +1666,13 @@
                         ]
                       }
                     ]
-                  }
+                  },
+                  "matchLabelKeys": [
+                    "matchLabelKeysValue"
+                  ],
+                  "mismatchLabelKeys": [
+                    "mismatchLabelKeysValue"
+                  ]
                 }
               }
             ]
@@ -1710,7 +1773,8 @@
     },
     "ttlSecondsAfterFinished": 8,
     "completionMode": "completionModeValue",
-    "suspend": true
+    "suspend": true,
+    "podReplacementPolicy": "podReplacementPolicyValue"
   },
   "status": {
     "conditions": [
@@ -1728,7 +1792,9 @@
     "active": 4,
     "succeeded": 5,
     "failed": 6,
+    "terminating": 11,
     "completedIndexes": "completedIndexesValue",
+    "failedIndexes": "failedIndexesValue",
     "uncountedTerminatedPods": {
       "succeeded": [
         "succeededValue"

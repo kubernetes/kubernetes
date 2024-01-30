@@ -31,8 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -66,11 +71,12 @@ type WebhookAuthorizer struct {
 	retryBackoff        wait.Backoff
 	decisionOnError     authorizer.Decision
 	metrics             AuthorizerMetrics
+	celMatcher          *authorizationcel.CELMatcher
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
-func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
-	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, metrics)
+func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
+	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics)
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -92,27 +98,33 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
-func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff) (*WebhookAuthorizer, error) {
+func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromConfig(config, version, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, AuthorizerMetrics{
+	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matchConditions, AuthorizerMetrics{
 		RecordRequestTotal:   noopMetrics{}.RecordRequestTotal,
 		RecordRequestLatency: noopMetrics{}.RecordRequestLatency,
 	})
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
+func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
+	// compile all expressions once in validation and save the results to be used for eval later
+	cm, fieldErr := apiservervalidation.ValidateAndCompileMatchConditions(matchConditions)
+	if err := fieldErr.ToAggregate(); err != nil {
+		return nil, err
+	}
 	return &WebhookAuthorizer{
 		subjectAccessReview: subjectAccessReview,
 		responseCache:       cache.NewLRUExpireCache(8192),
 		authorizedTTL:       authorizedTTL,
 		unauthorizedTTL:     unauthorizedTTL,
 		retryBackoff:        retryBackoff,
-		decisionOnError:     authorizer.DecisionNoOpinion,
+		decisionOnError:     decisionOnError,
 		metrics:             metrics,
+		celMatcher:          cm,
 	}, nil
 }
 
@@ -190,6 +202,24 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			Verb: attr.GetVerb(),
 		}
 	}
+	// skipping match when feature is not enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration) {
+		// Process Match Conditions before calling the webhook
+		matches, err := w.match(ctx, r)
+		// If at least one matchCondition evaluates to an error (but none are FALSE):
+		// If failurePolicy=Deny, then the webhook rejects the request
+		// If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
+		if err != nil {
+			return w.decisionOnError, "", err
+		}
+		// If at least one matchCondition successfully evaluates to FALSE,
+		// then the webhook is skipped.
+		if !matches {
+			return authorizer.DecisionNoOpinion, "", nil
+		}
+	}
+	// If all evaluated successfully and ALL matchConditions evaluate to TRUE,
+	// then the webhook is called.
 	key, err := json.Marshal(r.Spec)
 	if err != nil {
 		return w.decisionOnError, "", err
@@ -254,6 +284,18 @@ func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]author
 	)
 	incomplete := true
 	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
+}
+
+// Match is used to evaluate the SubjectAccessReviewSpec against
+// the authorizer's matchConditions in the form of cel expressions
+// to return match or no match found, which then is used to
+// determine if the webhook should be skipped.
+func (w *WebhookAuthorizer) match(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error) {
+	// A nil celMatcher or zero saved CompilationResults matches all requests.
+	if w.celMatcher == nil || w.celMatcher.CompilationResults == nil {
+		return true, nil
+	}
+	return w.celMatcher.Eval(ctx, r)
 }
 
 func convertToSARExtra(extra map[string][]string) map[string]authorizationv1.ExtraValue {

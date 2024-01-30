@@ -37,9 +37,18 @@ type Type interface {
 type Val interface {
 	// ConvertToNative converts the Value to a native Go struct according to the
 	// reflected type description, or error if the conversion is not feasible.
-	ConvertToNative(typeDesc reflect.Type) (interface{}, error)
+	//
+	// The ConvertToNative method is intended to be used to support conversion between CEL types
+	// and native types during object creation expressions or by clients who need to adapt the,
+	// returned CEL value into an equivalent Go value instance.
+	//
+	// When implementing or using ConvertToNative, the following guidelines apply:
+	// - Use ConvertToNative when marshalling CEL evaluation results to native types.
+	// - Do not use ConvertToNative within CEL extension functions.
+	// - Document whether your implementation supports non-CEL field types, such as Go or Protobuf.
+	ConvertToNative(typeDesc reflect.Type) (any, error)
 
-	// ConvertToType supports type conversions between value types supported by the expression language.
+	// ConvertToType supports type conversions between CEL value types supported by the expression language.
 	ConvertToType(typeValue Type) Val
 
 	// Equal returns true if the `other` value has the same type and content as the implementing struct.
@@ -50,5 +59,5 @@ type Val interface {
 
 	// Value returns the raw value of the instance which may not be directly compatible with the expression
 	// language types.
-	Value() interface{}
+	Value() any
 }

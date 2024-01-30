@@ -2,7 +2,6 @@
 
 reviewers:
   - thockin
-  - lavalamp
   - smarterclayton
   - wojtek-t
   - deads2k
@@ -19,5 +18,6 @@ reviewers:
   - mwielgus
   - soltysh
   - dims
+  - jpbetz
 labels:
   - sig/apps

@@ -37,6 +37,10 @@ type testLib struct {
 	version uint32
 }
 
+func (*testLib) LibraryName() string {
+	return "k8s.test"
+}
+
 type TestOption func(*testLib) *testLib
 
 func TestVersion(version uint32) func(lib *testLib) *testLib {

@@ -28,14 +28,15 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubetypes "k8s.io/kubelet/pkg/types"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // cadvisorStatsProvider implements the containerStatsProvider interface by
@@ -121,7 +122,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 		// Update the PodStats entry with the stats from the container by
 		// adding it to podStats.Containers.
 		containerName := kubetypes.GetContainerName(cinfo.Spec.Labels)
-		if containerName == leaky.PodInfraContainerName {
+		if containerName == kubetypes.PodInfraContainerName {
 			// Special case for infrastructure container which is hidden from
 			// the user and has network stats.
 			podStats.Network = cadvisorInfoToNetworkStats(&cinfo)
@@ -152,6 +153,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
 			podStats.CPU = cpu
 			podStats.Memory = memory
+			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
 			podStats.ProcessStats = cadvisorInfoToProcessStats(podInfo)
 		}
 
@@ -208,7 +210,7 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 		// Update the PodStats entry with the stats from the container by
 		// adding it to podStats.Containers.
 		containerName := kubetypes.GetContainerName(cinfo.Spec.Labels)
-		if containerName == leaky.PodInfraContainerName {
+		if containerName == kubetypes.PodInfraContainerName {
 			// Special case for infrastructure container which is hidden from
 			// the user and has network stats.
 			podStats.StartTime = metav1.NewTime(cinfo.Spec.CreationTime)
@@ -227,6 +229,7 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
 			podStats.CPU = cpu
 			podStats.Memory = memory
+			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
 		}
 		result = append(result, *podStats)
 	}
@@ -235,31 +238,86 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 }
 
 // ImageFsStats returns the stats of the filesystem for storing images.
-func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (*statsapi.FsStats, error) {
+func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *statsapi.FsStats, containerFsRet *statsapi.FsStats, errCall error) {
 	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
-	}
-	imageStats, err := p.imageService.ImageStats(ctx)
-	if err != nil || imageStats == nil {
-		return nil, fmt.Errorf("failed to get image stats: %v", err)
+		return nil, nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletSeparateDiskGC) {
+		imageStats, err := p.imageService.ImageStats(ctx)
+		if err != nil || imageStats == nil {
+			return nil, nil, fmt.Errorf("failed to get image stats: %v", err)
+		}
+
+		var imageFsInodesUsed *uint64
+		if imageFsInfo.Inodes != nil && imageFsInfo.InodesFree != nil {
+			imageFsIU := *imageFsInfo.Inodes - *imageFsInfo.InodesFree
+			imageFsInodesUsed = &imageFsIU
+		}
+
+		imageFs := &statsapi.FsStats{
+			Time:           metav1.NewTime(imageFsInfo.Timestamp),
+			AvailableBytes: &imageFsInfo.Available,
+			CapacityBytes:  &imageFsInfo.Capacity,
+			UsedBytes:      &imageStats.TotalStorageBytes,
+			InodesFree:     imageFsInfo.InodesFree,
+			Inodes:         imageFsInfo.Inodes,
+			InodesUsed:     imageFsInodesUsed,
+		}
+		return imageFs, imageFs, nil
+	}
+	containerFsInfo, err := p.cadvisor.ContainerFsInfo()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get container fs info: %v", err)
+	}
+	imageStats, err := p.imageService.ImageFsInfo(ctx)
+	if err != nil || imageStats == nil {
+		return nil, nil, fmt.Errorf("failed to get image stats: %v", err)
+	}
+	splitFileSystem := false
+	if imageStats.ImageFilesystems[0].FsId.Mountpoint != imageStats.ContainerFilesystems[0].FsId.Mountpoint {
+		klog.InfoS("Detect Split Filesystem", "ImageFilesystems", imageStats.ImageFilesystems[0], "ContainerFilesystems", imageStats.ContainerFilesystems[0])
+		splitFileSystem = true
+	}
+	imageFs := imageStats.ImageFilesystems[0]
 	var imageFsInodesUsed *uint64
 	if imageFsInfo.Inodes != nil && imageFsInfo.InodesFree != nil {
 		imageFsIU := *imageFsInfo.Inodes - *imageFsInfo.InodesFree
 		imageFsInodesUsed = &imageFsIU
 	}
 
-	return &statsapi.FsStats{
+	fsStats := &statsapi.FsStats{
 		Time:           metav1.NewTime(imageFsInfo.Timestamp),
 		AvailableBytes: &imageFsInfo.Available,
 		CapacityBytes:  &imageFsInfo.Capacity,
-		UsedBytes:      &imageStats.TotalStorageBytes,
+		UsedBytes:      &imageFs.UsedBytes.Value,
 		InodesFree:     imageFsInfo.InodesFree,
 		Inodes:         imageFsInfo.Inodes,
 		InodesUsed:     imageFsInodesUsed,
-	}, nil
+	}
+	if !splitFileSystem {
+		return fsStats, fsStats, nil
+	}
+
+	containerFs := imageStats.ContainerFilesystems[0]
+	var containerFsInodesUsed *uint64
+	if containerFsInfo.Inodes != nil && containerFsInfo.InodesFree != nil {
+		containerFsIU := *containerFsInfo.Inodes - *containerFsInfo.InodesFree
+		containerFsInodesUsed = &containerFsIU
+	}
+
+	fsContainerStats := &statsapi.FsStats{
+		Time:           metav1.NewTime(containerFsInfo.Timestamp),
+		AvailableBytes: &containerFsInfo.Available,
+		CapacityBytes:  &containerFsInfo.Capacity,
+		UsedBytes:      &containerFs.UsedBytes.Value,
+		InodesFree:     containerFsInfo.InodesFree,
+		Inodes:         containerFsInfo.Inodes,
+		InodesUsed:     containerFsInodesUsed,
+	}
+
+	return fsStats, fsContainerStats, nil
 }
 
 // ImageFsDevice returns name of the device where the image filesystem locates,

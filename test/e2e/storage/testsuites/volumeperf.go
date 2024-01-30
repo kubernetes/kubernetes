@@ -126,7 +126,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ClientBurst: 400,
 	}
 	f := framework.NewFramework("volume-lifecycle-performance", frameworkOptions, nil)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.AfterEach(func(ctx context.Context) {
 		if l != nil {
@@ -150,7 +150,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		}
 	})
 
-	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func(ctx context.Context) {
+	f.It("should provision volumes at scale within performance constraints", f.WithSlow(), f.WithSerial(), func(ctx context.Context) {
 		l = &local{
 			cs:      f.ClientSet,
 			ns:      f.Namespace,

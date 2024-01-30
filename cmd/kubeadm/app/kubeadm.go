@@ -37,12 +37,14 @@ func Run() error {
 	pflag.Set("logtostderr", "true")
 	// We do not want these flags to show up in --help
 	// These MarkHidden calls must be after the lines above
-	pflag.CommandLine.MarkHidden("version")
-	pflag.CommandLine.MarkHidden("log-flush-frequency")
 	pflag.CommandLine.MarkHidden("alsologtostderr")
 	pflag.CommandLine.MarkHidden("log-backtrace-at")
 	pflag.CommandLine.MarkHidden("log-dir")
 	pflag.CommandLine.MarkHidden("logtostderr")
+	pflag.CommandLine.MarkHidden("log-file")          //nolint:errcheck
+	pflag.CommandLine.MarkHidden("log-file-max-size") //nolint:errcheck
+	pflag.CommandLine.MarkHidden("one-output")        //nolint:errcheck
+	pflag.CommandLine.MarkHidden("skip-log-headers")  //nolint:errcheck
 	pflag.CommandLine.MarkHidden("stderrthreshold")
 	pflag.CommandLine.MarkHidden("vmodule")
 

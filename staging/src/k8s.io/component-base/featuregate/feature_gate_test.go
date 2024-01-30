@@ -433,7 +433,7 @@ func TestFeatureGateMetrics(t *testing.T) {
 	const testBetaDisabled Feature = "TestBetaDisabled"
 	testedMetrics := []string{"kubernetes_feature_enabled"}
 	expectedOutput := `
-		# HELP kubernetes_feature_enabled [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
+		# HELP kubernetes_feature_enabled [BETA] This metric records the data about the stage and enablement of a k8s feature.
         # TYPE kubernetes_feature_enabled gauge
         kubernetes_feature_enabled{name="TestAlpha",stage="ALPHA"} 0
         kubernetes_feature_enabled{name="TestBeta",stage="BETA"} 1
@@ -507,4 +507,142 @@ func TestFeatureGateString(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFeatureGateOverrideDefault(t *testing.T) {
+	t.Run("overrides take effect", func(t *testing.T) {
+		f := NewFeatureGate()
+		if err := f.Add(map[Feature]FeatureSpec{
+			"TestFeature1": {Default: true},
+			"TestFeature2": {Default: false},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.OverrideDefault("TestFeature1", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.OverrideDefault("TestFeature2", true); err != nil {
+			t.Fatal(err)
+		}
+		if f.Enabled("TestFeature1") {
+			t.Error("expected TestFeature1 to have effective default of false")
+		}
+		if !f.Enabled("TestFeature2") {
+			t.Error("expected TestFeature2 to have effective default of true")
+		}
+	})
+
+	t.Run("overrides are preserved across deep copies", func(t *testing.T) {
+		f := NewFeatureGate()
+		if err := f.Add(map[Feature]FeatureSpec{"TestFeature": {Default: false}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.OverrideDefault("TestFeature", true); err != nil {
+			t.Fatal(err)
+		}
+		fcopy := f.DeepCopy()
+		if !fcopy.Enabled("TestFeature") {
+			t.Error("default override was not preserved by deep copy")
+		}
+	})
+
+	t.Run("reflected in known features", func(t *testing.T) {
+		f := NewFeatureGate()
+		if err := f.Add(map[Feature]FeatureSpec{"TestFeature": {
+			Default:    false,
+			PreRelease: Alpha,
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.OverrideDefault("TestFeature", true); err != nil {
+			t.Fatal(err)
+		}
+		var found bool
+		for _, s := range f.KnownFeatures() {
+			if !strings.Contains(s, "TestFeature") {
+				continue
+			}
+			found = true
+			if !strings.Contains(s, "default=true") {
+				t.Errorf("expected override of default to be reflected in known feature description %q", s)
+			}
+		}
+		if !found {
+			t.Error("found no entry for TestFeature in known features")
+		}
+	})
+
+	t.Run("may not change default for specs with locked defaults", func(t *testing.T) {
+		f := NewFeatureGate()
+		if err := f.Add(map[Feature]FeatureSpec{
+			"LockedFeature": {
+				Default:       true,
+				LockToDefault: true,
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if f.OverrideDefault("LockedFeature", false) == nil {
+			t.Error("expected error when attempting to override the default for a feature with a locked default")
+		}
+		if f.OverrideDefault("LockedFeature", true) == nil {
+			t.Error("expected error when attempting to override the default for a feature with a locked default")
+		}
+	})
+
+	t.Run("does not supersede explicitly-set value", func(t *testing.T) {
+		f := NewFeatureGate()
+		if err := f.Add(map[Feature]FeatureSpec{"TestFeature": {Default: true}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.OverrideDefault("TestFeature", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.SetFromMap(map[string]bool{"TestFeature": true}); err != nil {
+			t.Fatal(err)
+		}
+		if !f.Enabled("TestFeature") {
+			t.Error("expected feature to be effectively enabled despite default override")
+		}
+	})
+
+	t.Run("prevents re-registration of feature spec after overriding default", func(t *testing.T) {
+		f := NewFeatureGate()
+		if err := f.Add(map[Feature]FeatureSpec{
+			"TestFeature": {
+				Default:    true,
+				PreRelease: Alpha,
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.OverrideDefault("TestFeature", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Add(map[Feature]FeatureSpec{
+			"TestFeature": {
+				Default:    true,
+				PreRelease: Alpha,
+			},
+		}); err == nil {
+			t.Error("expected re-registration to return a non-nil error after overriding its default")
+		}
+	})
+
+	t.Run("does not allow override for an unknown feature", func(t *testing.T) {
+		f := NewFeatureGate()
+		if err := f.OverrideDefault("TestFeature", true); err == nil {
+			t.Error("expected an error to be returned in attempt to override default for unregistered feature")
+		}
+	})
+
+	t.Run("returns error if already added to flag set", func(t *testing.T) {
+		f := NewFeatureGate()
+		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		f.AddFlag(fs)
+
+		if err := f.OverrideDefault("TestFeature", true); err == nil {
+			t.Error("expected a non-nil error to be returned")
+		}
+	})
 }

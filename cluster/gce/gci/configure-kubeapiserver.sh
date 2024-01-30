@@ -68,7 +68,7 @@ function start-kube-apiserver {
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --allow-privileged=true"
-  params+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}"
+  params+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-external}"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
 
   # params is passed by reference, so no "$"
@@ -336,6 +336,12 @@ function start-kube-apiserver {
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
     container_env+="{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}"
+  fi
+  if [[ -n "${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR:-}" ]]; then
+    if [[ -n "${container_env}" ]]; then
+      container_env="${container_env}, "
+    fi
+    container_env+="{\"name\": \"KUBE_WATCHLIST_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR}\"}"
   fi
   if [[ -n "${ENABLE_PATCH_CONVERSION_DETECTOR:-}" ]]; then
     if [[ -n "${container_env}" ]]; then

@@ -16,6 +16,26 @@ limitations under the License.
 
 package apiextensions
 
+// FieldValueErrorReason is a machine-readable value providing more detail about why a field failed the validation.
+// +enum
+type FieldValueErrorReason string
+
+const (
+	// FieldValueRequired is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	FieldValueRequired FieldValueErrorReason = "FieldValueRequired"
+	// FieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	FieldValueDuplicate FieldValueErrorReason = "FieldValueDuplicate"
+	// FieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match, too long, out of bounds).
+	FieldValueInvalid FieldValueErrorReason = "FieldValueInvalid"
+	// FieldValueForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted under some conditions, but which are not
+	// permitted by the current conditions (such as security policy).
+	FieldValueForbidden FieldValueErrorReason = "FieldValueForbidden"
+)
+
 // JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
 type JSONSchemaProps struct {
 	ID                   string
@@ -190,6 +210,19 @@ type ValidationRule struct {
 	//   - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values
 	//     are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with
 	//     non-intersecting keys are appended, retaining their partial order.
+	//
+	// If `rule` makes use of the `oldSelf` variable it is implicitly a
+	// `transition rule`.
+	//
+	// By default, the `oldSelf` variable is the same type as `self`.
+	// When `optionalOldSelf` is true, the `oldSelf` variable is a CEL optional
+	//  variable whose value() is the same type as `self`.
+	// See the documentation for the `optionalOldSelf` field for details.
+	//
+	// Transition rules by default are applied only on UPDATE requests and are
+	// skipped if an old value could not be found. You can opt a transition
+	// rule into unconditional evaluation by setting `optionalOldSelf` to true.
+	//
 	Rule string
 	// Message represents the message displayed when validation fails. The message is required if the Rule contains
 	// line breaks. The message must not contain line breaks.
@@ -208,6 +241,42 @@ type ValidationRule struct {
 	// "x must be less than max ("+string(self.max)+")"
 	// +optional
 	MessageExpression string
+	// reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule.
+	// The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule.
+	// The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
+	// If not set, default to use "FieldValueInvalid".
+	// All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
+	// +optional
+	Reason *FieldValueErrorReason
+	// fieldPath represents the field path returned when the validation fails.
+	// It must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.
+	// e.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`
+	// If the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`
+	// It does not support list numeric index.
+	// It supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.
+	// Numeric index of array is not supported.
+	// For field name which contains special characters, use `['specialName']` to refer the field name.
+	// e.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`
+	// +optional
+	FieldPath string
+
+	// optionalOldSelf is used to opt a transition rule into evaluation
+	// even when the object is first created, or if the old object is
+	// missing the value.
+	//
+	// When enabled `oldSelf` will be a CEL optional whose value will be
+	// `None` if there is no old value, or when the object is initially created.
+	//
+	// You may check for presence of oldSelf using `oldSelf.hasValue()` and
+	// unwrap it after checking using `oldSelf.value()`. Check the CEL
+	// documentation for Optional types for more information:
+	// https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
+	//
+	// May not be set unless `oldSelf` is used in `rule`.
+	//
+	// +featureGate=CRDValidationRatcheting
+	// +optional
+	OptionalOldSelf *bool
 }
 
 // JSON represents any valid JSON value.

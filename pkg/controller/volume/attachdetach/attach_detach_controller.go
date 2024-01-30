@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -55,7 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -120,23 +120,21 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (AttachDetachController, error) {
+	timerConfig TimerConfig) (AttachDetachController, error) {
 
 	adc := &attachDetachController{
-		kubeClient:          kubeClient,
-		pvcLister:           pvcInformer.Lister(),
-		pvcsSynced:          pvcInformer.Informer().HasSynced,
-		pvLister:            pvInformer.Lister(),
-		pvsSynced:           pvInformer.Informer().HasSynced,
-		podLister:           podInformer.Lister(),
-		podsSynced:          podInformer.Informer().HasSynced,
-		podIndexer:          podInformer.Informer().GetIndexer(),
-		nodeLister:          nodeInformer.Lister(),
-		nodesSynced:         nodeInformer.Informer().HasSynced,
-		cloud:               cloud,
-		pvcQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
-		filteredDialOptions: filteredDialOptions,
+		kubeClient:  kubeClient,
+		pvcLister:   pvcInformer.Lister(),
+		pvcsSynced:  pvcInformer.Informer().HasSynced,
+		pvLister:    pvInformer.Lister(),
+		pvsSynced:   pvInformer.Informer().HasSynced,
+		podLister:   podInformer.Lister(),
+		podsSynced:  podInformer.Informer().HasSynced,
+		podIndexer:  podInformer.Informer().GetIndexer(),
+		nodeLister:  nodeInformer.Lister(),
+		nodesSynced: nodeInformer.Informer().HasSynced,
+		cloud:       cloud,
+		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
 	}
 
 	adc.csiNodeLister = csiNodeInformer.Lister()
@@ -325,9 +323,6 @@ type attachDetachController struct {
 
 	// intreeToCSITranslator translates from in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
-
-	// filteredDialOptions configures any dialing done by the controller.
-	filteredDialOptions *proxyutil.FilteredDialOptions
 }
 
 func (adc *attachDetachController) Run(ctx context.Context) {
@@ -343,17 +338,8 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	logger.Info("Starting attach detach controller")
 	defer logger.Info("Shutting down attach detach controller")
 
-	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced}
-	if adc.csiNodeSynced != nil {
-		synced = append(synced, adc.csiNodeSynced)
-	}
-	if adc.csiDriversSynced != nil {
-		synced = append(synced, adc.csiDriversSynced)
-	}
-	if adc.volumeAttachmentSynced != nil {
-		synced = append(synced, adc.volumeAttachmentSynced)
-	}
-
+	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced,
+		adc.csiNodeSynced, adc.csiDriversSynced, adc.volumeAttachmentSynced}
 	if !kcache.WaitForNamedCacheSync("attach detach", ctx.Done(), synced...) {
 		return
 	}
@@ -390,6 +376,8 @@ func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
+		volumesInUse := sets.New(node.Status.VolumesInUse...)
+
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			uniqueName := attachedVolume.Name
 			// The nil VolumeSpec is safe only in the case the volume is not in use by any pod.
@@ -402,9 +390,13 @@ func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger
 				logger.Error(err, "Failed to mark the volume as attached")
 				continue
 			}
-			adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
-			adc.addNodeToDswp(node, types.NodeName(node.Name))
+			inUse := volumesInUse.Has(uniqueName)
+			err = adc.actualStateOfWorld.SetVolumeMountedByNode(logger, uniqueName, nodeName, inUse)
+			if err != nil {
+				logger.Error(err, "Failed to set volume mounted by node")
+			}
 		}
+		adc.addNodeToDswp(node, types.NodeName(node.Name))
 	}
 	err = adc.processVolumeAttachments(logger)
 	if err != nil {
@@ -880,6 +872,7 @@ func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string
 
 func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
+		// nolint:logcheck
 		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in attachDetachController")
 	}
 }
@@ -917,10 +910,6 @@ func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 func (adc *attachDetachController) GetSubpather() subpath.Interface {
 	// Subpaths not needed in attachdetach controller
 	return nil
-}
-
-func (adc *attachDetachController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
-	return adc.filteredDialOptions
 }
 
 func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {

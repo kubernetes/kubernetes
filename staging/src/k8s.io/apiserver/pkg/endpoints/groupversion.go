@@ -56,6 +56,11 @@ type APIGroupVersion struct {
 	// GroupVersion is the external group version
 	GroupVersion schema.GroupVersion
 
+	// AllServedVersionsByResource is indexed by resource and maps to a list of versions that resource exists in.
+	// This was created so that StorageVersion for APIs can include a list of all version that are served for each
+	// GroupResource tuple.
+	AllServedVersionsByResource map[string][]string
+
 	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and metav1.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If

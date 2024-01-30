@@ -142,7 +142,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	}
 
 	// do not bother reading the list of pods if user namespaces are not enabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return &m, nil
 	}
 
@@ -258,7 +258,7 @@ func (m *UsernsManager) record(pod types.UID, from, length uint32) (err error) {
 
 // Release releases the user namespace allocated to the specified pod.
 func (m *UsernsManager) Release(podUID types.UID) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return
 	}
 
@@ -266,6 +266,19 @@ func (m *UsernsManager) Release(podUID types.UID) {
 	defer m.lock.Unlock()
 
 	m.releaseWithLock(podUID)
+}
+
+// podAllocated returns true if the pod is allocated, false otherwise.
+func (m *UsernsManager) podAllocated(podUID types.UID) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		return false
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	_, ok := m.usedBy[podUID]
+	return ok
 }
 
 func (m *UsernsManager) releaseWithLock(pod types.UID) {
@@ -367,14 +380,14 @@ func (m *UsernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err err
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return nil, nil
 	}
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if pod.Spec.HostUsers == nil || *pod.Spec.HostUsers == true {
+	if pod.Spec.HostUsers == nil || *pod.Spec.HostUsers {
 		return &runtimeapi.UserNamespace{
 			Mode: runtimeapi.NamespaceMode_NODE,
 		}, nil
@@ -427,7 +440,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimea
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
 func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return nil
 	}
 

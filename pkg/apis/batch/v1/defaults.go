@@ -17,9 +17,13 @@ limitations under the License.
 package v1
 
 import (
+	"math"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -38,7 +42,11 @@ func SetDefaults_Job(obj *batchv1.Job) {
 		obj.Spec.Parallelism = utilpointer.Int32(1)
 	}
 	if obj.Spec.BackoffLimit == nil {
-		obj.Spec.BackoffLimit = utilpointer.Int32(6)
+		if obj.Spec.BackoffLimitPerIndex != nil {
+			obj.Spec.BackoffLimit = utilpointer.Int32(math.MaxInt32)
+		} else {
+			obj.Spec.BackoffLimit = utilpointer.Int32(6)
+		}
 	}
 	labels := obj.Spec.Template.Labels
 	if labels != nil && len(obj.Labels) == 0 {
@@ -62,6 +70,18 @@ func SetDefaults_Job(obj *batchv1.Job) {
 			}
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+		if obj.Spec.PodReplacementPolicy == nil {
+			if obj.Spec.PodFailurePolicy != nil {
+				obj.Spec.PodReplacementPolicy = podReplacementPolicyPtr(batchv1.Failed)
+			} else {
+				obj.Spec.PodReplacementPolicy = podReplacementPolicyPtr(batchv1.TerminatingOrFailed)
+			}
+		}
+	}
+	if obj.Spec.ManualSelector == nil {
+		obj.Spec.ManualSelector = utilpointer.Bool(false)
+	}
 }
 
 func SetDefaults_CronJob(obj *batchv1.CronJob) {
@@ -77,4 +97,8 @@ func SetDefaults_CronJob(obj *batchv1.CronJob) {
 	if obj.Spec.FailedJobsHistoryLimit == nil {
 		obj.Spec.FailedJobsHistoryLimit = utilpointer.Int32(1)
 	}
+}
+
+func podReplacementPolicyPtr(obj batchv1.PodReplacementPolicy) *batchv1.PodReplacementPolicy {
+	return &obj
 }

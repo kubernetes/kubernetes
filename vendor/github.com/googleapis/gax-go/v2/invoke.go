@@ -68,6 +68,16 @@ type sleeper func(ctx context.Context, d time.Duration) error
 // invoke implements Invoke, taking an additional sleeper argument for testing.
 func invoke(ctx context.Context, call APICall, settings CallSettings, sp sleeper) error {
 	var retryer Retryer
+
+	// Only use the value provided via WithTimeout if the context doesn't
+	// already have a deadline. This is important for backwards compatibility if
+	// the user already set a deadline on the context given to Invoke.
+	if _, ok := ctx.Deadline(); !ok && settings.timeout != 0 {
+		c, cc := context.WithTimeout(ctx, settings.timeout)
+		defer cc()
+		ctx = c
+	}
+
 	for {
 		err := call(ctx, settings)
 		if err == nil {

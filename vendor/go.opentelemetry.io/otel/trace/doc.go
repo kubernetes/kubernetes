@@ -17,7 +17,7 @@ Package trace provides an implementation of the tracing part of the
 OpenTelemetry API.
 
 To participate in distributed traces a Span needs to be created for the
-operation being performed as part of a traced workflow. It its simplest form:
+operation being performed as part of a traced workflow. In its simplest form:
 
 	var tracer trace.Tracer
 

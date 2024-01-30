@@ -32,7 +32,7 @@ import (
 // TypeConverter allows you to convert from runtime.Object to
 // typed.TypedValue and the other way around.
 type TypeConverter interface {
-	ObjectToTyped(runtime.Object) (*typed.TypedValue, error)
+	ObjectToTyped(runtime.Object, ...typed.ValidationOptions) (*typed.TypedValue, error)
 	TypedToObject(*typed.TypedValue) (runtime.Object, error)
 }
 
@@ -54,7 +54,7 @@ func NewTypeConverter(openapiSpec map[string]*spec.Schema, preserveUnknownFields
 	return &typeConverter{parser: tr}, nil
 }
 
-func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
+func (c *typeConverter) ObjectToTyped(obj runtime.Object, opts ...typed.ValidationOptions) (*typed.TypedValue, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	t := c.parser[gvk]
 	if t == nil {
@@ -62,9 +62,9 @@ func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, er
 	}
 	switch o := obj.(type) {
 	case *unstructured.Unstructured:
-		return t.FromUnstructured(o.UnstructuredContent())
+		return t.FromUnstructured(o.UnstructuredContent(), opts...)
 	default:
-		return t.FromStructured(obj)
+		return t.FromStructured(obj, opts...)
 	}
 }
 
@@ -84,12 +84,12 @@ func NewDeducedTypeConverter() TypeConverter {
 }
 
 // ObjectToTyped converts an object into a TypedValue with a "deduced type".
-func (deducedTypeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
+func (deducedTypeConverter) ObjectToTyped(obj runtime.Object, opts ...typed.ValidationOptions) (*typed.TypedValue, error) {
 	switch o := obj.(type) {
 	case *unstructured.Unstructured:
-		return typed.DeducedParseableType.FromUnstructured(o.UnstructuredContent())
+		return typed.DeducedParseableType.FromUnstructured(o.UnstructuredContent(), opts...)
 	default:
-		return typed.DeducedParseableType.FromStructured(obj)
+		return typed.DeducedParseableType.FromStructured(obj, opts...)
 	}
 }
 

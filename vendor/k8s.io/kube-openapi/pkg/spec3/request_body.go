@@ -36,6 +36,9 @@ type RequestBody struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode RequestBody as JSON
 func (r *RequestBody) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(r)
+	}
 	b1, err := json.Marshal(r.Refable)
 	if err != nil {
 		return nil, err
@@ -49,6 +52,18 @@ func (r *RequestBody) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
+}
+
+func (r *RequestBody) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref              string                   `json:"$ref,omitempty"`
+		RequestBodyProps requestBodyPropsOmitZero `json:",inline"`
+		spec.Extensions
+	}
+	x.Ref = r.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(r.Extensions)
+	x.RequestBodyProps = requestBodyPropsOmitZero(r.RequestBodyProps)
+	return opts.MarshalNext(enc, x)
 }
 
 func (r *RequestBody) UnmarshalJSON(data []byte) error {
@@ -75,6 +90,12 @@ type RequestBodyProps struct {
 	Content map[string]*MediaType `json:"content,omitempty"`
 	// Required determines if the request body is required in the request
 	Required bool `json:"required,omitempty"`
+}
+
+type requestBodyPropsOmitZero struct {
+	Description string                `json:"description,omitempty"`
+	Content     map[string]*MediaType `json:"content,omitempty"`
+	Required    bool                  `json:"required,omitzero"`
 }
 
 func (r *RequestBody) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {

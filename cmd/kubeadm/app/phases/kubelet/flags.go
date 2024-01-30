@@ -51,7 +51,7 @@ func GetNodeNameAndHostname(cfg *kubeadmapi.NodeRegistrationOptions) (string, st
 	if cfg.Name != "" {
 		nodeName = cfg.Name
 	}
-	if name, ok := cfg.KubeletExtraArgs["hostname-override"]; ok {
+	if name, idx := kubeadmapi.GetArgValue(cfg.KubeletExtraArgs, "hostname-override", -1); idx > -1 {
 		nodeName = name
 	}
 	return nodeName, hostname, err
@@ -65,23 +65,23 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 	}
-	stringMap := buildKubeletArgMap(flagOpts)
-	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
+	stringMap := buildKubeletArgs(flagOpts)
+	argList := kubeadmutil.ArgumentsToCommand(stringMap, nodeReg.KubeletExtraArgs)
 	envFileContent := fmt.Sprintf("%s=%q\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
 
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
-// buildKubeletArgMapCommon takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+// buildKubeletArgsCommon takes a kubeletFlagsOpts object and builds based on that a slice of arguments
 // that are common to both Linux and Windows
-func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
-	kubeletFlags := map[string]string{}
-	kubeletFlags["container-runtime-endpoint"] = opts.nodeRegOpts.CRISocket
+func buildKubeletArgsCommon(opts kubeletFlagsOpts) []kubeadmapi.Arg {
+	kubeletFlags := []kubeadmapi.Arg{}
+	kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "container-runtime-endpoint", Value: opts.nodeRegOpts.CRISocket})
 
 	// This flag passes the pod infra container image (e.g. "pause" image) to the kubelet
 	// and prevents its garbage collection
 	if opts.pauseImage != "" {
-		kubeletFlags["pod-infra-container-image"] = opts.pauseImage
+		kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "pod-infra-container-image", Value: opts.pauseImage})
 	}
 
 	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
@@ -89,8 +89,7 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 		for _, taint := range opts.nodeRegOpts.Taints {
 			taintStrs = append(taintStrs, taint.ToString())
 		}
-
-		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
+		kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "register-with-taints", Value: strings.Join(taintStrs, ",")})
 	}
 
 	// Pass the "--hostname-override" flag to the kubelet only if it's different from the hostname
@@ -100,7 +99,7 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	}
 	if nodeName != hostname {
 		klog.V(1).Infof("setting kubelet hostname-override to %q", nodeName)
-		kubeletFlags["hostname-override"] = nodeName
+		kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "hostname-override", Value: nodeName})
 	}
 
 	return kubeletFlags
@@ -121,8 +120,8 @@ func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 	return nil
 }
 
-// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+// buildKubeletArgs takes a kubeletFlagsOpts object and builds based on that a slice of arguments
 // that should be given to the local kubelet daemon.
-func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
-	return buildKubeletArgMapCommon(opts)
+func buildKubeletArgs(opts kubeletFlagsOpts) []kubeadmapi.Arg {
+	return buildKubeletArgsCommon(opts)
 }

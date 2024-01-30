@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build amd64 && !purego && gc
-// +build amd64,!purego,gc
 
 // This code was translated into a form compatible with 6a from the public
 // domain sources in SUPERCOP: https://bench.cr.yp.to/supercop.html

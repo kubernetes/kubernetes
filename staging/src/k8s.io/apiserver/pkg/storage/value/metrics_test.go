@@ -19,6 +19,7 @@ package value
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -34,10 +35,13 @@ func TestTotals(t *testing.T) {
 	nonStatusErr := errors.New("test error")
 	failedPreconditionErr := status.Error(codes.FailedPrecondition, "test error")
 	internalErr := status.Error(codes.Internal, "test error")
+	wrappedErr := fmt.Errorf("some low level thing failed: %w", status.Error(codes.NotFound, "some error"))
+
 	nonStatusErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: nonStatusErr}}
 	failedPreconditionErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: failedPreconditionErr}}
 	internalErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: internalErr}}
 	okTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{from: []byte("value")}}
+	wrappedErrTransformer := PrefixTransformer{Prefix: []byte("k8s:enc:kms:v1:"), Transformer: &testTransformer{err: wrappedErr}}
 
 	testCases := []struct {
 		desc    string
@@ -52,10 +56,10 @@ func TestTotals(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
 				# TYPE apiserver_storage_transformation_operations_total counter
-				apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-				apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
 				`,
 		},
 		{
@@ -65,7 +69,7 @@ func TestTotals(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
 				# TYPE apiserver_storage_transformation_operations_total counter
 				apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
 				apiserver_storage_transformation_operations_total{status="OK",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
@@ -78,7 +82,7 @@ func TestTotals(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
 				# TYPE apiserver_storage_transformation_operations_total counter
 				apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
 				apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
@@ -91,11 +95,24 @@ func TestTotals(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
 				# TYPE apiserver_storage_transformation_operations_total counter
 				apiserver_storage_transformation_operations_total{status="Internal",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
 				apiserver_storage_transformation_operations_total{status="Internal",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
 				`,
+		},
+		{
+			desc:   "wrapped not found error",
+			prefix: NewPrefixTransformers(nil, wrappedErrTransformer),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+			# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption
+			# TYPE apiserver_storage_transformation_operations_total counter
+			apiserver_storage_transformation_operations_total{status="NotFound",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+			apiserver_storage_transformation_operations_total{status="NotFound",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+			`,
 		},
 	}
 

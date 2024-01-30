@@ -3290,7 +3290,7 @@ var (
 
 	pattern_Maintenance_Hash_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v3", "maintenance", "hash"}, "", runtime.AssumeColonVerbOpt(true)))
 
-	pattern_Maintenance_HashKV_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v3", "maintenance", "hash"}, "", runtime.AssumeColonVerbOpt(true)))
+	pattern_Maintenance_HashKV_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v3", "maintenance", "hashkv"}, "", runtime.AssumeColonVerbOpt(true)))
 
 	pattern_Maintenance_Snapshot_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v3", "maintenance", "snapshot"}, "", runtime.AssumeColonVerbOpt(true)))
 

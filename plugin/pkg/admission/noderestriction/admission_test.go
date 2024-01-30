@@ -394,6 +394,9 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	configmappod, _ := makeTestPod("ns", "myconfigmappod", "mynode", true)
 	configmappod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "foo"}}}}}
 
+	ctbpod, _ := makeTestPod("ns", "myctbpod", "mynode", true)
+	ctbpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ClusterTrustBundle: &api.ClusterTrustBundleProjection{Name: pointer.String("foo")}}}}}}}
+
 	pvcpod, _ := makeTestPod("ns", "mypvcpod", "mynode", true)
 	pvcpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "foo"}}}}
 
@@ -865,6 +868,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(configmappod, nil, podKind, configmappod.Namespace, configmappod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "reference configmaps",
+		},
+		{
+			name:       "forbid create of pod referencing clustertrustbundle",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(ctbpod, nil, podKind, ctbpod.Namespace, ctbpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			err:        "reference clustertrustbundles",
 		},
 		{
 			name:       "forbid create of pod referencing persistentvolumeclaim",
@@ -1438,6 +1447,8 @@ func TestAdmitPVCStatus(t *testing.T) {
 	noExistingPods := corev1lister.NewPodLister(noExistingPodsIndex)
 	mynode := &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 
+	nodeExpansionFailed := api.PersistentVolumeClaimNodeResizeFailed
+
 	tests := []struct {
 		name                    string
 		resource                schema.GroupVersionResource
@@ -1452,11 +1463,11 @@ func TestAdmitPVCStatus(t *testing.T) {
 			name: "should not allow full pvc update from nodes",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
-				api.PersistentVolumeClaimNoExpansionInProgress, "10G",
+				"10G", nil,
 			),
 			subresource: "",
 			newObj: makeTestPVC(
-				"", api.PersistentVolumeClaimNoExpansionInProgress, "10G",
+				"", "10G", nil,
 			),
 			expectError: "is forbidden: may only update PVC status",
 		},
@@ -1464,13 +1475,13 @@ func TestAdmitPVCStatus(t *testing.T) {
 			name: "should allow capacity and condition updates, if expansion is enabled",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
-				api.PersistentVolumeClaimNoExpansionInProgress, "10G",
+				"10G", nil,
 			),
 			expansionFeatureEnabled: true,
 			subresource:             "status",
 			newObj: makeTestPVC(
 				api.PersistentVolumeClaimFileSystemResizePending,
-				api.PersistentVolumeClaimNoExpansionInProgress, "10G",
+				"10G", nil,
 			),
 			expectError: "",
 		},
@@ -1478,13 +1489,13 @@ func TestAdmitPVCStatus(t *testing.T) {
 			name: "should not allow updates to allocatedResources with just expansion enabled",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
-				api.PersistentVolumeClaimNoExpansionInProgress, "10G",
+				"10G", nil,
 			),
 			subresource:             "status",
 			expansionFeatureEnabled: true,
 			newObj: makeTestPVC(
 				api.PersistentVolumeClaimFileSystemResizePending,
-				api.PersistentVolumeClaimNoExpansionInProgress, "15G",
+				"15G", nil,
 			),
 			expectError: "is not allowed to update fields other than",
 		},
@@ -1492,14 +1503,14 @@ func TestAdmitPVCStatus(t *testing.T) {
 			name: "should allow updates to allocatedResources with expansion and recovery enabled",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
-				api.PersistentVolumeClaimNoExpansionInProgress, "10G",
+				"10G", nil,
 			),
 			subresource:             "status",
 			expansionFeatureEnabled: true,
 			recoveryFeatureEnabled:  true,
 			newObj: makeTestPVC(
 				api.PersistentVolumeClaimFileSystemResizePending,
-				api.PersistentVolumeClaimNoExpansionInProgress, "15G",
+				"15G", nil,
 			),
 			expectError: "",
 		},
@@ -1507,14 +1518,14 @@ func TestAdmitPVCStatus(t *testing.T) {
 			name: "should allow updates to resizeStatus with expansion and recovery enabled",
 			oldObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
-				api.PersistentVolumeClaimNoExpansionInProgress, "10G",
+				"10G", nil,
 			),
 			subresource:             "status",
 			expansionFeatureEnabled: true,
 			recoveryFeatureEnabled:  true,
 			newObj: makeTestPVC(
 				api.PersistentVolumeClaimResizing,
-				api.PersistentVolumeClaimNodeExpansionFailed, "10G",
+				"10G", &nodeExpansionFailed,
 			),
 			expectError: "",
 		},
@@ -1545,12 +1556,12 @@ func TestAdmitPVCStatus(t *testing.T) {
 
 func makeTestPVC(
 	condition api.PersistentVolumeClaimConditionType,
-	resizeStatus api.PersistentVolumeClaimResizeStatus,
-	allocatedResources string) *api.PersistentVolumeClaim {
+	allocatedResources string,
+	resizeStatus *api.ClaimResourceStatus) *api.PersistentVolumeClaim {
 	pvc := &api.PersistentVolumeClaim{
 		Spec: api.PersistentVolumeClaimSpec{
 			VolumeName: "volume1",
-			Resources: api.ResourceRequirements{
+			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
 					api.ResourceStorage: resource.MustParse("10G"),
 				},
@@ -1560,13 +1571,19 @@ func makeTestPVC(
 			Capacity: api.ResourceList{
 				api.ResourceStorage: resource.MustParse(allocatedResources),
 			},
-			Phase:        api.ClaimBound,
-			ResizeStatus: &resizeStatus,
+			Phase: api.ClaimBound,
 			AllocatedResources: api.ResourceList{
 				api.ResourceStorage: resource.MustParse(allocatedResources),
 			},
 		},
 	}
+	if resizeStatus != nil {
+		claimStatusMap := map[api.ResourceName]api.ClaimResourceStatus{
+			api.ResourceStorage: *resizeStatus,
+		}
+		pvc.Status.AllocatedResourceStatuses = claimStatusMap
+	}
+
 	if len(condition) > 0 {
 		pvc.Status.Conditions = []api.PersistentVolumeClaimCondition{
 			{

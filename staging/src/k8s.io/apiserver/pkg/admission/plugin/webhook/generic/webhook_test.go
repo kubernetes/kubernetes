@@ -54,7 +54,7 @@ type fakeMatcher struct {
 	matchResult bool
 }
 
-func (f *fakeMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) matchconditions.MatchResult {
+func (f *fakeMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) matchconditions.MatchResult {
 	if f.throwError != nil {
 		return matchconditions.MatchResult{
 			Matches:             true,
@@ -76,7 +76,7 @@ type fakeWebhookAccessor struct {
 	matchResult bool
 }
 
-func (f *fakeWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler, authorizer authorizer.Authorizer) matchconditions.Matcher {
+func (f *fakeWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler) matchconditions.Matcher {
 	return &fakeMatcher{
 		throwError:  f.throwError,
 		matchResult: f.matchResult,

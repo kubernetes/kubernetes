@@ -148,7 +148,7 @@ func CreateServiceForSimpleApp(ctx context.Context, c clientset.Interface, contP
 		return []v1.ServicePort{{
 			Protocol:   v1.ProtocolTCP,
 			Port:       int32(svcPort),
-			TargetPort: intstr.FromInt(contPort),
+			TargetPort: intstr.FromInt32(int32(contPort)),
 		}}
 	}
 	framework.Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)

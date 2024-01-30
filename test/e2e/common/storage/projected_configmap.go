@@ -28,6 +28,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -37,14 +38,14 @@ import (
 
 var _ = SIGDescribe("Projected configMap", func() {
 	f := framework.NewDefaultFramework("projected")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 	   Release: v1.9
 	   Testname: Projected Volume, ConfigMap, volume mode default
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume", f.WithNodeConformance(), func(ctx context.Context) {
 		doProjectedConfigMapE2EWithoutMappings(ctx, f, false, 0, nil)
 	})
 
@@ -54,12 +55,12 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with permission mode set to 0400. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0400)
 		doProjectedConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -71,11 +72,11 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, non-root user
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume as non-root", f.WithNodeConformance(), func(ctx context.Context) {
 		doProjectedConfigMapE2EWithoutMappings(ctx, f, true, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doProjectedConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil)
@@ -86,7 +87,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, mapped
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings", f.WithNodeConformance(), func(ctx context.Context) {
 		doProjectedConfigMapE2EWithMappings(ctx, f, false, 0, nil)
 	})
 
@@ -96,7 +97,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with permission mode set to 0400. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r--r--r--.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		mode := int32(0400)
 		doProjectedConfigMapE2EWithMappings(ctx, f, false, 0, &mode)
 	})
@@ -106,11 +107,11 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, mapped, non-root user
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r--r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root", f.WithNodeConformance(), func(ctx context.Context) {
 		doProjectedConfigMapE2EWithMappings(ctx, f, true, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doProjectedConfigMapE2EWithMappings(ctx, f, true, 1001, nil)
@@ -121,7 +122,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, update
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap and performs a create and update to new value. Pod MUST be able to create the configMap with value-1. Pod MUST be able to update the value in the confgiMap to value-2.
 	*/
-	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("updates should be reflected in volume", f.WithNodeConformance(), func(ctx context.Context) {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
@@ -171,7 +172,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, create, update and delete
 	   Description: Create a Pod with three containers with ConfigMaps namely a create, update and delete container. Create Container when started MUST not have configMap, update and delete containers MUST be created with a ConfigMap value as 'value-1'. Create a configMap in the create container, the Pod MUST be able to read the configMap from the create container. Update the configMap in the update container, Pod MUST be able to read the updated configMap value. Delete the configMap in the delete container. Pod MUST fail to read the configMap from the delete container.
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("optional updates should be reflected in volume", f.WithNodeConformance(), func(ctx context.Context) {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -372,7 +373,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, multiple volume paths
 	   Description: A Pod is created with a projected volume source 'ConfigMap' to store a configMap. The configMap is mapped to two different volume mounts. Pod MUST be able to read the content of the configMap successfully from the two volume mounts.
 	*/
-	framework.ConformanceIt("should be consumable in multiple volumes in the same pod [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable in multiple volumes in the same pod", f.WithNodeConformance(), func(ctx context.Context) {
 		var (
 			name             = "projected-configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "projected-configmap-volume"
@@ -460,7 +461,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	//The pod is in pending during volume creation until the configMap objects are available
 	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timeout exception unless it is marked optional.
 	//Slow (~5 mins)
-	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to configMap object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-configmap-volumes"
 		pod := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
 		getPod := e2epod.Get(f.ClientSet, pod)
@@ -470,7 +471,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
 	// the volume setup will error unless it is marked optional, during the pod creation.
 	//Slow (~5 mins)
-	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to the key in the configMap object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
 		pod := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
 		getPod := e2epod.Get(f.ClientSet, pod)

@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/integer"
 )
 
 type backoffEntry struct {
@@ -100,7 +99,7 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 	} else {
 		delay := entry.backoff * 2       // exponential
 		delay += p.jitter(entry.backoff) // add some jitter to the delay
-		entry.backoff = time.Duration(integer.Int64Min(int64(delay), int64(p.maxDuration)))
+		entry.backoff = min(delay, p.maxDuration)
 	}
 	entry.lastUpdate = p.Clock.Now()
 }

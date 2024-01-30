@@ -8,10 +8,13 @@ package gocommand
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"os/exec"
+	"reflect"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -19,9 +22,10 @@ import (
 	"sync"
 	"time"
 
-	exec "golang.org/x/sys/execabs"
-
 	"golang.org/x/tools/internal/event"
+	"golang.org/x/tools/internal/event/keys"
+	"golang.org/x/tools/internal/event/label"
+	"golang.org/x/tools/internal/event/tag"
 )
 
 // An Runner will run go command invocations and serialize
@@ -51,9 +55,19 @@ func (runner *Runner) initialize() {
 // 1.14: go: updating go.mod: existing contents have changed since last read
 var modConcurrencyError = regexp.MustCompile(`go:.*go.mod.*contents have changed`)
 
+// verb is an event label for the go command verb.
+var verb = keys.NewString("verb", "go command verb")
+
+func invLabels(inv Invocation) []label.Label {
+	return []label.Label{verb.Of(inv.Verb), tag.Directory.Of(inv.WorkingDir)}
+}
+
 // Run is a convenience wrapper around RunRaw.
 // It returns only stdout and a "friendly" error.
 func (runner *Runner) Run(ctx context.Context, inv Invocation) (*bytes.Buffer, error) {
+	ctx, done := event.Start(ctx, "gocommand.Runner.Run", invLabels(inv)...)
+	defer done()
+
 	stdout, _, friendly, _ := runner.RunRaw(ctx, inv)
 	return stdout, friendly
 }
@@ -61,13 +75,19 @@ func (runner *Runner) Run(ctx context.Context, inv Invocation) (*bytes.Buffer, e
 // RunPiped runs the invocation serially, always waiting for any concurrent
 // invocations to complete first.
 func (runner *Runner) RunPiped(ctx context.Context, inv Invocation, stdout, stderr io.Writer) error {
+	ctx, done := event.Start(ctx, "gocommand.Runner.RunPiped", invLabels(inv)...)
+	defer done()
+
 	_, err := runner.runPiped(ctx, inv, stdout, stderr)
 	return err
 }
 
 // RunRaw runs the invocation, serializing requests only if they fight over
 // go.mod changes.
+// Postcondition: both error results have same nilness.
 func (runner *Runner) RunRaw(ctx context.Context, inv Invocation) (*bytes.Buffer, *bytes.Buffer, error, error) {
+	ctx, done := event.Start(ctx, "gocommand.Runner.RunRaw", invLabels(inv)...)
+	defer done()
 	// Make sure the runner is always initialized.
 	runner.initialize()
 
@@ -75,23 +95,24 @@ func (runner *Runner) RunRaw(ctx context.Context, inv Invocation) (*bytes.Buffer
 	stdout, stderr, friendlyErr, err := runner.runConcurrent(ctx, inv)
 
 	// If we encounter a load concurrency error, we need to retry serially.
-	if friendlyErr == nil || !modConcurrencyError.MatchString(friendlyErr.Error()) {
-		return stdout, stderr, friendlyErr, err
-	}
-	event.Error(ctx, "Load concurrency error, will retry serially", err)
+	if friendlyErr != nil && modConcurrencyError.MatchString(friendlyErr.Error()) {
+		event.Error(ctx, "Load concurrency error, will retry serially", err)
 
-	// Run serially by calling runPiped.
-	stdout.Reset()
-	stderr.Reset()
-	friendlyErr, err = runner.runPiped(ctx, inv, stdout, stderr)
+		// Run serially by calling runPiped.
+		stdout.Reset()
+		stderr.Reset()
+		friendlyErr, err = runner.runPiped(ctx, inv, stdout, stderr)
+	}
+
 	return stdout, stderr, friendlyErr, err
 }
 
+// Postcondition: both error results have same nilness.
 func (runner *Runner) runConcurrent(ctx context.Context, inv Invocation) (*bytes.Buffer, *bytes.Buffer, error, error) {
 	// Wait for 1 worker to become available.
 	select {
 	case <-ctx.Done():
-		return nil, nil, nil, ctx.Err()
+		return nil, nil, ctx.Err(), ctx.Err()
 	case runner.inFlight <- struct{}{}:
 		defer func() { <-runner.inFlight }()
 	}
@@ -101,6 +122,7 @@ func (runner *Runner) runConcurrent(ctx context.Context, inv Invocation) (*bytes
 	return stdout, stderr, friendlyErr, err
 }
 
+// Postcondition: both error results have same nilness.
 func (runner *Runner) runPiped(ctx context.Context, inv Invocation, stdout, stderr io.Writer) (error, error) {
 	// Make sure the runner is always initialized.
 	runner.initialize()
@@ -109,7 +131,7 @@ func (runner *Runner) runPiped(ctx context.Context, inv Invocation, stdout, stde
 	// runPiped commands.
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err(), ctx.Err()
 	case runner.serialized <- struct{}{}:
 		defer func() { <-runner.serialized }()
 	}
@@ -119,7 +141,7 @@ func (runner *Runner) runPiped(ctx context.Context, inv Invocation, stdout, stde
 	for i := 0; i < maxInFlight; i++ {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err(), ctx.Err()
 		case runner.inFlight <- struct{}{}:
 			// Make sure we always "return" any workers we took.
 			defer func() { <-runner.inFlight }()
@@ -152,6 +174,7 @@ type Invocation struct {
 	Logf       func(format string, args ...interface{})
 }
 
+// Postcondition: both error results have same nilness.
 func (i *Invocation) runWithFriendlyError(ctx context.Context, stdout, stderr io.Writer) (friendlyError error, rawError error) {
 	rawError = i.run(ctx, stdout, stderr)
 	if rawError != nil {
@@ -215,6 +238,18 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 	cmd := exec.Command("go", goArgs...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
+
+	// cmd.WaitDelay was added only in go1.20 (see #50436).
+	if waitDelay := reflect.ValueOf(cmd).Elem().FieldByName("WaitDelay"); waitDelay.IsValid() {
+		// https://go.dev/issue/59541: don't wait forever copying stderr
+		// after the command has exited.
+		// After CL 484741 we copy stdout manually, so we we'll stop reading that as
+		// soon as ctx is done. However, we also don't want to wait around forever
+		// for stderr. Give a much-longer-than-reasonable delay and then assume that
+		// something has wedged in the kernel or runtime.
+		waitDelay.Set(reflect.ValueOf(30 * time.Second))
+	}
+
 	// On darwin the cwd gets resolved to the real path, which breaks anything that
 	// expects the working directory to keep the original path, including the
 	// go command when dealing with modules.
@@ -229,6 +264,7 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 		cmd.Env = append(cmd.Env, "PWD="+i.WorkingDir)
 		cmd.Dir = i.WorkingDir
 	}
+
 	defer func(start time.Time) { log("%s for %v", time.Since(start), cmdDebugStr(cmd)) }(time.Now())
 
 	return runCmdContext(ctx, cmd)
@@ -242,10 +278,85 @@ var DebugHangingGoCommands = false
 
 // runCmdContext is like exec.CommandContext except it sends os.Interrupt
 // before os.Kill.
-func runCmdContext(ctx context.Context, cmd *exec.Cmd) error {
-	if err := cmd.Start(); err != nil {
+func runCmdContext(ctx context.Context, cmd *exec.Cmd) (err error) {
+	// If cmd.Stdout is not an *os.File, the exec package will create a pipe and
+	// copy it to the Writer in a goroutine until the process has finished and
+	// either the pipe reaches EOF or command's WaitDelay expires.
+	//
+	// However, the output from 'go list' can be quite large, and we don't want to
+	// keep reading (and allocating buffers) if we've already decided we don't
+	// care about the output. We don't want to wait for the process to finish, and
+	// we don't wait to wait for the WaitDelay to expire either.
+	//
+	// Instead, if cmd.Stdout requires a copying goroutine we explicitly replace
+	// it with a pipe (which is an *os.File), which we can close in order to stop
+	// copying output as soon as we realize we don't care about it.
+	var stdoutW *os.File
+	if cmd.Stdout != nil {
+		if _, ok := cmd.Stdout.(*os.File); !ok {
+			var stdoutR *os.File
+			stdoutR, stdoutW, err = os.Pipe()
+			if err != nil {
+				return err
+			}
+			prevStdout := cmd.Stdout
+			cmd.Stdout = stdoutW
+
+			stdoutErr := make(chan error, 1)
+			go func() {
+				_, err := io.Copy(prevStdout, stdoutR)
+				if err != nil {
+					err = fmt.Errorf("copying stdout: %w", err)
+				}
+				stdoutErr <- err
+			}()
+			defer func() {
+				// We started a goroutine to copy a stdout pipe.
+				// Wait for it to finish, or terminate it if need be.
+				var err2 error
+				select {
+				case err2 = <-stdoutErr:
+					stdoutR.Close()
+				case <-ctx.Done():
+					stdoutR.Close()
+					// Per https://pkg.go.dev/os#File.Close, the call to stdoutR.Close
+					// should cause the Read call in io.Copy to unblock and return
+					// immediately, but we still need to receive from stdoutErr to confirm
+					// that it has happened.
+					<-stdoutErr
+					err2 = ctx.Err()
+				}
+				if err == nil {
+					err = err2
+				}
+			}()
+
+			// Per https://pkg.go.dev/os/exec#Cmd, “If Stdout and Stderr are the
+			// same writer, and have a type that can be compared with ==, at most
+			// one goroutine at a time will call Write.”
+			//
+			// Since we're starting a goroutine that writes to cmd.Stdout, we must
+			// also update cmd.Stderr so that it still holds.
+			func() {
+				defer func() { recover() }()
+				if cmd.Stderr == prevStdout {
+					cmd.Stderr = cmd.Stdout
+				}
+			}()
+		}
+	}
+
+	err = cmd.Start()
+	if stdoutW != nil {
+		// The child process has inherited the pipe file,
+		// so close the copy held in this process.
+		stdoutW.Close()
+		stdoutW = nil
+	}
+	if err != nil {
 		return err
 	}
+
 	resChan := make(chan error, 1)
 	go func() {
 		resChan <- cmd.Wait()
@@ -253,11 +364,14 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) error {
 
 	// If we're interested in debugging hanging Go commands, stop waiting after a
 	// minute and panic with interesting information.
-	if DebugHangingGoCommands {
+	debug := DebugHangingGoCommands
+	if debug {
+		timer := time.NewTimer(1 * time.Minute)
+		defer timer.Stop()
 		select {
 		case err := <-resChan:
 			return err
-		case <-time.After(1 * time.Minute):
+		case <-timer.C:
 			HandleHangingGoCommand(cmd.Process)
 		case <-ctx.Done():
 		}
@@ -270,30 +384,25 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) error {
 	}
 
 	// Cancelled. Interrupt and see if it ends voluntarily.
-	cmd.Process.Signal(os.Interrupt)
-	select {
-	case err := <-resChan:
-		return err
-	case <-time.After(time.Second):
+	if err := cmd.Process.Signal(os.Interrupt); err == nil {
+		// (We used to wait only 1s but this proved
+		// fragile on loaded builder machines.)
+		timer := time.NewTimer(5 * time.Second)
+		defer timer.Stop()
+		select {
+		case err := <-resChan:
+			return err
+		case <-timer.C:
+		}
 	}
 
 	// Didn't shut down in response to interrupt. Kill it hard.
 	// TODO(rfindley): per advice from bcmills@, it may be better to send SIGQUIT
 	// on certain platforms, such as unix.
-	if err := cmd.Process.Kill(); err != nil && DebugHangingGoCommands {
-		// Don't panic here as this reliably fails on windows with EINVAL.
+	if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && debug {
 		log.Printf("error killing the Go command: %v", err)
 	}
 
-	// See above: don't wait indefinitely if we're debugging hanging Go commands.
-	if DebugHangingGoCommands {
-		select {
-		case err := <-resChan:
-			return err
-		case <-time.After(10 * time.Second): // a shorter wait as resChan should return quickly following Kill
-			HandleHangingGoCommand(cmd.Process)
-		}
-	}
 	return <-resChan
 }
 

@@ -220,6 +220,7 @@ message HorizontalPodAutoscalerSpec {
   // increased, and vice-versa.  See the individual metric source types for
   // more information about how each type of metric must respond.
   // +optional
+  // +listType=atomic
   repeated MetricSpec metrics = 4;
 }
 
@@ -244,11 +245,13 @@ message HorizontalPodAutoscalerStatus {
 
   // currentMetrics is the last read state of the metrics used by this autoscaler.
   // +optional
+  // +listType=atomic
   repeated MetricStatus currentMetrics = 5;
 
   // conditions is the set of conditions required for this autoscaler to scale its target,
   // and indicates whether or not those conditions are met.
   // +optional
+  // +listType=atomic
   repeated HorizontalPodAutoscalerCondition conditions = 6;
 }
 

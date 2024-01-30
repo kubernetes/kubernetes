@@ -175,7 +175,7 @@ func RecordNodeEvent(ctx context.Context, recorder record.EventRecorder, nodeNam
 }
 
 // RecordNodeStatusChange records a event related to a node status change. (Common to lifecycle and ipam)
-func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newStatus string) {
+func RecordNodeStatusChange(logger klog.Logger, recorder record.EventRecorder, node *v1.Node, newStatus string) {
 	ref := &v1.ObjectReference{
 		APIVersion: "v1",
 		Kind:       "Node",
@@ -183,7 +183,7 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 		UID:        node.UID,
 		Namespace:  "",
 	}
-	klog.V(2).InfoS("Recording status change event message for node", "status", newStatus, "node", node.Name)
+	logger.V(2).Info("Recording status change event message for node", "status", newStatus, "node", node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
 	recorder.Eventf(ref, v1.EventTypeNormal, newStatus, "Node %s status is now: %s", node.Name, newStatus)
@@ -265,7 +265,7 @@ func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 }
 
 // CreateDeleteNodeHandler creates a delete node handler. (Common to lifecycle and ipam)
-func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
+func CreateDeleteNodeHandler(logger klog.Logger, f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		originalNode, isNode := originalObj.(*v1.Node)
 		// We can get DeletedFinalStateUnknown instead of *v1.Node here and
@@ -273,12 +273,12 @@ func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) 
 		if !isNode {
 			deletedState, ok := originalObj.(cache.DeletedFinalStateUnknown)
 			if !ok {
-				klog.ErrorS(nil, "Received unexpected object", "object", originalObj)
+				logger.Error(nil, "Received unexpected object", "object", originalObj)
 				return
 			}
 			originalNode, ok = deletedState.Obj.(*v1.Node)
 			if !ok {
-				klog.ErrorS(nil, "DeletedFinalStateUnknown contained non-Node object", "object", deletedState.Obj)
+				logger.Error(nil, "DeletedFinalStateUnknown contained non-Node object", "object", deletedState.Obj)
 				return
 			}
 		}

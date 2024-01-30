@@ -19,13 +19,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/golang/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/prometheus/client_golang/prometheus/internal"
 
 	dto "github.com/prometheus/client_model/go"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ValueType is an enumeration of metric types that represent a simple value.
@@ -188,9 +186,9 @@ func MakeLabelPairs(desc *Desc, labelValues []string) []*dto.LabelPair {
 		return desc.constLabelPairs
 	}
 	labelPairs := make([]*dto.LabelPair, 0, totalLen)
-	for i, n := range desc.variableLabels {
+	for i, l := range desc.variableLabels {
 		labelPairs = append(labelPairs, &dto.LabelPair{
-			Name:  proto.String(n),
+			Name:  proto.String(l.Name),
 			Value: proto.String(labelValues[i]),
 		})
 	}

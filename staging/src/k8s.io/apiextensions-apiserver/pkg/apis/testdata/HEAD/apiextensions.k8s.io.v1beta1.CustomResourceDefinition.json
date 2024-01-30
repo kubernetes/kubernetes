@@ -134,7 +134,10 @@
           {
             "rule": "ruleValue",
             "message": "messageValue",
-            "messageExpression": "messageExpressionValue"
+            "messageExpression": "messageExpressionValue",
+            "reason": "reasonValue",
+            "fieldPath": "fieldPathValue",
+            "optionalOldSelf": true
           }
         ]
       }
@@ -229,7 +232,10 @@
               {
                 "rule": "ruleValue",
                 "message": "messageValue",
-                "messageExpression": "messageExpressionValue"
+                "messageExpression": "messageExpressionValue",
+                "reason": "reasonValue",
+                "fieldPath": "fieldPathValue",
+                "optionalOldSelf": true
               }
             ]
           }

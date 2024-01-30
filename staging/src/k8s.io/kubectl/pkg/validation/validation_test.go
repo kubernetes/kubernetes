@@ -32,14 +32,22 @@ import (
 
 var fakeSchema = testing.Fake{Path: filepath.Join("..", "..", "testdata", "openapi", "swagger.json")}
 
+// fakeResourcesGetter implements the OpenAPIResourcesGetter interface, returning the
+// openapi resources from the swagger.json (above).
+type fakeResourcesGetter struct{}
+
+func (r *fakeResourcesGetter) OpenAPISchema() (openapi.Resources, error) {
+	doc, err := fakeSchema.OpenAPISchema()
+	if err != nil {
+		return nil, err
+	}
+	return openapi.NewOpenAPIData(doc)
+}
+
 var _ = Describe("resource validation using OpenAPI Schema", func() {
 	var validator Schema
 	BeforeEach(func() {
-		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).ToNot(HaveOccurred())
-		resources, err := openapi.NewOpenAPIData(s)
-		Expect(err).ToNot(HaveOccurred())
-		validator = NewSchemaValidation(resources)
+		validator = NewSchemaValidation(&fakeResourcesGetter{})
 		Expect(validator).ToNot(BeNil())
 	})
 

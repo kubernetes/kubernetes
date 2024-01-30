@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -219,7 +222,7 @@ func (f *FakeIPTables) SaveInto(table iptables.Table, buffer *bytes.Buffer) erro
 }
 
 // This is not a complete list but it's enough to pass the unit tests
-var builtinTargets = sets.NewString("ACCEPT", "DROP", "RETURN", "REJECT", "DNAT", "SNAT", "MASQUERADE", "MARK")
+var builtinTargets = sets.New("ACCEPT", "DROP", "RETURN", "REJECT", "DNAT", "SNAT", "MASQUERADE", "MARK")
 
 func (f *FakeIPTables) restoreTable(newDump *IPTablesDump, newTable *Table, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	oldTable, err := f.Dump.GetTable(newTable.Name)

@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -169,6 +170,7 @@ func TestStatefulSetControl(t *testing.T) {
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
 		{RecreatesFailedPod, simpleSetFn},
+		{RecreatesSucceededPod, simpleSetFn},
 		{CreatePodFailure, simpleSetFn},
 		{UpdatePodFailure, simpleSetFn},
 		{UpdateSetStatusFailure, simpleSetFn},
@@ -225,6 +227,31 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set UpdatedReplicas correctly")
+	}
+	// Check all pods have correct pod index label.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Error(err)
+		}
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(pods) != 3 {
+			t.Errorf("Expected 3 pods, got %d", len(pods))
+		}
+		for _, pod := range pods {
+			podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
+			if !exists {
+				t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
+				continue
+			}
+			podIndexFromName := strconv.Itoa(getOrdinal(pod))
+			if podIndexFromLabel != podIndexFromName {
+				t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
+			}
+		}
 	}
 }
 
@@ -371,7 +398,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 	}
 }
 
-func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func recreatesPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, phase v1.PodPhase) {
 	client := fake.NewSimpleClientset()
 	om, _, ssc := setupController(client)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -392,7 +419,7 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	if err != nil {
 		t.Error(err)
 	}
-	pods[0].Status.Phase = v1.PodFailed
+	pods[0].Status.Phase = phase
 	om.podsIndexer.Update(pods[0])
 	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
@@ -407,6 +434,15 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	if isCreated(pods[0]) {
 		t.Error("StatefulSet did not recreate failed Pod")
 	}
+
+}
+
+func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	recreatesPod(t, set, invariants, v1.PodFailed)
+}
+
+func RecreatesSucceededPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	recreatesPod(t, set, invariants, v1.PodSucceeded)
 }
 
 func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
@@ -1040,7 +1076,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		// Setup the statefulSet controller
-		totalPods := 6
+		var totalPods int32 = 6
 		var partition int32 = 3
 		var maxUnavailable = intstr.FromInt32(2)
 		set := setupPodManagementPolicy(tc.policyType, newStatefulSet(totalPods))
@@ -1102,7 +1138,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		tc.verifyFn(set, spc, ssc, pods, totalPods, selector)
+		tc.verifyFn(set, spc, ssc, pods, int(totalPods), selector)
 
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
@@ -1125,8 +1161,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 
 }
 
-func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, intstr.IntOrString, int) {
-	totalPods := 6
+func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, intstr.IntOrString, int32) {
+	var totalPods int32 = 6
 	set := newStatefulSet(totalPods)
 	// update all pods >=3(3,4,5)
 	var partition int32 = 3
@@ -1221,7 +1257,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 				expecteddPodsToBeDeleted = 0
 			}
 
-			expectedPodsAfterUpdate := totalPods - expecteddPodsToBeDeleted
+			expectedPodsAfterUpdate := int(totalPods) - expecteddPodsToBeDeleted
 
 			if len(pods) != expectedPodsAfterUpdate {
 				t.Errorf("Expected pods %v, got pods %v", expectedPodsAfterUpdate, len(pods))
@@ -2357,22 +2393,64 @@ func TestStatefulSetStatusUpdate(t *testing.T) {
 }
 
 type requestTracker struct {
+	sync.Mutex
 	requests int
 	err      error
 	after    int
+
+	parallelLock sync.Mutex
+	parallel     int
+	maxParallel  int
+
+	delay time.Duration
 }
 
 func (rt *requestTracker) errorReady() bool {
+	rt.Lock()
+	defer rt.Unlock()
 	return rt.err != nil && rt.requests >= rt.after
 }
 
 func (rt *requestTracker) inc() {
+	rt.parallelLock.Lock()
+	rt.parallel++
+	if rt.maxParallel < rt.parallel {
+		rt.maxParallel = rt.parallel
+	}
+	rt.parallelLock.Unlock()
+
+	rt.Lock()
+	defer rt.Unlock()
 	rt.requests++
+	if rt.delay != 0 {
+		time.Sleep(rt.delay)
+	}
 }
 
 func (rt *requestTracker) reset() {
+	rt.parallelLock.Lock()
+	rt.parallel = 0
+	rt.parallelLock.Unlock()
+
+	rt.Lock()
+	defer rt.Unlock()
 	rt.err = nil
 	rt.after = 0
+	rt.delay = 0
+}
+
+func (rt *requestTracker) getErr() error {
+	rt.Lock()
+	defer rt.Unlock()
+	return rt.err
+}
+
+func newRequestTracker(requests int, err error, after int) requestTracker {
+	return requestTracker{
+		requests: requests,
+		err:      err,
+		after:    after,
+	}
 }
 
 type fakeObjectManager struct {
@@ -2402,16 +2480,17 @@ func newFakeObjectManager(informerFactory informers.SharedInformerFactory) *fake
 		claimInformer.Informer().GetIndexer(),
 		setInformer.Informer().GetIndexer(),
 		revisionInformer.Informer().GetIndexer(),
-		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0}}
+		newRequestTracker(0, nil, 0),
+		newRequestTracker(0, nil, 0),
+		newRequestTracker(0, nil, 0),
+	}
 }
 
 func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	defer om.createPodTracker.inc()
 	if om.createPodTracker.errorReady() {
 		defer om.createPodTracker.reset()
-		return om.createPodTracker.err
+		return om.createPodTracker.getErr()
 	}
 	pod.SetUID(types.UID(pod.Name + "-uid"))
 	return om.podsIndexer.Update(pod)
@@ -2429,7 +2508,7 @@ func (om *fakeObjectManager) DeletePod(pod *v1.Pod) error {
 	defer om.deletePodTracker.inc()
 	if om.deletePodTracker.errorReady() {
 		defer om.deletePodTracker.reset()
-		return om.deletePodTracker.err
+		return om.deletePodTracker.getErr()
 	}
 	if key, err := controller.KeyFunc(pod); err != nil {
 		return err
@@ -2619,7 +2698,7 @@ func newFakeStatefulSetStatusUpdater(setInformer appsinformers.StatefulSetInform
 	return &fakeStatefulSetStatusUpdater{
 		setInformer.Lister(),
 		setInformer.Informer().GetIndexer(),
-		requestTracker{0, nil, 0},
+		newRequestTracker(0, nil, 0),
 	}
 }
 
@@ -2832,6 +2911,183 @@ func fakeResourceVersion(object interface{}) {
 	} else if intValue, err := strconv.ParseInt(version, 10, 32); err == nil {
 		obj.SetResourceVersion(strconv.FormatInt(intValue+1, 10))
 	}
+}
+
+func TestParallelScale(t *testing.T) {
+	for _, tc := range []struct {
+		desc            string
+		replicas        int32
+		desiredReplicas int32
+	}{
+		{
+			desc:            "scale up from 3 to 30",
+			replicas:        3,
+			desiredReplicas: 30,
+		},
+		{
+			desc:            "scale down from 10 to 1",
+			replicas:        10,
+			desiredReplicas: 1,
+		},
+
+		{
+			desc:            "scale down to 0",
+			replicas:        501,
+			desiredReplicas: 0,
+		},
+		{
+			desc:            "scale up from 0",
+			replicas:        0,
+			desiredReplicas: 1000,
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			set := burst(newStatefulSet(0))
+			set.Spec.VolumeClaimTemplates[0].ObjectMeta.Labels = map[string]string{"test": "test"}
+			parallelScale(t, set, tc.replicas, tc.desiredReplicas, assertBurstInvariants)
+		})
+	}
+
+}
+
+func parallelScale(t *testing.T, set *apps.StatefulSet, replicas, desiredReplicas int32, invariants invariantFunc) {
+	var err error
+	diff := desiredReplicas - replicas
+	client := fake.NewSimpleClientset(set)
+	om, _, ssc := setupController(client)
+	om.createPodTracker.delay = time.Millisecond
+
+	*set.Spec.Replicas = replicas
+	if err := parallelScaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.Replicas != replicas {
+		t.Errorf("want %v, got %v replicas", replicas, set.Status.Replicas)
+	}
+
+	fn := parallelScaleUpStatefulSetControl
+	if diff < 0 {
+		fn = parallelScaleDownStatefulSetControl
+	}
+	*set.Spec.Replicas = desiredReplicas
+	if err := fn(set, ssc, om, invariants); err != nil {
+		t.Errorf("Failed to scale StatefulSet : %s", err)
+	}
+
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+
+	if set.Status.Replicas != desiredReplicas {
+		t.Errorf("Failed to scale statefulset to %v replicas, got %v replicas", desiredReplicas, set.Status.Replicas)
+	}
+
+	if (diff < -1 || diff > 1) && om.createPodTracker.maxParallel <= 1 {
+		t.Errorf("want max parallel requests > 1, got %v", om.createPodTracker.maxParallel)
+	}
+}
+
+func parallelScaleUpStatefulSetControl(set *apps.StatefulSet,
+	ssc StatefulSetControlInterface,
+	om *fakeObjectManager,
+	invariants invariantFunc) error {
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return err
+	}
+
+	// Give up after 2 loops.
+	// 2 * 500 pods per loop = 1000 max pods <- this should be enough for all test cases.
+	// Anything slower than that (requiring more iterations) indicates a problem and should fail the test.
+	maxLoops := 2
+	loops := maxLoops
+	for set.Status.Replicas < *set.Spec.Replicas {
+		if loops < 1 {
+			return fmt.Errorf("after %v loops: want %v, got replicas %v", maxLoops, *set.Spec.Replicas, set.Status.Replicas)
+		}
+		loops--
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			return err
+		}
+		sort.Sort(ascendingOrdinal(pods))
+
+		ordinals := []int{}
+		for _, pod := range pods {
+			if pod.Status.Phase == "" {
+				ordinals = append(ordinals, getOrdinal(pod))
+			}
+		}
+		// ensure all pods are valid (have a phase)
+		for _, ord := range ordinals {
+			if pods, err = om.setPodPending(set, ord); err != nil {
+				return err
+			}
+		}
+
+		// run the controller once and check invariants
+		_, err = ssc.UpdateStatefulSet(context.TODO(), set, pods)
+		if err != nil {
+			return err
+		}
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			return err
+		}
+		if err := invariants(set, om); err != nil {
+			return err
+		}
+	}
+	return invariants(set, om)
+}
+
+func parallelScaleDownStatefulSetControl(set *apps.StatefulSet, ssc StatefulSetControlInterface, om *fakeObjectManager, invariants invariantFunc) error {
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return err
+	}
+
+	// Give up after 2 loops.
+	// 2 * 500 pods per loop = 1000 max pods <- this should be enough for all test cases.
+	// Anything slower than that (requiring more iterations) indicates a problem and should fail the test.
+	maxLoops := 2
+	loops := maxLoops
+	for set.Status.Replicas > *set.Spec.Replicas {
+		if loops < 1 {
+			return fmt.Errorf("after %v loops: want %v replicas, got %v", maxLoops, *set.Spec.Replicas, set.Status.Replicas)
+		}
+		loops--
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			return err
+		}
+		sort.Sort(ascendingOrdinal(pods))
+		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+			return err
+		}
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			return err
+		}
+		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+			return err
+		}
+	}
+
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		return err
+	}
+	if err := invariants(set, om); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func scaleUpStatefulSetControl(set *apps.StatefulSet,

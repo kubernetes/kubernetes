@@ -30,7 +30,6 @@ type PolicyV1beta1Interface interface {
 	RESTClient() rest.Interface
 	EvictionsGetter
 	PodDisruptionBudgetsGetter
-	PodSecurityPoliciesGetter
 }
 
 // PolicyV1beta1Client is used to interact with features provided by the policy group.
@@ -44,10 +43,6 @@ func (c *PolicyV1beta1Client) Evictions(namespace string) EvictionInterface {
 
 func (c *PolicyV1beta1Client) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {
 	return newPodDisruptionBudgets(c, namespace)
-}
-
-func (c *PolicyV1beta1Client) PodSecurityPolicies() PodSecurityPolicyInterface {
-	return newPodSecurityPolicies(c)
 }
 
 // NewForConfig creates a new PolicyV1beta1Client for the given config.

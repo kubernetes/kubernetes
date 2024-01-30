@@ -90,6 +90,7 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 		fields  fakeNetworkStatsProvider
 		want    map[string]*statsapi.NetworkStats
 		wantErr bool
+		skipped bool
 	}{
 		{
 			name: "basic example",
@@ -395,10 +396,15 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 				},
 			},
 			wantErr: false,
+			skipped: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// TODO: Remove skip once https://github.com/kubernetes/kubernetes/issues/116692 is fixed.
+			if tt.skipped {
+				t.Skip("Test temporarily skipped.")
+			}
 			p := &criStatsProvider{
 				windowsNetworkStatsProvider: fakeNetworkStatsProvider{
 					containers: tt.fields.containers,

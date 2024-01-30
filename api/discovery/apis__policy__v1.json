@@ -1,0 +1,38 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "policy/v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "PodDisruptionBudget",
+      "name": "poddisruptionbudgets",
+      "namespaced": true,
+      "shortNames": [
+        "pdb"
+      ],
+      "singularName": "poddisruptionbudget",
+      "storageVersionHash": "EVWiDmWqyJw=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PodDisruptionBudget",
+      "name": "poddisruptionbudgets/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

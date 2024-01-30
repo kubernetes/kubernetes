@@ -23,7 +23,10 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/errors"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
 )
 
 func init() {
@@ -39,15 +42,28 @@ type Context interface {
 	AuthenticatedData() []byte
 }
 
-// Transformer allows a value to be transformed before being read from or written to the underlying store. The methods
-// must be able to undo the transformation caused by the other.
-type Transformer interface {
+type Read interface {
 	// TransformFromStorage may transform the provided data from its underlying storage representation or return an error.
 	// Stale is true if the object on disk is stale and a write to etcd should be issued, even if the contents of the object
 	// have not changed.
 	TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error)
+}
+
+type Write interface {
 	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
 	TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error)
+}
+
+// Transformer allows a value to be transformed before being read from or written to the underlying store. The methods
+// must be able to undo the transformation caused by the other.
+type Transformer interface {
+	Read
+	Write
+}
+
+// ResourceTransformers returns a transformer for the provided resource.
+type ResourceTransformers interface {
+	TransformerForResource(resource schema.GroupResource) Transformer
 }
 
 // DefaultContext is a simple implementation of Context for a slice of bytes.
@@ -144,6 +160,7 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 		}
 	}
 	if err := errors.Reduce(errors.NewAggregate(errs)); err != nil {
+		logTransformErr(ctx, err, "failed to decrypt data")
 		return nil, false, err
 	}
 	RecordTransformation("from_storage", "unknown", time.Since(start), t.err)
@@ -157,10 +174,40 @@ func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)
 	RecordTransformation("to_storage", string(transformer.Prefix), time.Since(start), err)
 	if err != nil {
+		logTransformErr(ctx, err, "failed to encrypt data")
 		return nil, err
 	}
 	prefixedData := make([]byte, len(transformer.Prefix), len(result)+len(transformer.Prefix))
 	copy(prefixedData, transformer.Prefix)
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
+}
+
+func logTransformErr(ctx context.Context, err error, message string) {
+	requestInfo := getRequestInfoFromContext(ctx)
+	if klogLevel6 := klog.V(6); klogLevel6.Enabled() {
+		klogLevel6.InfoSDepth(
+			1,
+			message,
+			"err", err,
+			"group", requestInfo.APIGroup,
+			"version", requestInfo.APIVersion,
+			"resource", requestInfo.Resource,
+			"subresource", requestInfo.Subresource,
+			"verb", requestInfo.Verb,
+			"namespace", requestInfo.Namespace,
+			"name", requestInfo.Name,
+		)
+
+		return
+	}
+
+	klog.ErrorSDepth(1, err, message)
+}
+
+func getRequestInfoFromContext(ctx context.Context) *genericapirequest.RequestInfo {
+	if reqInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return reqInfo
+	}
+	return &genericapirequest.RequestInfo{}
 }

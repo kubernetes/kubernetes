@@ -73,6 +73,11 @@ func (kt *KustTarget) Load() error {
 
 	k.FixKustomization()
 
+	// check that Kustomization is empty
+	if err := k.CheckEmpty(); err != nil {
+		return err
+	}
+
 	errs := k.EnforceFields()
 	if len(errs) > 0 {
 		return fmt.Errorf(

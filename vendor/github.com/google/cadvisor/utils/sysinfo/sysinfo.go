@@ -57,6 +57,16 @@ func GetBlockDeviceInfo(sysfs sysfs.SysFs) (map[string]info.DiskInfo, error) {
 		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "sr") {
 			continue
 		}
+		// Ignore "hidden" devices (i.e. nvme path device sysfs entries).
+		// These devices are in the form of /dev/nvme$Xc$Yn$Z and will
+		// not have a device handle (i.e. "hidden")
+		isHidden, err := sysfs.IsBlockDeviceHidden(name)
+		if err != nil {
+			return nil, err
+		}
+		if isHidden {
+			continue
+		}
 		diskInfo := info.DiskInfo{
 			Name: name,
 		}
@@ -104,7 +114,7 @@ func GetNetworkDevices(sysfs sysfs.SysFs) ([]info.NetInfo, error) {
 	for _, dev := range devs {
 		name := dev.Name()
 		// Ignore docker, loopback, and veth devices.
-		ignoredDevices := []string{"lo", "veth", "docker"}
+		ignoredDevices := []string{"lo", "veth", "docker", "nerdctl"}
 		ignored := false
 		for _, prefix := range ignoredDevices {
 			if strings.HasPrefix(name, prefix) {
@@ -200,7 +210,7 @@ func GetNodesInfo(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 	}
 
 	if len(nodesDirs) == 0 {
-		klog.Warningf("Nodes topology is not available, providing CPU topology")
+		klog.V(4).Info("Nodes topology is not available, providing CPU topology")
 		return getCPUTopology(sysFs)
 	}
 

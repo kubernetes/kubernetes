@@ -77,6 +77,20 @@ func NewSuite() *Suite {
 	}
 }
 
+func (suite *Suite) Clone() (*Suite, error) {
+	if suite.phase != PhaseBuildTopLevel {
+		return nil, fmt.Errorf("cannot clone suite after tree has been built")
+	}
+	return &Suite{
+		tree:                    &TreeNode{},
+		phase:                   PhaseBuildTopLevel,
+		ProgressReporterManager: NewProgressReporterManager(),
+		topLevelContainers:      suite.topLevelContainers.Clone(),
+		suiteNodes:              suite.suiteNodes.Clone(),
+		selectiveLock:           &sync.Mutex{},
+	}, nil
+}
+
 func (suite *Suite) BuildTree() error {
 	// During PhaseBuildTopLevel, the top level containers are stored in suite.topLevelCotainers and entered
 	// We now enter PhaseBuildTree where these top level containers are entered and added to the spec tree
@@ -245,7 +259,9 @@ func (suite *Suite) pushCleanupNode(node Node) error {
 
 	node.NodeIDWhereCleanupWasGenerated = suite.currentNode.ID
 	node.NestingLevel = suite.currentNode.NestingLevel
+	suite.selectiveLock.Lock()
 	suite.cleanupNodes = append(suite.cleanupNodes, node)
+	suite.selectiveLock.Unlock()
 
 	return nil
 }
@@ -324,6 +340,16 @@ func (suite *Suite) CurrentSpecReport() types.SpecReport {
 	report.ReportEntries = make([]ReportEntry, len(report.ReportEntries))
 	copy(report.ReportEntries, suite.currentSpecReport.ReportEntries)
 	return report
+}
+
+// Only valid in the preview context.  In general suite.report only includes
+// the specs run by _this_ node - it is only at the end of the suite that
+// the parallel reports are aggregated.  However in the preview context we run
+// in series and
+func (suite *Suite) GetPreviewReport() types.Report {
+	suite.selectiveLock.Lock()
+	defer suite.selectiveLock.Unlock()
+	return suite.report
 }
 
 func (suite *Suite) AddReportEntry(entry ReportEntry) error {
@@ -832,7 +858,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 	}
 
 	sc := NewSpecContext(suite)
-	defer sc.cancel()
+	defer sc.cancel(fmt.Errorf("spec has finished"))
 
 	suite.selectiveLock.Lock()
 	suite.currentSpecContext = sc
@@ -932,11 +958,17 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 
 			// tell the spec to stop.  it's important we generate the progress report first to make sure we capture where
 			// the spec is actually stuck
-			sc.cancel()
+			sc.cancel(fmt.Errorf("%s timeout occurred", timeoutInPlay))
 			//and now we wait for the grace period
 			gracePeriodChannel = time.After(gracePeriod)
 		case <-interruptStatus.Channel:
 			interruptStatus = suite.interruptHandler.Status()
+			// ignore interruption from other process if we are cleaning up or reporting
+			if interruptStatus.Cause == interrupt_handler.InterruptCauseAbortByOtherProcess &&
+				node.NodeType.Is(types.NodeTypesAllowedDuringReportInterrupt|types.NodeTypesAllowedDuringCleanupInterrupt) {
+				continue
+			}
+
 			deadlineChannel = nil // don't worry about deadlines, time's up now
 
 			failureTimelineLocation := suite.generateTimelineLocation()
@@ -953,7 +985,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 			}
 
 			progressReport = progressReport.WithoutOtherGoroutines()
-			sc.cancel()
+			sc.cancel(fmt.Errorf(interruptStatus.Message()))
 
 			if interruptStatus.Level == interrupt_handler.InterruptLevelBailOut {
 				if interruptStatus.ShouldIncludeProgressReport() {

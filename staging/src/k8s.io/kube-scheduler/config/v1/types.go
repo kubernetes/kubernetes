@@ -89,6 +89,12 @@ type KubeSchedulerConfiguration struct {
 	// with the extender. These extenders are shared by all scheduler profiles.
 	// +listType=set
 	Extenders []Extender `json:"extenders,omitempty"`
+
+	// DelayCacheUntilActive specifies when to start caching. If this is true and leader election is enabled,
+	// the scheduler will wait to fill informer caches until it is the leader. Doing so will have slower
+	// failover with the benefit of lower memory overhead while waiting to become leader.
+	// Defaults to false.
+	DelayCacheUntilActive bool `json:"delayCacheUntilActive,omitempty"`
 }
 
 // DecodeNestedObjects decodes plugin args for known types.

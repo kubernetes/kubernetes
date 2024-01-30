@@ -24,10 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -144,6 +146,8 @@ func (serviceStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 func (serviceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
+
+	dropServiceStatusDisabledFields(newService, oldService)
 	// status changes are not allowed to update spec
 	newService.Spec = oldService.Spec
 }
@@ -156,6 +160,33 @@ func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 // WarningsOnUpdate returns warnings for the given update.
 func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropServiceStatusDisabledFields drops fields that are not used if their associated feature gates
+// are not enabled.  The typical pattern is:
+//
+//	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	    newSvc.Status.MyFeature = nil
+//	}
+func dropServiceStatusDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && !loadbalancerIPModeInUse(oldSvc) {
+		for i := range newSvc.Status.LoadBalancer.Ingress {
+			newSvc.Status.LoadBalancer.Ingress[i].IPMode = nil
+		}
+	}
+}
+
+// returns true when the LoadBalancer Ingress IPMode fields are in use.
+func loadbalancerIPModeInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	for _, ing := range svc.Status.LoadBalancer.Ingress {
+		if ing.IPMode != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func sameStringSlice(a []string, b []string) bool {
@@ -246,7 +277,7 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 
 	// If a user is switching to a type that doesn't need ExternalTrafficPolicy
 	// AND they did not change this field, it is safe to drop it.
-	if needsExternalTrafficPolicy(oldSvc) && !needsExternalTrafficPolicy(newSvc) && sameExternalTrafficPolicy(oldSvc, newSvc) {
+	if serviceapi.ExternallyAccessible(oldSvc) && !serviceapi.ExternallyAccessible(newSvc) && sameExternalTrafficPolicy(oldSvc, newSvc) {
 		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicy("")
 	}
 
@@ -343,10 +374,6 @@ func sameLoadBalancerClass(oldSvc, newSvc *api.Service) bool {
 		return true // both are nil
 	}
 	return *oldSvc.Spec.LoadBalancerClass == *newSvc.Spec.LoadBalancerClass
-}
-
-func needsExternalTrafficPolicy(svc *api.Service) bool {
-	return svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer
 }
 
 func sameExternalTrafficPolicy(oldSvc, newSvc *api.Service) bool {

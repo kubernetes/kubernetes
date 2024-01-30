@@ -17,14 +17,17 @@ limitations under the License.
 package v1
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"math"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 
 	"k8s.io/klog/v2"
@@ -57,6 +60,24 @@ func NewLoggingConfiguration() *LoggingConfiguration {
 	return &c
 }
 
+// Applying configurations multiple times is not safe unless it's guaranteed that there
+// are no goroutines which might call logging functions. The default for ValidateAndApply
+// and ValidateAndApplyWithOptions is to return an error when called more than once.
+// Binaries and unit tests can override that behavior.
+var ReapplyHandling = ReapplyHandlingError
+
+type ReapplyHandlingType int
+
+const (
+	// ReapplyHandlingError is the default: calling ValidateAndApply or
+	// ValidateAndApplyWithOptions again returns an error.
+	ReapplyHandlingError ReapplyHandlingType = iota
+	// ReapplyHandlingIgnoreUnchanged silently ignores any additional calls of
+	// ValidateAndApply or ValidateAndApplyWithOptions if the configuration
+	// is unchanged, otherwise they return an error.
+	ReapplyHandlingIgnoreUnchanged
+)
+
 // ValidateAndApply combines validation and application of the logging configuration.
 // This should be invoked as early as possible because then the rest of the program
 // startup (including validation of other options) will already run with the final
@@ -64,6 +85,10 @@ func NewLoggingConfiguration() *LoggingConfiguration {
 //
 // The optional FeatureGate controls logging features. If nil, the default for
 // these features is used.
+//
+// Logging options must be applied as early as possible during the program
+// startup. Some changes are global and cannot be done safely when there are
+// already goroutines running.
 func ValidateAndApply(c *LoggingConfiguration, featureGate featuregate.FeatureGate) error {
 	return validateAndApply(c, nil, featureGate, nil)
 }
@@ -71,6 +96,10 @@ func ValidateAndApply(c *LoggingConfiguration, featureGate featuregate.FeatureGa
 // ValidateAndApplyWithOptions is a variant of ValidateAndApply which accepts
 // additional options beyond those that can be configured through the API. This
 // is meant for testing.
+//
+// Logging options must be applied as early as possible during the program
+// startup. Some changes are global and cannot be done safely when there are
+// already goroutines running.
 func ValidateAndApplyWithOptions(c *LoggingConfiguration, options *LoggingOptions, featureGate featuregate.FeatureGate) error {
 	return validateAndApply(c, options, featureGate, nil)
 }
@@ -183,10 +212,30 @@ func featureEnabled(featureGate featuregate.FeatureGate, feature featuregate.Fea
 }
 
 func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate featuregate.FeatureGate) error {
-	contextualLoggingEnabled := contextualLoggingDefault
-	if featureGate != nil {
-		contextualLoggingEnabled = featureGate.Enabled(ContextualLogging)
+	p := &parameters{
+		C:                        c,
+		Options:                  options,
+		ContextualLoggingEnabled: contextualLoggingDefault,
 	}
+	if featureGate != nil {
+		p.ContextualLoggingEnabled = featureGate.Enabled(ContextualLogging)
+	}
+
+	oldP := applyParameters.Load()
+	if oldP != nil {
+		switch ReapplyHandling {
+		case ReapplyHandlingError:
+			return errors.New("logging configuration was already applied earlier, changing it is not allowed")
+		case ReapplyHandlingIgnoreUnchanged:
+			if diff := cmp.Diff(oldP, p); diff != "" {
+				return fmt.Errorf("the logging configuration should not be changed after setting it once (- old setting, + new setting):\n%s", diff)
+			}
+			return nil
+		default:
+			return fmt.Errorf("invalid value %d for ReapplyHandling", ReapplyHandling)
+		}
+	}
+	applyParameters.Store(p)
 
 	// if log format not exists, use nil loggr
 	format, _ := logRegistry.get(c.Format)
@@ -205,7 +254,7 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 			defer setverbositylevel.Mutex.Unlock()
 			setverbositylevel.Callbacks = append(setverbositylevel.Callbacks, control.SetVerbosityLevel)
 		}
-		klog.SetLoggerWithOptions(log, klog.ContextualLogger(contextualLoggingEnabled), klog.FlushLogger(control.Flush))
+		klog.SetLoggerWithOptions(log, klog.ContextualLogger(p.ContextualLoggingEnabled), klog.FlushLogger(control.Flush))
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(VerbosityLevelPflag(&c.Verbosity).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog verbosity: %v", err)
@@ -213,8 +262,41 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 	if err := loggingFlags.Lookup("vmodule").Value.Set(VModuleConfigurationPflag(&c.VModule).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog vmodule: %v", err)
 	}
-	klog.StartFlushDaemon(c.FlushFrequency)
-	klog.EnableContextualLogging(contextualLoggingEnabled)
+	klog.StartFlushDaemon(c.FlushFrequency.Duration.Duration)
+	klog.EnableContextualLogging(p.ContextualLoggingEnabled)
+	return nil
+}
+
+type parameters struct {
+	C                        *LoggingConfiguration
+	Options                  *LoggingOptions
+	ContextualLoggingEnabled bool
+}
+
+var applyParameters atomic.Pointer[parameters]
+
+// ResetForTest restores the default settings. This is not thread-safe and should only
+// be used when there are no goroutines running. The intended users are unit
+// tests in other packages.
+func ResetForTest(featureGate featuregate.FeatureGate) error {
+	oldP := applyParameters.Load()
+	if oldP == nil {
+		// Nothing to do.
+		return nil
+	}
+
+	// This makes it possible to call apply again without triggering errors.
+	applyParameters.Store(nil)
+
+	// Restore defaults. Shouldn't fail, but check anyway.
+	config := NewLoggingConfiguration()
+	if err := ValidateAndApply(config, featureGate); err != nil {
+		return fmt.Errorf("apply default configuration: %v", err)
+	}
+
+	// And again...
+	applyParameters.Store(nil)
+
 	return nil
 }
 
@@ -260,7 +342,7 @@ func addFlags(c *LoggingConfiguration, fs flagSet) {
 	// No new log formats should be added after generation is of flag options
 	logRegistry.freeze()
 
-	fs.DurationVar(&c.FlushFrequency, LogFlushFreqFlagName, c.FlushFrequency, "Maximum number of seconds between log flushes")
+	fs.DurationVar(&c.FlushFrequency.Duration.Duration, LogFlushFreqFlagName, c.FlushFrequency.Duration.Duration, "Maximum number of seconds between log flushes")
 	fs.VarP(VerbosityLevelPflag(&c.Verbosity), "v", "v", "number for the log level verbosity")
 	fs.Var(VModuleConfigurationPflag(&c.VModule), "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
 
@@ -282,8 +364,9 @@ func SetRecommendedLoggingConfiguration(c *LoggingConfiguration) {
 	if c.Format == "" {
 		c.Format = "text"
 	}
-	if c.FlushFrequency == 0 {
-		c.FlushFrequency = LogFlushFreqDefault
+	if c.FlushFrequency.Duration.Duration == 0 {
+		c.FlushFrequency.Duration.Duration = LogFlushFreqDefault
+		c.FlushFrequency.SerializeAsString = true
 	}
 	var empty resource.QuantityValue
 	if c.Options.JSON.InfoBufferSize == empty {

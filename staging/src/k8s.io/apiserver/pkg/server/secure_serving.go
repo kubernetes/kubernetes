@@ -189,7 +189,10 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	if s.HTTP2MaxStreamsPerConnection > 0 {
 		http2Options.MaxConcurrentStreams = uint32(s.HTTP2MaxStreamsPerConnection)
 	} else {
-		http2Options.MaxConcurrentStreams = 250
+		// match http2.initialMaxConcurrentStreams used by clients
+		// this makes it so that a malicious client can only open 400 streams before we forcibly close the connection
+		// https://github.com/golang/net/commit/b225e7ca6dde1ef5a5ae5ce922861bda011cfabd
+		http2Options.MaxConcurrentStreams = 100
 	}
 
 	// increase the connection buffer size from the 1MB default to handle the specified number of concurrent streams

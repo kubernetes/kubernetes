@@ -37,6 +37,18 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
 		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*v1beta1.MutatingWebhookConfigurationList))
 	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.ValidatingAdmissionPolicy{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicy(obj.(*v1beta1.ValidatingAdmissionPolicy))
+	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.ValidatingAdmissionPolicyBinding{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyBinding(obj.(*v1beta1.ValidatingAdmissionPolicyBinding))
+	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.ValidatingAdmissionPolicyBindingList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyBindingList(obj.(*v1beta1.ValidatingAdmissionPolicyBindingList))
+	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.ValidatingAdmissionPolicyList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingAdmissionPolicyList(obj.(*v1beta1.ValidatingAdmissionPolicyList))
+	})
 	scheme.AddTypeDefaultingFunc(&v1beta1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*v1beta1.ValidatingWebhookConfiguration))
 	})
@@ -64,6 +76,49 @@ func SetObjectDefaults_MutatingWebhookConfigurationList(in *v1beta1.MutatingWebh
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_MutatingWebhookConfiguration(a)
+	}
+}
+
+func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1beta1.ValidatingAdmissionPolicy) {
+	SetDefaults_ValidatingAdmissionPolicySpec(&in.Spec)
+	if in.Spec.MatchConstraints != nil {
+		SetDefaults_MatchResources(in.Spec.MatchConstraints)
+		for i := range in.Spec.MatchConstraints.ResourceRules {
+			a := &in.Spec.MatchConstraints.ResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+		for i := range in.Spec.MatchConstraints.ExcludeResourceRules {
+			a := &in.Spec.MatchConstraints.ExcludeResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+	}
+}
+
+func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1beta1.ValidatingAdmissionPolicyBinding) {
+	if in.Spec.MatchResources != nil {
+		SetDefaults_MatchResources(in.Spec.MatchResources)
+		for i := range in.Spec.MatchResources.ResourceRules {
+			a := &in.Spec.MatchResources.ResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+		for i := range in.Spec.MatchResources.ExcludeResourceRules {
+			a := &in.Spec.MatchResources.ExcludeResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+	}
+}
+
+func SetObjectDefaults_ValidatingAdmissionPolicyBindingList(in *v1beta1.ValidatingAdmissionPolicyBindingList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ValidatingAdmissionPolicyBinding(a)
+	}
+}
+
+func SetObjectDefaults_ValidatingAdmissionPolicyList(in *v1beta1.ValidatingAdmissionPolicyList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ValidatingAdmissionPolicy(a)
 	}
 }
 

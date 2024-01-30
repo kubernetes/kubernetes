@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,12 +31,10 @@ import (
 var (
 	timeout  = 10 * time.Minute
 	waitTime = 2 * time.Second
-)
 
-// SIGDescribe annotates the test with the SIG label.
-func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-scheduling] "+text, body)
-}
+	// SIGDescribe annotates the test with the SIG label.
+	SIGDescribe = framework.SIGDescribe("scheduling")
+)
 
 // WaitForStableCluster waits until all existing pods are scheduled and returns their amount.
 func WaitForStableCluster(c clientset.Interface, workerNodes sets.Set[string]) int {

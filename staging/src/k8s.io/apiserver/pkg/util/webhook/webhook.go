@@ -62,7 +62,7 @@ type GenericWebhook struct {
 // Otherwise it returns false for an immediate fail.
 func DefaultShouldRetry(err error) bool {
 	// these errors indicate a transient error that should be retried.
-	if utilnet.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
+	if utilnet.IsConnectionReset(err) || utilnet.IsHTTP2ConnectionLost(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
 		return true
 	}
 	// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.

@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -137,10 +138,10 @@ func iperf2ClientDaemonSet(ctx context.Context, client clientset.Interface, name
 //	  would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
 //	  as the cluster size increases.
 //	Finally, after collecting all data, the results are analyzed and tabulated.
-var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
+var _ = common.SIGDescribe("Networking IPerf2", feature.NetworkingPerformance, func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should run iperf2", func(ctx context.Context) {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)

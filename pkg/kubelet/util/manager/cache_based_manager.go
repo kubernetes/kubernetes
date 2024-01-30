@@ -224,21 +224,29 @@ func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 	names := c.getReferencedObjects(pod)
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	for name := range names {
-		c.objectStore.AddReference(pod.Namespace, name, pod.UID)
-	}
 	var prev *v1.Pod
 	key := objectKey{namespace: pod.Namespace, name: pod.Name, uid: pod.UID}
 	prev = c.registeredPods[key]
 	c.registeredPods[key] = pod
-	if prev != nil {
-		for name := range c.getReferencedObjects(prev) {
-			// On an update, the .Add() call above will have re-incremented the
-			// ref count of any existing object, so any objects that are in both
-			// names and prev need to have their ref counts decremented. Any that
-			// are only in prev need to be completely removed. This unconditional
-			// call takes care of both cases.
-			c.objectStore.DeleteReference(prev.Namespace, name, prev.UID)
+	// To minimize unnecessary API requests to the API server for the configmap/secret get API
+	// only invoke AddReference the first time RegisterPod is called for a pod.
+	if prev == nil {
+		for name := range names {
+			c.objectStore.AddReference(pod.Namespace, name, pod.UID)
+		}
+	} else {
+		prevNames := c.getReferencedObjects(prev)
+		// Add new references
+		for name := range names {
+			if !prevNames.Has(name) {
+				c.objectStore.AddReference(pod.Namespace, name, pod.UID)
+			}
+		}
+		// Remove dropped references
+		for prevName := range prevNames {
+			if !names.Has(prevName) {
+				c.objectStore.DeleteReference(pod.Namespace, prevName, pod.UID)
+			}
 		}
 	}
 }

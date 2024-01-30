@@ -18,13 +18,10 @@ package validation
 
 import (
 	"fmt"
-	"net"
 	"reflect"
-	"strconv"
-	"strings"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,7 +30,6 @@ import (
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -69,32 +65,6 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 		}
 		errs = append(errs, validateCommonQueueSort(profilesPath, cc.Profiles)...)
 	}
-	if len(cc.HealthzBindAddress) > 0 {
-		host, port, err := splitHostIntPort(cc.HealthzBindAddress)
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, err.Error()))
-		} else {
-			if errMsgs := validation.IsValidIP(host); errMsgs != nil {
-				errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, strings.Join(errMsgs, ",")))
-			}
-			if port != 0 {
-				errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, "must be empty or with an explicit 0 port"))
-			}
-		}
-	}
-	if len(cc.MetricsBindAddress) > 0 {
-		host, port, err := splitHostIntPort(cc.MetricsBindAddress)
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, err.Error()))
-		} else {
-			if errMsgs := validation.IsValidIP(host); errMsgs != nil {
-				errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, strings.Join(errMsgs, ",")))
-			}
-			if port != 0 {
-				errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, "must be empty or with an explicit 0 port"))
-			}
-		}
-	}
 
 	errs = append(errs, validatePercentageOfNodesToScore(field.NewPath("percentageOfNodesToScore"), cc.PercentageOfNodesToScore))
 
@@ -109,18 +79,6 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 
 	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
-}
-
-func splitHostIntPort(s string) (string, int, error) {
-	host, port, err := net.SplitHostPort(s)
-	if err != nil {
-		return "", 0, err
-	}
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		return "", 0, err
-	}
-	return host, portInt, err
 }
 
 func validatePercentageOfNodesToScore(path *field.Path, percentageOfNodesToScore *int32) error {
@@ -142,12 +100,8 @@ type invalidPlugins struct {
 // version (even if the list of invalid plugins is empty).
 var invalidPluginsByVersion = []invalidPlugins{
 	{
-		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
-		plugins:            []string{},
-	},
-	{
 		schemeGroupVersion: v1.SchemeGroupVersion.String(),
-		plugins:            []string{"SelectorSpread"},
+		plugins:            []string{},
 	},
 }
 
@@ -277,12 +231,12 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 		if profiles[i].Plugins != nil {
 			curr = profiles[i].Plugins.QueueSort
 		}
-		if !cmp.Equal(canon, curr) {
-			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "has to match for all profiles"))
+		if !apiequality.Semantic.DeepEqual(canon, curr) {
+			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "queueSort must be the same for all profiles"))
 		}
 		for _, cfg := range profiles[i].PluginConfig {
-			if cfg.Name == queueSortName && !cmp.Equal(queueSortArgs, cfg.Args) {
-				errs = append(errs, field.Invalid(path.Index(i).Child("pluginConfig", "args"), cfg.Args, "has to match for all profiles"))
+			if cfg.Name == queueSortName && !apiequality.Semantic.DeepEqual(queueSortArgs, cfg.Args) {
+				errs = append(errs, field.Invalid(path.Index(i).Child("pluginConfig", "args"), cfg.Args, "queueSort must be the same for all profiles"))
 			}
 		}
 	}

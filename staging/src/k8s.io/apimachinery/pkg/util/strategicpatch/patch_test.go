@@ -36,6 +36,9 @@ import (
 var (
 	fakeMergeItemSchema     = sptest.Fake{Path: filepath.Join("testdata", "swagger-merge-item.json")}
 	fakePrecisionItemSchema = sptest.Fake{Path: filepath.Join("testdata", "swagger-precision-item.json")}
+
+	fakeMergeItemV3Schema     = sptest.OpenAPIV3Getter{Path: filepath.Join("testdata", "swagger-merge-item-v3.json")}
+	fakePrecisionItemV3Schema = sptest.OpenAPIV3Getter{Path: filepath.Join("testdata", "swagger-precision-item-v3.json")}
 )
 
 type SortMergeListTestCases struct {
@@ -284,9 +287,14 @@ func TestSortMergeLists(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	tc := SortMergeListTestCases{}
@@ -766,9 +774,14 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	tc := StrategicMergePatchTestCases{}
@@ -6169,9 +6182,14 @@ func TestStrategicMergePatch(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	tc := StrategicMergePatchTestCases{}
@@ -6564,9 +6582,14 @@ func TestNumberConversion(t *testing.T) {
 	precisionItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakePrecisionItemSchema, "precisionItem"),
 	}
+	precisionItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakePrecisionItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakePrecisionItemV3Schema.SchemaOrDie().Components.Schemas["precisionItem"],
+	}
 	precisionItemSchemas := []LookupPatchMeta{
 		precisionItemStructSchema,
 		precisionItemOpenapiSchema,
+		precisionItemOpenapiV3Schema,
 	}
 
 	for _, schema := range precisionItemSchemas {
@@ -6774,9 +6797,14 @@ func TestReplaceWithRawExtension(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	for _, schema := range schemas {
@@ -6946,9 +6974,14 @@ func TestUnknownField(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	for _, k := range sets.StringKeySet(testcases).List() {

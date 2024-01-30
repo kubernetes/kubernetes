@@ -34,11 +34,12 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Directory", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-directory")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -103,9 +104,9 @@ var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType File", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-file")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -172,9 +173,9 @@ var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Socket", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-socket")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -238,9 +239,9 @@ var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Character Device", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-char-dev")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns            string
@@ -308,9 +309,9 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 	})
 })
 
-var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
+var _ = utils.SIGDescribe("HostPathType Block Device", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("host-path-type-block-dev")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns             string
@@ -478,7 +479,7 @@ func verifyPodHostPathTypeFailure(ctx context.Context, f *framework.Framework, n
 	// Check the pod is still not running
 	p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-	framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+	gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
 }

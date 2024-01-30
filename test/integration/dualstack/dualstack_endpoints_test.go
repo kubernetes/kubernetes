@@ -100,6 +100,7 @@ func TestDualStackEndpoints(t *testing.T) {
 		1*time.Second)
 
 	epsController := endpointslice.NewController(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
@@ -112,7 +113,7 @@ func TestDualStackEndpoints(t *testing.T) {
 	informers.Start(ctx.Done())
 	// use only one worker to serialize the updates
 	go epController.Run(ctx, 1)
-	go epsController.Run(1, ctx.Done())
+	go epsController.Run(ctx, 1)
 
 	var testcases = []struct {
 		name           string

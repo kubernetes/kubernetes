@@ -281,7 +281,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	// happens quite often because there is race condition between adding request after resyncPeriod
 	// and removing them from queue. Request can be added by resync before previous request is
 	// removed from queue. If we didn't add request here then in this case one request would be dropped
-	// and HPA would processed after 2 x resyncPeriod.
+	// and HPA would process after 2 x resyncPeriod.
 	if !deleted {
 		a.queue.AddRateLimited(key)
 	}
@@ -534,7 +534,7 @@ func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (de
 
 // computeStatusForObjectMetric computes the desired number of replicas for the specified metric of type ObjectMetricSourceType.
 func (a *HorizontalController) computeStatusForObjectMetric(specReplicas, statusReplicas int32, metricSpec autoscalingv2.MetricSpec, hpa *autoscalingv2.HorizontalPodAutoscaler, selector labels.Selector, status *autoscalingv2.MetricStatus, metricSelector labels.Selector) (replicas int32, timestamp time.Time, metricName string, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
-	if metricSpec.Object.Target.Type == autoscalingv2.ValueMetricType {
+	if metricSpec.Object.Target.Type == autoscalingv2.ValueMetricType && metricSpec.Object.Target.Value != nil {
 		replicaCountProposal, usageProposal, timestampProposal, err := a.replicaCalc.GetObjectMetricReplicas(specReplicas, metricSpec.Object.Target.Value.MilliValue(), metricSpec.Object.Metric.Name, hpa.Namespace, &metricSpec.Object.DescribedObject, selector, metricSelector)
 		if err != nil {
 			condition := a.getUnableComputeReplicaCountCondition(hpa, "FailedGetObjectMetric", err)
@@ -554,7 +554,7 @@ func (a *HorizontalController) computeStatusForObjectMetric(specReplicas, status
 			},
 		}
 		return replicaCountProposal, timestampProposal, fmt.Sprintf("%s metric %s", metricSpec.Object.DescribedObject.Kind, metricSpec.Object.Metric.Name), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
-	} else if metricSpec.Object.Target.Type == autoscalingv2.AverageValueMetricType {
+	} else if metricSpec.Object.Target.Type == autoscalingv2.AverageValueMetricType && metricSpec.Object.Target.AverageValue != nil {
 		replicaCountProposal, usageProposal, timestampProposal, err := a.replicaCalc.GetObjectPerPodMetricReplicas(statusReplicas, metricSpec.Object.Target.AverageValue.MilliValue(), metricSpec.Object.Metric.Name, hpa.Namespace, &metricSpec.Object.DescribedObject, metricSelector)
 		if err != nil {
 			condition := a.getUnableComputeReplicaCountCondition(hpa, "FailedGetObjectMetric", err)
@@ -819,7 +819,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	rescale := true
 	logger := klog.FromContext(ctx)
 
-	if scale.Spec.Replicas == 0 && minReplicas != 0 {
+	if currentReplicas == 0 && minReplicas != 0 {
 		// Autoscaling is disabled for this resource
 		desiredReplicas = 0
 		rescale = false
@@ -836,7 +836,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		// computeReplicasForMetrics may return both non-zero metricDesiredReplicas and an error.
 		// That means some metrics still work and HPA should perform scaling based on them.
 		if err != nil && metricDesiredReplicas == -1 {
-			a.setCurrentReplicasInStatus(hpa, currentReplicas)
+			a.setCurrentReplicasAndMetricsInStatus(hpa, currentReplicas, metricStatuses)
 			if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
 				utilruntime.HandleError(err)
 			}
@@ -879,7 +879,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
-			a.setCurrentReplicasInStatus(hpa, currentReplicas)
+			a.setCurrentReplicasAndMetricsInStatus(hpa, currentReplicas, metricStatuses)
 			if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
 				utilruntime.HandleError(err)
 			}
@@ -1357,9 +1357,9 @@ func (a *HorizontalController) scaleForResourceMappings(ctx context.Context, nam
 	return nil, schema.GroupResource{}, firstErr
 }
 
-// setCurrentReplicasInStatus sets the current replica count in the status of the HPA.
-func (a *HorizontalController) setCurrentReplicasInStatus(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas int32) {
-	a.setStatus(hpa, currentReplicas, hpa.Status.DesiredReplicas, hpa.Status.CurrentMetrics, false)
+// setCurrentReplicasAndMetricsInStatus sets the current replica count and metrics in the status of the HPA.
+func (a *HorizontalController) setCurrentReplicasAndMetricsInStatus(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas int32, metricStatuses []autoscalingv2.MetricStatus) {
+	a.setStatus(hpa, currentReplicas, hpa.Status.DesiredReplicas, metricStatuses, false)
 }
 
 // setStatus recreates the status of the given HPA, updating the current and

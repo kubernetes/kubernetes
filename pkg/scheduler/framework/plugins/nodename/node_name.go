@@ -41,9 +41,9 @@ const (
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeName) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+func (pl *NodeName) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
 	}
 }
 
@@ -54,9 +54,7 @@ func (pl *NodeName) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo.Node() == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
+
 	if !Fits(pod, nodeInfo) {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason)
 	}
@@ -69,6 +67,6 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &NodeName{}, nil
 }

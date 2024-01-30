@@ -19,11 +19,12 @@ import (
 	"reflect"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+
 	"github.com/google/cel-go/common/types/pb"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -32,17 +33,64 @@ import (
 	tpb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type protoTypeRegistry struct {
-	revTypeMap map[string]ref.Type
+// Adapter converts native Go values of varying type and complexity to equivalent CEL values.
+type Adapter = ref.TypeAdapter
+
+// Provider specifies functions for creating new object instances and for resolving
+// enum values by name.
+type Provider interface {
+	// EnumValue returns the numeric value of the given enum value name.
+	EnumValue(enumName string) ref.Val
+
+	// FindIdent takes a qualified identifier name and returns a ref.Val if one exists.
+	FindIdent(identName string) (ref.Val, bool)
+
+	// FindStructType returns the Type give a qualified type name.
+	//
+	// For historical reasons, only struct types are expected to be returned through this
+	// method, and the type values are expected to be wrapped in a TypeType instance using
+	// TypeTypeWithParam(<structType>).
+	//
+	// Returns false if not found.
+	FindStructType(structType string) (*Type, bool)
+
+	// FieldStructFieldType returns the field type for a checked type value. Returns
+	// false if the field could not be found.
+	FindStructFieldType(structType, fieldName string) (*FieldType, bool)
+
+	// NewValue creates a new type value from a qualified name and map of field
+	// name to value.
+	//
+	// Note, for each value, the Val.ConvertToNative function will be invoked
+	// to convert the Val to the field's native type. If an error occurs during
+	// conversion, the NewValue will be a types.Err.
+	NewValue(structType string, fields map[string]ref.Val) ref.Val
+}
+
+// FieldType represents a field's type value and whether that field supports presence detection.
+type FieldType struct {
+	// Type of the field as a CEL native type value.
+	Type *Type
+
+	// IsSet indicates whether the field is set on an input object.
+	IsSet ref.FieldTester
+
+	// GetFrom retrieves the field value on the input object, if set.
+	GetFrom ref.FieldGetter
+}
+
+// Registry provides type information for a set of registered types.
+type Registry struct {
+	revTypeMap map[string]*Type
 	pbdb       *pb.Db
 }
 
 // NewRegistry accepts a list of proto message instances and returns a type
 // provider which can create new instances of the provided message or any
 // message that proto depends upon in its FileDescriptor.
-func NewRegistry(types ...proto.Message) (ref.TypeRegistry, error) {
-	p := &protoTypeRegistry{
-		revTypeMap: make(map[string]ref.Type),
+func NewRegistry(types ...proto.Message) (*Registry, error) {
+	p := &Registry{
+		revTypeMap: make(map[string]*Type),
 		pbdb:       pb.NewDb(),
 	}
 	err := p.RegisterType(
@@ -78,18 +126,17 @@ func NewRegistry(types ...proto.Message) (ref.TypeRegistry, error) {
 }
 
 // NewEmptyRegistry returns a registry which is completely unconfigured.
-func NewEmptyRegistry() ref.TypeRegistry {
-	return &protoTypeRegistry{
-		revTypeMap: make(map[string]ref.Type),
+func NewEmptyRegistry() *Registry {
+	return &Registry{
+		revTypeMap: make(map[string]*Type),
 		pbdb:       pb.NewDb(),
 	}
 }
 
-// Copy implements the ref.TypeRegistry interface method which copies the current state of the
-// registry into its own memory space.
-func (p *protoTypeRegistry) Copy() ref.TypeRegistry {
-	copy := &protoTypeRegistry{
-		revTypeMap: make(map[string]ref.Type),
+// Copy copies the current state of the registry into its own memory space.
+func (p *Registry) Copy() *Registry {
+	copy := &Registry{
+		revTypeMap: make(map[string]*Type),
 		pbdb:       p.pbdb.Copy(),
 	}
 	for k, v := range p.revTypeMap {
@@ -98,7 +145,8 @@ func (p *protoTypeRegistry) Copy() ref.TypeRegistry {
 	return copy
 }
 
-func (p *protoTypeRegistry) EnumValue(enumName string) ref.Val {
+// EnumValue returns the numeric value of the given enum value name.
+func (p *Registry) EnumValue(enumName string) ref.Val {
 	enumVal, found := p.pbdb.DescribeEnum(enumName)
 	if !found {
 		return NewErr("unknown enum name '%s'", enumName)
@@ -106,9 +154,12 @@ func (p *protoTypeRegistry) EnumValue(enumName string) ref.Val {
 	return Int(enumVal.Value())
 }
 
-func (p *protoTypeRegistry) FindFieldType(messageType string,
-	fieldName string) (*ref.FieldType, bool) {
-	msgType, found := p.pbdb.DescribeType(messageType)
+// FieldFieldType returns the field type for a checked type value. Returns false if
+// the field could not be found.
+//
+// Deprecated: use FindStructFieldType
+func (p *Registry) FindFieldType(structType, fieldName string) (*ref.FieldType, bool) {
+	msgType, found := p.pbdb.DescribeType(structType)
 	if !found {
 		return nil, false
 	}
@@ -117,15 +168,32 @@ func (p *protoTypeRegistry) FindFieldType(messageType string,
 		return nil, false
 	}
 	return &ref.FieldType{
-			Type:    field.CheckedType(),
-			IsSet:   field.IsSet,
-			GetFrom: field.GetFrom},
-		true
+		Type:    field.CheckedType(),
+		IsSet:   field.IsSet,
+		GetFrom: field.GetFrom}, true
 }
 
-func (p *protoTypeRegistry) FindIdent(identName string) (ref.Val, bool) {
+// FieldStructFieldType returns the field type for a checked type value. Returns
+// false if the field could not be found.
+func (p *Registry) FindStructFieldType(structType, fieldName string) (*FieldType, bool) {
+	msgType, found := p.pbdb.DescribeType(structType)
+	if !found {
+		return nil, false
+	}
+	field, found := msgType.FieldByName(fieldName)
+	if !found {
+		return nil, false
+	}
+	return &FieldType{
+		Type:    fieldDescToCELType(field),
+		IsSet:   field.IsSet,
+		GetFrom: field.GetFrom}, true
+}
+
+// FindIdent takes a qualified identifier name and returns a ref.Val if one exists.
+func (p *Registry) FindIdent(identName string) (ref.Val, bool) {
 	if t, found := p.revTypeMap[identName]; found {
-		return t.(ref.Val), true
+		return t, true
 	}
 	if enumVal, found := p.pbdb.DescribeEnum(identName); found {
 		return Int(enumVal.Value()), true
@@ -133,24 +201,50 @@ func (p *protoTypeRegistry) FindIdent(identName string) (ref.Val, bool) {
 	return nil, false
 }
 
-func (p *protoTypeRegistry) FindType(typeName string) (*exprpb.Type, bool) {
-	if _, found := p.pbdb.DescribeType(typeName); !found {
+// FindType looks up the Type given a qualified typeName. Returns false if not found.
+//
+// Deprecated: use FindStructType
+func (p *Registry) FindType(structType string) (*exprpb.Type, bool) {
+	if _, found := p.pbdb.DescribeType(structType); !found {
 		return nil, false
 	}
-	if typeName != "" && typeName[0] == '.' {
-		typeName = typeName[1:]
+	if structType != "" && structType[0] == '.' {
+		structType = structType[1:]
 	}
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_Type{
 			Type: &exprpb.Type{
 				TypeKind: &exprpb.Type_MessageType{
-					MessageType: typeName}}}}, true
+					MessageType: structType}}}}, true
 }
 
-func (p *protoTypeRegistry) NewValue(typeName string, fields map[string]ref.Val) ref.Val {
-	td, found := p.pbdb.DescribeType(typeName)
+// FindStructType returns the Type give a qualified type name.
+//
+// For historical reasons, only struct types are expected to be returned through this
+// method, and the type values are expected to be wrapped in a TypeType instance using
+// TypeTypeWithParam(<structType>).
+//
+// Returns false if not found.
+func (p *Registry) FindStructType(structType string) (*Type, bool) {
+	if _, found := p.pbdb.DescribeType(structType); !found {
+		return nil, false
+	}
+	if structType != "" && structType[0] == '.' {
+		structType = structType[1:]
+	}
+	return NewTypeTypeWithParam(NewObjectType(structType)), true
+}
+
+// NewValue creates a new type value from a qualified name and map of field
+// name to value.
+//
+// Note, for each value, the Val.ConvertToNative function will be invoked
+// to convert the Val to the field's native type. If an error occurs during
+// conversion, the NewValue will be a types.Err.
+func (p *Registry) NewValue(structType string, fields map[string]ref.Val) ref.Val {
+	td, found := p.pbdb.DescribeType(structType)
 	if !found {
-		return NewErr("unknown type '%s'", typeName)
+		return NewErr("unknown type '%s'", structType)
 	}
 	msg := td.New()
 	fieldMap := td.FieldMap()
@@ -167,7 +261,8 @@ func (p *protoTypeRegistry) NewValue(typeName string, fields map[string]ref.Val)
 	return p.NativeToValue(msg.Interface())
 }
 
-func (p *protoTypeRegistry) RegisterDescriptor(fileDesc protoreflect.FileDescriptor) error {
+// RegisterDescriptor registers the contents of a protocol buffer `FileDescriptor`.
+func (p *Registry) RegisterDescriptor(fileDesc protoreflect.FileDescriptor) error {
 	fd, err := p.pbdb.RegisterDescriptor(fileDesc)
 	if err != nil {
 		return err
@@ -175,7 +270,8 @@ func (p *protoTypeRegistry) RegisterDescriptor(fileDesc protoreflect.FileDescrip
 	return p.registerAllTypes(fd)
 }
 
-func (p *protoTypeRegistry) RegisterMessage(message proto.Message) error {
+// RegisterMessage registers a protocol buffer message and its dependencies.
+func (p *Registry) RegisterMessage(message proto.Message) error {
 	fd, err := p.pbdb.RegisterMessage(message)
 	if err != nil {
 		return err
@@ -183,11 +279,32 @@ func (p *protoTypeRegistry) RegisterMessage(message proto.Message) error {
 	return p.registerAllTypes(fd)
 }
 
-func (p *protoTypeRegistry) RegisterType(types ...ref.Type) error {
+// RegisterType registers a type value with the provider which ensures the provider is aware of how to
+// map the type to an identifier.
+//
+// If the `ref.Type` value is a `*types.Type` it will be registered directly by its runtime type name.
+// If the `ref.Type` value is not a `*types.Type` instance, a `*types.Type` instance which reflects the
+// traits present on the input and the runtime type name. By default this foreign type will be treated
+// as a types.StructKind. To avoid potential issues where the `ref.Type` values does not match the
+// generated `*types.Type` instance, consider always using the `*types.Type` to represent type extensions
+// to CEL, even when they're not based on protobuf types.
+func (p *Registry) RegisterType(types ...ref.Type) error {
 	for _, t := range types {
-		p.revTypeMap[t.TypeName()] = t
+		celType := maybeForeignType(t)
+		existing, found := p.revTypeMap[t.TypeName()]
+		if !found {
+			p.revTypeMap[t.TypeName()] = celType
+			continue
+		}
+		if !existing.IsEquivalentType(celType) {
+			return fmt.Errorf("type registration conflict. found: %v, input: %v", existing, celType)
+		}
+		if existing.traitMask != celType.traitMask {
+			return fmt.Errorf(
+				"type registered with conflicting traits: %v with traits %v, input: %v",
+				existing.TypeName(), existing.traitMask, celType.traitMask)
+		}
 	}
-	// TODO: generate an error when the type name is registered more than once.
 	return nil
 }
 
@@ -195,7 +312,7 @@ func (p *protoTypeRegistry) RegisterType(types ...ref.Type) error {
 // providing support for custom proto-based types.
 //
 // This method should be the inverse of ref.Val.ConvertToNative.
-func (p *protoTypeRegistry) NativeToValue(value interface{}) ref.Val {
+func (p *Registry) NativeToValue(value any) ref.Val {
 	if val, found := nativeToValue(p, value); found {
 		return val
 	}
@@ -217,7 +334,7 @@ func (p *protoTypeRegistry) NativeToValue(value interface{}) ref.Val {
 		if !found {
 			return NewErr("unknown type: '%s'", typeName)
 		}
-		return NewObject(p, td, typeVal.(*TypeValue), v)
+		return NewObject(p, td, typeVal, v)
 	case *pb.Map:
 		return NewProtoMap(p, v)
 	case protoreflect.List:
@@ -230,14 +347,41 @@ func (p *protoTypeRegistry) NativeToValue(value interface{}) ref.Val {
 	return UnsupportedRefValConversionErr(value)
 }
 
-func (p *protoTypeRegistry) registerAllTypes(fd *pb.FileDescription) error {
+func (p *Registry) registerAllTypes(fd *pb.FileDescription) error {
 	for _, typeName := range fd.GetTypeNames() {
+		// skip well-known type names since they're automatically sanitized
+		// during NewObjectType() calls.
+		if _, found := checkedWellKnowns[typeName]; found {
+			continue
+		}
 		err := p.RegisterType(NewObjectTypeValue(typeName))
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func fieldDescToCELType(field *pb.FieldDescription) *Type {
+	if field.IsMap() {
+		return NewMapType(
+			singularFieldDescToCELType(field.KeyType),
+			singularFieldDescToCELType(field.ValueType))
+	}
+	if field.IsList() {
+		return NewListType(singularFieldDescToCELType(field))
+	}
+	return singularFieldDescToCELType(field)
+}
+
+func singularFieldDescToCELType(field *pb.FieldDescription) *Type {
+	if field.IsMessage() {
+		return NewObjectType(string(field.Descriptor().Message().FullName()))
+	}
+	if field.IsEnum() {
+		return IntType
+	}
+	return ProtoCELPrimitives[field.ProtoKind()]
 }
 
 // defaultTypeAdapter converts go native types to CEL values.
@@ -249,7 +393,7 @@ var (
 )
 
 // NativeToValue implements the ref.TypeAdapter interface.
-func (a *defaultTypeAdapter) NativeToValue(value interface{}) ref.Val {
+func (a *defaultTypeAdapter) NativeToValue(value any) ref.Val {
 	if val, found := nativeToValue(a, value); found {
 		return val
 	}
@@ -258,7 +402,7 @@ func (a *defaultTypeAdapter) NativeToValue(value interface{}) ref.Val {
 
 // nativeToValue returns the converted (ref.Val, true) of a conversion is found,
 // otherwise (nil, false)
-func nativeToValue(a ref.TypeAdapter, value interface{}) (ref.Val, bool) {
+func nativeToValue(a Adapter, value any) (ref.Val, bool) {
 	switch v := value.(type) {
 	case nil:
 		return NullValue, true
@@ -364,7 +508,7 @@ func nativeToValue(a ref.TypeAdapter, value interface{}) (ref.Val, bool) {
 	// specializations for common map types.
 	case map[string]string:
 		return NewStringStringMap(a, v), true
-	case map[string]interface{}:
+	case map[string]any:
 		return NewStringInterfaceMap(a, v), true
 	case map[ref.Val]ref.Val:
 		return NewRefValMap(a, v), true
@@ -479,9 +623,12 @@ func msgSetField(target protoreflect.Message, field *pb.FieldDescription, val re
 	if err != nil {
 		return fieldTypeConversionError(field, err)
 	}
-	switch v.(type) {
+	if v == nil {
+		return nil
+	}
+	switch pv := v.(type) {
 	case proto.Message:
-		v = v.(proto.Message).ProtoReflect()
+		v = pv.ProtoReflect()
 	}
 	target.Set(field.Descriptor(), protoreflect.ValueOf(v))
 	return nil
@@ -494,6 +641,9 @@ func msgSetListField(target protoreflect.List, listField *pb.FieldDescription, l
 		elemVal, err := elem.ConvertToNative(elemReflectType)
 		if err != nil {
 			return fieldTypeConversionError(listField, err)
+		}
+		if elemVal == nil {
+			continue
 		}
 		switch ev := elemVal.(type) {
 		case proto.Message:
@@ -519,9 +669,12 @@ func msgSetMapField(target protoreflect.Map, mapField *pb.FieldDescription, mapV
 		if err != nil {
 			return fieldTypeConversionError(mapField, err)
 		}
-		switch v.(type) {
+		if v == nil {
+			continue
+		}
+		switch pv := v.(type) {
 		case proto.Message:
-			v = v.(proto.Message).ProtoReflect()
+			v = pv.ProtoReflect()
 		}
 		target.Set(protoreflect.ValueOf(k).MapKey(), protoreflect.ValueOf(v))
 	}
@@ -537,3 +690,24 @@ func fieldTypeConversionError(field *pb.FieldDescription, err error) error {
 	msgName := field.Descriptor().ContainingMessage().FullName()
 	return fmt.Errorf("field type conversion error for %v.%v value type: %v", msgName, field.Name(), err)
 }
+
+var (
+	// ProtoCELPrimitives provides a map from the protoreflect Kind to the equivalent CEL type.
+	ProtoCELPrimitives = map[protoreflect.Kind]*Type{
+		protoreflect.BoolKind:     BoolType,
+		protoreflect.BytesKind:    BytesType,
+		protoreflect.DoubleKind:   DoubleType,
+		protoreflect.FloatKind:    DoubleType,
+		protoreflect.Int32Kind:    IntType,
+		protoreflect.Int64Kind:    IntType,
+		protoreflect.Sint32Kind:   IntType,
+		protoreflect.Sint64Kind:   IntType,
+		protoreflect.Uint32Kind:   UintType,
+		protoreflect.Uint64Kind:   UintType,
+		protoreflect.Fixed32Kind:  UintType,
+		protoreflect.Fixed64Kind:  UintType,
+		protoreflect.Sfixed32Kind: IntType,
+		protoreflect.Sfixed64Kind: IntType,
+		protoreflect.StringKind:   StringType,
+	}
+)

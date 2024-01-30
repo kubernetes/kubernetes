@@ -30,7 +30,7 @@ import (
 func TestPodLogValidates(t *testing.T) {
 	config, server := registrytest.NewEtcdStorage(t, "")
 	defer server.Terminate(t)
-	s, destroyFunc, err := generic.NewRawStorage(config, nil)
+	s, destroyFunc, err := generic.NewRawStorage(config, nil, nil, "")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

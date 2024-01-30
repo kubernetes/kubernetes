@@ -1,0 +1,560 @@
+{
+  "groupVersion": "v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "Binding",
+      "name": "bindings",
+      "namespaced": true,
+      "singularName": "binding",
+      "verbs": [
+        "create"
+      ]
+    },
+    {
+      "kind": "ComponentStatus",
+      "name": "componentstatuses",
+      "namespaced": false,
+      "shortNames": [
+        "cs"
+      ],
+      "singularName": "componentstatus",
+      "verbs": [
+        "get",
+        "list"
+      ]
+    },
+    {
+      "kind": "ConfigMap",
+      "name": "configmaps",
+      "namespaced": true,
+      "shortNames": [
+        "cm"
+      ],
+      "singularName": "configmap",
+      "storageVersionHash": "qFsyl6wFWjQ=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Endpoints",
+      "name": "endpoints",
+      "namespaced": true,
+      "shortNames": [
+        "ep"
+      ],
+      "singularName": "endpoints",
+      "storageVersionHash": "fWeeMqaN/OA=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Event",
+      "name": "events",
+      "namespaced": true,
+      "shortNames": [
+        "ev"
+      ],
+      "singularName": "event",
+      "storageVersionHash": "r2yiGXH7wu8=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "LimitRange",
+      "name": "limitranges",
+      "namespaced": true,
+      "shortNames": [
+        "limits"
+      ],
+      "singularName": "limitrange",
+      "storageVersionHash": "EBKMFVe6cwo=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Namespace",
+      "name": "namespaces",
+      "namespaced": false,
+      "shortNames": [
+        "ns"
+      ],
+      "singularName": "namespace",
+      "storageVersionHash": "Q3oi5N2YM8M=",
+      "verbs": [
+        "create",
+        "delete",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Namespace",
+      "name": "namespaces/finalize",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "update"
+      ]
+    },
+    {
+      "kind": "Namespace",
+      "name": "namespaces/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Node",
+      "name": "nodes",
+      "namespaced": false,
+      "shortNames": [
+        "no"
+      ],
+      "singularName": "node",
+      "storageVersionHash": "XwShjMxG9Fs=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "NodeProxyOptions",
+      "name": "nodes/proxy",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "create",
+        "delete",
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Node",
+      "name": "nodes/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "PersistentVolumeClaim",
+      "name": "persistentvolumeclaims",
+      "namespaced": true,
+      "shortNames": [
+        "pvc"
+      ],
+      "singularName": "persistentvolumeclaim",
+      "storageVersionHash": "QWTyNDq0dC4=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PersistentVolumeClaim",
+      "name": "persistentvolumeclaims/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "PersistentVolume",
+      "name": "persistentvolumes",
+      "namespaced": false,
+      "shortNames": [
+        "pv"
+      ],
+      "singularName": "persistentvolume",
+      "storageVersionHash": "HN/zwEC+JgM=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PersistentVolume",
+      "name": "persistentvolumes/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "Pod",
+      "name": "pods",
+      "namespaced": true,
+      "shortNames": [
+        "po"
+      ],
+      "singularName": "pod",
+      "storageVersionHash": "xPOwRZ+Yhw8=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PodAttachOptions",
+      "name": "pods/attach",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create",
+        "get"
+      ]
+    },
+    {
+      "kind": "Binding",
+      "name": "pods/binding",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "pods/ephemeralcontainers",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "group": "policy",
+      "kind": "Eviction",
+      "name": "pods/eviction",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create"
+      ],
+      "version": "v1"
+    },
+    {
+      "kind": "PodExecOptions",
+      "name": "pods/exec",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create",
+        "get"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "pods/log",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get"
+      ]
+    },
+    {
+      "kind": "PodPortForwardOptions",
+      "name": "pods/portforward",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create",
+        "get"
+      ]
+    },
+    {
+      "kind": "PodProxyOptions",
+      "name": "pods/proxy",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create",
+        "delete",
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "pods/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "PodTemplate",
+      "name": "podtemplates",
+      "namespaced": true,
+      "singularName": "podtemplate",
+      "storageVersionHash": "LIXB2x4IFpk=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "ReplicationController",
+      "name": "replicationcontrollers",
+      "namespaced": true,
+      "shortNames": [
+        "rc"
+      ],
+      "singularName": "replicationcontroller",
+      "storageVersionHash": "Jond2If31h0=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "group": "autoscaling",
+      "kind": "Scale",
+      "name": "replicationcontrollers/scale",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ],
+      "version": "v1"
+    },
+    {
+      "kind": "ReplicationController",
+      "name": "replicationcontrollers/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "ResourceQuota",
+      "name": "resourcequotas",
+      "namespaced": true,
+      "shortNames": [
+        "quota"
+      ],
+      "singularName": "resourcequota",
+      "storageVersionHash": "8uhSgffRX6w=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourceQuota",
+      "name": "resourcequotas/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Secret",
+      "name": "secrets",
+      "namespaced": true,
+      "singularName": "secret",
+      "storageVersionHash": "S6u1pOWzb84=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ServiceAccount",
+      "name": "serviceaccounts",
+      "namespaced": true,
+      "shortNames": [
+        "sa"
+      ],
+      "singularName": "serviceaccount",
+      "storageVersionHash": "pbx9ZvyFpBE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "group": "authentication.k8s.io",
+      "kind": "TokenRequest",
+      "name": "serviceaccounts/token",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create"
+      ],
+      "version": "v1"
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "Service",
+      "name": "services",
+      "namespaced": true,
+      "shortNames": [
+        "svc"
+      ],
+      "singularName": "service",
+      "storageVersionHash": "0/CO1lhkEBI=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ServiceProxyOptions",
+      "name": "services/proxy",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "create",
+        "delete",
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Service",
+      "name": "services/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

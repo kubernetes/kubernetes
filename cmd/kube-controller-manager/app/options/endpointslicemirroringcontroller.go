@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 )
 
@@ -44,9 +45,9 @@ func (o *EndpointSliceMirroringControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.MirroringConcurrentServiceEndpointSyncs, "mirroring-concurrent-service-endpoint-syncs", o.MirroringConcurrentServiceEndpointSyncs, "The number of service endpoint syncing operations that will be done concurrently by the EndpointSliceMirroring controller. Larger number = faster endpoint slice updating, but more CPU (and network) load. Defaults to 5.")
-	fs.Int32Var(&o.MirroringMaxEndpointsPerSubset, "mirroring-max-endpoints-per-subset", o.MirroringMaxEndpointsPerSubset, "The maximum number of endpoints that will be added to an EndpointSlice by the EndpointSliceMirroring controller. More endpoints per slice will result in less endpoint slices, but larger resources. Defaults to 100.")
-	fs.DurationVar(&o.MirroringEndpointUpdatesBatchPeriod.Duration, "mirroring-endpointslice-updates-batch-period", o.MirroringEndpointUpdatesBatchPeriod.Duration, "The length of EndpointSlice updates batching period for EndpointSliceMirroring controller. Processing of EndpointSlice changes will be delayed by this duration to join them with potential upcoming updates and reduce the overall number of EndpointSlice updates. Larger number = higher endpoint programming latency, but lower number of endpoints revision generated")
+	fs.Int32Var(&o.MirroringConcurrentServiceEndpointSyncs, "mirroring-concurrent-service-endpoint-syncs", o.MirroringConcurrentServiceEndpointSyncs, fmt.Sprintf("The number of service endpoint syncing operations that will be done concurrently by the %s. Larger number = faster endpoint slice updating, but more CPU (and network) load. Defaults to 5.", names.EndpointSliceMirroringController))
+	fs.Int32Var(&o.MirroringMaxEndpointsPerSubset, "mirroring-max-endpoints-per-subset", o.MirroringMaxEndpointsPerSubset, fmt.Sprintf("The maximum number of endpoints that will be added to an EndpointSlice by the %s. More endpoints per slice will result in less endpoint slices, but larger resources. Defaults to 100.", names.EndpointSliceMirroringController))
+	fs.DurationVar(&o.MirroringEndpointUpdatesBatchPeriod.Duration, "mirroring-endpointslice-updates-batch-period", o.MirroringEndpointUpdatesBatchPeriod.Duration, fmt.Sprintf("The length of EndpointSlice updates batching period for %s. Processing of EndpointSlice changes will be delayed by this duration to join them with potential upcoming updates and reduce the overall number of EndpointSlice updates. Larger number = higher endpoint programming latency, but lower number of endpoints revision generated", names.EndpointSliceMirroringController))
 }
 
 // ApplyTo fills up EndpointSliceMirroringController config with options.

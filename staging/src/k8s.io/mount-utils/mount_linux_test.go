@@ -22,7 +22,6 @@ package mount
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"reflect"
@@ -31,13 +30,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
-	successCase :=
-		`/dev/0 /path/to/0 type0 flags 0 0
+	successCase := `/dev/0 /path/to/0 type0 flags 0 0
 /dev/1    /path/to/1   type1	flags 1 1
 /dev/2 /path/to/2 type2 flags,1,2=3 2 2
 `
@@ -148,10 +147,14 @@ func setEquivalent(set1, set2 []string) bool {
 func TestGetDeviceNameFromMount(t *testing.T) {
 	fm := NewFakeMounter(
 		[]MountPoint{
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/111"},
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/222"},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/111",
+			},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/222",
+			},
 		})
 
 	tests := []struct {
@@ -203,7 +206,6 @@ func TestGetMountRefsByDev(t *testing.T) {
 	}
 
 	for i, test := range tests {
-
 		if refs, err := getMountRefsByDev(fm, test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
 			t.Errorf("%d. getMountRefsByDev(%q) = %v, %v; expected %v, nil", i, test.mountPath, refs, err, test.expectedRefs)
 		}
@@ -294,7 +296,6 @@ func TestPathWithinBase(t *testing.T) {
 		if PathWithinBase(test.fullPath, test.basePath) != test.expected {
 			t.Errorf("test %q failed: expected %v", test.name, test.expected)
 		}
-
 	}
 }
 
@@ -422,27 +423,31 @@ func TestSearchMountPoints(t *testing.T) {
 62 25 7:1 / /var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 95 25 7:1 / /var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 `,
-			[]string{"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
-				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test"},
+			[]string{
+				"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+			},
 			nil,
 		},
 	}
-	tmpFile, err := ioutil.TempFile("", "test-get-filetype")
+	tmpFile, err := os.CreateTemp("", "test-get-filetype")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 	for _, v := range testcases {
-		tmpFile.Truncate(0)
-		tmpFile.Seek(0, 0)
-		tmpFile.WriteString(v.mountInfos)
-		tmpFile.Sync()
+		assert.NoError(t, tmpFile.Truncate(0))
+		_, err := tmpFile.Seek(0, 0)
+		assert.NoError(t, err)
+		_, err = tmpFile.WriteString(v.mountInfos)
+		assert.NoError(t, err)
+		assert.NoError(t, tmpFile.Sync())
 		refs, err := SearchMountPoints(v.source, tmpFile.Name())
 		if !reflect.DeepEqual(refs, v.expectedRefs) {
 			t.Errorf("test %q: expected Refs: %#v, got %#v", v.name, v.expectedRefs, refs)
 		}
-		if !reflect.DeepEqual(err, v.expectedErr) {
+		if err != v.expectedErr {
 			t.Errorf("test %q: expected err: %v, got %v", v.name, v.expectedErr, err)
 		}
 	}
@@ -459,7 +464,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 		mountFlags       []string
 	}{
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -468,7 +472,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -477,7 +480,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -486,7 +488,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -705,7 +706,10 @@ func TestFormatConcurrency(t *testing.T) {
 			// for one to be released
 			for i := 0; i < tc.max+1; i++ {
 				go func() {
-					mounter.format(fstype, nil)
+					_, err := mounter.format(fstype, nil)
+					if err != nil {
+						t.Errorf("format(%q): %v", fstype, err)
+					}
 				}()
 			}
 
@@ -780,7 +784,10 @@ func TestFormatTimeout(t *testing.T) {
 
 	for i := 0; i < maxConcurrency+1; i++ {
 		go func() {
-			mounter.format(fstype, nil)
+			_, err := mounter.format(fstype, nil)
+			if err != nil {
+				t.Errorf("format(%q): %v", fstype, err)
+			}
 		}()
 	}
 

@@ -61,6 +61,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.HealthzPort = 10248
 			obj.HTTPCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
 			obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
+			obj.ImageMaximumGCAge = metav1.Duration{}
 			obj.ImageGCHighThresholdPercent = 85
 			obj.ImageGCLowThresholdPercent = 80
 			obj.KernelMemcgNotification = false

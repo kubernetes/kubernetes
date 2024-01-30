@@ -68,16 +68,17 @@ func InstrumentRoundTripperCounter(counter *prometheus.CounterVec, next http.Rou
 		o.apply(rtOpts)
 	}
 
-	code, method := checkLabels(counter)
+	// Curry the counter with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(counter.MustCurryWith(rtOpts.emptyDynamicLabels()))
 
 	return func(r *http.Request) (*http.Response, error) {
 		resp, err := next.RoundTrip(r)
 		if err == nil {
-			addWithExemplar(
-				counter.With(labels(code, method, r.Method, resp.StatusCode, rtOpts.extraMethods...)),
-				1,
-				rtOpts.getExemplarFn(r.Context()),
-			)
+			l := labels(code, method, r.Method, resp.StatusCode, rtOpts.extraMethods...)
+			for label, resolve := range rtOpts.extraLabelsFromCtx {
+				l[label] = resolve(resp.Request.Context())
+			}
+			addWithExemplar(counter.With(l), 1, rtOpts.getExemplarFn(r.Context()))
 		}
 		return resp, err
 	}
@@ -110,17 +111,18 @@ func InstrumentRoundTripperDuration(obs prometheus.ObserverVec, next http.RoundT
 		o.apply(rtOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(rtOpts.emptyDynamicLabels()))
 
 	return func(r *http.Request) (*http.Response, error) {
 		start := time.Now()
 		resp, err := next.RoundTrip(r)
 		if err == nil {
-			observeWithExemplar(
-				obs.With(labels(code, method, r.Method, resp.StatusCode, rtOpts.extraMethods...)),
-				time.Since(start).Seconds(),
-				rtOpts.getExemplarFn(r.Context()),
-			)
+			l := labels(code, method, r.Method, resp.StatusCode, rtOpts.extraMethods...)
+			for label, resolve := range rtOpts.extraLabelsFromCtx {
+				l[label] = resolve(resp.Request.Context())
+			}
+			observeWithExemplar(obs.With(l), time.Since(start).Seconds(), rtOpts.getExemplarFn(r.Context()))
 		}
 		return resp, err
 	}

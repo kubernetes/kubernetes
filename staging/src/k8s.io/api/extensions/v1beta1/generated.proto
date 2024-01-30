@@ -176,6 +176,8 @@ message DaemonSetStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated DaemonSetCondition conditions = 10;
 }
 
@@ -343,6 +345,8 @@ message DeploymentStatus {
   // Represents the latest available observations of a deployment's current state.
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated DeploymentCondition conditions = 6;
 
   // Count of hash collisions for the Deployment. The Deployment controller uses this
@@ -406,6 +410,7 @@ message HTTPIngressPath {
 // or '#'.
 message HTTPIngressRuleValue {
   // A collection of paths that map requests to backends.
+  // +listType=atomic
   repeated HTTPIngressPath paths = 1;
 }
 
@@ -422,6 +427,7 @@ message IPBlock {
   // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
+  // +listType=atomic
   repeated string except = 2;
 }
 
@@ -495,6 +501,7 @@ message IngressLoadBalancerIngress {
 message IngressLoadBalancerStatus {
   // Ingress is a list containing ingress points for the load-balancer.
   // +optional
+  // +listType=atomic
   repeated IngressLoadBalancerIngress ingress = 1;
 }
 
@@ -602,11 +609,13 @@ message IngressSpec {
   // through the SNI TLS extension, if the ingress controller fulfilling the
   // ingress supports SNI.
   // +optional
+  // +listType=atomic
   repeated IngressTLS tls = 2;
 
   // A list of host rules used to configure the Ingress. If unspecified, or
   // no rule matches, all traffic is sent to the default backend.
   // +optional
+  // +listType=atomic
   repeated IngressRule rules = 3;
 }
 
@@ -624,6 +633,7 @@ message IngressTLS {
   // wildcard host setting for the loadbalancer controller fulfilling this
   // Ingress, if left unspecified.
   // +optional
+  // +listType=atomic
   repeated string hosts = 1;
 
   // SecretName is the name of the secret used to terminate SSL traffic on 443.
@@ -659,6 +669,7 @@ message NetworkPolicyEgressRule {
   // If this field is present and contains at least one item, then this rule allows
   // traffic only if the traffic matches at least one port in the list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPort ports = 1;
 
   // List of destinations for outgoing traffic of pods selected for this rule.
@@ -667,6 +678,7 @@ message NetworkPolicyEgressRule {
   // destination). If this field is present and contains at least one item, this rule
   // allows traffic only if the traffic matches at least one item in the to list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPeer to = 2;
 }
 
@@ -679,6 +691,7 @@ message NetworkPolicyIngressRule {
   // If this field is present and contains at least one item, then this rule allows traffic
   // only if the traffic matches at least one port in the list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPort ports = 1;
 
   // List of sources which should be able to access the pods selected for this rule.
@@ -687,6 +700,7 @@ message NetworkPolicyIngressRule {
   // If this field is present and contains at least one item, this rule allows traffic only if the
   // traffic matches at least one item in the from list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPeer from = 2;
 }
 
@@ -767,6 +781,7 @@ message NetworkPolicySpec {
   // If this field is empty then this NetworkPolicy does not allow any traffic
   // (and serves solely to ensure that the pods it selects are isolated by default).
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyIngressRule ingress = 2;
 
   // List of egress rules to be applied to the selected pods. Outgoing traffic is
@@ -777,6 +792,7 @@ message NetworkPolicySpec {
   // solely to ensure that the pods it selects are isolated by default).
   // This field is beta-level in 1.8
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyEgressRule egress = 3;
 
   // List of rule types that the NetworkPolicy relates to.
@@ -790,6 +806,7 @@ message NetworkPolicySpec {
   // an Egress section and would otherwise default to just [ "Ingress" ]).
   // This field is beta-level in 1.8
   // +optional
+  // +listType=atomic
   repeated string policyTypes = 4;
 }
 
@@ -905,6 +922,8 @@ message ReplicaSetStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated ReplicaSetCondition conditions = 6;
 }
 

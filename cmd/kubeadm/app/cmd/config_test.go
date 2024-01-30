@@ -38,7 +38,6 @@ import (
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
@@ -83,13 +82,8 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
 apiVersion: %s
-kind: InitConfiguration
-nodeRegistration:
-  criSocket: %s
----
-apiVersion: %[1]s
 kind: ClusterConfiguration
-kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket, constants.CurrentKubernetesVersion))),
+kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",
@@ -99,13 +93,8 @@ kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.U
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
 apiVersion: %s
-kind: InitConfiguration
-nodeRegistration:
-  criSocket: %s
----
-apiVersion: %[1]s
 kind: ClusterConfiguration
-kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket, constants.MinimumControlPlaneVersion))),
+kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.MinimumControlPlaneVersion))),
 		},
 	}
 
@@ -246,9 +235,9 @@ func TestConfigImagesListOutput(t *testing.T) {
 registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
 registry.k8s.io/kube-scheduler:{{.KubeVersion}}
 registry.k8s.io/kube-proxy:{{.KubeVersion}}
+registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 registry.k8s.io/pause:{{.PauseVersion}}
 registry.k8s.io/etcd:{{.EtcdVersion}}
-registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -265,9 +254,9 @@ registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
         "registry.k8s.io/kube-controller-manager:{{.KubeVersion}}",
         "registry.k8s.io/kube-scheduler:{{.KubeVersion}}",
         "registry.k8s.io/kube-proxy:{{.KubeVersion}}",
+        "registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}",
         "registry.k8s.io/pause:{{.PauseVersion}}",
-        "registry.k8s.io/etcd:{{.EtcdVersion}}",
-        "registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}"
+        "registry.k8s.io/etcd:{{.EtcdVersion}}"
     ]
 }
 `,
@@ -284,9 +273,9 @@ images:
 - registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
 - registry.k8s.io/kube-scheduler:{{.KubeVersion}}
 - registry.k8s.io/kube-proxy:{{.KubeVersion}}
+- registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 - registry.k8s.io/pause:{{.PauseVersion}}
 - registry.k8s.io/etcd:{{.EtcdVersion}}
-- registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 kind: Images
 `,
 		},
@@ -300,9 +289,9 @@ kind: Images
 registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
 registry.k8s.io/kube-scheduler:{{.KubeVersion}}
 registry.k8s.io/kube-proxy:{{.KubeVersion}}
+registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 registry.k8s.io/pause:{{.PauseVersion}}
 registry.k8s.io/etcd:{{.EtcdVersion}}
-registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -312,7 +301,7 @@ registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
 			expectedOutput: "registry.k8s.io/kube-apiserver:{{.KubeVersion}} registry.k8s.io/kube-controller-manager:{{.KubeVersion}} registry.k8s.io/kube-scheduler:{{.KubeVersion}} " +
-				"registry.k8s.io/kube-proxy:{{.KubeVersion}} registry.k8s.io/pause:{{.PauseVersion}} registry.k8s.io/etcd:{{.EtcdVersion}} registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}} ",
+				"registry.k8s.io/kube-proxy:{{.KubeVersion}} registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}} registry.k8s.io/pause:{{.PauseVersion}} registry.k8s.io/etcd:{{.EtcdVersion}} ",
 		},
 	}
 
@@ -390,51 +379,6 @@ func TestImagesPull(t *testing.T) {
 	}
 }
 
-func TestMigrate(t *testing.T) {
-	cfg := []byte(dedent.Dedent(fmt.Sprintf(`
-        # This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
-        apiVersion: %s
-        kind: InitConfiguration
-        nodeRegistration:
-          criSocket: %s
-	`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)))
-	configFile, cleanup := tempConfig(t, cfg)
-	defer cleanup()
-
-	var output bytes.Buffer
-	command := newCmdConfigMigrate(&output)
-	if err := command.Flags().Set("old-config", configFile); err != nil {
-		t.Fatalf("failed to set old-config flag")
-	}
-	newConfigPath := filepath.Join(filepath.Dir(configFile), "new-migrated-config")
-	if err := command.Flags().Set("new-config", newConfigPath); err != nil {
-		t.Fatalf("failed to set new-config flag")
-	}
-	if err := command.RunE(nil, nil); err != nil {
-		t.Fatalf("Error from running the migrate command: %v", err)
-	}
-	if _, err := configutil.LoadInitConfigurationFromFile(newConfigPath); err != nil {
-		t.Fatalf("Could not read output back into internal type: %v", err)
-	}
-}
-
-// Returns the name of the file created and a cleanup callback
-func tempConfig(t *testing.T, config []byte) (string, func()) {
-	t.Helper()
-	tmpDir, err := os.MkdirTemp("", "kubeadm-migration-test")
-	if err != nil {
-		t.Fatalf("Unable to create temporary directory: %v", err)
-	}
-	configFilePath := filepath.Join(tmpDir, "test-config-file")
-	if err := os.WriteFile(configFilePath, config, 0644); err != nil {
-		os.RemoveAll(tmpDir)
-		t.Fatalf("Failed writing a config file: %v", err)
-	}
-	return configFilePath, func() {
-		os.RemoveAll(tmpDir)
-	}
-}
-
 func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -472,30 +416,16 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			cmdProc:          newCmdConfigPrintInitDefaults,
 		},
 		{
-			name: "JoinConfiguration: No component configs",
+			name: "JoinConfiguration",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
 			},
 			cmdProc: newCmdConfigPrintJoinDefaults,
 		},
 		{
-			name: "JoinConfiguration: KubeProxyConfiguration",
-			expectedKinds: []string{
-				constants.JoinConfigurationKind,
-				"KubeProxyConfiguration",
-			},
-			componentConfigs: "KubeProxyConfiguration",
-			cmdProc:          newCmdConfigPrintJoinDefaults,
-		},
-		{
-			name: "JoinConfiguration: KubeProxyConfiguration and KubeletConfiguration",
-			expectedKinds: []string{
-				constants.JoinConfigurationKind,
-				"KubeProxyConfiguration",
-				"KubeletConfiguration",
-			},
-			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
-			cmdProc:          newCmdConfigPrintJoinDefaults,
+			name:          "ResetConfiguration",
+			expectedKinds: []string{constants.ResetConfigurationKind},
+			cmdProc:       newCmdConfigPrintResetDefaults,
 		},
 	}
 
@@ -504,8 +434,10 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			var output bytes.Buffer
 
 			command := test.cmdProc(&output)
-			if err := command.Flags().Set("component-configs", test.componentConfigs); err != nil {
-				t.Fatalf("failed to set component-configs flag")
+			if test.componentConfigs != "" {
+				if err := command.Flags().Set("component-configs", test.componentConfigs); err != nil {
+					t.Fatalf("failed to set component-configs flag")
+				}
 			}
 			if err := command.RunE(nil, nil); err != nil {
 				t.Fatalf("Error from running the print command: %v", err)

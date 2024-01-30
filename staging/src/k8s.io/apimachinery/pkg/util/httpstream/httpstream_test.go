@@ -17,6 +17,8 @@ limitations under the License.
 package httpstream
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -127,5 +129,42 @@ func TestHandshake(t *testing.T) {
 		if e, a := []string{test.expectedProtocol}, w.Header()[HeaderProtocolVersion]; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: protocol response header: expected %v, got %v", name, e, a)
 		}
+	}
+}
+
+func TestIsUpgradeFailureError(t *testing.T) {
+	testCases := map[string]struct {
+		err      error
+		expected bool
+	}{
+		"nil error should return false": {
+			err:      nil,
+			expected: false,
+		},
+		"Non-upgrade error should return false": {
+			err:      fmt.Errorf("this is not an upgrade error"),
+			expected: false,
+		},
+		"UpgradeFailure error should return true": {
+			err:      &UpgradeFailureError{},
+			expected: true,
+		},
+		"Wrapped Non-UpgradeFailure error should return false": {
+			err:      fmt.Errorf("%s: %w", "first error", errors.New("Non-upgrade error")),
+			expected: false,
+		},
+		"Wrapped UpgradeFailure error should return true": {
+			err:      fmt.Errorf("%s: %w", "first error", &UpgradeFailureError{}),
+			expected: true,
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			actual := IsUpgradeFailure(test.err)
+			if test.expected != actual {
+				t.Errorf("expected upgrade failure %t, got %t", test.expected, actual)
+			}
+		})
 	}
 }

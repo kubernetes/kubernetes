@@ -27,62 +27,42 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v4/merge"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
-// NewFakeObjectCreater implements ObjectCreater, it can create empty
+// FakeObjectCreater implements ObjectCreater, it can create empty
 // objects (unstructured) of the given GVK.
-func NewFakeObjectCreater() runtime.ObjectCreater {
-	return &fakeObjectCreater{}
-}
+type FakeObjectCreater struct{}
 
-type fakeObjectCreater struct{}
-
-func (f *fakeObjectCreater) New(gvk schema.GroupVersionKind) (runtime.Object, error) {
+func (f *FakeObjectCreater) New(gvk schema.GroupVersionKind) (runtime.Object, error) {
 	u := unstructured.Unstructured{Object: map[string]interface{}{}}
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
 	return &u, nil
 }
 
-type fakeObjectConvertor struct {
-	converter  merge.Converter
-	apiVersion fieldpath.APIVersion
-}
+// FakeObjectConvertor implements runtime.ObjectConvertor but it
+// actually does nothing but return its input.
+type FakeObjectConvertor struct{}
 
 //nolint:staticcheck,ineffassign // SA4009 backwards compatibility
-func (c *fakeObjectConvertor) Convert(in, out, context interface{}) error {
-	if typedValue, ok := in.(*typed.TypedValue); ok {
-		var err error
-		out, err = c.converter.Convert(typedValue, c.apiVersion)
-		return err
-	}
+func (c *FakeObjectConvertor) Convert(in, out, context interface{}) error {
+	out = in
 	return nil
 }
 
-func (c *fakeObjectConvertor) ConvertToVersion(in runtime.Object, _ runtime.GroupVersioner) (runtime.Object, error) {
+func (c *FakeObjectConvertor) ConvertToVersion(in runtime.Object, _ runtime.GroupVersioner) (runtime.Object, error) {
 	return in, nil
 }
 
-func (c *fakeObjectConvertor) ConvertFieldLabel(_ schema.GroupVersionKind, _, _ string) (string, string, error) {
+func (c *FakeObjectConvertor) ConvertFieldLabel(_ schema.GroupVersionKind, _, _ string) (string, string, error) {
 	return "", "", errors.New("not implemented")
 }
 
-type fakeObjectDefaulter struct{}
+// FakeObjectDefaulter implements runtime.Defaulter, but it actually
+// does nothing.
+type FakeObjectDefaulter struct{}
 
-func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
-
-type sameVersionConverter struct{}
-
-func (sameVersionConverter) Convert(object *typed.TypedValue, version fieldpath.APIVersion) (*typed.TypedValue, error) {
-	return object, nil
-}
-
-func (sameVersionConverter) IsMissingVersionError(error) bool {
-	return false
-}
+func (d *FakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManagerImpl struct {
 	fieldManager *internal.FieldManager
@@ -139,12 +119,10 @@ func (f *TestFieldManagerImpl) ManagedFields() []metav1.ManagedFieldsEntry {
 
 // NewTestFieldManager creates a new manager for the given GVK.
 func NewTestFieldManagerImpl(typeConverter managedfields.TypeConverter, gvk schema.GroupVersionKind, subresource string, chainFieldManager func(internal.Manager) internal.Manager) *TestFieldManagerImpl {
-	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
-	objectConverter := &fakeObjectConvertor{sameVersionConverter{}, apiVersion}
 	f, err := internal.NewStructuredMergeManager(
 		typeConverter,
-		objectConverter,
-		&fakeObjectDefaulter{},
+		&FakeObjectConvertor{},
+		&FakeObjectDefaulter{},
 		gvk.GroupVersion(),
 		gvk.GroupVersion(),
 		nil,
@@ -159,16 +137,18 @@ func NewTestFieldManagerImpl(typeConverter managedfields.TypeConverter, gvk sche
 	// 1. We don't want to create a `internal.FieldManager`
 	// 2. We don't want to use the CapManager that is tested separately with
 	// a smaller than the default cap.
-	f = internal.NewLastAppliedUpdater(
-		internal.NewLastAppliedManager(
-			internal.NewProbabilisticSkipNonAppliedManager(
-				internal.NewBuildManagerInfoManager(
-					internal.NewManagedFieldsUpdater(
-						internal.NewStripMetaManager(f),
-					), gvk.GroupVersion(), subresource,
-				), NewFakeObjectCreater(), gvk, internal.DefaultTrackOnCreateProbability,
-			), typeConverter, objectConverter, gvk.GroupVersion(),
-		),
+	f = internal.NewVersionCheckManager(
+		internal.NewLastAppliedUpdater(
+			internal.NewLastAppliedManager(
+				internal.NewProbabilisticSkipNonAppliedManager(
+					internal.NewBuildManagerInfoManager(
+						internal.NewManagedFieldsUpdater(
+							internal.NewStripMetaManager(f),
+						), gvk.GroupVersion(), subresource,
+					), &FakeObjectCreater{}, internal.DefaultTrackOnCreateProbability,
+				), typeConverter, &FakeObjectConvertor{}, gvk.GroupVersion(),
+			),
+		), gvk,
 	)
 	if chainFieldManager != nil {
 		f = chainFieldManager(f)

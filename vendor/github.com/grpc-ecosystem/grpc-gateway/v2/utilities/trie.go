@@ -40,7 +40,7 @@ func NewDoubleArray(seqs [][]string) *DoubleArray {
 func registerTokens(da *DoubleArray, seqs [][]string) [][]int {
 	var result [][]int
 	for _, seq := range seqs {
-		var encoded []int
+		encoded := make([]int, 0, len(seq))
 		for _, token := range seq {
 			if _, ok := da.Encoding[token]; !ok {
 				da.Encoding[token] = len(da.Encoding)

@@ -39,6 +39,9 @@ type ExternalDocumentationProps struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Responses as JSON
 func (e *ExternalDocumentation) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(e)
+	}
 	b1, err := json.Marshal(e.ExternalDocumentationProps)
 	if err != nil {
 		return nil, err
@@ -48,6 +51,16 @@ func (e *ExternalDocumentation) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2), nil
+}
+
+func (e *ExternalDocumentation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		ExternalDocumentationProps `json:",inline"`
+		spec.Extensions
+	}
+	x.Extensions = internal.SanitizeExtensions(e.Extensions)
+	x.ExternalDocumentationProps = e.ExternalDocumentationProps
+	return opts.MarshalNext(enc, x)
 }
 
 func (e *ExternalDocumentation) UnmarshalJSON(data []byte) error {

@@ -283,7 +283,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	}
 
 	// wait until the kubelet observes the new CA
-	if err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		_, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
 		if errors.IsUnauthorized(errLog) {
 			return true, nil
@@ -302,7 +302,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	}
 
 	// confirm that the API server observes the new client cert and closes existing connections to use it
-	if err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		fixedPodLogs, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
 		if errors.IsUnauthorized(errLog) {
 			t.Log("api server has not observed new client cert")

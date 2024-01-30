@@ -142,12 +142,6 @@ func InstallReadyzHandler(mux mux, checks ...HealthChecker) {
 	InstallPathHandler(mux, "/readyz", checks...)
 }
 
-// InstallReadyzHandlerWithHealthyFunc is like InstallReadyzHandler, but in addition call firstTimeReady
-// the first time /readyz succeeds.
-func InstallReadyzHandlerWithHealthyFunc(mux mux, firstTimeReady func(), checks ...HealthChecker) {
-	InstallPathHandlerWithHealthyFunc(mux, "/readyz", firstTimeReady, checks...)
-}
-
 // InstallLivezHandler registers handlers for liveness checking on the path
 // "/livez" to mux. *All handlers* for mux must be specified in
 // exactly one call to InstallHandler. Calling InstallHandler more

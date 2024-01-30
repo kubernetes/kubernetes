@@ -115,32 +115,31 @@ func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
 // textDecoder implements the Decoder interface for the text protocol.
 type textDecoder struct {
 	r    io.Reader
-	p    TextParser
-	fams []*dto.MetricFamily
+	fams map[string]*dto.MetricFamily
+	err  error
 }
 
 // Decode implements the Decoder interface.
 func (d *textDecoder) Decode(v *dto.MetricFamily) error {
-	// TODO(fabxc): Wrap this as a line reader to make streaming safer.
-	if len(d.fams) == 0 {
-		// No cached metric families, read everything and parse metrics.
-		fams, err := d.p.TextToMetricFamilies(d.r)
-		if err != nil {
-			return err
-		}
-		if len(fams) == 0 {
-			return io.EOF
-		}
-		d.fams = make([]*dto.MetricFamily, 0, len(fams))
-		for _, f := range fams {
-			d.fams = append(d.fams, f)
+	if d.err == nil {
+		// Read all metrics in one shot.
+		var p TextParser
+		d.fams, d.err = p.TextToMetricFamilies(d.r)
+		// If we don't get an error, store io.EOF for the end.
+		if d.err == nil {
+			d.err = io.EOF
 		}
 	}
-
-	*v = *d.fams[0]
-	d.fams = d.fams[1:]
-
-	return nil
+	// Pick off one MetricFamily per Decode until there's nothing left.
+	for key, fam := range d.fams {
+		v.Name = fam.Name
+		v.Help = fam.Help
+		v.Type = fam.Type
+		v.Metric = fam.Metric
+		delete(d.fams, key)
+		return nil
+	}
+	return d.err
 }
 
 // SampleDecoder wraps a Decoder to extract samples from the metric families

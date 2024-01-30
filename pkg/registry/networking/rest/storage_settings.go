@@ -25,11 +25,11 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	clustercidrstore "k8s.io/kubernetes/pkg/registry/networking/clustercidr/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/networking/ingress/storage"
 	ingressclassstore "k8s.io/kubernetes/pkg/registry/networking/ingressclass/storage"
 	ipaddressstore "k8s.io/kubernetes/pkg/registry/networking/ipaddress/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
+	servicecidrstore "k8s.io/kubernetes/pkg/registry/networking/servicecidr/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -90,14 +90,6 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// clustercidrs
-	if resource := "clustercidrs"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		clusterCIDRCStorage, err := clustercidrstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return storage, err
-		}
-		storage[resource] = clusterCIDRCStorage
-	}
 
 	// ipaddress
 	if resource := "ipaddresses"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
@@ -107,6 +99,17 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 		}
 		storage[resource] = ipAddressStorage
 	}
+
+	// servicecidrs
+	if resource := "servicecidrs"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		serviceCIDRStorage, serviceCIDRStatusStorage, err := servicecidrstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = serviceCIDRStorage
+		storage[resource+"/status"] = serviceCIDRStatusStorage
+	}
+
 	return storage, nil
 }
 

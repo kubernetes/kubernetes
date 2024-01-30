@@ -16,19 +16,11 @@ const (
 	prime5 uint64 = 2870177450012600261
 )
 
-// NOTE(caleb): I'm using both consts and vars of the primes. Using consts where
-// possible in the Go code is worth a small (but measurable) performance boost
-// by avoiding some MOVQs. Vars are needed for the asm and also are useful for
-// convenience in the Go code in a few places where we need to intentionally
-// avoid constant arithmetic (e.g., v1 := prime1 + prime2 fails because the
-// result overflows a uint64).
-var (
-	prime1v = prime1
-	prime2v = prime2
-	prime3v = prime3
-	prime4v = prime4
-	prime5v = prime5
-)
+// Store the primes in an array as well.
+//
+// The consts are used when possible in Go code to avoid MOVs but we need a
+// contiguous array of the assembly code.
+var primes = [...]uint64{prime1, prime2, prime3, prime4, prime5}
 
 // Digest implements hash.Hash64.
 type Digest struct {
@@ -50,10 +42,10 @@ func New() *Digest {
 
 // Reset clears the Digest's state so that it can be reused.
 func (d *Digest) Reset() {
-	d.v1 = prime1v + prime2
+	d.v1 = primes[0] + prime2
 	d.v2 = prime2
 	d.v3 = 0
-	d.v4 = -prime1v
+	d.v4 = -primes[0]
 	d.total = 0
 	d.n = 0
 }
@@ -69,21 +61,23 @@ func (d *Digest) Write(b []byte) (n int, err error) {
 	n = len(b)
 	d.total += uint64(n)
 
+	memleft := d.mem[d.n&(len(d.mem)-1):]
+
 	if d.n+n < 32 {
 		// This new data doesn't even fill the current block.
-		copy(d.mem[d.n:], b)
+		copy(memleft, b)
 		d.n += n
 		return
 	}
 
 	if d.n > 0 {
 		// Finish off the partial block.
-		copy(d.mem[d.n:], b)
+		c := copy(memleft, b)
 		d.v1 = round(d.v1, u64(d.mem[0:8]))
 		d.v2 = round(d.v2, u64(d.mem[8:16]))
 		d.v3 = round(d.v3, u64(d.mem[16:24]))
 		d.v4 = round(d.v4, u64(d.mem[24:32]))
-		b = b[32-d.n:]
+		b = b[c:]
 		d.n = 0
 	}
 
@@ -133,21 +127,20 @@ func (d *Digest) Sum64() uint64 {
 
 	h += d.total
 
-	i, end := 0, d.n
-	for ; i+8 <= end; i += 8 {
-		k1 := round(0, u64(d.mem[i:i+8]))
+	b := d.mem[:d.n&(len(d.mem)-1)]
+	for ; len(b) >= 8; b = b[8:] {
+		k1 := round(0, u64(b[:8]))
 		h ^= k1
 		h = rol27(h)*prime1 + prime4
 	}
-	if i+4 <= end {
-		h ^= uint64(u32(d.mem[i:i+4])) * prime1
+	if len(b) >= 4 {
+		h ^= uint64(u32(b[:4])) * prime1
 		h = rol23(h)*prime2 + prime3
-		i += 4
+		b = b[4:]
 	}
-	for i < end {
-		h ^= uint64(d.mem[i]) * prime5
+	for ; len(b) > 0; b = b[1:] {
+		h ^= uint64(b[0]) * prime5
 		h = rol11(h) * prime1
-		i++
 	}
 
 	h ^= h >> 33

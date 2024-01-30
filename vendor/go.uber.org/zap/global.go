@@ -31,6 +31,7 @@ import (
 )
 
 const (
+	_stdLogDefaultDepth      = 1
 	_loggerWriterDepth       = 2
 	_programmerErrorTemplate = "You've found a bug in zap! Please file a bug at " +
 		"https://github.com/uber-go/zap/issues/new and reference this error: %v"

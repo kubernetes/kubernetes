@@ -127,6 +127,9 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
 				Resource: split[0],
 				Scope:    scope,
+				// avoid nil panics in v0.26.0-v0.26.3 client-go clients
+				// see https://github.com/kubernetes/kubernetes/issues/118361
+				ResponseKind: &metav1.GroupVersionKind{},
 			})
 			parentidx = len(apiResourceList) - 1
 			parentResources[split[0]] = parentidx
@@ -140,6 +143,9 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 		subresource := apidiscoveryv2beta1.APISubresourceDiscovery{
 			Subresource: split[1],
 			Verbs:       r.Verbs,
+			// avoid nil panics in v0.26.0-v0.26.3 client-go clients
+			// see https://github.com/kubernetes/kubernetes/issues/118361
+			ResponseKind: &metav1.GroupVersionKind{},
 		}
 		if r.Kind != "" {
 			subresource.ResponseKind = &metav1.GroupVersionKind{
@@ -600,6 +606,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if a.group.ConvertabilityChecker != nil {
 			decodableVersions = a.group.ConvertabilityChecker.VersionsForGroupKind(fqKindToRegister.GroupKind())
 		}
+
 		resourceInfo = &storageversion.ResourceInfo{
 			GroupResource: schema.GroupResource{
 				Group:    a.group.GroupVersion.Group,
@@ -612,6 +619,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
 
 			DirectlyDecodableVersions: decodableVersions,
+
+			ServedVersions: a.group.AllServedVersionsByResource[path],
 		}
 	}
 
@@ -711,7 +720,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
 		}
-		if strings.Index(action.Path, "/{name}") != -1 || action.Verb == "POST" {
+		if strings.Contains(action.Path, "/{name}") || action.Verb == "POST" {
 			requestScope = "resource"
 		}
 		if action.AllNamespaces {
@@ -787,7 +796,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
@@ -808,7 +817,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
 				Returns(http.StatusOK, "OK", versionedList).
@@ -841,7 +850,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
@@ -870,7 +879,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Consumes(supportedTypes...).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
@@ -900,7 +909,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			route := ws.POST(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
@@ -929,7 +938,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(deleteReturnType).
@@ -953,7 +962,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
@@ -981,7 +990,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
@@ -1002,7 +1011,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).

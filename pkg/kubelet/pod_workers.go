@@ -716,19 +716,17 @@ func (p *podWorkers) IsPodForMirrorPodTerminatingByFullName(podFullName string) 
 }
 
 func isPodStatusCacheTerminal(status *kubecontainer.PodStatus) bool {
-	runningContainers := 0
-	runningSandboxes := 0
 	for _, container := range status.ContainerStatuses {
 		if container.State == kubecontainer.ContainerStateRunning {
-			runningContainers++
+			return false
 		}
 	}
 	for _, sb := range status.SandboxStatuses {
 		if sb.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			runningSandboxes++
+			return false
 		}
 	}
-	return runningContainers == 0 && runningSandboxes == 0
+	return true
 }
 
 // UpdatePod carries a configuration change or termination state to a pod. A pod is either runnable,
@@ -1181,6 +1179,12 @@ func (p *podWorkers) startPodSync(podUID types.UID) (ctx context.Context, update
 	status.startedAt = p.clock.Now()
 	status.mergeLastUpdate(update.Options)
 
+	// If we are admitting the pod and it is new, record the count of containers
+	// TODO: We should probably move this into syncPod and add an execution count
+	// to the syncPod arguments, and this should be recorded on the first sync.
+	// Leaving it here complicates a particularly important loop.
+	metrics.ContainersPerPodCount.Observe(float64(len(update.Options.Pod.Spec.Containers)))
+
 	return ctx, update, true, true, true
 }
 
@@ -1532,7 +1536,7 @@ func (p *podWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorke
 	p.podsSynced = true
 	for uid, status := range p.podSyncStatuses {
 		// We retain the worker history of any pod that is still desired according to
-		// its UID. However, there are ]two scenarios during a sync that result in us
+		// its UID. However, there are two scenarios during a sync that result in us
 		// needing to purge the history:
 		//
 		// 1. The pod is no longer desired (the local version is orphaned)
@@ -1652,7 +1656,7 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 
 		// we timeout and return an error if we don't get a callback within a reasonable time.
 		// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
-		timeout := int64(gracePeriod + (gracePeriod / 2))
+		timeout := gracePeriod + (gracePeriod / 2)
 		minTimeout := int64(10)
 		if timeout < minTimeout {
 			timeout = minTimeout

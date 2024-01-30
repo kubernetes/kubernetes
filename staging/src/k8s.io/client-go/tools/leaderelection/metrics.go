@@ -26,24 +26,26 @@ import (
 type leaderMetricsAdapter interface {
 	leaderOn(name string)
 	leaderOff(name string)
+	slowpathExercised(name string)
 }
 
-// GaugeMetric represents a single numerical value that can arbitrarily go up
-// and down.
-type SwitchMetric interface {
+// LeaderMetric instruments metrics used in leader election.
+type LeaderMetric interface {
 	On(name string)
 	Off(name string)
+	SlowpathExercised(name string)
 }
 
 type noopMetric struct{}
 
-func (noopMetric) On(name string)  {}
-func (noopMetric) Off(name string) {}
+func (noopMetric) On(name string)                {}
+func (noopMetric) Off(name string)               {}
+func (noopMetric) SlowpathExercised(name string) {}
 
 // defaultLeaderMetrics expects the caller to lock before setting any metrics.
 type defaultLeaderMetrics struct {
 	// leader's value indicates if the current process is the owner of name lease
-	leader SwitchMetric
+	leader LeaderMetric
 }
 
 func (m *defaultLeaderMetrics) leaderOn(name string) {
@@ -60,19 +62,27 @@ func (m *defaultLeaderMetrics) leaderOff(name string) {
 	m.leader.Off(name)
 }
 
+func (m *defaultLeaderMetrics) slowpathExercised(name string) {
+	if m == nil {
+		return
+	}
+	m.leader.SlowpathExercised(name)
+}
+
 type noMetrics struct{}
 
-func (noMetrics) leaderOn(name string)  {}
-func (noMetrics) leaderOff(name string) {}
+func (noMetrics) leaderOn(name string)          {}
+func (noMetrics) leaderOff(name string)         {}
+func (noMetrics) slowpathExercised(name string) {}
 
 // MetricsProvider generates various metrics used by the leader election.
 type MetricsProvider interface {
-	NewLeaderMetric() SwitchMetric
+	NewLeaderMetric() LeaderMetric
 }
 
 type noopMetricsProvider struct{}
 
-func (_ noopMetricsProvider) NewLeaderMetric() SwitchMetric {
+func (noopMetricsProvider) NewLeaderMetric() LeaderMetric {
 	return noopMetric{}
 }
 

@@ -67,7 +67,7 @@ func test_UpgradePVC(t *testing.T, featureEnabled bool) {
 			UID:               "08675309-9376-9376-9376-086753099999",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},

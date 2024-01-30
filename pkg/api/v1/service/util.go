@@ -67,10 +67,16 @@ func GetLoadBalancerSourceRanges(service *v1.Service) (utilnet.IPNetSet, error) 
 	return ipnets, nil
 }
 
-// ExternalPolicyLocal checks if service has ETP = Local.
+// ExternallyAccessible checks if service is externally accessible.
+func ExternallyAccessible(service *v1.Service) bool {
+	return service.Spec.Type == v1.ServiceTypeLoadBalancer ||
+		service.Spec.Type == v1.ServiceTypeNodePort ||
+		(service.Spec.Type == v1.ServiceTypeClusterIP && len(service.Spec.ExternalIPs) > 0)
+}
+
+// ExternalPolicyLocal checks if service is externally accessible and has ETP = Local.
 func ExternalPolicyLocal(service *v1.Service) bool {
-	if service.Spec.Type != v1.ServiceTypeLoadBalancer &&
-		service.Spec.Type != v1.ServiceTypeNodePort {
+	if !ExternallyAccessible(service) {
 		return false
 	}
 	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal

@@ -62,7 +62,7 @@ type Stat struct {
 	// Summed up cpu statistics.
 	CPUTotal CPUStat
 	// Per-CPU statistics.
-	CPU []CPUStat
+	CPU map[int64]CPUStat
 	// Number of times interrupts were handled, which contains numbered and unnumbered IRQs.
 	IRQTotal uint64
 	// Number of times a numbered IRQ was triggered.
@@ -170,10 +170,23 @@ func (fs FS) Stat() (Stat, error) {
 	if err != nil {
 		return Stat{}, err
 	}
+	procStat, err := parseStat(bytes.NewReader(data), fileName)
+	if err != nil {
+		return Stat{}, err
+	}
+	return procStat, nil
+}
 
-	stat := Stat{}
+// parseStat parses the metrics from /proc/[pid]/stat.
+func parseStat(r io.Reader, fileName string) (Stat, error) {
+	var (
+		scanner = bufio.NewScanner(r)
+		stat    = Stat{
+			CPU: make(map[int64]CPUStat),
+		}
+		err error
+	)
 
-	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Fields(scanner.Text())
@@ -228,9 +241,6 @@ func (fs FS) Stat() (Stat, error) {
 			if cpuID == -1 {
 				stat.CPUTotal = cpuStat
 			} else {
-				for int64(len(stat.CPU)) <= cpuID {
-					stat.CPU = append(stat.CPU, CPUStat{})
-				}
 				stat.CPU[cpuID] = cpuStat
 			}
 		}

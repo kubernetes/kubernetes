@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/cel-go/common/overloads"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -53,15 +52,6 @@ const (
 	maxUnixTime int64 = 253402300799
 )
 
-var (
-	// TimestampType singleton.
-	TimestampType = NewTypeValue("google.protobuf.Timestamp",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.ReceiverType,
-		traits.SubtractorType)
-)
-
 // Add implements traits.Adder.Add.
 func (t Timestamp) Add(other ref.Val) ref.Val {
 	switch other.Type() {
@@ -89,7 +79,7 @@ func (t Timestamp) Compare(other ref.Val) ref.Val {
 }
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (t Timestamp) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (t Timestamp) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// If the timestamp is already assignable to the desired type return it.
 	if reflect.TypeOf(t.Time).AssignableTo(typeDesc) {
 		return t.Time, nil
@@ -138,6 +128,11 @@ func (t Timestamp) Equal(other ref.Val) ref.Val {
 	return Bool(ok && t.Time.Equal(otherTime.Time))
 }
 
+// IsZeroValue returns true if the timestamp is epoch 0.
+func (t Timestamp) IsZeroValue() bool {
+	return t.IsZero()
+}
+
 // Receive implements traits.Receiver.Receive.
 func (t Timestamp) Receive(function string, overload string, args []ref.Val) ref.Val {
 	switch len(args) {
@@ -160,14 +155,14 @@ func (t Timestamp) Subtract(subtrahend ref.Val) ref.Val {
 		dur := subtrahend.(Duration)
 		val, err := subtractTimeDurationChecked(t.Time, dur.Duration)
 		if err != nil {
-			return wrapErr(err)
+			return WrapErr(err)
 		}
 		return timestampOf(val)
 	case TimestampType:
 		t2 := subtrahend.(Timestamp).Time
 		val, err := subtractTimeChecked(t.Time, t2)
 		if err != nil {
-			return wrapErr(err)
+			return WrapErr(err)
 		}
 		return durationOf(val)
 	}
@@ -180,7 +175,7 @@ func (t Timestamp) Type() ref.Type {
 }
 
 // Value implements ref.Val.Value.
-func (t Timestamp) Value() interface{} {
+func (t Timestamp) Value() any {
 	return t.Time
 }
 
@@ -288,7 +283,7 @@ func timeZone(tz ref.Val, visitor timestampVisitor) timestampVisitor {
 		if ind == -1 {
 			loc, err := time.LoadLocation(val)
 			if err != nil {
-				return wrapErr(err)
+				return WrapErr(err)
 			}
 			return visitor(t.In(loc))
 		}
@@ -297,11 +292,11 @@ func timeZone(tz ref.Val, visitor timestampVisitor) timestampVisitor {
 		// in the format ^(+|-)(0[0-9]|1[0-4]):[0-5][0-9]$. The numerical input is parsed in terms of hours and minutes.
 		hr, err := strconv.Atoi(string(val[0:ind]))
 		if err != nil {
-			return wrapErr(err)
+			return WrapErr(err)
 		}
 		min, err := strconv.Atoi(string(val[ind+1:]))
 		if err != nil {
-			return wrapErr(err)
+			return WrapErr(err)
 		}
 		var offset int
 		if string(val[0]) == "-" {

@@ -34,11 +34,14 @@ service KeyManagementService {
 message StatusRequest {}
 
 message StatusResponse {
-    // Version of the KMS plugin API.  Must match the configured .resources[].providers[].kms.apiVersion
+    // Version of the KMS gRPC plugin API. Must equal v2 to v2beta1 (v2 is recommended, but both are equivalent).
     string version = 1;
     // Any value other than "ok" is failing healthz.  On failure, the associated API server healthz endpoint will contain this value as part of the error message.
     string healthz = 2;
     // the current write key, used to determine staleness of data updated via value.Transformer.TransformFromStorage.
+    // keyID must satisfy the following constraints:
+    // 1. The keyID is not empty.
+    // 2. The size of keyID is less than 1 kB.
     string key_id = 3;
 }
 
@@ -68,11 +71,20 @@ message EncryptRequest {
 
 message EncryptResponse {
     // The encrypted data.
+    // ciphertext must satisfy the following constraints:  
+    // 1. The ciphertext is not empty.  
+    // 2. The ciphertext is less than 1 kB.
     bytes ciphertext = 1;
     // The KMS key ID used to encrypt the data. This must always refer to the KMS KEK and not any local KEKs that may be in use.
     // This can be used to inform staleness of data updated via value.Transformer.TransformFromStorage.
+    // keyID must satisfy the following constraints:
+    // 1. The keyID is not empty.
+    // 2. The size of keyID is less than 1 kB.
     string key_id = 2;
     // Additional metadata to be stored with the encrypted data.
     // This data is stored in plaintext in etcd. KMS plugin implementations are responsible for pre-encrypting any sensitive data.
+    // Annotations must satisfy the following constraints:
+    //  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+    //  2. The size of annotations keys + values is less than 32 kB.
     map<string, bytes> annotations = 3;
 }

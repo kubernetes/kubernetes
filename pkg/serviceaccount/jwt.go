@@ -43,6 +43,7 @@ type ServiceAccountTokenGetter interface {
 	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
 	GetPod(namespace, name string) (*v1.Pod, error)
 	GetSecret(namespace, name string) (*v1.Secret, error)
+	GetNode(name string) (*v1.Node, error)
 }
 
 type TokenGenerator interface {

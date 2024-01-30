@@ -187,13 +187,20 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		logger := klog.FromContext(ctx)
 
 		// Get the current resource list from discovery.
-		newResources := GetDeletableResources(discoveryClient)
+		newResources, err := GetDeletableResources(logger, discoveryClient)
 
-		// This can occur if there is an internal error in GetDeletableResources.
 		if len(newResources) == 0 {
 			logger.V(2).Info("no resources reported by discovery, skipping garbage collector sync")
 			metrics.GarbageCollectorResourcesSyncError.Inc()
 			return
+		}
+		if groupLookupFailures, isLookupFailure := discovery.GroupDiscoveryFailedErrorGroups(err); isLookupFailure {
+			// In partial discovery cases, preserve existing synced informers for resources in the failed groups, so resyncMonitors will only add informers for newly seen resources
+			for k, v := range oldResources {
+				if _, failed := groupLookupFailures[k.GroupVersion()]; failed && gc.dependencyGraphBuilder.IsResourceSynced(k) {
+					newResources[k] = v
+				}
+			}
 		}
 
 		// Decide whether discovery has reported a change.
@@ -214,11 +221,20 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 
 			// On a reattempt, check if available resources have changed
 			if attempt > 1 {
-				newResources = GetDeletableResources(discoveryClient)
+				newResources, err = GetDeletableResources(logger, discoveryClient)
+
 				if len(newResources) == 0 {
 					logger.V(2).Info("no resources reported by discovery", "attempt", attempt)
 					metrics.GarbageCollectorResourcesSyncError.Inc()
 					return false, nil
+				}
+				if groupLookupFailures, isLookupFailure := discovery.GroupDiscoveryFailedErrorGroups(err); isLookupFailure {
+					// In partial discovery cases, preserve existing synced informers for resources in the failed groups, so resyncMonitors will only add informers for newly seen resources
+					for k, v := range oldResources {
+						if _, failed := groupLookupFailures[k.GroupVersion()]; failed && gc.dependencyGraphBuilder.IsResourceSynced(k) {
+							newResources[k] = v
+						}
+					}
 				}
 			}
 
@@ -806,20 +822,23 @@ func (gc *GarbageCollector) GraphHasUID(u types.UID) bool {
 // garbage collector should recognize and work with. More specifically, all
 // preferred resources which support the 'delete', 'list', and 'watch' verbs.
 //
+// If an error was encountered fetching resources from the server,
+// it is included as well, along with any resources that were successfully resolved.
+//
 // All discovery errors are considered temporary. Upon encountering any error,
 // GetDeletableResources will log and return any discovered resources it was
 // able to process (which may be none).
-func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
-	preferredResources, err := discoveryClient.ServerPreferredResources()
-	if err != nil {
-		if discovery.IsGroupDiscoveryFailedError(err) {
-			klog.Warningf("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+func GetDeletableResources(logger klog.Logger, discoveryClient discovery.ServerResourcesInterface) (map[schema.GroupVersionResource]struct{}, error) {
+	preferredResources, lookupErr := discoveryClient.ServerPreferredResources()
+	if lookupErr != nil {
+		if groupLookupFailures, isLookupFailure := discovery.GroupDiscoveryFailedErrorGroups(lookupErr); isLookupFailure {
+			logger.Info("failed to discover some groups", "groups", groupLookupFailures)
 		} else {
-			klog.Warningf("failed to discover preferred resources: %v", err)
+			logger.Info("failed to discover preferred resources", "error", lookupErr)
 		}
 	}
 	if preferredResources == nil {
-		return map[schema.GroupVersionResource]struct{}{}
+		return map[schema.GroupVersionResource]struct{}{}, lookupErr
 	}
 
 	// This is extracted from discovery.GroupVersionResources to allow tolerating
@@ -829,7 +848,7 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	for _, rl := range deletableResources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {
-			klog.Warningf("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
+			logger.Info("ignoring invalid discovered resource", "groupversion", rl.GroupVersion, "error", err)
 			continue
 		}
 		for i := range rl.APIResources {
@@ -837,7 +856,7 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 		}
 	}
 
-	return deletableGroupVersionResources
+	return deletableGroupVersionResources, lookupErr
 }
 
 func (gc *GarbageCollector) Name() string {

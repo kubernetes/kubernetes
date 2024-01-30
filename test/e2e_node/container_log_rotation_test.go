@@ -41,9 +41,9 @@ const (
 	rotationConsistentlyTimeout = 2 * time.Minute
 )
 
-var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
+var _ = SIGDescribe("ContainerLogRotation", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("container-log-rotation-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when a container generates a lot of log", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.ContainerLogMaxFiles = testContainerLogMaxFiles
@@ -80,7 +80,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
 
 			ginkgo.By("get container log path")
-			framework.ExpectEqual(len(logRotationPod.Status.ContainerStatuses), 1, "log rotation pod should have one container")
+			gomega.Expect(logRotationPod.Status.ContainerStatuses).To(gomega.HaveLen(1), "log rotation pod should have one container")
 			id := kubecontainer.ParseContainerID(logRotationPod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
 			framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")

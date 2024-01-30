@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -25,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -56,7 +60,7 @@ func (t *NvidiaGPUUpgradeTest) Test(ctx context.Context, f *framework.Framework,
 		// MasterUpgrade should be totally hitless.
 		job, err := e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, "cuda-add")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(job.Status.Failed, 0, "Job pods failed during master upgrade: %v", job.Status.Failed)
+		gomega.Expect(job.Status.Failed).To(gomega.BeZero(), "Job pods failed during master upgrade: %v", job.Status.Failed)
 	}
 }
 

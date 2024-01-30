@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -178,4 +179,103 @@ etcd_request_errors_total{operation="foo",type="bar"} 1
 			}
 		})
 	}
+}
+
+func TestStorageSizeCollector(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	registry.CustomMustRegister(storageMonitor)
+
+	testCases := []struct {
+		desc           string
+		getterOverride func() ([]Monitor, error)
+		err            error
+		want           string
+	}{
+		{
+			desc: "fake etcd getter",
+			getterOverride: func() ([]Monitor, error) {
+				return []Monitor{fakeEtcdMonitor{storageSize: 1e9}}, nil
+			},
+			err: nil,
+			want: `# HELP apiserver_storage_size_bytes [ALPHA] Size of the storage database file physically allocated in bytes.
+			# TYPE apiserver_storage_size_bytes gauge
+			apiserver_storage_size_bytes{cluster="etcd-0"} 1e+09
+			`,
+		},
+		{
+			desc:           "getters not configured",
+			getterOverride: nil,
+			err:            nil,
+			want:           ``,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			defer registry.Reset()
+			if test.getterOverride != nil {
+				oldGetter := storageMonitor.monitorGetter
+				defer SetStorageMonitorGetter(oldGetter)
+				SetStorageMonitorGetter(test.getterOverride)
+			}
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), "apiserver_storage_size_bytes"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+
+}
+
+func TestUpdateObjectCount(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	registry.Register(objectCounts)
+	testedMetrics := "apiserver_storage_objects"
+
+	testCases := []struct {
+		desc     string
+		resource string
+		count    int64
+		want     string
+	}{
+		{
+			desc:     "successful fetch",
+			resource: "foo",
+			count:    10,
+			want: `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="foo"} 10
+`,
+		},
+		{
+			desc:     "failed fetch",
+			resource: "bar",
+			count:    -1,
+			want: `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="bar"} -1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			defer registry.Reset()
+			UpdateObjectCount(test.resource, test.count)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+type fakeEtcdMonitor struct {
+	storageSize int64
+}
+
+func (m fakeEtcdMonitor) Monitor(_ context.Context) (StorageMetrics, error) {
+	return StorageMetrics{Size: m.storageSize}, nil
+}
+
+func (m fakeEtcdMonitor) Close() error {
+	return nil
 }

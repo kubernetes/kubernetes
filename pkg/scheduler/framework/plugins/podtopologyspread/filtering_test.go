@@ -36,7 +36,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var cmpOpts = []cmp.Option{
@@ -1986,7 +1986,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 
@@ -2302,7 +2302,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 
@@ -2376,8 +2376,8 @@ func BenchmarkFilter(b *testing.B) {
 		var state *framework.CycleState
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
-			ctx := context.Background()
-			pl := plugintesting.SetupPlugin(b, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			_, ctx := ktesting.NewTestContext(b)
+			pl := plugintesting.SetupPlugin(ctx, b, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
 			p := pl.(*PodTopologySpread)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -2731,7 +2731,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(4), // larger than the number of domains(3)
+				ptr.To[int32](4), // larger than the number of domains(3)
 				nil,
 				nil,
 				nil,
@@ -2762,7 +2762,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(2), // smaller than the number of domains(3)
+				ptr.To[int32](2), // smaller than the number of domains(3)
 				nil,
 				nil,
 				nil,
@@ -2793,7 +2793,7 @@ func TestSingleConstraint(t *testing.T) {
 				"zone",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(3), // larger than the number of domains(2)
+				ptr.To[int32](3), // larger than the number of domains(2)
 				nil,
 				nil,
 				nil,
@@ -2824,7 +2824,7 @@ func TestSingleConstraint(t *testing.T) {
 				"zone",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(1), // smaller than the number of domains(2)
+				ptr.To[int32](1), // smaller than the number of domains(2)
 				nil,
 				nil,
 				nil,
@@ -3007,7 +3007,7 @@ func TestSingleConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			p.enableMinDomainsInPodTopologySpread = tt.enableMinDomains
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
@@ -3352,7 +3352,7 @@ func TestMultipleConstraints(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			state := framework.NewCycleState()
@@ -3376,7 +3376,8 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
+	_, ctx := ktesting.NewTestContext(t)
+	p := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(*PodTopologySpread).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))

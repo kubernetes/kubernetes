@@ -64,6 +64,8 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
 	// standard for []metav1.Condition
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 // resetFieldsStatusDefault conflicts with statusDefault
@@ -80,6 +82,9 @@ var noConflicts = map[string]struct{}{
 	// storageVersions are skipped because their spec is empty
 	// and thus they can never have a conflict.
 	"storageversions": {},
+	// servicecidrs are skipped because their spec is inmutable
+	// and thus they can never have a conflict.
+	"servicecidrs": {},
 	// namespaces only have a spec.finalizers field which is also skipped,
 	// thus it will never have a conflict.
 	"namespaces": {},
@@ -106,7 +111,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("", "v1", "pods"):                                                          `{"metadata": {"deletionTimestamp": "2020-01-01T00:00:00Z", "ownerReferences":[]}, "spec": {"containers": [{"image": "` + image2 + `", "name": "container7"}]}}`,
 	gvr("", "v1", "replicationcontrollers"):                                        `{"spec": {"selector": {"new": "stuff2"}}}`,
 	gvr("", "v1", "resourcequotas"):                                                `{"spec": {"hard": {"cpu": "25M"}}}`,
-	gvr("", "v1", "services"):                                                      `{"spec": {"externalName": "service2name"}}`,
+	gvr("", "v1", "services"):                                                      `{"spec": {"type": "ClusterIP"}}`,
 	gvr("apps", "v1", "daemonsets"):                                                `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container6"}]}}}}`,
 	gvr("apps", "v1", "deployments"):                                               `{"metadata": {"labels": {"a":"c"}}, "spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container6"}]}}}}`,
 	gvr("apps", "v1", "replicasets"):                                               `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container4"}]}}}}`,
@@ -124,17 +129,20 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
+	gvr("flowcontrol.apiserver.k8s.io", "v1", "flowschemas"):                       `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"): `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"nominalConcurrencyShares": 23}}}`,
+	gvr("flowcontrol.apiserver.k8s.io", "v1", "prioritylevelconfigurations"):       `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"nominalConcurrencyShares": 23}}}`,
 	gvr("extensions", "v1beta1", "ingresses"):                                      `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                               `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,
+	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                                    `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                               `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
-	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "vaName2"}, "spec": {"nodeName": "localhost2"}}`,
-	gvr("storage.k8s.io", "v1", "volumeattachments"):                               `{"metadata": {"name": "vaName2"}, "spec": {"nodeName": "localhost2"}}`,
+	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "va3"}, "spec": {"nodeName": "localhost2"}}`,
+	gvr("storage.k8s.io", "v1", "volumeattachments"):                               `{"metadata": {"name": "va3"}, "spec": {"nodeName": "localhost2"}}`,
 	gvr("apiextensions.k8s.io", "v1", "customresourcedefinitions"):                 `{"metadata": {"labels":{"a":"c"}}, "spec": {"group": "webconsole22.operator.openshift.io"}}`,
 	gvr("apiextensions.k8s.io", "v1beta1", "customresourcedefinitions"):            `{"metadata": {"labels":{"a":"c"}}, "spec": {"group": "webconsole22.operator.openshift.io"}}`,
 	gvr("awesome.bears.com", "v1", "pandas"):                                       `{"spec": {"replicas": 102}}`,
@@ -147,6 +155,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
+	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 }
 
 // TestResetFields makes sure that fieldManager does not own fields reset by the storage strategy.

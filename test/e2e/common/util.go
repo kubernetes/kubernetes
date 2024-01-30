@@ -63,7 +63,6 @@ var PrePulledImages = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Httpd),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
-	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 	imageutils.GetE2EImage(imageutils.NonRoot),
 )
 
@@ -133,7 +132,7 @@ func svcByName(name string, port int) *v1.Service {
 			},
 			Ports: []v1.ServicePort{{
 				Port:       int32(port),
-				TargetPort: intstr.FromInt(port),
+				TargetPort: intstr.FromInt32(int32(port)),
 			}},
 		},
 	}

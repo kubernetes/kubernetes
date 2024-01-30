@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -49,6 +50,10 @@ type handshakeTransport struct {
 	// it contains all host keys that can be used to sign the
 	// connection.
 	hostKeys []Signer
+
+	// publicKeyAuthAlgorithms is non-empty if we are the server. In that case,
+	// it contains the supported client public key authentication algorithms.
+	publicKeyAuthAlgorithms []string
 
 	// hostKeyAlgorithms is non-empty if we are the client. In that case,
 	// we accept these key types from the server as host key.
@@ -141,6 +146,7 @@ func newClientTransport(conn keyingTransport, clientVersion, serverVersion []byt
 func newServerTransport(conn keyingTransport, clientVersion, serverVersion []byte, config *ServerConfig) *handshakeTransport {
 	t := newHandshakeTransport(conn, &config.Config, clientVersion, serverVersion)
 	t.hostKeys = config.hostKeys
+	t.publicKeyAuthAlgorithms = config.PublicKeyAuthAlgorithms
 	go t.readLoop()
 	go t.kexLoop()
 	return t
@@ -461,19 +467,24 @@ func (t *handshakeTransport) sendKexInit() error {
 	isServer := len(t.hostKeys) > 0
 	if isServer {
 		for _, k := range t.hostKeys {
-			// If k is an AlgorithmSigner, presume it supports all signature algorithms
-			// associated with the key format. (Ideally AlgorithmSigner would have a
-			// method to advertise supported algorithms, but it doesn't. This means that
-			// adding support for a new algorithm is a breaking change, as we will
-			// immediately negotiate it even if existing implementations don't support
-			// it. If that ever happens, we'll have to figure something out.)
-			// If k is not an AlgorithmSigner, we can only assume it only supports the
-			// algorithms that matches the key format. (This means that Sign can't pick
-			// a different default.)
+			// If k is a MultiAlgorithmSigner, we restrict the signature
+			// algorithms. If k is a AlgorithmSigner, presume it supports all
+			// signature algorithms associated with the key format. If k is not
+			// an AlgorithmSigner, we can only assume it only supports the
+			// algorithms that matches the key format. (This means that Sign
+			// can't pick a different default).
 			keyFormat := k.PublicKey().Type()
-			if _, ok := k.(AlgorithmSigner); ok {
+
+			switch s := k.(type) {
+			case MultiAlgorithmSigner:
+				for _, algo := range algorithmsForKeyFormat(keyFormat) {
+					if contains(s.Algorithms(), underlyingAlgo(algo)) {
+						msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, algo)
+					}
+				}
+			case AlgorithmSigner:
 				msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, algorithmsForKeyFormat(keyFormat)...)
-			} else {
+			default:
 				msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, keyFormat)
 			}
 		}
@@ -642,16 +653,21 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 
 	// On the server side, after the first SSH_MSG_NEWKEYS, send a SSH_MSG_EXT_INFO
 	// message with the server-sig-algs extension if the client supports it. See
-	// RFC 8308, Sections 2.4 and 3.1.
+	// RFC 8308, Sections 2.4 and 3.1, and [PROTOCOL], Section 1.9.
 	if !isClient && firstKeyExchange && contains(clientInit.KexAlgos, "ext-info-c") {
+		supportedPubKeyAuthAlgosList := strings.Join(t.publicKeyAuthAlgorithms, ",")
 		extInfo := &extInfoMsg{
-			NumExtensions: 1,
-			Payload:       make([]byte, 0, 4+15+4+len(supportedPubKeyAuthAlgosList)),
+			NumExtensions: 2,
+			Payload:       make([]byte, 0, 4+15+4+len(supportedPubKeyAuthAlgosList)+4+16+4+1),
 		}
 		extInfo.Payload = appendInt(extInfo.Payload, len("server-sig-algs"))
 		extInfo.Payload = append(extInfo.Payload, "server-sig-algs"...)
 		extInfo.Payload = appendInt(extInfo.Payload, len(supportedPubKeyAuthAlgosList))
 		extInfo.Payload = append(extInfo.Payload, supportedPubKeyAuthAlgosList...)
+		extInfo.Payload = appendInt(extInfo.Payload, len("ping@openssh.com"))
+		extInfo.Payload = append(extInfo.Payload, "ping@openssh.com"...)
+		extInfo.Payload = appendInt(extInfo.Payload, 1)
+		extInfo.Payload = append(extInfo.Payload, "0"...)
 		if err := t.conn.writePacket(Marshal(extInfo)); err != nil {
 			return err
 		}
@@ -685,9 +701,16 @@ func (a algorithmSignerWrapper) SignWithAlgorithm(rand io.Reader, data []byte, a
 
 func pickHostKey(hostKeys []Signer, algo string) AlgorithmSigner {
 	for _, k := range hostKeys {
+		if s, ok := k.(MultiAlgorithmSigner); ok {
+			if !contains(s.Algorithms(), underlyingAlgo(algo)) {
+				continue
+			}
+		}
+
 		if algo == k.PublicKey().Type() {
 			return algorithmSignerWrapper{k}
 		}
+
 		k, ok := k.(AlgorithmSigner)
 		if !ok {
 			continue

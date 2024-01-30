@@ -137,12 +137,6 @@ func (o *Options) ApplyDeprecated() {
 	if deprecated.Changed("kube-api-burst") {
 		o.ComponentConfig.ClientConnection.Burst = o.Deprecated.Burst
 	}
-	if deprecated.Changed("lock-object-namespace") {
-		o.ComponentConfig.LeaderElection.ResourceNamespace = o.Deprecated.ResourceNamespace
-	}
-	if deprecated.Changed("lock-object-name") {
-		o.ComponentConfig.LeaderElection.ResourceName = o.Deprecated.ResourceName
-	}
 }
 
 // ApplyLeaderElectionTo obtains the CLI args related with leaderelection, and override the values in `cfg`.
@@ -210,7 +204,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 		o.ApplyLeaderElectionTo(o.ComponentConfig)
 		c.ComponentConfig = *o.ComponentConfig
 	} else {
-		cfg, err := loadConfigFromFile(logger, o.ConfigFile)
+		cfg, err := LoadConfigFromFile(logger, o.ConfigFile)
 		if err != nil {
 			return err
 		}
@@ -289,7 +283,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 		return nil, err
 	}
 
-	c.EventBroadcaster = events.NewEventBroadcasterAdapter(eventClient)
+	c.EventBroadcaster = events.NewEventBroadcasterAdapterWithContext(ctx, eventClient)
 
 	// Set up leader election if enabled.
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig

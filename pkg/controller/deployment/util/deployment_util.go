@@ -184,12 +184,12 @@ func SetDeploymentRevision(deployment *apps.Deployment, revision string) bool {
 }
 
 // MaxRevision finds the highest revision in the replica sets
-func MaxRevision(allRSs []*apps.ReplicaSet) int64 {
+func MaxRevision(logger klog.Logger, allRSs []*apps.ReplicaSet) int64 {
 	max := int64(0)
 	for _, rs := range allRSs {
 		if v, err := Revision(rs); err != nil {
 			// Skip the replica sets when it failed to parse their revision information
-			klog.V(4).Info("Couldn't parse revision for replica set, deployment controller will skip it when reconciling revisions", "replicaSet", klog.KObj(rs), "err", err)
+			logger.V(4).Info("Couldn't parse revision for replica set, deployment controller will skip it when reconciling revisions", "replicaSet", klog.KObj(rs), "err", err)
 		} else if v > max {
 			max = v
 		}
@@ -198,12 +198,12 @@ func MaxRevision(allRSs []*apps.ReplicaSet) int64 {
 }
 
 // LastRevision finds the second max revision number in all replica sets (the last revision)
-func LastRevision(allRSs []*apps.ReplicaSet) int64 {
+func LastRevision(logger klog.Logger, allRSs []*apps.ReplicaSet) int64 {
 	max, secMax := int64(0), int64(0)
 	for _, rs := range allRSs {
 		if v, err := Revision(rs); err != nil {
 			// Skip the replica sets when it failed to parse their revision information
-			klog.V(4).Info("Couldn't parse revision for replica set, deployment controller will skip it when reconciling revisions", "replicaSet", klog.KObj(rs), "err", err)
+			logger.V(4).Info("Couldn't parse revision for replica set, deployment controller will skip it when reconciling revisions", "replicaSet", klog.KObj(rs), "err", err)
 		} else if v >= max {
 			secMax = max
 			max = v
@@ -479,12 +479,12 @@ func GetProportion(logger klog.Logger, rs *apps.ReplicaSet, d apps.Deployment, d
 		// Use the minimum between the replica set fraction and the maximum allowed replicas
 		// when scaling up. This way we ensure we will not scale up more than the allowed
 		// replicas we can add.
-		return integer.Int32Min(rsFraction, allowed)
+		return min(rsFraction, allowed)
 	}
 	// Use the maximum between the replica set fraction and the maximum allowed replicas
 	// when scaling down. This way we ensure we will not scale down more than the allowed
 	// replicas we can remove.
-	return integer.Int32Max(rsFraction, allowed)
+	return max(rsFraction, allowed)
 }
 
 // getReplicaSetFraction estimates the fraction of replicas a replica set can have in
@@ -799,7 +799,7 @@ func NewRSNewReplicas(deployment *apps.Deployment, allRSs []*apps.ReplicaSet, ne
 		// Scale up.
 		scaleUpCount := maxTotalPods - currentPodCount
 		// Do not exceed the number of desired replicas.
-		scaleUpCount = int32(integer.IntMin(int(scaleUpCount), int(*(deployment.Spec.Replicas)-*(newRS.Spec.Replicas))))
+		scaleUpCount = min(scaleUpCount, *(deployment.Spec.Replicas)-*(newRS.Spec.Replicas))
 		return *(newRS.Spec.Replicas) + scaleUpCount, nil
 	case apps.RecreateDeploymentStrategyType:
 		return *(deployment.Spec.Replicas), nil

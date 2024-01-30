@@ -346,3 +346,109 @@ func TestComponents(t *testing.T) {
 		}
 	}
 }
+
+func TestHighestSupportedVersion(t *testing.T) {
+	testCases := []struct {
+		versions                        []string
+		expectedHighestSupportedVersion string
+		shouldFail                      bool
+	}{
+		{
+			versions:                        []string{"v1.0.0"},
+			expectedHighestSupportedVersion: "1.0.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:   []string{"0.3.0"},
+			shouldFail: true,
+		},
+		{
+			versions:   []string{"0.2.0"},
+			shouldFail: true,
+		},
+		{
+			versions:                        []string{"1.0.0"},
+			expectedHighestSupportedVersion: "1.0.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:   []string{"v0.3.0"},
+			shouldFail: true,
+		},
+		{
+			versions:   []string{"v0.2.0"},
+			shouldFail: true,
+		},
+		{
+			versions:   []string{"0.2.0", "v0.3.0"},
+			shouldFail: true,
+		},
+		{
+			versions:                        []string{"0.2.0", "v1.0.0"},
+			expectedHighestSupportedVersion: "1.0.0",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"0.2.0", "v1.2.3"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"v1.2.3", "v0.3.0"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"v1.2.3", "v0.3.0", "2.0.1"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{"4.9.12", "2.0.1"},
+			expectedHighestSupportedVersion: "",
+			shouldFail:                      true,
+		},
+		{
+			versions:                        []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
+			expectedHighestSupportedVersion: "1.2.3",
+			shouldFail:                      false,
+		},
+		{
+			versions:                        []string{},
+			expectedHighestSupportedVersion: "",
+			shouldFail:                      true,
+		},
+		{
+			versions:                        []string{"var", "boo", "foo"},
+			expectedHighestSupportedVersion: "",
+			shouldFail:                      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		// Arrange & Act
+		actual, err := HighestSupportedVersion(tc.versions)
+
+		// Assert
+		if tc.shouldFail && err == nil {
+			t.Fatalf("expecting highestSupportedVersion to fail, but got nil error for testcase: %#v", tc)
+		}
+		if !tc.shouldFail && err != nil {
+			t.Fatalf("unexpected error during ValidatePlugin for testcase: %#v\r\n err:%v", tc, err)
+		}
+		if tc.expectedHighestSupportedVersion != "" {
+			result, err := actual.Compare(tc.expectedHighestSupportedVersion)
+			if err != nil {
+				t.Fatalf("comparison failed with %v for testcase %#v", err, tc)
+			}
+			if result != 0 {
+				t.Fatalf("expectedHighestSupportedVersion %v, but got %v for tc: %#v", tc.expectedHighestSupportedVersion, actual, tc)
+			}
+		}
+	}
+}

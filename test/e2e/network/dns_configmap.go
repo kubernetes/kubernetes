@@ -316,7 +316,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 	ginkgo.Context("Change stubDomain", func() {
 		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}
 
-		ginkgo.It("should be able to change stubDomain configuration [Slow][Serial]", func(ctx context.Context) {
+		framework.It("should be able to change stubDomain configuration", framework.WithSlow(), framework.WithSerial(), func(ctx context.Context) {
 			nsTest.c = nsTest.f.ClientSet
 			nsTest.run(ctx, framework.TestContext.ClusterIsIPv6())
 		})
@@ -325,7 +325,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 	ginkgo.Context("Forward PTR lookup", func() {
 		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDNSTestCommon()}
 
-		ginkgo.It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func(ctx context.Context) {
+		framework.It("should forward PTR records lookup to upstream nameserver", framework.WithSlow(), framework.WithSerial(), func(ctx context.Context) {
 			fwdTest.c = fwdTest.f.ClientSet
 			fwdTest.run(ctx, framework.TestContext.ClusterIsIPv6())
 		})
@@ -334,7 +334,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 	ginkgo.Context("Forward external name lookup", func() {
 		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDNSTestCommon()}
 
-		ginkgo.It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func(ctx context.Context) {
+		framework.It("should forward externalname lookup to upstream nameserver", framework.WithSlow(), framework.WithSerial(), func(ctx context.Context) {
 			externalNameTest.c = externalNameTest.f.ClientSet
 			externalNameTest.run(ctx, framework.TestContext.ClusterIsIPv6())
 		})

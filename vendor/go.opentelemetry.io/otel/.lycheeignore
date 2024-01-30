@@ -1,3 +1,6 @@
 http://localhost
 http://jaeger-collector
 https://github.com/open-telemetry/opentelemetry-go/milestone/
+https://github.com/open-telemetry/opentelemetry-go/projects
+file:///home/runner/work/opentelemetry-go/opentelemetry-go/libraries
+file:///home/runner/work/opentelemetry-go/opentelemetry-go/manual

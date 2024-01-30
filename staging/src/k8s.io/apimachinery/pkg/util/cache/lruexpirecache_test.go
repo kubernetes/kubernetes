@@ -67,6 +67,20 @@ func TestSimpleRemove(t *testing.T) {
 	expectNotEntry(t, c, "long-lived")
 }
 
+func TestSimpleRemoveAll(t *testing.T) {
+	c := NewLRUExpireCache(10)
+	c.Add("long-lived", "12345", 10*time.Hour)
+	c.Add("other-long-lived", "12345", 10*time.Hour)
+	c.RemoveAll(func(k any) bool {
+		return k.(string) == "long-lived"
+	})
+
+	assertKeys(t, c.Keys(), []any{"other-long-lived"})
+
+	expectNotEntry(t, c, "long-lived")
+	expectEntry(t, c, "other-long-lived", "12345")
+}
+
 func TestExpiredGet(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	c := NewLRUExpireCacheWithClock(10, fakeClock)

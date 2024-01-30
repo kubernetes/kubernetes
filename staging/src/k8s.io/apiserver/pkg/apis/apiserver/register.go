@@ -43,6 +43,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&AdmissionConfiguration{},
+		&AuthenticationConfiguration{},
+		&AuthorizationConfiguration{},
+		&EncryptionConfiguration{},
 		&EgressSelectorConfiguration{},
 		&TracingConfiguration{},
 	)

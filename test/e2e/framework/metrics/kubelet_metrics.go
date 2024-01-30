@@ -44,7 +44,7 @@ const (
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	podStartDurationKey = "pod_start_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
-	PodStartSLIDurationKey = "pod_start_sli_duration_seconds"
+	podStartSLIDurationKey = "pod_start_sli_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	cgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
@@ -155,7 +155,7 @@ func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
 		podWorkerDurationKey,
 		podWorkerStartDurationKey,
 		podStartDurationKey,
-		PodStartSLIDurationKey,
+		podStartSLIDurationKey,
 		cgroupManagerOperationsKey,
 		dockerOperationsLatencyKey,
 		podWorkerStartDurationKey,

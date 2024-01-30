@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostnamespaces0
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+  hostIPC: true
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1

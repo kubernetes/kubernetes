@@ -27,7 +27,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -367,8 +367,12 @@ func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 			return
 		}
 	}
+	d := dc.getDeploymentForPod(logger, pod)
+	if d == nil {
+		return
+	}
 	logger.V(4).Info("Pod deleted", "pod", klog.KObj(pod))
-	if d := dc.getDeploymentForPod(logger, pod); d != nil && d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
+	if d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
 		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.AppsV1()))
 		if err != nil {
@@ -582,7 +586,7 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	logger := klog.FromContext(ctx)
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		klog.ErrorS(err, "Failed to split meta namespace cache key", "cacheKey", key)
+		logger.Error(err, "Failed to split meta namespace cache key", "cacheKey", key)
 		return err
 	}
 

@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -46,11 +45,6 @@ func (c *Fake) Start() error {
 	return nil
 }
 
-// ContainerInfo is a fake implementation of Interface.ContainerInfo.
-func (c *Fake) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-	return new(cadvisorapi.ContainerInfo), nil
-}
-
 // ContainerInfoV2 is a fake implementation of Interface.ContainerInfoV2.
 func (c *Fake) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return map[string]cadvisorapiv2.ContainerInfo{}, nil
@@ -59,16 +53,6 @@ func (c *Fake) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions
 // GetRequestedContainersInfo is a fake implementation if Interface.GetRequestedContainersInfo
 func (c *Fake) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
-}
-
-// SubcontainerInfo is a fake implementation of Interface.SubcontainerInfo.
-func (c *Fake) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
-	return map[string]*cadvisorapi.ContainerInfo{}, nil
-}
-
-// DockerContainer is a fake implementation of Interface.DockerContainer.
-func (c *Fake) DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error) {
-	return cadvisorapi.ContainerInfo{}, nil
 }
 
 // MachineInfo is a fake implementation of Interface.MachineInfo.
@@ -101,9 +85,9 @@ func (c *Fake) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 
-// WatchEvents is a fake implementation of Interface.WatchEvents.
-func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
-	return new(events.EventChannel), nil
+// ContainerFsInfo is a fake implementation of Interface.ContainerFsInfo.
+func (c *Fake) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
+	return cadvisorapiv2.FsInfo{}, nil
 }
 
 // GetDirFsInfo is a fake implementation of Interface.GetDirFsInfo.

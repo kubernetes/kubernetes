@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 )
 
 const (
@@ -75,22 +76,6 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 			continue
 		}
 
-		if plState.queues == nil {
-			tabPrint(tabWriter, row(
-				plState.pl.Name, // 1
-				"<none>",        // 2
-				"<none>",        // 3
-				"<none>",        // 4
-				"<none>",        // 5
-				"<none>",        // 6
-				"<none>",        // 7
-				"<none>",        // 8
-				"<none>",        // 9
-				"<none>",        // 10
-			))
-			endLine(tabWriter)
-			continue
-		}
 		queueSetDigest := plState.queues.Dump(false)
 		activeQueueNum := 0
 		for _, q := range queueSetDigest.Queues {
@@ -134,21 +119,6 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
-		if plState.queues == nil {
-			tabPrint(tabWriter, row(
-				plState.pl.Name, // 1
-				"<none>",        // 2
-				"<none>",        // 3
-				"<none>",        // 4
-				"<none>",        // 5
-				"<none>",        // 6
-				"<none>",        // 7
-				"<none>",        // 8
-				"<none>",        // 9
-			))
-			endLine(tabWriter)
-			continue
-		}
 		queueSetDigest := plState.queues.Dump(false)
 		for i, q := range queueSetDigest.Queues {
 			tabPrint(tabWriter, row(
@@ -185,57 +155,65 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 		"InitialSeats",        // 7
 		"FinalSeats",          // 8
 		"AdditionalLatency",   // 9
+		"StartTime",           // 10
 	}))
 	if includeRequestDetails {
 		continueLine(tabWriter)
 		tabPrint(tabWriter, rowForHeaders([]string{
-			"UserName",    // 10
-			"Verb",        // 11
-			"APIPath",     // 12
-			"Namespace",   // 13
-			"Name",        // 14
-			"APIVersion",  // 15
-			"Resource",    // 16
-			"SubResource", // 17
+			"UserName",    // 11
+			"Verb",        // 12
+			"APIPath",     // 13
+			"Namespace",   // 14
+			"Name",        // 15
+			"APIVersion",  // 16
+			"Resource",    // 17
+			"SubResource", // 18
 		}))
 	}
 	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
-		if plState.queues == nil {
-			continue
-		}
 		queueSetDigest := plState.queues.Dump(includeRequestDetails)
+		dumpRequest := func(iq, ir int, r debug.RequestDump) {
+			tabPrint(tabWriter, row(
+				plState.pl.Name,     // 1
+				r.MatchedFlowSchema, // 2
+				strconv.Itoa(iq),    // 3
+				strconv.Itoa(ir),    // 4
+				r.FlowDistinguisher, // 5
+				r.ArriveTime.UTC().Format(time.RFC3339Nano),    // 6
+				strconv.Itoa(int(r.WorkEstimate.InitialSeats)), // 7
+				strconv.Itoa(int(r.WorkEstimate.FinalSeats)),   // 8
+				r.WorkEstimate.AdditionalLatency.String(),      // 9
+				r.StartTime.UTC().Format(time.RFC3339Nano),     // 10
+			))
+			if includeRequestDetails {
+				continueLine(tabWriter)
+				tabPrint(tabWriter, rowForRequestDetails(
+					r.UserName,              // 11
+					r.RequestInfo.Verb,      // 12
+					r.RequestInfo.Path,      // 13
+					r.RequestInfo.Namespace, // 14
+					r.RequestInfo.Name,      // 15
+					schema.GroupVersion{
+						Group:   r.RequestInfo.APIGroup,
+						Version: r.RequestInfo.APIVersion,
+					}.String(), // 16
+					r.RequestInfo.Resource,    // 17
+					r.RequestInfo.Subresource, // 18
+				))
+			}
+			endLine(tabWriter)
+		}
 		for iq, q := range queueSetDigest.Queues {
 			for ir, r := range q.Requests {
-				tabPrint(tabWriter, row(
-					plState.pl.Name,     // 1
-					r.MatchedFlowSchema, // 2
-					strconv.Itoa(iq),    // 3
-					strconv.Itoa(ir),    // 4
-					r.FlowDistinguisher, // 5
-					r.ArriveTime.UTC().Format(time.RFC3339Nano),    // 6
-					strconv.Itoa(int(r.WorkEstimate.InitialSeats)), // 7
-					strconv.Itoa(int(r.WorkEstimate.FinalSeats)),   // 8
-					r.WorkEstimate.AdditionalLatency.String(),      // 9
-				))
-				if includeRequestDetails {
-					continueLine(tabWriter)
-					tabPrint(tabWriter, rowForRequestDetails(
-						r.UserName,              // 10
-						r.RequestInfo.Verb,      // 11
-						r.RequestInfo.Path,      // 12
-						r.RequestInfo.Namespace, // 13
-						r.RequestInfo.Name,      // 14
-						schema.GroupVersion{
-							Group:   r.RequestInfo.APIGroup,
-							Version: r.RequestInfo.APIVersion,
-						}.String(), // 15
-						r.RequestInfo.Resource,    // 16
-						r.RequestInfo.Subresource, // 17
-					))
-				}
-				endLine(tabWriter)
+				dumpRequest(iq, ir, r)
 			}
+			for _, r := range q.RequestsExecuting {
+				dumpRequest(iq, -1, r)
+			}
+		}
+		for _, r := range queueSetDigest.QueuelessExecutingRequests {
+			dumpRequest(-1, -1, r)
 		}
 	}
 	runtime.HandleError(tabWriter.Flush())

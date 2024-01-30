@@ -24,6 +24,20 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1"
 )
 
+// PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
+func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
+	// Use beta annotation first
+	if _, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
+		return true
+	}
+
+	if claim.Spec.StorageClassName != nil {
+		return true
+	}
+
+	return false
+}
+
 // GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
 // requested, it returns "".
 func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {

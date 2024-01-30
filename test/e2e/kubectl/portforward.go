@@ -449,7 +449,7 @@ func doTestOverWebSockets(ctx context.Context, bindAddress string, f *framework.
 
 var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	f := framework.NewDefaultFramework("port-forwarding")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("With a server listening on 0.0.0.0", func() {
 		ginkgo.Describe("that expects a client request", func() {

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	api "k8s.io/api/core/v1"
+
 	v1 "k8s.io/api/admissionregistration/v1"
 
 	celtypes "github.com/google/cel-go/common/types"
@@ -40,7 +42,7 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(context.Context, *admission.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, int64) ([]cel.EvaluationResult, int64, error) {
+func (f *fakeCelFilter) ForInput(context.Context, *admission.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, *api.Namespace, int64) ([]cel.EvaluationResult, int64, error) {
 	if f.throwError {
 		return nil, 0, errors.New("test error")
 	}
@@ -334,9 +336,9 @@ func TestMatch(t *testing.T) {
 			m := NewMatcher(&fakeCelFilter{
 				evaluations: tc.evaluations,
 				throwError:  tc.throwError,
-			}, nil, tc.failPolicy, "test", "testhook")
+			}, tc.failPolicy, "webhook", "test", "testhook")
 			ctx := context.TODO()
-			matchResult := m.Match(ctx, fakeVersionedAttr, nil)
+			matchResult := m.Match(ctx, fakeVersionedAttr, nil, nil)
 
 			if matchResult.Error != nil {
 				if len(tc.expectError) == 0 {

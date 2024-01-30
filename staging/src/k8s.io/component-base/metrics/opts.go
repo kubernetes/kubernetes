@@ -18,13 +18,18 @@ package metrics
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"gopkg.in/yaml.v2"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	promext "k8s.io/component-base/metrics/prometheusextension"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -319,6 +324,7 @@ func (allowList *MetricLabelAllowList) ConstrainToAllowedList(labelNameList, lab
 		if allowValues, ok := allowList.labelToAllowList[name]; ok {
 			if !allowValues.Has(value) {
 				labelValueList[index] = "unexpected"
+				cardinalityEnforcementUnexpectedCategorizationsTotal.Inc()
 			}
 		}
 	}
@@ -329,6 +335,7 @@ func (allowList *MetricLabelAllowList) ConstrainLabelMap(labels map[string]strin
 		if allowValues, ok := allowList.labelToAllowList[name]; ok {
 			if !allowValues.Has(value) {
 				labels[name] = "unexpected"
+				cardinalityEnforcementUnexpectedCategorizationsTotal.Inc()
 			}
 		}
 	}
@@ -353,4 +360,21 @@ func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
 			}
 		}
 	}
+}
+
+func SetLabelAllowListFromManifest(manifest string) {
+	allowListLock.Lock()
+	defer allowListLock.Unlock()
+	allowListMapping := make(map[string]string)
+	data, err := os.ReadFile(filepath.Clean(manifest))
+	if err != nil {
+		klog.Errorf("Failed to read allow list manifest: %v", err)
+		return
+	}
+	err = yaml.Unmarshal(data, &allowListMapping)
+	if err != nil {
+		klog.Errorf("Failed to parse allow list manifest: %v", err)
+		return
+	}
+	SetLabelAllowListFromCLI(allowListMapping)
 }

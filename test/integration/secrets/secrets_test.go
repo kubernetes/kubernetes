@@ -22,8 +22,11 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"encoding/json"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
@@ -48,6 +51,57 @@ func TestSecrets(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	DoTestSecrets(t, client, ns)
+	DoTestSecretsImmutableWithEmptyValue(t, client, ns)
+}
+
+// DoTestSecretsImmutableWithEmptyValue Test whether apiserver will judge the secret data inconsistency
+// if the value of map in secret data is the empty string when patch secret,
+// and if the Immutable value of secret is true, the patch request is rejected.
+func DoTestSecretsImmutableWithEmptyValue(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
+	// Make a secret object. Make a secret object. the map in the secret data contains the value of the empty string
+	// make Immutable true, so that if the apiserver judge that the patch secret is inconsistent, it will refuse the patch
+	trueVal := true
+	s := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret",
+			Namespace: ns.Name,
+		},
+		Immutable: &trueVal,
+		Data: map[string][]byte{
+			"emptyData": {},
+		},
+	}
+
+	if _, err := client.CoreV1().Secrets(s.Namespace).Create(context.TODO(), &s, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unable to create test secret: %v", err)
+	}
+	defer deleteSecretOrErrorf(t, client, s.Namespace, s.Name)
+
+	// Make a patch secret object
+	patchSecret := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret",
+			Namespace: ns.Name,
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+		Immutable: &trueVal,
+		Data: map[string][]byte{
+			"emptyData": {},
+		},
+	}
+
+	secretPatch, err := json.Marshal(patchSecret)
+	if err != nil {
+		t.Errorf("unable to marshal test secret: %v", err)
+	}
+
+	// Patch secret object, expect patch to succeed,
+	// more detailed discussion is at #119229
+	if _, err := client.CoreV1().Secrets(s.Namespace).Patch(context.TODO(), patchSecret.Name, types.StrategicMergePatchType, secretPatch, metav1.PatchOptions{}); err != nil {
+		t.Errorf("unable to patch test secret: %v", err)
+	}
 }
 
 // DoTestSecrets test secrets for one api version.

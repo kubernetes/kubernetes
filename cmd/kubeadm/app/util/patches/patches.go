@@ -75,6 +75,7 @@ func (ps *patchSet) String() string {
 	)
 }
 
+// KubeletConfiguration defines the kubeletconfiguration patch target.
 const KubeletConfiguration = "kubeletconfiguration"
 
 var (
@@ -102,6 +103,7 @@ var (
 	}
 )
 
+// KnownTargets returns the locally defined knownTargets.
 func KnownTargets() []string {
 	return knownTargets
 }

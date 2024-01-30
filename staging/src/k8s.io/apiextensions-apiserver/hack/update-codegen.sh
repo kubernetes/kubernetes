@@ -46,6 +46,7 @@ kube::codegen::gen_openapi \
 
 kube::codegen::gen_client \
     --with-watch \
+    --with-applyconfig \
     --input-pkg-root k8s.io/apiextensions-apiserver/pkg/apis \
     --output-pkg-root k8s.io/apiextensions-apiserver/pkg/client \
     --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \

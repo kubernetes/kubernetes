@@ -61,9 +61,9 @@ function usage() {
   local release_latest
   local ci_latest
 
-  release_stable=$(gsutil cat gs://kubernetes-release/release/stable.txt)
-  release_latest=$(gsutil cat gs://kubernetes-release/release/latest.txt)
-  ci_latest=$(gsutil cat gs://k8s-release-dev/ci/latest.txt)
+  release_stable=$(curl -sL https://dl.k8s.io/release/stable.txt)
+  release_latest=$(curl -sL https://dl.k8s.io/release/latest.txt)
+  ci_latest=$(curl -sL https://dl.k8s.io/ci/latest.txt)
 
   echo "Right now, versions are as follows:"
   echo "  release/stable: ${0} ${release_stable}"
@@ -406,7 +406,7 @@ function do-node-upgrade() {
     fi
     instances=()
     while IFS='' read -r line; do instances+=("$line"); done < <(gcloud compute instance-groups managed list-instances "${group}" \
-        --format='value(instance)' \
+        --format='value(name)' \
         --project="${PROJECT}" \
         --zone="${ZONE}" 2>&1) && list_instances_rc=$? || list_instances_rc=$?
     if [[ "${list_instances_rc}" != 0 ]]; then

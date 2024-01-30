@@ -127,6 +127,11 @@ func NewREST(
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate
 
+	// users can patch the status to remove the finalizer,
+	// hence statusStore must participate on the AfterDelete
+	// hook to release the allocated resources
+	statusStore.AfterDelete = genericStore.afterDelete
+
 	return genericStore, &StatusREST{store: &statusStore}, &svcreg.ProxyREST{Redirector: genericStore, ProxyTransport: proxyTransport}, nil
 }
 

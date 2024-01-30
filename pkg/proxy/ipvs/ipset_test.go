@@ -1,5 +1,5 @@
-//go:build !windows
-// +build !windows
+//go:build linux
+// +build linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -22,8 +22,8 @@ package ipvs
 import (
 	"testing"
 
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	fakeipset "k8s.io/kubernetes/pkg/util/ipset/testing"
+	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
+	fakeipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset/testing"
 )
 
 func TestCheckIPSetVersion(t *testing.T) {

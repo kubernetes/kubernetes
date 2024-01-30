@@ -119,11 +119,6 @@ func createSocketFile(socketDir string) (string, error) {
 }
 
 func TestGetFileType(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	hu := NewHostUtil()
 
 	testCase := []struct {

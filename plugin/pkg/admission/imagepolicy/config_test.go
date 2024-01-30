@@ -120,10 +120,10 @@ func TestConfigNormalization(t *testing.T) {
 	}
 	for _, tt := range tests {
 		err := normalizeWebhookConfig(&tt.config)
-		if err == nil && tt.wantErr == true {
+		if err == nil && tt.wantErr {
 			t.Errorf("%s: expected error from normalization and didn't have one", tt.test)
 		}
-		if err != nil && tt.wantErr == false {
+		if err != nil && !tt.wantErr {
 			t.Errorf("%s: unexpected error from normalization: %v", tt.test, err)
 		}
 		if err == nil && !reflect.DeepEqual(tt.config, tt.normalizedConfig) {

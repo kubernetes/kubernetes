@@ -184,7 +184,7 @@ func TestPluginReRegistration(t *testing.T) {
 	// The updated plugin should be in the desired state of world cache
 	for i := 0; i < 10; i++ {
 		// Stop the plugin; the plugin should be removed from the desired state of world cache
-		// The plugin removel doesn't work when running the unit tests locally: event.Op of plugin watcher won't pick up the delete event
+		// The plugin removal doesn't work when running the unit tests locally: event.Op of plugin watcher won't pick up the delete event
 		require.NoError(t, p.Stop())
 		waitForUnregistration(t, pluginInfo.SocketPath, dsw)
 

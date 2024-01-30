@@ -1322,6 +1322,21 @@ func TestReplicaCalcEmptyCPURequest(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestPlainMetricReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 5,
+		metric: &metricInfo{
+			name:          "qps",
+			levels:        []int64{20000, 19000, 21000},
+			targetUsage:   20000,
+			expectedUsage: 20000,
+			metricType:    podMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  2,
@@ -1981,6 +1996,115 @@ func TestGroupPods(t *testing.T) {
 			if !ignoredPods.Equal(tc.expectIgnoredPods) {
 				t.Errorf("%s got ignoredPods %v, expected %v", tc.name, ignoredPods, tc.expectIgnoredPods)
 			}
+		})
+	}
+}
+
+func TestCalculatePodRequests(t *testing.T) {
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+	testPod := "test-pod"
+
+	tests := []struct {
+		name             string
+		pods             []*v1.Pod
+		container        string
+		resource         v1.ResourceName
+		expectedRequests map[string]int64
+		expectedError    error
+	}{
+		{
+			name:             "void",
+			pods:             []*v1.Pod{},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{},
+			expectedError:    nil,
+		},
+		{
+			name: "pod with regular containers",
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 150},
+			expectedError:    nil,
+		},
+		{
+			name: "calculate requests with special container",
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "container1",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 100},
+			expectedError:    nil,
+		},
+		{
+			name: "container missing requests",
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+		},
+		{
+			name: "pod with restartable init containers",
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(20, resource.DecimalSI)}}},
+						{Name: "restartable-container1", RestartPolicy: &containerRestartPolicyAlways, Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 150},
+			expectedError:    nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			requests, err := calculatePodRequests(tc.pods, tc.container, tc.resource)
+			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
+			assert.Equal(t, tc.expectedError, err, "error should be as expected")
 		})
 	}
 }

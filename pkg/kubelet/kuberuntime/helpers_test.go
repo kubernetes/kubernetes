@@ -25,8 +25,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -136,11 +139,53 @@ func TestToKubeContainer(t *testing.T) {
 			Type: runtimetesting.FakeRuntimeName,
 			ID:   "test-id",
 		},
-		Name:    "test-name",
-		ImageID: "test-image-ref",
-		Image:   "test-image",
-		Hash:    uint64(0x1234),
-		State:   kubecontainer.ContainerStateRunning,
+		Name:                "test-name",
+		ImageID:             "test-image-ref",
+		Image:               "test-image",
+		ImageRuntimeHandler: "",
+		Hash:                uint64(0x1234),
+		State:               kubecontainer.ContainerStateRunning,
+	}
+
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+	got, err := m.toKubeContainer(c)
+	assert.NoError(t, err)
+	assert.Equal(t, expect, got)
+
+	// unable to convert a nil pointer to a runtime container
+	_, err = m.toKubeContainer(nil)
+	assert.Error(t, err)
+	_, err = m.sandboxToKubeContainer(nil)
+	assert.Error(t, err)
+}
+
+func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+	c := &runtimeapi.Container{
+		Id: "test-id",
+		Metadata: &runtimeapi.ContainerMetadata{
+			Name:    "test-name",
+			Attempt: 1,
+		},
+		Image:    &runtimeapi.ImageSpec{Image: "test-image", RuntimeHandler: "test-runtimeHandler"},
+		ImageRef: "test-image-ref",
+		State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
+		Annotations: map[string]string{
+			containerHashLabel: "1234",
+		},
+	}
+	expect := &kubecontainer.Container{
+		ID: kubecontainer.ContainerID{
+			Type: runtimetesting.FakeRuntimeName,
+			ID:   "test-id",
+		},
+		Name:                "test-name",
+		ImageID:             "test-image-ref",
+		Image:               "test-image",
+		ImageRuntimeHandler: "test-runtimeHandler",
+		Hash:                uint64(0x1234),
+		State:               kubecontainer.ContainerStateRunning,
 	}
 
 	_, _, m, err := createTestRuntimeManager()

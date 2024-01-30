@@ -37,12 +37,13 @@ import (
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/cpuset"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
@@ -216,9 +217,7 @@ func updateKubeletConfigWithMemoryManagerParams(initialCfg *kubeletconfig.Kubele
 	if initialCfg.ReservedMemory == nil {
 		initialCfg.ReservedMemory = []kubeletconfig.MemoryReservation{}
 	}
-	for _, memoryReservation := range params.systemReservedMemory {
-		initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, memoryReservation)
-	}
+	initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, params.systemReservedMemory...)
 }
 
 func getAllNUMANodes() []int {
@@ -243,7 +242,7 @@ func getAllNUMANodes() []int {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager]", func() {
+var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.WithSerial(), feature.MemoryManager, func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
 		allNUMANodes             []int
@@ -254,7 +253,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 	)
 
 	f := framework.NewDefaultFramework("memory-manager-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	memoryQuantity := resource.MustParse("1100Mi")
 	defaultKubeParams := &kubeletParams{
@@ -280,7 +279,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		currentNUMANodeIDs, err := cpuset.Parse(strings.Trim(output, "\n"))
 		framework.ExpectNoError(err)
 
-		framework.ExpectEqual(numaNodeIDs, currentNUMANodeIDs.List())
+		gomega.Expect(numaNodeIDs).To(gomega.Equal(currentNUMANodeIDs.List()))
 	}
 
 	waitingForHugepages := func(ctx context.Context, hugepagesCount int) {
@@ -394,16 +393,16 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			framework.ExpectNoError(err)
 
 			stateAllocatableMemory := getAllocatableMemoryFromStateFile(stateData)
-			framework.ExpectEqual(len(resp.Memory), len(stateAllocatableMemory))
+			gomega.Expect(resp.Memory).To(gomega.HaveLen(len(stateAllocatableMemory)))
 
 			for _, containerMemory := range resp.Memory {
 				gomega.Expect(containerMemory.Topology).NotTo(gomega.BeNil())
-				framework.ExpectEqual(len(containerMemory.Topology.Nodes), 1)
+				gomega.Expect(containerMemory.Topology.Nodes).To(gomega.HaveLen(1))
 				gomega.Expect(containerMemory.Topology.Nodes[0]).NotTo(gomega.BeNil())
 
 				numaNodeID := int(containerMemory.Topology.Nodes[0].ID)
 				for _, numaStateMemory := range stateAllocatableMemory {
-					framework.ExpectEqual(len(numaStateMemory.NUMAAffinity), 1)
+					gomega.Expect(numaStateMemory.NUMAAffinity).To(gomega.HaveLen(1))
 					if numaNodeID != numaStateMemory.NUMAAffinity[0] {
 						continue
 					}
@@ -627,7 +626,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 
 					return true
 				}, time.Minute, 5*time.Second).Should(
-					gomega.Equal(true),
+					gomega.BeTrue(),
 					"the pod succeeded to start, when it should fail with the admission error",
 				)
 			})

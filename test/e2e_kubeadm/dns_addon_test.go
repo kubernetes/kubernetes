@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -36,87 +35,27 @@ const (
 	coreDNSRoleName           = "system:coredns"
 	coreDNSRoleBindingName    = coreDNSRoleName
 	coreDNSDeploymentName     = "coredns"
-
-	kubeDNSServiceAccountName = "kube-dns"
-	kubeDNSDeploymentName     = "kube-dns"
-)
-
-var (
-	dnsType = ""
 )
 
 // Define container for all the test specification aimed at verifying
-// that kubeadm configures the dns as expected
+// that kubeadm configures the DNS addon as expected
 var _ = Describe("DNS addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("DNS")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	// kubeadm supports two type of DNS addon, and so
-	// it is necessary to get it from the kubeadm-config ConfigMap before testing
-	ginkgo.BeforeEach(func() {
-		// if the dnsType name is already known exit
-		if dnsType != "" {
-			return
-		}
-
-		// gets the ClusterConfiguration from the kubeadm kubeadm-config ConfigMap as a untyped map
-		m := getClusterConfiguration(f.ClientSet)
-
-		// Extract the dnsType
-		dnsType = "CoreDNS"
-		if _, ok := m["dns"]; ok {
-			d := m["dns"].(map[interface{}]interface{})
-			if t, ok := d["type"]; ok {
-				dnsType = t.(string)
-			}
-		}
-	})
-
-	ginkgo.Context("kube-dns", func() {
-		ginkgo.Context("kube-dns ServiceAccount", func() {
-			ginkgo.It("should exist", func(ctx context.Context) {
-				if dnsType != "kube-dns" {
-					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
-				}
-
-				ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, kubeDNSServiceAccountName)
-			})
-		})
-
-		ginkgo.Context("kube-dns Deployment", func() {
-			ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
-				if dnsType != "kube-dns" {
-					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
-				}
-
-				d := GetDeployment(f.ClientSet, kubeSystemNamespace, kubeDNSDeploymentName)
-
-				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, kubeDNSServiceAccountName)
-			})
-		})
-	})
-
 	ginkgo.Context("CoreDNS", func() {
 		ginkgo.Context("CoreDNS ServiceAccount", func() {
 			ginkgo.It("should exist", func(ctx context.Context) {
-				if dnsType != "CoreDNS" {
-					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
-				}
-
 				ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, coreDNSServiceAccountName)
 			})
 
 			ginkgo.It("should have related ClusterRole and ClusterRoleBinding", func(ctx context.Context) {
-				if dnsType != "CoreDNS" {
-					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
-				}
-
 				ExpectClusterRole(f.ClientSet, coreDNSRoleName)
 				ExpectClusterRoleBinding(f.ClientSet, coreDNSRoleBindingName)
 			})
@@ -124,25 +63,15 @@ var _ = Describe("DNS addon", func() {
 
 		ginkgo.Context("CoreDNS ConfigMap", func() {
 			ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
-				if dnsType != "CoreDNS" {
-					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
-				}
-
 				cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, coreDNSConfigMap)
-
 				gomega.Expect(cm.Data).To(gomega.HaveKey(coreDNSConfigMapKey))
 			})
 		})
 
 		ginkgo.Context("CoreDNS Deployment", func() {
 			ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
-				if dnsType != "CoreDNS" {
-					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
-				}
-
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, coreDNSDeploymentName)
-
-				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, coreDNSServiceAccountName)
+				gomega.Expect(d.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(coreDNSServiceAccountName))
 			})
 		})
 	})

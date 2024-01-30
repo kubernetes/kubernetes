@@ -103,6 +103,27 @@ func (VolumeAttachmentStatus) SwaggerDoc() map[string]string {
 	return map_VolumeAttachmentStatus
 }
 
+var map_VolumeAttributesClass = map[string]string{
+	"":           "VolumeAttributesClass represents a specification of mutable volume attributes defined by the CSI driver. The class can be specified during dynamic provisioning of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.",
+	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"driverName": "Name of the CSI driver This field is immutable.",
+	"parameters": "parameters hold volume attributes defined by the CSI driver. These values are opaque to the Kubernetes and are passed directly to the CSI driver. The underlying storage provider supports changing these attributes on an existing volume, however the parameters field itself is immutable. To invoke a volume update, a new VolumeAttributesClass should be created with new parameters, and the PersistentVolumeClaim should be updated to reference the new VolumeAttributesClass.\n\nThis field is required and must contain at least one key/value pair. The keys cannot be empty, and the maximum number of parameters is 512, with a cumulative max size of 256K. If the CSI driver rejects invalid parameters, the target PersistentVolumeClaim will be set to an \"Infeasible\" state in the modifyVolumeStatus field.",
+}
+
+func (VolumeAttributesClass) SwaggerDoc() map[string]string {
+	return map_VolumeAttributesClass
+}
+
+var map_VolumeAttributesClassList = map[string]string{
+	"":         "VolumeAttributesClassList is a collection of VolumeAttributesClass objects.",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is the list of VolumeAttributesClass objects.",
+}
+
+func (VolumeAttributesClassList) SwaggerDoc() map[string]string {
+	return map_VolumeAttributesClassList
+}
+
 var map_VolumeError = map[string]string{
 	"":        "VolumeError captures an error encountered during a volume operation.",
 	"time":    "time represents the time the error was encountered.",

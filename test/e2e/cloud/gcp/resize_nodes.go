@@ -44,9 +44,9 @@ func resizeRC(ctx context.Context, c clientset.Interface, ns, name string, repli
 	return err
 }
 
-var _ = SIGDescribe("Nodes [Disruptive]", func() {
+var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("resize-nodes")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var systemPodsNo int32
 	var c clientset.Interface
 	var ns string
@@ -66,11 +66,11 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	})
 
 	// Slow issue #13323 (8 min)
-	ginkgo.Describe("Resize [Slow]", func() {
+	f.Describe("Resize", framework.WithSlow(), func() {
 		var originalNodeCount int32
 
 		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				ginkgo.By("restoring the original node instance group size")

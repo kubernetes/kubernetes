@@ -164,3 +164,13 @@ func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selec
 	}
 	return count
 }
+
+// podLabelsMatchSpreadConstraints returns whether tha labels matches with the selector in any of topologySpreadConstraint
+func podLabelsMatchSpreadConstraints(constraints []topologySpreadConstraint, labels labels.Set) bool {
+	for _, c := range constraints {
+		if c.Selector.Matches(labels) {
+			return true
+		}
+	}
+	return false
+}

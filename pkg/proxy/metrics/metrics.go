@@ -160,15 +160,52 @@ var (
 		},
 	)
 
-	// IptablesRulesTotal is the number of iptables rules that the iptables proxy installs.
+	// IptablesRulesTotal is the total number of iptables rules that the iptables
+	// proxy has installed.
 	IptablesRulesTotal = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_total",
-			Help:           "Number of proxy iptables rules programmed",
+			Help:           "Total number of iptables rules owned by kube-proxy",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"table"},
+	)
+
+	// IptablesRulesLastSync is the number of iptables rules that the iptables proxy
+	// updated in the last sync.
+	IptablesRulesLastSync = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_last",
+			Help:           "Number of iptables rules written by kube-proxy in last sync",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"table"},
+	)
+
+	// ProxyHealthzTotal is the number of returned HTTP Status for each
+	// healthz probe.
+	ProxyHealthzTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "proxy_healthz_total",
+			Help:           "Cumulative proxy healthz HTTP status",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"code"},
+	)
+
+	// ProxyLivezTotal is the number of returned HTTP Status for each
+	// livez probe.
+	ProxyLivezTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "proxy_livez_total",
+			Help:           "Cumulative proxy livez HTTP status",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"code"},
 	)
 
 	// SyncProxyRulesLastQueuedTimestamp is the last time a proxy sync was
@@ -212,10 +249,14 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesPending)
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRulesTotal)
+		legacyregistry.MustRegister(IptablesRulesLastSync)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
 		legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
+		legacyregistry.MustRegister(ProxyHealthzTotal)
+		legacyregistry.MustRegister(ProxyLivezTotal)
+
 	})
 }
 

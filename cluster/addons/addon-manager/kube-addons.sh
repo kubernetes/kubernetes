@@ -114,28 +114,28 @@ function log() {
   esac
 }
 
-# Generate kubectl prune-whitelist flags from provided resource list.
-function generate_prune_whitelist_flags() {
+# Generate kubectl prune-allowlist flags from provided resource list.
+function generate_prune_allowlist_flags() {
   local -r resources=( "$@" )
   for resource in "${resources[@]}"; do
     # Check if $resource isn't composed just of whitespaces by replacing ' '
     # with '' and checking whether the resulting string is not empty.
     if [[ -n "${resource// /}" ]]; then
-      printf "%s" "--prune-whitelist ${resource} "
+      printf "%s" "--prune-allowlist ${resource} "
     fi
   done
 }
 
-# KUBECTL_EXTRA_PRUNE_WHITELIST is a list of extra whitelisted resources
+# KUBECTL_EXTRA_PRUNE_WHITELIST is a list of extra allowed resources
 # besides the default ones.
-extra_prune_whitelist=
+extra_prune_allowlist=
 if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
-  read -ra extra_prune_whitelist <<< "${KUBECTL_EXTRA_PRUNE_WHITELIST}"
+  read -ra extra_prune_allowlist <<< "${KUBECTL_EXTRA_PRUNE_WHITELIST}"
 fi
-prune_whitelist=( "${KUBECTL_PRUNE_WHITELIST[@]}"  "${extra_prune_whitelist[@]}" )
-prune_whitelist_flags=$(generate_prune_whitelist_flags "${prune_whitelist[@]}")
+prune_allowlist=( "${KUBECTL_PRUNE_WHITELIST[@]}"  "${extra_prune_allowlist[@]}" )
+prune_allowlist_flags=$(generate_prune_allowlist_flags "${prune_allowlist[@]}")
 
-log INFO "== Generated kubectl prune whitelist flags: $prune_whitelist_flags =="
+log INFO "== Generated kubectl prune allowlist flags: $prune_allowlist_flags =="
 
 # $1 filename of addon to start.
 # $2 count of tries to start the addon.
@@ -240,14 +240,14 @@ function reconcile_addons() {
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}=true,${ADDON_MANAGER_LABEL}!=EnsureExists \
-    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
+    --prune=true ${prune_allowlist_flags} --recursive | grep -v configured
 
   log INFO "== Reconciling with addon-manager label =="
   # shellcheck disable=SC2086
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}!=true,${ADDON_MANAGER_LABEL}=Reconcile \
-    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
+    --prune=true ${prune_allowlist_flags} --recursive | grep -v configured
 
   log INFO "== Kubernetes addon reconcile completed at $(date -Is) =="
 }

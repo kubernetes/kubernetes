@@ -28,6 +28,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 )
@@ -46,7 +48,7 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(_ context.Context, _ *admission.VersionedAttributes, _ *admissionv1.AdmissionRequest, _ cel.OptionalVariableBindings, costBudget int64) ([]cel.EvaluationResult, int64, error) {
+func (f *fakeCelFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, optionalVars cel.OptionalVariableBindings, namespace *corev1.Namespace, costBudget int64) ([]cel.EvaluationResult, int64, error) {
 	if costBudget <= 0 { // this filter will cost 1, so cost = 0 means fail.
 		return nil, -1, &apiservercel.Error{
 			Type:   apiservercel.ErrorTypeInvalid,
@@ -70,7 +72,7 @@ type fakeCELMatcher struct {
 	matches bool
 }
 
-func (f *fakeCELMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) matchconditions.MatchResult {
+func (f *fakeCELMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) matchconditions.MatchResult {
 	return matchconditions.MatchResult{Matches: f.matches, FailedConditionName: "placeholder", Error: f.error}
 }
 
@@ -891,7 +893,7 @@ func TestValidate(t *testing.T) {
 			if tc.costBudget != 0 {
 				budget = tc.costBudget
 			}
-			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, budget)
+			validateResult := v.Validate(ctx, fakeVersionedAttr.GetResource(), fakeVersionedAttr, nil, nil, budget, nil)
 
 			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
@@ -943,7 +945,7 @@ func TestContextCanceled(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.TODO())
 	cancel()
-	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+	validationResult := v.Validate(ctx, fakeVersionedAttr.GetResource(), fakeVersionedAttr, nil, nil, celconfig.RuntimeCELCostBudget, nil)
 	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
 		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
 	}

@@ -19,7 +19,7 @@ package openapi_test
 import (
 	"fmt"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 

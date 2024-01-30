@@ -23,15 +23,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/emicklei/go-restful/v3"
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler3"
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type testV3APIService struct {
@@ -89,7 +94,7 @@ func TestV2APIService(t *testing.T) {
 	downloader := Downloader{}
 	pathHandler := mux.NewPathRecorderMux("aggregator_test")
 	var serveHandler http.Handler = pathHandler
-	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), pathHandler)
+	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), nil, nil, pathHandler)
 	if err != nil {
 		t.Error(err)
 	}
@@ -126,6 +131,19 @@ func TestV2APIService(t *testing.T) {
 
 	apiServiceNames := specProxier.GetAPIServiceNames()
 	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
+
+	// Ensure that OpenAPI v3 for legacy APIService is removed.
+	specProxier.RemoveAPIServiceSpec(apiService.Name)
+	data = sendReq(t, serveHandler, "/openapi/v3")
+	groupVersionList = handler3.OpenAPIV3Discovery{}
+	if err := json.Unmarshal(data, &groupVersionList); err != nil {
+		t.Fatal(err)
+	}
+
+	path, ok = groupVersionList.Paths["apis/group.example.com/v1"]
+	if ok {
+		t.Error("Expected group.example.com/v1 not to be in group version list")
+	}
 }
 
 func TestV3APIService(t *testing.T) {
@@ -133,7 +151,7 @@ func TestV3APIService(t *testing.T) {
 
 	pathHandler := mux.NewPathRecorderMux("aggregator_test")
 	var serveHandler http.Handler = pathHandler
-	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), pathHandler)
+	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), nil, nil, pathHandler)
 	if err != nil {
 		t.Error(err)
 	}
@@ -170,6 +188,54 @@ func TestV3APIService(t *testing.T) {
 	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
 }
 
+func TestV3RootAPIService(t *testing.T) {
+	ws := new(restful.WebService)
+	{
+		ws.Path("/apis/apiregistration.k8s.io/v1")
+		ws.Doc("API at/apis/apiregistration.k8s.io/v1 ")
+		ws.Consumes("*/*")
+		ws.Produces("application/json")
+		ws.ApiVersion("apiregistration.k8s.io/v1")
+		routeBuilder := ws.GET("apiservices").
+			To(func(request *restful.Request, response *restful.Response) {}).
+			Doc("list or watch objects of kind APIService").
+			Operation("listAPIService").
+			Produces("application/json").
+			Returns(http.StatusOK, "OK", v1.APIService{}).
+			Writes(v1.APIService{})
+		ws.Route(routeBuilder)
+	}
+	openapiConfig := genericapiserver.DefaultOpenAPIV3Config(getTestAPIServiceOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
+
+	downloader := Downloader{}
+	goRestfulContainer := restful.NewContainer()
+	goRestfulContainer.Add(ws)
+	pathHandler := mux.NewPathRecorderMux("aggregator_test")
+	var serveHandler http.Handler = pathHandler
+	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), goRestfulContainer, openapiConfig, pathHandler)
+	if err != nil {
+		t.Error(err)
+	}
+	expectedSpecJSON := []byte(`{"openapi":"3.0.0","info":{"title":"Generic API Server"},"paths":{"/apis/apiregistration.k8s.io/v1/apiservices":{"get":{"tags":["apiregistration_v1"],"description":"list or watch objects of kind APIService","operationId":"listApiregistrationV1APIService","responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"}}}}}}}},"components":{"schemas":{"io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService":{"description":"APIService represents a server for a particular GroupVersion. Name must be \"version.group\".","type":"object"}}}}`)
+
+	data := sendReq(t, serveHandler, "/openapi/v3")
+	groupVersionList := handler3.OpenAPIV3Discovery{}
+	if err := json.Unmarshal(data, &groupVersionList); err != nil {
+		t.Fatal(err)
+	}
+	path, ok := groupVersionList.Paths["apis/apiregistration.k8s.io/v1"]
+	if !ok {
+		t.Error("Expected apiregistration.k8s.io/v1 to be in group version list")
+	}
+	gotSpecJSON := sendReq(t, serveHandler, path.ServerRelativeURL)
+	if bytes.Compare(gotSpecJSON, expectedSpecJSON) != 0 {
+		t.Errorf("Spec mismatch, expected %s, got %s", expectedSpecJSON, gotSpecJSON)
+	}
+
+	apiServiceNames := specProxier.GetAPIServiceNames()
+	assert.ElementsMatch(t, []string{"k8s_internal_local_kube_aggregator_types", openAPIV2Converter}, apiServiceNames)
+}
+
 func TestOpenAPIRequestMetrics(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()
@@ -178,7 +244,7 @@ func TestOpenAPIRequestMetrics(t *testing.T) {
 
 	pathHandler := mux.NewPathRecorderMux("aggregator_metrics_test")
 	var serveHandler http.Handler = pathHandler
-	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), pathHandler)
+	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), nil, nil, pathHandler)
 	if err != nil {
 		t.Error(err)
 	}
@@ -238,4 +304,21 @@ func sendReq(t *testing.T, handler http.Handler, path string) []byte {
 	writer := newInMemoryResponseWriter()
 	handler.ServeHTTP(writer, req)
 	return writer.data
+}
+
+func getTestAPIServiceOpenAPIDefinitions(_ openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition {
+	return map[string]openapicommon.OpenAPIDefinition{
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIService": buildTestAPIServiceOpenAPIDefinition(),
+	}
+}
+
+func buildTestAPIServiceOpenAPIDefinition() openapicommon.OpenAPIDefinition {
+	return openapicommon.OpenAPIDefinition{
+		Schema: kubeopenapispec.Schema{
+			SchemaProps: kubeopenapispec.SchemaProps{
+				Description: "APIService represents a server for a particular GroupVersion. Name must be \"version.group\".",
+				Type:        []string{"object"},
+			},
+		},
+	}
 }

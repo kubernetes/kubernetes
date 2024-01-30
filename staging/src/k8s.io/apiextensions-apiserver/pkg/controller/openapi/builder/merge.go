@@ -35,14 +35,20 @@ func MergeSpecs(staticSpec *spec.Swagger, crdSpecs ...*spec.Swagger) (*spec.Swag
 	// create shallow copy of staticSpec, but replace paths and definitions because we modify them.
 	specToReturn := *staticSpec
 	if staticSpec.Definitions != nil {
-		specToReturn.Definitions = spec.Definitions{}
+		specToReturn.Definitions = make(spec.Definitions, len(staticSpec.Definitions))
 		for k, s := range staticSpec.Definitions {
 			specToReturn.Definitions[k] = s
 		}
 	}
+	if staticSpec.Parameters != nil {
+		specToReturn.Parameters = make(map[string]spec.Parameter, len(staticSpec.Parameters))
+		for k, s := range staticSpec.Parameters {
+			specToReturn.Parameters[k] = s
+		}
+	}
 	if staticSpec.Paths != nil {
 		specToReturn.Paths = &spec.Paths{
-			Paths: map[string]spec.PathItem{},
+			Paths: make(map[string]spec.PathItem, len(staticSpec.Paths.Paths)),
 		}
 		for k, p := range staticSpec.Paths.Paths {
 			specToReturn.Paths.Paths[k] = p
@@ -58,13 +64,13 @@ func MergeSpecs(staticSpec *spec.Swagger, crdSpecs ...*spec.Swagger) (*spec.Swag
 
 	// The static spec has the highest priority. Resolve conflicts to prevent user-defined
 	// CRDs potentially overlapping the built-in apiextensions API
-	if err := aggregator.MergeSpecsIgnorePathConflict(&specToReturn, crdSpec); err != nil {
+	if err := aggregator.MergeSpecsIgnorePathConflictRenamingDefinitionsAndParameters(&specToReturn, crdSpec); err != nil {
 		return nil, err
 	}
 	return &specToReturn, nil
 }
 
-// mergeSpec copies paths and definitions from source to dest, mutating dest, but not source.
+// mergeSpec copies paths, parameters and definitions from source to dest, mutating dest, but not source.
 // We assume that conflicts do not matter.
 func mergeSpec(dest, source *spec.Swagger) {
 	if source == nil || source.Paths == nil {
@@ -75,13 +81,19 @@ func mergeSpec(dest, source *spec.Swagger) {
 	}
 	for k, v := range source.Definitions {
 		if dest.Definitions == nil {
-			dest.Definitions = spec.Definitions{}
+			dest.Definitions = make(spec.Definitions, len(source.Definitions))
 		}
 		dest.Definitions[k] = v
 	}
+	for k, v := range source.Parameters {
+		if dest.Parameters == nil {
+			dest.Parameters = make(map[string]spec.Parameter, len(source.Parameters))
+		}
+		dest.Parameters[k] = v
+	}
 	for k, v := range source.Paths.Paths {
 		if dest.Paths.Paths == nil {
-			dest.Paths.Paths = map[string]spec.PathItem{}
+			dest.Paths.Paths = make(map[string]spec.PathItem, len(source.Paths.Paths))
 		}
 		dest.Paths.Paths[k] = v
 	}

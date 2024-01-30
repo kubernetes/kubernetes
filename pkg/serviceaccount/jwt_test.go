@@ -151,6 +151,15 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			Namespace: "test",
 		},
 	}
+	invalidAutoSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-rsa-secret",
+			Namespace: "test",
+			Labels: map[string]string{
+				"kubernetes.io/legacy-token-invalid-since": "2022-12-20",
+			},
+		},
+	}
 	ecdsaSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-ecdsa-secret",
@@ -175,6 +184,20 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	checkJSONWebSignatureHasKeyID(t, rsaToken, rsaKeyID)
+
+	// Generate RSA token with invalidAutoSecret
+	invalidAutoSecretToken, err := rsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *invalidAutoSecret))
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(invalidAutoSecretToken) == 0 {
+		t.Fatalf("no token generated")
+	}
+	invalidAutoSecret.Data = map[string][]byte{
+		"token": []byte(invalidAutoSecretToken),
+	}
+
+	checkJSONWebSignatureHasKeyID(t, invalidAutoSecretToken, rsaKeyID)
 
 	// Generate the ECDSA token
 	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
@@ -327,6 +350,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
+		"secret is marked as invalid": {
+			Token:       invalidAutoSecretToken,
+			Client:      fake.NewSimpleClientset(serviceAccount, invalidAutoSecret),
+			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
+			ExpectedErr: true,
+		},
 	}
 
 	for k, tc := range testCases {
@@ -341,6 +370,9 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			})),
 			v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
 				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			})),
+			v1listers.NewNodeLister(newIndexer(func(_, name string) (interface{}, error) {
+				return tc.Client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
 		var secretsWriter typedv1core.SecretsGetter
@@ -414,6 +446,11 @@ func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
 	parts := strings.SplitN(key, "/", 2)
 	namespace := parts[0]
 	name := ""
+	// implies the key does not contain a / (this is a cluster-scoped object)
+	if len(parts) == 1 {
+		name = parts[0]
+		namespace = ""
+	}
 	if len(parts) == 2 {
 		name = parts[1]
 	}

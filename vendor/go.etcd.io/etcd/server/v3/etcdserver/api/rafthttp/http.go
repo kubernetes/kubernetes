@@ -54,7 +54,7 @@ var (
 	RaftSnapshotPrefix = path.Join(RaftPrefix, "snapshot")
 
 	errIncompatibleVersion = errors.New("incompatible version")
-	errClusterIDMismatch   = errors.New("cluster ID mismatch")
+	ErrClusterIDMismatch   = errors.New("cluster ID mismatch")
 )
 
 type peerGetter interface {
@@ -508,7 +508,7 @@ func checkClusterCompatibilityFromHeader(lg *zap.Logger, localID types.ID, heade
 			zap.String("remote-peer-server-minimum-cluster-version", remoteMinClusterVs),
 			zap.String("remote-peer-cluster-id", gcid),
 		)
-		return errClusterIDMismatch
+		return ErrClusterIDMismatch
 	}
 	return nil
 }

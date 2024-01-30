@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 func TestCPUAccumulatorFreeSockets(t *testing.T) {
@@ -522,7 +522,7 @@ func commonTakeByTopologyTestCases(t *testing.T) []takeByTopologyTestCase {
 			topoSingleSocketHT,
 			cpuset.New(0, 2, 4, 6),
 			5,
-			"not enough cpus available to satisfy request",
+			"not enough cpus available to satisfy request: requested=5, available=4",
 			cpuset.New(),
 		},
 		{

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,6 +33,7 @@ import (
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 )
 
 // TestQueueWaitTimeLatencyTracker tests the queue wait times recorded by the P&F latency tracker
@@ -80,7 +81,7 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 100,
+				NominalConcurrencyShares: ptr.To(int32(100)),
 				LendablePercent:          &lendable,
 				BorrowingLimitPercent:    &borrowingLimit,
 				LimitResponse: flowcontrol.LimitResponse{
@@ -98,7 +99,7 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 
 	clientset := clientsetfake.NewSimpleClientset(cfgObjs...)
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
-	flowcontrolClient := clientset.FlowcontrolV1beta3()
+	flowcontrolClient := clientset.FlowcontrolV1()
 	startTime := time.Now()
 	clk, _ := eventclock.NewFake(startTime, 0, nil)
 	controller := newTestableController(TestableConfig{
@@ -109,21 +110,22 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 		InformerFactory:        informerFactory,
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: 24,
-		RequestWaitLimit:       time.Minute,
 		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	})
 
-	informerFactory.Start(nil)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
-	status := informerFactory.WaitForCacheSync(nil)
+	informerFactory.Start(stopCh)
+	status := informerFactory.WaitForCacheSync(stopCh)
 	if names := unsynced(status); len(names) > 0 {
 		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
 	}
 
 	go func() {
-		controller.Run(nil)
+		controller.Run(stopCh)
 	}()
 
 	// ensure that the controller has run its first loop.

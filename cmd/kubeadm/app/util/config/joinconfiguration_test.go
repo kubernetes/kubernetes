@@ -78,7 +78,11 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 				return
 			}
 
-			obj, err := LoadJoinConfigurationFromFile(cfgPath)
+			opts := LoadOrDefaultConfigurationOptions{
+				SkipCRIDetect: true,
+			}
+
+			obj, err := LoadJoinConfigurationFromFile(cfgPath, opts)
 			if rt.expectErr {
 				if err == nil {
 					t.Error("Unexpected success")

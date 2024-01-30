@@ -17,11 +17,6 @@ limitations under the License.
 // Package init registers the command line flags for k8s.io/klogr/testing in
 // the flag.CommandLine. This is done during initialization, so merely
 // importing it is enough.
-//
-// # Experimental
-//
-// Notice: This package is EXPERIMENTAL and may be changed or removed in a
-// later release.
 package init
 
 import (

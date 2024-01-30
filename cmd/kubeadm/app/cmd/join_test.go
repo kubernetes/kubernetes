@@ -31,11 +31,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -222,6 +222,7 @@ func TestNewJoinData(t *testing.T) {
 							CRISocket:             expectedCRISocket,
 							IgnorePreflightErrors: []string{"c", "d"},
 							ImagePullPolicy:       "IfNotPresent",
+							ImagePullSerial:       ptr.To(true),
 							Taints:                []v1.Taint{{Key: "node-role.kubernetes.io/control-plane", Effect: "NoSchedule"}},
 						},
 						CACertPath: kubeadmapiv1.DefaultCACertPath,
@@ -240,7 +241,7 @@ func TestNewJoinData(t *testing.T) {
 					},
 					ignorePreflightErrors: sets.New("c", "d"),
 				}
-				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(joinData{}), cmpopts.IgnoreFields(joinData{}, "client", "initCfg", "cfg.ControlPlane.LocalAPIEndpoint")); diff != "" {
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(joinData{}), cmpopts.IgnoreFields(joinData{}, "client", "initCfg", "cfg.ControlPlane.LocalAPIEndpoint", "cfg.Timeouts")); diff != "" {
 					t.Fatalf("newJoinData returned data (-want,+got):\n%s", diff)
 				}
 			},
@@ -312,6 +313,7 @@ func TestNewJoinData(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external join option and inject it to the join cmd
 			joinOptions := newJoinOptions()
+			joinOptions.skipCRIDetect = true // avoid CRI detection in unit tests
 			cmd := newCmdJoin(nil, joinOptions)
 
 			// set klog output destination to bytes.Buffer so that log could be fetched and verified later.
@@ -320,15 +322,6 @@ func TestNewJoinData(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
-			// set the cri socket here, otherwise the testcase might fail if is run on the node with multiple
-			// cri endpoints configured, the failure caused by this is normally not an expected failure.
-			if tc.flags == nil {
-				tc.flags = make(map[string]string)
-			}
-			// set `cri-socket` only if `CfgPath` is not set
-			if _, okay := tc.flags[options.CfgPath]; !okay {
-				tc.flags[options.NodeCRISocket] = constants.UnknownCRISocket
-			}
 			// sets cmd flags (that will be reflected on the join options)
 			for f, v := range tc.flags {
 				cmd.Flags().Set(f, v)

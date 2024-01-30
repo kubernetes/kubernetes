@@ -89,3 +89,49 @@ func Test_v1HeaderToHTTPHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestHeaderConversion(t *testing.T) {
+	testCases := []struct {
+		headers  []v1.HTTPHeader
+		expected http.Header
+	}{
+		{
+			[]v1.HTTPHeader{
+				{
+					Name:  "Accept",
+					Value: "application/json",
+				},
+			},
+			http.Header{
+				"Accept": []string{"application/json"},
+			},
+		},
+		{
+			[]v1.HTTPHeader{
+				{Name: "accept", Value: "application/json"},
+			},
+			http.Header{
+				"Accept": []string{"application/json"},
+			},
+		},
+		{
+			[]v1.HTTPHeader{
+				{Name: "accept", Value: "application/json"},
+				{Name: "Accept", Value: "*/*"},
+				{Name: "pragma", Value: "no-cache"},
+				{Name: "X-forwarded-for", Value: "username"},
+			},
+			http.Header{
+				"Accept":          []string{"application/json", "*/*"},
+				"Pragma":          []string{"no-cache"},
+				"X-Forwarded-For": []string{"username"},
+			},
+		},
+	}
+	for _, test := range testCases {
+		headers := v1HeaderToHTTPHeader(test.headers)
+		if !reflect.DeepEqual(headers, test.expected) {
+			t.Errorf("Expected %v, got %v", test.expected, headers)
+		}
+	}
+}

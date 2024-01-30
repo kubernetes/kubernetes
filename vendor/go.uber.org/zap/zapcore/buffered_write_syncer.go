@@ -43,6 +43,37 @@ const (
 //
 // BufferedWriteSyncer is safe for concurrent use. You don't need to use
 // zapcore.Lock for WriteSyncers with BufferedWriteSyncer.
+//
+// To set up a BufferedWriteSyncer, construct a WriteSyncer for your log
+// destination (*os.File is a valid WriteSyncer), wrap it with
+// BufferedWriteSyncer, and defer a Stop() call for when you no longer need the
+// object.
+//
+//	 func main() {
+//	   ws := ... // your log destination
+//	   bws := &zapcore.BufferedWriteSyncer{WS: ws}
+//	   defer bws.Stop()
+//
+//	   // ...
+//	   core := zapcore.NewCore(enc, bws, lvl)
+//	   logger := zap.New(core)
+//
+//	   // ...
+//	}
+//
+// By default, a BufferedWriteSyncer will buffer up to 256 kilobytes of logs,
+// waiting at most 30 seconds between flushes.
+// You can customize these parameters by setting the Size or FlushInterval
+// fields.
+// For example, the following buffers up to 512 kB of logs before flushing them
+// to Stderr, with a maximum of one minute between each flush.
+//
+//	ws := &BufferedWriteSyncer{
+//	  WS:            os.Stderr,
+//	  Size:          512 * 1024, // 512 kB
+//	  FlushInterval: time.Minute,
+//	}
+//	defer ws.Stop()
 type BufferedWriteSyncer struct {
 	// WS is the WriteSyncer around which BufferedWriteSyncer will buffer
 	// writes.

@@ -21,7 +21,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"net"
-	"path"
+	"path/filepath"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -60,8 +60,11 @@ func AssertCertificateHasCommonName(t *testing.T, cert *x509.Certificate, common
 }
 
 // AssertCertificateHasOrganizations is a utility function for kubeadm testing that asserts if a given certificate has
-// the expected Subject.Organization
+// and only has the expected Subject.Organization
 func AssertCertificateHasOrganizations(t *testing.T, cert *x509.Certificate, organizations ...string) {
+	if len(cert.Subject.Organization) != len(organizations) {
+		t.Fatalf("cert contains a different number of Subject.Organization, expected %v, got %v", organizations, cert.Subject.Organization)
+	}
 	for _, organization := range organizations {
 		found := false
 		for i := range cert.Subject.Organization {
@@ -230,7 +233,7 @@ func WritePKIFiles(t *testing.T, dir string, files PKIFiles) {
 	for filename, body := range files {
 		switch body := body.(type) {
 		case *x509.Certificate:
-			if err := certutil.WriteCert(path.Join(dir, filename), pkiutil.EncodeCertPEM(body)); err != nil {
+			if err := certutil.WriteCert(filepath.Join(dir, filename), pkiutil.EncodeCertPEM(body)); err != nil {
 				t.Errorf("unable to write certificate to file %q: [%v]", dir, err)
 			}
 		case *rsa.PublicKey:
@@ -238,7 +241,7 @@ func WritePKIFiles(t *testing.T, dir string, files PKIFiles) {
 			if err != nil {
 				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
 			}
-			if err := keyutil.WriteKey(path.Join(dir, filename), publicKeyBytes); err != nil {
+			if err := keyutil.WriteKey(filepath.Join(dir, filename), publicKeyBytes); err != nil {
 				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
 			}
 		case *rsa.PrivateKey:
@@ -246,7 +249,7 @@ func WritePKIFiles(t *testing.T, dir string, files PKIFiles) {
 			if err != nil {
 				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
 			}
-			if err := keyutil.WriteKey(path.Join(dir, filename), privateKey); err != nil {
+			if err := keyutil.WriteKey(filepath.Join(dir, filename), privateKey); err != nil {
 				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
 			}
 		}

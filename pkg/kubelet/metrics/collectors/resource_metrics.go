@@ -31,11 +31,18 @@ var (
 		"Cumulative cpu time consumed by the node in core-seconds",
 		nil,
 		nil,
-		metrics.ALPHA,
+		metrics.STABLE,
 		"")
 
 	nodeMemoryUsageDesc = metrics.NewDesc("node_memory_working_set_bytes",
 		"Current working set of the node in bytes",
+		nil,
+		nil,
+		metrics.STABLE,
+		"")
+
+	nodeSwapUsageDesc = metrics.NewDesc("node_swap_usage_bytes",
+		"Current swap usage of the node in bytes. Reported only on non-windows systems",
 		nil,
 		nil,
 		metrics.ALPHA,
@@ -45,11 +52,18 @@ var (
 		"Cumulative cpu time consumed by the container in core-seconds",
 		[]string{"container", "pod", "namespace"},
 		nil,
-		metrics.ALPHA,
+		metrics.STABLE,
 		"")
 
 	containerMemoryUsageDesc = metrics.NewDesc("container_memory_working_set_bytes",
 		"Current working set of the container in bytes",
+		[]string{"container", "pod", "namespace"},
+		nil,
+		metrics.STABLE,
+		"")
+
+	containerSwapUsageDesc = metrics.NewDesc("container_swap_usage_bytes",
+		"Current amount of the container swap usage in bytes. Reported only on non-windows systems",
 		[]string{"container", "pod", "namespace"},
 		nil,
 		metrics.ALPHA,
@@ -59,11 +73,18 @@ var (
 		"Cumulative cpu time consumed by the pod in core-seconds",
 		[]string{"pod", "namespace"},
 		nil,
-		metrics.ALPHA,
+		metrics.STABLE,
 		"")
 
 	podMemoryUsageDesc = metrics.NewDesc("pod_memory_working_set_bytes",
 		"Current working set of the pod in bytes",
+		[]string{"pod", "namespace"},
+		nil,
+		metrics.STABLE,
+		"")
+
+	podSwapUsageDesc = metrics.NewDesc("pod_swap_usage_bytes",
+		"Current amount of the pod swap usage in bytes. Reported only on non-windows systems",
 		[]string{"pod", "namespace"},
 		nil,
 		metrics.ALPHA,
@@ -74,13 +95,20 @@ var (
 		nil,
 		nil,
 		metrics.ALPHA,
+		"1.29.0")
+
+	resourceScrapeErrorResultDesc = metrics.NewDesc("resource_scrape_error",
+		"1 if there was an error while getting container metrics, 0 otherwise",
+		nil,
+		nil,
+		metrics.STABLE,
 		"")
 
 	containerStartTimeDesc = metrics.NewDesc("container_start_time_seconds",
 		"Start time of the container since unix epoch in seconds",
 		[]string{"container", "pod", "namespace"},
 		nil,
-		metrics.ALPHA,
+		metrics.STABLE,
 		"")
 )
 
@@ -104,12 +132,16 @@ var _ metrics.StableCollector = &resourceMetricsCollector{}
 func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- nodeCPUUsageDesc
 	ch <- nodeMemoryUsageDesc
+	ch <- nodeSwapUsageDesc
 	ch <- containerStartTimeDesc
 	ch <- containerCPUUsageDesc
 	ch <- containerMemoryUsageDesc
+	ch <- containerSwapUsageDesc
 	ch <- podCPUUsageDesc
 	ch <- podMemoryUsageDesc
+	ch <- podSwapUsageDesc
 	ch <- resourceScrapeResultDesc
+	ch <- resourceScrapeErrorResultDesc
 }
 
 // CollectWithStability implements metrics.StableCollector
@@ -121,6 +153,7 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 	var errorCount float64
 	defer func() {
 		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
+		ch <- metrics.NewLazyConstMetric(resourceScrapeErrorResultDesc, metrics.GaugeValue, errorCount)
 	}()
 	statsSummary, err := rc.provider.GetCPUAndMemoryStats(ctx)
 	if err != nil {
@@ -131,15 +164,18 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 
 	rc.collectNodeCPUMetrics(ch, statsSummary.Node)
 	rc.collectNodeMemoryMetrics(ch, statsSummary.Node)
+	rc.collectNodeSwapMetrics(ch, statsSummary.Node)
 
 	for _, pod := range statsSummary.Pods {
 		for _, container := range pod.Containers {
 			rc.collectContainerStartTime(ch, pod, container)
 			rc.collectContainerCPUMetrics(ch, pod, container)
 			rc.collectContainerMemoryMetrics(ch, pod, container)
+			rc.collectContainerSwapMetrics(ch, pod, container)
 		}
 		rc.collectPodCPUMetrics(ch, pod)
 		rc.collectPodMemoryMetrics(ch, pod)
+		rc.collectPodSwapMetrics(ch, pod)
 	}
 }
 
@@ -161,13 +197,21 @@ func (rc *resourceMetricsCollector) collectNodeMemoryMetrics(ch chan<- metrics.M
 		metrics.NewLazyConstMetric(nodeMemoryUsageDesc, metrics.GaugeValue, float64(*s.Memory.WorkingSetBytes)))
 }
 
+func (rc *resourceMetricsCollector) collectNodeSwapMetrics(ch chan<- metrics.Metric, s summary.NodeStats) {
+	if s.Swap == nil || s.Swap.SwapUsageBytes == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(s.Memory.Time.Time,
+		metrics.NewLazyConstMetric(nodeSwapUsageDesc, metrics.GaugeValue, float64(*s.Swap.SwapUsageBytes)))
+}
+
 func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
 	if s.StartTime.Unix() <= 0 {
 		return
 	}
 
-	ch <- metrics.NewLazyMetricWithTimestamp(s.StartTime.Time,
-		metrics.NewLazyConstMetric(containerStartTimeDesc, metrics.GaugeValue, float64(s.StartTime.UnixNano())/float64(time.Second), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+	ch <- metrics.NewLazyConstMetric(containerStartTimeDesc, metrics.GaugeValue, float64(s.StartTime.UnixNano())/float64(time.Second), s.Name, pod.PodRef.Name, pod.PodRef.Namespace)
 }
 
 func (rc *resourceMetricsCollector) collectContainerCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
@@ -190,6 +234,16 @@ func (rc *resourceMetricsCollector) collectContainerMemoryMetrics(ch chan<- metr
 			float64(*s.Memory.WorkingSetBytes), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
 }
 
+func (rc *resourceMetricsCollector) collectContainerSwapMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
+	if s.Swap == nil || s.Swap.SwapUsageBytes == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(s.Swap.Time.Time,
+		metrics.NewLazyConstMetric(containerSwapUsageDesc, metrics.GaugeValue,
+			float64(*s.Swap.SwapUsageBytes), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+}
+
 func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
 	if pod.CPU == nil || pod.CPU.UsageCoreNanoSeconds == nil {
 		return
@@ -208,4 +262,14 @@ func (rc *resourceMetricsCollector) collectPodMemoryMetrics(ch chan<- metrics.Me
 	ch <- metrics.NewLazyMetricWithTimestamp(pod.Memory.Time.Time,
 		metrics.NewLazyConstMetric(podMemoryUsageDesc, metrics.GaugeValue,
 			float64(*pod.Memory.WorkingSetBytes), pod.PodRef.Name, pod.PodRef.Namespace))
+}
+
+func (rc *resourceMetricsCollector) collectPodSwapMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
+	if pod.Swap == nil || pod.Swap.SwapUsageBytes == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(pod.Swap.Time.Time,
+		metrics.NewLazyConstMetric(podSwapUsageDesc, metrics.GaugeValue,
+			float64(*pod.Swap.SwapUsageBytes), pod.PodRef.Name, pod.PodRef.Namespace))
 }

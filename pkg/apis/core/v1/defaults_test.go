@@ -1221,6 +1221,74 @@ func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
 	}
 }
 
+func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
+	modeVIP := v1.LoadBalancerIPModeVIP
+	modeProxy := v1.LoadBalancerIPModeProxy
+	testCases := []struct {
+		name           string
+		ipModeEnabled  bool
+		svc            *v1.Service
+		expectedIPMode []*v1.LoadBalancerIPMode
+	}{
+		{
+			name:          "Set IP but not set IPMode with LoadbalancerIPMode disabled",
+			ipModeEnabled: false,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{{
+							IP: "1.2.3.4",
+						}},
+					},
+				}},
+			expectedIPMode: []*v1.LoadBalancerIPMode{nil},
+		}, {
+			name:          "Set IP but bot set IPMode with LoadbalancerIPMode enabled",
+			ipModeEnabled: true,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{{
+							IP: "1.2.3.4",
+						}},
+					},
+				}},
+			expectedIPMode: []*v1.LoadBalancerIPMode{&modeVIP},
+		}, {
+			name:          "Both IP and IPMode are set with LoadbalancerIPMode enabled",
+			ipModeEnabled: true,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{{
+							IP:     "1.2.3.4",
+							IPMode: &modeProxy,
+						}},
+					},
+				}},
+			expectedIPMode: []*v1.LoadBalancerIPMode{&modeProxy},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			obj := roundTrip(t, runtime.Object(tc.svc))
+			svc := obj.(*v1.Service)
+			for i, s := range svc.Status.LoadBalancer.Ingress {
+				got := s.IPMode
+				expected := tc.expectedIPMode[i]
+				if !reflect.DeepEqual(got, expected) {
+					t.Errorf("Expected IPMode %v, got %v", tc.expectedIPMode[i], s.IPMode)
+				}
+			}
+		})
+	}
+}
+
 func TestSetDefaultSecretVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
@@ -1562,6 +1630,27 @@ func TestSetDefaultServiceExternalTraffic(t *testing.T) {
 	out = obj.(*v1.Service)
 	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
 		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeClusterIP, ExternalIPs: []string{"1.2.3.4"}}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeClusterIP}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeExternalName}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
 	}
 }
 

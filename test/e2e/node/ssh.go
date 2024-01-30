@@ -34,7 +34,7 @@ const maxNodes = 100
 var _ = SIGDescribe("SSH", func() {
 
 	f := framework.NewDefaultFramework("ssh")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// When adding more providers here, also implement their functionality in e2essh.GetSigner(...).

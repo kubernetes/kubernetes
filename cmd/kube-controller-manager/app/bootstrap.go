@@ -21,10 +21,19 @@ import (
 	"fmt"
 
 	"k8s.io/controller-manager/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
 
-func startBootstrapSignerController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                names.BootstrapSignerController,
+		aliases:             []string{"bootstrapsigner"},
+		initFunc:            startBootstrapSignerController,
+		isDisabledByDefault: true,
+	}
+}
+func startBootstrapSignerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	bsc, err := bootstrap.NewSigner(
 		controllerContext.ClientBuilder.ClientOrDie("bootstrap-signer"),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
@@ -38,7 +47,15 @@ func startBootstrapSignerController(ctx context.Context, controllerContext Contr
 	return nil, true, nil
 }
 
-func startTokenCleanerController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                names.TokenCleanerController,
+		aliases:             []string{"tokencleaner"},
+		initFunc:            startTokenCleanerController,
+		isDisabledByDefault: true,
+	}
+}
+func startTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	tcc, err := bootstrap.NewTokenCleaner(
 		controllerContext.ClientBuilder.ClientOrDie("token-cleaner"),
 		controllerContext.InformerFactory.Core().V1().Secrets(),

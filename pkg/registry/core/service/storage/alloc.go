@@ -405,7 +405,8 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 			var allocatedIP net.IP
 			var err error
 			if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-				svcAllocator, ok := allocator.(*ipallocator.Allocator)
+				// TODO: simplify this and avoid all this duplicate code
+				svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
 				if ok {
 					allocatedIP, err = svcAllocator.AllocateNextService(service)
 				} else {
@@ -425,7 +426,8 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 			}
 			var err error
 			if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-				svcAllocator, ok := allocator.(*ipallocator.Allocator)
+				// TODO: simplify this and avoid all this duplicate code
+				svcAllocator, ok := allocator.(*ipallocator.MetaAllocator)
 				if ok {
 					err = svcAllocator.AllocateService(service, parsedIP)
 				} else {

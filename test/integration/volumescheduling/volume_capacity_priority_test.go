@@ -304,7 +304,7 @@ func setPVCapacity(pv *v1.PersistentVolume, capacity resource.Quantity) *v1.Pers
 }
 
 func setPVCRequestStorage(pvc *v1.PersistentVolumeClaim, request resource.Quantity) *v1.PersistentVolumeClaim {
-	pvc.Spec.Resources = v1.ResourceRequirements{
+	pvc.Spec.Resources = v1.VolumeResourceRequirements{
 		Requests: v1.ResourceList{
 			v1.ResourceName(v1.ResourceStorage): request,
 		},

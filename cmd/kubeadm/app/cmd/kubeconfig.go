@@ -65,7 +65,7 @@ func newCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 // newCmdUserKubeConfig returns sub commands for kubeconfig phase
 func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 
-	initCfg := cmdutil.DefaultInitConfiguration()
+	initCfg := &kubeadmapiv1.InitConfiguration{}
 	clusterCfg := &kubeadmapiv1.ClusterConfiguration{}
 
 	var (
@@ -82,7 +82,9 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 		Example: userKubeconfigExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// This call returns the ready-to-use configuration based on the defaults populated by flags
-			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
+			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg, configutil.LoadOrDefaultConfigurationOptions{
+				SkipCRIDetect: true,
+			})
 			if err != nil {
 				return err
 			}

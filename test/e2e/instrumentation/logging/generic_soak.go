@@ -34,6 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var loggingSoak struct {
@@ -42,10 +43,10 @@ var loggingSoak struct {
 }
 var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 
-var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
+var _ = instrumentation.SIGDescribe("Logging soak [Performance]", framework.WithSlow(), framework.WithDisruptive(), func() {
 
 	f := framework.NewDefaultFramework("logging-soak")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Not a global constant (irrelevant outside this test), also not a parameter (if you want more logs, use --scale=).
 	kbRateInSeconds := 1 * time.Second
@@ -85,7 +86,7 @@ func RunLogPodsWithSleepOf(ctx context.Context, f *framework.Framework, sleep ti
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 	totalPods := len(nodes.Items)
-	framework.ExpectNotEqual(totalPods, 0)
+	gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 

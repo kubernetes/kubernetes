@@ -71,11 +71,14 @@ func (m *StatusRequest) XXX_DiscardUnknown() {
 var xxx_messageInfo_StatusRequest proto.InternalMessageInfo
 
 type StatusResponse struct {
-	// Version of the KMS plugin API.  Must match the configured .resources[].providers[].kms.apiVersion
+	// Version of the KMS gRPC plugin API. Must equal v2 to v2beta1 (v2 is recommended, but both are equivalent).
 	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
 	// Any value other than "ok" is failing healthz.  On failure, the associated API server healthz endpoint will contain this value as part of the error message.
 	Healthz string `protobuf:"bytes,2,opt,name=healthz,proto3" json:"healthz,omitempty"`
 	// the current write key, used to determine staleness of data updated via value.Transformer.TransformFromStorage.
+	// keyID must satisfy the following constraints:
+	// 1. The keyID is not empty.
+	// 2. The size of keyID is less than 1 kB.
 	KeyId                string   `protobuf:"bytes,3,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -283,12 +286,21 @@ func (m *EncryptRequest) GetUid() string {
 
 type EncryptResponse struct {
 	// The encrypted data.
+	// ciphertext must satisfy the following constraints:
+	// 1. The ciphertext is not empty.
+	// 2. The ciphertext is less than 1 kB.
 	Ciphertext []byte `protobuf:"bytes,1,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`
 	// The KMS key ID used to encrypt the data. This must always refer to the KMS KEK and not any local KEKs that may be in use.
 	// This can be used to inform staleness of data updated via value.Transformer.TransformFromStorage.
+	// keyID must satisfy the following constraints:
+	// 1. The keyID is not empty.
+	// 2. The size of keyID is less than 1 kB.
 	KeyId string `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
 	// Additional metadata to be stored with the encrypted data.
 	// This data is stored in plaintext in etcd. KMS plugin implementations are responsible for pre-encrypting any sensitive data.
+	// Annotations must satisfy the following constraints:
+	//  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+	//  2. The size of annotations keys + values is less than 32 kB.
 	Annotations          map[string][]byte `protobuf:"bytes,3,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`

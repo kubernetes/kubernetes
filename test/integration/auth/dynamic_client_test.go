@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,7 +40,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.RemoveAll(tmpfile.Name())
+	defer utiltesting.CloseAndRemove(t, tmpfile)
 
 	if err = os.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", tmpfile.Name(), err)

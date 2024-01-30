@@ -18,7 +18,6 @@ package testing
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -26,6 +25,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/exec"
@@ -868,8 +869,8 @@ func (fv *FakeVolume) GetSetUpDeviceCallCount() int {
 
 // Block volume support
 func (fv *FakeVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	fv.RLock()
-	defer fv.RUnlock()
+	fv.Lock()
+	defer fv.Unlock()
 	fv.GlobalMapPathCallCount++
 	return fv.getGlobalMapPath()
 }
@@ -1706,7 +1707,7 @@ func CreateTestPVC(capacity string, accessModes []v1.PersistentVolumeAccessMode)
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
 				},

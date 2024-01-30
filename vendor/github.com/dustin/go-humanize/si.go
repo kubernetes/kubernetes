@@ -8,6 +8,8 @@ import (
 )
 
 var siPrefixTable = map[float64]string{
+	-30: "q", // quecto
+	-27: "r", // ronto
 	-24: "y", // yocto
 	-21: "z", // zepto
 	-18: "a", // atto
@@ -25,6 +27,8 @@ var siPrefixTable = map[float64]string{
 	18:  "E", // exa
 	21:  "Z", // zetta
 	24:  "Y", // yotta
+	27:  "R", // ronna
+	30:  "Q", // quetta
 }
 
 var revSIPrefixTable = revfmap(siPrefixTable)

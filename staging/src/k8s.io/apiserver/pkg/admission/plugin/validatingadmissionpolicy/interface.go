@@ -21,12 +21,14 @@ import (
 
 	celgo "github.com/google/cel-go/cel"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 var _ cel.ExpressionAccessor = &ValidationCondition{}
@@ -60,17 +62,39 @@ func (v *AuditAnnotationCondition) ReturnTypes() []*celgo.Type {
 	return []*celgo.Type{celgo.StringType, celgo.NullType}
 }
 
+// Variable is a named expression for composition.
+type Variable struct {
+	Name       string
+	Expression string
+}
+
+func (v *Variable) GetExpression() string {
+	return v.Expression
+}
+
+func (v *Variable) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.AnyType, celgo.DynType}
+}
+
+func (v *Variable) GetName() string {
+	return v.Name
+}
+
 // Matcher is used for matching ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding to attributes
 type Matcher interface {
 	admission.InitializationValidator
 
 	// DefinitionMatches says whether this policy definition matches the provided admission
 	// resource request
-	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error)
+	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error)
 
 	// BindingMatches says whether this policy definition matches the provided admission
 	// resource request
-	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error)
+	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicyBinding) (bool, error)
+
+	// GetNamespace retrieves the Namespace resource by the given name. The name may be empty, in which case
+	// GetNamespace must return nil, nil
+	GetNamespace(name string) (*corev1.Namespace, error)
 }
 
 // ValidateResult defines the result of a Validator.Validate operation.
@@ -85,5 +109,5 @@ type ValidateResult struct {
 type Validator interface {
 	// Validate is used to take cel evaluations and convert into decisions
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
+	Validate(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *corev1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult
 }

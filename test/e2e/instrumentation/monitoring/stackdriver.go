@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -66,9 +67,9 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should have cluster metrics [Feature:StackdriverMonitoring]", func(ctx context.Context) {
+	f.It("should have cluster metrics", feature.StackdriverMonitoring, func(ctx context.Context) {
 		testStackdriverMonitoring(ctx, f, 1, 100, 200)
 	})
 

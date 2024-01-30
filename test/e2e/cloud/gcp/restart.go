@@ -43,9 +43,9 @@ func nodeNames(nodes []v1.Node) []string {
 	return result
 }
 
-var _ = SIGDescribe("Restart [Disruptive]", func() {
+var _ = SIGDescribe("Restart", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("restart")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ps *testutils.PodStore
 	var originalNodes []v1.Node
 	var originalPodNames []string
@@ -88,7 +88,8 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		}
 	})
 
-	ginkgo.It("should restart all nodes and ensure all nodes and pods recover", func(ctx context.Context) {
+	// TODO(upodroid) This test will be removed in 1.33 when kubeup is removed
+	f.It(f.WithLabel("KubeUp"), "should restart all nodes and ensure all nodes and pods recover", func(ctx context.Context) {
 		ginkgo.By("restarting all of the nodes")
 		err := common.RestartNodes(f.ClientSet, originalNodes)
 		framework.ExpectNoError(err)

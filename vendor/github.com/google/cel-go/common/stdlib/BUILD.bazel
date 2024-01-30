@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "standard.go",
+    ],
+    importpath = "github.com/google/cel-go/common/stdlib",
+    deps = [
+        "//checker/decls:go_default_library",
+        "//common/decls:go_default_library",
+        "//common/functions:go_default_library",
+        "//common/operators:go_default_library",
+        "//common/overloads:go_default_library",
+        "//common/types:go_default_library",
+        "//common/types/ref:go_default_library",
+        "//common/types/traits:go_default_library",
+        "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
+    ],
+)

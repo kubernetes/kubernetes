@@ -40,14 +40,14 @@ const dnsTestServiceName = "dns-test-service"
 
 var _ = common.SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
 		Testname: DNS, cluster
 		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via DNS.
 	*/
-	framework.ConformanceIt("should provide DNS for the cluster ", func(ctx context.Context) {
+	framework.ConformanceIt("should provide DNS for the cluster", func(ctx context.Context) {
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
@@ -134,7 +134,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		Testname: DNS, services
 		Description: When a headless service is created, the service MUST be able to resolve all the required service endpoints. When the service is created, any pod in the same namespace must be able to resolve the service by all of the expected DNS names.
 	*/
-	framework.ConformanceIt("should provide DNS for services ", func(ctx context.Context) {
+	framework.ConformanceIt("should provide DNS for services", func(ctx context.Context) {
 		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
@@ -600,7 +600,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 var _ = common.SIGDescribe("DNS HostNetwork", func() {
 	f := framework.NewDefaultFramework("hostnetworkdns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy: ClusterFirstWithHostNet [LinuxOnly]", func(ctx context.Context) {
 		// Create a test headless service.

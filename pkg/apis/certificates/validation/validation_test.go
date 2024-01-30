@@ -1104,228 +1104,249 @@ func TestValidateClusterTrustBundle(t *testing.T) {
 	badBlockTypeBlock := string(mustMakePEMBlock("NOTACERTIFICATE", nil, goodCert1))
 	badNonParseableBlock := string(mustMakePEMBlock("CERTIFICATE", nil, []byte("this is not a certificate")))
 
+	badTooBigBundle := ""
+	for i := 0; i < (core.MaxSecretSize/len(goodCert1Block))+1; i++ {
+		badTooBigBundle += goodCert1Block + "\n"
+	}
+
 	testCases := []struct {
 		description string
 		bundle      *capi.ClusterTrustBundle
 		opts        ValidateClusterTrustBundleOptions
 		wantErrors  field.ErrorList
-	}{{
-		description: "valid, no signer name",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: goodCert1Block,
-			},
-		},
-	}, {
-		description: "invalid, no signer name, invalid name",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "k8s.io:bar:foo",
-			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: goodCert1Block,
+	}{
+		{
+			description: "valid, no signer name",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: goodCert1Block,
+				},
 			},
 		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "name"), "k8s.io:bar:foo", "ClusterTrustBundle without signer name must not have \":\" in its name"),
-		},
-	}, {
-		description: "valid, with signer name",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "k8s.io:foo:bar",
+		{
+			description: "invalid, too big",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: badTooBigBundle,
+				},
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				SignerName:  "k8s.io/foo",
-				TrustBundle: goodCert1Block,
-			},
-		},
-	}, {
-		description: "invalid, with signer name, missing name prefix",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "look-ma-no-prefix",
-			},
-			Spec: capi.ClusterTrustBundleSpec{
-				SignerName:  "k8s.io/foo",
-				TrustBundle: goodCert1Block,
+			wantErrors: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "trustBundle"), fmt.Sprintf("<value omitted, len %d>", len(badTooBigBundle)), core.MaxSecretSize),
 			},
 		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "name"), "look-ma-no-prefix", "ClusterTrustBundle for signerName k8s.io/foo must be named with prefix k8s.io:foo:"),
-		},
-	}, {
-		description: "invalid, with signer name, empty name suffix",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "k8s.io:foo:",
+		{
+			description: "invalid, no signer name, invalid name",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "k8s.io:bar:foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: goodCert1Block,
+				},
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				SignerName:  "k8s.io/foo",
-				TrustBundle: goodCert1Block,
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "k8s.io:bar:foo", "ClusterTrustBundle without signer name must not have \":\" in its name"),
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:", `a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
-		},
-	}, {
-		description: "invalid, with signer name, bad name suffix",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "k8s.io:foo:123notvalidDNSSubdomain",
+		}, {
+			description: "valid, with signer name",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "k8s.io:foo:bar",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					SignerName:  "k8s.io/foo",
+					TrustBundle: goodCert1Block,
+				},
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				SignerName:  "k8s.io/foo",
-				TrustBundle: goodCert1Block,
+		}, {
+			description: "invalid, with signer name, missing name prefix",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "look-ma-no-prefix",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					SignerName:  "k8s.io/foo",
+					TrustBundle: goodCert1Block,
+				},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:123notvalidDNSSubdomain", `a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
-		},
-	}, {
-		description: "valid, with signer name, with inter-block garbage",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "k8s.io:foo:abc",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "look-ma-no-prefix", "ClusterTrustBundle for signerName k8s.io/foo must be named with prefix k8s.io:foo:"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				SignerName:  "k8s.io/foo",
-				TrustBundle: "garbage\n" + goodCert1Block + "\ngarbage\n" + goodCert2Block,
+		}, {
+			description: "invalid, with signer name, empty name suffix",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "k8s.io:foo:",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					SignerName:  "k8s.io/foo",
+					TrustBundle: goodCert1Block,
+				},
 			},
-		},
-	}, {
-		description: "invalid, no signer name, no trust anchors",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:", `a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
 			},
-			Spec: capi.ClusterTrustBundleSpec{},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
-		},
-	}, {
-		description: "invalid, no trust anchors",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "k8s.io:foo:abc",
+		}, {
+			description: "invalid, with signer name, bad name suffix",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "k8s.io:foo:123notvalidDNSSubdomain",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					SignerName:  "k8s.io/foo",
+					TrustBundle: goodCert1Block,
+				},
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				SignerName: "k8s.io/foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:123notvalidDNSSubdomain", `a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
-		},
-	}, {
-		description: "invalid, bad signer name",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "invalid:foo",
+		}, {
+			description: "valid, with signer name, with inter-block garbage",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "k8s.io:foo:abc",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					SignerName:  "k8s.io/foo",
+					TrustBundle: "garbage\n" + goodCert1Block + "\ngarbage\n" + goodCert2Block,
+				},
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				SignerName:  "invalid",
-				TrustBundle: goodCert1Block,
+		}, {
+			description: "invalid, no signer name, no trust anchors",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "signerName"), "invalid", "must be a fully qualified domain and path of the form 'example.com/signer-name'"),
-		},
-	}, {
-		description: "invalid, no blocks",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: "non block garbage",
+		}, {
+			description: "invalid, no trust anchors",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "k8s.io:foo:abc",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					SignerName: "k8s.io/foo",
+				},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
-		},
-	}, {
-		description: "invalid, bad block type",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: goodCert1Block + "\n" + badBlockTypeBlock,
+		}, {
+			description: "invalid, bad signer name",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid:foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					SignerName:  "invalid",
+					TrustBundle: goodCert1Block,
+				},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 1 has bad block type: NOTACERTIFICATE"),
-		},
-	}, {
-		description: "invalid, block with headers",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "signerName"), "invalid", "must be a fully qualified domain and path of the form 'example.com/signer-name'"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: goodCert1Block + "\n" + badBlockHeadersBlock,
+		}, {
+			description: "invalid, no blocks",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: "non block garbage",
+				},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 1 has PEM block headers"),
-		},
-	}, {
-		description: "invalid, cert is not a CA cert",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: badNotCACertBlock,
+		}, {
+			description: "invalid, bad block type",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: goodCert1Block + "\n" + badBlockTypeBlock,
+				},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 0 does not have the CA bit set"),
-		},
-	}, {
-		description: "invalid, duplicated blocks",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 1 has bad block type: NOTACERTIFICATE"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: goodCert1Block + "\n" + goodCert1AlternateBlock,
+		}, {
+			description: "invalid, block with headers",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: goodCert1Block + "\n" + badBlockHeadersBlock,
+				},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "duplicate trust anchor (indices [0 1])"),
-		},
-	}, {
-		description: "invalid, non-certificate entry",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 1 has PEM block headers"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: goodCert1Block + "\n" + badNonParseableBlock,
+		}, {
+			description: "invalid, cert is not a CA cert",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: badNotCACertBlock,
+				},
 			},
-		},
-		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 1 does not parse as X.509"),
-		},
-	}, {
-		description: "allow any old garbage in the PEM field if we suppress parsing",
-		bundle: &capi.ClusterTrustBundle{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 0 does not have the CA bit set"),
 			},
-			Spec: capi.ClusterTrustBundleSpec{
-				TrustBundle: "garbage",
+		}, {
+			description: "invalid, duplicated blocks",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: goodCert1Block + "\n" + goodCert1AlternateBlock,
+				},
 			},
-		},
-		opts: ValidateClusterTrustBundleOptions{
-			SuppressBundleParsing: true,
-		},
-	}}
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "duplicate trust anchor (indices [0 1])"),
+			},
+		}, {
+			description: "invalid, non-certificate entry",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: goodCert1Block + "\n" + badNonParseableBlock,
+				},
+			},
+			wantErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "entry 1 does not parse as X.509"),
+			},
+		}, {
+			description: "allow any old garbage in the PEM field if we suppress parsing",
+			bundle: &capi.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: capi.ClusterTrustBundleSpec{
+					TrustBundle: "garbage",
+				},
+			},
+			opts: ValidateClusterTrustBundleOptions{
+				SuppressBundleParsing: true,
+			},
+		}}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			gotErrors := ValidateClusterTrustBundle(tc.bundle, tc.opts)

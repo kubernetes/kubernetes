@@ -30,6 +30,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
@@ -54,9 +55,9 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for old resource model [Feature:StackdriverCustomMetrics]", func(ctx context.Context) {
+	f.It("should run Custom Metrics - Stackdriver Adapter for old resource model", feature.StackdriverCustomMetrics, func(ctx context.Context) {
 		kubeClient := f.ClientSet
 		config, err := framework.LoadConfig()
 		if err != nil {
@@ -71,7 +72,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		testCustomMetrics(ctx, f, kubeClient, customMetricsClient, discoveryClient, AdapterForOldResourceModel)
 	})
 
-	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for new resource model [Feature:StackdriverCustomMetrics]", func(ctx context.Context) {
+	f.It("should run Custom Metrics - Stackdriver Adapter for new resource model", feature.StackdriverCustomMetrics, func(ctx context.Context) {
 		kubeClient := f.ClientSet
 		config, err := framework.LoadConfig()
 		if err != nil {
@@ -86,7 +87,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		testCustomMetrics(ctx, f, kubeClient, customMetricsClient, discoveryClient, AdapterForNewResourceModel)
 	})
 
-	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for external metrics [Feature:StackdriverExternalMetrics]", func(ctx context.Context) {
+	f.It("should run Custom Metrics - Stackdriver Adapter for external metrics", feature.StackdriverExternalMetrics, func(ctx context.Context) {
 		kubeClient := f.ClientSet
 		config, err := framework.LoadConfig()
 		if err != nil {

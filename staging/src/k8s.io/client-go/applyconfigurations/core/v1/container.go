@@ -35,6 +35,7 @@ type ContainerApplyConfiguration struct {
 	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty"`
 	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty"`
 	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
+	RestartPolicy            *corev1.ContainerRestartPolicy            `json:"restartPolicy,omitempty"`
 	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty"`
 	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty"`
 	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty"`
@@ -157,6 +158,14 @@ func (b *ContainerApplyConfiguration) WithResizePolicy(values ...*ContainerResiz
 		}
 		b.ResizePolicy = append(b.ResizePolicy, *values[i])
 	}
+	return b
+}
+
+// WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RestartPolicy field is set to the value of the last call.
+func (b *ContainerApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *ContainerApplyConfiguration {
+	b.RestartPolicy = &value
 	return b
 }
 

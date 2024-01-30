@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -53,9 +54,13 @@ type Stub struct {
 	// getPreferredAllocFunc is used for handling getPreferredAllocation request
 	getPreferredAllocFunc stubGetPreferredAllocFunc
 
+	// registerControlFunc is used for controlling auto-registration of requests
+	registerControlFunc stubRegisterControlFunc
+
 	registrationStatus chan watcherapi.RegistrationStatus // for testing
 	endpoint           string                             // for testing
 
+	kubeletRestartWatcher *fsnotify.Watcher
 }
 
 // stubGetPreferredAllocFunc is the function called when a getPreferredAllocation request is received from Kubelet
@@ -76,20 +81,36 @@ func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.De
 	return &response, nil
 }
 
+// stubRegisterControlFunc is the function called when a registration request is received from Kubelet
+type stubRegisterControlFunc func() bool
+
+func defaultRegisterControlFunc() bool {
+	return true
+}
+
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
 func NewDevicePluginStub(devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool, getPreferredAllocationFlag bool) *Stub {
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		klog.ErrorS(err, "Watcher creation failed")
+		panic(err)
+	}
+
 	return &Stub{
 		devs:                       devs,
 		socket:                     socket,
 		resourceName:               name,
 		preStartContainerFlag:      preStartContainerFlag,
 		getPreferredAllocationFlag: getPreferredAllocationFlag,
+		registerControlFunc:        defaultRegisterControlFunc,
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
 
 		allocFunc:             defaultAllocFunc,
 		getPreferredAllocFunc: defaultGetPreferredAllocFunc,
+		kubeletRestartWatcher: watcher,
 	}
 }
 
@@ -103,9 +124,15 @@ func (m *Stub) SetAllocFunc(f stubAllocFunc) {
 	m.allocFunc = f
 }
 
+// SetRegisterControlFunc sets RegisterControlFunc of the device plugin
+func (m *Stub) SetRegisterControlFunc(f stubRegisterControlFunc) {
+	m.registerControlFunc = f
+}
+
 // Start starts the gRPC server of the device plugin. Can only
 // be called once.
 func (m *Stub) Start() error {
+	klog.InfoS("Starting device plugin server")
 	err := m.cleanup()
 	if err != nil {
 		return err
@@ -120,6 +147,12 @@ func (m *Stub) Start() error {
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
 	pluginapi.RegisterDevicePluginServer(m.server, m)
 	watcherapi.RegisterRegistrationServer(m.server, m)
+
+	err = m.kubeletRestartWatcher.Add(filepath.Dir(m.socket))
+	if err != nil {
+		klog.ErrorS(err, "Failed to add watch", "devicePluginPath", pluginapi.DevicePluginPath)
+		return err
+	}
 
 	go func() {
 		defer m.wg.Done()
@@ -144,19 +177,75 @@ func (m *Stub) Start() error {
 	return nil
 }
 
+func (m *Stub) Restart() error {
+	klog.InfoS("Restarting Device Plugin server")
+	if m.server == nil {
+		return nil
+	}
+
+	m.server.Stop()
+	m.server = nil
+
+	return m.Start()
+}
+
 // Stop stops the gRPC server. Can be called without a prior Start
 // and more than once. Not safe to be called concurrently by different
 // goroutines!
 func (m *Stub) Stop() error {
+	klog.InfoS("Stopping device plugin server")
 	if m.server == nil {
 		return nil
 	}
+
+	m.kubeletRestartWatcher.Close()
+
 	m.server.Stop()
 	m.wg.Wait()
 	m.server = nil
 	close(m.stop) // This prevents re-starting the server.
 
 	return m.cleanup()
+}
+
+func (m *Stub) Watch(kubeletEndpoint, resourceName, pluginSockDir string) {
+	for {
+		select {
+		// Detect a kubelet restart by watching for a newly created
+		// 'pluginapi.KubeletSocket' file. When this occurs, restart
+		// the device plugin server
+		case event := <-m.kubeletRestartWatcher.Events:
+			if event.Name == kubeletEndpoint && event.Op&fsnotify.Create == fsnotify.Create {
+				klog.InfoS("inotify: file created, restarting", "kubeletEndpoint", kubeletEndpoint)
+				var lastErr error
+
+				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 2*time.Minute, false, func(context.Context) (done bool, err error) {
+					restartErr := m.Restart()
+					if restartErr == nil {
+						return true, nil
+					}
+					klog.ErrorS(restartErr, "Retrying after error")
+					lastErr = restartErr
+					return false, nil
+				})
+				if err != nil {
+					klog.ErrorS(err, "Unable to restart server: wait timed out", "lastErr", lastErr.Error())
+					panic(err)
+				}
+
+				if ok := m.registerControlFunc(); ok {
+					if err := m.Register(kubeletEndpoint, resourceName, pluginSockDir); err != nil {
+						klog.ErrorS(err, "Unable to register to kubelet")
+						panic(err)
+					}
+				}
+			}
+
+		// Watch for any other fs errors and log them.
+		case err := <-m.kubeletRestartWatcher.Errors:
+			klog.ErrorS(err, "inotify error")
+		}
+	}
 }
 
 // GetInfo is the RPC which return pluginInfo
@@ -182,6 +271,8 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 
 // Register registers the device plugin for the given resourceName with Kubelet.
 func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir string) error {
+	klog.InfoS("Register", "kubeletEndpoint", kubeletEndpoint, "resourceName", resourceName, "socket", pluginSockDir)
+
 	if pluginSockDir != "" {
 		if _, err := os.Stat(pluginSockDir + "DEPRECATION"); err == nil {
 			klog.InfoS("Deprecation file found. Skip registration")
@@ -214,6 +305,13 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 	}
 
 	_, err = client.Register(context.Background(), reqt)
+	if err != nil {
+		// Stop server
+		m.server.Stop()
+		klog.ErrorS(err, "Client unable to register to kubelet")
+		return err
+	}
+	klog.InfoS("Device Plugin registered with the Kubelet")
 	return err
 }
 

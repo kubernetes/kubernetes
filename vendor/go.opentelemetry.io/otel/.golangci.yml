@@ -9,7 +9,6 @@ linters:
   disable-all: true
   # Specifically enable linters we want to use.
   enable:
-    - deadcode
     - depguard
     - errcheck
     - godot
@@ -21,10 +20,8 @@ linters:
     - misspell
     - revive
     - staticcheck
-    - structcheck
     - typecheck
     - unused
-    - varcheck
 
 issues:
   # Maximum issues count per one linter.
@@ -64,30 +61,67 @@ issues:
 
 linters-settings:
   depguard:
-    # Check the list against standard lib.
-    # Default: false
-    include-go-root: true
-    # A list of packages for the list type specified.
-    # Default: []
-    packages:
-      - "crypto/md5"
-      - "crypto/sha1"
-      - "crypto/**/pkix"
-    ignore-file-rules:
-      - "**/*_test.go"
-    additional-guards:
-      # Do not allow testing packages in non-test files.
-      - list-type: denylist
-        include-go-root: true
-        packages:
-          - testing
-          - github.com/stretchr/testify
-        ignore-file-rules:
-          - "**/*_test.go"
-          - "**/*test/*.go"
-          - "**/internal/matchers/*.go"
+    rules:
+      non-tests:
+        files:
+          - "!$test"
+          - "!**/*test/*.go"
+          - "!**/internal/matchers/*.go"
+        deny:
+          - pkg: "testing"
+          - pkg: "github.com/stretchr/testify"
+          - pkg: "crypto/md5"
+          - pkg: "crypto/sha1"
+          - pkg: "crypto/**/pkix"
+      otlp-internal:
+        files:
+          - "!**/exporters/otlp/internal/**/*.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/exporters/otlp/internal"
+            desc: Do not use cross-module internal packages.
+      otlptrace-internal:
+        files:
+          - "!**/exporters/otlp/otlptrace/*.go"
+          - "!**/exporters/otlp/otlptrace/internal/**.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal"
+            desc: Do not use cross-module internal packages.
+      otlpmetric-internal:
+        files:
+          - "!**/exporters/otlp/otlpmetric/internal/*.go"
+          - "!**/exporters/otlp/otlpmetric/internal/**/*.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/internal"
+            desc: Do not use cross-module internal packages.
+      otel-internal:
+        files:
+          - "**/sdk/*.go"
+          - "**/sdk/**/*.go"
+          - "**/exporters/*.go"
+          - "**/exporters/**/*.go"
+          - "**/schema/*.go"
+          - "**/schema/**/*.go"
+          - "**/metric/*.go"
+          - "**/metric/**/*.go"
+          - "**/bridge/*.go"
+          - "**/bridge/**/*.go"
+          - "**/example/*.go"
+          - "**/example/**/*.go"
+          - "**/trace/*.go"
+          - "**/trace/**/*.go"
+        deny:
+          - pkg: "go.opentelemetry.io/otel/internal$"
+            desc: Do not use cross-module internal packages.
+          - pkg: "go.opentelemetry.io/otel/internal/attribute"
+            desc: Do not use cross-module internal packages.
+          - pkg: "go.opentelemetry.io/otel/internal/internaltest"
+            desc: Do not use cross-module internal packages.
+          - pkg: "go.opentelemetry.io/otel/internal/matchers"
+            desc: Do not use cross-module internal packages.
   godot:
     exclude:
+      # Exclude links.
+      - '^ *\[[^]]+\]:'
       # Exclude sentence fragments for lists.
       - '^[ ]*[-•]'
       # Exclude sentences prefixing a list.
@@ -114,8 +148,9 @@ linters-settings:
       - name: constant-logical-expr
         disabled: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument
+      # TODO (#3372) re-enable linter when it is compatible. https://github.com/golangci/golangci-lint/issues/3280
       - name: context-as-argument
-        disabled: false
+        disabled: true
         arguments:
           allowTypesBefore: "*testing.T"
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-keys-type

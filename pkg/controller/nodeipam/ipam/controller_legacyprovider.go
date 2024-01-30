@@ -150,7 +150,7 @@ func (c *Controller) Start(logger klog.Logger, nodeInformer informers.NodeInform
 		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			return c.onUpdate(logger, newNode)
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			return c.onDelete(logger, node)
 		}),
 	})
@@ -163,17 +163,6 @@ func (c *Controller) Run(ctx context.Context) {
 
 	go c.adapter.Run(ctx)
 	<-ctx.Done()
-}
-
-// occupyServiceCIDR removes the service CIDR range from the cluster CIDR if it
-// intersects.
-func occupyServiceCIDR(set *cidrset.CidrSet, clusterCIDR, serviceCIDR *net.IPNet) error {
-	if clusterCIDR.Contains(serviceCIDR.IP) || serviceCIDR.Contains(clusterCIDR.IP) {
-		if err := set.Occupy(serviceCIDR); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 type nodeState struct {

@@ -76,8 +76,10 @@ func getUpperPath(path string) string {
 // Check whether a directory/file is a link type or not
 // LinkType could be SymbolicLink, Junction, or HardLink
 func isLinkPath(path string) (bool, error) {
-	cmd := fmt.Sprintf("(Get-Item -LiteralPath %q).LinkType", path)
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	cmd := exec.Command("powershell", "/c", "$ErrorActionPreference = 'Stop'; (Get-Item -Force -LiteralPath $env:linkpath).LinkType")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("linkpath=%s", path))
+	klog.V(8).Infof("Executing command: %q", cmd.String())
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false, err
 	}
@@ -115,8 +117,10 @@ func evalSymlink(path string) (string, error) {
 	}
 	// This command will give the target path of a given symlink
 	// The -Force parameter will allow Get-Item to also evaluate hidden folders, like AppData.
-	cmd := fmt.Sprintf("(Get-Item -Force -LiteralPath %q).Target", upperpath)
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	cmd := exec.Command("powershell", "/c", "$ErrorActionPreference = 'Stop'; (Get-Item -Force -LiteralPath $env:linkpath).Target")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("linkpath=%s", upperpath))
+	klog.V(8).Infof("Executing command: %q", cmd.String())
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -29,7 +30,7 @@ import (
 
 var _ = SIGDescribe("Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
 
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Networking", func() {
 			Description: Create a hostexec pod that is capable of curl to netcat commands. Create a test Pod that will act as a webserver front end exposing ports 8080 for tcp and 8081 for udp. The netserver service proxies are created on specified number of nodes.
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
-		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should function for intra-pod communication: http", f.WithNodeConformance(), func(ctx context.Context) {
 			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, false)
 			checkPodToPodConnectivity(ctx, config, "http", e2enetwork.EndpointHTTPPort)
 		})
@@ -92,7 +93,7 @@ var _ = SIGDescribe("Networking", func() {
 			Description: Create a hostexec pod that is capable of curl to netcat commands. Create a test Pod that will act as a webserver front end exposing ports 8080 for tcp and 8081 for udp. The netserver service proxies are created on specified number of nodes.
 			The kubectl exec on the webserver container MUST reach a udp port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
-		framework.ConformanceIt("should function for intra-pod communication: udp [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should function for intra-pod communication: udp", f.WithNodeConformance(), func(ctx context.Context) {
 			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, false)
 			checkPodToPodConnectivity(ctx, config, "udp", e2enetwork.EndpointUDPPort)
 		})
@@ -104,7 +105,7 @@ var _ = SIGDescribe("Networking", func() {
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 			This test is marked LinuxOnly it breaks when using Overlay networking with Windows.
 		*/
-		framework.ConformanceIt("should function for node-pod communication: http [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should function for node-pod communication: http [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, true)
 			for _, endpointPod := range config.EndpointPods {
 				err := config.DialFromNode(ctx, "http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
@@ -121,7 +122,7 @@ var _ = SIGDescribe("Networking", func() {
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 			This test is marked LinuxOnly it breaks when using Overlay networking with Windows.
 		*/
-		framework.ConformanceIt("should function for node-pod communication: udp [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should function for node-pod communication: udp [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, true)
 			for _, endpointPod := range config.EndpointPods {
 				err := config.DialFromNode(ctx, "udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
@@ -131,12 +132,12 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]", func(ctx context.Context) {
+		f.It("should function for intra-pod communication: sctp [LinuxOnly]", feature.SCTPConnectivity, func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
 			checkPodToPodConnectivity(ctx, config, "sctp", e2enetwork.EndpointSCTPPort)
 		})
 
-		ginkgo.It("should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]", func(ctx context.Context) {
+		f.It("should function for node-pod communication: sctp [LinuxOnly]", feature.SCTPConnectivity, func(ctx context.Context) {
 			ginkgo.Skip("Skipping SCTP node to pod test until DialFromNode supports SCTP #96482")
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
 			for _, endpointPod := range config.EndpointPods {

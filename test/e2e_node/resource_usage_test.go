@@ -37,7 +37,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
+var _ = SIGDescribe("Resource-usage", framework.WithSerial(), framework.WithSlow(), func() {
 	const (
 		// Interval to poll /stats/container on a node
 		containerStatsPollingPeriod = 10 * time.Second
@@ -49,7 +49,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 	)
 
 	f := framework.NewDefaultFramework("resource-usage")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		om = e2ekubelet.NewRuntimeOperationMonitor(ctx, f.ClientSet)

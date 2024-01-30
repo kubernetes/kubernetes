@@ -95,6 +95,10 @@ var listsLib = &lists{}
 
 type lists struct{}
 
+func (*lists) LibraryName() string {
+	return "k8s.lists"
+}
+
 var paramA = cel.TypeParamType("A")
 
 // CEL typeParams can be used to constraint to a specific trait (e.g. traits.ComparableType) if the 1st operand is the type to constrain.

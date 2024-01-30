@@ -410,7 +410,8 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	err = wait.Poll(time.Second, wait.ForeverTestTimeout, testutils.PodScheduled(cs, myPod.Namespace, myPod.Name))
+	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, wait.ForeverTestTimeout, false,
+		testutils.PodScheduled(cs, myPod.Namespace, myPod.Name))
 	if err != nil {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}

@@ -31,18 +31,19 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
 		Testname: ConfigMap, from environment field
 		Description: Create a Pod with an environment variable value set using a value from ConfigMap. A ConfigMap value MUST be accessible in the container environment.
 	*/
-	framework.ConformanceIt("should be consumable via environment variable [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable via environment variable", f.WithNodeConformance(), func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -90,7 +91,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap, from environment variables
 		Description: Create a Pod with a environment source from ConfigMap. All ConfigMap values MUST be available as environment variables in the container.
 	*/
-	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable via the environment", f.WithNodeConformance(), func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -137,7 +138,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should fail to create ConfigMap with empty key", func(ctx context.Context) {
 		configMap, err := newConfigMapWithEmptyKey(ctx, f)
-		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
 
 	ginkgo.It("should update ConfigMap successfully", func(ctx context.Context) {
@@ -157,7 +158,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get ConfigMap")
 		ginkgo.By(fmt.Sprintf("Verifying update of ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
-		framework.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
+		gomega.Expect(configMapFromUpdate.Data).To(gomega.Equal(configMap.Data))
 	})
 
 	/*
@@ -189,8 +190,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		ginkgo.By("fetching the ConfigMap")
 		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(ctx, testConfigMapName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get ConfigMap")
-		framework.ExpectEqual(configMap.Data["valueName"], testConfigMap.Data["valueName"])
-		framework.ExpectEqual(configMap.Labels["test-configmap-static"], testConfigMap.Labels["test-configmap-static"])
+		gomega.Expect(configMap.Data["valueName"]).To(gomega.Equal(testConfigMap.Data["valueName"]))
+		gomega.Expect(configMap.Labels["test-configmap-static"]).To(gomega.Equal(testConfigMap.Labels["test-configmap-static"]))
 
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -239,7 +240,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			LabelSelector: "test-configmap-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list ConfigMap by LabelSelector")
-		framework.ExpectEqual(len(configMapList.Items), 0, "ConfigMap is still present after being deleted by collection")
+		gomega.Expect(configMapList.Items).To(gomega.BeEmpty(), "ConfigMap is still present after being deleted by collection")
 	})
 })
 

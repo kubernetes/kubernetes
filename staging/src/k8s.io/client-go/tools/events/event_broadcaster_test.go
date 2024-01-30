@@ -25,6 +25,7 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestRecordEventToSink(t *testing.T) {
@@ -78,11 +79,12 @@ func TestRecordEventToSink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			kubeClient := fake.NewSimpleClientset()
 			eventSink := &EventSinkImpl{Interface: kubeClient.EventsV1()}
 
 			for _, ev := range tc.eventsToRecord {
-				recordEvent(eventSink, &ev)
+				recordEvent(ctx, eventSink, &ev)
 			}
 
 			recordedEvents, err := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})

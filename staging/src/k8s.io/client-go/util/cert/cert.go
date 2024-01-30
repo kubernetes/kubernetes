@@ -45,6 +45,7 @@ type Config struct {
 	Organization []string
 	AltNames     AltNames
 	Usages       []x509.ExtKeyUsage
+	NotBefore    time.Time
 }
 
 // AltNames contains the domain names and IP addresses that will be added
@@ -64,6 +65,10 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 		return nil, err
 	}
 	serial = new(big.Int).Add(serial, big.NewInt(1))
+	notBefore := now.UTC()
+	if !cfg.NotBefore.IsZero() {
+		notBefore = cfg.NotBefore.UTC()
+	}
 	tmpl := x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
@@ -71,7 +76,7 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 			Organization: cfg.Organization,
 		},
 		DNSNames:              []string{cfg.CommonName},
-		NotBefore:             now.UTC(),
+		NotBefore:             notBefore,
 		NotAfter:              now.Add(duration365d * 10).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,

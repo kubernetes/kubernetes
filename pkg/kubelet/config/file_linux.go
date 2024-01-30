@@ -140,14 +140,14 @@ func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 			pod, podExist, err := s.store.GetByKey(objKey)
 			if err != nil {
 				return err
-			} else if !podExist {
-				return fmt.Errorf("the pod with key %s doesn't exist in cache", objKey)
-			} else {
-				if err = s.store.Delete(pod); err != nil {
-					return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
-				}
-				delete(s.fileKeyMapping, e.fileName)
 			}
+			if !podExist {
+				return fmt.Errorf("the pod with key %s doesn't exist in cache", objKey)
+			}
+			if err = s.store.Delete(pod); err != nil {
+				return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
+			}
+			delete(s.fileKeyMapping, e.fileName)
 		}
 	}
 	return nil

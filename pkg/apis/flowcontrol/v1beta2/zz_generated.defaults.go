@@ -59,6 +59,9 @@ func SetObjectDefaults_PriorityLevelConfiguration(in *v1beta2.PriorityLevelConfi
 			SetDefaults_QueuingConfiguration(in.Spec.Limited.LimitResponse.Queuing)
 		}
 	}
+	if in.Spec.Exempt != nil {
+		SetDefaults_ExemptPriorityLevelConfiguration(in.Spec.Exempt)
+	}
 }
 
 func SetObjectDefaults_PriorityLevelConfigurationList(in *v1beta2.PriorityLevelConfigurationList) {

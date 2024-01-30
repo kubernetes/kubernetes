@@ -43,6 +43,7 @@ healthzPort: 10248
 httpCheckFrequency: 20s
 imageGCHighThresholdPercent: 85
 imageGCLowThresholdPercent: 80
+imageMaximumGCAge: 0s
 imageMinimumGCAge: 2m0s
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
@@ -51,7 +52,7 @@ kubeAPIBurst: 100
 kubeAPIQPS: 50
 localStorageCapacityIsolation: true
 logging:
-  flushFrequency: 5000000000
+  flushFrequency: 5s
   format: text
   options:
     json:

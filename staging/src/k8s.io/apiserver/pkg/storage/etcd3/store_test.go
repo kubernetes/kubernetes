@@ -64,6 +64,10 @@ func newPod() runtime.Object {
 	return &example.Pod{}
 }
 
+func newPodList() runtime.Object {
+	return &example.PodList{}
+}
+
 func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
 	return func(ctx context.Context, t *testing.T, key string) {
 		getResp, err := etcdClient.KV.Get(ctx, key)
@@ -137,9 +141,24 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, store)
 }
 
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, store)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, store)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, store)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -155,8 +174,10 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	originalTransformer := s.transformer.(*storagetesting.PrefixTransformer)
 	transformer := *originalTransformer
 	s.transformer = modifier(&transformer)
+	s.watcher.transformer = modifier(&transformer)
 	return func() {
 		s.transformer = originalTransformer
+		s.watcher.transformer = originalTransformer
 	}
 }
 
@@ -191,13 +212,8 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, false)
-}
-
-func TestListWithoutPaging(t *testing.T) {
-	ctx, store, _ := testSetup(t, withoutPaging())
-	storagetesting.RunTestListWithoutPaging(ctx, t, store)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestList(ctx, t, store, compactStorage(client), false)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -258,7 +274,7 @@ func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := etcdClient.KV.Compact(ctx, int64(rv), clientv3.WithCompactPhysical()); err != nil {
+		if _, _, err = compact(ctx, etcdClient, 0, int64(rv)); err != nil {
 			t.Fatalf("Unable to compact, %v", err)
 		}
 	}
@@ -466,14 +482,15 @@ func (r *clientRecorder) GetReadsAndReset() uint64 {
 }
 
 type setupOptions struct {
-	client        func(testing.TB) *clientv3.Client
-	codec         runtime.Codec
-	newFunc       func() runtime.Object
-	prefix        string
-	groupResource schema.GroupResource
-	transformer   value.Transformer
-	pagingEnabled bool
-	leaseConfig   LeaseManagerConfig
+	client         func(testing.TB) *clientv3.Client
+	codec          runtime.Codec
+	newFunc        func() runtime.Object
+	newListFunc    func() runtime.Object
+	prefix         string
+	resourcePrefix string
+	groupResource  schema.GroupResource
+	transformer    value.Transformer
+	leaseConfig    LeaseManagerConfig
 
 	recorderEnabled bool
 }
@@ -491,12 +508,6 @@ func withClientConfig(config *embed.Config) setupOption {
 func withPrefix(prefix string) setupOption {
 	return func(options *setupOptions) {
 		options.prefix = prefix
-	}
-}
-
-func withoutPaging() setupOption {
-	return func(options *setupOptions) {
-		options.pagingEnabled = false
 	}
 }
 
@@ -518,10 +529,11 @@ func withDefaults(options *setupOptions) {
 	}
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
+	options.newListFunc = newPodList
 	options.prefix = ""
+	options.resourcePrefix = "/pods"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
 	options.transformer = newTestTransformer()
-	options.pagingEnabled = true
 	options.leaseConfig = newTestLeaseManagerConfig()
 }
 
@@ -541,10 +553,11 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 		client,
 		setupOpts.codec,
 		setupOpts.newFunc,
+		setupOpts.newListFunc,
 		setupOpts.prefix,
+		setupOpts.resourcePrefix,
 		setupOpts.groupResource,
 		setupOpts.transformer,
-		setupOpts.pagingEnabled,
 		setupOpts.leaseConfig,
 	)
 	ctx := context.Background()
@@ -624,6 +637,129 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
 	_, countErr := store.Count(invalidKey)
 	expectInvalidKey("Count", countErr)
+}
+
+func TestResolveGetListRev(t *testing.T) {
+	_, store, _ := testSetup(t)
+	testCases := []struct {
+		name          string
+		continueKey   string
+		continueRV    int64
+		rv            string
+		rvMatch       metav1.ResourceVersionMatch
+		recursive     bool
+		expectedError string
+		limit         int64
+		expectedRev   int64
+	}{
+		{
+			name:          "specifying resource versionwhen using continue",
+			continueKey:   "continue",
+			continueRV:    100,
+			rv:            "200",
+			expectedError: "specifying resource version is not allowed when using continue",
+		},
+		{
+			name:          "invalid resource version",
+			rv:            "invalid",
+			expectedError: "invalid resource version",
+		},
+		{
+			name:          "unknown ResourceVersionMatch value",
+			rv:            "200",
+			rvMatch:       "unknown",
+			expectedError: "unknown ResourceVersionMatch value",
+		},
+		{
+			name:        "use continueRV",
+			continueKey: "continue",
+			continueRV:  100,
+			rv:          "0",
+			expectedRev: 100,
+		},
+		{
+			name:        "use continueRV with empty rv",
+			continueKey: "continue",
+			continueRV:  100,
+			rv:          "",
+			expectedRev: 100,
+		},
+		{
+			name:        "continueRV = 0",
+			continueKey: "continue",
+			continueRV:  0,
+			rv:          "",
+			expectedRev: 0,
+		},
+		{
+			name:        "continueRV < 0",
+			continueKey: "continue",
+			continueRV:  -1,
+			rv:          "",
+			expectedRev: 0,
+		},
+		{
+			name:        "default",
+			expectedRev: 0,
+		},
+		{
+			name:        "rev resolve to 0 if ResourceVersionMatchNotOlderThan",
+			rv:          "200",
+			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+			expectedRev: 0,
+		},
+		{
+			name:        "specified rev if ResourceVersionMatchExact",
+			rv:          "200",
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectedRev: 200,
+		},
+		{
+			name:        "rev resolve to 0 if not recursive",
+			rv:          "200",
+			limit:       1,
+			expectedRev: 0,
+		},
+		{
+			name:        "rev resolve to 0 if limit unspecified",
+			rv:          "200",
+			recursive:   true,
+			expectedRev: 0,
+		},
+		{
+			name:        "specified rev if recursive with limit",
+			rv:          "200",
+			recursive:   true,
+			limit:       1,
+			expectedRev: 200,
+		},
+	}
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			storageOpts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate: storage.SelectionPredicate{
+					Limit: tt.limit,
+				},
+				Recursive: tt.recursive,
+			}
+			rev, err := store.resolveGetListRev(tt.continueKey, tt.continueRV, storageOpts)
+			if len(tt.expectedError) > 0 {
+				if err == nil || !strings.Contains(err.Error(), tt.expectedError) {
+					t.Fatalf("expected error: %s, but got: %v", tt.expectedError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolveRevForGetList failed: %v", err)
+			}
+			if rev != tt.expectedRev {
+				t.Errorf("%s: expecting rev = %d, but get %d", tt.name, tt.expectedRev, rev)
+			}
+		})
+	}
 }
 
 func BenchmarkStore_GetList(b *testing.B) {

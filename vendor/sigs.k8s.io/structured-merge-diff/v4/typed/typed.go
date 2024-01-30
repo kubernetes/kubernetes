@@ -17,8 +17,6 @@ limitations under the License.
 package typed
 
 import (
-	"fmt"
-	"strings"
 	"sync"
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -26,16 +24,24 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
+// ValidationOptions is the list of all the options available when running the validation.
+type ValidationOptions int
+
+const (
+	// AllowDuplicates means that sets and associative lists can have duplicate similar items.
+	AllowDuplicates ValidationOptions = iota
+)
+
 // AsTyped accepts a value and a type and returns a TypedValue. 'v' must have
 // type 'typeName' in the schema. An error is returned if the v doesn't conform
 // to the schema.
-func AsTyped(v value.Value, s *schema.Schema, typeRef schema.TypeRef) (*TypedValue, error) {
+func AsTyped(v value.Value, s *schema.Schema, typeRef schema.TypeRef, opts ...ValidationOptions) (*TypedValue, error) {
 	tv := &TypedValue{
 		value:   v,
 		typeRef: typeRef,
 		schema:  s,
 	}
-	if err := tv.Validate(); err != nil {
+	if err := tv.Validate(opts...); err != nil {
 		return nil, err
 	}
 	return tv, nil
@@ -45,6 +51,10 @@ func AsTyped(v value.Value, s *schema.Schema, typeRef schema.TypeRef) (*TypedVal
 // conforms to the schema, for cases where that has already been checked or
 // where you're going to call a method that validates as a side-effect (like
 // ToFieldSet).
+//
+// Deprecated: This function was initially created because validation
+// was expensive. Now that this has been solved, objects should always
+// be created as validated, using `AsTyped`.
 func AsTypedUnvalidated(v value.Value, s *schema.Schema, typeRef schema.TypeRef) *TypedValue {
 	tv := &TypedValue{
 		value:   v,
@@ -77,8 +87,14 @@ func (tv TypedValue) Schema() *schema.Schema {
 }
 
 // Validate returns an error with a list of every spec violation.
-func (tv TypedValue) Validate() error {
+func (tv TypedValue) Validate(opts ...ValidationOptions) error {
 	w := tv.walker()
+	for _, opt := range opts {
+		switch opt {
+		case AllowDuplicates:
+			w.allowDuplicates = true
+		}
+	}
 	defer w.finished()
 	if errs := w.validate(nil); len(errs) != 0 {
 		return errs
@@ -113,6 +129,10 @@ func (tv TypedValue) Merge(pso *TypedValue) (*TypedValue, error) {
 	return merge(&tv, pso, ruleKeepRHS, nil)
 }
 
+var cmpwPool = sync.Pool{
+	New: func() interface{} { return &compareWalker{} },
+}
+
 // Compare compares the two objects. See the comments on the `Comparison`
 // struct for details on the return value.
 //
@@ -120,33 +140,44 @@ func (tv TypedValue) Merge(pso *TypedValue) (*TypedValue, error) {
 // match), or an error will be returned. Validation errors will be returned if
 // the objects don't conform to the schema.
 func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
-	c = &Comparison{
+	lhs := tv
+	if lhs.schema != rhs.schema {
+		return nil, errorf("expected objects with types from the same schema")
+	}
+	if !lhs.typeRef.Equals(&rhs.typeRef) {
+		return nil, errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
+	}
+
+	cmpw := cmpwPool.Get().(*compareWalker)
+	defer func() {
+		cmpw.lhs = nil
+		cmpw.rhs = nil
+		cmpw.schema = nil
+		cmpw.typeRef = schema.TypeRef{}
+		cmpw.comparison = nil
+		cmpw.inLeaf = false
+
+		cmpwPool.Put(cmpw)
+	}()
+
+	cmpw.lhs = lhs.value
+	cmpw.rhs = rhs.value
+	cmpw.schema = lhs.schema
+	cmpw.typeRef = lhs.typeRef
+	cmpw.comparison = &Comparison{
 		Removed:  fieldpath.NewSet(),
 		Modified: fieldpath.NewSet(),
 		Added:    fieldpath.NewSet(),
 	}
-	_, err = merge(&tv, rhs, func(w *mergingWalker) {
-		if w.lhs == nil {
-			c.Added.Insert(w.path)
-		} else if w.rhs == nil {
-			c.Removed.Insert(w.path)
-		} else if !value.Equals(w.rhs, w.lhs) {
-			// TODO: Equality is not sufficient for this.
-			// Need to implement equality check on the value type.
-			c.Modified.Insert(w.path)
-		}
-	}, func(w *mergingWalker) {
-		if w.lhs == nil {
-			c.Added.Insert(w.path)
-		} else if w.rhs == nil {
-			c.Removed.Insert(w.path)
-		}
-	})
-	if err != nil {
-		return nil, err
+	if cmpw.allocator == nil {
+		cmpw.allocator = value.NewFreelistAllocator()
 	}
 
-	return c, nil
+	errs := cmpw.compare(nil)
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	return cmpw.comparison, nil
 }
 
 // RemoveItems removes each provided list or map item from the value.
@@ -159,63 +190,6 @@ func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
 func (tv TypedValue) ExtractItems(items *fieldpath.Set) *TypedValue {
 	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef, true)
 	return &tv
-}
-
-// NormalizeUnions takes the new object and normalizes the union:
-// - If discriminator changed to non-nil, and a new field has been added
-// that doesn't match, an error is returned,
-// - If discriminator hasn't changed and two fields or more are set, an
-// error is returned,
-// - If discriminator changed to non-nil, all other fields but the
-// discriminated one will be cleared,
-// - Otherwise, If only one field is left, update discriminator to that value.
-//
-// Please note: union behavior isn't finalized yet and this is still experimental.
-func (tv TypedValue) NormalizeUnions(new *TypedValue) (*TypedValue, error) {
-	var errs ValidationErrors
-	var normalizeFn = func(w *mergingWalker) {
-		if w.rhs != nil {
-			v := w.rhs.Unstructured()
-			w.out = &v
-		}
-		if err := normalizeUnions(w); err != nil {
-			errs = append(errs, errorf(err.Error())...)
-		}
-	}
-	out, mergeErrs := merge(&tv, new, func(w *mergingWalker) {}, normalizeFn)
-	if mergeErrs != nil {
-		errs = append(errs, mergeErrs.(ValidationErrors)...)
-	}
-	if len(errs) > 0 {
-		return nil, errs
-	}
-	return out, nil
-}
-
-// NormalizeUnionsApply specifically normalize unions on apply. It
-// validates that the applied union is correct (there should be no
-// ambiguity there), and clear the fields according to the sent intent.
-//
-// Please note: union behavior isn't finalized yet and this is still experimental.
-func (tv TypedValue) NormalizeUnionsApply(new *TypedValue) (*TypedValue, error) {
-	var errs ValidationErrors
-	var normalizeFn = func(w *mergingWalker) {
-		if w.rhs != nil {
-			v := w.rhs.Unstructured()
-			w.out = &v
-		}
-		if err := normalizeUnionsApply(w); err != nil {
-			errs = append(errs, errorf(err.Error())...)
-		}
-	}
-	out, mergeErrs := merge(&tv, new, func(w *mergingWalker) {}, normalizeFn)
-	if mergeErrs != nil {
-		errs = append(errs, mergeErrs.(ValidationErrors)...)
-	}
-	if len(errs) > 0 {
-		return nil, errs
-	}
-	return out, nil
 }
 
 func (tv TypedValue) Empty() *TypedValue {
@@ -272,51 +246,4 @@ func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) 
 		out.value = value.NewValueInterface(*mw.out)
 	}
 	return out, nil
-}
-
-// Comparison is the return value of a TypedValue.Compare() operation.
-//
-// No field will appear in more than one of the three fieldsets. If all of the
-// fieldsets are empty, then the objects must have been equal.
-type Comparison struct {
-	// Removed contains any fields removed by rhs (the right-hand-side
-	// object in the comparison).
-	Removed *fieldpath.Set
-	// Modified contains fields present in both objects but different.
-	Modified *fieldpath.Set
-	// Added contains any fields added by rhs.
-	Added *fieldpath.Set
-}
-
-// IsSame returns true if the comparison returned no changes (the two
-// compared objects are similar).
-func (c *Comparison) IsSame() bool {
-	return c.Removed.Empty() && c.Modified.Empty() && c.Added.Empty()
-}
-
-// String returns a human readable version of the comparison.
-func (c *Comparison) String() string {
-	bld := strings.Builder{}
-	if !c.Modified.Empty() {
-		bld.WriteString(fmt.Sprintf("- Modified Fields:\n%v\n", c.Modified))
-	}
-	if !c.Added.Empty() {
-		bld.WriteString(fmt.Sprintf("- Added Fields:\n%v\n", c.Added))
-	}
-	if !c.Removed.Empty() {
-		bld.WriteString(fmt.Sprintf("- Removed Fields:\n%v\n", c.Removed))
-	}
-	return bld.String()
-}
-
-// ExcludeFields fields from the compare recursively removes the fields
-// from the entire comparison
-func (c *Comparison) ExcludeFields(fields *fieldpath.Set) *Comparison {
-	if fields == nil || fields.Empty() {
-		return c
-	}
-	c.Removed = c.Removed.RecursiveDifference(fields)
-	c.Modified = c.Modified.RecursiveDifference(fields)
-	c.Added = c.Added.RecursiveDifference(fields)
-	return c
 }

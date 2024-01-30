@@ -24,7 +24,7 @@ import (
 
 var (
 	// IteratorType singleton.
-	IteratorType = NewTypeValue("iterator", traits.IteratorType)
+	IteratorType = NewObjectType("iterator", traits.IteratorType)
 )
 
 // baseIterator is the basis for list, map, and object iterators.
@@ -34,7 +34,7 @@ var (
 // interpreter.
 type baseIterator struct{}
 
-func (*baseIterator) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (*baseIterator) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	return nil, fmt.Errorf("type conversion on iterators not supported")
 }
 
@@ -50,6 +50,6 @@ func (*baseIterator) Type() ref.Type {
 	return IteratorType
 }
 
-func (*baseIterator) Value() interface{} {
+func (*baseIterator) Value() any {
 	return nil
 }

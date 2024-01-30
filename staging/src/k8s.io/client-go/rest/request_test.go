@@ -139,11 +139,6 @@ func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
-
-	r = (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("/foo/")
-	if s := r.URL().String(); s != "/foo/" {
-		t.Errorf("trailing slash should be preserved: %s", s)
-	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
@@ -322,7 +317,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test error set when failing to read file
-	f, err := os.CreateTemp("", "test")
+	f, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}

@@ -425,13 +425,25 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 type FeatureGate string
 
 const (
-	ApplySet              FeatureGate = "KUBECTL_APPLYSET"
-	ExplainOpenapiV3      FeatureGate = "KUBECTL_EXPLAIN_OPENAPIV3"
-	CmdPluginAsSubcommand FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
+	ApplySet                FeatureGate = "KUBECTL_APPLYSET"
+	CmdPluginAsSubcommand   FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
+	InteractiveDelete       FeatureGate = "KUBECTL_INTERACTIVE_DELETE"
+	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
+	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 )
 
+// IsEnabled returns true iff environment variable is set to true.
+// All other cases, it returns false.
 func (f FeatureGate) IsEnabled() bool {
-	return os.Getenv(string(f)) == "true"
+	return strings.ToLower(os.Getenv(string(f))) == "true"
+}
+
+// IsDisabled returns true iff environment variable is set to false.
+// All other cases, it returns true.
+// This function is used for the cases where feature is enabled by default,
+// but it may be needed to provide a way to ability to disable this feature.
+func (f FeatureGate) IsDisabled() bool {
+	return strings.ToLower(os.Getenv(string(f))) == "false"
 }
 
 func AddValidateFlags(cmd *cobra.Command) {
@@ -511,11 +523,9 @@ func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 }
 
-func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, pruneWhitelist *[]string, all *bool, applySetRef *string) {
+func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, all *bool, applySetRef *string) {
 	// Flags associated with the original allowlist-based alpha
 	cmd.Flags().StringArrayVar(pruneAllowlist, "prune-allowlist", *pruneAllowlist, "Overwrite the default allowlist with <group/version/kind> for --prune")
-	cmd.Flags().StringArrayVar(pruneWhitelist, "prune-whitelist", *pruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune") // TODO: Remove this in kubectl 1.28 or later
-	_ = cmd.Flags().MarkDeprecated("prune-whitelist", "Use --prune-allowlist instead.")
 	cmd.Flags().BoolVar(all, "all", *all, "Select all resources in the namespace of the specified resource types.")
 
 	// Flags associated with the new ApplySet-based alpha

@@ -39,17 +39,27 @@ func IsNotExist(err error) bool {
 // components in the returned string are not modified (in other words are not
 // replaced with symlinks on the filesystem) after this function has returned.
 // Such a symlink race is necessarily out-of-scope of SecureJoin.
+//
+// Volume names in unsafePath are always discarded, regardless if they are
+// provided via direct input or when evaluating symlinks. Therefore:
+//
+// "C:\Temp" + "D:\path\to\file.txt" results in "C:\Temp\path\to\file.txt"
 func SecureJoinVFS(root, unsafePath string, vfs VFS) (string, error) {
 	// Use the os.* VFS implementation if none was specified.
 	if vfs == nil {
 		vfs = osVFS{}
 	}
 
+	unsafePath = filepath.FromSlash(unsafePath)
 	var path bytes.Buffer
 	n := 0
 	for unsafePath != "" {
 		if n > 255 {
-			return "", &os.PathError{Op: "SecureJoin", Path: root + "/" + unsafePath, Err: syscall.ELOOP}
+			return "", &os.PathError{Op: "SecureJoin", Path: root + string(filepath.Separator) + unsafePath, Err: syscall.ELOOP}
+		}
+
+		if v := filepath.VolumeName(unsafePath); v != "" {
+			unsafePath = unsafePath[len(v):]
 		}
 
 		// Next path component, p.

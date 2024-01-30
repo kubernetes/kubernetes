@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"flag"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -56,6 +57,9 @@ func TestOpenTelemetryTracing(t *testing.T) {
 		tr.AddEvent("reticulated splines", attribute.Bool("should I do it?", false)) // took 5ms
 		time.Sleep(10 * time.Millisecond)
 
+		// Add error event to the frobber span
+		tr.RecordError(fmt.Errorf("something went wrong"))
+
 		// Ensure setting context with span makes the next span a child
 		ctx = ContextWithSpan(context.Background(), tr)
 
@@ -87,7 +91,7 @@ func TestOpenTelemetryTracing(t *testing.T) {
 	if len(child.Attributes()) != 1 {
 		t.Errorf("got attributes %v; expected one attribute in child.Attributes()", child.Attributes())
 	}
-	if len(child.Events()) != 2 {
+	if len(child.Events()) != 3 {
 		t.Errorf("got events %v; expected 2 events in child.Events()", child.Events())
 	}
 	if child.Events()[0].Name != "reticulated splines" {
@@ -96,11 +100,17 @@ func TestOpenTelemetryTracing(t *testing.T) {
 	if len(child.Events()[0].Attributes) != 1 {
 		t.Errorf("got event %v; expected 1 attribute in child.Events()[0].Attributes", child.Events()[0])
 	}
-	if child.Events()[1].Name != "sequenced particles" {
-		t.Errorf("got event %v; expected child.Events()[1].Name == sequenced particles", child.Events()[1])
+	if child.Events()[1].Name != "exception" {
+		t.Errorf("got event %v; expected child.Events()[1].Name == something went wrong", child.Events()[1])
 	}
-	if len(child.Events()[1].Attributes) != 1 {
-		t.Errorf("got event %v; expected 1 attribute in child.Events()[1].Attributes", child.Events()[1])
+	if len(child.Events()[1].Attributes) != 2 {
+		t.Errorf("got event %#v; expected 2 attribute in child.Events()[1].Attributes", child.Events()[1])
+	}
+	if child.Events()[2].Name != "sequenced particles" {
+		t.Errorf("got event %v; expected child.Events()[2].Name == sequenced particles", child.Events()[2])
+	}
+	if len(child.Events()[2].Attributes) != 1 {
+		t.Errorf("got event %v; expected 1 attribute in child.Events()[2].Attributes", child.Events()[2])
 	}
 	// Parent span is ended last
 	parent := output[2]

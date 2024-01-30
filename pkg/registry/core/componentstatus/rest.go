@@ -38,12 +38,12 @@ import (
 )
 
 type REST struct {
-	GetServersToValidate func() map[string]*Server
+	GetServersToValidate func() map[string]Server
 	rest.TableConvertor
 }
 
 // NewStorage returns a new REST.
-func NewStorage(serverRetriever func() map[string]*Server) *REST {
+func NewStorage(serverRetriever func() map[string]Server) *REST {
 	return &REST{
 		GetServersToValidate: serverRetriever,
 		TableConvertor:       printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
@@ -83,7 +83,7 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 	wait.Add(len(servers))
 	statuses := make(chan api.ComponentStatus, len(servers))
 	for k, v := range servers {
-		go func(name string, server *Server) {
+		go func(name string, server Server) {
 			defer wait.Done()
 			status := rs.getComponentStatus(name, server)
 			statuses <- *status
@@ -153,7 +153,7 @@ func ToConditionStatus(s probe.Result) api.ConditionStatus {
 	}
 }
 
-func (rs *REST) getComponentStatus(name string, server *Server) *api.ComponentStatus {
+func (rs *REST) getComponentStatus(name string, server Server) *api.ComponentStatus {
 	status, msg, err := server.DoServerCheck()
 	errorMsg := ""
 	if err != nil {

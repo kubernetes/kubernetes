@@ -36,6 +36,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,7 +80,7 @@ func TestTypeResolver(t *testing.T) {
 		}
 	}(crd)
 	discoveryResolver := &resolver.ClientDiscoveryResolver{Discovery: client.Discovery()}
-	definitionsResolver := resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, openapi.GetOpenAPIDefinitions)
+	definitionsResolver := resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme)
 	// wait until the CRD schema is published at the OpenAPI v3 endpoint
 	err = wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
 		p, err := client.OpenAPIV3().Paths()
@@ -330,7 +331,7 @@ func TestBuiltinResolution(t *testing.T) {
 	}{
 		{
 			name:     "definitions",
-			resolver: resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, openapi.GetOpenAPIDefinitions),
+			resolver: resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme),
 			scheme:   buildTestScheme(),
 		},
 		{
@@ -352,6 +353,14 @@ func TestBuiltinResolution(t *testing.T) {
 				}
 				// skip internal types
 				if gvk.Version == "__internal" {
+					continue
+				}
+				// apiextensions.k8s.io/v1beta1 not published
+				if tc.name == "discovery" && gvk.Group == "apiextensions.k8s.io" && gvk.Version == "v1beta1" {
+					continue
+				}
+				// apiextensions.k8s.io ConversionReview not published
+				if tc.name == "discovery" && gvk.Group == "apiextensions.k8s.io" && gvk.Kind == "ConversionReview" {
 					continue
 				}
 				_, err = tc.resolver.ResolveSchema(gvk)
@@ -506,5 +515,6 @@ func buildTestScheme() *runtime.Scheme {
 	_ = networkingv1.AddToScheme(scheme)
 	_ = nodev1.AddToScheme(scheme)
 	_ = storagev1.AddToScheme(scheme)
+	_ = apiextensionsscheme.AddToScheme(scheme)
 	return scheme
 }

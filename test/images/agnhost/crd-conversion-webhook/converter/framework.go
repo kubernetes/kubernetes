@@ -216,8 +216,8 @@ func addToScheme(scheme *runtime.Scheme) {
 }
 
 var serializers = map[mediaType]runtime.Serializer{
-	{"application", "json"}: json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false),
-	{"application", "yaml"}: json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme),
+	{"application", "json"}: json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Pretty: false}),
+	{"application", "yaml"}: json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Yaml: true}),
 }
 
 func getInputSerializer(contentType string) runtime.Serializer {

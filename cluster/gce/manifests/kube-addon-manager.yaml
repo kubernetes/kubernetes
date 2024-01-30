@@ -23,7 +23,7 @@ spec:
         - all
     # When updating version also bump it in:
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: registry.k8s.io/addon-manager/kube-addon-manager:v9.1.6
+    image: registry.k8s.io/addon-manager/kube-addon-manager:v9.1.7
     command:
     - /bin/bash
     - -c

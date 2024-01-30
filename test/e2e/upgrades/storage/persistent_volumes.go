@@ -84,7 +84,7 @@ func (t *PersistentVolumeUpgradeTest) Teardown(ctx context.Context, f *framework
 
 // testPod creates a pod that consumes a pv and prints it out. The output is then verified.
 func (t *PersistentVolumeUpgradeTest) testPod(ctx context.Context, f *framework.Framework, cmd string) {
-	pod := e2epod.MakePod(f.Namespace.Name, nil, []*v1.PersistentVolumeClaim{t.pvc}, false, cmd)
+	pod := e2epod.MakePod(f.Namespace.Name, nil, []*v1.PersistentVolumeClaim{t.pvc}, f.NamespacePodSecurityLevel, cmd)
 	expectedOutput := []string{pvTestData}
 	e2eoutput.TestContainerOutput(ctx, f, "pod consumes pv", pod, 0, expectedOutput)
 }

@@ -254,10 +254,10 @@ func TestGetBool(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GetBool(tt.parameters, tt.key, tt.defaultValue)
-			if err != nil && tt.expectError == false {
+			if err != nil && !tt.expectError {
 				t.Errorf("%s: unexpected error: %v", tt.name, err)
 			}
-			if err == nil && tt.expectError == true {
+			if err == nil && tt.expectError {
 				t.Errorf("%s: expect error, got nil", tt.name)
 			}
 			if got != tt.expected {

@@ -4,10 +4,10 @@ approvers:
   - andrewsykim
   - cheftako
   - deads2k
-  - lavalamp
   - liggitt
   - mtaufen
   - sttts
+  - jpbetz
 reviewers:
   - andrewsykim
   - cheftako
@@ -15,11 +15,13 @@ reviewers:
   - deads2k
   - jiahuif
   - jpbetz
-  - lavalamp
   - liggitt
   - luxas
   - mtaufen
   - sttts
+  - jpbetz
 labels:
   - sig/api-machinery
   - sig/cloud-provider
+emeritus_approvers:
+  - lavalamp

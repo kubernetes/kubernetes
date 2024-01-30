@@ -69,8 +69,10 @@ func (c *client) Connect() error {
 		klog.ErrorS(err, "Unable to connect to device plugin client with socket path", "path", c.socket)
 		return err
 	}
+	c.mutex.Lock()
 	c.grpc = conn
 	c.client = client
+	c.mutex.Unlock()
 	return c.handler.PluginConnected(c.resource, c)
 }
 

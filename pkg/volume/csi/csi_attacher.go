@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -287,7 +288,9 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if c.csiClient == nil {
 		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
 		if err != nil {
-			return errors.New(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
+			// Treat the absence of the CSI driver as a transient error
+			// See https://github.com/kubernetes/kubernetes/issues/120268
+			return volumetypes.NewTransientOperationFailure(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
 		}
 	}
 	csi := c.csiClient
@@ -339,9 +342,10 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+	if err = filesystem.MkdirAllWithPathCheck(deviceMountPath, 0750); err != nil {
 		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
+
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 	dataDir := filepath.Dir(deviceMountPath)
 	data := map[string]string{
@@ -607,7 +611,9 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	if c.csiClient == nil {
 		c.csiClient, err = newCsiDriverClient(csiDriverName(driverName))
 		if err != nil {
-			return errors.New(log("attacher.UnmountDevice failed to create newCsiDriverClient: %v", err))
+			// Treat the absence of the CSI driver as a transient error
+			// See https://github.com/kubernetes/kubernetes/issues/120268
+			return volumetypes.NewTransientOperationFailure(log("attacher.UnmountDevice failed to create newCsiDriverClient: %v", err))
 		}
 	}
 	csi := c.csiClient

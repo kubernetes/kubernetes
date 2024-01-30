@@ -17,47 +17,53 @@ package global // import "go.opentelemetry.io/otel/internal/global"
 import (
 	"log"
 	"os"
-	"sync"
+	"sync/atomic"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/stdr"
 )
 
-// globalLogger is the logging interface used within the otel api and sdk provide deatails of the internals.
+// globalLogger is the logging interface used within the otel api and sdk provide details of the internals.
 //
 // The default logger uses stdr which is backed by the standard `log.Logger`
 // interface. This logger will only show messages at the Error Level.
-var globalLogger logr.Logger = stdr.New(log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile))
-var globalLoggerLock = &sync.RWMutex{}
+var globalLogger atomic.Pointer[logr.Logger]
+
+func init() {
+	SetLogger(stdr.New(log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)))
+}
 
 // SetLogger overrides the globalLogger with l.
 //
-// To see Info messages use a logger with `l.V(1).Enabled() == true`
-// To see Debug messages use a logger with `l.V(5).Enabled() == true`.
+// To see Warn messages use a logger with `l.V(1).Enabled() == true`
+// To see Info messages use a logger with `l.V(4).Enabled() == true`
+// To see Debug messages use a logger with `l.V(8).Enabled() == true`.
 func SetLogger(l logr.Logger) {
-	globalLoggerLock.Lock()
-	defer globalLoggerLock.Unlock()
-	globalLogger = l
+	globalLogger.Store(&l)
+}
+
+func getLogger() logr.Logger {
+	return *globalLogger.Load()
 }
 
 // Info prints messages about the general state of the API or SDK.
-// This should usually be less then 5 messages a minute.
+// This should usually be less than 5 messages a minute.
 func Info(msg string, keysAndValues ...interface{}) {
-	globalLoggerLock.RLock()
-	defer globalLoggerLock.RUnlock()
-	globalLogger.V(1).Info(msg, keysAndValues...)
+	getLogger().V(4).Info(msg, keysAndValues...)
 }
 
 // Error prints messages about exceptional states of the API or SDK.
 func Error(err error, msg string, keysAndValues ...interface{}) {
-	globalLoggerLock.RLock()
-	defer globalLoggerLock.RUnlock()
-	globalLogger.Error(err, msg, keysAndValues...)
+	getLogger().Error(err, msg, keysAndValues...)
 }
 
 // Debug prints messages about all internal changes in the API or SDK.
 func Debug(msg string, keysAndValues ...interface{}) {
-	globalLoggerLock.RLock()
-	defer globalLoggerLock.RUnlock()
-	globalLogger.V(5).Info(msg, keysAndValues...)
+	getLogger().V(8).Info(msg, keysAndValues...)
+}
+
+// Warn prints messages about warnings in the API or SDK.
+// Not an error but is likely more important than an informational event.
+func Warn(msg string, keysAndValues ...interface{}) {
+	getLogger().V(1).Info(msg, keysAndValues...)
 }

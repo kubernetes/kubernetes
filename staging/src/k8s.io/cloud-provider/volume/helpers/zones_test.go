@@ -784,7 +784,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 					t.Errorf("Unexpected error from SelectZoneForVolume for %s; Error: %v", test.Name, err)
 				}
 
-				if test.ExpectSpecificZone == true {
+				if test.ExpectSpecificZone {
 					if zone != test.ExpectedZone {
 						t.Errorf("Expected zone %v does not match obtained zone %v for %s", test.ExpectedZone, zone, test.Name)
 					}

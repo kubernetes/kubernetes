@@ -22,10 +22,13 @@ import (
 	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
@@ -46,15 +49,21 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 		}
 
 		updatedOrNewSecret := bootstraptokenv1.BootstrapTokenToSecret(&token)
-		// Try to create or update the token with an exponential backoff
-		err = apiclient.TryRunCommand(func() error {
-			if err := apiclient.CreateOrUpdateSecret(client, updatedOrNewSecret); err != nil {
-				return errors.Wrapf(err, "failed to create or update bootstrap token with name %s", secretName)
-			}
-			return nil
-		}, 5)
+
+		var lastError error
+		err = wait.PollUntilContextTimeout(
+			context.Background(),
+			kubeadmconstants.KubernetesAPICallRetryInterval,
+			kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+			true, func(_ context.Context) (bool, error) {
+				if err := apiclient.CreateOrUpdateSecret(client, updatedOrNewSecret); err != nil {
+					lastError = errors.Wrapf(err, "failed to create or update bootstrap token with name %s", secretName)
+					return false, nil
+				}
+				return true, nil
+			})
 		if err != nil {
-			return err
+			return lastError
 		}
 	}
 	return nil

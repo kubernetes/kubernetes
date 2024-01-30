@@ -26,7 +26,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -184,11 +183,6 @@ func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	addPodConditionReady(pod, metav1.Now())
 	_, err := c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 	return err
-}
-
-func intOrStrP(num int) *intstr.IntOrString {
-	intstr := intstr.FromInt(num)
-	return &intstr
 }
 
 // markUpdatedPodsReady manually marks updated Deployment pods status to ready,

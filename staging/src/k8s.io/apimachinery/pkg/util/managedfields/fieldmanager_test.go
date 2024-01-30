@@ -183,14 +183,14 @@ func TestVersionCheck(t *testing.T) {
 		t.Fatalf("error decoding YAML: %v", err)
 	}
 
-	// patch has 'apiVersion: apps/v2' but live version is apps/v1 -> error
+	// patch has 'apiVersion: apps/v1beta1' but live version is apps/v1 -> error
 	err = f.Apply(appliedObj, "fieldmanager_test", false)
 	if err == nil {
 		t.Fatalf("expected an error from mismatched patch and live versions")
 	}
 	switch typ := err.(type) {
 	default:
-		t.Fatalf("expected error to be of type %T was %T", apierrors.StatusError{}, typ)
+		t.Fatalf("expected error to be of type %T was %T (%v)", apierrors.StatusError{}, typ, err)
 	case apierrors.APIStatus:
 		if typ.Status().Code != http.StatusBadRequest {
 			t.Fatalf("expected status code to be %d but was %d",
@@ -198,6 +198,7 @@ func TestVersionCheck(t *testing.T) {
 		}
 	}
 }
+
 func TestVersionCheckDoesNotPanic(t *testing.T) {
 	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
@@ -228,7 +229,7 @@ func TestVersionCheckDoesNotPanic(t *testing.T) {
 	}
 	switch typ := err.(type) {
 	default:
-		t.Fatalf("expected error to be of type %T was %T", apierrors.StatusError{}, typ)
+		t.Fatalf("expected error to be of type %T was %T (%v)", apierrors.StatusError{}, typ, err)
 	case apierrors.APIStatus:
 		if typ.Status().Code != http.StatusBadRequest {
 			t.Fatalf("expected status code to be %d but was %d",

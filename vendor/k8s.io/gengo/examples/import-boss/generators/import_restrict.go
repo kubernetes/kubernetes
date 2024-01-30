@@ -64,7 +64,7 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 	}
 
 	for _, p := range c.Universe {
-		if !arguments.InputIncludes(p) {
+		if !inputIncludes(arguments.InputDirs, p) {
 			// Don't run on e.g. third party dependencies.
 			continue
 		}
@@ -87,6 +87,30 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 	}
 
 	return pkgs
+}
+
+// inputIncludes returns true if the given package is a (sub) package of one of
+// the InputDirs.
+func inputIncludes(inputs []string, p *types.Package) bool {
+	// TODO: This does not handle conversion of local paths (./foo) into
+	// canonical packages (github.com/example/project/foo).
+	for _, input := range inputs {
+		// Normalize paths
+		input := strings.TrimSuffix(input, "/")
+		input = strings.TrimPrefix(input, "./vendor/")
+		seek := strings.TrimSuffix(p.Path, "/")
+
+		if input == seek {
+			return true
+		}
+		if strings.HasSuffix(input, "...") {
+			input = strings.TrimSuffix(input, "...")
+			if strings.HasPrefix(seek+"/", input) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // A single import restriction rule.

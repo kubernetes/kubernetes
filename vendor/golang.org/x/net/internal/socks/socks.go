@@ -289,7 +289,7 @@ func (up *UsernamePassword) Authenticate(ctx context.Context, rw io.ReadWriter, 
 	case AuthMethodNotRequired:
 		return nil
 	case AuthMethodUsernamePassword:
-		if len(up.Username) == 0 || len(up.Username) > 255 || len(up.Password) == 0 || len(up.Password) > 255 {
+		if len(up.Username) == 0 || len(up.Username) > 255 || len(up.Password) > 255 {
 			return errors.New("invalid username/password")
 		}
 		b := []byte{authUsernamePasswordVersion}

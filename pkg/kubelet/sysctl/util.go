@@ -17,38 +17,9 @@ limitations under the License.
 package sysctl
 
 import (
-	"strings"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 )
-
-// convertSysctlVariableToDotsSeparator can return sysctl variables in dots separator format.
-// The '/' separator is also accepted in place of a '.'.
-// Convert the sysctl variables to dots separator format for validation.
-// More info:
-//
-//	https://man7.org/linux/man-pages/man8/sysctl.8.html
-//	https://man7.org/linux/man-pages/man5/sysctl.d.5.html
-func convertSysctlVariableToDotsSeparator(val string) string {
-	if val == "" {
-		return val
-	}
-	firstSepIndex := strings.IndexAny(val, "./")
-	if firstSepIndex == -1 || val[firstSepIndex] == '.' {
-		return val
-	}
-
-	f := func(r rune) rune {
-		switch r {
-		case '.':
-			return '/'
-		case '/':
-			return '.'
-		}
-		return r
-	}
-	return strings.Map(f, val)
-}
 
 // ConvertPodSysctlsVariableToDotsSeparator converts sysctls variable in the Pod.Spec.SecurityContext.Sysctls slice into a dot as a separator
 // according to the linux sysctl conversion rules.
@@ -58,7 +29,7 @@ func ConvertPodSysctlsVariableToDotsSeparator(securityContext *v1.PodSecurityCon
 		return
 	}
 	for i, sysctl := range securityContext.Sysctls {
-		securityContext.Sysctls[i].Name = convertSysctlVariableToDotsSeparator(sysctl.Name)
+		securityContext.Sysctls[i].Name = utilsysctl.NormalizeName(sysctl.Name)
 	}
 	return
 }

@@ -3,6 +3,7 @@
 reviewers:
   - sig-network-reviewers
   - andrewsykim
+  - aroradaman
   - uablrek
 approvers:
   - sig-network-approvers

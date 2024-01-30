@@ -29,40 +29,39 @@ import (
 // DefinitionsSchemaResolver resolves the schema of a built-in type
 // by looking up the OpenAPI definitions.
 type DefinitionsSchemaResolver struct {
-	defs        map[string]common.OpenAPIDefinition
-	gvkToSchema map[schema.GroupVersionKind]*spec.Schema
+	defs     map[string]common.OpenAPIDefinition
+	gvkToRef map[schema.GroupVersionKind]string
 }
 
 // NewDefinitionsSchemaResolver creates a new DefinitionsSchemaResolver.
 // An example working setup:
-// scheme         = "k8s.io/client-go/kubernetes/scheme".Scheme
 // getDefinitions = "k8s.io/kubernetes/pkg/generated/openapi".GetOpenAPIDefinitions
-func NewDefinitionsSchemaResolver(scheme *runtime.Scheme, getDefinitions common.GetOpenAPIDefinitions) *DefinitionsSchemaResolver {
-	gvkToSchema := make(map[schema.GroupVersionKind]*spec.Schema)
-	namer := openapi.NewDefinitionNamer(scheme)
+// scheme         = "k8s.io/client-go/kubernetes/scheme".Scheme
+func NewDefinitionsSchemaResolver(getDefinitions common.GetOpenAPIDefinitions, schemes ...*runtime.Scheme) *DefinitionsSchemaResolver {
+	gvkToRef := make(map[schema.GroupVersionKind]string)
+	namer := openapi.NewDefinitionNamer(schemes...)
 	defs := getDefinitions(func(path string) spec.Ref {
 		return spec.MustCreateRef(path)
 	})
-	for name, def := range defs {
+	for name := range defs {
 		_, e := namer.GetDefinitionName(name)
 		gvks := extensionsToGVKs(e)
-		s := def.Schema // map value not addressable, make copy
 		for _, gvk := range gvks {
-			gvkToSchema[gvk] = &s
+			gvkToRef[gvk] = name
 		}
 	}
 	return &DefinitionsSchemaResolver{
-		gvkToSchema: gvkToSchema,
-		defs:        defs,
+		gvkToRef: gvkToRef,
+		defs:     defs,
 	}
 }
 
 func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.Schema, error) {
-	s, ok := d.gvkToSchema[gvk]
+	ref, ok := d.gvkToRef[gvk]
 	if !ok {
 		return nil, fmt.Errorf("cannot resolve %v: %w", gvk, ErrSchemaNotFound)
 	}
-	s, err := populateRefs(func(ref string) (*spec.Schema, bool) {
+	s, err := PopulateRefs(func(ref string) (*spec.Schema, bool) {
 		// find the schema by the ref string, and return a deep copy
 		def, ok := d.defs[ref]
 		if !ok {
@@ -70,7 +69,7 @@ func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (
 		}
 		s := def.Schema
 		return &s, true
-	}, s)
+	}, ref)
 	if err != nil {
 		return nil, err
 	}

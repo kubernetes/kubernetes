@@ -54,7 +54,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
 			},
@@ -73,7 +73,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
 			},
@@ -170,7 +170,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 
 func getPVCWithAllocatedResource(pvcSize, allocatedSize string) *core.PersistentVolumeClaim {
 	validPVCWithAllocatedResources := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceStorage: resource.MustParse(pvcSize),
 			},

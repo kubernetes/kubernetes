@@ -24,8 +24,6 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::verify_go_version
-
 cd "${KUBE_ROOT}"
 if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- 'staging/src/k8s.io/api/**/*beta*/doc.go'; then
   echo "!!! Some beta packages doc.go do not include prerelease-lifecycle tags."

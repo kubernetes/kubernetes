@@ -1,6 +1,13 @@
 //go:build windows
 // +build windows
 
+// Windows backend based on ReadDirectoryChangesW()
+//
+// https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw
+//
+// Note: the documentation on the Watcher type and methods is generated from
+// mkdoc.zsh
+
 package fsnotify
 
 import (
@@ -27,9 +34,9 @@ import (
 // When a file is removed a Remove event won't be emitted until all file
 // descriptors are closed, and deletes will always emit a Chmod. For example:
 //
-//     fp := os.Open("file")
-//     os.Remove("file")        // Triggers Chmod
-//     fp.Close()               // Triggers Remove
+//	fp := os.Open("file")
+//	os.Remove("file")        // Triggers Chmod
+//	fp.Close()               // Triggers Remove
 //
 // This is the event that inotify sends, so not much can be changed about this.
 //
@@ -43,16 +50,16 @@ import (
 //
 // To increase them you can use sysctl or write the value to the /proc file:
 //
-//     # Default values on Linux 5.18
-//     sysctl fs.inotify.max_user_watches=124983
-//     sysctl fs.inotify.max_user_instances=128
+//	# Default values on Linux 5.18
+//	sysctl fs.inotify.max_user_watches=124983
+//	sysctl fs.inotify.max_user_instances=128
 //
 // To make the changes persist on reboot edit /etc/sysctl.conf or
 // /usr/lib/sysctl.d/50-default.conf (details differ per Linux distro; check
 // your distro's documentation):
 //
-//     fs.inotify.max_user_watches=124983
-//     fs.inotify.max_user_instances=128
+//	fs.inotify.max_user_watches=124983
+//	fs.inotify.max_user_instances=128
 //
 // Reaching the limit will result in a "no space left on device" or "too many open
 // files" error.
@@ -68,14 +75,20 @@ import (
 // control the maximum number of open files, as well as /etc/login.conf on BSD
 // systems.
 //
-// # macOS notes
+// # Windows notes
 //
-// Spotlight indexing on macOS can result in multiple events (see [#15]). A
-// temporary workaround is to add your folder(s) to the "Spotlight Privacy
-// Settings" until we have a native FSEvents implementation (see [#11]).
+// Paths can be added as "C:\path\to\dir", but forward slashes
+// ("C:/path/to/dir") will also work.
 //
-// [#11]: https://github.com/fsnotify/fsnotify/issues/11
-// [#15]: https://github.com/fsnotify/fsnotify/issues/15
+// When a watched directory is removed it will always send an event for the
+// directory itself, but may not send events for all files in that directory.
+// Sometimes it will send events for all times, sometimes it will send no
+// events, and often only for some files.
+//
+// The default ReadDirectoryChangesW() buffer size is 64K, which is the largest
+// value that is guaranteed to work with SMB filesystems. If you have many
+// events in quick succession this may not be enough, and you will have to use
+// [WithBufferSize] to increase the value.
 type Watcher struct {
 	// Events sends the filesystem change events.
 	//
@@ -102,31 +115,52 @@ type Watcher struct {
 	//                      initiated by the user may show up as one or multiple
 	//                      writes, depending on when the system syncs things to
 	//                      disk. For example when compiling a large Go program
-	//                      you may get hundreds of Write events, so you
-	//                      probably want to wait until you've stopped receiving
-	//                      them (see the dedup example in cmd/fsnotify).
+	//                      you may get hundreds of Write events, and you may
+	//                      want to wait until you've stopped receiving them
+	//                      (see the dedup example in cmd/fsnotify).
+	//
+	//                      Some systems may send Write event for directories
+	//                      when the directory content changes.
 	//
 	//   fsnotify.Chmod     Attributes were changed. On Linux this is also sent
 	//                      when a file is removed (or more accurately, when a
 	//                      link to an inode is removed). On kqueue it's sent
-	//                      and on kqueue when a file is truncated. On Windows
-	//                      it's never sent.
+	//                      when a file is truncated. On Windows it's never
+	//                      sent.
 	Events chan Event
 
 	// Errors sends any errors.
+	//
+	// ErrEventOverflow is used to indicate there are too many events:
+	//
+	//  - inotify:      There are too many queued events (fs.inotify.max_queued_events sysctl)
+	//  - windows:      The buffer size is too small; WithBufferSize() can be used to increase it.
+	//  - kqueue, fen:  Not used.
 	Errors chan error
 
 	port  windows.Handle // Handle to completion port
 	input chan *input    // Inputs to the reader are sent on this channel
 	quit  chan chan<- error
 
-	mu       sync.Mutex // Protects access to watches, isClosed
-	watches  watchMap   // Map of watches (key: i-number)
-	isClosed bool       // Set to true when Close() is first called
+	mu      sync.Mutex // Protects access to watches, closed
+	watches watchMap   // Map of watches (key: i-number)
+	closed  bool       // Set to true when Close() is first called
 }
 
 // NewWatcher creates a new Watcher.
 func NewWatcher() (*Watcher, error) {
+	return NewBufferedWatcher(50)
+}
+
+// NewBufferedWatcher creates a new Watcher with a buffered Watcher.Events
+// channel.
+//
+// The main use case for this is situations with a very large number of events
+// where the kernel buffer size can't be increased (e.g. due to lack of
+// permissions). An unbuffered Watcher will perform better for almost all use
+// cases, and whenever possible you will be better off increasing the kernel
+// buffers instead of adding a large userspace buffer.
+func NewBufferedWatcher(sz uint) (*Watcher, error) {
 	port, err := windows.CreateIoCompletionPort(windows.InvalidHandle, 0, 0, 0)
 	if err != nil {
 		return nil, os.NewSyscallError("CreateIoCompletionPort", err)
@@ -135,12 +169,18 @@ func NewWatcher() (*Watcher, error) {
 		port:    port,
 		watches: make(watchMap),
 		input:   make(chan *input, 1),
-		Events:  make(chan Event, 50),
+		Events:  make(chan Event, sz),
 		Errors:  make(chan error),
 		quit:    make(chan chan<- error, 1),
 	}
 	go w.readEvents()
 	return w, nil
+}
+
+func (w *Watcher) isClosed() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.closed
 }
 
 func (w *Watcher) sendEvent(name string, mask uint64) bool {
@@ -167,14 +207,14 @@ func (w *Watcher) sendError(err error) bool {
 	return false
 }
 
-// Close removes all watches and closes the events channel.
+// Close removes all watches and closes the Events channel.
 func (w *Watcher) Close() error {
-	w.mu.Lock()
-	if w.isClosed {
-		w.mu.Unlock()
+	if w.isClosed() {
 		return nil
 	}
-	w.isClosed = true
+
+	w.mu.Lock()
+	w.closed = true
 	w.mu.Unlock()
 
 	// Send "quit" message to the reader goroutine
@@ -188,16 +228,20 @@ func (w *Watcher) Close() error {
 
 // Add starts monitoring the path for changes.
 //
-// A path can only be watched once; attempting to watch it more than once will
-// return an error. Paths that do not yet exist on the filesystem cannot be
-// added. A watch will be automatically removed if the path is deleted.
+// A path can only be watched once; watching it more than once is a no-op and will
+// not return an error. Paths that do not yet exist on the filesystem cannot be
+// watched.
 //
-// A path will remain watched if it gets renamed to somewhere else on the same
-// filesystem, but the monitor will get removed if the path gets deleted and
-// re-created, or if it's moved to a different filesystem.
+// A watch will be automatically removed if the watched path is deleted or
+// renamed. The exception is the Windows backend, which doesn't remove the
+// watcher on renames.
 //
 // Notifications on network filesystems (NFS, SMB, FUSE, etc.) or special
 // filesystems (/proc, /sys, etc.) generally don't work.
+//
+// Returns [ErrClosed] if [Watcher.Close] was called.
+//
+// See [Watcher.AddWith] for a version that allows adding options.
 //
 // # Watching directories
 //
@@ -208,27 +252,41 @@ func (w *Watcher) Close() error {
 // # Watching files
 //
 // Watching individual files (rather than directories) is generally not
-// recommended as many tools update files atomically. Instead of "just" writing
-// to the file a temporary file will be written to first, and if successful the
-// temporary file is moved to to destination removing the original, or some
-// variant thereof. The watcher on the original file is now lost, as it no
-// longer exists.
+// recommended as many programs (especially editors) update files atomically: it
+// will write to a temporary file which is then moved to to destination,
+// overwriting the original (or some variant thereof). The watcher on the
+// original file is now lost, as that no longer exists.
 //
-// Instead, watch the parent directory and use Event.Name to filter out files
-// you're not interested in. There is an example of this in [cmd/fsnotify/file.go].
-func (w *Watcher) Add(name string) error {
-	w.mu.Lock()
-	if w.isClosed {
-		w.mu.Unlock()
-		return errors.New("watcher already closed")
+// The upshot of this is that a power failure or crash won't leave a
+// half-written file.
+//
+// Watch the parent directory and use Event.Name to filter out files you're not
+// interested in. There is an example of this in cmd/fsnotify/file.go.
+func (w *Watcher) Add(name string) error { return w.AddWith(name) }
+
+// AddWith is like [Watcher.Add], but allows adding options. When using Add()
+// the defaults described below are used.
+//
+// Possible options are:
+//
+//   - [WithBufferSize] sets the buffer size for the Windows backend; no-op on
+//     other platforms. The default is 64K (65536 bytes).
+func (w *Watcher) AddWith(name string, opts ...addOpt) error {
+	if w.isClosed() {
+		return ErrClosed
 	}
-	w.mu.Unlock()
+
+	with := getOptions(opts...)
+	if with.bufsize < 4096 {
+		return fmt.Errorf("fsnotify.WithBufferSize: buffer size cannot be smaller than 4096 bytes")
+	}
 
 	in := &input{
-		op:    opAddWatch,
-		path:  filepath.Clean(name),
-		flags: sysFSALLEVENTS,
-		reply: make(chan error),
+		op:      opAddWatch,
+		path:    filepath.Clean(name),
+		flags:   sysFSALLEVENTS,
+		reply:   make(chan error),
+		bufsize: with.bufsize,
 	}
 	w.input <- in
 	if err := w.wakeupReader(); err != nil {
@@ -243,7 +301,13 @@ func (w *Watcher) Add(name string) error {
 // /tmp/dir and /tmp/dir/subdir then you will need to remove both.
 //
 // Removing a path that has not yet been added returns [ErrNonExistentWatch].
+//
+// Returns nil if [Watcher.Close] was called.
 func (w *Watcher) Remove(name string) error {
+	if w.isClosed() {
+		return nil
+	}
+
 	in := &input{
 		op:    opRemoveWatch,
 		path:  filepath.Clean(name),
@@ -256,8 +320,15 @@ func (w *Watcher) Remove(name string) error {
 	return <-in.reply
 }
 
-// WatchList returns all paths added with [Add] (and are not yet removed).
+// WatchList returns all paths explicitly added with [Watcher.Add] (and are not
+// yet removed).
+//
+// Returns nil if [Watcher.Close] was called.
 func (w *Watcher) WatchList() []string {
+	if w.isClosed() {
+		return nil
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -279,7 +350,6 @@ func (w *Watcher) WatchList() []string {
 // This should all be removed at some point, and just use windows.FILE_NOTIFY_*
 const (
 	sysFSALLEVENTS  = 0xfff
-	sysFSATTRIB     = 0x4
 	sysFSCREATE     = 0x100
 	sysFSDELETE     = 0x200
 	sysFSDELETESELF = 0x400
@@ -305,9 +375,6 @@ func (w *Watcher) newEvent(name string, mask uint32) Event {
 	if mask&sysFSMOVE == sysFSMOVE || mask&sysFSMOVESELF == sysFSMOVESELF || mask&sysFSMOVEDFROM == sysFSMOVEDFROM {
 		e.Op |= Rename
 	}
-	if mask&sysFSATTRIB == sysFSATTRIB {
-		e.Op |= Chmod
-	}
 	return e
 }
 
@@ -321,10 +388,11 @@ const (
 )
 
 type input struct {
-	op    int
-	path  string
-	flags uint32
-	reply chan error
+	op      int
+	path    string
+	flags   uint32
+	bufsize int
+	reply   chan error
 }
 
 type inode struct {
@@ -334,13 +402,14 @@ type inode struct {
 }
 
 type watch struct {
-	ov     windows.Overlapped
-	ino    *inode            // i-number
-	path   string            // Directory path
-	mask   uint64            // Directory itself is being watched with these notify flags
-	names  map[string]uint64 // Map of names being watched and their notify flags
-	rename string            // Remembers the old name while renaming a file
-	buf    [65536]byte       // 64K buffer
+	ov      windows.Overlapped
+	ino     *inode            // i-number
+	recurse bool              // Recursive watch?
+	path    string            // Directory path
+	mask    uint64            // Directory itself is being watched with these notify flags
+	names   map[string]uint64 // Map of names being watched and their notify flags
+	rename  string            // Remembers the old name while renaming a file
+	buf     []byte            // buffer, allocated later
 }
 
 type (
@@ -413,7 +482,10 @@ func (m watchMap) set(ino *inode, watch *watch) {
 }
 
 // Must run within the I/O thread.
-func (w *Watcher) addWatch(pathname string, flags uint64) error {
+func (w *Watcher) addWatch(pathname string, flags uint64, bufsize int) error {
+	//pathname, recurse := recursivePath(pathname)
+	recurse := false
+
 	dir, err := w.getDir(pathname)
 	if err != nil {
 		return err
@@ -433,9 +505,11 @@ func (w *Watcher) addWatch(pathname string, flags uint64) error {
 			return os.NewSyscallError("CreateIoCompletionPort", err)
 		}
 		watchEntry = &watch{
-			ino:   ino,
-			path:  dir,
-			names: make(map[string]uint64),
+			ino:     ino,
+			path:    dir,
+			names:   make(map[string]uint64),
+			recurse: recurse,
+			buf:     make([]byte, bufsize),
 		}
 		w.mu.Lock()
 		w.watches.set(ino, watchEntry)
@@ -465,6 +539,8 @@ func (w *Watcher) addWatch(pathname string, flags uint64) error {
 
 // Must run within the I/O thread.
 func (w *Watcher) remWatch(pathname string) error {
+	pathname, recurse := recursivePath(pathname)
+
 	dir, err := w.getDir(pathname)
 	if err != nil {
 		return err
@@ -477,6 +553,10 @@ func (w *Watcher) remWatch(pathname string) error {
 	w.mu.Lock()
 	watch := w.watches.get(ino)
 	w.mu.Unlock()
+
+	if recurse && !watch.recurse {
+		return fmt.Errorf("can't use \\... with non-recursive watch %q", pathname)
+	}
 
 	err = windows.CloseHandle(ino.handle)
 	if err != nil {
@@ -535,8 +615,11 @@ func (w *Watcher) startRead(watch *watch) error {
 		return nil
 	}
 
-	rdErr := windows.ReadDirectoryChanges(watch.ino.handle, &watch.buf[0],
-		uint32(unsafe.Sizeof(watch.buf)), false, mask, nil, &watch.ov, 0)
+	// We need to pass the array, rather than the slice.
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&watch.buf))
+	rdErr := windows.ReadDirectoryChanges(watch.ino.handle,
+		(*byte)(unsafe.Pointer(hdr.Data)), uint32(hdr.Len),
+		watch.recurse, mask, nil, &watch.ov, 0)
 	if rdErr != nil {
 		err := os.NewSyscallError("ReadDirectoryChanges", rdErr)
 		if rdErr == windows.ERROR_ACCESS_DENIED && watch.mask&provisional == 0 {
@@ -563,9 +646,8 @@ func (w *Watcher) readEvents() {
 	runtime.LockOSThread()
 
 	for {
+		// This error is handled after the watch == nil check below.
 		qErr := windows.GetQueuedCompletionStatus(w.port, &n, &key, &ov, windows.INFINITE)
-		// This error is handled after the watch == nil check below. NOTE: this
-		// seems odd, note sure if it's correct.
 
 		watch := (*watch)(unsafe.Pointer(ov))
 		if watch == nil {
@@ -595,7 +677,7 @@ func (w *Watcher) readEvents() {
 			case in := <-w.input:
 				switch in.op {
 				case opAddWatch:
-					in.reply <- w.addWatch(in.path, uint64(in.flags))
+					in.reply <- w.addWatch(in.path, uint64(in.flags), in.bufsize)
 				case opRemoveWatch:
 					in.reply <- w.remWatch(in.path)
 				}
@@ -605,6 +687,8 @@ func (w *Watcher) readEvents() {
 		}
 
 		switch qErr {
+		case nil:
+			// No error
 		case windows.ERROR_MORE_DATA:
 			if watch == nil {
 				w.sendError(errors.New("ERROR_MORE_DATA has unexpectedly null lpOverlapped buffer"))
@@ -626,13 +710,12 @@ func (w *Watcher) readEvents() {
 		default:
 			w.sendError(os.NewSyscallError("GetQueuedCompletionPort", qErr))
 			continue
-		case nil:
 		}
 
 		var offset uint32
 		for {
 			if n == 0 {
-				w.sendError(errors.New("short read in readEvents()"))
+				w.sendError(ErrEventOverflow)
 				break
 			}
 
@@ -703,8 +786,9 @@ func (w *Watcher) readEvents() {
 
 			// Error!
 			if offset >= n {
+				//lint:ignore ST1005 Windows should be capitalized
 				w.sendError(errors.New(
-					"Windows system assumed buffer larger than it is, events have likely been missed."))
+					"Windows system assumed buffer larger than it is, events have likely been missed"))
 				break
 			}
 		}
@@ -719,9 +803,6 @@ func (w *Watcher) toWindowsFlags(mask uint64) uint32 {
 	var m uint32
 	if mask&sysFSMODIFY != 0 {
 		m |= windows.FILE_NOTIFY_CHANGE_LAST_WRITE
-	}
-	if mask&sysFSATTRIB != 0 {
-		m |= windows.FILE_NOTIFY_CHANGE_ATTRIBUTES
 	}
 	if mask&(sysFSMOVE|sysFSCREATE|sysFSDELETE) != 0 {
 		m |= windows.FILE_NOTIFY_CHANGE_FILE_NAME | windows.FILE_NOTIFY_CHANGE_DIR_NAME

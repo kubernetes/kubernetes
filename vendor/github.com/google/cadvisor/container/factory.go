@@ -93,6 +93,14 @@ var AllMetrics = MetricSet{
 	OOMMetrics:                     struct{}{},
 }
 
+// AllNetworkMetrics represents all network metrics that cAdvisor supports.
+var AllNetworkMetrics = MetricSet{
+	NetworkUsageMetrics:            struct{}{},
+	NetworkTcpUsageMetrics:         struct{}{},
+	NetworkAdvancedTcpUsageMetrics: struct{}{},
+	NetworkUdpUsageMetrics:         struct{}{},
+}
+
 func (mk MetricKind) String() string {
 	return string(mk)
 }
@@ -102,6 +110,15 @@ type MetricSet map[MetricKind]struct{}
 func (ms MetricSet) Has(mk MetricKind) bool {
 	_, exists := ms[mk]
 	return exists
+}
+
+func (ms MetricSet) HasAny(ms1 MetricSet) bool {
+	for m := range ms1 {
+		if _, ok := ms[m]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (ms MetricSet) add(mk MetricKind) {
@@ -199,7 +216,9 @@ func InitializePlugins(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includ
 	for name, plugin := range plugins {
 		watcher, err := plugin.Register(factory, fsInfo, includedMetrics)
 		if err != nil {
-			klog.V(5).Infof("Registration of the %s container factory failed: %v", name, err)
+			klog.Infof("Registration of the %s container factory failed: %v", name, err)
+		} else {
+			klog.Infof("Registration of the %s container factory successfully", name)
 		}
 		if watcher != nil {
 			containerWatchers = append(containerWatchers, watcher)

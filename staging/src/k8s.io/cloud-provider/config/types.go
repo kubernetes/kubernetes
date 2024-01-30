@@ -65,7 +65,7 @@ type KubeCloudSharedConfiguration struct {
 	AllowUntaggedCloud bool
 	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
 	RouteReconciliationPeriod metav1.Duration
-	// nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
+	// nodeMonitorPeriod is the period for syncing NodeStatus in CloudNodeLifecycleController.
 	NodeMonitorPeriod metav1.Duration
 	// clusterName is the instance prefix for the cluster.
 	ClusterName string

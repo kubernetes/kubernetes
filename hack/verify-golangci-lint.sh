@@ -26,6 +26,8 @@ Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flag
    -a: automatically select the common base of origin/master and HEAD
        as revision
    -s: select a strict configuration for new code
+   -n: in addition to strict checking, also enable hints (aka nits) that may are may not
+       be useful
    -g <github action file>: also write results with --out-format=github-actions
        to a separate file
    -c <config|"none">: use the specified configuration or none instead of the default hack/golangci.yaml
@@ -47,20 +49,13 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 invocation=(./hack/verify-golangci-lint.sh "$@")
-
-# The logcheck plugin currently has to be configured via env variables
-# (https://github.com/golangci/golangci-lint/issues/1512).
-#
-# Remember to clean the golangci-lint cache when changing
-# the configuration and running this script multiple times,
-# otherwise golangci-lint will report stale results:
-# _output/local/bin/golangci-lint cache clean
-golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golangci-lint" run)
+golangci=("${GOBIN}/golangci-lint" run)
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 strict=
+hints=
 githubactions=
-while getopts "ar:sg:c:" o; do
+while getopts "ar:sng:c:" o; do
   case "${o}" in
     a)
       base="$(git merge-base origin/master HEAD)"
@@ -76,6 +71,10 @@ while getopts "ar:sg:c:" o; do
     s)
       golangci_config="${KUBE_ROOT}/hack/golangci-strict.yaml"
       strict=1
+      ;;
+    n)
+      golangci_config="${KUBE_ROOT}/hack/golangci-hints.yaml"
+      hints=1
       ;;
     g)
       githubactions="${OPTARG}"
@@ -93,8 +92,17 @@ while getopts "ar:sg:c:" o; do
   esac
 done
 
-if [ "${golangci_config}" ]; then
-    golangci+=(--config="${golangci_config}")
+# Below the output of golangci-lint is going to be piped into sed to add
+# a prefix to each output line. This helps make the output more visible
+# in the Prow log viewer ("error" is a key word there) and ensures that
+# only those lines get included as failure message in a JUnit file
+# by "make verify".
+#
+# The downside is that the automatic detection whether to colorize output
+# doesn't work anymore, so here we force it ourselves when connected to
+# a tty.
+if tty -s; then
+    golangci+=(--color=always)
 fi
 
 if [ "$base" ]; then
@@ -133,21 +141,37 @@ pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   fi
 popd >/dev/null
 
+if [ "${golangci_config}" ]; then
+  # The relative path to _output/local/bin only works if that actually is the
+  # GOBIN. If not, then we have to make a temporary copy of the config and
+  # replace the path with an absolute one. This could be done also
+  # unconditionally, but the invocation that is printed below is nicer if we
+  # don't to do it when not required.
+  if grep -q 'path: ../_output/local/bin/' "${golangci_config}" &&
+     [ "${GOBIN}" != "${KUBE_ROOT}/_output/local/bin" ]; then
+    kube::util::ensure-temp-dir
+    patched_golangci_config="${KUBE_TEMP}/$(basename "${golangci_config}")"
+    sed -e "s;path: ../_output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
+    golangci_config="${patched_golangci_config}"
+  fi
+  golangci+=(--config="${golangci_config}")
+fi
+
 cd "${KUBE_ROOT}"
 
 res=0
 run () {
   if [[ "${#targets[@]}" -gt 0 ]]; then
     echo "running ${golangci[*]} ${targets[*]}" >&2
-    "${golangci[@]}" "${targets[@]}" >&2 || res=$?
+    "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
   else
     echo "running ${golangci[*]} ./..." >&2
-    "${golangci[@]}" ./... >&2 || res=$?
+    "${golangci[@]}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
     for d in staging/src/k8s.io/*; do
       MODPATH="staging/src/k8s.io/$(basename "${d}")"
       echo "running ( cd ${KUBE_ROOT}/${MODPATH}; ${golangci[*]} --path-prefix ${MODPATH} ./... )"
       pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
-        "${golangci[@]}" --path-prefix "${MODPATH}" ./... >&2 || res=$?
+        "${golangci[@]}" --path-prefix "${MODPATH}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
       popd >/dev/null
     done
   fi
@@ -173,10 +197,30 @@ else
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
     if [ "$strict" ]; then
-        echo 'The more strict golangci-strict.yaml was used. If you feel that this warns about issues'
-        echo 'that should be ignored by default, then please discuss with your reviewer and propose'
-        echo 'a change for hack/golangci-strict.yaml as part of your PR.'
+        echo
+        echo 'golangci-strict.yaml was used as configuration. Warnings must be fixed in'
+        echo 'new or modified code.'
+    elif [ "$hints" ]; then
+        echo
+        echo 'golangci-hints.yaml was used as configuration. Some of the reported issues may'
+        echo 'have to be fixed while others can be ignored, depending on the circumstances'
+        echo 'and/or personal preferences. To determine which issues have to be fixed, check'
+        echo 'the report that uses golangci-strict.yaml (= pull-kubernetes-verify-lint).'
     fi
+    if [ "$strict" ] || [ "$hints" ]; then
+        echo
+        echo 'If you feel that this warns about issues that should be ignored by default,'
+        echo 'then please discuss with your reviewer and propose'
+        echo 'a change for hack/golangci.yaml.in as part of your PR.'
+        echo
+        echo 'Please do not create PRs which fix these issues in existing code just'
+        echo 'because the linter warns about them. Often they are harmless and not'
+        echo 'worth the cost associated with a PR (time required to review, code churn).'
+        echo 'Instead, propose to fix certain linter issues in an issue first and'
+        echo 'discuss there with maintainers. PRs are welcome if they address a real'
+        echo 'problem, which then needs to be explained in the PR.'
+    fi
+    echo
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
     echo ' that the project chooses to ignore.'
     echo 'See: https://golangci-lint.run/usage/false-positives/'

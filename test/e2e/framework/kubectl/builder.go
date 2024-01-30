@@ -49,7 +49,7 @@ func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
 	return b
 }
 
-// WithEnv appends the given environment and returns itself.
+// AppendEnv appends the given environment and returns itself.
 func (b *KubectlBuilder) AppendEnv(env []string) *KubectlBuilder {
 	if b.cmd.Env == nil {
 		b.cmd.Env = os.Environ()

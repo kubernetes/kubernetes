@@ -50,6 +50,7 @@ import (
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
 	statefulsetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1"
 	ttlafterfinishedconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config/v1alpha1"
+	validatingadmissionpolicystatusconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus/config/v1alpha1"
 	attachdetachconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config/v1alpha1"
 	ephemeralconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config/v1alpha1"
 	persistentvolumeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config/v1alpha1"
@@ -184,6 +185,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := cronjobconfigv1alpha1.Convert_v1alpha1_CronJobControllerConfiguration_To_config_CronJobControllerConfiguration(&in.CronJobController, &out.CronJobController, s); err != nil {
 		return err
 	}
+	if err := serviceaccountconfigv1alpha1.Convert_v1alpha1_LegacySATokenCleanerConfiguration_To_config_LegacySATokenCleanerConfiguration(&in.LegacySATokenCleaner, &out.LegacySATokenCleaner, s); err != nil {
+		return err
+	}
 	if err := namespaceconfigv1alpha1.Convert_v1alpha1_NamespaceControllerConfiguration_To_config_NamespaceControllerConfiguration(&in.NamespaceController, &out.NamespaceController, s); err != nil {
 		return err
 	}
@@ -215,6 +219,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 		return err
 	}
 	if err := ttlafterfinishedconfigv1alpha1.Convert_v1alpha1_TTLAfterFinishedControllerConfiguration_To_config_TTLAfterFinishedControllerConfiguration(&in.TTLAfterFinishedController, &out.TTLAfterFinishedController, s); err != nil {
+		return err
+	}
+	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration_To_config_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
 		return err
 	}
 	return nil
@@ -274,6 +281,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 	if err := cronjobconfigv1alpha1.Convert_config_CronJobControllerConfiguration_To_v1alpha1_CronJobControllerConfiguration(&in.CronJobController, &out.CronJobController, s); err != nil {
 		return err
 	}
+	if err := serviceaccountconfigv1alpha1.Convert_config_LegacySATokenCleanerConfiguration_To_v1alpha1_LegacySATokenCleanerConfiguration(&in.LegacySATokenCleaner, &out.LegacySATokenCleaner, s); err != nil {
+		return err
+	}
 	if err := namespaceconfigv1alpha1.Convert_config_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(&in.NamespaceController, &out.NamespaceController, s); err != nil {
 		return err
 	}
@@ -305,6 +315,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := ttlafterfinishedconfigv1alpha1.Convert_config_TTLAfterFinishedControllerConfiguration_To_v1alpha1_TTLAfterFinishedControllerConfiguration(&in.TTLAfterFinishedController, &out.TTLAfterFinishedController, s); err != nil {
+		return err
+	}
+	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_config_ValidatingAdmissionPolicyStatusControllerConfiguration_To_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
 		return err
 	}
 	return nil

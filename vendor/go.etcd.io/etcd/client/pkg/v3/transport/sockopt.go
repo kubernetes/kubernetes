@@ -21,12 +21,12 @@ type SocketOpts struct {
 	// in which case lock on data file could result in unexpected
 	// condition. User should take caution to protect against lock race.
 	// [1] https://man7.org/linux/man-pages/man7/socket.7.html
-	ReusePort bool
+	ReusePort bool `json:"reuse-port"`
 	// ReuseAddress enables a socket option SO_REUSEADDR which allows
 	// binding to an address in `TIME_WAIT` state. Useful to improve MTTR
 	// in cases where etcd slow to restart due to excessive `TIME_WAIT`.
 	// [1] https://man7.org/linux/man-pages/man7/socket.7.html
-	ReuseAddress bool
+	ReuseAddress bool `json:"reuse-address"`
 }
 
 func getControls(sopts *SocketOpts) Controls {

@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2020,19 +2021,38 @@ func TestStoreDeletionPropagation(t *testing.T) {
 	}
 }
 
-func TestStoreDeleteCollection(t *testing.T) {
-	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	podB := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+type storageWithCounter struct {
+	storage.Interface
 
+	listCounter int64
+}
+
+func (s *storageWithCounter) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	atomic.AddInt64(&s.listCounter, 1)
+	return s.Interface.GetList(ctx, key, opts, listObj)
+}
+
+func TestStoreDeleteCollection(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
-	if _, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if _, err := registry.Create(testContext, podB, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	// Overwrite the underlying storage interface so that it counts GetList calls
+	// and reduce the default page size to 2.
+	storeWithCounter := &storageWithCounter{Interface: registry.Storage.Storage}
+	registry.Storage.Storage = storeWithCounter
+	originalDeleteCollectionPageSize := deleteCollectionPageSize
+	deleteCollectionPageSize = 2
+	defer func() {
+		deleteCollectionPageSize = originalDeleteCollectionPageSize
+	}()
+
+	numPods := 10
+	for i := 0; i < numPods; i++ {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
+		if _, err := registry.Create(testContext, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 	}
 
 	// Delete all pods.
@@ -2041,15 +2061,18 @@ func TestStoreDeleteCollection(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	deletedPods := deleted.(*example.PodList)
-	if len(deletedPods.Items) != 2 {
-		t.Errorf("Unexpected number of pods deleted: %d, expected: 3", len(deletedPods.Items))
+	if len(deletedPods.Items) != numPods {
+		t.Errorf("Unexpected number of pods deleted: %d, expected: %d", len(deletedPods.Items), numPods)
+	}
+	expectedCalls := (int64(numPods) + deleteCollectionPageSize - 1) / deleteCollectionPageSize
+	if listCalls := atomic.LoadInt64(&storeWithCounter.listCounter); listCalls != expectedCalls {
+		t.Errorf("Unexpected number of list calls: %d, expected: %d", listCalls, expectedCalls)
 	}
 
-	if _, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
-		t.Errorf("Unexpected error: %v", err)
+	for i := 0; i < numPods; i++ {
+		if _, err := registry.Get(testContext, fmt.Sprintf("foo-%d", i), &metav1.GetOptions{}); !errors.IsNotFound(err) {
+			t.Errorf("Unexpected error: %v", err)
+		}
 	}
 }
 
@@ -2306,7 +2329,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}

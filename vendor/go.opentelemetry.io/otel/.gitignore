@@ -2,14 +2,18 @@
 Thumbs.db
 
 .tools/
+venv/
 .idea/
 .vscode/
 *.iml
 *.so
 coverage.*
+go.work
+go.work.sum
 
 gen/
 
+/example/dice/dice
 /example/fib/fib
 /example/fib/traces.txt
 /example/jaeger/jaeger

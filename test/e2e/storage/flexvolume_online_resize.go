@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -40,7 +41,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expand [Slow]", func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume volume expand", framework.WithSlow(), func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -55,7 +56,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 	)
 
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
@@ -136,7 +137,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 
 		pvs, err = e2epv.WaitForPVClaimBoundPhase(ctx, c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		framework.ExpectEqual(len(pvs), 1)
+		gomega.Expect(pvs).To(gomega.HaveLen(1))
 
 		var pod *v1.Pod
 		ginkgo.By("Creating pod")
@@ -169,7 +170,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 	})
 })
 

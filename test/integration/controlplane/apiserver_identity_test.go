@@ -154,48 +154,6 @@ func TestLeaseGarbageCollection(t *testing.T) {
 		testLeaseNotGarbageCollected(t, kubeclient, expiredNonKubeSystemLease))
 }
 
-func TestLeaseGarbageCollectionWithDeprecatedLabels(t *testing.T) {
-	oldIdentityLeaseDurationSeconds := controlplane.IdentityLeaseDurationSeconds
-	oldIdentityLeaseGCPeriod := controlplane.IdentityLeaseGCPeriod
-	oldIdentityLeaseRenewIntervalPeriod := controlplane.IdentityLeaseRenewIntervalPeriod
-	defer func() {
-		// reset the default values for leases after this test
-		controlplane.IdentityLeaseDurationSeconds = oldIdentityLeaseDurationSeconds
-		controlplane.IdentityLeaseGCPeriod = oldIdentityLeaseGCPeriod
-		controlplane.IdentityLeaseRenewIntervalPeriod = oldIdentityLeaseRenewIntervalPeriod
-	}()
-
-	// Shorten lease parameters so GC behavior can be exercised in integration tests
-	controlplane.IdentityLeaseDurationSeconds = 1
-	controlplane.IdentityLeaseGCPeriod = time.Second
-	controlplane.IdentityLeaseRenewIntervalPeriod = time.Second
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
-	defer result.TearDownFn()
-
-	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	expiredLease := newTestLeaseWithDeprecatedLabels(time.Now().Add(-2*time.Hour), metav1.NamespaceSystem)
-	t.Run("expired apiserver lease should be garbage collected",
-		testLeaseGarbageCollected(t, kubeclient, expiredLease))
-
-	freshLease := newTestLeaseWithDeprecatedLabels(time.Now().Add(-2*time.Minute), metav1.NamespaceSystem)
-	t.Run("fresh apiserver lease should not be garbage collected",
-		testLeaseNotGarbageCollected(t, kubeclient, freshLease))
-
-	expiredLease.Labels = nil
-	t.Run("expired non-identity lease should not be garbage collected",
-		testLeaseNotGarbageCollected(t, kubeclient, expiredLease))
-
-	// identity leases (with k8s.io/component label) created in user namespaces should not be GC'ed
-	expiredNonKubeSystemLease := newTestLeaseWithDeprecatedLabels(time.Now().Add(-2*time.Hour), metav1.NamespaceDefault)
-	t.Run("expired non-system identity lease should not be garbage collected",
-		testLeaseNotGarbageCollected(t, kubeclient, expiredNonKubeSystemLease))
-}
-
 func testLeaseGarbageCollected(t *testing.T, client kubernetes.Interface, lease *coordinationv1.Lease) func(t *testing.T) {
 	return func(t *testing.T) {
 		ns := lease.Namespace
@@ -253,24 +211,6 @@ func newTestLease(acquireTime time.Time, namespace string) *coordinationv1.Lease
 		},
 		Spec: coordinationv1.LeaseSpec{
 			HolderIdentity:       pointer.String(testLeaseName),
-			LeaseDurationSeconds: pointer.Int32(3600),
-			AcquireTime:          &metav1.MicroTime{Time: acquireTime},
-			RenewTime:            &metav1.MicroTime{Time: acquireTime},
-		},
-	}
-}
-
-func newTestLeaseWithDeprecatedLabels(acquireTime time.Time, namespace string) *coordinationv1.Lease {
-	return &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testLeaseName,
-			Namespace: namespace,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.StringPtr(testLeaseName),
 			LeaseDurationSeconds: pointer.Int32(3600),
 			AcquireTime:          &metav1.MicroTime{Time: acquireTime},
 			RenewTime:            &metav1.MicroTime{Time: acquireTime},

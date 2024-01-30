@@ -80,7 +80,13 @@ def main():
             continue
 
         for item in rule["branches"]:
-            if not item["source"]["dir"].endswith(rule["destination"]):
+            if "dir" in item["source"]:
+                raise Exception("use of deprecated `dir` field in rules for `%s`" % (rule["destination"]))
+            if len(item["source"]["dirs"]) > 1:
+                raise Exception("cannot have more than one directory (`%s`) per source branch `%s` of `%s`" %
+                                (item["source"]["dirs"], item["source"]["branch"], rule["destination"])
+                                )
+            if not item["source"]["dirs"][0].endswith(rule["destination"]):
                 raise Exception("copy/paste error `%s` refers to `%s`" % (rule["destination"],item["source"]["dir"]))
 
         if branch["name"] != "master":

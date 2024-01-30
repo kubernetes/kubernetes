@@ -147,7 +147,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 			if rp.Unified == nil {
 				rp.Unified = make(map[string]string)
 			}
-			rp.Unified[MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
+			rp.Unified[Cgroup2MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
 		}
 	}
 
@@ -256,7 +256,7 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 		value.Sub(v)
 
 		if value.Sign() < 0 {
-			errors = append(errors, fmt.Sprintf("Resource %q has an allocatable of %v, capacity of %v", k, v, value))
+			errors = append(errors, fmt.Sprintf("Resource %q has a reservation of %v but capacity of %v. Expected capacity >= reservation.", k, v, cm.capacity[k]))
 		}
 	}
 

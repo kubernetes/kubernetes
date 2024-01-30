@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -195,10 +196,10 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 }
 
 // Slow by design (1 hour)
-var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
+var _ = SIGDescribe("Kubelet", framework.WithSerial(), framework.WithSlow(), func() {
 	var nodeNames sets.String
 	f := framework.NewDefaultFramework("kubelet-perf")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var om *e2ekubelet.RuntimeOperationMonitor
 	var rm *e2ekubelet.ResourceMonitor
 
@@ -219,7 +220,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 		result := om.GetLatestRuntimeOperationErrorRate(ctx)
 		framework.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
 	})
-	ginkgo.Describe("regular resource usage tracking [Feature:RegularResourceUsageTracking]", func() {
+	f.Describe("regular resource usage tracking", feature.RegularResourceUsageTracking, func() {
 		// We assume that the scheduler will make reasonable scheduling choices
 		// and assign ~N pods on the node.
 		// Although we want to track N pods per node, there are N + add-on pods
@@ -271,7 +272,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 			})
 		}
 	})
-	ginkgo.Describe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
+	f.Describe("experimental resource usage tracking", feature.ExperimentalResourceUsageTracking, func() {
 		density := []int{100}
 		for i := range density {
 			podsPerNode := density[i]
