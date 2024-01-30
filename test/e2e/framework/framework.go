@@ -56,9 +56,9 @@ import (
 const (
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
 	DefaultNamespaceDeletionTimeout = 5 * time.Minute
-	defaultServiceAccountName       = "default"
 	// DefaultObservationTimeout is duration where checking kubernetes object status.
-	DefaultObservationTimeout       = 4 * time.Minute
+	DefaultObservationTimeout = 4 * time.Minute
+	defaultServiceAccountName = "default"
 )
 
 var (
