@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 // PodConfigNotificationMode describes how changes are sent to the update channel.
@@ -61,7 +60,7 @@ type podStartupSLIObserver interface {
 // in order.
 type PodConfig struct {
 	pods *podStorage
-	mux  *config.Mux
+	mux  *Mux
 
 	// the channel of denormalized changes passed to listeners
 	updates chan kubetypes.PodUpdate
@@ -78,7 +77,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder,
 	storage := newPodStorage(updates, mode, recorder, startupSLIObserver)
 	podConfig := &PodConfig{
 		pods:    storage,
-		mux:     config.NewMux(storage),
+		mux:     NewMux(storage),
 		updates: updates,
 		sources: sets.String{},
 	}
@@ -478,7 +477,6 @@ func (s *podStorage) Sync() {
 	s.updates <- kubetypes.PodUpdate{Pods: s.MergedState().([]*v1.Pod), Op: kubetypes.SET, Source: kubetypes.AllSource}
 }
 
-// Object implements config.Accessor
 func (s *podStorage) MergedState() interface{} {
 	s.podLock.RLock()
 	defer s.podLock.RUnlock()
