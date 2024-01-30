@@ -656,7 +656,7 @@ func TestPlaintext(t *testing.T) {
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum": []string{},
+					"enum": []any{},
 				},
 			},
 			Checks: []check{
@@ -664,33 +664,35 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
-			// show that extractEnum can extract string enum and style it
+			// show that extractEnum can extract any enum slice and style it uppercase
 			Name:        "Enum",
 			Subtemplate: "extractEnum",
 			Context: map[string]any{
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum": []string{"!=", "!", "=="},
+					"enum": []any{1, 2, 3},
 				},
+				"singleView":  true,
 			},
 			Checks: []check{
-				checkEquals(" (enum: !=, !, ==)"),
+				checkEquals("ENUM: 1, 2, 3"),
 			},
 		},
 		{
-			// show that extractEnum can extract integer enum and style it
+			// show that extractEnum can extract any enum slice and style it lowercase
 			Name:        "Enum",
 			Subtemplate: "extractEnum",
 			Context: map[string]any{
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum": []int{1, 2, 3},
+					"enum": []any{1, 2, 3},
 				},
+				"singleView":  false,
 			},
 			Checks: []check{
-				checkEquals(" (enum: 1, 2, 3)"),
+				checkEquals(" enum: 1, 2, 3"),
 			},
 		},
 	}
