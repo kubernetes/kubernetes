@@ -1182,14 +1182,7 @@ type vSphereDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-type vSphereVolume struct {
-	volumePath string
-}
-
 var _ storageframework.TestDriver = &vSphereDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &vSphereDriver{}
-var _ storageframework.InlineVolumeTestDriver = &vSphereDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &vSphereDriver{}
 var _ storageframework.DynamicPVTestDriver = &vSphereDriver{}
 
 // InitVSphereDriver returns vSphereDriver that implements TestDriver interface
@@ -1220,56 +1213,13 @@ func InitVSphereDriver() storageframework.TestDriver {
 		},
 	}
 }
+
 func (v *vSphereDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &v.driverInfo
 }
 
 func (v *vSphereDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("vsphere")
-}
-
-func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	vsv, ok := e2evolume.(*vSphereVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the cSphere test volume", e2evolume)
-	}
-
-	// vSphere driver doesn't seem to support readOnly volume
-	// TODO: check if it is correct
-	if readOnly {
-		return nil
-	}
-	volSource := v1.VolumeSource{
-		VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
-			VolumePath: vsv.volumePath,
-		},
-	}
-	if fsType != "" {
-		volSource.VsphereVolume.FSType = fsType
-	}
-	return &volSource
-}
-
-func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	vsv, ok := e2evolume.(*vSphereVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the vSphere test volume", e2evolume)
-	}
-
-	// vSphere driver doesn't seem to support readOnly volume
-	// TODO: check if it is correct
-	if readOnly {
-		return nil, nil
-	}
-	pvSource := v1.PersistentVolumeSource{
-		VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
-			VolumePath: vsv.volumePath,
-		},
-	}
-	if fsType != "" {
-		pvSource.VsphereVolume.FSType = fsType
-	}
-	return &pvSource, nil
 }
 
 func (v *vSphereDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1289,13 +1239,6 @@ func (v *vSphereDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 		Prefix:    "vsphere",
 		Framework: f,
 	}
-}
-
-func (v *vSphereDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	return &vSphereVolume{}
-}
-
-func (v *vSphereVolume) DeleteVolume(ctx context.Context) {
 }
 
 // Azure Disk
