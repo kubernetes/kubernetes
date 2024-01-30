@@ -26,7 +26,7 @@ func TestConfigurationChannels(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	mux := NewMux(nil)
+	mux := newMux(nil)
 	channelOne := mux.ChannelWithContext(ctx, "one")
 	if channelOne != mux.ChannelWithContext(ctx, "one") {
 		t.Error("Didn't get the same muxuration channel back with the same name")
@@ -58,7 +58,7 @@ func TestMergeInvoked(t *testing.T) {
 	defer cancel()
 
 	merger := MergeMock{"one", "test", t}
-	mux := NewMux(&merger)
+	mux := newMux(&merger)
 	mux.ChannelWithContext(ctx, "one") <- "test"
 }
 
@@ -74,7 +74,7 @@ func TestSimultaneousMerge(t *testing.T) {
 	defer cancel()
 
 	ch := make(chan bool, 2)
-	mux := NewMux(mergeFunc(func(source string, update interface{}) error {
+	mux := newMux(mergeFunc(func(source string, update interface{}) error {
 		switch source {
 		case "one":
 			if update.(string) != "test" {
