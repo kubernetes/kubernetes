@@ -161,7 +161,8 @@ func tcpSocketHandler(port int) v1.ProbeHandler {
 func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	podClient := e2epod.NewPodClient(f)
 	ns := f.Namespace.Name
-	gomega.Expect(len(pod.Spec.Containers)).To(gomega.BeNumerically("==", numContainers))
+	numContainersInPod := len(pod.Spec.Containers)
+	gomega.Expect(numContainersInPod).To(gomega.Equal(numContainers), "pod sould have a %v countainers but have %v", numContainers, numContainersInPod)
 	// At the end of the test, clean up by removing the pod.
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("deleting the pod")
