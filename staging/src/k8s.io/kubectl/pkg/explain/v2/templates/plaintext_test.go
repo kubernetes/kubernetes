@@ -656,7 +656,7 @@ func TestPlaintext(t *testing.T) {
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum": []any{},
+					"enum":        []int{},
 				},
 			},
 			Checks: []check{
@@ -671,9 +671,9 @@ func TestPlaintext(t *testing.T) {
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum": []any{1, 2, 3},
+					"enum":        []int{1, 2, 3},
 				},
-				"singleView":  true,
+				"singleView": true,
 			},
 			Checks: []check{
 				checkEquals("ENUM: 1, 2, 3"),
@@ -687,9 +687,9 @@ func TestPlaintext(t *testing.T) {
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum": []any{1, 2, 3},
+					"enum":        []int{1, 2, 3},
 				},
-				"singleView":  false,
+				"singleView": false,
 			},
 			Checks: []check{
 				checkEquals(" enum: 1, 2, 3"),
