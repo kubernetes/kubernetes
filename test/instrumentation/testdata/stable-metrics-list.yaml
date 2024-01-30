@@ -529,7 +529,7 @@
   help: E2e latency for a pod being scheduled which may include multiple scheduling
     attempts.
   type: Histogram
-  deprecatedVersion: 1.28.0
+  deprecatedVersion: 1.29.0
   stabilityLevel: STABLE
   labels:
   - attempts
