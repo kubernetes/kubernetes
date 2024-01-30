@@ -41,7 +41,7 @@ type Provider interface {
 	//
 	// ListPodStats returns the stats of all the containers managed by pods.
 	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
-	// ListPodStatsAndUpdateCPUNanoCoreUsage updates the cpu nano core usage for
+	// ListPodCPUAndMemoryStats updates the cpu nano core usage for
 	// the containers and returns the stats for all the pod-managed containers.
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
 	// ListPodStatsAndUpdateCPUNanoCoreUsage returns the stats of all the
