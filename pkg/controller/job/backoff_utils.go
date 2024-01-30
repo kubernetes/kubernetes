@@ -23,7 +23,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 type backoffRecord struct {
@@ -73,7 +76,7 @@ func (s *backoffStore) removeBackoffRecord(jobId string) error {
 
 }
 
-func newBackoffRecordStore() *backoffStore {
+func newBackoffStore() *backoffStore {
 	return &backoffStore{
 		store: cache.NewStore(backoffRecordKeyFunc),
 	}
@@ -86,8 +89,7 @@ var backoffRecordKeyFunc = func(obj interface{}) (string, error) {
 	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
-func (backoffRecordStore *backoffStore) newBackoffRecord(clock clock.WithTicker, key string, newSucceededPods []*v1.Pod, newFailedPods []*v1.Pod) backoffRecord {
-	now := clock.Now()
+func (backoffRecordStore *backoffStore) newBackoffRecord(key string, newSucceededPods []*v1.Pod, newFailedPods []*v1.Pod) backoffRecord {
 	var backoff *backoffRecord
 
 	if b, exists, _ := backoffRecordStore.store.GetByKey(key); exists {
@@ -105,8 +107,8 @@ func (backoffRecordStore *backoffStore) newBackoffRecord(clock clock.WithTicker,
 		}
 	}
 
-	sortByFinishedTime(newSucceededPods, now)
-	sortByFinishedTime(newFailedPods, now)
+	sortByFinishedTime(newSucceededPods)
+	sortByFinishedTime(newFailedPods)
 
 	if len(newSucceededPods) == 0 {
 		if len(newFailedPods) == 0 {
@@ -114,7 +116,7 @@ func (backoffRecordStore *backoffStore) newBackoffRecord(clock clock.WithTicker,
 		}
 
 		backoff.failuresAfterLastSuccess = backoff.failuresAfterLastSuccess + int32(len(newFailedPods))
-		lastFailureTime := getFinishedTime(newFailedPods[len(newFailedPods)-1], now)
+		lastFailureTime := getFinishedTime(newFailedPods[len(newFailedPods)-1])
 		backoff.lastFailureTime = &lastFailureTime
 		return *backoff
 
@@ -128,9 +130,9 @@ func (backoffRecordStore *backoffStore) newBackoffRecord(clock clock.WithTicker,
 		backoff.failuresAfterLastSuccess = 0
 		backoff.lastFailureTime = nil
 
-		lastSuccessTime := getFinishedTime(newSucceededPods[len(newSucceededPods)-1], now)
+		lastSuccessTime := getFinishedTime(newSucceededPods[len(newSucceededPods)-1])
 		for i := len(newFailedPods) - 1; i >= 0; i-- {
-			failedTime := getFinishedTime(newFailedPods[i], now)
+			failedTime := getFinishedTime(newFailedPods[i])
 			if !failedTime.After(lastSuccessTime) {
 				break
 			}
@@ -146,48 +148,97 @@ func (backoffRecordStore *backoffStore) newBackoffRecord(clock clock.WithTicker,
 
 }
 
-func sortByFinishedTime(pods []*v1.Pod, currentTime time.Time) {
+func sortByFinishedTime(pods []*v1.Pod) {
 	sort.Slice(pods, func(i, j int) bool {
 		p1 := pods[i]
 		p2 := pods[j]
-		p1FinishTime := getFinishedTime(p1, currentTime)
-		p2FinishTime := getFinishedTime(p2, currentTime)
+		p1FinishTime := getFinishedTime(p1)
+		p2FinishTime := getFinishedTime(p2)
 
 		return p1FinishTime.Before(p2FinishTime)
 	})
 }
 
-func getFinishedTime(p *v1.Pod, currentTime time.Time) time.Time {
+// Returns the pod finish time using the following lookups:
+// 1. if all containers finished, use the latest time
+// 2. if the pod has Ready=False condition, use the last transition time
+// 3. if the pod has been deleted, use the `deletionTimestamp - grace_period` to estimate the moment of deletion
+// 4. fallback to pod's creation time
+//
+// Pods owned by Kubelet are marked with Ready=False condition when
+// transitioning to terminal phase, thus being handled by (1.) or (2.).
+// Orphaned pods are deleted by PodGC, thus being handled by (3.).
+func getFinishedTime(p *v1.Pod) time.Time {
+	if finishTime := getFinishTimeFromContainers(p); finishTime != nil {
+		return *finishTime
+	}
+	if finishTime := getFinishTimeFromPodReadyFalseCondition(p); finishTime != nil {
+		return *finishTime
+	}
+	if finishTime := getFinishTimeFromDeletionTimestamp(p); finishTime != nil {
+		return *finishTime
+	}
+	// This should not happen in clusters with Kubelet and PodGC running.
+	return p.CreationTimestamp.Time
+}
+
+func getFinishTimeFromContainers(p *v1.Pod) *time.Time {
 	var finishTime *time.Time
 	for _, containerState := range p.Status.ContainerStatuses {
 		if containerState.State.Terminated == nil {
-			finishTime = nil
-			break
+			return nil
 		}
-
-		if finishTime == nil {
+		if containerState.State.Terminated.FinishedAt.Time.IsZero() {
+			return nil
+		}
+		if finishTime == nil || finishTime.Before(containerState.State.Terminated.FinishedAt.Time) {
 			finishTime = &containerState.State.Terminated.FinishedAt.Time
-		} else {
-			if finishTime.Before(containerState.State.Terminated.FinishedAt.Time) {
-				finishTime = &containerState.State.Terminated.FinishedAt.Time
-			}
 		}
 	}
+	return finishTime
+}
 
-	if finishTime == nil || finishTime.IsZero() {
-		return currentTime
+func getFinishTimeFromPodReadyFalseCondition(p *v1.Pod) *time.Time {
+	if _, c := apipod.GetPodCondition(&p.Status, v1.PodReady); c != nil && c.Status == v1.ConditionFalse && !c.LastTransitionTime.Time.IsZero() {
+		return &c.LastTransitionTime.Time
 	}
+	return nil
+}
 
-	return *finishTime
+func getFinishTimeFromDeletionTimestamp(p *v1.Pod) *time.Time {
+	if p.DeletionTimestamp != nil {
+		finishTime := p.DeletionTimestamp.Time.Add(-time.Duration(ptr.Deref(p.DeletionGracePeriodSeconds, 0)) * time.Second)
+		return &finishTime
+	}
+	return nil
 }
 
 func (backoff backoffRecord) getRemainingTime(clock clock.WithTicker, defaultBackoff time.Duration, maxBackoff time.Duration) time.Duration {
-	if backoff.failuresAfterLastSuccess == 0 {
+	return getRemainingTimeForFailuresCount(clock, defaultBackoff, maxBackoff, backoff.failuresAfterLastSuccess, backoff.lastFailureTime)
+}
+
+// getRemainingTimePerIndex returns the remaining time left for a given index to
+// create the replacement pods. The number of consecutive pod failures for the
+// index is retrieved from the `job-index-failure-count` annotation of the
+// last failed pod within the index (represented by `lastFailedPod`).
+// The last failed pod is also used to determine the time of the last failure.
+func getRemainingTimePerIndex(logger klog.Logger, clock clock.WithTicker, defaultBackoff time.Duration, maxBackoff time.Duration, lastFailedPod *v1.Pod) time.Duration {
+	if lastFailedPod == nil {
+		// There is no previous failed pod for this index
+		return time.Duration(0)
+	}
+	failureCount := getIndexAbsoluteFailureCount(logger, lastFailedPod) + 1
+	lastFailureTime := getFinishedTime(lastFailedPod)
+	return getRemainingTimeForFailuresCount(clock, defaultBackoff, maxBackoff, failureCount, &lastFailureTime)
+}
+
+func getRemainingTimeForFailuresCount(clock clock.WithTicker, defaultBackoff time.Duration, maxBackoff time.Duration, failuresCount int32, lastFailureTime *time.Time) time.Duration {
+	if failuresCount == 0 {
 		return 0
 	}
 
 	backoffDuration := defaultBackoff
-	for i := 1; i < int(backoff.failuresAfterLastSuccess); i++ {
+	for i := 1; i < int(failuresCount); i++ {
 		backoffDuration = backoffDuration * 2
 		if backoffDuration >= maxBackoff {
 			backoffDuration = maxBackoff
@@ -195,7 +246,7 @@ func (backoff backoffRecord) getRemainingTime(clock clock.WithTicker, defaultBac
 		}
 	}
 
-	timeElapsedSinceLastFailure := clock.Since(*backoff.lastFailureTime)
+	timeElapsedSinceLastFailure := clock.Since(*lastFailureTime)
 
 	if backoffDuration < timeElapsedSinceLastFailure {
 		return 0

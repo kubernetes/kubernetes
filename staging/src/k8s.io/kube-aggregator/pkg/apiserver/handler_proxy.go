@@ -17,23 +17,18 @@ limitations under the License.
 package apiserver
 
 import (
-	"context"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync/atomic"
-	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/x509metrics"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
@@ -43,8 +38,6 @@ import (
 
 const (
 	aggregatorComponent string = "aggregator"
-
-	aggregatedDiscoveryTimeout = 5 * time.Second
 )
 
 type certKeyFunc func() ([]byte, []byte)
@@ -149,7 +142,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
 
-	newReq, cancelFn := newRequestForProxy(location, req)
+	newReq, cancelFn := apiserverproxyutil.NewRequestForProxy(location, req)
 	defer cancelFn()
 
 	if handlingInfo.proxyRoundTripper == nil {
@@ -175,37 +168,6 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	utilflowcontrol.RequestDelegated(req.Context())
 	handler.ServeHTTP(w, newReq)
-}
-
-// newRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
-func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, context.CancelFunc) {
-	newCtx := req.Context()
-	cancelFn := func() {}
-
-	if requestInfo, ok := genericapirequest.RequestInfoFrom(req.Context()); ok {
-		// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
-		// segments that we are going to proxy, we have a discovery request.
-		if !requestInfo.IsResourceRequest && len(strings.Split(strings.Trim(requestInfo.Path, "/"), "/")) == 3 {
-			// discovery requests are used by kubectl and others to determine which resources a server has.  This is a cheap call that
-			// should be fast for every aggregated apiserver.  Latency for aggregation is expected to be low (as for all extensions)
-			// so forcing a short timeout here helps responsiveness of all clients.
-			newCtx, cancelFn = context.WithTimeout(newCtx, aggregatedDiscoveryTimeout)
-		}
-	}
-
-	// WithContext creates a shallow clone of the request with the same context.
-	newReq := req.WithContext(newCtx)
-	newReq.Header = utilnet.CloneHeader(req.Header)
-	newReq.URL = location
-	newReq.Host = location.Host
-
-	// If the original request has an audit ID, let's make sure we propagate this
-	// to the aggregated server.
-	if auditID, found := audit.AuditIDFrom(req.Context()); found {
-		newReq.Header.Set(auditinternal.HeaderAuditID, string(auditID))
-	}
-
-	return newReq, cancelFn
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.

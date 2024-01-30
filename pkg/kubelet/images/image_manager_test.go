@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -27,8 +28,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/kubernetes/pkg/features"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	testingclock "k8s.io/utils/clock/testing"
@@ -161,6 +166,39 @@ func pullerTestCases() []pullerTestCase {
 				{[]string{"GetImageRef"}, ErrImagePull, true, false},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false},
 			}},
+		// error case if image name fails validation due to invalid reference format
+		{containerImage: "FAILED_IMAGE",
+			testName:   "invalid image name, no pull",
+			policy:     v1.PullAlways,
+			inspectErr: nil,
+			pullerErr:  nil,
+			qps:        0.0,
+			burst:      0,
+			expected: []pullerExpects{
+				{[]string(nil), ErrInvalidImageName, false, false},
+			}},
+		// error case if image name contains http
+		{containerImage: "http://url",
+			testName:   "invalid image name with http, no pull",
+			policy:     v1.PullAlways,
+			inspectErr: nil,
+			pullerErr:  nil,
+			qps:        0.0,
+			burst:      0,
+			expected: []pullerExpects{
+				{[]string(nil), ErrInvalidImageName, false, false},
+			}},
+		// error case if image name contains sha256
+		{containerImage: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+			testName:   "invalid image name with sha256, no pull",
+			policy:     v1.PullAlways,
+			inspectErr: nil,
+			pullerErr:  nil,
+			qps:        0.0,
+			burst:      0,
+			expected: []pullerExpects{
+				{[]string(nil), ErrInvalidImageName, false, false},
+			}},
 	}
 }
 
@@ -189,7 +227,7 @@ func (m *mockPodPullingTimeRecorder) reset() {
 	m.finishedPullingRecorded = false
 }
 
-func pullerTestEnv(c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container, fakePodPullingTimeRecorder *mockPodPullingTimeRecorder) {
+func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelImagePulls *int32) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container, fakePodPullingTimeRecorder *mockPodPullingTimeRecorder) {
 	container = &v1.Container{
 		Name:            "container_name",
 		Image:           c.containerImage,
@@ -200,7 +238,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool, maxParallelImagePulls *int
 	fakeClock = testingclock.NewFakeClock(time.Now())
 	backOff.Clock = fakeClock
 
-	fakeRuntime = &ctest.FakeRuntime{}
+	fakeRuntime = &ctest.FakeRuntime{T: t}
 	fakeRecorder := &record.FakeRecorder{}
 
 	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
@@ -228,13 +266,13 @@ func TestParallelPuller(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
-			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(c, useSerializedEnv, nil)
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -260,13 +298,13 @@ func TestSerializedPuller(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			ctx := context.Background()
-			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(c, useSerializedEnv, nil)
+			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -286,6 +324,8 @@ func TestApplyDefaultImageTag(t *testing.T) {
 		{testName: "root", Input: "root", Output: "root:latest"},
 		{testName: "root:tag", Input: "root:tag", Output: "root:tag"},
 		{testName: "root@sha", Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{testName: "root:latest@sha", Input: "root:latest@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "root:latest@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{testName: "root:latest", Input: "root:latest", Output: "root:latest"},
 	} {
 		t.Run(testCase.testName, func(t *testing.T) {
 			image, err := applyDefaultImageTag(testCase.Input)
@@ -322,12 +362,12 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
 		ctx := context.Background()
-		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(c, useSerializedEnv, nil)
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
 
-		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -338,6 +378,67 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 		image := images[0]
 		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
+		assert.Equal(t, "", image.Spec.RuntimeHandler, "image.Spec.RuntimeHandler not empty", "ImageID", image.ID)
+
+		expectedAnnotations := []Annotation{
+			{
+				Name:  "kubernetes.io/runtimehandler",
+				Value: "handler_name",
+			}}
+		assert.Equal(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
+	})
+}
+
+func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T) {
+	runtimeHandler := "handler_name"
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+			Annotations: map[string]string{
+				"kubernetes.io/runtimehandler": runtimeHandler,
+			},
+		},
+		Spec: v1.PodSpec{
+			RuntimeClassName: &runtimeHandler,
+		},
+	}
+	c := pullerTestCase{ // pull missing image
+		testName:       "test pull and list image with pod annotations",
+		containerImage: "missing_image",
+		policy:         v1.PullIfNotPresent,
+		inspectErr:     nil,
+		pullerErr:      nil,
+		expected: []pullerExpects{
+			{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+		}}
+
+	useSerializedEnv := true
+	t.Run(c.testName, func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+		ctx := context.Background()
+		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
+		fakeRuntime.CalledFunctions = nil
+		fakeRuntime.ImageList = []Image{}
+		fakeClock.Step(time.Second)
+
+		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, runtimeHandler)
+		fakeRuntime.AssertCalls(c.expected[0].calls)
+		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
+		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
+		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
+
+		images, _ := fakeRuntime.ListImages(ctx)
+		assert.Equal(t, 1, len(images), "ListImages() count")
+
+		image := images[0]
+		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
+
+		// when RuntimeClassInImageCriAPI feature gate is enabled, check runtime
+		// handler information for every image in the ListImages() response
+		assert.Equal(t, runtimeHandler, image.Spec.RuntimeHandler, "runtime handler returned not as expected", "Image ID", image)
 
 		expectedAnnotations := []Annotation{
 			{
@@ -372,7 +473,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	maxParallelImagePulls := 5
 	var wg sync.WaitGroup
 
-	puller, fakeClock, fakeRuntime, container, _ := pullerTestEnv(*testCase, useSerializedEnv, utilpointer.Int32Ptr(int32(maxParallelImagePulls)))
+	puller, fakeClock, fakeRuntime, container, _ := pullerTestEnv(t, *testCase, useSerializedEnv, utilpointer.Int32Ptr(int32(maxParallelImagePulls)))
 	fakeRuntime.BlockImagePulls = true
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.T = t
@@ -382,7 +483,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < maxParallelImagePulls; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 			assert.Nil(t, err)
 			wg.Done()
 		}()
@@ -394,7 +495,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+			_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil, "")
 			assert.Nil(t, err)
 			wg.Done()
 		}()
@@ -412,4 +513,63 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 
 	wg.Wait()
 	fakeRuntime.AssertCallCounts("PullImage", 7)
+}
+
+func TestEvalCRIPullErr(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		input  error
+		assert func(string, error)
+	}{
+		{
+			name:  "fallback error",
+			input: errors.New("test"),
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, ErrImagePull)
+				assert.Contains(t, msg, "test")
+			},
+		},
+		{
+			name:  "registry is unavailable",
+			input: crierrors.ErrRegistryUnavailable,
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
+				assert.Equal(t, msg, "image pull failed for test because the registry is unavailable")
+			},
+		},
+		{
+			name:  "registry is unavailable with additional error message",
+			input: fmt.Errorf("%v: foo", crierrors.ErrRegistryUnavailable),
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
+				assert.Equal(t, msg, "image pull failed for test because the registry is unavailable: foo")
+			},
+		},
+		{
+			name:  "signature is invalid",
+			input: crierrors.ErrSignatureValidationFailed,
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
+				assert.Equal(t, msg, "image pull failed for test because the signature validation failed")
+			},
+		},
+		{
+			name:  "signature is invalid with additional error message (wrapped)",
+			input: fmt.Errorf("%w: bar", crierrors.ErrSignatureValidationFailed),
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
+				assert.Equal(t, msg, "image pull failed for test because the signature validation failed: bar")
+			},
+		},
+	} {
+		testInput := tc.input
+		testAssert := tc.assert
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			msg, err := evalCRIPullErr(&v1.Container{Image: "test"}, testInput)
+			testAssert(msg, err)
+		})
+	}
 }

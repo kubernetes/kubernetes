@@ -18,7 +18,6 @@
 # golangci-lint. It does nothing when invoked as part of a normal "make
 # verify".
 
-set -o errexit
 set -o nounset
 set -o pipefail
 
@@ -29,9 +28,4 @@ fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# TODO (https://github.com/kubernetes/test-infra/issues/17056):
-# take this additional artifact and convert it to GitHub annotations
-# to make it easier to see these problems during a PR review.
-#
-# -g "${ARTIFACTS}/golangci-lint-githubactions.log"
 "${KUBE_ROOT}/hack/verify-golangci-lint.sh" -r "${PULL_BASE_SHA}" -s

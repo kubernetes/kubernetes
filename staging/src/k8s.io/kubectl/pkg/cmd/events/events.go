@@ -49,26 +49,26 @@ import (
 
 var (
 	eventsLong = templates.LongDesc(i18n.T(`
-		Display events
+		Display events.
 
 		Prints a table of the most important information about events.
 		You can request events for a namespace, for all namespace, or
 		filtered to only those pertaining to a specified resource.`))
 
 	eventsExample = templates.Examples(i18n.T(`
-	# List recent events in the default namespace.
+	# List recent events in the default namespace
 	kubectl events
 
-	# List recent events in all namespaces.
+	# List recent events in all namespaces
 	kubectl events --all-namespaces
 
-	# List recent events for the specified pod, then wait for more events and list them as they arrive.
+	# List recent events for the specified pod, then wait for more events and list them as they arrive
 	kubectl events --for pod/web-pod-13je7 --watch
 
-	# List recent events in given format. Supported ones, apart from default, are json and yaml.
+	# List recent events in YAML format
 	kubectl events -oyaml
 
-	# List recent only events in given event types
+	# List recent only events of type 'Warning' or 'Normal'
 	kubectl events --types=Warning,Normal`))
 )
 
@@ -121,7 +121,7 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--event=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
+		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--types=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("List events"),
 		Long:                  eventsLong,
@@ -229,6 +229,7 @@ func (o *EventsOptions) Run() error {
 	if o.forName != "" {
 		listOptions.FieldSelector = fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
+			fields.OneTermEqualSelector("involvedObject.apiVersion", o.forGVK.GroupVersion().String()),
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
 	if o.Watch {

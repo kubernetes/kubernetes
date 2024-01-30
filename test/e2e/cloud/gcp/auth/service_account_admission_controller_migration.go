@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/auth"
@@ -33,9 +34,9 @@ var upgradeTests = []upgrades.Test{
 	&auth.ServiceAccountAdmissionControllerMigrationTest{},
 }
 
-var _ = SIGDescribe("ServiceAccount admission controller migration [Feature:BoundServiceAccountTokenVolume]", func() {
+var _ = SIGDescribe("ServiceAccount admission controller migration", feature.BoundServiceAccountTokenVolume, func() {
 	f := framework.NewDefaultFramework("serviceaccount-admission-controller-migration")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("master upgrade", func() {

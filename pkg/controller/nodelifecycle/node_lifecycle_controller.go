@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -54,7 +55,9 @@ import (
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
+	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/kubernetes/pkg/features"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -127,6 +130,13 @@ const (
 	// podUpdateWorkerSizes assumes that in most cases pod will be handled by monitorNodeHealth pass.
 	// Pod update workers will only handle lagging cache pods. 4 workers should be enough.
 	podUpdateWorkerSize = 4
+	// nodeUpdateWorkerSize defines the size of workers for node update or/and pod update.
+	nodeUpdateWorkerSize = 8
+
+	// taintEvictionController is defined here in order to prevent imports of
+	// k8s.io/kubernetes/cmd/kube-controller-manager/names which would result in validation errors.
+	// This constant will be removed upon graduation of the SeparateTaintEvictionController feature.
+	taintEvictionController = "taint-eviction-controller"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -207,7 +217,7 @@ type podUpdateItem struct {
 
 // Controller is the controller that manages node's life cycle.
 type Controller struct {
-	taintManager *scheduler.NoExecuteTaintManager
+	taintManager *tainteviction.Controller
 
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
@@ -326,7 +336,7 @@ func NewNodeLifecycleController(
 		nodeMonitorPeriod:           nodeMonitorPeriod,
 		nodeStartupGracePeriod:      nodeStartupGracePeriod,
 		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
-		nodeUpdateWorkerSize:        scheduler.UpdateWorkerSize,
+		nodeUpdateWorkerSize:        nodeUpdateWorkerSize,
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
 		nodesToRetry:                sync.Map{},
 		zoneStates:                  make(map[string]ZoneState),
@@ -346,17 +356,11 @@ func NewNodeLifecycleController(
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			nc.podUpdated(nil, pod)
-			if nc.taintManager != nil {
-				nc.taintManager.PodUpdated(nil, pod)
-			}
 		},
 		UpdateFunc: func(prev, obj interface{}) {
 			prevPod := prev.(*v1.Pod)
 			newPod := obj.(*v1.Pod)
 			nc.podUpdated(prevPod, newPod)
-			if nc.taintManager != nil {
-				nc.taintManager.PodUpdated(prevPod, newPod)
-			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod, isPod := obj.(*v1.Pod)
@@ -374,9 +378,6 @@ func NewNodeLifecycleController(
 				}
 			}
 			nc.podUpdated(pod, nil)
-			if nc.taintManager != nil {
-				nc.taintManager.PodUpdated(pod, nil)
-			}
 		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
@@ -412,21 +413,14 @@ func NewNodeLifecycleController(
 	nc.podLister = podInformer.Lister()
 	nc.nodeLister = nodeInformer.Lister()
 
-	nc.taintManager = scheduler.NewNoExecuteTaintManager(ctx, kubeClient, nc.podLister, nc.nodeLister, nc.getPodsAssignedToNode)
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
-			nc.taintManager.NodeUpdated(nil, node)
-			return nil
-		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
-			nc.taintManager.NodeUpdated(oldNode, newNode)
-			return nil
-		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
-			nc.taintManager.NodeUpdated(node, nil)
-			return nil
-		}),
-	})
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
+		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
+		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
+		if err != nil {
+			return nil, err
+		}
+		nc.taintManager = tm
+	}
 
 	logger.Info("Controller will reconcile labels")
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -438,7 +432,7 @@ func NewNodeLifecycleController(
 			nc.nodeUpdateQueue.Add(newNode.Name)
 			return nil
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			nc.nodesToRetry.Delete(node.Name)
 			return nil
 		}),
@@ -480,10 +474,13 @@ func (nc *Controller) Run(ctx context.Context) {
 		return
 	}
 
-	go nc.taintManager.Run(ctx)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
+		logger.Info("Starting", "controller", taintEvictionController)
+		go nc.taintManager.Run(ctx)
+	}
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
-	for i := 0; i < scheduler.UpdateWorkerSize; i++ {
+	for i := 0; i < nodeUpdateWorkerSize; i++ {
 		// Thanks to "workqueue", each worker just need to get item from queue, because
 		// the item is flagged when got from queue: if new event come, the new item will
 		// be re-queued until "Done", so no more than one worker handle the same item and
@@ -744,7 +741,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			switch {
 			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
 				// Report node event only once when status changed.
-				controllerutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
+				controllerutil.RecordNodeStatusChange(logger, nc.recorder, node, "NodeNotReady")
 				fallthrough
 			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
@@ -1202,7 +1199,7 @@ func (nc *Controller) HealthyQPSFunc(nodeNum int) float32 {
 	return nc.evictionLimiterQPS
 }
 
-// ReducedQPSFunc returns the QPS for when a the cluster is large make
+// ReducedQPSFunc returns the QPS for when the cluster is large make
 // evictions slower, if they're small stop evictions altogether.
 func (nc *Controller) ReducedQPSFunc(nodeNum int) float32 {
 	if int32(nodeNum) > nc.largeClusterThreshold {

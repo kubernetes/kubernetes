@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentconfigtesting "k8s.io/component-base/config/testing"
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 func TestComponentConfigSetup(t *testing.T) {
@@ -31,8 +32,9 @@ func TestComponentConfigSetup(t *testing.T) {
 		SchemeGroupVersion: SchemeGroupVersion,
 		AddToScheme:        AddToScheme,
 		AllowedTags: map[reflect.Type]bool{
-			reflect.TypeOf(metav1.TypeMeta{}): true,
-			reflect.TypeOf(metav1.Duration{}): true,
+			reflect.TypeOf(metav1.TypeMeta{}):              true,
+			reflect.TypeOf(metav1.Duration{}):              true,
+			reflect.TypeOf(logsapi.LoggingConfiguration{}): true,
 		},
 	}
 

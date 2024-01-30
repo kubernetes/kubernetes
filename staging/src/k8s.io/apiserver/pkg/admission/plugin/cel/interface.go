@@ -24,14 +24,23 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 
 	v1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/environment"
 )
 
 type ExpressionAccessor interface {
 	GetExpression() string
 	ReturnTypes() []*cel.Type
+}
+
+// NamedExpressionAccessor extends NamedExpressionAccessor with a name.
+type NamedExpressionAccessor interface {
+	ExpressionAccessor
+
+	GetName() string // follows the naming convention of ExpressionAccessor
 }
 
 // EvaluationResult contains the minimal required fields and metadata of a cel evaluation
@@ -57,8 +66,7 @@ type OptionalVariableDeclarations struct {
 // FilterCompiler contains a function to assist with converting types and values to/from CEL-typed values.
 type FilterCompiler interface {
 	// Compile is used for the cel expression compilation
-	// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, perCallLimit uint64) Filter
+	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Filter
 }
 
 // OptionalVariableBindings provides expression bindings for optional CEL variables.
@@ -80,7 +88,7 @@ type Filter interface {
 	// ForInput converts compiled CEL-typed values into evaluated CEL-typed value.
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 	// If cost budget is calculated, the filter should return the remaining budget.
-	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error)
+	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the evaluator
 	CompilationErrors() []error

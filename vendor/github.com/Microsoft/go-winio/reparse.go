@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package winio
 
 import (
@@ -113,16 +116,16 @@ func EncodeReparsePoint(rp *ReparsePoint) []byte {
 	}
 
 	var b bytes.Buffer
-	binary.Write(&b, binary.LittleEndian, &data)
+	_ = binary.Write(&b, binary.LittleEndian, &data)
 	if !rp.IsMountPoint {
 		flags := uint32(0)
 		if relative {
 			flags |= 1
 		}
-		binary.Write(&b, binary.LittleEndian, flags)
+		_ = binary.Write(&b, binary.LittleEndian, flags)
 	}
 
-	binary.Write(&b, binary.LittleEndian, ntTarget16)
-	binary.Write(&b, binary.LittleEndian, target16)
+	_ = binary.Write(&b, binary.LittleEndian, ntTarget16)
+	_ = binary.Write(&b, binary.LittleEndian, target16)
 	return b.Bytes()
 }

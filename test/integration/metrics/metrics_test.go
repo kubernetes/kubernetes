@@ -76,6 +76,30 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 	})
 }
 
+func TestAPIServerStorageMetrics(t *testing.T) {
+	config := framework.SharedEtcd()
+	config.Transport.ServerList = []string{config.Transport.ServerList[0], config.Transport.ServerList[0]}
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, config)
+	defer s.TearDownFn()
+
+	metrics, err := scrapeMetrics(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	samples, ok := metrics["apiserver_storage_size_bytes"]
+	if !ok {
+		t.Fatalf("apiserver_storage_size_bytes metric not exposed")
+	}
+	if len(samples) != 1 {
+		t.Fatalf("Unexpected number of samples in apiserver_storage_size_bytes")
+	}
+
+	if samples[0].Value == -1 {
+		t.Errorf("Unexpected non-zero apiserver_storage_size_bytes, got: %s", samples[0].Value)
+	}
+}
+
 func TestAPIServerMetrics(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer s.TearDownFn()
@@ -88,8 +112,8 @@ func TestAPIServerMetrics(t *testing.T) {
 	}
 
 	// Make a request to a deprecated API to ensure there's at least one data point
-	if _, err := client.StorageV1beta1().CSIStorageCapacities("default").List(context.TODO(), metav1.ListOptions{}); err != nil {
-		t.Fatalf("unexpected error getting rbac roles: %v", err)
+	if _, err := client.FlowcontrolV1beta3().FlowSchemas().List(context.TODO(), metav1.ListOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	metrics, err := scrapeMetrics(s)

@@ -178,14 +178,14 @@ func (ks kobjSlice) process() (objs []interface{}, err string) {
 	return objectRefs, ""
 }
 
-var nilToken = []byte("<nil>")
+var nilToken = []byte("null")
 
 func (ks kobjSlice) WriteText(out *bytes.Buffer) {
 	s := reflect.ValueOf(ks.arg)
 	switch s.Kind() {
 	case reflect.Invalid:
-		// nil parameter, print as empty slice.
-		out.WriteString("[]")
+		// nil parameter, print as null.
+		out.Write(nilToken)
 		return
 	case reflect.Slice:
 		// Okay, handle below.
@@ -197,15 +197,15 @@ func (ks kobjSlice) WriteText(out *bytes.Buffer) {
 	defer out.Write([]byte{']'})
 	for i := 0; i < s.Len(); i++ {
 		if i > 0 {
-			out.Write([]byte{' '})
+			out.Write([]byte{','})
 		}
 		item := s.Index(i).Interface()
 		if item == nil {
 			out.Write(nilToken)
 		} else if v, ok := item.(KMetadata); ok {
-			KObj(v).writeUnquoted(out)
+			KObj(v).WriteText(out)
 		} else {
-			fmt.Fprintf(out, "<KObjSlice needs a slice of values implementing KMetadata, got type %T>", item)
+			fmt.Fprintf(out, `"<KObjSlice needs a slice of values implementing KMetadata, got type %T>"`, item)
 			return
 		}
 	}

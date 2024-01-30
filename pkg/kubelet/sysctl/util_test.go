@@ -24,29 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestConvertSysctlVariableToDotsSeparator tests whether the sysctl variable
-// can be correctly converted to a dot as a separator.
-func TestConvertSysctlVariableToDotsSeparator(t *testing.T) {
-	type testCase struct {
-		in  string
-		out string
-	}
-	valid := []testCase{
-		{in: "kernel.shm_rmid_forced", out: "kernel.shm_rmid_forced"},
-		{in: "kernel/shm_rmid_forced", out: "kernel.shm_rmid_forced"},
-		{in: "net.ipv4.conf.eno2/100.rp_filter", out: "net.ipv4.conf.eno2/100.rp_filter"},
-		{in: "net/ipv4/conf/eno2.100/rp_filter", out: "net.ipv4.conf.eno2/100.rp_filter"},
-		{in: "net/ipv4/ip_local_port_range", out: "net.ipv4.ip_local_port_range"},
-		{in: "kernel/msgmax", out: "kernel.msgmax"},
-		{in: "kernel/sem", out: "kernel.sem"},
-	}
-
-	for _, test := range valid {
-		convertSysctlVal := convertSysctlVariableToDotsSeparator(test.in)
-		assert.Equalf(t, test.out, convertSysctlVal, "The sysctl variable was not converted correctly. got: %s, want: %s", convertSysctlVal, test.out)
-	}
-}
-
 // TestConvertPodSysctlsVariableToDotsSeparator tests whether the sysctls variable
 // can be correctly converted to a dot as a separator.
 func TestConvertPodSysctlsVariableToDotsSeparator(t *testing.T) {

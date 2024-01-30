@@ -31,6 +31,13 @@ func TestFromInt(t *testing.T) {
 	}
 }
 
+func TestFromInt32(t *testing.T) {
+	i := FromInt32(93)
+	if i.Type != Int || i.IntVal != 93 {
+		t.Errorf("Expected IntVal=93, got %+v", i)
+	}
+}
+
 func TestFromString(t *testing.T) {
 	i := FromString("76")
 	if i.Type != String || i.StrVal != "76" {
@@ -47,7 +54,7 @@ func TestIntOrStringUnmarshalJSON(t *testing.T) {
 		input  string
 		result IntOrString
 	}{
-		{"{\"val\": 123}", FromInt(123)},
+		{"{\"val\": 123}", FromInt32(123)},
 		{"{\"val\": \"123\"}", FromString("123")},
 	}
 
@@ -67,7 +74,7 @@ func TestIntOrStringMarshalJSON(t *testing.T) {
 		input  IntOrString
 		result string
 	}{
-		{FromInt(123), "{\"val\":123}"},
+		{FromInt32(123), "{\"val\":123}"},
 		{FromString("123"), "{\"val\":\"123\"}"},
 	}
 
@@ -87,7 +94,7 @@ func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
 	cases := []struct {
 		input IntOrString
 	}{
-		{FromInt(123)},
+		{FromInt32(123)},
 		{FromString("123")},
 	}
 
@@ -118,7 +125,7 @@ func TestGetIntFromIntOrString(t *testing.T) {
 		expectPerc bool
 	}{
 		{
-			input:      FromInt(200),
+			input:      FromInt32(200),
 			expectErr:  false,
 			expectVal:  200,
 			expectPerc: false,
@@ -191,7 +198,7 @@ func TestGetIntFromIntOrPercent(t *testing.T) {
 		expectVal int
 	}{
 		{
-			input:     FromInt(123),
+			input:     FromInt32(123),
 			expectErr: false,
 			expectVal: 123,
 		},
@@ -255,5 +262,65 @@ func TestGetValueFromIntOrPercentNil(t *testing.T) {
 	_, err := GetScaledValueFromIntOrPercent(nil, 0, false)
 	if err == nil {
 		t.Errorf("expected error got none")
+	}
+}
+
+func TestParse(t *testing.T) {
+	tests := []struct {
+		input  string
+		output IntOrString
+	}{
+		{
+			input:  "0",
+			output: IntOrString{Type: Int, IntVal: 0},
+		},
+		{
+			input:  "2147483647", // math.MaxInt32
+			output: IntOrString{Type: Int, IntVal: 2147483647},
+		},
+		{
+			input:  "-2147483648", // math.MinInt32
+			output: IntOrString{Type: Int, IntVal: -2147483648},
+		},
+		{
+			input:  "2147483648", // math.MaxInt32+1
+			output: IntOrString{Type: String, StrVal: "2147483648"},
+		},
+		{
+			input:  "-2147483649", // math.MinInt32-1
+			output: IntOrString{Type: String, StrVal: "-2147483649"},
+		},
+		{
+			input:  "9223372036854775807", // math.MaxInt64
+			output: IntOrString{Type: String, StrVal: "9223372036854775807"},
+		},
+		{
+			input:  "-9223372036854775808", // math.MinInt64
+			output: IntOrString{Type: String, StrVal: "-9223372036854775808"},
+		},
+		{
+			input:  "9223372036854775808", // math.MaxInt64+1
+			output: IntOrString{Type: String, StrVal: "9223372036854775808"},
+		},
+		{
+			input:  "-9223372036854775809", // math.MinInt64-1
+			output: IntOrString{Type: String, StrVal: "-9223372036854775809"},
+		},
+	}
+
+	for i, test := range tests {
+		t.Logf("test case %d", i)
+		value := Parse(test.input)
+		if test.output.Type != value.Type {
+			t.Errorf("expected type %d (%v), but got %d (%v)", test.output.Type, test.output, value.Type, value)
+			continue
+		}
+		if value.Type == Int && test.output.IntVal != value.IntVal {
+			t.Errorf("expected int value %d (%v), but got %d (%v)", test.output.IntVal, test.output, value.IntVal, value)
+			continue
+		}
+		if value.Type == String && test.output.StrVal != value.StrVal {
+			t.Errorf("expected string value %q (%v), but got %q (%v)", test.output.StrVal, test.output, value.StrVal, value)
+		}
 	}
 }

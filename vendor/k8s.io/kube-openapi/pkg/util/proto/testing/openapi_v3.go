@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	openapi_v3 "github.com/google/gnostic/openapiv3"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 )
 
 type FakeV3 struct {

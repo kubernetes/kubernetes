@@ -7,7 +7,6 @@ reviewers:
   - aojea
   - dchen1107
   - johnSchnake
-  - lavalamp
   - liggitt
   - neolit123
   - SataQiu
@@ -26,7 +25,6 @@ approvers:
   - dims
   - enj
   - janetkuo
-  - lavalamp
   - liggitt
   - mikedanese
   - MrHohn
@@ -51,6 +49,7 @@ emeritus_approvers:
   - krousey
   - krzyzacy
   - kow3ns
+  - lavalamp
   - madhusudancs
   - marun
   - zmerlynn

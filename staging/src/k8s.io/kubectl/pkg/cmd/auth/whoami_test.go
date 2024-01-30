@@ -38,12 +38,13 @@ import (
 
 func TestWhoAmIRun(t *testing.T) {
 	tests := []struct {
-		name          string
-		o             *WhoAmIOptions
-		args          []string
-		serverErr     error
-		alphaDisabled bool
-		betaDisabled  bool
+		name           string
+		o              *WhoAmIOptions
+		args           []string
+		serverErr      error
+		alphaDisabled  bool
+		betaDisabled   bool
+		stableDisabled bool
 
 		expectedError       error
 		expectedBodyStrings []string
@@ -73,7 +74,7 @@ func TestWhoAmIRun(t *testing.T) {
 			expectedBodyStrings: []string{
 				`{
     "kind": "SelfSubjectReview",
-    "apiVersion": "authentication.k8s.io/v1beta1",
+    "apiVersion": "authentication.k8s.io/v1",
     "metadata": {
         "creationTimestamp": null
     },
@@ -119,12 +120,13 @@ func TestWhoAmIRun(t *testing.T) {
 			},
 		},
 		{
-			name: "JSON test no alpha",
+			name: "JSON test no alpha and stable",
 			o: &WhoAmIOptions{
 				resourcePrinterFunc: printers.NewTypeSetter(scheme.Scheme).ToPrinter(&printers.JSONPrinter{}).PrintObj,
 			},
-			args:          []string{},
-			alphaDisabled: true,
+			args:           []string{},
+			alphaDisabled:  true,
+			stableDisabled: true,
 			expectedBodyStrings: []string{
 				`{
     "kind": "SelfSubjectReview",
@@ -183,7 +185,7 @@ func TestWhoAmIRun(t *testing.T) {
 			expectedBodyStrings: []string{
 				`{
     "kind": "SelfSubjectReview",
-    "apiVersion": "authentication.k8s.io/v1alpha1",
+    "apiVersion": "authentication.k8s.io/v1",
     "metadata": {
         "creationTimestamp": null
     },
@@ -212,14 +214,15 @@ func TestWhoAmIRun(t *testing.T) {
 			},
 		},
 		{
-			name: "both API disabled",
+			name: "all API disabled",
 			o: &WhoAmIOptions{
 				resourcePrinterFunc: printTableSelfSubjectAccessReview,
 			},
-			args:          []string{},
-			betaDisabled:  true,
-			alphaDisabled: true,
-			expectedError: notEnabledErr,
+			args:           []string{},
+			betaDisabled:   true,
+			alphaDisabled:  true,
+			stableDisabled: true,
+			expectedError:  notEnabledErr,
 		},
 		{
 			name: "Forbidden error",
@@ -304,12 +307,23 @@ func TestWhoAmIRun(t *testing.T) {
 							},
 						}
 						return true, res, nil
+					case "authentication.k8s.io/v1":
+						if test.stableDisabled {
+							return true, nil, errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo")
+						}
+						res := &authenticationv1.SelfSubjectReview{
+							Status: authenticationv1.SelfSubjectReviewStatus{
+								UserInfo: ui,
+							},
+						}
+						return true, res, nil
 					default:
 						return false, nil, fmt.Errorf("unknown API")
 					}
 				})
 			test.o.authV1beta1Client = fakeAuthClientSet.AuthenticationV1beta1()
 			test.o.authV1alpha1Client = fakeAuthClientSet.AuthenticationV1alpha1()
+			test.o.authV1Client = fakeAuthClientSet.AuthenticationV1()
 
 			err := test.o.Run()
 			switch {

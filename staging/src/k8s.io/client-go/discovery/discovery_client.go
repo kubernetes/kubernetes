@@ -19,7 +19,9 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"sort"
@@ -29,7 +31,7 @@ import (
 
 	//nolint:staticcheck // SA1019 Keep using module since it's still being maintained and the api of google.golang.org/protobuf/proto differs
 	"github.com/golang/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -58,12 +60,16 @@ const (
 	defaultBurst = 300
 
 	AcceptV1 = runtime.ContentTypeJSON
-	// Aggregated discovery content-type (currently v2beta1). NOTE: Currently, we are assuming the order
-	// for "g", "v", and "as" from the server. We can only compare this string if we can make that assumption.
+	// Aggregated discovery content-type (v2beta1). NOTE: content-type parameters
+	// MUST be ordered (g, v, as) for server in "Accept" header (BUT we are resilient
+	// to ordering when comparing returned values in "Content-Type" header).
 	AcceptV2Beta1 = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
 	// Prioritize aggregated discovery by placing first in the order of discovery accept types.
 	acceptDiscoveryFormats = AcceptV2Beta1 + "," + AcceptV1
 )
+
+// Aggregated discovery content-type GVK.
+var v2Beta1GVK = schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2beta1", Kind: "APIGroupDiscoveryList"}
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
@@ -258,9 +264,16 @@ func (d *DiscoveryClient) downloadLegacy() (
 	}
 
 	var resourcesByGV map[schema.GroupVersion]*metav1.APIResourceList
-	// Switch on content-type server responded with: aggregated or unaggregated.
-	switch responseContentType {
-	case AcceptV1:
+	// Based on the content-type server responded with: aggregated or unaggregated.
+	if isGVK, _ := ContentTypeIsGVK(responseContentType, v2Beta1GVK); isGVK {
+		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
+		err = json.Unmarshal(body, &aggregatedDiscovery)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
+	} else {
+		// Default is unaggregated discovery v1.
 		var v metav1.APIVersions
 		err = json.Unmarshal(body, &v)
 		if err != nil {
@@ -271,15 +284,6 @@ func (d *DiscoveryClient) downloadLegacy() (
 			apiGroup = apiVersionsToAPIGroup(&v)
 		}
 		apiGroupList.Groups = []metav1.APIGroup{apiGroup}
-	case AcceptV2Beta1:
-		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
-		err = json.Unmarshal(body, &aggregatedDiscovery)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
-	default:
-		return nil, nil, nil, fmt.Errorf("Unknown discovery response content-type: %s", responseContentType)
 	}
 
 	return apiGroupList, resourcesByGV, failedGVs, nil
@@ -312,25 +316,48 @@ func (d *DiscoveryClient) downloadAPIs() (
 	apiGroupList := &metav1.APIGroupList{}
 	failedGVs := map[schema.GroupVersion]error{}
 	var resourcesByGV map[schema.GroupVersion]*metav1.APIResourceList
-	// Switch on content-type server responded with: aggregated or unaggregated.
-	switch responseContentType {
-	case AcceptV1:
-		err = json.Unmarshal(body, apiGroupList)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	case AcceptV2Beta1:
+	// Based on the content-type server responded with: aggregated or unaggregated.
+	if isGVK, _ := ContentTypeIsGVK(responseContentType, v2Beta1GVK); isGVK {
 		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
 		err = json.Unmarshal(body, &aggregatedDiscovery)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
-	default:
-		return nil, nil, nil, fmt.Errorf("Unknown discovery response content-type: %s", responseContentType)
+	} else {
+		// Default is unaggregated discovery v1.
+		err = json.Unmarshal(body, apiGroupList)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	return apiGroupList, resourcesByGV, failedGVs, nil
+}
+
+// ContentTypeIsGVK checks of the content-type string is both
+// "application/json" and matches the provided GVK. An error
+// is returned if the content type string is malformed.
+// NOTE: This function is resilient to the ordering of the
+// content-type parameters, as well as parameters added by
+// intermediaries such as proxies or gateways. Examples:
+//
+//	("application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io;charset=utf-8", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json", any GVK) = (false, nil)
+//	("application/json; charset=UTF-8", any GVK) = (false, nil)
+//	("malformed content type string", any GVK) = (false, error)
+func ContentTypeIsGVK(contentType string, gvk schema.GroupVersionKind) (bool, error) {
+	base, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false, err
+	}
+	gvkMatch := runtime.ContentTypeJSON == base &&
+		params["g"] == gvk.Group &&
+		params["v"] == gvk.Version &&
+		params["as"] == gvk.Kind
+	return gvkMatch, nil
 }
 
 // ServerGroups returns the supported groups, with information like supported versions and the
@@ -393,11 +420,27 @@ func (e *ErrGroupDiscoveryFailed) Error() string {
 	return fmt.Sprintf("unable to retrieve the complete list of server APIs: %s", strings.Join(groups, ", "))
 }
 
+// Is makes it possible for the callers to use `errors.Is(` helper on errors wrapped with ErrGroupDiscoveryFailed error.
+func (e *ErrGroupDiscoveryFailed) Is(target error) bool {
+	_, ok := target.(*ErrGroupDiscoveryFailed)
+	return ok
+}
+
 // IsGroupDiscoveryFailedError returns true if the provided error indicates the server was unable to discover
 // a complete list of APIs for the client to use.
 func IsGroupDiscoveryFailedError(err error) bool {
 	_, ok := err.(*ErrGroupDiscoveryFailed)
 	return err != nil && ok
+}
+
+// GroupDiscoveryFailedErrorGroups returns true if the error is an ErrGroupDiscoveryFailed error,
+// along with the map of group versions that failed discovery.
+func GroupDiscoveryFailedErrorGroups(err error) (map[schema.GroupVersion]error, bool) {
+	var groupDiscoveryError *ErrGroupDiscoveryFailed
+	if err != nil && goerrors.As(err, &groupDiscoveryError) {
+		return groupDiscoveryError.Groups, true
+	}
+	return nil, false
 }
 
 func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
@@ -611,16 +654,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", openAPIV2mimePb).Do(context.TODO()).Raw()
 	if err != nil {
-		if errors.IsForbidden(err) || errors.IsNotFound(err) || errors.IsNotAcceptable(err) {
-			// single endpoint not found/registered in old server, try to fetch old endpoint
-			// TODO: remove this when kubectl/client-go don't work with 1.9 server
-			data, err = d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do(context.TODO()).Raw()
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 	document := &openapi_v2.Document{}
 	err = proto.Unmarshal(data, document)

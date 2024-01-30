@@ -36,11 +36,11 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-limit")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI volume limit information using mock driver", func() {
-		ginkgo.It("should report attach limit when limit is bigger than 0 [Slow]", func(ctx context.Context) {
+		f.It("should report attach limit when limit is bigger than 0", f.WithSlow(), func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
 			m.init(ctx, testParameters{attachLimit: 2})
@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
 		})
 
-		ginkgo.It("should report attach limit for generic ephemeral volume when persistent volume is attached [Slow]", func(ctx context.Context) {
+		f.It("should report attach limit for generic ephemeral volume when persistent volume is attached", f.WithSlow(), func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
 			m.init(ctx, testParameters{attachLimit: 1})
@@ -98,7 +98,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
 		})
 
-		ginkgo.It("should report attach limit for persistent volume when generic ephemeral volume is attached [Slow]", func(ctx context.Context) {
+		f.It("should report attach limit for persistent volume when generic ephemeral volume is attached", f.WithSlow(), func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
 			m.init(ctx, testParameters{attachLimit: 1})

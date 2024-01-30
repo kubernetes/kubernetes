@@ -161,11 +161,11 @@ const (
 // - lack of eviction of tolerating pods from a tainted node,
 // - delayed eviction of short-tolerating pod from a tainted node,
 // - lack of eviction of short-tolerating pod after taint removal.
-var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
+var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), func() {
 	var cs clientset.Interface
 	var ns string
 	f := framework.NewDefaultFramework("taint-single-pod")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet
@@ -287,7 +287,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		Description: The Pod with toleration timeout scheduled on a tainted Node MUST not be
 		evicted if the taint is removed before toleration time ends.
 	*/
-	framework.ConformanceIt("removing taint cancels eviction [Disruptive]", func(ctx context.Context) {
+	framework.ConformanceIt("removing taint cancels eviction", f.WithDisruptive(), func(ctx context.Context) {
 		podName := "taint-eviction-4"
 		pod := createPodForTaintsTest(true, 2*additionalWaitPerDeleteSeconds, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
@@ -370,11 +370,11 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	})
 })
 
-var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
+var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(), func() {
 	var cs clientset.Interface
 	var ns string
 	f := framework.NewDefaultFramework("taint-multiple-pods")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet
@@ -447,7 +447,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		Description: In a multi-pods scenario with tolerationSeconds, the pods MUST be evicted as per
 		the toleration time limit.
 	*/
-	framework.ConformanceIt("evicts pods with minTolerationSeconds [Disruptive]", func(ctx context.Context) {
+	framework.ConformanceIt("evicts pods with minTolerationSeconds", f.WithDisruptive(), func(ctx context.Context) {
 		podGroup := "taint-eviction-b"
 		observedDeletions := make(chan string, 100)
 		createTestController(ctx, cs, observedDeletions, podGroup, ns)

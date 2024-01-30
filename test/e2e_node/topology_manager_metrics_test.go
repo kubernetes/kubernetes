@@ -28,20 +28,21 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.TopologyManager, func() {
 	f := framework.NewDefaultFramework("topologymanager-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration
 		var testPod *v1.Pod
-		var cpusNumPerNUMA, numaNodes int
+		var cpusNumPerNUMA, coresNumPerNUMA, numaNodes, threadsPerCore int
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
@@ -50,13 +51,16 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManag
 				framework.ExpectNoError(err)
 			}
 
-			numaNodes, cpusNumPerNUMA = hostCheck()
+			numaNodes, coresNumPerNUMA, threadsPerCore = hostCheck()
+			cpusNumPerNUMA = coresNumPerNUMA * threadsPerCore
 
 			// It is safe to assume that the CPUs are distributed equally across
 			// NUMA nodes and therefore number of CPUs on all NUMA nodes are same
 			// so we just check the CPUs on the first NUMA node
 
 			framework.Logf("numaNodes on the system %d", numaNodes)
+			framework.Logf("Cores per NUMA on the system %d", coresNumPerNUMA)
+			framework.Logf("Threads per Core on the system %d", threadsPerCore)
 			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
 
 			policy := topologymanager.PolicySingleNumaNode
@@ -92,9 +96,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManag
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should report admission failures when the topology manager alignment is known to fail", func(ctx context.Context) {
@@ -118,9 +122,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManag
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should not report any admission failures when the topology manager alignment is expected to succeed", func(ctx context.Context) {
@@ -144,14 +148,14 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManag
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 		})
 	})
 })
 
-func hostCheck() (int, int) {
+func hostCheck() (int, int, int) {
 	// this is a very rough check. We just want to rule out system that does NOT have
 	// multi-NUMA nodes or at least 4 cores
 
@@ -165,7 +169,9 @@ func hostCheck() (int, int) {
 		e2eskipper.Skipf("this test is intended to be run on a system with at least %d cores per socket", minCoreCount)
 	}
 
-	return numaNodes, coreCount
+	threadsPerCore := detectThreadPerCore()
+
+	return numaNodes, coreCount, threadsPerCore
 }
 
 func checkMetricValueGreaterThan(value interface{}) types.GomegaMatcher {
@@ -174,5 +180,6 @@ func checkMetricValueGreaterThan(value interface{}) types.GomegaMatcher {
 		"Metric":    gstruct.Ignore(),
 		"Value":     gomega.BeNumerically(">", value),
 		"Timestamp": gstruct.Ignore(),
+		"Histogram": gstruct.Ignore(),
 	}))
 }

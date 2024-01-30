@@ -17,8 +17,11 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 )
 
@@ -33,7 +36,7 @@ func (o *TTLAfterFinishedControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.ConcurrentTTLSyncs, "concurrent-ttl-after-finished-syncs", o.ConcurrentTTLSyncs, "The number of TTL-after-finished controller workers that are allowed to sync concurrently.")
+	fs.Int32Var(&o.ConcurrentTTLSyncs, "concurrent-ttl-after-finished-syncs", o.ConcurrentTTLSyncs, fmt.Sprintf("The number of %s workers that are allowed to sync concurrently.", names.TTLAfterFinishedController))
 }
 
 // ApplyTo fills up TTLAfterFinishedController config with options.

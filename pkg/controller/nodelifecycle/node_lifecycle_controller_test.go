@@ -2433,6 +2433,10 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 
 // TestApplyNoExecuteTaintsToNodesEnqueueTwice ensures we taint every node with NoExecute even if enqueued twice
 func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{

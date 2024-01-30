@@ -16,6 +16,26 @@ limitations under the License.
 
 package v1beta1
 
+// FieldValueErrorReason is a machine-readable value providing more detail about why a field failed the validation.
+// +enum
+type FieldValueErrorReason string
+
+const (
+	// FieldValueRequired is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	FieldValueRequired FieldValueErrorReason = "FieldValueRequired"
+	// FieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	FieldValueDuplicate FieldValueErrorReason = "FieldValueDuplicate"
+	// FieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match, too long, out of bounds).
+	FieldValueInvalid FieldValueErrorReason = "FieldValueInvalid"
+	// FieldValueForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted under some conditions, but which are not
+	// permitted by the current conditions (such as security policy).
+	FieldValueForbidden FieldValueErrorReason = "FieldValueForbidden"
+)
+
 // JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
 type JSONSchemaProps struct {
 	ID          string        `json:"id,omitempty" protobuf:"bytes,1,opt,name=id"`
@@ -56,25 +76,30 @@ type JSONSchemaProps struct {
 	// default is a default value for undefined object fields.
 	// Defaulting is a beta feature under the CustomResourceDefaulting feature gate.
 	// CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API.
-	Default              *JSON                      `json:"default,omitempty" protobuf:"bytes,8,opt,name=default"`
-	Maximum              *float64                   `json:"maximum,omitempty" protobuf:"bytes,9,opt,name=maximum"`
-	ExclusiveMaximum     bool                       `json:"exclusiveMaximum,omitempty" protobuf:"bytes,10,opt,name=exclusiveMaximum"`
-	Minimum              *float64                   `json:"minimum,omitempty" protobuf:"bytes,11,opt,name=minimum"`
-	ExclusiveMinimum     bool                       `json:"exclusiveMinimum,omitempty" protobuf:"bytes,12,opt,name=exclusiveMinimum"`
-	MaxLength            *int64                     `json:"maxLength,omitempty" protobuf:"bytes,13,opt,name=maxLength"`
-	MinLength            *int64                     `json:"minLength,omitempty" protobuf:"bytes,14,opt,name=minLength"`
-	Pattern              string                     `json:"pattern,omitempty" protobuf:"bytes,15,opt,name=pattern"`
-	MaxItems             *int64                     `json:"maxItems,omitempty" protobuf:"bytes,16,opt,name=maxItems"`
-	MinItems             *int64                     `json:"minItems,omitempty" protobuf:"bytes,17,opt,name=minItems"`
-	UniqueItems          bool                       `json:"uniqueItems,omitempty" protobuf:"bytes,18,opt,name=uniqueItems"`
-	MultipleOf           *float64                   `json:"multipleOf,omitempty" protobuf:"bytes,19,opt,name=multipleOf"`
-	Enum                 []JSON                     `json:"enum,omitempty" protobuf:"bytes,20,rep,name=enum"`
-	MaxProperties        *int64                     `json:"maxProperties,omitempty" protobuf:"bytes,21,opt,name=maxProperties"`
-	MinProperties        *int64                     `json:"minProperties,omitempty" protobuf:"bytes,22,opt,name=minProperties"`
-	Required             []string                   `json:"required,omitempty" protobuf:"bytes,23,rep,name=required"`
-	Items                *JSONSchemaPropsOrArray    `json:"items,omitempty" protobuf:"bytes,24,opt,name=items"`
-	AllOf                []JSONSchemaProps          `json:"allOf,omitempty" protobuf:"bytes,25,rep,name=allOf"`
-	OneOf                []JSONSchemaProps          `json:"oneOf,omitempty" protobuf:"bytes,26,rep,name=oneOf"`
+	Default          *JSON    `json:"default,omitempty" protobuf:"bytes,8,opt,name=default"`
+	Maximum          *float64 `json:"maximum,omitempty" protobuf:"bytes,9,opt,name=maximum"`
+	ExclusiveMaximum bool     `json:"exclusiveMaximum,omitempty" protobuf:"bytes,10,opt,name=exclusiveMaximum"`
+	Minimum          *float64 `json:"minimum,omitempty" protobuf:"bytes,11,opt,name=minimum"`
+	ExclusiveMinimum bool     `json:"exclusiveMinimum,omitempty" protobuf:"bytes,12,opt,name=exclusiveMinimum"`
+	MaxLength        *int64   `json:"maxLength,omitempty" protobuf:"bytes,13,opt,name=maxLength"`
+	MinLength        *int64   `json:"minLength,omitempty" protobuf:"bytes,14,opt,name=minLength"`
+	Pattern          string   `json:"pattern,omitempty" protobuf:"bytes,15,opt,name=pattern"`
+	MaxItems         *int64   `json:"maxItems,omitempty" protobuf:"bytes,16,opt,name=maxItems"`
+	MinItems         *int64   `json:"minItems,omitempty" protobuf:"bytes,17,opt,name=minItems"`
+	UniqueItems      bool     `json:"uniqueItems,omitempty" protobuf:"bytes,18,opt,name=uniqueItems"`
+	MultipleOf       *float64 `json:"multipleOf,omitempty" protobuf:"bytes,19,opt,name=multipleOf"`
+	// +listType=atomic
+	Enum          []JSON `json:"enum,omitempty" protobuf:"bytes,20,rep,name=enum"`
+	MaxProperties *int64 `json:"maxProperties,omitempty" protobuf:"bytes,21,opt,name=maxProperties"`
+	MinProperties *int64 `json:"minProperties,omitempty" protobuf:"bytes,22,opt,name=minProperties"`
+	// +listType=atomic
+	Required []string                `json:"required,omitempty" protobuf:"bytes,23,rep,name=required"`
+	Items    *JSONSchemaPropsOrArray `json:"items,omitempty" protobuf:"bytes,24,opt,name=items"`
+	// +listType=atomic
+	AllOf []JSONSchemaProps `json:"allOf,omitempty" protobuf:"bytes,25,rep,name=allOf"`
+	// +listType=atomic
+	OneOf []JSONSchemaProps `json:"oneOf,omitempty" protobuf:"bytes,26,rep,name=oneOf"`
+	// +listType=atomic
 	AnyOf                []JSONSchemaProps          `json:"anyOf,omitempty" protobuf:"bytes,27,rep,name=anyOf"`
 	Not                  *JSONSchemaProps           `json:"not,omitempty" protobuf:"bytes,28,opt,name=not"`
 	Properties           map[string]JSONSchemaProps `json:"properties,omitempty" protobuf:"bytes,29,rep,name=properties"`
@@ -130,6 +155,7 @@ type JSONSchemaProps struct {
 	// to ensure those properties are present for all list items.
 	//
 	// +optional
+	// +listType=atomic
 	XListMapKeys []string `json:"x-kubernetes-list-map-keys,omitempty" protobuf:"bytes,41,rep,name=xKubernetesListMapKeys"`
 
 	// x-kubernetes-list-type annotates an array to further describe its topology.
@@ -229,6 +255,19 @@ type ValidationRule struct {
 	//   - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values
 	//     are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with
 	//     non-intersecting keys are appended, retaining their partial order.
+	//
+	// If `rule` makes use of the `oldSelf` variable it is implicitly a
+	// `transition rule`.
+	//
+	// By default, the `oldSelf` variable is the same type as `self`.
+	// When `optionalOldSelf` is true, the `oldSelf` variable is a CEL optional
+	//  variable whose value() is the same type as `self`.
+	// See the documentation for the `optionalOldSelf` field for details.
+	//
+	// Transition rules by default are applied only on UPDATE requests and are
+	// skipped if an old value could not be found. You can opt a transition
+	// rule into unconditional evaluation by setting `optionalOldSelf` to true.
+	//
 	Rule string `json:"rule" protobuf:"bytes,1,opt,name=rule"`
 	// Message represents the message displayed when validation fails. The message is required if the Rule contains
 	// line breaks. The message must not contain line breaks.
@@ -247,6 +286,42 @@ type ValidationRule struct {
 	// "x must be less than max ("+string(self.max)+")"
 	// +optional
 	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,3,opt,name=messageExpression"`
+	// reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule.
+	// The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule.
+	// The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
+	// If not set, default to use "FieldValueInvalid".
+	// All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
+	// +optional
+	Reason *FieldValueErrorReason `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// fieldPath represents the field path returned when the validation fails.
+	// It must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.
+	// e.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`
+	// If the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`
+	// It does not support list numeric index.
+	// It supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.
+	// Numeric index of array is not supported.
+	// For field name which contains special characters, use `['specialName']` to refer the field name.
+	// e.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`
+	// +optional
+	FieldPath string `json:"fieldPath,omitempty" protobuf:"bytes,5,opt,name=fieldPath"`
+
+	// optionalOldSelf is used to opt a transition rule into evaluation
+	// even when the object is first created, or if the old object is
+	// missing the value.
+	//
+	// When enabled `oldSelf` will be a CEL optional whose value will be
+	// `None` if there is no old value, or when the object is initially created.
+	//
+	// You may check for presence of oldSelf using `oldSelf.hasValue()` and
+	// unwrap it after checking using `oldSelf.value()`. Check the CEL
+	// documentation for Optional types for more information:
+	// https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
+	//
+	// May not be set unless `oldSelf` is used in `rule`.
+	//
+	// +featureGate=CRDValidationRatcheting
+	// +optional
+	OptionalOldSelf *bool `json:"optionalOldSelf,omitempty" protobuf:"bytes,6,opt,name=optionalOldSelf"`
 }
 
 // JSON represents any valid JSON value.
@@ -274,7 +349,8 @@ type JSONSchemaURL string
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps
 // or an array of JSONSchemaProps. Mainly here for serialization purposes.
 type JSONSchemaPropsOrArray struct {
-	Schema      *JSONSchemaProps  `protobuf:"bytes,1,opt,name=schema"`
+	Schema *JSONSchemaProps `protobuf:"bytes,1,opt,name=schema"`
+	// +listType=atomic
 	JSONSchemas []JSONSchemaProps `protobuf:"bytes,2,rep,name=jSONSchemas"`
 }
 
@@ -316,8 +392,9 @@ type JSONSchemaDependencies map[string]JSONSchemaPropsOrStringArray
 
 // JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.
 type JSONSchemaPropsOrStringArray struct {
-	Schema   *JSONSchemaProps `protobuf:"bytes,1,opt,name=schema"`
-	Property []string         `protobuf:"bytes,2,rep,name=property"`
+	Schema *JSONSchemaProps `protobuf:"bytes,1,opt,name=schema"`
+	// +listType=atomic
+	Property []string `protobuf:"bytes,2,rep,name=property"`
 }
 
 // OpenAPISchemaType is used by the kube-openapi generator when constructing

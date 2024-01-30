@@ -29,6 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -52,7 +53,7 @@ func Example_view() {
 		expectedConfig: expectedConfig,
 	}
 
-	output := test.run(nil)
+	output := test.run(&testing.T{})
 	fmt.Printf("%v", output)
 	// Output:
 	// apiVersion: v1
@@ -261,7 +262,7 @@ func TestAdditionalAuth(t *testing.T) {
 
 func TestEmbedClientCert(t *testing.T) {
 	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeCertFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	fakeData := []byte("fake-data")
 	os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
@@ -278,9 +279,94 @@ func TestEmbedClientCert(t *testing.T) {
 	test.run(t)
 }
 
+func TestExecPlugin(t *testing.T) {
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
+	fakeData := []byte("fake-data")
+	err := os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.Exec = &clientcmdapi.ExecConfig{
+		Command: "example-client-go-exec-plugin",
+		Args:    []string{"arg1", "arg2"},
+		Env: []clientcmdapi.ExecEnvVar{
+			{
+				Name:  "FOO",
+				Value: "bar",
+			},
+		},
+		APIVersion:         "client.authentication.k8s.io/v1",
+		ProvideClusterInfo: false,
+		InteractiveMode:    "Never",
+	}
+	expectedConfig.AuthInfos["cred-exec-user"] = authInfo
+
+	test := configCommandTest{
+		args: []string{
+			"set-credentials",
+			"cred-exec-user",
+			"--exec-api-version=client.authentication.k8s.io/v1",
+			"--exec-command=example-client-go-exec-plugin",
+			"--exec-arg=arg1,arg2",
+			"--exec-env=FOO=bar",
+			"--exec-interactive-mode=Never",
+		},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestExecPluginWithProveClusterInfo(t *testing.T) {
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
+	fakeData := []byte("fake-data")
+	err := os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.Exec = &clientcmdapi.ExecConfig{
+		Command: "example-client-go-exec-plugin",
+		Args:    []string{"arg1", "arg2"},
+		Env: []clientcmdapi.ExecEnvVar{
+			{
+				Name:  "FOO",
+				Value: "bar",
+			},
+		},
+		APIVersion:         "client.authentication.k8s.io/v1",
+		ProvideClusterInfo: true,
+		InteractiveMode:    "Always",
+	}
+	expectedConfig.AuthInfos["cred-exec-user"] = authInfo
+
+	test := configCommandTest{
+		args: []string{
+			"set-credentials",
+			"cred-exec-user",
+			"--exec-api-version=client.authentication.k8s.io/v1",
+			"--exec-command=example-client-go-exec-plugin",
+			"--exec-arg=arg1,arg2",
+			"--exec-env=FOO=bar",
+			"--exec-interactive-mode=Always",
+			"--exec-provide-cluster-info=true",
+		},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
 func TestEmbedClientKey(t *testing.T) {
 	fakeKeyFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeKeyFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeKeyFile)
 	fakeData := []byte("fake-data")
 	os.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
@@ -326,7 +412,7 @@ func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
 	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "cert-file")
-	defer os.Remove(fakeCertFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientCertificate = path.Base(fakeCertFile.Name())
@@ -569,7 +655,7 @@ func TestUnsetBytes(t *testing.T) {
 
 func TestCAClearsInsecure(t *testing.T) {
 	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "ca-file")
-	defer os.Remove(fakeCAFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCAFile)
 	clusterInfoWithInsecure := clientcmdapi.NewCluster()
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
 
@@ -638,7 +724,7 @@ func TestInsecureClearsCA(t *testing.T) {
 
 func TestCADataClearsCA(t *testing.T) {
 	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeCAFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCAFile)
 	fakeData := []byte("cadata")
 	os.WriteFile(fakeCAFile.Name(), fakeData, 0600)
 
@@ -852,7 +938,7 @@ func TestToBool(t *testing.T) {
 
 func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
 	fakeKubeFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeKubeFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
 	err := clientcmd.WriteToFile(startingConfig, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

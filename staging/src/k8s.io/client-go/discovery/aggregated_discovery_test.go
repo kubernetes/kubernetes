@@ -611,6 +611,76 @@ func TestSplitGroupsAndResources(t *testing.T) {
 			expectedFailedGVs: map[schema.GroupVersion]error{},
 		},
 		{
+			name: "Aggregated discovery with single subresource and parent empty GVK",
+			agg: apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "external.metrics.k8s.io",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										// resilient to empty GVK for parent
+										Resource:         "*",
+										Scope:            apidiscovery.ScopeNamespace,
+										SingularResource: "",
+										ResponseKind:     &metav1.GroupVersionKind{},
+										Subresources: []apidiscovery.APISubresourceDiscovery{
+											{
+												Subresource: "other-external-metric",
+												ResponseKind: &metav1.GroupVersionKind{
+													Kind: "MetricValueList",
+												},
+												Verbs: []string{"get"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroups: metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
+					{
+						Name: "external.metrics.k8s.io",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{
+								GroupVersion: "external.metrics.k8s.io/v1beta1",
+								Version:      "v1beta1",
+							},
+						},
+						PreferredVersion: metav1.GroupVersionForDiscovery{
+							GroupVersion: "external.metrics.k8s.io/v1beta1",
+							Version:      "v1beta1",
+						},
+					},
+				},
+			},
+			expectedGVResources: map[schema.GroupVersion]*metav1.APIResourceList{
+				{Group: "external.metrics.k8s.io", Version: "v1beta1"}: {
+					GroupVersion: "external.metrics.k8s.io/v1beta1",
+					APIResources: []metav1.APIResource{
+						// Since parent GVK was nil, it is NOT returned--only the subresource.
+						{
+							Name:         "*/other-external-metric",
+							SingularName: "",
+							Namespaced:   true,
+							Group:        "",
+							Version:      "",
+							Kind:         "MetricValueList",
+							Verbs:        []string{"get"},
+						},
+					},
+				},
+			},
+			expectedFailedGVs: map[schema.GroupVersion]error{},
+		},
+		{
 			name: "Aggregated discovery with multiple subresources",
 			agg: apidiscovery.APIGroupDiscoveryList{
 				Items: []apidiscovery.APIGroupDiscovery{

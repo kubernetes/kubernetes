@@ -46,8 +46,12 @@ type TestSuite interface {
 // This function actually register tests inside testsuite
 func RegisterTests(suite TestSuite, driver TestDriver, pattern TestPattern) {
 	tsInfo := suite.GetTestSuiteInfo()
-	testName := fmt.Sprintf("[Testpattern: %s]%s %s%s", pattern.Name, pattern.FeatureTag, tsInfo.Name, tsInfo.FeatureTag)
-	ginkgo.Context(testName, func() {
+	var args []interface{}
+	args = append(args, fmt.Sprintf("[Testpattern: %s]", pattern.Name))
+	args = append(args, pattern.TestTags...)
+	args = append(args, tsInfo.Name)
+	args = append(args, tsInfo.TestTags...)
+	args = append(args, func() {
 		ginkgo.BeforeEach(func() {
 			// skip all the invalid combination of driver and pattern
 			SkipInvalidDriverPatternCombination(driver, pattern)
@@ -60,6 +64,7 @@ func RegisterTests(suite TestSuite, driver TestDriver, pattern TestPattern) {
 		// might still needed for specific independent test cases.
 		suite.DefineTests(driver, pattern)
 	})
+	framework.Context(args...)
 }
 
 // DefineTestSuites defines tests for all testpatterns and all testSuites for a driver
@@ -75,7 +80,7 @@ func DefineTestSuites(driver TestDriver, tsInits []func() TestSuite) {
 // TestSuiteInfo represents a set of parameters for TestSuite
 type TestSuiteInfo struct {
 	Name               string              // name of the TestSuite
-	FeatureTag         string              // featureTag for the TestSuite
+	TestTags           []interface{}       // additional parameters for framework.It, like framework.WithDisruptive()
 	TestPatterns       []TestPattern       // Slice of TestPattern for the TestSuite
 	SupportedSizeRange e2evolume.SizeRange // Size range supported by the test suite
 }

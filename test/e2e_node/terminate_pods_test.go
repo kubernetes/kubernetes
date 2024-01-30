@@ -34,7 +34,7 @@ import (
 
 var _ = SIGDescribe("Terminate Pods", func() {
 	f := framework.NewDefaultFramework("terminate-pods")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should not hang when terminating pods mounting non-existent volumes", func(ctx context.Context) {
 		pod := &v1.Pod{

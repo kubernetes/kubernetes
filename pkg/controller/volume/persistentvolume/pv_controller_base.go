@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	"k8s.io/kubernetes/pkg/features"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/slice"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -73,19 +72,13 @@ type ControllerParameters struct {
 	ClassInformer             storageinformers.StorageClassInformer
 	PodInformer               coreinformers.PodInformer
 	NodeInformer              coreinformers.NodeInformer
-	EventRecorder             record.EventRecorder
 	EnableDynamicProvisioning bool
-	FilteredDialOptions       *proxyutil.FilteredDialOptions
 }
 
 // NewController creates a new PersistentVolume controller
 func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolumeController, error) {
-	eventRecorder := p.EventRecorder
-	var eventBroadcaster record.EventBroadcaster
-	if eventRecorder == nil {
-		eventBroadcaster = record.NewBroadcaster()
-		eventRecorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
-	}
+	eventBroadcaster := record.NewBroadcaster()
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 
 	controller := &PersistentVolumeController{
 		volumes:                       newPersistentVolumeOrderedIndex(),
@@ -147,8 +140,6 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
 	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
-
-	controller.filteredDialOptions = p.FilteredDialOptions
 
 	return controller, nil
 }
@@ -314,11 +305,10 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	defer ctrl.volumeQueue.ShutDown()
 
 	// Start events processing pipeline.
-	if ctrl.eventBroadcaster != nil {
-		ctrl.eventBroadcaster.StartStructuredLogging(0)
-		ctrl.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ctrl.kubeClient.CoreV1().Events("")})
-		defer ctrl.eventBroadcaster.Shutdown()
-	}
+	ctrl.eventBroadcaster.StartStructuredLogging(0)
+	ctrl.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ctrl.kubeClient.CoreV1().Events("")})
+	defer ctrl.eventBroadcaster.Shutdown()
+
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting persistent volume controller")
 	defer logger.Info("Shutting down persistent volume controller")

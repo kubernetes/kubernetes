@@ -103,19 +103,46 @@ func TestAuthorization(t *testing.T) {
 			strategy := NewStrategy(tc.auth, tc.policyGetter, tc.resourceResolver)
 			t.Run("create", func(t *testing.T) {
 				ctx := request.WithUser(context.Background(), tc.userInfo)
-				errs := strategy.Validate(ctx, validPolicyBinding())
-				if len(errs) > 0 != tc.expectErr {
-					t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
+				for _, obj := range validPolicyBindings() {
+					errs := strategy.Validate(ctx, obj)
+					if len(errs) > 0 != tc.expectErr {
+						t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
+					}
 				}
 			})
 			t.Run("update", func(t *testing.T) {
 				ctx := request.WithUser(context.Background(), tc.userInfo)
-				obj := validPolicyBinding()
-				objWithChangedParamRef := obj.DeepCopy()
-				objWithChangedParamRef.Spec.ParamRef.Name = "changed"
-				errs := strategy.ValidateUpdate(ctx, obj, objWithChangedParamRef)
-				if len(errs) > 0 != tc.expectErr {
-					t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
+				for _, obj := range validPolicyBindings() {
+					objWithChangedParamRef := obj.DeepCopy()
+					if pr := objWithChangedParamRef.Spec.ParamRef; pr != nil {
+						if len(pr.Name) > 0 {
+							pr.Name = "changed"
+						}
+
+						if pr.Selector != nil {
+							pr.Selector = &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"changed": "value",
+								},
+							}
+						}
+
+						if len(pr.Namespace) > 0 {
+							pr.Namespace = "othernamespace"
+						}
+
+						if pr.ParameterNotFoundAction == nil || *pr.ParameterNotFoundAction == admissionregistration.AllowAction {
+							v := admissionregistration.DenyAction
+							pr.ParameterNotFoundAction = &v
+						} else {
+							v := admissionregistration.AllowAction
+							pr.ParameterNotFoundAction = &v
+						}
+					}
+					errs := strategy.ValidateUpdate(ctx, obj, objWithChangedParamRef)
+					if len(errs) > 0 != tc.expectErr {
+						t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
+					}
 				}
 			})
 		})

@@ -62,6 +62,9 @@ func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1alpha1.ValidatingAdmissio
 }
 
 func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1alpha1.ValidatingAdmissionPolicyBinding) {
+	if in.Spec.ParamRef != nil {
+		SetDefaults_ParamRef(in.Spec.ParamRef)
+	}
 	if in.Spec.MatchResources != nil {
 		SetDefaults_MatchResources(in.Spec.MatchResources)
 		for i := range in.Spec.MatchResources.ResourceRules {

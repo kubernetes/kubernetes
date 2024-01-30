@@ -115,6 +115,9 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
 	recvEvent.FirstTimestamp = expectedEvent.FirstTimestamp
 	recvEvent.LastTimestamp = expectedEvent.LastTimestamp
+
+	recvEvent.ReportingController = expectedEvent.ReportingController
+
 	// Check that name has the right prefix.
 	if n, en := recvEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
 		t.Errorf("%v - Name '%v' does not contain prefix '%v'", messagePrefix, n, en)

@@ -20,9 +20,9 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/kubernetes/pkg/windows/service"
-
 	"github.com/spf13/pflag"
+
+	"k8s.io/kubernetes/pkg/windows/service"
 )
 
 const (

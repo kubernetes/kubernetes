@@ -79,6 +79,8 @@ type Builder struct {
 	stdinInUse bool
 	dir        bool
 
+	visitorConcurrency int
+
 	labelSelector     *string
 	fieldSelector     *string
 	selectAll         bool
@@ -230,6 +232,13 @@ func (b *Builder) AddError(err error) *Builder {
 		return b
 	}
 	b.errs = append(b.errs, err)
+	return b
+}
+
+// VisitorConcurrency sets the number of concurrent visitors to use when
+// visiting lists.
+func (b *Builder) VisitorConcurrency(concurrency int) *Builder {
+	b.visitorConcurrency = concurrency
 	return b
 }
 
@@ -1124,7 +1133,10 @@ func (b *Builder) visitByPaths() *Result {
 	if b.continueOnError {
 		visitors = EagerVisitorList(b.paths)
 	} else {
-		visitors = VisitorList(b.paths)
+		visitors = ConcurrentVisitorList{
+			visitors:    b.paths,
+			concurrency: b.visitorConcurrency,
+		}
 	}
 
 	if b.flatten {

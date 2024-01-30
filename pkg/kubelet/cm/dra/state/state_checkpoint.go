@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -54,6 +55,35 @@ type ClaimInfoState struct {
 	// PodUIDs is a set of pod UIDs that reference a resource
 	PodUIDs sets.Set[string]
 
+	// ResourceHandles is a list of opaque resource data for processing by a specific kubelet plugin
+	ResourceHandles []resourcev1alpha2.ResourceHandle
+
+	// CDIDevices is a map of DriverName --> CDI devices returned by the
+	// GRPC API call NodePrepareResource
+	CDIDevices map[string][]string
+}
+
+// ClaimInfoStateWithoutResourceHandles is an old implementation of the ClaimInfoState
+// TODO: remove in Beta
+type ClaimInfoStateWithoutResourceHandles struct {
+	// Name of the DRA driver
+	DriverName string
+
+	// ClassName is a resource class of the claim
+	ClassName string
+
+	// ClaimUID is an UID of the resource claim
+	ClaimUID types.UID
+
+	// ClaimName is a name of the resource claim
+	ClaimName string
+
+	// Namespace is a claim namespace
+	Namespace string
+
+	// PodUIDs is a set of pod UIDs that reference a resource
+	PodUIDs sets.Set[string]
+
 	// CDIDevices is a map of DriverName --> CDI devices returned by the
 	// GRPC API call NodePrepareResource
 	CDIDevices map[string][]string
@@ -67,6 +97,10 @@ type stateCheckpoint struct {
 
 // NewCheckpointState creates new State for keeping track of claim info  with checkpoint backend
 func NewCheckpointState(stateDir, checkpointName string) (*stateCheckpoint, error) {
+	if len(checkpointName) == 0 {
+		return nil, fmt.Errorf("received empty string instead of checkpointName")
+	}
+
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)

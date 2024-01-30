@@ -88,7 +88,7 @@ message CSIDriverSpec {
   // If true, Kubelet will pass pod information as VolumeContext in the CSI NodePublishVolume() calls.
   // The CSI driver is responsible for parsing and validating the information passed in as VolumeContext.
   //
-  // The following VolumeConext will be passed if podInfoOnMount is set to true.
+  // The following VolumeContext will be passed if podInfoOnMount is set to true.
   // This list might grow, but the prefix will be used.
   // "csi.storage.k8s.io/pod.name": pod.Name
   // "csi.storage.k8s.io/pod.namespace": pod.Namespace
@@ -103,7 +103,7 @@ message CSIDriverSpec {
   // deployed on such a cluster and the deployment determines which mode that is, for example
   // via a command line parameter of the driver.
   //
-  // This field is immutable.
+  // This field was immutable in Kubernetes < 1.29 and now is mutable.
   //
   // +optional
   optional bool podInfoOnMount = 2;
@@ -150,7 +150,7 @@ message CSIDriverSpec {
   // permission of the volume before being mounted.
   // Refer to the specific FSGroupPolicy values for additional details.
   //
-  // This field is immutable.
+  // This field was immutable in Kubernetes < 1.29 and now is mutable.
   //
   // Defaults to ReadWriteOnceWithFSType, which will examine each volume
   // to determine if Kubernetes should modify ownership and permissions of the volume.
@@ -261,6 +261,7 @@ message CSINodeDriver {
   // It is possible for different nodes to use different topology keys.
   // This can be empty if driver does not support topology.
   // +optional
+  // +listType=atomic
   repeated string topologyKeys = 3;
 
   // allocatable represents the volume resources of a node that are available for scheduling.
@@ -286,6 +287,8 @@ message CSINodeSpec {
   // If all drivers in the list are uninstalled, this can become empty.
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated CSINodeDriver drivers = 1;
 }
 
@@ -378,8 +381,6 @@ message CSIStorageCapacityList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CSIStorageCapacity objects.
-  // +listType=map
-  // +listMapKey=name
   repeated CSIStorageCapacity items = 2;
 }
 
@@ -411,6 +412,7 @@ message StorageClass {
   // e.g. ["ro", "soft"]. Not validated -
   // mount of the PVs will simply fail if one is invalid.
   // +optional
+  // +listType=atomic
   repeated string mountOptions = 5;
 
   // allowVolumeExpansion shows whether the storage class allow volume expand.

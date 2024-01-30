@@ -453,8 +453,8 @@ func (g ginkgoErrors) InvalidEntryDescription(cl CodeLocation) error {
 
 func (g ginkgoErrors) MissingParametersForTableFunction(cl CodeLocation) error {
 	return GinkgoError{
-		Heading:      fmt.Sprintf("No parameters have been passed to the Table Function"),
-		Message:      fmt.Sprintf("The Table Function expected at least 1 parameter"),
+		Heading:      "No parameters have been passed to the Table Function",
+		Message:      "The Table Function expected at least 1 parameter",
 		CodeLocation: cl,
 		DocLink:      "table-specs",
 	}
@@ -500,6 +500,15 @@ func (g ginkgoErrors) IncorrectVariadicParameterTypeToTableFunction(expected, ac
 	return GinkgoError{
 		Heading:      fmt.Sprintf("Incorrect parameters type passed to %s", kind),
 		Message:      fmt.Sprintf("The %s expected its variadic parameters to be of type <%s> but you passed in <%s>", kind, expected, actual),
+		CodeLocation: cl,
+		DocLink:      "table-specs",
+	}
+}
+
+func (g ginkgoErrors) ContextsCannotBeUsedInSubtreeTables(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "Contexts cannot be used in subtree tables",
+		Message:      "You''ve defined a subtree body function that accepts a context but did not provide one in the table entry.  Ginkgo SpecContexts can only be passed in to subject and setup nodes - so if you are trying to implement a spec timeout you should request a context in the It function within your subtree body function, not in the subtree body function itself.",
 		CodeLocation: cl,
 		DocLink:      "table-specs",
 	}

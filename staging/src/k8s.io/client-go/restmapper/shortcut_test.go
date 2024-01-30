@@ -19,7 +19,7 @@ package restmapper
 import (
 	"testing"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -133,7 +133,7 @@ func TestReplaceAliases(t *testing.T) {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}
-		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds).(shortcutExpander)
+		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, nil).(shortcutExpander)
 
 		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
 		if actual != test.expected {
@@ -187,7 +187,9 @@ func TestKindFor(t *testing.T) {
 		}
 
 		delegate := &fakeRESTMapper{}
-		mapper := NewShortcutExpander(delegate, ds)
+		mapper := NewShortcutExpander(delegate, ds, func(a string) {
+			t.Fatalf("unexpected warning message %s", a)
+		})
 
 		mapper.KindFor(test.in)
 		if delegate.kindForInput != test.expected {
@@ -242,7 +244,9 @@ func TestKindForWithNewCRDs(t *testing.T) {
 			// will answer the initial request, only failure to match will trigger
 			// the cache invalidation and live discovery call
 			delegate := NewDeferredDiscoveryRESTMapper(fakeCachedDiscovery)
-			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery)
+			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery, func(a string) {
+				t.Fatalf("unexpected warning message %s", a)
+			})
 
 			gvk, err := mapper.KindFor(test.in)
 			if err != nil {
@@ -252,6 +256,201 @@ func TestKindForWithNewCRDs(t *testing.T) {
 				t.Errorf("unexpected data returned %#v, expected %#v", gvk, test.expected)
 			}
 		})
+	}
+}
+
+func TestWarnAmbigious(t *testing.T) {
+	tests := []struct {
+		name                string
+		arg                 string
+		expected            schema.GroupVersionResource
+		expectedWarningLogs []string
+		srvRes              []*metav1.APIResourceList
+	}{
+		{
+			name:                "warn ambiguity",
+			arg:                 "hpa",
+			expected:            schema.GroupVersionResource{Resource: "superhorizontalpodautoscalers", Group: "autoscaling"},
+			expectedWarningLogs: []string{`short name "hpa" could also match lower priority resource horizontalpodautoscalers.autoscaling`},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "superhorizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                "warn-builtin-shortname-ambugity",
+			arg:                 "po",
+			expected:            schema.GroupVersionResource{Resource: "pods", Group: ""},
+			expectedWarningLogs: []string{`short name "po" could also match lower priority resource poddlers.acme.com`},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{Name: "pods", SingularName: "pod", ShortNames: []string{"po"}}},
+				},
+				{
+					GroupVersion: "acme.com/v1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"po"}}},
+				},
+			},
+		},
+		{
+			name:                "warn-builtin-shortname-ambugity-multi-version",
+			arg:                 "po",
+			expected:            schema.GroupVersionResource{Resource: "pods", Group: ""},
+			expectedWarningLogs: []string{`short name "po" could also match lower priority resource poddlers.acme.com`},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{Name: "pods", SingularName: "pod", ShortNames: []string{"po"}}},
+				},
+				{
+					GroupVersion: "acme.com/v1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"po"}}},
+				},
+				{
+					GroupVersion: "acme.com/v1beta1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"po"}}},
+				},
+			},
+		},
+		{
+			name:     "resource-match-singular-preferred",
+			arg:      "pod",
+			expected: schema.GroupVersionResource{Resource: "pod", Group: ""},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{Name: "pods", SingularName: "pod"}},
+				},
+				{
+					GroupVersion: "acme.com/v1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"pods", "pod"}}},
+				},
+			},
+		},
+		{
+			name:                "resource-multiple-versions-shortform",
+			arg:                 "hpa",
+			expected:            schema.GroupVersionResource{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
+			expectedWarningLogs: []string{},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "autoscaling/v1alphav1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "multi-resource-multiple-versions-shortform",
+			arg:      "hpa",
+			expected: schema.GroupVersionResource{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
+			expectedWarningLogs: []string{
+				`short name "hpa" could also match lower priority resource foo.foo`,
+				`short name "hpa" could also match lower priority resource bar.bar`,
+			},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "autoscaling/v1alphav1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "foo/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "foo",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "foo/v1beta1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "foo",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "bar/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "bar",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		ds := &fakeDiscoveryClient{}
+		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
+			return test.srvRes, nil
+		}
+
+		var actualWarnings []string
+		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, func(a string) {
+			actualWarnings = append(actualWarnings, a)
+		}).(shortcutExpander)
+
+		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
+		if actual != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, actual)
+		}
+
+		if len(actualWarnings) == 0 && len(test.expectedWarningLogs) == 0 {
+			continue
+		}
+
+		if !cmp.Equal(test.expectedWarningLogs, actualWarnings) {
+			t.Fatalf("expected warning message %s but got %s", test.expectedWarningLogs, actualWarnings)
+		}
 	}
 }
 

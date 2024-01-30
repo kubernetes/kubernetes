@@ -302,6 +302,8 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 				{
 					Resource: "cronjobs",
 					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					// populated to avoid nil panics
+					ResponseKind: &metav1.GroupVersionKind{},
 					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
 						Subresource: "status",
 						ResponseKind: &metav1.GroupVersionKind{
@@ -310,6 +312,32 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 							Kind:    "CronJob",
 						},
 						Verbs: []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+					}},
+				},
+			},
+		},
+		{
+			name: "Test with subresource with missing kind",
+			resources: []metav1.APIResource{
+				{
+					Name:       "cronjobs/status",
+					Namespaced: true,
+					Group:      "batch",
+					Version:    "v1",
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				},
+			},
+			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+				{
+					Resource: "cronjobs",
+					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					// populated to avoid nil panics
+					ResponseKind: &metav1.GroupVersionKind{},
+					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+						Subresource: "status",
+						// populated to avoid nil panics
+						ResponseKind: &metav1.GroupVersionKind{},
+						Verbs:        []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 					}},
 				},
 			},

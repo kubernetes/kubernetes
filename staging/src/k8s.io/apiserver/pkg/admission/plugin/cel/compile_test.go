@@ -17,12 +17,15 @@ limitations under the License.
 package cel
 
 import (
+	"math/rand"
 	"strings"
 	"testing"
 
 	celgo "github.com/google/cel-go/cel"
 
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/cel/library"
 )
 
 func TestCompileValidatingPolicyExpression(t *testing.T) {
@@ -32,6 +35,7 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 		hasParams        bool
 		hasAuthorizer    bool
 		errorExpressions map[string]string
+		envType          environment.Type
 	}{
 		{
 			name: "invalid syntax",
@@ -43,6 +47,11 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 		{
 			name:        "with params",
 			expressions: []string{"object.foo < params.x"},
+			hasParams:   true,
+		},
+		{
+			name:        "namespaceObject",
+			expressions: []string{"namespaceObject.metadata.name.startsWith('test')"},
 			hasParams:   true,
 		},
 		{
@@ -117,25 +126,92 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 				"authorizer.group('') != null": "undeclared reference to 'authorizer'",
 			},
 		},
+		{
+			name: "compile with storage environment should recognize functions available only in the storage environment",
+			expressions: []string{
+				"test() == true",
+			},
+			envType: environment.StoredExpressions,
+		},
+		{
+			name: "compile with supported environment should not recognize functions available only in the storage environment",
+			errorExpressions: map[string]string{
+				"test() == true": "undeclared reference to 'test'",
+			},
+			envType: environment.NewExpressions,
+		},
+		{
+			name: "valid namespaceObject",
+			expressions: []string{
+				"namespaceObject.metadata != null",
+				"namespaceObject.metadata.name == 'test'",
+				"namespaceObject.metadata.generateName == 'test'",
+				"namespaceObject.metadata.namespace == 'testns'",
+				"'test' in namespaceObject.metadata.labels",
+				"'test' in namespaceObject.metadata.annotations",
+				"namespaceObject.metadata.UID == '12345'",
+				"type(namespaceObject.metadata.creationTimestamp) == google.protobuf.Timestamp",
+				"type(namespaceObject.metadata.deletionTimestamp) == google.protobuf.Timestamp",
+				"namespaceObject.metadata.deletionGracePeriodSeconds == 5",
+				"namespaceObject.metadata.generation == 2",
+				"namespaceObject.metadata.resourceVersion == 'v1'",
+				"namespaceObject.metadata.finalizers[0] == 'testEnv'",
+				"namespaceObject.spec.finalizers[0] == 'testEnv'",
+				"namespaceObject.status.phase == 'Active'",
+				"namespaceObject.status.conditions[0].status == 'True'",
+				"namespaceObject.status.conditions[0].type == 'NamespaceDeletionDiscoveryFailure'",
+				"type(namespaceObject.status.conditions[0].lastTransitionTime) == google.protobuf.Timestamp",
+				"namespaceObject.status.conditions[0].message == 'Unknow'",
+				"namespaceObject.status.conditions[0].reason == 'Invalid'",
+			},
+		},
+		{
+			name: "invalid namespaceObject",
+			errorExpressions: map[string]string{
+				"namespaceObject.foo1 == 'nope'":                      "undefined field 'foo1'",
+				"namespaceObject.metadata.foo2 == 'nope'":             "undefined field 'foo2'",
+				"namespaceObject.spec.foo3 == 'nope'":                 "undefined field 'foo3'",
+				"namespaceObject.status.foo4 == 'nope'":               "undefined field 'foo4'",
+				"namespaceObject.status.conditions[0].foo5 == 'nope'": "undefined field 'foo5'",
+			},
+		},
 	}
 
+	// Include the test library, which includes the test() function in the storage environment during test
+	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	extended, err := base.Extend(environment.VersionedOptions{
+		IntroducedVersion: version.MajorMinor(1, 999),
+		EnvOptions:        []celgo.EnvOption{library.Test()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiler := NewCompiler(extended)
+
 	for _, tc := range cases {
+		envType := tc.envType
+		if envType == "" {
+			envType = environment.NewExpressions
+		}
 		t.Run(tc.name, func(t *testing.T) {
 			for _, expr := range tc.expressions {
 				t.Run(expr, func(t *testing.T) {
 					t.Run("expression", func(t *testing.T) {
-						result := CompileCELExpression(&fakeValidationCondition{
+						options := OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}
+
+						result := compiler.CompileCELExpression(&fakeValidationCondition{
 							Expression: expr,
-						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						}, options, envType)
 						if result.Error != nil {
 							t.Errorf("Unexpected error: %v", result.Error)
 						}
 					})
 					t.Run("auditAnnotation.valueExpression", func(t *testing.T) {
 						// Test audit annotation compilation by casting the result to a string
-						result := CompileCELExpression(&fakeAuditAnnotationCondition{
+						options := OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}
+						result := compiler.CompileCELExpression(&fakeAuditAnnotationCondition{
 							ValueExpression: "string(" + expr + ")",
-						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						}, options, envType)
 						if result.Error != nil {
 							t.Errorf("Unexpected error: %v", result.Error)
 						}
@@ -145,9 +221,10 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 			for expr, expectErr := range tc.errorExpressions {
 				t.Run(expr, func(t *testing.T) {
 					t.Run("expression", func(t *testing.T) {
-						result := CompileCELExpression(&fakeValidationCondition{
+						options := OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}
+						result := compiler.CompileCELExpression(&fakeValidationCondition{
 							Expression: expr,
-						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						}, options, envType)
 						if result.Error == nil {
 							t.Errorf("Expected expression '%s' to contain '%v' but got no error", expr, expectErr)
 							return
@@ -158,9 +235,10 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 					})
 					t.Run("auditAnnotation.valueExpression", func(t *testing.T) {
 						// Test audit annotation compilation by casting the result to a string
-						result := CompileCELExpression(&fakeAuditAnnotationCondition{
+						options := OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}
+						result := compiler.CompileCELExpression(&fakeAuditAnnotationCondition{
 							ValueExpression: "string(" + expr + ")",
-						}, OptionalVariableDeclarations{HasParams: tc.hasParams, HasAuthorizer: tc.hasAuthorizer}, celconfig.PerCallLimit)
+						}, options, envType)
 						if result.Error == nil {
 							t.Errorf("Expected expression '%s' to contain '%v' but got no error", expr, expectErr)
 							return
@@ -172,6 +250,21 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func BenchmarkCompile(b *testing.B) {
+	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		options := OptionalVariableDeclarations{HasParams: rand.Int()%2 == 0, HasAuthorizer: rand.Int()%2 == 0}
+
+		result := compiler.CompileCELExpression(&fakeValidationCondition{
+			Expression: "object.foo < object.bar",
+		}, options, environment.StoredExpressions)
+		if result.Error != nil {
+			b.Fatal(result.Error)
+		}
 	}
 }
 

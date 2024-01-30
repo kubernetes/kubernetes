@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
@@ -32,6 +33,7 @@ import (
 type CommandBuilder struct {
 	webhookConfigs                 map[string]WebhookConfig
 	controllerInitFuncConstructors map[string]ControllerInitFuncConstructor
+	controllerAliases              map[string]string
 	additionalFlags                cliflag.NamedFlagSets
 	options                        *options.CloudControllerManagerOptions
 	cloudInitializer               InitCloudFunc
@@ -45,6 +47,7 @@ func NewBuilder() *CommandBuilder {
 	cb := CommandBuilder{}
 	cb.webhookConfigs = make(map[string]WebhookConfig)
 	cb.controllerInitFuncConstructors = make(map[string]ControllerInitFuncConstructor)
+	cb.controllerAliases = make(map[string]string)
 	return &cb
 }
 
@@ -56,13 +59,21 @@ func (cb *CommandBuilder) AddFlags(additionalFlags cliflag.NamedFlagSets) {
 	cb.additionalFlags = additionalFlags
 }
 
-func (cb *CommandBuilder) RegisterController(name string, constructor ControllerInitFuncConstructor) {
+func (cb *CommandBuilder) RegisterController(name string, constructor ControllerInitFuncConstructor, aliases map[string]string) {
 	cb.controllerInitFuncConstructors[name] = constructor
+	for key, val := range aliases {
+		if name == val {
+			cb.controllerAliases[key] = val
+		}
+	}
 }
 
 func (cb *CommandBuilder) RegisterDefaultControllers() {
 	for key, val := range DefaultInitFuncConstructors {
 		cb.controllerInitFuncConstructors[key] = val
+	}
+	for key, val := range names.CCMControllerAliases() {
+		cb.controllerAliases[key] = val
 	}
 }
 
@@ -129,7 +140,7 @@ func (cb *CommandBuilder) BuildCommand() *cobra.Command {
 			cliflag.PrintFlags(cmd.Flags())
 
 			config, err := cb.options.Config(ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(),
-				WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())
+				cb.controllerAliases, WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
@@ -156,7 +167,8 @@ func (cb *CommandBuilder) BuildCommand() *cobra.Command {
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := cb.options.Flags(ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(), WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())
+	namedFlagSets := cb.options.Flags(ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(), cb.controllerAliases,
+		WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
 

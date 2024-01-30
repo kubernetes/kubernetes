@@ -18,7 +18,6 @@ package test
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 )
@@ -43,7 +42,6 @@ func init() {
 			return nil
 		},
 		expectErrorSubstring: "hostProcess",
-		failRequiresFeatures: []featuregate.Feature{"WindowsHostProcessContainers"},
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			if p.Spec.SecurityContext.WindowsOptions == nil {

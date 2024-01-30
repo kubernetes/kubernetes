@@ -814,15 +814,21 @@ func (d decoder) unmarshalTimestamp(m protoreflect.Message) error {
 		return d.unexpectedTokenError(tok)
 	}
 
-	t, err := time.Parse(time.RFC3339Nano, tok.ParsedString())
+	s := tok.ParsedString()
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return d.newError(tok.Pos(), "invalid %v value %v", genid.Timestamp_message_fullname, tok.RawString())
 	}
-	// Validate seconds. No need to validate nanos because time.Parse would have
-	// covered that already.
+	// Validate seconds.
 	secs := t.Unix()
 	if secs < minTimestampSeconds || secs > maxTimestampSeconds {
 		return d.newError(tok.Pos(), "%v value out of range: %v", genid.Timestamp_message_fullname, tok.RawString())
+	}
+	// Validate subseconds.
+	i := strings.LastIndexByte(s, '.')  // start of subsecond field
+	j := strings.LastIndexAny(s, "Z-+") // start of timezone field
+	if i >= 0 && j >= i && j-i > len(".999999999") {
+		return d.newError(tok.Pos(), "invalid %v value %v", genid.Timestamp_message_fullname, tok.RawString())
 	}
 
 	fds := m.Descriptor().Fields()

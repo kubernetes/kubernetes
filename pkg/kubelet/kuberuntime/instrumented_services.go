@@ -317,7 +317,7 @@ func (in instrumentedImageManagerService) RemoveImage(ctx context.Context, image
 	return err
 }
 
-func (in instrumentedImageManagerService) ImageFsInfo(ctx context.Context) ([]*runtimeapi.FilesystemUsage, error) {
+func (in instrumentedImageManagerService) ImageFsInfo(ctx context.Context) (*runtimeapi.ImageFsInfoResponse, error) {
 	const operation = "image_fs_info"
 	defer recordOperation(operation, time.Now())
 
@@ -358,6 +358,15 @@ func (in instrumentedRuntimeService) ListPodSandboxMetrics(ctx context.Context) 
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ListPodSandboxMetrics(ctx)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
+	const operation = "runtime_config"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.RuntimeConfig(ctx)
 	recordError(operation, err)
 	return out, err
 }

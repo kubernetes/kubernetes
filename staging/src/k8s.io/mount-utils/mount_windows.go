@@ -82,11 +82,11 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 
 	if source == "tmpfs" {
 		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, sanitizedOptionsForLogging)
-		return os.MkdirAll(target, 0755)
+		return os.MkdirAll(target, 0o755)
 	}
 
 	parentDir := filepath.Dir(target)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return err
 	}
 
@@ -150,12 +150,12 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		mklinkSource = mklinkSource + "\\"
 	}
 
-	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, mklinkSource).CombinedOutput()
+	err := os.Symlink(mklinkSource, target)
 	if err != nil {
-		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, mklinkSource, target, string(output))
+		klog.Errorf("symlink failed: %v, source(%q) target(%q)", err, mklinkSource, target)
 		return err
 	}
-	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", mklinkSource, target, string(output))
+	klog.V(2).Infof("symlink source(%q) on target(%q) successfully", mklinkSource, target)
 
 	return nil
 }
@@ -164,7 +164,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 // return (output, error)
 func newSMBMapping(username, password, remotepath string) (string, error) {
 	if username == "" || password == "" || remotepath == "" {
-		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remoteapth: %s)", username, sensitiveOptionsRemoved, remotepath)
+		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remotepath: %s)", username, sensitiveOptionsRemoved, remotepath)
 	}
 
 	// use PowerShell Environment Variables to store user input string to prevent command line injection
@@ -193,8 +193,8 @@ func isSMBMappingExist(remotepath string) bool {
 // check whether remotepath is valid
 // return (true, nil) if remotepath is valid
 func isValidPath(remotepath string) (bool, error) {
-	cmd := exec.Command("powershell", "/c", `Test-Path $Env:remoteapth`)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("remoteapth=%s", remotepath))
+	cmd := exec.Command("powershell", "/c", `Test-Path $Env:remotepath`)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("remotepath=%s", remotepath))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("returned output: %s, error: %v", string(output), err)
@@ -219,8 +219,9 @@ func removeSMBMapping(remotepath string) (string, error) {
 func (mounter *Mounter) Unmount(target string) error {
 	klog.V(4).Infof("Unmount target (%q)", target)
 	target = NormalizeWindowsPath(target)
-	if output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput(); err != nil {
-		klog.Errorf("rmdir failed: %v, output: %q", err, string(output))
+
+	if err := os.Remove(target); err != nil {
+		klog.Errorf("removing directory %s failed: %v", target, err)
 		return err
 	}
 	return nil
@@ -287,38 +288,40 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		fstype = "NTFS"
 	}
 
-	// format disk if it is unformatted(raw)
-	formatOptionsUnwrapped := ""
 	if len(formatOptions) > 0 {
-		formatOptionsUnwrapped = " " + strings.Join(formatOptions, " ")
+		return fmt.Errorf("diskMount: formatOptions are not supported on Windows")
 	}
-	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle GPT -PassThru"+
-		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false%s", source, fstype, formatOptionsUnwrapped)
-	if output, err := mounter.Exec.Command("powershell", "/c", cmd).CombinedOutput(); err != nil {
+
+	cmdString := "Get-Disk -Number $env:source | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle GPT -PassThru" +
+		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem $env:fstype -Confirm:$false"
+	cmd := mounter.Exec.Command("powershell", "/c", cmdString)
+	env := append(os.Environ(),
+		fmt.Sprintf("source=%s", source),
+		fmt.Sprintf("fstype=%s", fstype),
+	)
+	cmd.SetEnv(env)
+	klog.V(8).Infof("Executing command: %q", cmdString)
+	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
 	}
 	klog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
-	volumeIds, err := listVolumesOnDisk(source)
+	volumeIds, err := ListVolumesOnDisk(source)
 	if err != nil {
 		return err
 	}
 	driverPath := volumeIds[0]
-	target = NormalizeWindowsPath(target)
-	output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
-	if err != nil {
-		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, driverPath, err, string(output))
-		return err
-	}
-	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", driverPath, fstype, target, string(output))
-	return nil
+	return mounter.MountSensitive(driverPath, target, fstype, options, sensitiveOptions)
 }
 
 // ListVolumesOnDisk - returns back list of volumes(volumeIDs) in the disk (requested in diskID).
-func listVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
-	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume).UniqueId", diskID)
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	klog.V(4).Infof("listVolumesOnDisk id from %s: %s", diskID, string(output))
+func ListVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
+	// If a Disk has multiple volumes, Get-Volume may not return items in the same order.
+	cmd := exec.Command("powershell", "/c", "(Get-Disk -DeviceId $env:diskID | Get-Partition | Get-Volume | Sort-Object -Property UniqueId).UniqueId")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("diskID=%s", diskID))
+	klog.V(8).Infof("Executing command: %q", cmd.String())
+	output, err := cmd.CombinedOutput()
+	klog.V(4).Infof("ListVolumesOnDisk id from %s: %s", diskID, string(output))
 	if err != nil {
 		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
 	}

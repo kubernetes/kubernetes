@@ -41,7 +41,7 @@ import (
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
-	f.NamespacePodSecurityEnforceLevel = api.LevelPrivileged
+	f.NamespacePodSecurityLevel = api.LevelPrivileged
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
@@ -67,7 +67,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func(ctx context.Context) {
+	f.It("should run a Pod requesting a RuntimeClass with scheduling with taints", f.WithSerial(), func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 
@@ -123,8 +123,8 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// check that pod got scheduled on specified node.
 		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
-		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)
+		gomega.Expect(nodeName).To(gomega.Equal(scheduledPod.Spec.NodeName))
+		gomega.Expect(nodeSelector).To(gomega.Equal(pod.Spec.NodeSelector))
 		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
 	})
 
@@ -169,8 +169,8 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// check that pod got scheduled on specified node.
 		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
-		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)
+		gomega.Expect(nodeName).To(gomega.Equal(scheduledPod.Spec.NodeName))
+		gomega.Expect(nodeSelector).To(gomega.Equal(pod.Spec.NodeSelector))
 	})
 })
 

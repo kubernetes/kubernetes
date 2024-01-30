@@ -1,5 +1,8 @@
-//go:build linux
-// +build linux
+//go:build linux && !appengine
+// +build linux,!appengine
+
+// Note: the documentation on the Watcher type and methods is generated from
+// mkdoc.zsh
 
 package fsnotify
 
@@ -26,9 +29,9 @@ import (
 // When a file is removed a Remove event won't be emitted until all file
 // descriptors are closed, and deletes will always emit a Chmod. For example:
 //
-//     fp := os.Open("file")
-//     os.Remove("file")        // Triggers Chmod
-//     fp.Close()               // Triggers Remove
+//	fp := os.Open("file")
+//	os.Remove("file")        // Triggers Chmod
+//	fp.Close()               // Triggers Remove
 //
 // This is the event that inotify sends, so not much can be changed about this.
 //
@@ -42,16 +45,16 @@ import (
 //
 // To increase them you can use sysctl or write the value to the /proc file:
 //
-//     # Default values on Linux 5.18
-//     sysctl fs.inotify.max_user_watches=124983
-//     sysctl fs.inotify.max_user_instances=128
+//	# Default values on Linux 5.18
+//	sysctl fs.inotify.max_user_watches=124983
+//	sysctl fs.inotify.max_user_instances=128
 //
 // To make the changes persist on reboot edit /etc/sysctl.conf or
 // /usr/lib/sysctl.d/50-default.conf (details differ per Linux distro; check
 // your distro's documentation):
 //
-//     fs.inotify.max_user_watches=124983
-//     fs.inotify.max_user_instances=128
+//	fs.inotify.max_user_watches=124983
+//	fs.inotify.max_user_instances=128
 //
 // Reaching the limit will result in a "no space left on device" or "too many open
 // files" error.
@@ -67,14 +70,20 @@ import (
 // control the maximum number of open files, as well as /etc/login.conf on BSD
 // systems.
 //
-// # macOS notes
+// # Windows notes
 //
-// Spotlight indexing on macOS can result in multiple events (see [#15]). A
-// temporary workaround is to add your folder(s) to the "Spotlight Privacy
-// Settings" until we have a native FSEvents implementation (see [#11]).
+// Paths can be added as "C:\path\to\dir", but forward slashes
+// ("C:/path/to/dir") will also work.
 //
-// [#11]: https://github.com/fsnotify/fsnotify/issues/11
-// [#15]: https://github.com/fsnotify/fsnotify/issues/15
+// When a watched directory is removed it will always send an event for the
+// directory itself, but may not send events for all files in that directory.
+// Sometimes it will send events for all times, sometimes it will send no
+// events, and often only for some files.
+//
+// The default ReadDirectoryChangesW() buffer size is 64K, which is the largest
+// value that is guaranteed to work with SMB filesystems. If you have many
+// events in quick succession this may not be enough, and you will have to use
+// [WithBufferSize] to increase the value.
 type Watcher struct {
 	// Events sends the filesystem change events.
 	//
@@ -101,36 +110,148 @@ type Watcher struct {
 	//                      initiated by the user may show up as one or multiple
 	//                      writes, depending on when the system syncs things to
 	//                      disk. For example when compiling a large Go program
-	//                      you may get hundreds of Write events, so you
-	//                      probably want to wait until you've stopped receiving
-	//                      them (see the dedup example in cmd/fsnotify).
+	//                      you may get hundreds of Write events, and you may
+	//                      want to wait until you've stopped receiving them
+	//                      (see the dedup example in cmd/fsnotify).
+	//
+	//                      Some systems may send Write event for directories
+	//                      when the directory content changes.
 	//
 	//   fsnotify.Chmod     Attributes were changed. On Linux this is also sent
 	//                      when a file is removed (or more accurately, when a
 	//                      link to an inode is removed). On kqueue it's sent
-	//                      and on kqueue when a file is truncated. On Windows
-	//                      it's never sent.
+	//                      when a file is truncated. On Windows it's never
+	//                      sent.
 	Events chan Event
 
 	// Errors sends any errors.
+	//
+	// ErrEventOverflow is used to indicate there are too many events:
+	//
+	//  - inotify:      There are too many queued events (fs.inotify.max_queued_events sysctl)
+	//  - windows:      The buffer size is too small; WithBufferSize() can be used to increase it.
+	//  - kqueue, fen:  Not used.
 	Errors chan error
 
 	// Store fd here as os.File.Read() will no longer return on close after
 	// calling Fd(). See: https://github.com/golang/go/issues/26439
 	fd          int
-	mu          sync.Mutex // Map access
 	inotifyFile *os.File
-	watches     map[string]*watch // Map of inotify watches (key: path)
-	paths       map[int]string    // Map of watched paths (key: watch descriptor)
-	done        chan struct{}     // Channel for sending a "quit message" to the reader goroutine
-	doneResp    chan struct{}     // Channel to respond to Close
+	watches     *watches
+	done        chan struct{} // Channel for sending a "quit message" to the reader goroutine
+	closeMu     sync.Mutex
+	doneResp    chan struct{} // Channel to respond to Close
+}
+
+type (
+	watches struct {
+		mu   sync.RWMutex
+		wd   map[uint32]*watch // wd → watch
+		path map[string]uint32 // pathname → wd
+	}
+	watch struct {
+		wd    uint32 // Watch descriptor (as returned by the inotify_add_watch() syscall)
+		flags uint32 // inotify flags of this watch (see inotify(7) for the list of valid flags)
+		path  string // Watch path.
+	}
+)
+
+func newWatches() *watches {
+	return &watches{
+		wd:   make(map[uint32]*watch),
+		path: make(map[string]uint32),
+	}
+}
+
+func (w *watches) len() int {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return len(w.wd)
+}
+
+func (w *watches) add(ww *watch) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.wd[ww.wd] = ww
+	w.path[ww.path] = ww.wd
+}
+
+func (w *watches) remove(wd uint32) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	delete(w.path, w.wd[wd].path)
+	delete(w.wd, wd)
+}
+
+func (w *watches) removePath(path string) (uint32, bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	wd, ok := w.path[path]
+	if !ok {
+		return 0, false
+	}
+
+	delete(w.path, path)
+	delete(w.wd, wd)
+
+	return wd, true
+}
+
+func (w *watches) byPath(path string) *watch {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.wd[w.path[path]]
+}
+
+func (w *watches) byWd(wd uint32) *watch {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.wd[wd]
+}
+
+func (w *watches) updatePath(path string, f func(*watch) (*watch, error)) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	var existing *watch
+	wd, ok := w.path[path]
+	if ok {
+		existing = w.wd[wd]
+	}
+
+	upd, err := f(existing)
+	if err != nil {
+		return err
+	}
+	if upd != nil {
+		w.wd[upd.wd] = upd
+		w.path[upd.path] = upd.wd
+
+		if upd.wd != wd {
+			delete(w.wd, wd)
+		}
+	}
+
+	return nil
 }
 
 // NewWatcher creates a new Watcher.
 func NewWatcher() (*Watcher, error) {
-	// Create inotify fd
-	// Need to set the FD to nonblocking mode in order for SetDeadline methods to work
-	// Otherwise, blocking i/o operations won't terminate on close
+	return NewBufferedWatcher(0)
+}
+
+// NewBufferedWatcher creates a new Watcher with a buffered Watcher.Events
+// channel.
+//
+// The main use case for this is situations with a very large number of events
+// where the kernel buffer size can't be increased (e.g. due to lack of
+// permissions). An unbuffered Watcher will perform better for almost all use
+// cases, and whenever possible you will be better off increasing the kernel
+// buffers instead of adding a large userspace buffer.
+func NewBufferedWatcher(sz uint) (*Watcher, error) {
+	// Need to set nonblocking mode for SetDeadline to work, otherwise blocking
+	// I/O operations won't terminate on close.
 	fd, errno := unix.InotifyInit1(unix.IN_CLOEXEC | unix.IN_NONBLOCK)
 	if fd == -1 {
 		return nil, errno
@@ -139,9 +260,8 @@ func NewWatcher() (*Watcher, error) {
 	w := &Watcher{
 		fd:          fd,
 		inotifyFile: os.NewFile(uintptr(fd), ""),
-		watches:     make(map[string]*watch),
-		paths:       make(map[int]string),
-		Events:      make(chan Event),
+		watches:     newWatches(),
+		Events:      make(chan Event, sz),
 		Errors:      make(chan error),
 		done:        make(chan struct{}),
 		doneResp:    make(chan struct{}),
@@ -157,8 +277,8 @@ func (w *Watcher) sendEvent(e Event) bool {
 	case w.Events <- e:
 		return true
 	case <-w.done:
+		return false
 	}
-	return false
 }
 
 // Returns true if the error was sent, or false if watcher is closed.
@@ -180,17 +300,15 @@ func (w *Watcher) isClosed() bool {
 	}
 }
 
-// Close removes all watches and closes the events channel.
+// Close removes all watches and closes the Events channel.
 func (w *Watcher) Close() error {
-	w.mu.Lock()
+	w.closeMu.Lock()
 	if w.isClosed() {
-		w.mu.Unlock()
+		w.closeMu.Unlock()
 		return nil
 	}
-
-	// Send 'close' signal to goroutine, and set the Watcher to closed.
 	close(w.done)
-	w.mu.Unlock()
+	w.closeMu.Unlock()
 
 	// Causes any blocking reads to return with an error, provided the file
 	// still supports deadline operations.
@@ -207,16 +325,20 @@ func (w *Watcher) Close() error {
 
 // Add starts monitoring the path for changes.
 //
-// A path can only be watched once; attempting to watch it more than once will
-// return an error. Paths that do not yet exist on the filesystem cannot be
-// added. A watch will be automatically removed if the path is deleted.
+// A path can only be watched once; watching it more than once is a no-op and will
+// not return an error. Paths that do not yet exist on the filesystem cannot be
+// watched.
 //
-// A path will remain watched if it gets renamed to somewhere else on the same
-// filesystem, but the monitor will get removed if the path gets deleted and
-// re-created, or if it's moved to a different filesystem.
+// A watch will be automatically removed if the watched path is deleted or
+// renamed. The exception is the Windows backend, which doesn't remove the
+// watcher on renames.
 //
 // Notifications on network filesystems (NFS, SMB, FUSE, etc.) or special
 // filesystems (/proc, /sys, etc.) generally don't work.
+//
+// Returns [ErrClosed] if [Watcher.Close] was called.
+//
+// See [Watcher.AddWith] for a version that allows adding options.
 //
 // # Watching directories
 //
@@ -227,44 +349,59 @@ func (w *Watcher) Close() error {
 // # Watching files
 //
 // Watching individual files (rather than directories) is generally not
-// recommended as many tools update files atomically. Instead of "just" writing
-// to the file a temporary file will be written to first, and if successful the
-// temporary file is moved to to destination removing the original, or some
-// variant thereof. The watcher on the original file is now lost, as it no
-// longer exists.
+// recommended as many programs (especially editors) update files atomically: it
+// will write to a temporary file which is then moved to to destination,
+// overwriting the original (or some variant thereof). The watcher on the
+// original file is now lost, as that no longer exists.
 //
-// Instead, watch the parent directory and use Event.Name to filter out files
-// you're not interested in. There is an example of this in [cmd/fsnotify/file.go].
-func (w *Watcher) Add(name string) error {
-	name = filepath.Clean(name)
+// The upshot of this is that a power failure or crash won't leave a
+// half-written file.
+//
+// Watch the parent directory and use Event.Name to filter out files you're not
+// interested in. There is an example of this in cmd/fsnotify/file.go.
+func (w *Watcher) Add(name string) error { return w.AddWith(name) }
+
+// AddWith is like [Watcher.Add], but allows adding options. When using Add()
+// the defaults described below are used.
+//
+// Possible options are:
+//
+//   - [WithBufferSize] sets the buffer size for the Windows backend; no-op on
+//     other platforms. The default is 64K (65536 bytes).
+func (w *Watcher) AddWith(name string, opts ...addOpt) error {
 	if w.isClosed() {
-		return errors.New("inotify instance already closed")
+		return ErrClosed
 	}
+
+	name = filepath.Clean(name)
+	_ = getOptions(opts...)
 
 	var flags uint32 = unix.IN_MOVED_TO | unix.IN_MOVED_FROM |
 		unix.IN_CREATE | unix.IN_ATTRIB | unix.IN_MODIFY |
 		unix.IN_MOVE_SELF | unix.IN_DELETE | unix.IN_DELETE_SELF
 
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	watchEntry := w.watches[name]
-	if watchEntry != nil {
-		flags |= watchEntry.flags | unix.IN_MASK_ADD
-	}
-	wd, errno := unix.InotifyAddWatch(w.fd, name, flags)
-	if wd == -1 {
-		return errno
-	}
+	return w.watches.updatePath(name, func(existing *watch) (*watch, error) {
+		if existing != nil {
+			flags |= existing.flags | unix.IN_MASK_ADD
+		}
 
-	if watchEntry == nil {
-		w.watches[name] = &watch{wd: uint32(wd), flags: flags}
-		w.paths[wd] = name
-	} else {
-		watchEntry.wd = uint32(wd)
-		watchEntry.flags = flags
-	}
+		wd, err := unix.InotifyAddWatch(w.fd, name, flags)
+		if wd == -1 {
+			return nil, err
+		}
 
-	return nil
+		if existing == nil {
+			return &watch{
+				wd:    uint32(wd),
+				path:  name,
+				flags: flags,
+			}, nil
+		}
+
+		existing.wd = uint32(wd)
+		existing.flags = flags
+		return existing, nil
+	})
 }
 
 // Remove stops monitoring the path for changes.
@@ -273,32 +410,22 @@ func (w *Watcher) Add(name string) error {
 // /tmp/dir and /tmp/dir/subdir then you will need to remove both.
 //
 // Removing a path that has not yet been added returns [ErrNonExistentWatch].
+//
+// Returns nil if [Watcher.Close] was called.
 func (w *Watcher) Remove(name string) error {
-	name = filepath.Clean(name)
+	if w.isClosed() {
+		return nil
+	}
+	return w.remove(filepath.Clean(name))
+}
 
-	// Fetch the watch.
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	watch, ok := w.watches[name]
-
-	// Remove it from inotify.
+func (w *Watcher) remove(name string) error {
+	wd, ok := w.watches.removePath(name)
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrNonExistentWatch, name)
 	}
 
-	// We successfully removed the watch if InotifyRmWatch doesn't return an
-	// error, we need to clean up our internal state to ensure it matches
-	// inotify's kernel state.
-	delete(w.paths, int(watch.wd))
-	delete(w.watches, name)
-
-	// inotify_rm_watch will return EINVAL if the file has been deleted;
-	// the inotify will already have been removed.
-	// watches and pathes are deleted in ignoreLinux() implicitly and asynchronously
-	// by calling inotify_rm_watch() below. e.g. readEvents() goroutine receives IN_IGNORE
-	// so that EINVAL means that the wd is being rm_watch()ed or its file removed
-	// by another thread and we have not received IN_IGNORE event.
-	success, errno := unix.InotifyRmWatch(w.fd, watch.wd)
+	success, errno := unix.InotifyRmWatch(w.fd, wd)
 	if success == -1 {
 		// TODO: Perhaps it's not helpful to return an error here in every case;
 		//       The only two possible errors are:
@@ -312,26 +439,26 @@ func (w *Watcher) Remove(name string) error {
 		//         are watching is deleted.
 		return errno
 	}
-
 	return nil
 }
 
-// WatchList returns all paths added with [Add] (and are not yet removed).
+// WatchList returns all paths explicitly added with [Watcher.Add] (and are not
+// yet removed).
+//
+// Returns nil if [Watcher.Close] was called.
 func (w *Watcher) WatchList() []string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	entries := make([]string, 0, len(w.watches))
-	for pathname := range w.watches {
-		entries = append(entries, pathname)
+	if w.isClosed() {
+		return nil
 	}
 
-	return entries
-}
+	entries := make([]string, 0, w.watches.len())
+	w.watches.mu.RLock()
+	for pathname := range w.watches.path {
+		entries = append(entries, pathname)
+	}
+	w.watches.mu.RUnlock()
 
-type watch struct {
-	wd    uint32 // Watch descriptor (as returned by the inotify_add_watch() syscall)
-	flags uint32 // inotify flags of this watch (see inotify(7) for the list of valid flags)
+	return entries
 }
 
 // readEvents reads from the inotify file descriptor, converts the
@@ -367,14 +494,11 @@ func (w *Watcher) readEvents() {
 		if n < unix.SizeofInotifyEvent {
 			var err error
 			if n == 0 {
-				// If EOF is received. This should really never happen.
-				err = io.EOF
+				err = io.EOF // If EOF is received. This should really never happen.
 			} else if n < 0 {
-				// If an error occurred while reading.
-				err = errno
+				err = errno // If an error occurred while reading.
 			} else {
-				// Read was too short.
-				err = errors.New("notify: short read in readEvents()")
+				err = errors.New("notify: short read in readEvents()") // Read was too short.
 			}
 			if !w.sendError(err) {
 				return
@@ -403,18 +527,29 @@ func (w *Watcher) readEvents() {
 			// doesn't append the filename to the event, but we would like to always fill the
 			// the "Name" field with a valid filename. We retrieve the path of the watch from
 			// the "paths" map.
-			w.mu.Lock()
-			name, ok := w.paths[int(raw.Wd)]
-			// IN_DELETE_SELF occurs when the file/directory being watched is removed.
-			// This is a sign to clean up the maps, otherwise we are no longer in sync
-			// with the inotify kernel state which has already deleted the watch
-			// automatically.
-			if ok && mask&unix.IN_DELETE_SELF == unix.IN_DELETE_SELF {
-				delete(w.paths, int(raw.Wd))
-				delete(w.watches, name)
-			}
-			w.mu.Unlock()
+			watch := w.watches.byWd(uint32(raw.Wd))
 
+			// inotify will automatically remove the watch on deletes; just need
+			// to clean our state here.
+			if watch != nil && mask&unix.IN_DELETE_SELF == unix.IN_DELETE_SELF {
+				w.watches.remove(watch.wd)
+			}
+			// We can't really update the state when a watched path is moved;
+			// only IN_MOVE_SELF is sent and not IN_MOVED_{FROM,TO}. So remove
+			// the watch.
+			if watch != nil && mask&unix.IN_MOVE_SELF == unix.IN_MOVE_SELF {
+				err := w.remove(watch.path)
+				if err != nil && !errors.Is(err, ErrNonExistentWatch) {
+					if !w.sendError(err) {
+						return
+					}
+				}
+			}
+
+			var name string
+			if watch != nil {
+				name = watch.path
+			}
 			if nameLen > 0 {
 				// Point "bytes" at the first byte of the filename
 				bytes := (*[unix.PathMax]byte)(unsafe.Pointer(&buf[offset+unix.SizeofInotifyEvent]))[:nameLen:nameLen]

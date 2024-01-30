@@ -42,11 +42,12 @@ import (
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = common.SIGDescribe("EndpointSlice", func() {
 	f := framework.NewDefaultFramework("endpointslice")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var cs clientset.Interface
 	var podClient *e2epod.PodClient
@@ -268,7 +269,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example",
 					Port:       80,
-					TargetPort: intstr.FromInt(3000),
+					TargetPort: intstr.FromInt32(3000),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
@@ -300,13 +301,13 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example-no-match",
 					Port:       80,
-					TargetPort: intstr.FromInt(8080),
+					TargetPort: intstr.FromInt32(8080),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
 		})
 
-		err := wait.Poll(5*time.Second, 3*time.Minute, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			var err error
 			pod1, err = podClient.Get(ctx, pod1.Name, metav1.GetOptions{})
 			if err != nil {
@@ -435,12 +436,12 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("getting")
 		queriedEPS, err := epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(queriedEPS.UID, createdEPS.UID)
+		gomega.Expect(queriedEPS.UID).To(gomega.Equal(createdEPS.UID))
 
 		ginkgo.By("listing")
 		epsList, err := epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(epsList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
@@ -452,7 +453,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("cluster-wide listing")
 		clusterEPSList, err := clusterEPSClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterEPSList.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(clusterEPSList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
@@ -462,7 +463,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("patching")
 		patchedEPS, err := epsClient.Patch(ctx, createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedEPS.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedEPS.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		var epsToUpdate, updatedEPS *discoveryv1.EndpointSlice
@@ -476,7 +477,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedEPS.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedEPS.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
@@ -485,7 +486,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				if !ok {
 					framework.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedEPS, isEPS := evt.Object.(*discoveryv1.EndpointSlice)
 				if !isEPS {
 					framework.Failf("expected EndpointSlice, got %T", evt.Object)
@@ -512,7 +513,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(epsList.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 		for _, eps := range epsList.Items {
 			if eps.Namespace == createdEPS.Namespace && eps.Name == createdEPS.Name {
 				framework.Fail("listing after deleting createdEPS")
@@ -524,7 +525,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(epsList.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
 	ginkgo.It("should support a Service with multiple ports specified in multiple EndpointSlices", func(ctx context.Context) {
@@ -582,6 +583,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		// create custom endpoint slices
 		tcpProtocol := v1.ProtocolTCP
+		readyCondTrue := true
 		epsTemplate := &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
 				Labels: map[string]string{
@@ -590,7 +592,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				}},
 			AddressType: addressType,
 			Endpoints: []discoveryv1.Endpoint{
-				{Addresses: []string{pod.Status.PodIP}},
+				{
+					Addresses:  []string{pod.Status.PodIP},
+					Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+				},
 			},
 		}
 
@@ -683,6 +688,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		// create custom endpoint slices
 		tcpProtocol := v1.ProtocolTCP
+		readyCondTrue := true
 		epsTemplate := &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
 				Labels: map[string]string{
@@ -695,7 +701,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("creating")
 		eps1 := epsTemplate.DeepCopy()
 		eps1.Endpoints = []discoveryv1.Endpoint{
-			{Addresses: []string{pod1.Status.PodIP}},
+			{
+				Addresses:  []string{pod1.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+			},
 		}
 		eps1.Ports = []discoveryv1.EndpointPort{{
 			Name:     pointer.String("port80"),
@@ -707,7 +716,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Endpoints = []discoveryv1.Endpoint{
-			{Addresses: []string{pod2.Status.PodIP}},
+			{
+				Addresses:  []string{pod2.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+			},
 		}
 		eps2.Ports = []discoveryv1.EndpointPort{{
 			Name:     pointer.String("port81"),
@@ -739,7 +751,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 // the only caller of this function.
 func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
 	endpointSlices := []discoveryv1.EndpointSlice{}
-	if err := wait.PollImmediateWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(ctx, cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
 			return false, nil
@@ -751,7 +763,7 @@ func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns st
 	}
 
 	endpoints := &v1.Endpoints{}
-	if err := wait.PollWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointsFound, hasMatchingEndpoints := hasMatchingEndpoints(ctx, cs, ns, svc.Name, len(pods), numSubsets)
 		if !hasMatchingEndpoints {
 			framework.Logf("Matching Endpoints not found")

@@ -27,7 +27,9 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/certificates"
+	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/plugin/pkg/admission/certificates"
 )
 
@@ -106,6 +108,11 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, _ admissi
 	// If signer name isn't specified, we don't need to perform the
 	// attest check.
 	if newBundle.Spec.SignerName == "" {
+		return nil
+	}
+
+	// Skip the attest check when the semantics of the bundle are unchanged to support storage migration and GC workflows
+	if a.GetOperation() == admission.Update && rbac.IsOnlyMutatingGCFields(a.GetObject(), a.GetOldObject(), kapihelper.Semantic) {
 		return nil
 	}
 

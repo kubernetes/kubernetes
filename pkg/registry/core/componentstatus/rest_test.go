@@ -59,9 +59,9 @@ func NewTestREST(resp testResponse) *REST {
 		err:    resp.err,
 	}
 	return &REST{
-		GetServersToValidate: func() map[string]*Server {
-			return map[string]*Server{
-				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz", Prober: prober},
+		GetServersToValidate: func() map[string]Server {
+			return map[string]Server{
+				"test1": &HttpServer{Addr: "testserver1", Port: 8000, Path: "/healthz", Prober: prober},
 			}
 		},
 	}

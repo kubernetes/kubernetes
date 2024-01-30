@@ -114,8 +114,10 @@ type ResourceClaimStatus struct {
 	//
 	// +listType=map
 	// +listMapKey=uid
+	// +patchStrategy=merge
+	// +patchMergeKey=uid
 	// +optional
-	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
+	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
 
 	// DeallocationRequested indicates that a ResourceClaim is to be
 	// deallocated.
@@ -248,7 +250,7 @@ type PodSchedulingContextSpec struct {
 	// that suits all pending resources. This may get increased in the
 	// future, but not reduced.
 	//
-	// +listType=set
+	// +listType=atomic
 	// +optional
 	PotentialNodes []string `json:"potentialNodes,omitempty" protobuf:"bytes,2,opt,name=potentialNodes"`
 }
@@ -283,7 +285,7 @@ type ResourceClaimSchedulingStatus struct {
 	// PodSchedulingSpec.PotentialNodes. This may get increased in the
 	// future, but not reduced.
 	//
-	// +listType=set
+	// +listType=atomic
 	// +optional
 	UnsuitableNodes []string `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,opt,name=unsuitableNodes"`
 }

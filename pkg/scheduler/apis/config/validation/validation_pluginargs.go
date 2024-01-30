@@ -271,7 +271,7 @@ func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs)
 	})
 }
 
-// ValidateVolumeBindingArgs validates that VolumeBindingArgs with scheduler features.
+// ValidateVolumeBindingArgsWithOptions validates that VolumeBindingArgs and VolumeBindingArgsValidationOptions with scheduler features.
 func ValidateVolumeBindingArgsWithOptions(path *field.Path, args *config.VolumeBindingArgs, opts VolumeBindingArgsValidationOptions) error {
 	var allErrs field.ErrorList
 

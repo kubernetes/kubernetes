@@ -29,7 +29,7 @@
 #    stable release, (e.g. 'v1.3.7').
 #    See https://github.com/kubernetes/kubernetes/releases for release options.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
-#    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
+#    (Defaults to https://dl.k8s.io/release).
 #
 #  Set KUBERNETES_SERVER_ARCH to choose the server (Kubernetes cluster)
 #  architecture to download:
@@ -136,7 +136,7 @@ fi
 
 if [[ -d "./kubernetes" ]]; then
   if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
-    echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
+    echo "'kubernetes' directory already exists. Should we skip download step and start to create cluster based on it? [Y]/n"
     read -r confirm
     if [[ ! "${confirm}" =~ ^[nN]$ ]]; then
       echo "Skipping download step."

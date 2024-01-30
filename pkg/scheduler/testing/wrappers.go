@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var zero int64
@@ -255,7 +256,7 @@ func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *P
 			APIVersion: gvk.GroupVersion().String(),
 			Kind:       gvk.Kind,
 			Name:       name,
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	}
 	return p
@@ -413,6 +414,12 @@ func (p *PodWrapper) PVC(name string) *PodWrapper {
 // Volume creates volume and injects into the inner pod.
 func (p *PodWrapper) Volume(volume v1.Volume) *PodWrapper {
 	p.Spec.Volumes = append(p.Spec.Volumes, volume)
+	return p
+}
+
+// Volumes set the volumes and inject into the inner pod.
+func (p *PodWrapper) Volumes(volumes []v1.Volume) *PodWrapper {
+	p.Spec.Volumes = volumes
 	return p
 }
 
@@ -723,6 +730,15 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 	return n
 }
 
+// Annotation applies a {k,v} annotation pair to the inner node.
+func (n *NodeWrapper) Annotation(k, v string) *NodeWrapper {
+	if n.Annotations == nil {
+		n.Annotations = make(map[string]string)
+	}
+	metav1.SetMetaDataAnnotation(&n.ObjectMeta, k, v)
+	return n
+}
+
 // Capacity sets the capacity and the allocatable resources of the inner node.
 // Each entry in `resources` corresponds to a resource name and its quantity.
 // By default, the capacity and allocatable number of pods are set to 32.
@@ -751,6 +767,27 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 // Taints applies taints to the inner node.
 func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
 	n.Spec.Taints = taints
+	return n
+}
+
+// Unschedulable applies the unschedulable field.
+func (n *NodeWrapper) Unschedulable(unschedulable bool) *NodeWrapper {
+	n.Spec.Unschedulable = unschedulable
+	return n
+}
+
+// Condition applies the node condition.
+func (n *NodeWrapper) Condition(typ v1.NodeConditionType, status v1.ConditionStatus, message, reason string) *NodeWrapper {
+	n.Status.Conditions = []v1.NodeCondition{
+		{
+			Type:               typ,
+			Status:             status,
+			Message:            message,
+			Reason:             reason,
+			LastHeartbeatTime:  metav1.Time{Time: time.Now()},
+			LastTransitionTime: metav1.Time{Time: time.Now()},
+		},
+	}
 	return n
 }
 
@@ -801,7 +838,7 @@ func (p *PersistentVolumeClaimWrapper) AccessModes(accessModes []v1.PersistentVo
 
 // Resources sets `resources` as the resource requirements of the inner
 // PersistentVolumeClaim.
-func (p *PersistentVolumeClaimWrapper) Resources(resources v1.ResourceRequirements) *PersistentVolumeClaimWrapper {
+func (p *PersistentVolumeClaimWrapper) Resources(resources v1.VolumeResourceRequirements) *PersistentVolumeClaimWrapper {
 	p.PersistentVolumeClaim.Spec.Resources = resources
 	return p
 }
@@ -889,7 +926,7 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 			Kind:       gvk.Kind,
 			Name:       name,
 			UID:        types.UID(uid),
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	}
 	return wrapper
@@ -930,12 +967,12 @@ type PodSchedulingWrapper struct {
 	resourcev1alpha2.PodSchedulingContext
 }
 
-// MakePodSchedulingContext creates a PodSchedulingContext wrapper.
+// MakePodSchedulingContexts creates a PodSchedulingContext wrapper.
 func MakePodSchedulingContexts() *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{resourcev1alpha2.PodSchedulingContext{}}
 }
 
-// FromPodSchedulingContext creates a PodSchedulingContext wrapper from some existing object.
+// FromPodSchedulingContexts creates a PodSchedulingContext wrapper from an existing object.
 func FromPodSchedulingContexts(other *resourcev1alpha2.PodSchedulingContext) *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{*other.DeepCopy()}
 }
@@ -967,11 +1004,12 @@ func (wrapper *PodSchedulingWrapper) Namespace(s string) *PodSchedulingWrapper {
 func (wrapper *PodSchedulingWrapper) OwnerReference(name, uid string, gvk schema.GroupVersionKind) *PodSchedulingWrapper {
 	wrapper.OwnerReferences = []metav1.OwnerReference{
 		{
-			APIVersion: gvk.GroupVersion().String(),
-			Kind:       gvk.Kind,
-			Name:       name,
-			UID:        types.UID(uid),
-			Controller: pointer.Bool(true),
+			APIVersion:         gvk.GroupVersion().String(),
+			Kind:               gvk.Kind,
+			Name:               name,
+			UID:                types.UID(uid),
+			Controller:         ptr.To(true),
+			BlockOwnerDeletion: ptr.To(true),
 		},
 	}
 	return wrapper

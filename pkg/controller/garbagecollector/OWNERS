@@ -2,11 +2,12 @@
 
 approvers:
   - caesarxuchao
-  - lavalamp
   - deads2k
 reviewers:
   - caesarxuchao
-  - lavalamp
   - deads2k
+  - jpbetz
 labels:
   - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

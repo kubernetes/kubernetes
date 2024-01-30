@@ -123,22 +123,6 @@ func TestStatus(t *testing.T) {
 	}
 }
 
-// The String() method relies on the value and order of the status codes to function properly.
-func TestStatusCodes(t *testing.T) {
-	assertStatusCode(t, Success, 0)
-	assertStatusCode(t, Error, 1)
-	assertStatusCode(t, Unschedulable, 2)
-	assertStatusCode(t, UnschedulableAndUnresolvable, 3)
-	assertStatusCode(t, Wait, 4)
-	assertStatusCode(t, Skip, 5)
-}
-
-func assertStatusCode(t *testing.T, code Code, value int) {
-	if int(code) != value {
-		t.Errorf("Status code %q should have a value of %v but got %v", code.String(), value, int(code))
-	}
-}
-
 func TestPreFilterResultMerge(t *testing.T) {
 	tests := map[string]struct {
 		receiver *PreFilterResult

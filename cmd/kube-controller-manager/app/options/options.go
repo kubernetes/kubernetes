@@ -30,6 +30,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	cpnames "k8s.io/cloud-provider/names"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -38,6 +39,7 @@ import (
 	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
@@ -60,30 +62,32 @@ type KubeControllerManagerOptions struct {
 	KubeCloudShared   *cpoptions.KubeCloudSharedOptions
 	ServiceController *cpoptions.ServiceControllerOptions
 
-	AttachDetachController           *AttachDetachControllerOptions
-	CSRSigningController             *CSRSigningControllerOptions
-	DaemonSetController              *DaemonSetControllerOptions
-	DeploymentController             *DeploymentControllerOptions
-	StatefulSetController            *StatefulSetControllerOptions
-	DeprecatedFlags                  *DeprecatedControllerOptions
-	EndpointController               *EndpointControllerOptions
-	EndpointSliceController          *EndpointSliceControllerOptions
-	EndpointSliceMirroringController *EndpointSliceMirroringControllerOptions
-	EphemeralVolumeController        *EphemeralVolumeControllerOptions
-	GarbageCollectorController       *GarbageCollectorControllerOptions
-	HPAController                    *HPAControllerOptions
-	JobController                    *JobControllerOptions
-	CronJobController                *CronJobControllerOptions
-	NamespaceController              *NamespaceControllerOptions
-	NodeIPAMController               *NodeIPAMControllerOptions
-	NodeLifecycleController          *NodeLifecycleControllerOptions
-	PersistentVolumeBinderController *PersistentVolumeBinderControllerOptions
-	PodGCController                  *PodGCControllerOptions
-	ReplicaSetController             *ReplicaSetControllerOptions
-	ReplicationController            *ReplicationControllerOptions
-	ResourceQuotaController          *ResourceQuotaControllerOptions
-	SAController                     *SAControllerOptions
-	TTLAfterFinishedController       *TTLAfterFinishedControllerOptions
+	AttachDetachController                    *AttachDetachControllerOptions
+	CSRSigningController                      *CSRSigningControllerOptions
+	DaemonSetController                       *DaemonSetControllerOptions
+	DeploymentController                      *DeploymentControllerOptions
+	StatefulSetController                     *StatefulSetControllerOptions
+	DeprecatedFlags                           *DeprecatedControllerOptions
+	EndpointController                        *EndpointControllerOptions
+	EndpointSliceController                   *EndpointSliceControllerOptions
+	EndpointSliceMirroringController          *EndpointSliceMirroringControllerOptions
+	EphemeralVolumeController                 *EphemeralVolumeControllerOptions
+	GarbageCollectorController                *GarbageCollectorControllerOptions
+	HPAController                             *HPAControllerOptions
+	JobController                             *JobControllerOptions
+	CronJobController                         *CronJobControllerOptions
+	LegacySATokenCleaner                      *LegacySATokenCleanerOptions
+	NamespaceController                       *NamespaceControllerOptions
+	NodeIPAMController                        *NodeIPAMControllerOptions
+	NodeLifecycleController                   *NodeLifecycleControllerOptions
+	PersistentVolumeBinderController          *PersistentVolumeBinderControllerOptions
+	PodGCController                           *PodGCControllerOptions
+	ReplicaSetController                      *ReplicaSetControllerOptions
+	ReplicationController                     *ReplicationControllerOptions
+	ResourceQuotaController                   *ResourceQuotaControllerOptions
+	SAController                              *SAControllerOptions
+	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
+	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
 
 	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
@@ -150,6 +154,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		CronJobController: &CronJobControllerOptions{
 			&componentConfig.CronJobController,
 		},
+		LegacySATokenCleaner: &LegacySATokenCleanerOptions{
+			&componentConfig.LegacySATokenCleaner,
+		},
 		NamespaceController: &NamespaceControllerOptions{
 			&componentConfig.NamespaceController,
 		},
@@ -179,6 +186,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&componentConfig.TTLAfterFinishedController,
+		},
+		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
+			&componentConfig.ValidatingAdmissionPolicyStatusController,
 		},
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
@@ -220,40 +230,43 @@ func NewDefaultComponentConfig() (kubectrlmgrconfig.KubeControllerManagerConfigu
 }
 
 // Flags returns flags for a specific KubeController by section name
-func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
+func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
-	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
+	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	s.ServiceController.AddFlags(fss.FlagSet("service controller"))
+	s.ServiceController.AddFlags(fss.FlagSet(cpnames.ServiceLBController))
 
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 
-	s.AttachDetachController.AddFlags(fss.FlagSet("attachdetach controller"))
-	s.CSRSigningController.AddFlags(fss.FlagSet("csrsigning controller"))
-	s.DeploymentController.AddFlags(fss.FlagSet("deployment controller"))
-	s.StatefulSetController.AddFlags(fss.FlagSet("statefulset controller"))
-	s.DaemonSetController.AddFlags(fss.FlagSet("daemonset controller"))
+	s.AttachDetachController.AddFlags(fss.FlagSet(names.PersistentVolumeAttachDetachController))
+	s.CSRSigningController.AddFlags(fss.FlagSet(names.CertificateSigningRequestSigningController))
+	s.DeploymentController.AddFlags(fss.FlagSet(names.DeploymentController))
+	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
+	s.DaemonSetController.AddFlags(fss.FlagSet(names.DaemonSetController))
 	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
-	s.EndpointController.AddFlags(fss.FlagSet("endpoint controller"))
-	s.EndpointSliceController.AddFlags(fss.FlagSet("endpointslice controller"))
-	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet("endpointslicemirroring controller"))
-	s.EphemeralVolumeController.AddFlags(fss.FlagSet("ephemeralvolume controller"))
-	s.GarbageCollectorController.AddFlags(fss.FlagSet("garbagecollector controller"))
-	s.HPAController.AddFlags(fss.FlagSet("horizontalpodautoscaling controller"))
-	s.JobController.AddFlags(fss.FlagSet("job controller"))
-	s.CronJobController.AddFlags(fss.FlagSet("cronjob controller"))
-	s.NamespaceController.AddFlags(fss.FlagSet("namespace controller"))
-	s.NodeIPAMController.AddFlags(fss.FlagSet("nodeipam controller"))
-	s.NodeLifecycleController.AddFlags(fss.FlagSet("nodelifecycle controller"))
-	s.PersistentVolumeBinderController.AddFlags(fss.FlagSet("persistentvolume-binder controller"))
-	s.PodGCController.AddFlags(fss.FlagSet("podgc controller"))
-	s.ReplicaSetController.AddFlags(fss.FlagSet("replicaset controller"))
-	s.ReplicationController.AddFlags(fss.FlagSet("replicationcontroller"))
-	s.ResourceQuotaController.AddFlags(fss.FlagSet("resourcequota controller"))
-	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
-	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
+	s.EndpointController.AddFlags(fss.FlagSet(names.EndpointsController))
+	s.EndpointSliceController.AddFlags(fss.FlagSet(names.EndpointSliceController))
+	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet(names.EndpointSliceMirroringController))
+	s.EphemeralVolumeController.AddFlags(fss.FlagSet(names.EphemeralVolumeController))
+	s.GarbageCollectorController.AddFlags(fss.FlagSet(names.GarbageCollectorController))
+	s.HPAController.AddFlags(fss.FlagSet(names.HorizontalPodAutoscalerController))
+	s.JobController.AddFlags(fss.FlagSet(names.JobController))
+	s.CronJobController.AddFlags(fss.FlagSet(names.CronJobController))
+	s.LegacySATokenCleaner.AddFlags(fss.FlagSet(names.LegacyServiceAccountTokenCleanerController))
+	s.NamespaceController.AddFlags(fss.FlagSet(names.NamespaceController))
+	s.NodeIPAMController.AddFlags(fss.FlagSet(names.NodeIpamController))
+	s.NodeLifecycleController.AddFlags(fss.FlagSet(names.NodeLifecycleController))
+	s.PersistentVolumeBinderController.AddFlags(fss.FlagSet(names.PersistentVolumeBinderController))
+	s.PodGCController.AddFlags(fss.FlagSet(names.PodGarbageCollectorController))
+	s.ReplicaSetController.AddFlags(fss.FlagSet(names.ReplicaSetController))
+	s.ReplicationController.AddFlags(fss.FlagSet(names.ReplicationControllerController))
+	s.ResourceQuotaController.AddFlags(fss.FlagSet(names.ResourceQuotaController))
+	s.SAController.AddFlags(fss.FlagSet(names.ServiceAccountController))
+	s.TTLAfterFinishedController.AddFlags(fss.FlagSet(names.TTLAfterFinishedController))
+	s.ValidatingAdmissionPolicyStatusController.AddFlags(fss.FlagSet(names.ValidatingAdmissionPolicyStatusController))
+
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	logsapi.AddFlags(s.Logs, fss.FlagSet("logs"))
 
@@ -266,8 +279,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 }
 
 // ApplyTo fills up controller manager config with options.
-func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
-	if err := s.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
+func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) error {
+	if err := s.Generic.ApplyTo(&c.ComponentConfig.Generic, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return err
 	}
 	if err := s.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
@@ -315,6 +328,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.CronJobController.ApplyTo(&c.ComponentConfig.CronJobController); err != nil {
 		return err
 	}
+	if err := s.LegacySATokenCleaner.ApplyTo(&c.ComponentConfig.LegacySATokenCleaner); err != nil {
+		return err
+	}
 	if err := s.NamespaceController.ApplyTo(&c.ComponentConfig.NamespaceController); err != nil {
 		return err
 	}
@@ -348,6 +364,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
 		return err
 	}
+	if err := s.ValidatingAdmissionPolicyStatusController.ApplyTo(&c.ComponentConfig.ValidatingAdmissionPolicyStatusController); err != nil {
+		return err
+	}
 	if err := s.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
@@ -363,10 +382,10 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 }
 
 // Validate is used to validate the options and config before launching the controller manager
-func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string) error {
+func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) error {
 	var errs []error
 
-	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers)...)
+	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
 	errs = append(errs, s.KubeCloudShared.Validate()...)
 	errs = append(errs, s.AttachDetachController.Validate()...)
 	errs = append(errs, s.CSRSigningController.Validate()...)
@@ -382,6 +401,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.HPAController.Validate()...)
 	errs = append(errs, s.JobController.Validate()...)
 	errs = append(errs, s.CronJobController.Validate()...)
+	errs = append(errs, s.LegacySATokenCleaner.Validate()...)
 	errs = append(errs, s.NamespaceController.Validate()...)
 	errs = append(errs, s.NodeIPAMController.Validate()...)
 	errs = append(errs, s.NodeLifecycleController.Validate()...)
@@ -404,8 +424,8 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 }
 
 // Config return a controller manager config objective
-func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
-	if err := s.Validate(allControllers, disabledByDefaultControllers); err != nil {
+func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) (*kubecontrollerconfig.Config, error) {
+	if err := s.Validate(allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
 
@@ -437,7 +457,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		EventBroadcaster: eventBroadcaster,
 		EventRecorder:    eventRecorder,
 	}
-	if err := s.ApplyTo(c); err != nil {
+	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
 	s.Metrics.Apply()

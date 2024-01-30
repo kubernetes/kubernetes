@@ -258,6 +258,17 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	if hasConfigMaps {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference configmaps", nodeName))
 	}
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.VolumeSource.Projected != nil {
+			for _, src := range vol.VolumeSource.Projected.Sources {
+				if src.ClusterTrustBundle != nil {
+					return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference clustertrustbundles", nodeName))
+				}
+			}
+		}
+	}
+
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim != nil {
 			return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference persistentvolumeclaims", nodeName))
@@ -288,11 +299,37 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !labels.Equals(oldPod.Labels, newPod.Labels) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update labels through pod status", nodeName))
 		}
+		if !resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update resource claim statues", nodeName))
+		}
 		return nil
 
 	default:
 		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
 	}
+}
+
+func resourceClaimStatusesEqual(statusA, statusB []api.PodResourceClaimStatus) bool {
+	if len(statusA) != len(statusB) {
+		return false
+	}
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	for i := range statusA {
+		if statusA[i].Name != statusB[i].Name {
+			return false
+		}
+		claimNameA := statusA[i].ResourceClaimName
+		claimNameB := statusB[i].ResourceClaimName
+		if (claimNameA == nil) != (claimNameB == nil) {
+			return false
+		}
+		if claimNameA != nil && *claimNameA != *claimNameB {
+			return false
+		}
+	}
+	return true
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
@@ -360,8 +397,8 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 		newPVC.Status.Conditions = nil
 
 		if p.expansionRecoveryEnabled {
-			oldPVC.Status.ResizeStatus = nil
-			newPVC.Status.ResizeStatus = nil
+			oldPVC.Status.AllocatedResourceStatuses = nil
+			newPVC.Status.AllocatedResourceStatuses = nil
 
 			oldPVC.Status.AllocatedResources = nil
 			newPVC.Status.AllocatedResources = nil
@@ -539,6 +576,12 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	if pod.Spec.NodeName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node requested token bound to a pod scheduled on a different node"))
 	}
+
+	// Note: A token may only be bound to one object at a time. By requiring
+	// the Pod binding, noderestriction eliminates the opportunity to spoof
+	// a Node binding. Instead, kube-apiserver automatically infers and sets
+	// the Node binding when it receives a Pod binding. See:
+	// https://github.com/kubernetes/kubernetes/issues/121723 for more info.
 
 	return nil
 }

@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -52,16 +54,12 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-//lint:ignore U1000 we need to alias only for the sake of embedding
 type kubeClientSet = kubernetes.Interface
 
-//lint:ignore U1000 we need to alias only for the sake of embedding
 type aggegatorClientSet = aggregator.Interface
 
-//lint:ignore U1000 we need to alias only for the sake of embedding
 type apiextensionsClientSet = apiextensions.Interface
 
-//lint:ignore U1000 we need to alias only for the sake of embedding
 type dynamicClientset = dynamic.Interface
 type testClientSet struct {
 	kubeClientSet
@@ -94,6 +92,28 @@ var (
 						Verbs:      []string{"create", "list", "watch", "delete"},
 						ShortNames: []string{"jz"},
 						Categories: []string{"all"},
+					},
+				},
+				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+			},
+		},
+	}
+
+	basicTestGroupWithFixup = apidiscoveryv2beta1.APIGroupDiscovery{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "stable.example.com",
+		},
+		Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+			{
+				Version: "v1",
+				Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
+					{
+						Resource:   "jobs",
+						Verbs:      []string{"create", "list", "watch", "delete"},
+						ShortNames: []string{"jz"},
+						Categories: []string{"all"},
+						// aggregator will populate this with a non-nil value
+						ResponseKind: &metav1.GroupVersionKind{},
 					},
 				},
 				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
@@ -222,6 +242,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 
 	// For each groupversion served by our resourcemanager, create an APIService
 	// object connected to our fake APIServer
+	var groupVersions []metav1.GroupVersion
 	for _, versionInfo := range basicTestGroup.Versions {
 		groupVersion := metav1.GroupVersion{
 			Group:   basicTestGroup.Name,
@@ -229,14 +250,19 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 		}
 
 		require.NoError(t, registerAPIService(ctx, client, groupVersion, service))
-		defer func() {
-			require.NoError(t, unregisterAPIService(ctx, client, groupVersion))
-		}()
+		groupVersions = append(groupVersions, groupVersion)
 	}
 
 	// Keep repeatedly fetching document from aggregator.
 	// Check to see if it contains our service within a reasonable amount of time
-	require.NoError(t, WaitForGroups(ctx, client, basicTestGroup))
+	require.NoError(t, WaitForGroups(ctx, client, basicTestGroupWithFixup))
+	require.NoError(t, WaitForRootPaths(t, ctx, client, sets.New("/apis/"+basicTestGroup.Name), nil))
+
+	// Unregister and ensure the group gets dropped from root paths
+	for _, groupVersion := range groupVersions {
+		require.NoError(t, unregisterAPIService(ctx, client, groupVersion))
+	}
+	require.NoError(t, WaitForRootPaths(t, ctx, client, nil, sets.New("/apis/"+basicTestGroup.Name)))
 }
 
 func runTestCases(t *testing.T, cases []testCase) {

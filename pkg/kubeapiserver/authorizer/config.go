@@ -19,10 +19,10 @@ package authorizer
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -40,8 +40,6 @@ import (
 
 // Config contains the data on how to authorize a request to the Kube API Server
 type Config struct {
-	AuthorizationModes []string
-
 	// Options for ModeABAC
 
 	// Path to an ABAC policy file.
@@ -49,14 +47,6 @@ type Config struct {
 
 	// Options for ModeWebhook
 
-	// Kubeconfig file for Webhook authorization plugin.
-	WebhookConfigFile string
-	// API version of subject access reviews to send to the webhook (e.g. "v1", "v1beta1")
-	WebhookVersion string
-	// TTL for caching of authorized responses from the webhook server.
-	WebhookCacheAuthorizedTTL time.Duration
-	// TTL for caching of unauthorized responses from the webhook server.
-	WebhookCacheUnauthorizedTTL time.Duration
 	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
@@ -66,12 +56,16 @@ type Config struct {
 
 	// Optional field, custom dial function used to connect to webhook
 	CustomDial utilnet.DialFunc
+
+	// AuthorizationConfiguration stores the configuration for the Authorizer chain
+	// It will deprecate most of the above flags when GA
+	AuthorizationConfiguration *authzconfig.AuthorizationConfiguration
 }
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.
 func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	if len(config.AuthorizationModes) == 0 {
+	if len(config.AuthorizationConfiguration.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
@@ -84,10 +78,10 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 	superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 	authorizers = append(authorizers, superuserAuthorizer)
 
-	for _, authorizationMode := range config.AuthorizationModes {
+	for _, configuredAuthorizer := range config.AuthorizationConfiguration.Authorizers {
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
-		switch authorizationMode {
-		case modes.ModeNode:
+		switch configuredAuthorizer.Type {
+		case authzconfig.AuthorizerType(modes.ModeNode):
 			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
@@ -101,41 +95,52 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, nodeAuthorizer)
 			ruleResolvers = append(ruleResolvers, nodeAuthorizer)
 
-		case modes.ModeAlwaysAllow:
+		case authzconfig.AuthorizerType(modes.ModeAlwaysAllow):
 			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
 			authorizers = append(authorizers, alwaysAllowAuthorizer)
 			ruleResolvers = append(ruleResolvers, alwaysAllowAuthorizer)
-		case modes.ModeAlwaysDeny:
+		case authzconfig.AuthorizerType(modes.ModeAlwaysDeny):
 			alwaysDenyAuthorizer := authorizerfactory.NewAlwaysDenyAuthorizer()
 			authorizers = append(authorizers, alwaysDenyAuthorizer)
 			ruleResolvers = append(ruleResolvers, alwaysDenyAuthorizer)
-		case modes.ModeABAC:
+		case authzconfig.AuthorizerType(modes.ModeABAC):
 			abacAuthorizer, err := abac.NewFromFile(config.PolicyFile)
 			if err != nil {
 				return nil, nil, err
 			}
 			authorizers = append(authorizers, abacAuthorizer)
 			ruleResolvers = append(ruleResolvers, abacAuthorizer)
-		case modes.ModeWebhook:
+		case authzconfig.AuthorizerType(modes.ModeWebhook):
 			if config.WebhookRetryBackoff == nil {
 				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
 			}
-			clientConfig, err := webhookutil.LoadKubeconfig(config.WebhookConfigFile, config.CustomDial)
+			clientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, config.CustomDial)
 			if err != nil {
 				return nil, nil, err
 			}
+			var decisionOnError authorizer.Decision
+			switch configuredAuthorizer.Webhook.FailurePolicy {
+			case authzconfig.FailurePolicyNoOpinion:
+				decisionOnError = authorizer.DecisionNoOpinion
+			case authzconfig.FailurePolicyDeny:
+				decisionOnError = authorizer.DecisionDeny
+			default:
+				return nil, nil, fmt.Errorf("unknown failurePolicy %q", configuredAuthorizer.Webhook.FailurePolicy)
+			}
 			webhookAuthorizer, err := webhook.New(clientConfig,
-				config.WebhookVersion,
-				config.WebhookCacheAuthorizedTTL,
-				config.WebhookCacheUnauthorizedTTL,
+				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
+				configuredAuthorizer.Webhook.AuthorizedTTL.Duration,
+				configuredAuthorizer.Webhook.UnauthorizedTTL.Duration,
 				*config.WebhookRetryBackoff,
+				decisionOnError,
+				configuredAuthorizer.Webhook.MatchConditions,
 			)
 			if err != nil {
 				return nil, nil, err
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
-		case modes.ModeRBAC:
+		case authzconfig.AuthorizerType(modes.ModeRBAC):
 			rbacAuthorizer := rbac.New(
 				&rbac.RoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().Roles().Lister()},
 				&rbac.RoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().RoleBindings().Lister()},
@@ -145,7 +150,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, rbacAuthorizer)
 			ruleResolvers = append(ruleResolvers, rbacAuthorizer)
 		default:
-			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", authorizationMode)
+			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", configuredAuthorizer.Type)
 		}
 	}
 

@@ -120,7 +120,7 @@ var missingHanlders = sets.NewString(
 )
 
 func TestServerSidePrint(t *testing.T) {
-	clientSet, kubeConfig, tearDownFn := setupWithResources(t,
+	_, clientSet, kubeConfig, tearDownFn := setupWithResources(t,
 		// additional groupversions needed for the test to run
 		[]schema.GroupVersion{
 			{Group: "discovery.k8s.io", Version: "v1"},
@@ -137,6 +137,7 @@ func TestServerSidePrint(t *testing.T) {
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1"},
 			{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"},
 		},
 		[]schema.GroupVersionResource{},

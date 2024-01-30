@@ -25,8 +25,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	// Cloud providers
-	cloudprovider "k8s.io/cloud-provider"
 	// ensure the cloud providers are installed
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	// Volume plugins
@@ -84,7 +82,7 @@ func ProbeExpandableVolumePlugins(logger klog.Logger, config persistentvolumecon
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(logger klog.Logger, cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
+func ProbeControllerVolumePlugins(logger klog.Logger, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not

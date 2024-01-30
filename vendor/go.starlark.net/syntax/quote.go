@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // unesc maps single-letter chars following \ to their actual values.
@@ -40,21 +42,19 @@ var esc = [256]byte{
 	'"':  '"',
 }
 
-// notEsc is a list of characters that can follow a \ in a string value
-// without having to escape the \. That is, since ( is in this list, we
-// quote the Go string "foo\\(bar" as the Python literal "foo\(bar".
-// This really does happen in BUILD files, especially in strings
-// being used as shell arguments containing regular expressions.
-const notEsc = " !#$%&()*+,-./:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~"
-
 // unquote unquotes the quoted string, returning the actual
-// string value, whether the original was triple-quoted, and
-// an error describing invalid input.
-func unquote(quoted string) (s string, triple bool, err error) {
+// string value, whether the original was triple-quoted,
+// whether it was a byte string, and an error describing invalid input.
+func unquote(quoted string) (s string, triple, isByte bool, err error) {
 	// Check for raw prefix: means don't interpret the inner \.
 	raw := false
 	if strings.HasPrefix(quoted, "r") {
 		raw = true
+		quoted = quoted[1:]
+	}
+	// Check for bytes prefix.
+	if strings.HasPrefix(quoted, "b") {
+		isByte = true
 		quoted = quoted[1:]
 	}
 
@@ -127,22 +127,25 @@ func unquote(quoted string) (s string, triple bool, err error) {
 
 		switch quoted[1] {
 		default:
-			// In Python, if \z (for some byte z) is not a known escape sequence
-			// then it appears as literal text in the string.
-			buf.WriteString(quoted[:2])
-			quoted = quoted[2:]
+			// In Starlark, like Go, a backslash must escape something.
+			// (Python still treats unnecessary backslashes literally,
+			// but since 3.6 has emitted a deprecation warning.)
+			err = fmt.Errorf("invalid escape sequence \\%c", quoted[1])
+			return
 
 		case '\n':
 			// Ignore the escape and the line break.
 			quoted = quoted[2:]
 
 		case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '\'', '"':
-			// One-char escape
+			// One-char escape.
+			// Escapes are allowed for both kinds of quotation
+			// mark, not just the kind in use.
 			buf.WriteByte(unesc[quoted[1]])
 			quoted = quoted[2:]
 
 		case '0', '1', '2', '3', '4', '5', '6', '7':
-			// Octal escape, up to 3 digits.
+			// Octal escape, up to 3 digits, \OOO.
 			n := int(quoted[1] - '0')
 			quoted = quoted[2:]
 			for i := 1; i < 3; i++ {
@@ -151,6 +154,10 @@ func unquote(quoted string) (s string, triple bool, err error) {
 				}
 				n = n*8 + int(quoted[0]-'0')
 				quoted = quoted[1:]
+			}
+			if !isByte && n > 127 {
+				err = fmt.Errorf(`non-ASCII octal escape \%o (use \u%04X for the UTF-8 encoding of U+%04X)`, n, n, n)
+				return
 			}
 			if n >= 256 {
 				// NOTE: Python silently discards the high bit,
@@ -162,7 +169,7 @@ func unquote(quoted string) (s string, triple bool, err error) {
 			buf.WriteByte(byte(n))
 
 		case 'x':
-			// Hexadecimal escape, exactly 2 digits.
+			// Hexadecimal escape, exactly 2 digits, \xXX. [0-127]
 			if len(quoted) < 4 {
 				err = fmt.Errorf(`truncated escape sequence %s`, quoted)
 				return
@@ -172,8 +179,41 @@ func unquote(quoted string) (s string, triple bool, err error) {
 				err = fmt.Errorf(`invalid escape sequence %s`, quoted[:4])
 				return
 			}
+			if !isByte && n > 127 {
+				err = fmt.Errorf(`non-ASCII hex escape %s (use \u%04X for the UTF-8 encoding of U+%04X)`,
+					quoted[:4], n, n)
+				return
+			}
 			buf.WriteByte(byte(n))
 			quoted = quoted[4:]
+
+		case 'u', 'U':
+			// Unicode code point, 4 (\uXXXX) or 8 (\UXXXXXXXX) hex digits.
+			sz := 6
+			if quoted[1] == 'U' {
+				sz = 10
+			}
+			if len(quoted) < sz {
+				err = fmt.Errorf(`truncated escape sequence %s`, quoted)
+				return
+			}
+			n, err1 := strconv.ParseUint(quoted[2:sz], 16, 0)
+			if err1 != nil {
+				err = fmt.Errorf(`invalid escape sequence %s`, quoted[:sz])
+				return
+			}
+			if n > unicode.MaxRune {
+				err = fmt.Errorf(`code point out of range: %s (max \U%08x)`,
+					quoted[:sz], n)
+				return
+			}
+			// As in Go, surrogates are disallowed.
+			if 0xD800 <= n && n < 0xE000 {
+				err = fmt.Errorf(`invalid Unicode code point U+%04X`, n)
+				return
+			}
+			buf.WriteRune(rune(n))
+			quoted = quoted[sz:]
 		}
 	}
 
@@ -191,79 +231,79 @@ func indexByte(s string, b byte) int {
 	return -1
 }
 
-// hex is a list of the hexadecimal digits, for use in quoting.
-// We always print lower-case hexadecimal.
-const hex = "0123456789abcdef"
+// Quote returns a Starlark literal that denotes s.
+// If b, it returns a bytes literal.
+func Quote(s string, b bool) string {
+	const hex = "0123456789abcdef"
+	var runeTmp [utf8.UTFMax]byte
 
-// quote returns the quoted form of the string value "x".
-// If triple is true, quote uses the triple-quoted form """x""".
-func quote(unquoted string, triple bool) string {
-	q := `"`
-	if triple {
-		q = `"""`
+	buf := make([]byte, 0, 3*len(s)/2)
+	if b {
+		buf = append(buf, 'b')
 	}
-
-	buf := new(strings.Builder)
-	buf.WriteString(q)
-
-	for i := 0; i < len(unquoted); i++ {
-		c := unquoted[i]
-		if c == '"' && triple && (i+1 < len(unquoted) && unquoted[i+1] != '"' || i+2 < len(unquoted) && unquoted[i+2] != '"') {
-			// Can pass up to two quotes through, because they are followed by a non-quote byte.
-			buf.WriteByte(c)
-			if i+1 < len(unquoted) && unquoted[i+1] == '"' {
-				buf.WriteByte(c)
-				i++
+	buf = append(buf, '"')
+	for width := 0; len(s) > 0; s = s[width:] {
+		r := rune(s[0])
+		width = 1
+		if r >= utf8.RuneSelf {
+			r, width = utf8.DecodeRuneInString(s)
+		}
+		if width == 1 && r == utf8.RuneError {
+			// String (!b) literals accept \xXX escapes only for ASCII,
+			// but we must use them here to represent invalid bytes.
+			// The result is not a legal literal.
+			buf = append(buf, `\x`...)
+			buf = append(buf, hex[s[0]>>4])
+			buf = append(buf, hex[s[0]&0xF])
+			continue
+		}
+		if r == '"' || r == '\\' { // always backslashed
+			buf = append(buf, '\\')
+			buf = append(buf, byte(r))
+			continue
+		}
+		if strconv.IsPrint(r) {
+			n := utf8.EncodeRune(runeTmp[:], r)
+			buf = append(buf, runeTmp[:n]...)
+			continue
+		}
+		switch r {
+		case '\a':
+			buf = append(buf, `\a`...)
+		case '\b':
+			buf = append(buf, `\b`...)
+		case '\f':
+			buf = append(buf, `\f`...)
+		case '\n':
+			buf = append(buf, `\n`...)
+		case '\r':
+			buf = append(buf, `\r`...)
+		case '\t':
+			buf = append(buf, `\t`...)
+		case '\v':
+			buf = append(buf, `\v`...)
+		default:
+			switch {
+			case r < ' ' || r == 0x7f:
+				buf = append(buf, `\x`...)
+				buf = append(buf, hex[byte(r)>>4])
+				buf = append(buf, hex[byte(r)&0xF])
+			case r > utf8.MaxRune:
+				r = 0xFFFD
+				fallthrough
+			case r < 0x10000:
+				buf = append(buf, `\u`...)
+				for s := 12; s >= 0; s -= 4 {
+					buf = append(buf, hex[r>>uint(s)&0xF])
+				}
+			default:
+				buf = append(buf, `\U`...)
+				for s := 28; s >= 0; s -= 4 {
+					buf = append(buf, hex[r>>uint(s)&0xF])
+				}
 			}
-			continue
 		}
-		if triple && c == '\n' {
-			// Can allow newline in triple-quoted string.
-			buf.WriteByte(c)
-			continue
-		}
-		if c == '\'' {
-			// Can allow ' since we always use ".
-			buf.WriteByte(c)
-			continue
-		}
-		if c == '\\' {
-			if i+1 < len(unquoted) && indexByte(notEsc, unquoted[i+1]) >= 0 {
-				// Can pass \ through when followed by a byte that
-				// known not to be a valid escape sequence and also
-				// that does not trigger an escape sequence of its own.
-				// Use this, because various BUILD files do.
-				buf.WriteByte('\\')
-				buf.WriteByte(unquoted[i+1])
-				i++
-				continue
-			}
-		}
-		if esc[c] != 0 {
-			buf.WriteByte('\\')
-			buf.WriteByte(esc[c])
-			continue
-		}
-		if c < 0x20 || c >= 0x80 {
-			// BUILD files are supposed to be Latin-1, so escape all control and high bytes.
-			// I'd prefer to use \x here, but Blaze does not implement
-			// \x in quoted strings (b/7272572).
-			buf.WriteByte('\\')
-			buf.WriteByte(hex[c>>6]) // actually octal but reusing hex digits 0-7.
-			buf.WriteByte(hex[(c>>3)&7])
-			buf.WriteByte(hex[c&7])
-			/*
-				buf.WriteByte('\\')
-				buf.WriteByte('x')
-				buf.WriteByte(hex[c>>4])
-				buf.WriteByte(hex[c&0xF])
-			*/
-			continue
-		}
-		buf.WriteByte(c)
-		continue
 	}
-
-	buf.WriteString(q)
-	return buf.String()
+	buf = append(buf, '"')
+	return string(buf)
 }

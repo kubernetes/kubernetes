@@ -148,7 +148,7 @@ type Message interface {
 	// be preserved in marshaling or other operations.
 	IsValid() bool
 
-	// ProtoMethods returns optional fast-path implementions of various operations.
+	// ProtoMethods returns optional fast-path implementations of various operations.
 	// This method may return nil.
 	//
 	// The returned methods type is identical to

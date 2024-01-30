@@ -20,6 +20,6 @@ limitations under the License.
 // +k8s:prerelease-lifecycle-gen=true
 
 // Package policy is for any kind of policy object.  Suitable examples, even if
-// they aren't all here, are PodDisruptionBudget, PodSecurityPolicy,
+// they aren't all here, are PodDisruptionBudget,
 // NetworkPolicy, etc.
 package v1beta1 // import "k8s.io/api/policy/v1beta1"

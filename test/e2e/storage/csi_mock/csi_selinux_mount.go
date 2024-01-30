@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -42,22 +44,22 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-selinux")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
-	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinux]", func() {
+	f.Context("SELinuxMount [LinuxOnly]", feature.SELinux, func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c0,c1",
 		}
 		seLinuxMountOption1 := "context=\"system_u:object_r:container_file_t:s0:c0,c1\""
 		seLinuxOpts2 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c98,c99",
 		}
 		seLinuxMountOption2 := "context=\"system_u:object_r:container_file_t:s0:c98,c99\""
@@ -160,8 +162,8 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 
 				// Assert
 				ginkgo.By("Checking the initial pod mount options")
-				framework.ExpectEqual(nodeStageMountOpts, t.expectedFirstMountOptions, "NodeStage MountFlags for the initial pod")
-				framework.ExpectEqual(nodePublishMountOpts, t.expectedFirstMountOptions, "NodePublish MountFlags for the initial pod")
+				gomega.Expect(nodeStageMountOpts).To(gomega.Equal(t.expectedFirstMountOptions), "NodeStage MountFlags for the initial pod")
+				gomega.Expect(nodePublishMountOpts).To(gomega.Equal(t.expectedFirstMountOptions), "NodePublish MountFlags for the initial pod")
 
 				ginkgo.By("Checking the CSI driver calls for the initial pod")
 				gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnstage call count for the initial pod")
@@ -229,7 +231,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeUnstage calls after the first pod is deleted")
 					gomega.Expect(stageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeStage calls for the second pod")
 					// The second pod got the right mount option
-					framework.ExpectEqual(nodeStageMountOpts, t.expectedSecondMountOptions, "NodeStage MountFlags for the second pod")
+					gomega.Expect(nodeStageMountOpts).To(gomega.Equal(t.expectedSecondMountOptions), "NodeStage MountFlags for the second pod")
 				} else {
 					// Volume should not be fully unstaged between the first and the second pod
 					gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnstage calls after the first pod is deleted")
@@ -238,7 +240,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				// In both cases, Unublish and Publish is called, with the right mount opts
 				gomega.Expect(unpublishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeUnpublish calls after the first pod is deleted")
 				gomega.Expect(publishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodePublish calls for the second pod")
-				framework.ExpectEqual(nodePublishMountOpts, t.expectedSecondMountOptions, "NodePublish MountFlags for the second pod")
+				gomega.Expect(nodePublishMountOpts).To(gomega.Equal(t.expectedSecondMountOptions), "NodePublish MountFlags for the second pod")
 			})
 		}
 	})
@@ -246,35 +248,22 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 
 var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-selinux-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	// [Serial]: the tests read global kube-controller-manager metrics, so no other test changes them in parallel.
-	ginkgo.Context("SELinuxMount metrics [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod][Serial]", func() {
-
-		// All SELinux metrics. Unless explicitly mentioned in test.expectIncreases, these metrics must not grow during
-		// a test.
-		allMetrics := sets.NewString(
-			"volume_manager_selinux_container_errors_total",
-			"volume_manager_selinux_container_warnings_total",
-			"volume_manager_selinux_pod_context_mismatch_errors_total",
-			"volume_manager_selinux_pod_context_mismatch_warnings_total",
-			"volume_manager_selinux_volume_context_mismatch_errors_total",
-			"volume_manager_selinux_volume_context_mismatch_warnings_total",
-			"volume_manager_selinux_volumes_admitted_total",
-		)
-
+	f.Context("SELinuxMount metrics [LinuxOnly]", feature.SELinux, feature.SELinuxMountReadWriteOncePod, f.WithSerial(), func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c0,c1",
 		}
 		seLinuxOpts2 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c98,c99",
 		}
 
@@ -320,6 +309,21 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 		for _, t := range tests {
 			t := t
 			ginkgo.It(t.name, func(ctx context.Context) {
+				// Some metrics use CSI driver name as a label, which is "csi-mock-" + the namespace name.
+				volumePluginLabel := "{volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\"}"
+
+				// All SELinux metrics. Unless explicitly mentioned in test.expectIncreases, these metrics must not grow during
+				// a test.
+				allMetrics := sets.NewString(
+					"volume_manager_selinux_container_errors_total",
+					"volume_manager_selinux_container_warnings_total",
+					"volume_manager_selinux_pod_context_mismatch_errors_total",
+					"volume_manager_selinux_pod_context_mismatch_warnings_total",
+					"volume_manager_selinux_volume_context_mismatch_errors_total"+volumePluginLabel,
+					"volume_manager_selinux_volume_context_mismatch_warnings_total"+volumePluginLabel,
+					"volume_manager_selinux_volumes_admitted_total"+volumePluginLabel,
+				)
+
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
 				}
@@ -386,20 +390,17 @@ func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName stri
 	framework.ExpectNoError(err)
 
 	metrics := map[string]float64{}
-	for method, samples := range response {
-		if metricNames.Has(method) {
-			if len(samples) == 0 {
-				return nil, fmt.Errorf("metric %s has no samples", method)
-			}
-			lastSample := samples[len(samples)-1]
-			metrics[method] = float64(lastSample.Value)
+	for _, samples := range response {
+		if len(samples) == 0 {
+			continue
 		}
-	}
-
-	// Ensure all metrics were provided
-	for name := range metricNames {
-		if _, found := metrics[name]; !found {
-			return nil, fmt.Errorf("metric %s not found", name)
+		// Find the *last* sample that has the label we are interested in.
+		for i := len(samples) - 1; i >= 0; i-- {
+			metricNameWithLabels := samples[i].Metric.String()
+			if metricNames.Has(metricNameWithLabels) {
+				metrics[metricNameWithLabels] = float64(samples[i].Value)
+				break
+			}
 		}
 	}
 
@@ -420,11 +421,23 @@ func waitForMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber, nod
 		noIncreaseMetrics = sets.NewString()
 		// Always evaluate all SELinux metrics to check that the other metrics are not unexpectedly increased.
 		for name := range allMetricNames {
-			if expectedIncreaseNames.Has(name) {
+			expectIncrease := false
+
+			// allMetricNames can include "{volume_plugin="XXX"}", while expectedIncreaseNames does not.
+			// Compare them properly. Value of volume_plugin="XXX" was already checked in grabMetrics(),
+			// we can ignore it here.
+			for expectedIncreaseMetricName := range expectedIncreaseNames {
+				if strings.HasPrefix(name, expectedIncreaseMetricName) {
+					expectIncrease = true
+					break
+				}
+			}
+			if expectIncrease {
 				if metrics[name] <= initialValues[name] {
 					noIncreaseMetrics.Insert(name)
 				}
 			} else {
+				// Expect the metric to be stable
 				if initialValues[name] != metrics[name] {
 					return false, fmt.Errorf("metric %s unexpectedly increased to %v", name, metrics[name])
 				}

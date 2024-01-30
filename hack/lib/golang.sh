@@ -18,7 +18,8 @@
 
 # The golang package that we are building.
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
-readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
+readonly KUBE_GOPATH="${KUBE_GOPATH:-"${KUBE_OUTPUT}/go"}"
+export KUBE_GOPATH
 
 # The server platform we are building on.
 readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
@@ -329,6 +330,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kubectl
   kubectl-convert
   kubemark
+  mounter
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.
@@ -465,13 +467,23 @@ kube::golang::create_gopath_tree() {
 kube::golang::verify_go_version() {
   # default GO_VERSION to content of .go-version
   GO_VERSION="${GO_VERSION:-"$(cat "${KUBE_ROOT}/.go-version")"}"
-  # only setup go if we haven't set FORCE_HOST_GO, or `go version` doesn't match GO_VERSION
-  if ! ([ -n "${FORCE_HOST_GO:-}" ] || \
-      (command -v go >/dev/null && [ "$(go version | cut -d' ' -f3)" = "go${GO_VERSION}" ])); then
+  if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
+    # no-op, just respect GOTOOLCHAIN
+    :
+  elif [ -n "${FORCE_HOST_GO:-}" ]; then
+    # ensure existing host version is used, like before GOTOOLCHAIN existed
+    export GOTOOLCHAIN='local'
+  else
+    # otherwise, we want to ensure the go version matches GO_VERSION
+    GOTOOLCHAIN="go${GO_VERSION}"
+    export GOTOOLCHAIN
+    # if go is either not installed or too old to respect GOTOOLCHAIN then use gimme
+    if ! (command -v go >/dev/null && [ "$(go version | cut -d' ' -f3)" = "${GOTOOLCHAIN}" ]); then
       export GIMME_ENV_PREFIX=${GIMME_ENV_PREFIX:-"${KUBE_OUTPUT}/.gimme/envs"}
       export GIMME_VERSION_PREFIX=${GIMME_VERSION_PREFIX:-"${KUBE_OUTPUT}/.gimme/versions"}
       # eval because the output of this is shell to set PATH etc.
       eval "$("${KUBE_ROOT}/third_party/gimme/gimme" "${GO_VERSION}")"
+    fi
   fi
 
   if [[ -z "$(command -v go)" ]]; then
@@ -485,7 +497,8 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.20
+  # TODO: Update to go1.22 as soon we are ready to merge this
+  minimum_go_version=go1.21
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -555,19 +568,25 @@ kube::golang::setup_env() {
 
   # This seems to matter to some tools
   export GO15VENDOREXPERIMENT=1
+}
 
+kube::golang::setup_gomaxprocs() {
   # GOMAXPROCS by default does not reflect the number of cpu(s) available
   # when running in a container, please see https://github.com/golang/go/issues/33803
-  if ! command -v ncpu >/dev/null 2>&1; then
-    # shellcheck disable=SC2164
-    pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-    GO111MODULE=on go install ./ncpu
-    # shellcheck disable=SC2164
-    popd >/dev/null
+  if [[ -z "${GOMAXPROCS:-}" ]]; then
+    if ! command -v ncpu >/dev/null 2>&1; then
+      # shellcheck disable=SC2164
+      pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+      GO111MODULE=on go install ./ncpu || echo "Will not automatically set GOMAXPROCS"
+      # shellcheck disable=SC2164
+      popd >/dev/null
+    fi
+    if command -v ncpu >/dev/null 2>&1; then
+      GOMAXPROCS=$(ncpu)
+      export GOMAXPROCS
+      kube::log::status "Set GOMAXPROCS automatically to ${GOMAXPROCS}"
+    fi
   fi
-
-  GOMAXPROCS=${GOMAXPROCS:-$(ncpu)}
-  kube::log::status "Setting GOMAXPROCS: ${GOMAXPROCS}"
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
@@ -755,7 +774,7 @@ kube::golang::build_binaries_for_platform() {
   done
 
   V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} ASMFLAGS=${goasmflags} LDFLAGS=${goldflags}"
+  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
@@ -763,7 +782,6 @@ kube::golang::build_binaries_for_platform() {
       -installsuffix=static
       ${goflags:+"${goflags[@]}"}
       -gcflags="${gogcflags}"
-      -asmflags="${goasmflags}"
       -ldflags="${goldflags}"
       -tags="${gotags:-}"
     )
@@ -774,7 +792,6 @@ kube::golang::build_binaries_for_platform() {
     build_args=(
       ${goflags:+"${goflags[@]}"}
       -gcflags="${gogcflags}"
-      -asmflags="${goasmflags}"
       -ldflags="${goldflags}"
       -tags="${gotags:-}"
     )
@@ -790,7 +807,6 @@ kube::golang::build_binaries_for_platform() {
     go test -c \
       ${goflags:+"${goflags[@]}"} \
       -gcflags="${gogcflags}" \
-      -asmflags="${goasmflags}" \
       -ldflags="${goldflags}" \
       -tags="${gotags:-}" \
       -o "${outfile}" \
@@ -847,26 +863,19 @@ kube::golang::build_binaries() {
     # These are "local" but are visible to and relied on by functions this
     # function calls.  They are effectively part of the calling API to
     # build_binaries_for_platform.
-    local goflags goldflags goasmflags gogcflags gotags
+    local goflags goldflags gogcflags gotags
 
-    # This is $(pwd) because we use run-in-gopath to build.  Once that is
-    # excised, this can become ${KUBE_ROOT}.
-    local trimroot # two lines to appease shellcheck SC2155
-    trimroot=$(pwd)
+    goflags=()
+    gogcflags="${GOGCFLAGS:-}"
+    goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
 
-    goasmflags="all=-trimpath=${trimroot}"
-
-    gogcflags="all=-trimpath=${trimroot} ${GOGCFLAGS:-}"
     if [[ "${DBG:-}" == 1 ]]; then
         # Debugging - disable optimizations and inlining and trimPath
-        gogcflags="${GOGCFLAGS:-} all=-N -l"
-        goasmflags=""
-    fi
-
-    goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
-    if [[ "${DBG:-}" != 1 ]]; then
-        # Not debugging - disable symbols and DWARF.
+        gogcflags="${gogcflags} all=-N -l"
+    else
+        # Not debugging - disable symbols and DWARF, trim embedded paths
         goldflags="${goldflags} -s -w"
+        goflags+=("-trimpath")
     fi
 
     # Extract tags if any specified in GOFLAGS
@@ -892,9 +901,6 @@ kube::golang::build_binaries() {
     IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
-    else
-      kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
-      kube::log::status "         support for linux/arm will be removed in a subsequent release."
     fi
 
     local -a binaries

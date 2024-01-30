@@ -62,9 +62,9 @@ var (
 		kubectl describe pods
 
 		# Describe pods by label name=myLabel
-		kubectl describe po -l name=myLabel
+		kubectl describe pods -l name=myLabel
 
-		# Describe all pods managed by the 'frontend' replication controller 
+		# Describe all pods managed by the 'frontend' replication controller
 		# (rc-created pods get the name of the rc as a prefix in the pod name)
 		kubectl describe pods frontend`))
 )

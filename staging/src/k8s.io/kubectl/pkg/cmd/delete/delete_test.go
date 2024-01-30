@@ -18,6 +18,7 @@ package delete
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/utils/pointer"
 )
 
 func fakecmd() *cobra.Command {
@@ -45,6 +47,45 @@ func fakecmd() *cobra.Command {
 	}
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
+}
+
+func TestDeleteFlagValidation(t *testing.T) {
+	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
+	tests := []struct {
+		flags       DeleteFlags
+		args        [][]string
+		expectedErr string
+	}{
+		{
+			flags: DeleteFlags{
+				Raw:         pointer.String("test"),
+				Interactive: pointer.Bool(true),
+			},
+			expectedErr: "--interactive can not be used with --raw",
+		},
+	}
+
+	for _, test := range tests {
+		cmd := fakecmd()
+		deleteOptions, err := test.flags.ToOptions(nil, genericiooptions.NewTestIOStreamsDiscard())
+		if err != nil {
+			t.Fatalf("unexpected error creating delete options: %s", err)
+		}
+		deleteOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+		err = deleteOptions.Complete(f, nil, cmd)
+		if err != nil {
+			t.Fatalf("unexpected error creating delete options: %s", err)
+		}
+		err = deleteOptions.Validate()
+		if err == nil {
+			t.Fatalf("missing expected error")
+		}
+		if test.expectedErr != err.Error() {
+			t.Errorf("expected error %s, got %s", test.expectedErr, err)
+		}
+	}
 }
 
 func TestDeleteObjectByTuple(t *testing.T) {
@@ -259,6 +300,106 @@ func TestDeleteObject(t *testing.T) {
 
 	// uses the name from the file, not the response
 	if buf.String() != "replicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestPreviewResultEqualToResult(t *testing.T) {
+	deleteFlags := NewDeleteCommandFlags("")
+	deleteFlags.Interactive = pointer.Bool(true)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+
+	deleteOptions, err := deleteFlags.ToOptions(nil, streams)
+	deleteOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = deleteOptions.Complete(tf, nil, fakecmd())
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	infos, err := deleteOptions.Result.Infos()
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	previewInfos, err := deleteOptions.PreviewResult.Infos()
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if len(infos) != len(previewInfos) {
+		t.Errorf("result and previewResult must match")
+	}
+}
+
+func TestDeleteObjectWithInteractive(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, in, buf, _ := genericiooptions.NewTestIOStreams()
+	fmt.Fprint(in, "y")
+	cmd := NewCmdDelete(tf, streams)
+	err := cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("output", "name")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("interactive", "true")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): replicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	streams, in, buf, _ = genericiooptions.NewTestIOStreams()
+	fmt.Fprint(in, "n")
+	cmd = NewCmdDelete(tf, streams)
+	err = cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("output", "name")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	err = cmd.Flags().Set("interactive", "true")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): deletion is cancelled\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+	if buf.String() == ": replicationcontroller/redis-master\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

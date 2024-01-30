@@ -35,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -74,9 +75,9 @@ func proxyPostRequest(ctx context.Context, c clientset.Interface, node, endpoint
 	}
 }
 
-var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", func() {
+var _ = SIGDescribe("Checkpoint Container", nodefeature.CheckpointContainer, func() {
 	f := framework.NewDefaultFramework("checkpoint-container-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("will checkpoint a container out of a pod", func(ctx context.Context) {
 		ginkgo.By("creating a target pod")
 		podClient := e2epod.NewPodClient(f)
@@ -103,11 +104,9 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(
-			isReady,
-			true,
-			"pod should be ready",
-		)
+		if !isReady {
+			framework.Failf("pod %q should be ready", p.Name)
+		}
 
 		framework.Logf(
 			"About to checkpoint container %q on %q",
@@ -199,7 +198,9 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 				}
 			}
 			for fileName := range checkForFiles {
-				framework.ExpectEqual(checkForFiles[fileName], true)
+				if !checkForFiles[fileName] {
+					framework.Failf("File %q not found in checkpoint archive %q", fileName, item)
+				}
 			}
 			// cleanup checkpoint archive
 			os.RemoveAll(item)

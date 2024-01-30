@@ -19,11 +19,59 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/utils/clock"
 )
+
+// healthMux is an interface describing the methods InstallHandler requires.
+type healthMux interface {
+	Handle(pattern string, handler http.Handler)
+}
+
+type healthCheckRegistry struct {
+	path            string
+	lock            sync.Mutex
+	checks          []healthz.HealthChecker
+	checksInstalled bool
+	clock           clock.Clock
+}
+
+func (reg *healthCheckRegistry) addHealthChecks(checks ...healthz.HealthChecker) error {
+	return reg.addDelayedHealthChecks(0, checks...)
+}
+
+func (reg *healthCheckRegistry) addDelayedHealthChecks(delay time.Duration, checks ...healthz.HealthChecker) error {
+	if delay > 0 && reg.clock == nil {
+		return fmt.Errorf("nil clock in healthCheckRegistry for %s endpoint", reg.path)
+	}
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+	if reg.checksInstalled {
+		return fmt.Errorf("unable to add because the %s endpoint has already been created", reg.path)
+	}
+	if delay > 0 {
+		for _, check := range checks {
+			reg.checks = append(reg.checks, delayedHealthCheck(check, reg.clock, delay))
+		}
+	} else {
+		reg.checks = append(reg.checks, checks...)
+	}
+	return nil
+}
+
+func (reg *healthCheckRegistry) installHandler(mux healthMux) {
+	reg.installHandlerWithHealthyFunc(mux, nil)
+}
+
+func (reg *healthCheckRegistry) installHandlerWithHealthyFunc(mux healthMux, firstTimeHealthy func()) {
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+	reg.checksInstalled = true
+	healthz.InstallPathHandlerWithHealthyFunc(mux, reg.path, firstTimeHealthy, reg.checks...)
+}
 
 // AddHealthChecks adds HealthCheck(s) to health endpoints (healthz, livez, readyz) but
 // configures the liveness grace period to be zero, which means we expect this health check
@@ -47,40 +95,23 @@ func (s *GenericAPIServer) AddBootSequenceHealthChecks(checks ...healthz.HealthC
 // addHealthChecks adds health checks to healthz, livez, and readyz. The delay passed in will set
 // a corresponding grace period on livez.
 func (s *GenericAPIServer) addHealthChecks(livezGracePeriod time.Duration, checks ...healthz.HealthChecker) error {
-	s.healthzLock.Lock()
-	defer s.healthzLock.Unlock()
-	if s.healthzChecksInstalled {
-		return fmt.Errorf("unable to add because the healthz endpoint has already been created")
-	}
-	s.healthzChecks = append(s.healthzChecks, checks...)
-	if err := s.AddLivezChecks(livezGracePeriod, checks...); err != nil {
+	if err := s.healthzRegistry.addHealthChecks(checks...); err != nil {
 		return err
 	}
-	return s.AddReadyzChecks(checks...)
+	if err := s.livezRegistry.addDelayedHealthChecks(livezGracePeriod, checks...); err != nil {
+		return err
+	}
+	return s.readyzRegistry.addHealthChecks(checks...)
 }
 
 // AddReadyzChecks allows you to add a HealthCheck to readyz.
 func (s *GenericAPIServer) AddReadyzChecks(checks ...healthz.HealthChecker) error {
-	s.readyzLock.Lock()
-	defer s.readyzLock.Unlock()
-	if s.readyzChecksInstalled {
-		return fmt.Errorf("unable to add because the readyz endpoint has already been created")
-	}
-	s.readyzChecks = append(s.readyzChecks, checks...)
-	return nil
+	return s.readyzRegistry.addHealthChecks(checks...)
 }
 
 // AddLivezChecks allows you to add a HealthCheck to livez.
 func (s *GenericAPIServer) AddLivezChecks(delay time.Duration, checks ...healthz.HealthChecker) error {
-	s.livezLock.Lock()
-	defer s.livezLock.Unlock()
-	if s.livezChecksInstalled {
-		return fmt.Errorf("unable to add because the livez endpoint has already been created")
-	}
-	for _, check := range checks {
-		s.livezChecks = append(s.livezChecks, delayedHealthCheck(check, s.livezClock, delay))
-	}
-	return nil
+	return s.livezRegistry.addDelayedHealthChecks(delay, checks...)
 }
 
 // addReadyzShutdownCheck is a convenience function for adding a readyz shutdown check, so
@@ -92,29 +123,20 @@ func (s *GenericAPIServer) addReadyzShutdownCheck(stopCh <-chan struct{}) error 
 
 // installHealthz creates the healthz endpoint for this server
 func (s *GenericAPIServer) installHealthz() {
-	s.healthzLock.Lock()
-	defer s.healthzLock.Unlock()
-	s.healthzChecksInstalled = true
-	healthz.InstallHandler(s.Handler.NonGoRestfulMux, s.healthzChecks...)
+	s.healthzRegistry.installHandler(s.Handler.NonGoRestfulMux)
 }
 
 // installReadyz creates the readyz endpoint for this server.
 func (s *GenericAPIServer) installReadyz() {
-	s.readyzLock.Lock()
-	defer s.readyzLock.Unlock()
-	s.readyzChecksInstalled = true
-	healthz.InstallReadyzHandlerWithHealthyFunc(s.Handler.NonGoRestfulMux, func() {
-		// note: InstallReadyzHandlerWithHealthyFunc guarantees that this is called only once
+	s.readyzRegistry.installHandlerWithHealthyFunc(s.Handler.NonGoRestfulMux, func() {
+		// note: installHandlerWithHealthyFunc guarantees that this is called only once
 		s.lifecycleSignals.HasBeenReady.Signal()
-	}, s.readyzChecks...)
+	})
 }
 
 // installLivez creates the livez endpoint for this server.
 func (s *GenericAPIServer) installLivez() {
-	s.livezLock.Lock()
-	defer s.livezLock.Unlock()
-	s.livezChecksInstalled = true
-	healthz.InstallLivezHandler(s.Handler.NonGoRestfulMux, s.livezChecks...)
+	s.livezRegistry.installHandler(s.Handler.NonGoRestfulMux)
 }
 
 // shutdownCheck fails if the embedded channel is closed. This is intended to allow for graceful shutdown sequences

@@ -1,10 +1,11 @@
 package link
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 type RawTracepointOptions struct {
@@ -22,40 +23,65 @@ func AttachRawTracepoint(opts RawTracepointOptions) (Link, error) {
 		return nil, fmt.Errorf("invalid program type %s, expected RawTracepoint(Writable)", t)
 	}
 	if opts.Program.FD() < 0 {
-		return nil, fmt.Errorf("invalid program: %w", internal.ErrClosedFd)
+		return nil, fmt.Errorf("invalid program: %w", sys.ErrClosedFd)
 	}
 
-	fd, err := bpfRawTracepointOpen(&bpfRawTracepointOpenAttr{
-		name: internal.NewStringPointer(opts.Name),
-		fd:   uint32(opts.Program.FD()),
+	fd, err := sys.RawTracepointOpen(&sys.RawTracepointOpenAttr{
+		Name:   sys.NewStringPointer(opts.Name),
+		ProgFd: uint32(opts.Program.FD()),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &progAttachRawTracepoint{fd: fd}, nil
+	err = haveBPFLink()
+	if errors.Is(err, ErrNotSupported) {
+		// Prior to commit 70ed506c3bbc ("bpf: Introduce pinnable bpf_link abstraction")
+		// raw_tracepoints are just a plain fd.
+		return &simpleRawTracepoint{fd}, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &rawTracepoint{RawLink{fd: fd}}, nil
 }
 
-type progAttachRawTracepoint struct {
-	fd *internal.FD
+type simpleRawTracepoint struct {
+	fd *sys.FD
 }
 
-var _ Link = (*progAttachRawTracepoint)(nil)
+var _ Link = (*simpleRawTracepoint)(nil)
 
-func (rt *progAttachRawTracepoint) isLink() {}
+func (frt *simpleRawTracepoint) isLink() {}
 
-func (rt *progAttachRawTracepoint) Close() error {
-	return rt.fd.Close()
+func (frt *simpleRawTracepoint) Close() error {
+	return frt.fd.Close()
 }
 
-func (rt *progAttachRawTracepoint) Update(_ *ebpf.Program) error {
-	return fmt.Errorf("can't update raw_tracepoint: %w", ErrNotSupported)
+func (frt *simpleRawTracepoint) Update(_ *ebpf.Program) error {
+	return fmt.Errorf("update raw_tracepoint: %w", ErrNotSupported)
 }
 
-func (rt *progAttachRawTracepoint) Pin(_ string) error {
-	return fmt.Errorf("can't pin raw_tracepoint: %w", ErrNotSupported)
+func (frt *simpleRawTracepoint) Pin(string) error {
+	return fmt.Errorf("pin raw_tracepoint: %w", ErrNotSupported)
 }
 
-func (rt *progAttachRawTracepoint) Unpin() error {
+func (frt *simpleRawTracepoint) Unpin() error {
 	return fmt.Errorf("unpin raw_tracepoint: %w", ErrNotSupported)
+}
+
+func (frt *simpleRawTracepoint) Info() (*Info, error) {
+	return nil, fmt.Errorf("can't get raw_tracepoint info: %w", ErrNotSupported)
+}
+
+type rawTracepoint struct {
+	RawLink
+}
+
+var _ Link = (*rawTracepoint)(nil)
+
+func (rt *rawTracepoint) Update(_ *ebpf.Program) error {
+	return fmt.Errorf("update raw_tracepoint: %w", ErrNotSupported)
 }

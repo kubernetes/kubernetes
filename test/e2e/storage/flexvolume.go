@@ -27,6 +27,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -158,7 +159,7 @@ func getHostFromHostPort(hostPort string) string {
 
 var _ = utils.SIGDescribe("Flexvolumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// note that namespace deletion is handled by delete-namespace flag
 
@@ -200,7 +201,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
 	})
 
-	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func(ctx context.Context) {
+	f.It("should be mountable when attachable", feature.Flexvolumes, func(ctx context.Context) {
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 

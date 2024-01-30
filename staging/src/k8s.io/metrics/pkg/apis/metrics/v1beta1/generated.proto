@@ -80,6 +80,7 @@ message PodMetrics {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Duration window = 3;
 
   // Metrics for all containers are collected within the same time window.
+  // +listType=atomic
   repeated ContainerMetrics containers = 4;
 }
 

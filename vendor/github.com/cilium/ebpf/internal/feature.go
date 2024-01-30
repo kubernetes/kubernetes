@@ -54,11 +54,6 @@ type FeatureTestFn func() error
 //
 // Returns an error wrapping ErrNotSupported if the feature is not supported.
 func FeatureTest(name, version string, fn FeatureTestFn) func() error {
-	v, err := NewVersion(version)
-	if err != nil {
-		return func() error { return err }
-	}
-
 	ft := new(featureTest)
 	return func() error {
 		ft.RLock()
@@ -79,6 +74,11 @@ func FeatureTest(name, version string, fn FeatureTestFn) func() error {
 		err := fn()
 		switch {
 		case errors.Is(err, ErrNotSupported):
+			v, err := NewVersion(version)
+			if err != nil {
+				return err
+			}
+
 			ft.result = &UnsupportedFeatureError{
 				MinimumVersion: v,
 				Name:           name,

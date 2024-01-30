@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/component-base/metrics"
 )
 
@@ -308,6 +310,21 @@ var _ = custom.NewCounter(
 	)
 `},
 		{
+			testName: "Custom import NewDesc",
+			metric: metric{
+				Name:           "apiserver_storage_size_bytes",
+				Help:           "Size of the storage database file physically allocated in bytes.",
+				Labels:         []string{"server"},
+				StabilityLevel: "STABLE",
+				Type:           customType,
+				ConstLabels:    map[string]string{},
+			},
+			src: `
+package test
+import custom "k8s.io/component-base/metrics"
+var _ = custom.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"server"}, nil, custom.STABLE, "")
+`},
+		{
 			testName: "Const",
 			metric: metric{
 				Name:           "metric",
@@ -526,8 +543,8 @@ var _ = compbasemetrics.NewCounter(
 			if test.metric.Labels == nil {
 				test.metric.Labels = []string{}
 			}
-			if !reflect.DeepEqual(metrics[0], test.metric) {
-				t.Errorf("metric:\ngot  %v\nwant %v", metrics[0], test.metric)
+			if diff := cmp.Diff(metrics[0], test.metric); diff != "" {
+				t.Errorf("metric diff: %s", diff)
 			}
 		})
 	}
@@ -584,7 +601,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Fail on metric with stability set to function return",
-			err:      fmt.Errorf("testdata/metric.go:9:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:9:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -599,7 +616,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "error for passing stability as string",
-			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:6:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -611,7 +628,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "error for passing stability as variable",
-			err:      fmt.Errorf("testdata/metric.go:7:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:7:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"

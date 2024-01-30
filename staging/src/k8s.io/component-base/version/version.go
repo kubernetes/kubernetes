@@ -31,7 +31,7 @@ func Get() apimachineryversion.Info {
 	return apimachineryversion.Info{
 		Major:        gitMajor,
 		Minor:        gitMinor,
-		GitVersion:   gitVersion,
+		GitVersion:   dynamicGitVersion.Load().(string),
 		GitCommit:    gitCommit,
 		GitTreeState: gitTreeState,
 		BuildDate:    buildDate,

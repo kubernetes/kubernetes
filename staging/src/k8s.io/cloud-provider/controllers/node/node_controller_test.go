@@ -1656,8 +1656,11 @@ func Test_syncNode(t *testing.T) {
 				nodeStatusUpdateFrequency: 1 * time.Second,
 			}
 
-			factory.Start(nil)
-			factory.WaitForCacheSync(nil)
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
+			factory.Start(stopCh)
+			factory.WaitForCacheSync(stopCh)
 
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
@@ -1740,8 +1743,11 @@ func TestGCEConditionV2(t *testing.T) {
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
 
-	factory.Start(nil)
-	factory.WaitForCacheSync(nil)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	factory.Start(stopCh)
+	factory.WaitForCacheSync(stopCh)
 
 	w := eventBroadcaster.StartLogging(klog.Infof)
 	defer w.Stop()
@@ -1828,8 +1834,11 @@ func TestGCECondition(t *testing.T) {
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
 
-	factory.Start(nil)
-	factory.WaitForCacheSync(nil)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	factory.Start(stopCh)
+	factory.WaitForCacheSync(stopCh)
 
 	w := eventBroadcaster.StartLogging(klog.Infof)
 	defer w.Stop()
@@ -1934,10 +1943,13 @@ func Test_reconcileNodeLabels(t *testing.T) {
 				nodeInformer: factory.Core().V1().Nodes(),
 			}
 
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
 			// activate node informer
 			factory.Core().V1().Nodes().Informer()
-			factory.Start(nil)
-			factory.WaitForCacheSync(nil)
+			factory.Start(stopCh)
+			factory.WaitForCacheSync(stopCh)
 
 			err := cnc.reconcileNodeLabels("node01")
 			if err != test.expectedErr {

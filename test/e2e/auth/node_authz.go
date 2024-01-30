@@ -28,11 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -40,10 +42,10 @@ const (
 	nodeNamePrefix = "system:node:"
 )
 
-var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
+var _ = SIGDescribe(feature.NodeAuthorizer, func() {
 
 	f := framework.NewDefaultFramework("node-authz")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	// client that will impersonate a node
 	var c clientset.Interface
 	var ns string
@@ -54,7 +56,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
-		framework.ExpectNotEqual(len(nodeList.Items), 0)
+		gomega.Expect(nodeList.Items).NotTo(gomega.BeEmpty())
 		nodeName = nodeList.Items[0].Name
 		asUser = nodeNamePrefix + nodeName
 		ginkgo.By("Creating a kubernetes client that impersonates a node")

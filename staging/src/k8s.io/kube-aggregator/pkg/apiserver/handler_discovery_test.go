@@ -18,9 +18,10 @@ package apiserver
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,8 +29,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/require"
+
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,22 +65,94 @@ func waitForQueueComplete(stopCh <-chan struct{}, dm *discoveryManager) bool {
 func TestBasic(t *testing.T) {
 	service1 := discoveryendpoint.NewResourceManager("apis")
 	service2 := discoveryendpoint.NewResourceManager("apis")
+	service3 := discoveryendpoint.NewResourceManager("apis")
 	apiGroup1 := fuzzAPIGroups(2, 5, 25)
 	apiGroup2 := fuzzAPIGroups(2, 5, 50)
+	apiGroup3 := apidiscoveryv2beta1.APIGroupDiscoveryList{Items: []apidiscoveryv2beta1.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "weird.example.com"},
+			Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: "Current",
+					Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
+						{
+							Resource: "parent-missing-kind",
+							Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+								{Subresource: "subresource-missing-kind"},
+							},
+						},
+						{
+							Resource:     "parent-empty-kind",
+							ResponseKind: &metav1.GroupVersionKind{},
+							Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+								{Subresource: "subresource-empty-kind", ResponseKind: &metav1.GroupVersionKind{}},
+							},
+						},
+						{
+							Resource:     "parent-with-kind",
+							ResponseKind: &metav1.GroupVersionKind{Kind: "ParentWithKind"},
+							Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+								{Subresource: "subresource-with-kind", ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithKind"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
+	apiGroup3WithFixup := apidiscoveryv2beta1.APIGroupDiscoveryList{Items: []apidiscoveryv2beta1.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "weird.example.com"},
+			Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: "Current",
+					Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
+						{
+							Resource:     "parent-missing-kind",
+							ResponseKind: &metav1.GroupVersionKind{}, // defaulted by aggregator
+							Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+								{Subresource: "subresource-missing-kind", ResponseKind: &metav1.GroupVersionKind{}}, // defaulted by aggregator
+							},
+						},
+						{
+							Resource:     "parent-empty-kind",
+							ResponseKind: &metav1.GroupVersionKind{},
+							Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+								{Subresource: "subresource-empty-kind", ResponseKind: &metav1.GroupVersionKind{}},
+							},
+						},
+						{
+							Resource:     "parent-with-kind",
+							ResponseKind: &metav1.GroupVersionKind{Kind: "ParentWithKind"},
+							Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+								{Subresource: "subresource-with-kind", ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithKind"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
 	service1.SetGroups(apiGroup1.Items)
 	service2.SetGroups(apiGroup2.Items)
+	service3.SetGroups(apiGroup3.Items)
 	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
 	for _, g := range apiGroup1.Items {
+		versionPriority := int32(len(g.Versions) + 1)
 		for _, v := range g.Versions {
+			versionPriority--
 			aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v.Version + "." + g.Name,
 				},
 				Spec: apiregistrationv1.APIServiceSpec{
-					Group:   g.Name,
-					Version: v.Version,
+					Group:           g.Name,
+					Version:         v.Version,
+					VersionPriority: versionPriority,
 					Service: &apiregistrationv1.ServiceReference{
 						Name: "service1",
 					},
@@ -87,19 +162,42 @@ func TestBasic(t *testing.T) {
 	}
 
 	for _, g := range apiGroup2.Items {
+		versionPriority := int32(len(g.Versions) + 1)
 		for _, v := range g.Versions {
+			versionPriority--
 			aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v.Version + "." + g.Name,
 				},
 				Spec: apiregistrationv1.APIServiceSpec{
-					Group:   g.Name,
-					Version: v.Version,
+					Group:           g.Name,
+					Version:         v.Version,
+					VersionPriority: versionPriority,
 					Service: &apiregistrationv1.ServiceReference{
 						Name: "service2",
 					},
 				},
 			}, service2)
+		}
+	}
+
+	for _, g := range apiGroup3.Items {
+		versionPriority := int32(len(g.Versions) + 1)
+		for _, v := range g.Versions {
+			versionPriority--
+			aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: v.Version + "." + g.Name,
+				},
+				Spec: apiregistrationv1.APIServiceSpec{
+					Group:           g.Name,
+					Version:         v.Version,
+					VersionPriority: versionPriority,
+					Service: &apiregistrationv1.ServiceReference{
+						Name: "service3",
+					},
+				},
+			}, service3)
 		}
 	}
 
@@ -116,9 +214,11 @@ func TestBasic(t *testing.T) {
 	}
 	checkAPIGroups(t, apiGroup1, parsed)
 	checkAPIGroups(t, apiGroup2, parsed)
+	checkAPIGroups(t, apiGroup3WithFixup, parsed)
 }
 
 func checkAPIGroups(t *testing.T, api apidiscoveryv2beta1.APIGroupDiscoveryList, response *apidiscoveryv2beta1.APIGroupDiscoveryList) {
+	t.Helper()
 	if len(response.Items) < len(api.Items) {
 		t.Errorf("expected to check for at least %d groups, only have %d groups in response", len(api.Items), len(response.Items))
 	}
@@ -128,6 +228,10 @@ func checkAPIGroups(t *testing.T, api apidiscoveryv2beta1.APIGroupDiscoveryList,
 			if knownGroup.Name == possibleGroup.Name {
 				t.Logf("found %s", knownGroup.Name)
 				found = true
+				diff := cmp.Diff(knownGroup, possibleGroup)
+				if len(diff) > 0 {
+					t.Error(diff)
+				}
 			}
 		}
 		if found == false {
@@ -287,6 +391,10 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 				GroupVersion: "stable.example.com/v1alpha1",
 				Version:      "v1alpha1",
 			},
+			{
+				GroupVersion: "stable.example.com/v2alpha1",
+				Version:      "v2alpha1",
+			},
 		},
 	})
 
@@ -347,6 +455,17 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 			legacyResourceHandlerV1Beta1.ServeHTTP(w, r)
 		} else if r.URL.Path == "/apis/stable.example.com/v1alpha1" {
 			legacyResourceHandlerV1Alpha1.ServeHTTP(w, r)
+		} else if r.URL.Path == "/apis/stable.example.com/v2alpha1" {
+			// serve the most minimal discovery doc that could have worked prior to aggregated discovery
+			json.NewEncoder(w).Encode(&metav1.APIResourceList{
+				GroupVersion: "stable.example.com/v2alpha1",
+				APIResources: []metav1.APIResource{
+					{Name: "parent-without-kind"},
+					{Name: "missing-parent/subresource-without-parent", Kind: "SubresourceWithoutParent"},
+					{Name: "parent-without-kind/subresource", Kind: "Subresource"},
+					{Name: "parent-without-kind/subresource-without-kind"},
+				},
+			})
 		} else if r.URL.Path == "/apis" {
 			rootAPIsHandler.ServeHTTP(w, r)
 		} else {
@@ -392,6 +511,18 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 			},
 		},
 	}, handlerFunc)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v2alpha1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v2alpha1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, handlerFunc)
 
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -403,41 +534,70 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 	// includes the legacy resources
 	_, _, doc := fetchPath(aggregatedResourceManager, "")
 
-	aggregatedVersions := []apidiscoveryv2beta1.APIVersionDiscovery{}
-	for _, resource := range resources {
-		converted, err := endpoints.ConvertGroupVersionIntoToDiscovery([]metav1.APIResource{resource})
+	mustConvert := func(r []metav1.APIResource) []apidiscoveryv2beta1.APIResourceDiscovery {
+		converted, err := endpoints.ConvertGroupVersionIntoToDiscovery(r)
 		require.NoError(t, err)
-		aggregatedVersions = append(aggregatedVersions, apidiscoveryv2beta1.APIVersionDiscovery{
-			Version:   resource.Version,
-			Resources: converted,
-			Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
-		})
+		return converted
 	}
-	sort.Sort(byVersion(aggregatedVersions))
-	aggregatedDiscovery := []apidiscoveryv2beta1.APIGroupDiscovery{{
+	expectAggregatedDiscovery := []apidiscoveryv2beta1.APIGroupDiscovery{{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: resources["v1"].Group,
+			Name: "stable.example.com",
 		},
-		Versions: aggregatedVersions,
+		Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+			{
+				Version:   "v1",
+				Resources: mustConvert([]metav1.APIResource{resources["v1"]}),
+				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+			},
+			{
+				Version:   "v1beta1",
+				Resources: mustConvert([]metav1.APIResource{resources["v1beta1"]}),
+				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+			},
+			{
+				Version: "v2alpha1",
+				Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
+					{
+						Resource:     "parent-without-kind",
+						ResponseKind: &metav1.GroupVersionKind{}, // defaulted
+						Scope:        "Cluster",
+						Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+							{
+								Subresource:  "subresource",
+								ResponseKind: &metav1.GroupVersionKind{Kind: "Subresource"},
+							},
+							{
+								Subresource:  "subresource-without-kind",
+								ResponseKind: &metav1.GroupVersionKind{}, // defaulted
+							},
+						},
+					},
+					{
+						Resource:     "missing-parent",
+						ResponseKind: &metav1.GroupVersionKind{}, // defaulted
+						Scope:        "Cluster",
+						Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+							{
+								Subresource:  "subresource-without-parent",
+								ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithoutParent"},
+							},
+						},
+					},
+				},
+				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+			},
+			{
+				Version:   "v1alpha1",
+				Resources: mustConvert([]metav1.APIResource{resources["v1alpha1"]}),
+				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+			},
+		},
 	}}
-	require.Equal(t, doc.Items, aggregatedDiscovery)
+	require.Equal(t, doc.Items, expectAggregatedDiscovery)
 }
 
-type byVersion []apidiscoveryv2beta1.APIVersionDiscovery
-
-var versionMap = map[string]int{
-	"v1":       1,
-	"v1beta1":  2,
-	"v1alpha1": 3,
-}
-
-func (a byVersion) Len() int           { return len(a) }
-func (a byVersion) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byVersion) Less(i, j int) bool { return versionMap[a[i].Version] < versionMap[a[j].Version] }
-
-func TestLegacyFallback(t *testing.T) {
+func testLegacyFallbackWithCustomRootHandler(t *testing.T, rootHandlerFn func(http.ResponseWriter, *http.Request)) {
 	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
-	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
 
 	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
 		Name: "stable.example.com",
@@ -496,7 +656,7 @@ func TestLegacyFallback(t *testing.T) {
 			// defer to legacy discovery
 			legacyResourceHandler.ServeHTTP(w, r)
 		} else if r.URL.Path == "/apis" {
-			rootAPIsHandler.ServeHTTP(w, r)
+			rootHandlerFn(w, r)
 		} else {
 			// Unknown url
 			t.Fatalf("unexpected request sent to %v", r.URL.Path)
@@ -524,6 +684,82 @@ func TestLegacyFallback(t *testing.T) {
 					Version:   resource.Version,
 					Resources: converted,
 					Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+				},
+			},
+		},
+	}, doc.Items)
+}
+func TestLegacyFallback(t *testing.T) {
+	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
+	testCases := []struct {
+		name        string
+		rootHandler func(http.ResponseWriter, *http.Request)
+	}{
+		{
+			name:        "Default root handler (406)",
+			rootHandler: rootAPIsHandler.ServeHTTP,
+		},
+		{
+			name: "Root handler with non 200 status code",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(404)
+			},
+		},
+		{
+			name: "Root handler with 200 response code no content type",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(200)
+			},
+		},
+		{
+			name: "Root handler with 200 response code incorrect content type",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json;g=apidiscovery.k8s.io;v=v1alpha1;as=APIGroupDiscoveryList")
+				w.WriteHeader(200)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		testLegacyFallbackWithCustomRootHandler(t, tc.rootHandler)
+	}
+}
+
+func TestAPIServiceStale(t *testing.T) {
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+	}))
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done())
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+
+	// At this point external services have synced. Check if discovery document
+	// lists the APIService group version as Stale.
+	_, _, doc := fetchPath(aggregatedResourceManager, "")
+	require.Equal(t, []apidiscoveryv2beta1.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "stable.example.com",
+			},
+			Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: apidiscoveryv2beta1.DiscoveryFreshnessStale,
 				},
 			},
 		},
@@ -603,9 +839,14 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 		c.Fuzz(&atLeastOne)
 		o.Versions = append(o.Versions, atLeastOne)
 
-		o.TypeMeta = metav1.TypeMeta{
-			Kind:       "APIGroupDiscovery",
-			APIVersion: "v1",
+		// clear invalid fuzzed values
+		o.TypeMeta = metav1.TypeMeta{}
+		// truncate object meta to just name
+		o.ObjectMeta = metav1.ObjectMeta{Name: o.ObjectMeta.Name}
+		// fix version freshness value, make versions unique and non-empty
+		for i := range o.Versions {
+			o.Versions[i].Freshness = "Current"
+			o.Versions[i].Version = fmt.Sprintf("v%d", i+1)
 		}
 	})
 

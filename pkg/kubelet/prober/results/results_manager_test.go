@@ -21,7 +21,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -36,7 +37,7 @@ func TestCacheOperations(t *testing.T) {
 	_, found := m.Get(unsetID)
 	assert.False(t, found, "unset result found")
 
-	m.Set(setID, Success, &v1.Pod{})
+	m.Set(setID, Success, &corev1.Pod{})
 	result, found := m.Get(setID)
 	assert.True(t, result == Success, "set result")
 	assert.True(t, found, "set result found")
@@ -49,7 +50,7 @@ func TestCacheOperations(t *testing.T) {
 func TestUpdates(t *testing.T) {
 	m := NewManager()
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
 	fooID := kubecontainer.ContainerID{Type: "test", ID: "foo"}
 	barID := kubecontainer.ContainerID{Type: "test", ID: "bar"}
 
@@ -96,4 +97,66 @@ func TestUpdates(t *testing.T) {
 
 	m.Set(barID, Success, pod)
 	expectUpdate(Update{barID, Success, pod.UID}, "changed bar")
+}
+
+func TestResult_ToPrometheusType(t *testing.T) {
+	tests := []struct {
+		name     string
+		result   Result
+		expected float64
+	}{
+		{
+			name:     "result is Success",
+			result:   Success,
+			expected: 0,
+		},
+		{
+			name:     "result is Failure",
+			result:   Failure,
+			expected: 1,
+		},
+		{
+			name:     "result is other",
+			result:   123,
+			expected: -1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.result.ToPrometheusType(); got != test.expected {
+				t.Errorf("Result.ToPrometheusType() = %v, expected %v", got, test.expected)
+			}
+		})
+	}
+}
+
+func TestResult_String(t *testing.T) {
+	tests := []struct {
+		name     string
+		result   Result
+		expected string
+	}{
+		{
+			name:     "result is Success",
+			result:   Success,
+			expected: "Success",
+		},
+		{
+			name:     "result is Failure",
+			result:   Failure,
+			expected: "Failure",
+		},
+		{
+			name:     "result is other",
+			result:   -123,
+			expected: "UNKNOWN",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.result.String(); got != test.expected {
+				t.Errorf("Result.String() = %v, expected %v", got, test.expected)
+			}
+		})
+	}
 }

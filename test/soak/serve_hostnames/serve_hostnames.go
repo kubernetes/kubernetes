@@ -155,7 +155,7 @@ func main() {
 				Ports: []v1.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
-					TargetPort: intstr.FromInt(9376),
+					TargetPort: intstr.FromInt32(9376),
 				}},
 				Selector: map[string]string{
 					"name": "serve-hostname",

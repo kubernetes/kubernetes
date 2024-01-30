@@ -17,7 +17,8 @@ limitations under the License.
 package validatingadmissionpolicy
 
 import (
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,7 +29,7 @@ import (
 var _ matching.MatchCriteria = &matchCriteria{}
 
 type matchCriteria struct {
-	constraints *v1alpha1.MatchResources
+	constraints *v1beta1.MatchResources
 }
 
 // GetParsedNamespaceSelector returns the converted LabelSelector which implements labels.Selector
@@ -42,7 +43,7 @@ func (m *matchCriteria) GetParsedObjectSelector() (labels.Selector, error) {
 }
 
 // GetMatchResources returns the matchConstraints
-func (m *matchCriteria) GetMatchResources() v1alpha1.MatchResources {
+func (m *matchCriteria) GetMatchResources() v1beta1.MatchResources {
 	return *m.constraints
 }
 
@@ -62,17 +63,21 @@ func (c *matcher) ValidateInitialization() error {
 }
 
 // DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
-func (c *matcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
+func (c *matcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
 	criteria := matchCriteria{constraints: definition.Spec.MatchConstraints}
 	return c.Matcher.Matches(a, o, &criteria)
 }
 
 // BindingMatches returns whether this ValidatingAdmissionPolicyBinding matches the provided admission resource request
-func (c *matcher) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
+func (c *matcher) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1beta1.ValidatingAdmissionPolicyBinding) (bool, error) {
 	if binding.Spec.MatchResources == nil {
 		return true, nil
 	}
 	criteria := matchCriteria{constraints: binding.Spec.MatchResources}
-	isMatch, _, err := c.Matcher.Matches(a, o, &criteria)
+	isMatch, _, _, err := c.Matcher.Matches(a, o, &criteria)
 	return isMatch, err
+}
+
+func (c *matcher) GetNamespace(name string) (*corev1.Namespace, error) {
+	return c.Matcher.GetNamespace(name)
 }

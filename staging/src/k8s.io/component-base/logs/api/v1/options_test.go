@@ -32,6 +32,34 @@ import (
 	"k8s.io/klog/v2"
 )
 
+func TestReapply(t *testing.T) {
+	oldReapplyHandling := ReapplyHandling
+	defer func() {
+		ReapplyHandling = oldReapplyHandling
+		if err := ResetForTest(nil /* feature gates */); err != nil {
+			t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+		}
+	}()
+
+	newOptions := NewLoggingConfiguration()
+	if err := ValidateAndApply(newOptions, nil); err != nil {
+		t.Errorf("unexpected error for first ValidateAndApply: %v", err)
+	}
+	ReapplyHandling = ReapplyHandlingError
+	if err := ValidateAndApply(newOptions, nil); err == nil {
+		t.Error("did not get expected error for second ValidateAndApply")
+	}
+	ReapplyHandling = ReapplyHandlingIgnoreUnchanged
+	if err := ValidateAndApply(newOptions, nil); err != nil {
+		t.Errorf("unexpected error for third ValidateAndApply: %v", err)
+	}
+	modifiedOptions := newOptions.DeepCopy()
+	modifiedOptions.Verbosity = 100
+	if err := ValidateAndApply(modifiedOptions, nil); err == nil {
+		t.Errorf("unexpected success for forth ValidateAndApply, should have complained about modified config")
+	}
+}
+
 func TestOptions(t *testing.T) {
 	newOptions := NewLoggingConfiguration()
 	testcases := []struct {
@@ -75,6 +103,11 @@ func TestOptions(t *testing.T) {
 			if !assert.Equal(t, tc.want, c) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
 			}
+			defer func() {
+				if err := ResetForTest(nil /* feature gates */); err != nil {
+					t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+				}
+			}()
 			errs := ValidateAndApply(c, nil /* We don't care about feature gates here. */)
 			defer klog.StopFlushDaemon()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
@@ -182,6 +215,11 @@ func testContextualLogging(t *testing.T, enabled bool) {
 	AddFeatureGates(featureGate)
 	err = featureGate.SetFromMap(map[string]bool{string(ContextualLogging): enabled})
 	require.NoError(t, err)
+	defer func() {
+		if err := ResetForTest(nil /* feature gates */); err != nil {
+			t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+		}
+	}()
 	err = ValidateAndApply(c, featureGate)
 	require.NoError(t, err)
 	defer klog.StopFlushDaemon()

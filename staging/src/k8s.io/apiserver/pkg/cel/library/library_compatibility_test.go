@@ -20,22 +20,16 @@ import (
 	"testing"
 
 	"github.com/google/cel-go/cel"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestLibraryCompatibility(t *testing.T) {
-	functionNames := map[string]struct{}{}
-
-	decls := map[cel.Library]map[string][]cel.FunctionOpt{
-		urlsLib:  urlLibraryDecls,
-		listsLib: listsLibraryDecls,
-		regexLib: regexLibraryDecls,
-		authzLib: authzLibraryDecls,
-	}
-	if len(k8sExtensionLibs) != len(decls) {
-		t.Errorf("Expected the same number of libraries in the ExtensionLibs as are tested for compatibility")
-	}
-	for _, decl := range decls {
-		for name := range decl {
+	var libs []map[string][]cel.FunctionOpt
+	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls, ipLibraryDecls, cidrLibraryDecls)
+	functionNames := sets.New[string]()
+	for _, lib := range libs {
+		for name := range lib {
 			functionNames[name] = struct{}{}
 		}
 	}
@@ -43,19 +37,30 @@ func TestLibraryCompatibility(t *testing.T) {
 	// WARN: All library changes must follow
 	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/2876-crd-validation-expression-language#function-library-updates
 	// and must track the functions here along with which Kubernetes version introduced them.
-	knownFunctions := []string{
+	knownFunctions := sets.New(
 		// Kubernetes 1.24:
 		"isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "find", "findAll", "url", "getScheme", "getHost", "getHostname",
 		"getPort", "getEscapedPath", "getQuery", "isURL",
 		// Kubernetes <1.27>:
-		"path", "group", "serviceAccount", "resource", "subresource", "namespace", "name", "check", "allowed", "denied", "reason",
+		"path", "group", "serviceAccount", "resource", "subresource", "namespace", "name", "check", "allowed", "reason",
+		// Kubernetes <1.28>:
+		"errored", "error",
+		// Kubernetes <1.29>:
+		"add", "asApproximateFloat", "asInteger", "compareTo", "isGreaterThan", "isInteger", "isLessThan", "isQuantity", "quantity", "sign", "sub",
+		// Kubernetes <1.30>:
+		"ip", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast", "ip.isCanonical", "isIP", "cidr", "containsIP", "containsCIDR", "masked", "prefixLength", "isCIDR", "string",
 		// Kubernetes <1.??>:
-	}
-	for _, fn := range knownFunctions {
-		delete(functionNames, fn)
-	}
+	)
 
-	if len(functionNames) != 0 {
-		t.Errorf("Expected all functions in the libraries to be assigned to a kubernetes release, but found the unassigned function names: %v", functionNames)
+	// TODO: test celgo function lists
+
+	unexpected := functionNames.Difference(knownFunctions)
+	missing := knownFunctions.Difference(functionNames)
+
+	if len(unexpected) != 0 {
+		t.Errorf("Expected all functions in the libraries to be assigned to a kubernetes release, but found the unexpected function names: %v", unexpected)
+	}
+	if len(missing) != 0 {
+		t.Errorf("Expected all functions in the libraries to be assigned to a kubernetes release, but found the missing function names: %v", missing)
 	}
 }

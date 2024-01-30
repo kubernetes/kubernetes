@@ -130,6 +130,10 @@ func Test_validateServices(t *testing.T) {
 	var (
 		service1 = "svc1"
 		service2 = "svc2"
+		service3 = "svc.foo"
+		service4 = "svc_foo"
+		service5 = "svc@foo"
+		service6 = "svc:foo"
 		invalid1 = "svc\n"
 		invalid2 = "svc.foo\n"
 	)
@@ -140,10 +144,14 @@ func Test_validateServices(t *testing.T) {
 	}{
 		{name: "one service", services: []string{service1}},
 		{name: "two services", services: []string{service1, service2}},
+		{name: "dot service", services: []string{service3}},
+		{name: "underscore service", services: []string{service4}},
+		{name: "at service", services: []string{service5}},
+		{name: "colon service", services: []string{service6}},
 		{name: "invalid service new line", services: []string{invalid1}, wantErr: true},
 		{name: "invalid service with dot", services: []string{invalid2}, wantErr: true},
 		{name: "long service", services: []string{strings.Repeat(service1, 100)}, wantErr: true},
-		{name: "max number of services", services: []string{service1, service2, service1, service2, service1}, wantErr: true},
+		{name: "max number of services", services: []string{service1, service2, service3, service4, service5}, wantErr: true},
 	}
 	for _, tt := range tests {
 		errs := validateServices(tt.services)
@@ -189,7 +197,8 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 		{name: "until", Services: []string{service1}, options: options{UntilTime: &until}},
 		{name: "since until", Services: []string{service1}, options: options{SinceTime: &until, UntilTime: &since},
 			wantErr: true},
-		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}},
+		// boot is not supported on Windows.
+		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}, wantErr: runtime.GOOS == "windows"},
 		{name: "boot out of range", Services: []string{service1}, options: options{Boot: intPtr(1)}, wantErr: true},
 		{name: "tailLines", Services: []string{service1}, options: options{TailLines: intPtr(100)}},
 		{name: "tailLines out of range", Services: []string{service1}, options: options{TailLines: intPtr(100000)}},

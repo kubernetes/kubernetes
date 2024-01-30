@@ -28,14 +28,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/pkg/controller/testutil"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/legacy-cloud-providers/gce"
 	netutils "k8s.io/utils/net"
 )
@@ -51,7 +48,6 @@ func newTestNodeIpamController(ctx context.Context, clusterCIDR []*net.IPNet, se
 	fakeClient := &fake.Clientset{}
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
 	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
-	fakeClusterCIDRInformer := fakeInformerFactory.Networking().V1alpha1().ClusterCIDRs()
 
 	for _, node := range fakeNodeHandler.Existing {
 		fakeNodeInformer.Informer().GetStore().Add(node)
@@ -60,7 +56,7 @@ func newTestNodeIpamController(ctx context.Context, clusterCIDR []*net.IPNet, se
 	fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
 	return NewNodeIpamController(
 		ctx,
-		fakeNodeInformer, fakeClusterCIDRInformer, fakeGCE, clientSet,
+		fakeNodeInformer, fakeGCE, clientSet,
 		clusterCIDR, serviceCIDR, secondaryServiceCIDR, nodeCIDRMaskSizes, allocatorType,
 	)
 }
@@ -116,45 +112,6 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 				if err.Error() != test.expectedError.Error() {
 					t.Errorf("Test %s, got error: %v, expected error: %v", test.desc, err, test.expectedError)
 				}
-			}
-		})
-	}
-}
-
-// MultiCIDRRangeAllocatorType need enable feature gate
-func TestNewNodeIpamControllerWithCIDRMasks2(t *testing.T) {
-	emptyServiceCIDR := ""
-	for _, tc := range []struct {
-		desc                 string
-		clusterCIDR          string
-		serviceCIDR          string
-		secondaryServiceCIDR string
-		maskSize             []int
-		allocatorType        ipam.CIDRAllocatorType
-	}{
-		{"valid_multi_cidr_range_allocator", "10.0.0.0/21", "10.1.0.0/21", emptyServiceCIDR, []int{24}, ipam.MultiCIDRRangeAllocatorType},
-		{"valid_multi_cidr_range_allocator_dualstack", "10.0.0.0/21,2000::/48", "10.1.0.0/21", emptyServiceCIDR, []int{24, 64}, ipam.MultiCIDRRangeAllocatorType},
-	} {
-		test := tc
-		_, ctx := ktesting.NewTestContext(t)
-		t.Run(test.desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
-
-			clusterCidrs, err := netutils.ParseCIDRs(strings.Split(test.clusterCIDR, ","))
-			if err != nil {
-				clusterCidrs = nil
-			}
-			_, serviceCIDRIpNet, err := netutils.ParseCIDRSloppy(test.serviceCIDR)
-			if err != nil {
-				serviceCIDRIpNet = nil
-			}
-			_, secondaryServiceCIDRIpNet, err := netutils.ParseCIDRSloppy(test.secondaryServiceCIDR)
-			if err != nil {
-				secondaryServiceCIDRIpNet = nil
-			}
-			_, err = newTestNodeIpamController(ctx, clusterCidrs, serviceCIDRIpNet, secondaryServiceCIDRIpNet, test.maskSize, test.allocatorType)
-			if err != nil {
-				t.Errorf("Test %s, got error %v", test.desc, err)
 			}
 		})
 	}

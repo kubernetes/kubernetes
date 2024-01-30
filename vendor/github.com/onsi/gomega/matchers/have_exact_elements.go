@@ -44,7 +44,12 @@ func (matcher *HaveExactElementsMatcher) Match(actual interface{}) (success bool
 
 		elemMatcher := matchers[i].(omegaMatcher)
 		match, err := elemMatcher.Match(values[i])
-		if err != nil || !match {
+		if err != nil {
+			matcher.mismatchFailures = append(matcher.mismatchFailures, mismatchFailure{
+				index:   i,
+				failure: err.Error(),
+			})
+		} else if !match {
 			matcher.mismatchFailures = append(matcher.mismatchFailures, mismatchFailure{
 				index:   i,
 				failure: elemMatcher.FailureMessage(values[i]),

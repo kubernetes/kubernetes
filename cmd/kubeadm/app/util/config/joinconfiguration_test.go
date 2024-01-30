@@ -56,6 +56,8 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: JoinConfiguration
 				caCertPath: /etc/kubernetes/pki/ca.crt
+				nodeRegistration:
+				  criSocket: "unix:///var/run/unknown.sock"
 				discovery:
 				  bootstrapToken:
 				    apiServerEndpoint: kube-apiserver:6443
@@ -76,7 +78,11 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 				return
 			}
 
-			obj, err := LoadJoinConfigurationFromFile(cfgPath)
+			opts := LoadOrDefaultConfigurationOptions{
+				SkipCRIDetect: true,
+			}
+
+			obj, err := LoadJoinConfigurationFromFile(cfgPath, opts)
 			if rt.expectErr {
 				if err == nil {
 					t.Error("Unexpected success")

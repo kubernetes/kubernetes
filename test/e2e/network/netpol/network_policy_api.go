@@ -28,6 +28,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -36,7 +38,7 @@ import (
 
 var _ = common.SIGDescribe("Netpol API", func() {
 	f := framework.NewDefaultFramework("netpol")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.20
 		Testname: NetworkPolicies API
@@ -133,12 +135,12 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		ginkgo.By("getting")
 		gottenNetPol, err := npClient.Get(ctx, createdNetPol.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenNetPol.UID, createdNetPol.UID)
+		gomega.Expect(gottenNetPol.UID).To(gomega.Equal(createdNetPol.UID))
 
 		ginkgo.By("listing")
 		nps, err := npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(nps.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
@@ -149,7 +151,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		ginkgo.By("cluster-wide listing")
 		clusterNPs, err := clusterNPClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterNPs.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(clusterNPs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
@@ -159,14 +161,14 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		ginkgo.By("patching")
 		patchedNetPols, err := npClient.Patch(ctx, createdNetPol.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedNetPols.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedNetPols.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		npToUpdate := patchedNetPols.DeepCopy()
 		npToUpdate.Annotations["updated"] = "true"
 		updatedNetPols, err := npClient.Update(ctx, npToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedNetPols.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedNetPols.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
@@ -175,7 +177,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 				if !ok {
 					framework.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedNetPol, isNetPol := evt.Object.(*networkingv1.NetworkPolicy)
 				if !isNetPol {
 					framework.Failf("expected NetworkPolicy, got %T", evt.Object)
@@ -201,14 +203,14 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		}
 		nps, err = npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(nps.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = npClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		nps, err = npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(nps.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
 	/*
@@ -232,14 +234,14 @@ var _ = common.SIGDescribe("Netpol API", func() {
 			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
 			SetSpecEgressRules(egressRule))
 		_, err := npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field cannot be defined if the Port field is defined as a named (string) port.")
 		egressRule = networkingv1.NetworkPolicyEgressRule{}
 		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"}, EndPort: &endport})
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field must be equal or greater than port.")
 		ginkgo.By("When EndPort field is smaller than port, it will failed")
@@ -247,7 +249,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 30000}, EndPort: &endport})
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field is equal with port.")
 		egressRule.Ports[0].Port = &intstr.IntOrString{Type: intstr.Int, IntVal: 20000}
@@ -267,81 +269,6 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		framework.ExpectNoError(err)
 		nps, err := npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
-	})
-
-	/*
-			Release: v1.24
-			Testname: NetworkPolicy support status subresource
-			Description:
-		    - Status condition without a Reason cannot exist
-		    - Status should support conditions
-			- Two conditions with the same type cannot exist.
-	*/
-	ginkgo.It("should support creating NetworkPolicy with Status subresource [Feature:NetworkPolicyStatus]", func(ctx context.Context) {
-		ns := f.Namespace.Name
-		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
-
-		ginkgo.By("NetworkPolicy should deny invalid status condition without Reason field")
-
-		namespaceSelector := &metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				"ns-name": "pod-b",
-			},
-		}
-		podSelector := &metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				"pod-name": "client-a",
-			},
-		}
-		ingressRule := networkingv1.NetworkPolicyIngressRule{}
-		ingressRule.From = append(ingressRule.From, networkingv1.NetworkPolicyPeer{PodSelector: podSelector, NamespaceSelector: namespaceSelector})
-
-		npTemplate := GenNetworkPolicy(SetGenerateName("e2e-example-netpol-status-validate"),
-			SetObjectMetaLabel(map[string]string{"special-label": f.UniqueName}),
-			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
-			SetSpecIngressRules(ingressRule))
-		newNetPol, err := npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-
-		framework.ExpectNoError(err, "request template:%v", npTemplate)
-
-		condition := metav1.Condition{
-			Type:               string(networkingv1.NetworkPolicyConditionStatusAccepted),
-			Status:             metav1.ConditionTrue,
-			Reason:             "RuleApplied",
-			LastTransitionTime: metav1.Time{Time: time.Now().Add(-5 * time.Minute)},
-			Message:            "rule was successfully applied",
-			ObservedGeneration: 2,
-		}
-
-		status := networkingv1.NetworkPolicyStatus{
-			Conditions: []metav1.Condition{
-				condition,
-			},
-		}
-
-		ginkgo.By("NetworkPolicy should support valid status condition")
-		newNetPol.Status = status
-
-		_, err = npClient.UpdateStatus(ctx, newNetPol, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "request template:%v", newNetPol)
-
-		ginkgo.By("NetworkPolicy should not support status condition without reason field")
-		newNetPol.Status.Conditions[0].Reason = ""
-		_, err = npClient.UpdateStatus(ctx, newNetPol, metav1.UpdateOptions{})
-		framework.ExpectError(err, "request template:%v", newNetPol)
-
-		ginkgo.By("NetworkPolicy should not support status condition with duplicated types")
-		newNetPol.Status.Conditions = []metav1.Condition{condition, condition}
-		newNetPol.Status.Conditions[1].Status = metav1.ConditionFalse
-		_, err = npClient.UpdateStatus(ctx, newNetPol, metav1.UpdateOptions{})
-		framework.ExpectError(err, "request template:%v", newNetPol)
-
-		ginkgo.By("deleting all test collection")
-		err = npClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		nps, err := npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
+		gomega.Expect(nps.Items).To(gomega.BeEmpty(), "filtered list should be 0 items")
 	})
 })

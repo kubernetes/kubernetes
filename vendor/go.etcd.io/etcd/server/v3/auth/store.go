@@ -479,7 +479,8 @@ func (as *authStore) UserChangePassword(r *pb.AuthUserChangePasswordRequest) (*p
 	var password []byte
 	var err error
 
-	if !user.Options.NoPassword {
+	// Backward compatible with old versions of etcd, user options is nil
+	if user.Options == nil || !user.Options.NoPassword {
 		password, err = as.selectPassword(r.Password, r.HashedPassword)
 		if err != nil {
 			return nil, ErrNoPasswordUser
@@ -790,6 +791,9 @@ func (perms permSlice) Swap(i, j int) {
 func (as *authStore) RoleGrantPermission(r *pb.AuthRoleGrantPermissionRequest) (*pb.AuthRoleGrantPermissionResponse, error) {
 	if r.Perm == nil {
 		return nil, ErrPermissionNotGiven
+	}
+	if !isValidPermissionRange(r.Perm.Key, r.Perm.RangeEnd) {
+		return nil, ErrInvalidAuthMgmt
 	}
 
 	tx := as.be.BatchTx()
@@ -1156,6 +1160,9 @@ func (as *authStore) AuthInfoFromTLS(ctx context.Context) (ai *AuthInfo) {
 }
 
 func (as *authStore) AuthInfoFromCtx(ctx context.Context) (*AuthInfo, error) {
+	if !as.IsAuthEnabled() {
+		return nil, nil
+	}
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, nil

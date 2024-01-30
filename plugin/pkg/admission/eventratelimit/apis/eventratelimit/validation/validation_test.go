@@ -27,158 +27,124 @@ func TestValidateConfiguration(t *testing.T) {
 		name           string
 		config         eventratelimitapi.Configuration
 		expectedResult bool
-	}{
-		{
-			name: "valid server",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:  "Server",
-						Burst: 5,
-						QPS:   1,
-					},
-				},
-			},
-			expectedResult: true,
+	}{{
+		name: "valid server",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:  "Server",
+				Burst: 5,
+				QPS:   1,
+			}},
 		},
-		{
-			name: "valid namespace",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:      "Namespace",
-						Burst:     10,
-						QPS:       2,
-						CacheSize: 100,
-					},
-				},
-			},
-			expectedResult: true,
+		expectedResult: true,
+	}, {
+		name: "valid namespace",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:      "Namespace",
+				Burst:     10,
+				QPS:       2,
+				CacheSize: 100,
+			}},
 		},
-		{
-			name: "valid user",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:      "User",
-						Burst:     10,
-						QPS:       2,
-						CacheSize: 100,
-					},
-				},
-			},
-			expectedResult: true,
+		expectedResult: true,
+	}, {
+		name: "valid user",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:      "User",
+				Burst:     10,
+				QPS:       2,
+				CacheSize: 100,
+			}},
 		},
-		{
-			name: "valid source+object",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:      "SourceAndObject",
-						Burst:     5,
-						QPS:       1,
-						CacheSize: 1000,
-					},
-				},
-			},
-			expectedResult: true,
+		expectedResult: true,
+	}, {
+		name: "valid source+object",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:      "SourceAndObject",
+				Burst:     5,
+				QPS:       1,
+				CacheSize: 1000,
+			}},
 		},
-		{
-			name: "valid multiple",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:  "Server",
-						Burst: 5,
-						QPS:   1,
-					},
-					{
-						Type:      "Namespace",
-						Burst:     10,
-						QPS:       2,
-						CacheSize: 100,
-					},
-					{
-						Type:      "SourceAndObject",
-						Burst:     25,
-						QPS:       10,
-						CacheSize: 1000,
-					},
-				},
-			},
-			expectedResult: true,
+		expectedResult: true,
+	}, {
+		name: "valid multiple",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:  "Server",
+				Burst: 5,
+				QPS:   1,
+			}, {
+				Type:      "Namespace",
+				Burst:     10,
+				QPS:       2,
+				CacheSize: 100,
+			}, {
+				Type:      "SourceAndObject",
+				Burst:     25,
+				QPS:       10,
+				CacheSize: 1000,
+			}},
 		},
-		{
-			name:           "missing limits",
-			config:         eventratelimitapi.Configuration{},
-			expectedResult: false,
+		expectedResult: true,
+	}, {
+		name:           "missing limits",
+		config:         eventratelimitapi.Configuration{},
+		expectedResult: false,
+	}, {
+		name: "missing type",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Burst:     25,
+				QPS:       10,
+				CacheSize: 1000,
+			}},
 		},
-		{
-			name: "missing type",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Burst:     25,
-						QPS:       10,
-						CacheSize: 1000,
-					},
-				},
-			},
-			expectedResult: false,
+		expectedResult: false,
+	}, {
+		name: "invalid type",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:      "unknown-type",
+				Burst:     25,
+				QPS:       10,
+				CacheSize: 1000,
+			}},
 		},
-		{
-			name: "invalid type",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:      "unknown-type",
-						Burst:     25,
-						QPS:       10,
-						CacheSize: 1000,
-					},
-				},
-			},
-			expectedResult: false,
+		expectedResult: false,
+	}, {
+		name: "missing burst",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type: "Server",
+				QPS:  1,
+			}},
 		},
-		{
-			name: "missing burst",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type: "Server",
-						QPS:  1,
-					},
-				},
-			},
-			expectedResult: false,
+		expectedResult: false,
+	}, {
+		name: "missing qps",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:  "Server",
+				Burst: 5,
+			}},
 		},
-		{
-			name: "missing qps",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:  "Server",
-						Burst: 5,
-					},
-				},
-			},
-			expectedResult: false,
+		expectedResult: false,
+	}, {
+		name: "negative cache size",
+		config: eventratelimitapi.Configuration{
+			Limits: []eventratelimitapi.Limit{{
+				Type:      "Namespace",
+				Burst:     10,
+				QPS:       2,
+				CacheSize: -1,
+			}},
 		},
-		{
-			name: "negative cache size",
-			config: eventratelimitapi.Configuration{
-				Limits: []eventratelimitapi.Limit{
-					{
-						Type:      "Namespace",
-						Burst:     10,
-						QPS:       2,
-						CacheSize: -1,
-					},
-				},
-			},
-			expectedResult: false,
-		},
-	}
+		expectedResult: false,
+	}}
 	for _, tc := range cases {
 		errs := ValidateConfiguration(&tc.config)
 		if e, a := tc.expectedResult, len(errs) == 0; e != a {

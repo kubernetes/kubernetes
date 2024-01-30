@@ -202,6 +202,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
+	out.ImageMaximumGCAge = in.ImageMaximumGCAge
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	if in.CPUManagerPolicyOptions != nil {
 		in, out := &in.CPUManagerPolicyOptions, &out.CPUManagerPolicyOptions

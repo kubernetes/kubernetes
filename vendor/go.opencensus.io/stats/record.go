@@ -86,10 +86,29 @@ func createRecordOption(ros ...Options) *recordOptions {
 	return o
 }
 
+type measurementRecorder = func(tags *tag.Map, measurement []Measurement, attachments map[string]interface{})
+
 // Record records one or multiple measurements with the same context at once.
 // If there are any tags in the context, measurements will be tagged with them.
 func Record(ctx context.Context, ms ...Measurement) {
-	RecordWithOptions(ctx, WithMeasurements(ms...))
+	// Record behaves the same as RecordWithOptions, but because we do not have to handle generic functionality
+	// (RecordOptions) we can reduce some allocations to speed up this hot path
+	if len(ms) == 0 {
+		return
+	}
+	recorder := internal.MeasurementRecorder.(measurementRecorder)
+	record := false
+	for _, m := range ms {
+		if m.desc.subscribed() {
+			record = true
+			break
+		}
+	}
+	if !record {
+		return
+	}
+	recorder(tag.FromContext(ctx), ms, nil)
+	return
 }
 
 // RecordWithTags records one or multiple measurements at once.

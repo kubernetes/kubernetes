@@ -32,19 +32,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -81,8 +77,13 @@ type store struct {
 	groupResource       schema.GroupResource
 	groupResourceString string
 	watcher             *watcher
-	pagingEnabled       bool
 	leaseManager        *leaseManager
+}
+
+func (s *store) RequestWatchProgress(ctx context.Context) error {
+	// Use watchContext to match ctx metadata provided when creating the watch.
+	// In best case scenario we would use the same context that watch was created, but there is no way access it from watchCache.
+	return s.client.RequestProgress(s.watchContext(ctx))
 }
 
 type objState struct {
@@ -94,11 +95,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, prefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := storage.APIObjectVersioner{}
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
@@ -108,19 +109,36 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// Ensure the pathPrefix ends in "/" here to simplify key concatenation later.
 		pathPrefix += "/"
 	}
-	result := &store{
+
+	w := &watcher{
+		client:        c,
+		codec:         codec,
+		newFunc:       newFunc,
+		groupResource: groupResource,
+		versioner:     versioner,
+		transformer:   transformer,
+	}
+	if newFunc == nil {
+		w.objectType = "<unknown>"
+	} else {
+		w.objectType = reflect.TypeOf(newFunc()).String()
+	}
+	s := &store{
 		client:              c,
 		codec:               codec,
 		versioner:           versioner,
 		transformer:         transformer,
-		pagingEnabled:       pagingEnabled,
 		pathPrefix:          pathPrefix,
 		groupResource:       groupResource,
 		groupResourceString: groupResource.String(),
-		watcher:             newWatcher(c, codec, groupResource, newFunc, versioner),
+		watcher:             w,
 		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
 	}
-	return result
+
+	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
+		return storage.GetCurrentResourceVersionFromStorage(ctx, s, newListFunc, resourcePrefix, w.objectType)
+	}
+	return s
 }
 
 // Versioner implements storage.Interface.Versioner.
@@ -179,7 +197,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	)
 	defer span.End(500 * time.Millisecond)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
-		return errors.New("resourceVersion should not be set on objects to be created")
+		return storage.ErrResourceVersionSetOnCreate
 	}
 	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
 		return fmt.Errorf("PrepareObjectForStorage failed: %v", err)
@@ -252,15 +270,7 @@ func (s *store) Delete(
 func (s *store) conditionalDelete(
 	ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions,
 	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
-	getCurrentState := func() (*objState, error) {
-		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
-		if err != nil {
-			return nil, err
-		}
-		return s.getState(ctx, getResp, key, v, false)
-	}
+	getCurrentState := s.getCurrentState(ctx, key, v, false)
 
 	var origState *objState
 	var err error
@@ -388,15 +398,7 @@ func (s *store) GuaranteedUpdate(
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
 
-	getCurrentState := func() (*objState, error) {
-		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, preparedKey)
-		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
-		if err != nil {
-			return nil, err
-		}
-		return s.getState(ctx, getResp, preparedKey, v, ignoreNotFound)
-	}
+	getCurrentState := s.getCurrentState(ctx, preparedKey, v, ignoreNotFound)
 
 	var origState *objState
 	var origStateIsCurrent bool
@@ -582,23 +584,60 @@ func (s *store) Count(key string) (int64, error) {
 	return getResp.Count, nil
 }
 
+// resolveGetListRev is used by GetList to resolve the rev to use in the client.KV.Get request.
+func (s *store) resolveGetListRev(continueKey string, continueRV int64, opts storage.ListOptions) (int64, error) {
+	var withRev int64
+	// Uses continueRV if this is a continuation request.
+	if len(continueKey) > 0 {
+		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return withRev, apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
+		}
+		// If continueRV > 0, the LIST request needs a specific resource version.
+		// continueRV==0 is invalid.
+		// If continueRV < 0, the request is for the latest resource version.
+		if continueRV > 0 {
+			withRev = continueRV
+		}
+		return withRev, nil
+	}
+	// Returns 0 if ResourceVersion is not specified.
+	if len(opts.ResourceVersion) == 0 {
+		return withRev, nil
+	}
+	parsedRV, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return withRev, apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+	}
+
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchNotOlderThan:
+		// The not older than constraint is checked after we get a response from etcd,
+		// and returnedRV is then set to the revision we get from the etcd response.
+	case metav1.ResourceVersionMatchExact:
+		withRev = int64(parsedRV)
+	case "": // legacy case
+		if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
+			withRev = int64(parsedRV)
+		}
+	default:
+		return withRev, fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
+	}
+	return withRev, nil
+}
+
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	preparedKey, err := s.prepareKey(key)
 	if err != nil {
 		return err
 	}
-	recursive := opts.Recursive
-	resourceVersion := opts.ResourceVersion
-	match := opts.ResourceVersionMatch
-	pred := opts.Predicate
-	ctx, span := tracing.Start(ctx, fmt.Sprintf("List(recursive=%v) etcd3", recursive),
+	ctx, span := tracing.Start(ctx, fmt.Sprintf("List(recursive=%v) etcd3", opts.Recursive),
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
-		attribute.String("resourceVersion", resourceVersion),
-		attribute.String("resourceVersionMatch", string(match)),
-		attribute.Int("limit", int(pred.Limit)),
-		attribute.String("continue", pred.Continue))
+		attribute.String("resourceVersion", opts.ResourceVersion),
+		attribute.String("resourceVersionMatch", string(opts.ResourceVersionMatch)),
+		attribute.Int("limit", int(opts.Predicate.Limit)),
+		attribute.String("continue", opts.Predicate.Continue))
 	defer span.End(500 * time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
@@ -613,97 +652,42 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
 	// with prefix "/a" will return all three, while with prefix "/a/" will return only
 	// "/a/b" which is the correct answer.
-	if recursive && !strings.HasSuffix(preparedKey, "/") {
+	if opts.Recursive && !strings.HasSuffix(preparedKey, "/") {
 		preparedKey += "/"
 	}
 	keyPrefix := preparedKey
 
 	// set the appropriate clientv3 options to filter the returned data set
 	var limitOption *clientv3.OpOption
-	limit := pred.Limit
+	limit := opts.Predicate.Limit
 	var paging bool
 	options := make([]clientv3.OpOption, 0, 4)
-	if s.pagingEnabled && pred.Limit > 0 {
+	if opts.Predicate.Limit > 0 {
 		paging = true
 		options = append(options, clientv3.WithLimit(limit))
 		limitOption = &options[len(options)-1]
 	}
 
-	newItemFunc := getNewItemFunc(listObj, v)
-
-	var fromRV *uint64
-	if len(resourceVersion) > 0 {
-		parsedRV, err := s.versioner.ParseResourceVersion(resourceVersion)
-		if err != nil {
-			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
-		}
-		fromRV = &parsedRV
+	if opts.Recursive {
+		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+		options = append(options, clientv3.WithRange(rangeEnd))
 	}
 
-	var returnedRV, continueRV, withRev int64
+	newItemFunc := getNewItemFunc(listObj, v)
+
+	var continueRV, withRev int64
 	var continueKey string
-	switch {
-	case recursive && s.pagingEnabled && len(pred.Continue) > 0:
-		continueKey, continueRV, err = storage.DecodeContinue(pred.Continue, keyPrefix)
+	if opts.Recursive && len(opts.Predicate.Continue) > 0 {
+		continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
-
-		if len(resourceVersion) > 0 && resourceVersion != "0" {
-			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
-		}
-
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
 		preparedKey = continueKey
-
-		// If continueRV > 0, the LIST request needs a specific resource version.
-		// continueRV==0 is invalid.
-		// If continueRV < 0, the request is for the latest resource version.
-		if continueRV > 0 {
-			withRev = continueRV
-			returnedRV = continueRV
-		}
-	case recursive && s.pagingEnabled && pred.Limit > 0:
-		if fromRV != nil {
-			switch match {
-			case metav1.ResourceVersionMatchNotOlderThan:
-				// The not older than constraint is checked after we get a response from etcd,
-				// and returnedRV is then set to the revision we get from the etcd response.
-			case metav1.ResourceVersionMatchExact:
-				returnedRV = int64(*fromRV)
-				withRev = returnedRV
-			case "": // legacy case
-				if *fromRV > 0 {
-					returnedRV = int64(*fromRV)
-					withRev = returnedRV
-				}
-			default:
-				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
-			}
-		}
-
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
-	default:
-		if fromRV != nil {
-			switch match {
-			case metav1.ResourceVersionMatchNotOlderThan:
-				// The not older than constraint is checked after we get a response from etcd,
-				// and returnedRV is then set to the revision we get from the etcd response.
-			case metav1.ResourceVersionMatchExact:
-				returnedRV = int64(*fromRV)
-				withRev = returnedRV
-			case "": // legacy case
-			default:
-				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
-			}
-		}
-
-		if recursive {
-			options = append(options, clientv3.WithPrefix())
-		}
 	}
+	if withRev, err = s.resolveGetListRev(continueKey, continueRV, opts); err != nil {
+		return err
+	}
+
 	if withRev != 0 {
 		options = append(options, clientv3.WithRev(withRev))
 	}
@@ -722,7 +706,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	}()
 
 	metricsOp := "get"
-	if recursive {
+	if opts.Recursive {
 		metricsOp = "list"
 	}
 
@@ -731,10 +715,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		getResp, err = s.client.KV.Get(ctx, preparedKey, options...)
 		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
-			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
+			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
 		numFetched += len(getResp.Kvs)
-		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
+		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
 		hasMore = getResp.More
@@ -742,10 +726,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if len(getResp.Kvs) == 0 && getResp.More {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
+		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
+		if withRev == 0 {
+			withRev = getResp.Header.Revision
+			options = append(options, clientv3.WithRev(withRev))
+		}
 
 		// avoid small allocations for the result slice, since this can be called in many
 		// different contexts and we don't know how significantly the result will be filtered
-		if pred.Empty() {
+		if opts.Predicate.Empty() {
 			growSlice(v, len(getResp.Kvs))
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
@@ -753,7 +742,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 		// take items from the response until the bucket is full, filtering as we go
 		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= pred.Limit {
+			if paging && int64(v.Len()) >= opts.Predicate.Limit {
 				hasMore = true
 				break
 			}
@@ -764,7 +753,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
+			// Check if the request has already timed out before decode object
+			select {
+			case <-ctx.Done():
+				// parent context is canceled or timed out, no point in continuing
+				return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
+			default:
+			}
+
+			if err := appendListItem(v, data, uint64(kv.ModRevision), opts.Predicate, s.codec, s.versioner, newItemFunc); err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
 				return err
 			}
@@ -774,17 +771,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			getResp.Kvs[i] = nil
 		}
 
-		// indicate to the client which resource version was returned
-		if returnedRV == 0 {
-			returnedRV = getResp.Header.Revision
-		}
-
 		// no more results remain or we didn't request paging
 		if !hasMore || !paging {
 			break
 		}
 		// we're paging but we have filled our bucket
-		if int64(v.Len()) >= pred.Limit {
+		if int64(v.Len()) >= opts.Predicate.Limit {
 			break
 		}
 
@@ -798,11 +790,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			*limitOption = clientv3.WithLimit(limit)
 		}
 		preparedKey = string(lastKey) + "\x00"
-		if withRev == 0 {
-			withRev = returnedRV
-			options = append(options, clientv3.WithRev(withRev))
-		}
 	}
+
 	if v.IsNil() {
 		// Ensure that we never return a nil Items pointer in the result for consistency.
 		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
@@ -812,7 +801,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// we never return a key that the client wouldn't be allowed to see
 	if hasMore {
 		// we want to start immediately after the last key
-		next, err := storage.EncodeContinue(string(lastKey)+"\x00", keyPrefix, returnedRV)
+		next, err := storage.EncodeContinue(string(lastKey)+"\x00", keyPrefix, withRev)
 		if err != nil {
 			return err
 		}
@@ -820,17 +809,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		// getResp.Count counts in objects that do not match the pred.
 		// Instead of returning inaccurate count for non-empty selectors, we return nil.
 		// Only set remainingItemCount if the predicate is empty.
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemainingItemCount) {
-			if pred.Empty() {
-				c := int64(getResp.Count - pred.Limit)
-				remainingItemCount = &c
-			}
+		if opts.Predicate.Empty() {
+			c := int64(getResp.Count - opts.Predicate.Limit)
+			remainingItemCount = &c
 		}
-		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
+		return s.versioner.UpdateList(listObj, uint64(withRev), next, remainingItemCount)
 	}
 
 	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
+	return s.versioner.UpdateList(listObj, uint64(withRev), "", nil)
 }
 
 // growSlice takes a slice value and grows its capacity up
@@ -866,13 +853,6 @@ func growSlice(v reflect.Value, maxCapacity int, sizes ...int) {
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
-	if opts.SendInitialEvents != nil {
-		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: s.groupResource.Group, Kind: s.groupResource.Resource},
-			"",
-			field.ErrorList{field.Forbidden(field.NewPath("sendInitialEvents"), "for watch is unsupported by an etcd cluster")},
-		)
-	}
 	preparedKey, err := s.prepareKey(key)
 	if err != nil {
 		return nil, err
@@ -881,7 +861,30 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 	if err != nil {
 		return nil, err
 	}
-	return s.watcher.Watch(ctx, preparedKey, int64(rev), opts.Recursive, opts.ProgressNotify, s.transformer, opts.Predicate)
+	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), opts)
+}
+
+func (s *store) watchContext(ctx context.Context) context.Context {
+	// The etcd server waits until it cannot find a leader for 3 election
+	// timeouts to cancel existing streams. 3 is currently a hard coded
+	// constant. The election timeout defaults to 1000ms. If the cluster is
+	// healthy, when the leader is stopped, the leadership transfer should be
+	// smooth. (leader transfers its leadership before stopping). If leader is
+	// hard killed, other servers will take an election timeout to realize
+	// leader lost and start campaign.
+	return clientv3.WithRequireLeader(ctx)
+}
+
+func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value, ignoreNotFound bool) func() (*objState, error) {
+	return func() (*objState, error) {
+		startTime := time.Now()
+		getResp, err := s.client.KV.Get(ctx, key)
+		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
+		if err != nil {
+			return nil, err
+		}
+		return s.getState(ctx, getResp, key, v, ignoreNotFound)
+	}
 }
 
 func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {

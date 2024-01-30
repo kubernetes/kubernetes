@@ -380,6 +380,42 @@ func parseCPUInfoMips(info []byte) ([]CPUInfo, error) {
 	return cpuinfo, nil
 }
 
+func parseCPUInfoLoong(info []byte) ([]CPUInfo, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(info))
+	// find the first "processor" line
+	firstLine := firstNonEmptyLine(scanner)
+	if !strings.HasPrefix(firstLine, "system type") || !strings.Contains(firstLine, ":") {
+		return nil, errors.New("invalid cpuinfo file: " + firstLine)
+	}
+	field := strings.SplitN(firstLine, ": ", 2)
+	cpuinfo := []CPUInfo{}
+	systemType := field[1]
+	i := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.Contains(line, ":") {
+			continue
+		}
+		field := strings.SplitN(line, ": ", 2)
+		switch strings.TrimSpace(field[0]) {
+		case "processor":
+			v, err := strconv.ParseUint(field[1], 0, 32)
+			if err != nil {
+				return nil, err
+			}
+			i = int(v)
+			cpuinfo = append(cpuinfo, CPUInfo{}) // start of the next processor
+			cpuinfo[i].Processor = uint(v)
+			cpuinfo[i].VendorID = systemType
+		case "CPU Family":
+			cpuinfo[i].CPUFamily = field[1]
+		case "Model Name":
+			cpuinfo[i].ModelName = field[1]
+		}
+	}
+	return cpuinfo, nil
+}
+
 func parseCPUInfoPPC(info []byte) ([]CPUInfo, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(info))
 

@@ -28,8 +28,6 @@ import (
 type DeprecatedOptions struct {
 	componentbaseconfig.DebuggingConfiguration
 	componentbaseconfig.ClientConnectionConfiguration
-	// Note that only the deprecated options (lock-object-name and lock-object-namespace) are populated here.
-	componentbaseconfig.LeaderElectionConfiguration
 	// PodMaxInUnschedulablePodsDuration is the maximum time a pod can stay in
 	// unschedulablePods. If a pod stays in unschedulablePods for longer than this
 	// value, the pod will be moved from unschedulablePods to backoffQ or activeQ.
@@ -49,7 +47,8 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "DEPRECATED: content type of requests sent to apiserver. This parameter is ignored if a config file is specified in --config.")
 	fs.Float32Var(&o.QPS, "kube-api-qps", 50.0, "DEPRECATED: QPS to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
 	fs.Int32Var(&o.Burst, "kube-api-burst", 100, "DEPRECATED: burst to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
-	fs.StringVar(&o.ResourceNamespace, "lock-object-namespace", "kube-system", "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace. This parameter is ignored if a config file is specified in --config.")
-	fs.StringVar(&o.ResourceName, "lock-object-name", "kube-scheduler", "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name. This parameter is ignored if a config file is specified in --config.")
-	fs.DurationVar(&o.PodMaxInUnschedulablePodsDuration, "pod-max-in-unschedulable-pods-duration", 5*time.Minute, "DEPRECATED: the maximum time a pod can stay in unschedulablePods. If a pod stays in unschedulablePods for longer than this value, the pod will be moved from unschedulablePods to backoffQ or activeQ. This flag is deprecated and will be removed in 1.26")
+	// We found an issue(https://github.com/kubernetes/kubernetes/issues/110175) in which Pods can be stuck in the unschedulable pod pool for 5 min, and using this flag is the only workaround for this issue.
+	// This issue only could happen if you use custom plugins or if you change plugin set being used in your scheduler via the scheduler config.
+	// TODO: remove this flag once https://github.com/kubernetes/kubernetes/issues/110175 is done.
+	fs.DurationVar(&o.PodMaxInUnschedulablePodsDuration, "pod-max-in-unschedulable-pods-duration", 5*time.Minute, "DEPRECATED: the maximum time a pod can stay in unschedulablePods. If a pod stays in unschedulablePods for longer than this value, the pod will be moved from unschedulablePods to backoffQ or activeQ. This flag is deprecated and will be removed in a future version.")
 }

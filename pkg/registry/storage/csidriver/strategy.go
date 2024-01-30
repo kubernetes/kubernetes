@@ -83,10 +83,8 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newCSIDriver.Spec.SELinuxMount = nil
 	}
 
-	// Any changes to the mutable fields increment the generation number.
-	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) ||
-		!apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.RequiresRepublish, newCSIDriver.Spec.RequiresRepublish) ||
-		!apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.SELinuxMount, newCSIDriver.Spec.SELinuxMount) {
+	// Any changes to the spec increment the generation number.
+	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec, newCSIDriver.Spec) {
 		newCSIDriver.Generation = oldCSIDriver.Generation + 1
 	}
 }

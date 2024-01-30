@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -202,7 +201,7 @@ func TestGetNestedMountpoints(t *testing.T) {
 		},
 	}
 	for _, test := range tc {
-		dir, err := ioutil.TempDir("", "TestMakeNestedMountpoints.")
+		dir, err := os.MkdirTemp("", "TestMakeNestedMountpoints.")
 		if err != nil {
 			t.Errorf("Unexpected error trying to create temp directory: %v", err)
 			return

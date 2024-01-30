@@ -33,11 +33,11 @@ import (
 
 func TestScaleDownOldReplicaSets(t *testing.T) {
 	tests := []struct {
-		oldRSSizes []int
+		oldRSSizes []int32
 		d          *apps.Deployment
 	}{
 		{
-			oldRSSizes: []int{3},
+			oldRSSizes: []int32{3},
 			d:          newDeployment("foo", 3, nil, nil, nil, map[string]string{"foo": "bar"}),
 		},
 	}

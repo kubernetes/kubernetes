@@ -93,9 +93,10 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	t.Cleanup(func() { server.Terminate(t) })
 
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, "")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -456,24 +457,37 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	t.Cleanup(func() { server.Terminate(t) })
 
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
 
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
 	t.Cleanup(dFunc)
 
 	stopTests := []struct {
-		testName      string
-		serviceName   string
-		ip            string
-		endpointPorts []corev1.EndpointPort
-		endpointKeys  []string
-		initialState  []runtime.Object
-		expectUpdate  []runtime.Object
-		expectLeases  []string
+		testName         string
+		serviceName      string
+		ip               string
+		endpointPorts    []corev1.EndpointPort
+		endpointKeys     []string
+		initialState     []runtime.Object
+		expectUpdate     []runtime.Object
+		expectLeases     []string
+		apiServerStartup bool
 	}{
+		{
+			testName:         "successful remove previous endpoints before apiserver starts",
+			serviceName:      "foo",
+			ip:               "1.2.3.4",
+			endpointPorts:    []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:     []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			initialState:     makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:     makeEndpointsArray("foo", []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectLeases:     []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			apiServerStartup: true,
+		},
 		{
 			testName:      "successful stop reconciling",
 			serviceName:   "foo",
@@ -503,6 +517,16 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"},
 		},
+		{
+			testName:      "the last API server was shut down cleanly",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4"},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{}, []corev1.EndpointPort{}),
+			expectLeases:  []string{},
+		},
 	}
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {
@@ -514,6 +538,9 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
+			if !test.apiServerStartup {
+				r.StopReconciling()
+			}
 			err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			// if the ip is not on the endpoints, it must return an storage error and stop reconciling
 			if !contains(test.endpointKeys, test.ip) {
@@ -550,4 +577,132 @@ func contains(s []string, str string) bool {
 		}
 	}
 	return false
+}
+
+func TestApiserverShutdown(t *testing.T) {
+	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	t.Cleanup(func() { server.Terminate(t) })
+
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, "")
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
+	}
+	t.Cleanup(dFunc)
+
+	reconcileTests := []struct {
+		testName                string
+		serviceName             string
+		ip                      string
+		endpointPorts           []corev1.EndpointPort
+		endpointKeys            []string
+		initialState            []runtime.Object
+		expectUpdate            []runtime.Object
+		expectLeases            []string
+		shutDownBeforeReconcile bool
+	}{
+		{
+			testName:                "last apiserver shutdown after endpoint reconcile",
+			serviceName:             "foo",
+			ip:                      "1.2.3.4",
+			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:            []string{"1.2.3.4"},
+			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray("foo", []string{}, []corev1.EndpointPort{}),
+			expectLeases:            []string{},
+			shutDownBeforeReconcile: false,
+		},
+		{
+			testName:                "last apiserver shutdown before endpoint reconcile",
+			serviceName:             "foo",
+			ip:                      "1.2.3.4",
+			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:            []string{"1.2.3.4"},
+			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray("foo", []string{}, []corev1.EndpointPort{}),
+			expectLeases:            []string{},
+			shutDownBeforeReconcile: true,
+		},
+		{
+			testName:                "not the last apiserver which was shutdown before endpoint reconcile",
+			serviceName:             "foo",
+			ip:                      "1.2.3.4",
+			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:            []string{"1.2.3.4", "4.3.2.1"},
+			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectLeases:            []string{"4.3.2.1"},
+			shutDownBeforeReconcile: true,
+		},
+		{
+			testName:                "not the last apiserver which was shutdown after endpoint reconcile",
+			serviceName:             "foo",
+			ip:                      "1.2.3.4",
+			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:            []string{"1.2.3.4", "4.3.2.1"},
+			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectLeases:            []string{"4.3.2.1"},
+			shutDownBeforeReconcile: false,
+		},
+	}
+	for _, test := range reconcileTests {
+		t.Run(test.testName, func(t *testing.T) {
+			fakeLeases := newFakeLeases(t, s)
+			err := fakeLeases.SetKeys(test.endpointKeys)
+			if err != nil {
+				t.Errorf("unexpected error creating keys: %v", err)
+			}
+			clientset := fake.NewSimpleClientset(test.initialState...)
+
+			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
+
+			if test.shutDownBeforeReconcile {
+				// shutdown apiserver first
+				r.StopReconciling()
+				err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+				if err != nil {
+					t.Errorf("unexpected error remove endpoints: %v", err)
+				}
+
+				// reconcile endpoints in another goroutine
+				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				if err != nil {
+					t.Errorf("unexpected error reconciling: %v", err)
+				}
+			} else {
+				// reconcile endpoints first
+				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				if err != nil {
+					t.Errorf("unexpected error reconciling: %v", err)
+				}
+
+				r.StopReconciling()
+				err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+				if err != nil {
+					t.Errorf("unexpected error remove endpoints: %v", err)
+				}
+			}
+
+			err = verifyCreatesAndUpdates(clientset, nil, test.expectUpdate)
+			if err != nil {
+				t.Errorf("unexpected error in side effects: %v", err)
+			}
+
+			leases, err := fakeLeases.ListLeases()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			// sort for comparison
+			sort.Strings(leases)
+			sort.Strings(test.expectLeases)
+			if !reflect.DeepEqual(leases, test.expectLeases) {
+				t.Errorf("expected %v got: %v", test.expectLeases, leases)
+			}
+		})
+	}
 }

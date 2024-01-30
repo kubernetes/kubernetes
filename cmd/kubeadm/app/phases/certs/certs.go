@@ -69,12 +69,12 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	fmt.Printf("[certs] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
-	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.PublicKeyAlgorithm())
+	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.EncryptionAlgorithmType())
 }
 
 // CreateServiceAccountKeyAndPublicKeyFiles creates new public/private key files for signing service account users.
 // If the sa public/private key files already exist in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string, keyType x509.PublicKeyAlgorithm) error {
+func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string, keyType kubeadmapi.EncryptionAlgorithmType) error {
 	klog.V(1).Infoln("creating new public/private key files for signing service account users")
 	_, err := keyutil.PrivateKeyFromFile(filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName))
 	if err == nil {
@@ -137,15 +137,6 @@ func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.Cer
 	}
 
 	return pkiutil.NewCSRAndKey(certConfig)
-}
-
-// CreateCSR creates a certificate signing request
-func CreateCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration, path string) error {
-	csr, key, err := NewCSR(certSpec, cfg)
-	if err != nil {
-		return err
-	}
-	return writeCSRFilesIfNotExist(path, certSpec.BaseName, csr, key)
 }
 
 // CreateCertAndKeyFilesWithCA loads the given certificate authority from disk, then generates and writes out the given certificate and key.
@@ -265,33 +256,6 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 		}
 		if pkiutil.HasServerAuth(cert) {
 			fmt.Printf("[certs] %s serving cert is signed for DNS names %v and IPs %v\n", baseName, cert.DNSNames, cert.IPAddresses)
-		}
-	}
-
-	return nil
-}
-
-// writeCSRFilesIfNotExist writes a new CSR to the given path.
-// If there already is a CSR file at the given path; kubeadm tries to load it and check if it's a valid certificate.
-// otherwise this function returns an error.
-func writeCSRFilesIfNotExist(csrDir string, baseName string, csr *x509.CertificateRequest, key crypto.Signer) error {
-	if pkiutil.CSROrKeyExist(csrDir, baseName) {
-		_, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, baseName)
-		if err != nil {
-			return errors.Wrapf(err, "%s CSR existed but it could not be loaded properly", baseName)
-		}
-
-		fmt.Printf("[certs] Using the existing %q CSR\n", baseName)
-	} else {
-		// Write .key and .csr files to disk
-		fmt.Printf("[certs] Generating %q key and CSR\n", baseName)
-
-		if err := pkiutil.WriteKey(csrDir, baseName, key); err != nil {
-			return errors.Wrapf(err, "failure while saving %s key", baseName)
-		}
-
-		if err := pkiutil.WriteCSR(csrDir, baseName, csr); err != nil {
-			return errors.Wrapf(err, "failure while saving %s CSR", baseName)
 		}
 	}
 

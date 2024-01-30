@@ -55,8 +55,7 @@ func AllowBoostrapTokensToGetNodes(client clientset.Interface) error {
 
 	if err := apiclient.CreateOrUpdateClusterRole(client, &rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GetNodesClusterRoleName,
-			Namespace: metav1.NamespaceSystem,
+			Name: constants.GetNodesClusterRoleName,
 		},
 		Rules: []rbac.PolicyRule{
 			{
@@ -71,8 +70,7 @@ func AllowBoostrapTokensToGetNodes(client clientset.Interface) error {
 
 	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GetNodesClusterRoleName,
-			Namespace: metav1.NamespaceSystem,
+			Name: constants.GetNodesClusterRoleName,
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,

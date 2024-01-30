@@ -109,11 +109,19 @@ func (v *ConfigValidator) security(config *configs.Config) error {
 func (v *ConfigValidator) usernamespace(config *configs.Config) error {
 	if config.Namespaces.Contains(configs.NEWUSER) {
 		if _, err := os.Stat("/proc/self/ns/user"); os.IsNotExist(err) {
-			return errors.New("USER namespaces aren't enabled in the kernel")
+			return errors.New("user namespaces aren't enabled in the kernel")
 		}
+		hasPath := config.Namespaces.PathOf(configs.NEWUSER) != ""
+		hasMappings := config.UidMappings != nil || config.GidMappings != nil
+		if !hasPath && !hasMappings {
+			return errors.New("user namespaces enabled, but no namespace path to join nor mappings to apply specified")
+		}
+		// The hasPath && hasMappings validation case is handled in specconv --
+		// we cache the mappings in Config during specconv in the hasPath case,
+		// so we cannot do that validation here.
 	} else {
 		if config.UidMappings != nil || config.GidMappings != nil {
-			return errors.New("User namespace mappings specified, but USER namespace isn't enabled in the config")
+			return errors.New("user namespace mappings specified, but user namespace isn't enabled in the config")
 		}
 	}
 	return nil
@@ -131,9 +139,8 @@ func (v *ConfigValidator) cgroupnamespace(config *configs.Config) error {
 // convertSysctlVariableToDotsSeparator can return sysctl variables in dots separator format.
 // The '/' separator is also accepted in place of a '.'.
 // Convert the sysctl variables to dots separator format for validation.
-// More info:
-//   https://man7.org/linux/man-pages/man8/sysctl.8.html
-//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+// More info: sysctl(8), sysctl.d(5).
+//
 // For example:
 // Input sysctl variable "net/ipv4/conf/eno2.100.rp_filter"
 // will return the converted value "net.ipv4.conf.eno2/100.rp_filter"

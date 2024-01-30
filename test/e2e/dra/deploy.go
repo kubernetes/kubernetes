@@ -48,8 +48,10 @@ import (
 )
 
 const (
-	NodePrepareResourceMethod   = "/v1alpha2.Node/NodePrepareResource"
-	NodeUnprepareResourceMethod = "/v1alpha2.Node/NodeUnprepareResource"
+	NodePrepareResourceMethod    = "/v1alpha2.Node/NodePrepareResource"
+	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
+	NodeUnprepareResourceMethod  = "/v1alpha2.Node/NodeUnprepareResource"
+	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
 )
 
 type Nodes struct {
@@ -87,9 +89,11 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 // up after the test.
 func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources) *Driver {
 	d := &Driver{
-		f:          f,
-		fail:       map[MethodInstance]bool{},
-		callCounts: map[MethodInstance]int64{},
+		f:            f,
+		fail:         map[MethodInstance]bool{},
+		callCounts:   map[MethodInstance]int64{},
+		NodeV1alpha2: true,
+		NodeV1alpha3: true,
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -121,6 +125,8 @@ type Driver struct {
 	Name       string
 	Nodes      map[string]*app.ExamplePlugin
 
+	NodeV1alpha2, NodeV1alpha3 bool
+
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
 	callCounts map[MethodInstance]int64
@@ -130,6 +136,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
 	d.Nodes = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
+	resources.DriverName = d.Name
 
 	ctx, cancel := context.WithCancel(context.Background())
 	if d.NameSuffix != "" {
@@ -141,7 +148,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.cleanup = append(d.cleanup, cancel)
 
 	// The controller is easy: we simply connect to the API server.
-	d.Controller = app.NewController(d.f.ClientSet, d.Name, resources)
+	d.Controller = app.NewController(d.f.ClientSet, resources)
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
@@ -202,7 +209,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	selector := labels.NewSelector().Add(*requirement)
 	pods, err := d.f.ClientSet.CoreV1().Pods(d.f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "list proxy pods")
-	framework.ExpectEqual(numNodes, int32(len(pods.Items)), "number of proxy pods")
+	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
 
 	// Run registar and plugin for each of the pods.
 	for _, pod := range pods.Items {
@@ -214,11 +221,11 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
-					ginkgo.By(fmt.Sprintf("creating CDI file %s on node %s:\n%s", name, nodename, string(content)))
+					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
 					return d.createFile(&pod, name, content)
 				},
 				Remove: func(name string) error {
-					ginkgo.By(fmt.Sprintf("deleting CDI file %s on node %s", name, nodename))
+					klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
 					return d.removeFile(&pod, name)
 				},
 			},
@@ -229,6 +236,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
+			kubeletplugin.NodeV1alpha2(d.NodeV1alpha2),
+			kubeletplugin.NodeV1alpha3(d.NodeV1alpha3),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func() {
@@ -240,14 +249,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 
 	// Wait for registration.
 	ginkgo.By("wait for plugin registration")
-	gomega.Eventually(func() []string {
-		var notRegistered []string
+	gomega.Eventually(func() map[string][]app.GRPCCall {
+		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
-			if !plugin.IsRegistered() {
-				notRegistered = append(notRegistered, nodename)
+			calls := plugin.GetGRPCCalls()
+			if contains, err := app.BeRegistered.Match(calls); err != nil || !contains {
+				notRegistered[nodename] = calls
 			}
 		}
-		sort.Strings(notRegistered)
 		return notRegistered
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }

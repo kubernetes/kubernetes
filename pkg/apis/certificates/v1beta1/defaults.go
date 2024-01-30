@@ -68,15 +68,9 @@ func DefaultSignerNameFromSpec(obj *certificatesv1beta1.CertificateSigningReques
 func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
 	return certificates.IsKubeletServingCSR(req, usagesToSet(usages))
 }
-func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
-	return certificates.ValidateKubeletServingCSR(req, usagesToSet(usages))
-}
 
 func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
 	return certificates.IsKubeletClientCSR(req, usagesToSet(usages))
-}
-func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
-	return certificates.ValidateKubeletClientCSR(req, usagesToSet(usages))
 }
 
 func usagesToSet(usages []certificatesv1beta1.KeyUsage) sets.String {

@@ -229,6 +229,10 @@ type ActualStateOfWorldMounterUpdater interface {
 	// IsVolumeReconstructed returns true if volume currently added to actual state of the world
 	// was found during reconstruction.
 	IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
+	// IsVolumeDeviceReconstructed returns true if volume device identified by volumeName has been
+	// found during reconstruction.
+	IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -440,9 +444,9 @@ type VolumeToMount struct {
 	// time at which volume was requested to be mounted
 	MountRequestTime time.Time
 
-	// PersistentVolumeSize stores desired size of the volume.
+	// DesiredPersistentVolumeSize stores desired size of the volume.
 	// usually this is the size if pv.Spec.Capacity
-	PersistentVolumeSize resource.Quantity
+	DesiredPersistentVolumeSize resource.Quantity
 
 	// SELinux label that should be used to mount.
 	SELinuxLabel string

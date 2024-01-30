@@ -23,6 +23,8 @@ const (
 	ENODEV = syscall.ENODEV
 	EBADF  = syscall.Errno(0)
 	E2BIG  = syscall.Errno(0)
+	EFAULT = syscall.EFAULT
+	EACCES = syscall.Errno(0)
 	// ENOTSUPP is not the same as ENOTSUP or EOPNOTSUP
 	ENOTSUPP = syscall.Errno(0x20c)
 
@@ -67,6 +69,9 @@ const (
 	PERF_RECORD_SAMPLE       = 9
 	AT_FDCWD                 = -0x2
 	RENAME_NOREPLACE         = 0x1
+	SO_ATTACH_BPF            = 0x32
+	SO_DETACH_BPF            = 0x1b
+	SOL_SOCKET               = 0x1
 )
 
 // Statfs_t is a wrapper
@@ -84,6 +89,8 @@ type Statfs_t struct {
 	Flags   int64
 	Spare   [4]int64
 }
+
+type Stat_t struct{}
 
 // Rlimit is a wrapper
 type Rlimit struct {
@@ -258,10 +265,14 @@ func Renameat2(olddirfd int, oldpath string, newdirfd int, newpath string, flags
 	return errNonLinux
 }
 
-func KernelRelease() (string, error) {
-	return "", errNonLinux
+func Prlimit(pid, resource int, new, old *Rlimit) error {
+	return errNonLinux
 }
 
-func Prlimit(pid, resource int, new, old *Rlimit) error {
+func Open(path string, mode int, perm uint32) (int, error) {
+	return -1, errNonLinux
+}
+
+func Fstat(fd int, stat *Stat_t) error {
 	return errNonLinux
 }

@@ -99,7 +99,7 @@ func TestGeneratorContext(t *testing.T) {
 //
 //	apis/apps/v1
 func bytesForGV(t *testing.T, gvPath string) []byte {
-	fakeClient := openapitest.NewFileClient(t)
+	fakeClient := openapitest.NewEmbeddedFileClient()
 	paths, err := fakeClient.Paths()
 	require.NoError(t, err)
 	gv, found := paths[gvPath]

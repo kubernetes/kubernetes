@@ -61,7 +61,7 @@ func TestAddLabel(t *testing.T) {
 			review := v1.AdmissionReview{Request: &v1.AdmissionRequest{Object: runtime.RawExtension{Raw: raw}}}
 			response := addLabel(review)
 			if response.Patch != nil {
-				patchObj, err := jsonpatch.DecodePatch([]byte(response.Patch))
+				patchObj, err := jsonpatch.DecodePatch(response.Patch)
 				if err != nil {
 					t.Fatal(err)
 				}

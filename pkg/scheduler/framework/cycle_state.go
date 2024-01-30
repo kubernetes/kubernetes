@@ -43,12 +43,12 @@ type StateKey string
 // StateData stored by one plugin can be read, altered, or deleted by another plugin.
 // CycleState does not provide any data protection, as all plugins are assumed to be
 // trusted.
-// Note: CycleState uses a sync.Map to back the storage. It's aimed to optimize for the "write once and read many times" scenarios.
-// It is the recommended pattern used in all in-tree plugins - plugin-specific state is written once in PreFilter/PreScore and afterwards read many times in Filter/Score.
+// Note: CycleState uses a sync.Map to back the storage, because it is thread safe. It's aimed to optimize for the "write once and read many times" scenarios.
+// It is the recommended pattern used in all in-tree plugins - plugin-specific state is written once in PreFilter/PreScore and afterward read many times in Filter/Score.
 type CycleState struct {
 	// storage is keyed with StateKey, and valued with StateData.
 	storage sync.Map
-	// if recordPluginMetrics is true, PluginExecutionDuration will be recorded for this cycle.
+	// if recordPluginMetrics is true, metrics.PluginExecutionDuration will be recorded for this cycle.
 	recordPluginMetrics bool
 	// SkipFilterPlugins are plugins that will be skipped in the Filter extension point.
 	SkipFilterPlugins sets.Set[string]
@@ -61,7 +61,7 @@ func NewCycleState() *CycleState {
 	return &CycleState{}
 }
 
-// ShouldRecordPluginMetrics returns whether PluginExecutionDuration metrics should be recorded.
+// ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics should be recorded.
 func (c *CycleState) ShouldRecordPluginMetrics() bool {
 	if c == nil {
 		return false
@@ -84,10 +84,12 @@ func (c *CycleState) Clone() *CycleState {
 		return nil
 	}
 	copy := NewCycleState()
+	// Safe copy storage in case of overwriting.
 	c.storage.Range(func(k, v interface{}) bool {
 		copy.storage.Store(k, v.(StateData).Clone())
 		return true
 	})
+	// The below are not mutated, so we don't have to safe copy.
 	copy.recordPluginMetrics = c.recordPluginMetrics
 	copy.SkipFilterPlugins = c.SkipFilterPlugins
 	copy.SkipScorePlugins = c.SkipScorePlugins
@@ -96,8 +98,9 @@ func (c *CycleState) Clone() *CycleState {
 }
 
 // Read retrieves data with the given "key" from CycleState. If the key is not
-// present an error is returned.
-// This function is thread safe by using sync.Map.
+// present, ErrNotFound is returned.
+//
+// See CycleState for notes on concurrency.
 func (c *CycleState) Read(key StateKey) (StateData, error) {
 	if v, ok := c.storage.Load(key); ok {
 		return v.(StateData), nil
@@ -106,13 +109,15 @@ func (c *CycleState) Read(key StateKey) (StateData, error) {
 }
 
 // Write stores the given "val" in CycleState with the given "key".
-// This function is thread safe by using sync.Map.
+//
+// See CycleState for notes on concurrency.
 func (c *CycleState) Write(key StateKey, val StateData) {
 	c.storage.Store(key, val)
 }
 
 // Delete deletes data with the given key from CycleState.
-// This function is thread safe by using sync.Map.
+//
+// See CycleState for notes on concurrency.
 func (c *CycleState) Delete(key StateKey) {
 	c.storage.Delete(key)
 }

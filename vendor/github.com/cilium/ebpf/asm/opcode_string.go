@@ -14,25 +14,17 @@ func _() {
 	_ = x[StXClass-3]
 	_ = x[ALUClass-4]
 	_ = x[JumpClass-5]
+	_ = x[Jump32Class-6]
 	_ = x[ALU64Class-7]
 }
 
-const (
-	_Class_name_0 = "LdClassLdXClassStClassStXClassALUClassJumpClass"
-	_Class_name_1 = "ALU64Class"
-)
+const _Class_name = "LdClassLdXClassStClassStXClassALUClassJumpClassJump32ClassALU64Class"
 
-var (
-	_Class_index_0 = [...]uint8{0, 7, 15, 22, 30, 38, 47}
-)
+var _Class_index = [...]uint8{0, 7, 15, 22, 30, 38, 47, 58, 68}
 
 func (i Class) String() string {
-	switch {
-	case 0 <= i && i <= 5:
-		return _Class_name_0[_Class_index_0[i]:_Class_index_0[i+1]]
-	case i == 7:
-		return _Class_name_1
-	default:
+	if i >= Class(len(_Class_index)-1) {
 		return "Class(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
+	return _Class_name[_Class_index[i]:_Class_index[i+1]]
 }

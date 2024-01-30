@@ -38,6 +38,8 @@ const (
 	fsStatsLogs fsStatsType = "logs"
 	// fsStatsRoot identifies stats for pod container writable layers.
 	fsStatsRoot fsStatsType = "root"
+	// fsStatsContainer identifies stats for pod container read-only layers
+	fsStatsImages fsStatsType = "images"
 )
 
 // Config holds information about how eviction is configured.
@@ -85,6 +87,8 @@ type ImageGC interface {
 type ContainerGC interface {
 	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
 	DeleteAllUnusedContainers(ctx context.Context) error
+	// IsContainerFsSeparateFromImageFs checks if container filesystem is split from image filesystem.
+	IsContainerFsSeparateFromImageFs(ctx context.Context) bool
 }
 
 // KillPodFunc kills a pod.

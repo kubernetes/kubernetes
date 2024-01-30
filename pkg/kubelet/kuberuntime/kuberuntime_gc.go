@@ -141,7 +141,7 @@ func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containe
 				ID:   containers[i].id,
 			}
 			message := "Container is in unknown state, try killing it before removal"
-			if err := cgc.manager.killContainer(ctx, nil, id, containers[i].name, message, reasonUnknown, nil); err != nil {
+			if err := cgc.manager.killContainer(ctx, nil, id, containers[i].name, message, reasonUnknown, nil, nil); err != nil {
 				klog.ErrorS(err, "Failed to stop container", "containerID", containers[i].id)
 				continue
 			}
@@ -293,7 +293,7 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 		sandboxIDs.Insert(container.PodSandboxId)
 	}
 
-	sandboxesByPod := make(sandboxesByPodUID)
+	sandboxesByPod := make(sandboxesByPodUID, len(sandboxes))
 	for _, sandbox := range sandboxes {
 		podUID := types.UID(sandbox.Metadata.Uid)
 		sandboxInfo := sandboxGCInfo{
@@ -301,13 +301,8 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 			createTime: time.Unix(0, sandbox.CreatedAt),
 		}
 
-		// Set ready sandboxes to be active.
-		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			sandboxInfo.active = true
-		}
-
-		// Set sandboxes that still have containers to be active.
-		if sandboxIDs.Has(sandbox.Id) {
+		// Set ready sandboxes and sandboxes that still have containers to be active.
+		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY || sandboxIDs.Has(sandbox.Id) {
 			sandboxInfo.active = true
 		}
 

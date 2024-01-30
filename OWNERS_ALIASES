@@ -10,8 +10,6 @@ aliases:
     - sttts
     - tallclair
   sig-auth-audit-reviewers:
-    - hzxuzhonghu
-    - lavalamp
     - sttts
     - tallclair
   sig-auth-authenticators-approvers:
@@ -22,7 +20,6 @@ aliases:
   sig-auth-authenticators-reviewers:
     - deads2k
     - enj
-    - lavalamp
     - liggitt
     - mikedanese
     - sttts
@@ -35,7 +32,6 @@ aliases:
     - deads2k
     - dims
     - enj
-    - lavalamp
     - liggitt
     - mikedanese
     - ncdc
@@ -48,26 +44,17 @@ aliases:
     - mikedanese
     - smarterclayton
   sig-auth-certificates-reviewers:
-    - caesarxuchao
     - deads2k
     - dims
     - enj
-    - lavalamp
     - liggitt
     - mikedanese
-    - smarterclayton
-    - sttts
-    - thockin
-    - wojtek-t
   sig-auth-encryption-at-rest-approvers:
     - smarterclayton
     - enj
   sig-auth-encryption-at-rest-reviewers:
+    - aramase
     - enj
-    - lavalamp
-    - liggitt
-    - smarterclayton
-    - wojtek-t
   sig-auth-node-isolation-approvers:
     - deads2k
     - liggitt
@@ -89,6 +76,7 @@ aliases:
     - krmayankk
   sig-auth-serviceaccounts-approvers:
     - deads2k
+    - enj
     - liggitt
     - mikedanese
   sig-auth-serviceaccounts-reviewers:
@@ -147,6 +135,7 @@ aliases:
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
+    - carlory
     - chrishenzie
     - gnufied
     - humblec
@@ -166,14 +155,17 @@ aliases:
     - alculquicondor
     - Huang-Wei
     - ahg-g
-    - damemi
+    - kerthcet
+    - sanposhiho
   # emeritus:
+  # - damemi
   # - bsalamat
   # - k82cn
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
     - chendave
+    - damemi
     - denkensk
     - sanposhiho
     - kerthcet
@@ -227,6 +219,13 @@ aliases:
   # emeretus:
   # - dashpole
   # - vishh
+  sig-node-cri-approvers:
+    - msau42
+    - smarterclayton
+    - thockin
+    - saschagrunert
+    - haircommander
+    - mikebrow
   sig-node-reviewers:
     - Random-Liu
     - dchen1107
@@ -247,6 +246,10 @@ aliases:
     - bobbypage
     - pacoxu
     - bart0sh
+    - saschagrunert
+    - haircommander
+    - tzneal
+    - rphillips
   sig-network-approvers:
     - andrewsykim
     - aojea
@@ -262,6 +265,7 @@ aliases:
   sig-network-reviewers:
     - andrewsykim
     - aojea
+    - aroradaman
     - bowei
     - caseydavenport
     - danwinship
@@ -299,6 +303,7 @@ aliases:
     - RainbowMango
     - serathius
     - dgrisonnet
+    - rexagod
   sig-instrumentation-reviewers:
     - dashpole
     - ehashman
@@ -309,13 +314,14 @@ aliases:
     - serathius
     - dgrisonnet
     - pohly
+    - mengjiao-liu
+    - rexagod
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
 
   api-approvers:
     - deads2k
-    - lavalamp
     - msau42
     - smarterclayton
     - thockin
@@ -323,12 +329,10 @@ aliases:
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
   sig-api-machinery-api-approvers:
     - deads2k
-    - lavalamp
     - liggitt
     - smarterclayton
   sig-apps-api-approvers:
     - deads2k
-    - lavalamp
     - liggitt
     - smarterclayton
   sig-auth-api-approvers:
@@ -360,12 +364,7 @@ aliases:
     - caseydavenport
     - danwinship
     - thockin
-  sig-node-api-approvers:
-    - msau42
-    - smarterclayton
-    - thockin
   sig-scheduling-api-approvers:
-    - lavalamp
     - msau42
     - smarterclayton
     - thockin
@@ -385,7 +384,6 @@ aliases:
     - liggitt
   api-reviewers:
     - andrewsykim
-    - lavalamp
     - smarterclayton
     - thockin
     - liggitt
@@ -491,30 +489,35 @@ aliases:
     - logicalhan
   feature-approvers:
     - andrewsykim # Cloud Provider
-    - logicalhan # Instrumentation
     - ahg-g # Scheduling
-    - caseydavenport # Network
-    - dcbw # Network
+    - danwinship # Network
     - dchen1107 # Node
     - deads2k # API Machinery
     - derekwaynecarr # Node
     - dims # Architecture
     - ehashman # Instrumentation
+    - enj # Auth
     - janetkuo # Apps
     - jayunit100 # Windows
+    - jpbetz # API Machinery
     - jsafrane # Storage
     - jsturtevant # Windows
+    - justinsb # Cluster Lifecycle
     - kow3ns # Apps
-    - lavalamp # API Machinery
     - liggitt # Auth
+    - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
     - marosset # Windows
+    - mikezappa87 # Network
+    - mrunalp # Node
     - msau42 # Storage
     - mwielgus # Autoscaling
     - pwittrock # CLI
-    - justinsb # Cluster Lifecycle
+    - rexagod # Instrumentation
     - saad-ali # Storage
     - seans3 # CLI
+    - sergeykanzhelev # Node
+    - shaneutt # Network
     - soltysh # Apps, CLI
     - tallclair # Auth
     - thockin # Network

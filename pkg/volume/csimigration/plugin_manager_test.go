@@ -104,9 +104,8 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		csiMigrationCompleteResult    bool
 	}{
 		{
-			name:                          "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
+			name:                          "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag",
 			pluginName:                    "kubernetes.io/gce-pd",
-			pluginFeature:                 features.CSIMigrationGCE,
 			pluginFeatureEnabled:          true,
 			csiMigrationEnabled:           true,
 			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
@@ -115,34 +114,11 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                          "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
+			name:                          "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag",
 			pluginName:                    "kubernetes.io/gce-pd",
-			pluginFeature:                 features.CSIMigrationGCE,
 			pluginFeatureEnabled:          true,
 			csiMigrationEnabled:           true,
 			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
-			inTreePluginUnregisterEnabled: true,
-			csiMigrationResult:            true,
-			csiMigrationCompleteResult:    true,
-		},
-		{
-			name:                          "vsphere-volume migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                    "kubernetes.io/vsphere-volume",
-			pluginFeature:                 features.CSIMigrationvSphere,
-			pluginFeatureEnabled:          true,
-			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
-			inTreePluginUnregisterEnabled: false,
-			csiMigrationResult:            true,
-			csiMigrationCompleteResult:    false,
-		},
-		{
-			name:                          "vsphere-volume migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
-			pluginName:                    "kubernetes.io/vsphere-volume",
-			pluginFeature:                 features.CSIMigrationvSphere,
-			pluginFeatureEnabled:          true,
-			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
 			inTreePluginUnregisterEnabled: true,
 			csiMigrationResult:            true,
 			csiMigrationCompleteResult:    true,
@@ -155,7 +131,7 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			// CSIMigrationGCE is locked to on, so it cannot be enabled or disabled. There are a couple
 			// of test cases that check correct behavior when CSIMigrationGCE is enabled, but there are
 			// no longer any tests cases for CSIMigrationGCE being disabled as that is not possible.
-			if test.pluginFeature != features.CSIMigrationGCE {
+			if len(test.pluginFeature) > 0 {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()

@@ -160,8 +160,8 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 }
 
 func TestSetDefaultDeployment(t *testing.T) {
-	defaultIntOrString := intstr.FromInt(1)
-	differentIntOrString := intstr.FromInt(5)
+	defaultIntOrString := intstr.FromInt32(1)
+	differentIntOrString := intstr.FromInt32(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{

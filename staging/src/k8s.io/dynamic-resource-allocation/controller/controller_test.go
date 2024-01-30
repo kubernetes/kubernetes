@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +65,10 @@ func TestController(t *testing.T) {
 	otherNodeName := "worker-2"
 	unsuitableNodes := []string{otherNodeName}
 	potentialNodes := []string{nodeName, otherNodeName}
+	maxNodes := make([]string, resourcev1alpha2.PodSchedulingNodeListMaxSize)
+	for i := range maxNodes {
+		maxNodes[i] = fmt.Sprintf("node-%d", i)
+	}
 	withDeletionTimestamp := func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
 		var deleted metav1.Time
 		claim = claim.DeepCopy()
@@ -101,17 +106,23 @@ func TestController(t *testing.T) {
 		podSchedulingCtx.Spec.SelectedNode = nodeName
 		return podSchedulingCtx
 	}
-	withUnsuitableNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+	withSpecificUnsuitableNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext, unsuitableNodes []string) *resourcev1alpha2.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Status.ResourceClaims = append(podSchedulingCtx.Status.ResourceClaims,
 			resourcev1alpha2.ResourceClaimSchedulingStatus{Name: podClaimName, UnsuitableNodes: unsuitableNodes},
 		)
 		return podSchedulingCtx
 	}
-	withPotentialNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+	withUnsuitableNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+		return withSpecificUnsuitableNodes(podSchedulingCtx, unsuitableNodes)
+	}
+	withSpecificPotentialNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext, potentialNodes []string) *resourcev1alpha2.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Spec.PotentialNodes = potentialNodes
 		return podSchedulingCtx
+	}
+	withPotentialNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+		return withSpecificPotentialNodes(podSchedulingCtx, potentialNodes)
 	}
 
 	var m mockDriver
@@ -376,6 +387,48 @@ func TestController(t *testing.T) {
 			expectedSchedulingCtx: withUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx))),
 			expectedError:         errPeriodic.Error(),
 		},
+		// pod with delayed allocation, potential nodes, selected node, all unsuitable -> update unsuitable nodes
+		"pod-selected-is-potential-node": {
+			key:           podKey,
+			classes:       classes,
+			claim:         delayedClaim,
+			expectedClaim: delayedClaim,
+			pod:           podWithClaim,
+			schedulingCtx: withPotentialNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx))),
+			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
+				expectClaimParameters(map[string]interface{}{claimName: 2}).
+				expectUnsuitableNodes(map[string][]string{podClaimName: potentialNodes}, nil),
+			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx)), potentialNodes),
+			expectedError:         errPeriodic.Error(),
+		},
+		// pod with delayed allocation, max potential nodes, other selected node, all unsuitable -> update unsuitable nodes with truncation at start
+		"pod-selected-is-potential-node-truncate-first": {
+			key:           podKey,
+			classes:       classes,
+			claim:         delayedClaim,
+			expectedClaim: delayedClaim,
+			pod:           podWithClaim,
+			schedulingCtx: withSpecificPotentialNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), maxNodes),
+			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
+				expectClaimParameters(map[string]interface{}{claimName: 2}).
+				expectUnsuitableNodes(map[string][]string{podClaimName: append(maxNodes, nodeName)}, nil),
+			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), append(maxNodes[1:], nodeName)),
+			expectedError:         errPeriodic.Error(),
+		},
+		// pod with delayed allocation, max potential nodes, other selected node, all unsuitable (but in reverse order) -> update unsuitable nodes with truncation at end
+		"pod-selected-is-potential-node-truncate-last": {
+			key:           podKey,
+			classes:       classes,
+			claim:         delayedClaim,
+			expectedClaim: delayedClaim,
+			pod:           podWithClaim,
+			schedulingCtx: withSpecificPotentialNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), maxNodes),
+			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
+				expectClaimParameters(map[string]interface{}{claimName: 2}).
+				expectUnsuitableNodes(map[string][]string{podClaimName: append([]string{nodeName}, maxNodes...)}, nil),
+			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), append([]string{nodeName}, maxNodes[:len(maxNodes)-1]...)),
+			expectedError:         errPeriodic.Error(),
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
@@ -533,14 +586,19 @@ func (m mockDriver) GetClaimParameters(ctx context.Context, claim *resourcev1alp
 	return result, nil
 }
 
-func (m mockDriver) Allocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (*resourcev1alpha2.AllocationResult, error) {
-	m.t.Logf("Allocate(%s)", claim)
-	allocate, ok := m.allocate[claim.Name]
-	if !ok {
-		m.t.Fatal("unexpected Allocate call")
+func (m mockDriver) Allocate(ctx context.Context, claims []*ClaimAllocation, selectedNode string) {
+	m.t.Logf("Allocate(number of claims %d)", len(claims))
+	for _, claimAllocation := range claims {
+		m.t.Logf("Allocate(%s)", claimAllocation.Claim.Name)
+		allocate, ok := m.allocate[claimAllocation.Claim.Name]
+		if !ok {
+			m.t.Fatalf("unexpected Allocate call for claim %s", claimAllocation.Claim.Name)
+		}
+		assert.Equal(m.t, allocate.selectedNode, selectedNode, "selected node")
+		claimAllocation.Error = allocate.allocErr
+		claimAllocation.Allocation = allocate.allocResult
 	}
-	assert.Equal(m.t, allocate.selectedNode, selectedNode, "selected node")
-	return allocate.allocResult, allocate.allocErr
+	return
 }
 
 func (m mockDriver) Deallocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error {

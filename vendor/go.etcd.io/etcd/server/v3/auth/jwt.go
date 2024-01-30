@@ -42,7 +42,7 @@ func (t *tokenJWT) info(ctx context.Context, token string, rev uint64) (*AuthInf
 	// rev isn't used in JWT, it is only used in simple token
 	var (
 		username string
-		revision uint64
+		revision float64
 	)
 
 	parsed, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
@@ -74,10 +74,19 @@ func (t *tokenJWT) info(ctx context.Context, token string, rev uint64) (*AuthInf
 		return nil, false
 	}
 
-	username = claims["username"].(string)
-	revision = uint64(claims["revision"].(float64))
+	username, ok = claims["username"].(string)
+	if !ok {
+		t.lg.Warn("failed to obtain user claims from jwt token")
+		return nil, false
+	}
 
-	return &AuthInfo{Username: username, Revision: revision}, true
+	revision, ok = claims["revision"].(float64)
+	if !ok {
+		t.lg.Warn("failed to obtain revision claims from jwt token")
+		return nil, false
+	}
+
+	return &AuthInfo{Username: username, Revision: uint64(revision)}, true
 }
 
 func (t *tokenJWT) assign(ctx context.Context, username string, revision uint64) (string, error) {

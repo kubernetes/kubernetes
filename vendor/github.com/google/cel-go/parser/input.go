@@ -15,7 +15,8 @@
 package parser
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr"
+	antlr "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+
 	"github.com/google/cel-go/common/runes"
 )
 

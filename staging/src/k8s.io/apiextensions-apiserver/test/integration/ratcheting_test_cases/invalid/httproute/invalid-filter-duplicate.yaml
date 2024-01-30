@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: invalid-filter-duplicate
+spec:
+  rules:
+  - filters:
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        add:
+        - name: my-header
+          value: foo
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        add:
+        - name: my-header
+          value: bar
+

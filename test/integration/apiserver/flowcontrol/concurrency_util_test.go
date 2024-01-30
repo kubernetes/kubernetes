@@ -31,13 +31,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -147,10 +145,11 @@ func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Att
 // Secondarily, this test also checks the observed seat utilizations against values derived from expecting that
 // the throughput observed by the client equals the execution throughput observed by the server.
 func TestConcurrencyIsolation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
-	// NOTE: disabling the feature should fail the test
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	_, kubeConfig, closeFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, closeFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure all clients are allowed to send requests.
 			opts.Authorization.Modes = []string{"AlwaysAllow"}
@@ -191,7 +190,7 @@ func TestConcurrencyIsolation(t *testing.T) {
 	wg.Add(noxu1NumGoroutines)
 	streamRequests(noxu1NumGoroutines, func() {
 		start := time.Now()
-		_, err := noxu1Client.CoreV1().Namespaces().Get(context.Background(), "default", metav1.GetOptions{})
+		_, err := noxu1Client.CoreV1().Namespaces().Get(ctx, "default", metav1.GetOptions{})
 		duration := time.Since(start).Seconds()
 		noxu1LatMeasure.update(duration)
 		if err != nil {
@@ -204,7 +203,7 @@ func TestConcurrencyIsolation(t *testing.T) {
 	wg.Add(noxu2NumGoroutines)
 	streamRequests(noxu2NumGoroutines, func() {
 		start := time.Now()
-		_, err := noxu2Client.CoreV1().Namespaces().Get(context.Background(), "default", metav1.GetOptions{})
+		_, err := noxu2Client.CoreV1().Namespaces().Get(ctx, "default", metav1.GetOptions{})
 		duration := time.Since(start).Seconds()
 		noxu2LatMeasure.update(duration)
 		if err != nil {

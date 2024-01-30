@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
@@ -92,7 +92,7 @@ func isObjectOlder(newObject, oldObject runtime.Object) bool {
 	return newVersion < oldVersion
 }
 
-func (s *objectStore) AddReference(namespace, name string) {
+func (s *objectStore) AddReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod, thus it needs to be efficient.
@@ -114,7 +114,7 @@ func (s *objectStore) AddReference(namespace, name string) {
 	item.data = nil
 }
 
-func (s *objectStore) DeleteReference(namespace, name string) {
+func (s *objectStore) DeleteReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	s.lock.Lock()
@@ -224,21 +224,29 @@ func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 	names := c.getReferencedObjects(pod)
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	for name := range names {
-		c.objectStore.AddReference(pod.Namespace, name)
-	}
 	var prev *v1.Pod
 	key := objectKey{namespace: pod.Namespace, name: pod.Name, uid: pod.UID}
 	prev = c.registeredPods[key]
 	c.registeredPods[key] = pod
-	if prev != nil {
-		for name := range c.getReferencedObjects(prev) {
-			// On an update, the .Add() call above will have re-incremented the
-			// ref count of any existing object, so any objects that are in both
-			// names and prev need to have their ref counts decremented. Any that
-			// are only in prev need to be completely removed. This unconditional
-			// call takes care of both cases.
-			c.objectStore.DeleteReference(prev.Namespace, name)
+	// To minimize unnecessary API requests to the API server for the configmap/secret get API
+	// only invoke AddReference the first time RegisterPod is called for a pod.
+	if prev == nil {
+		for name := range names {
+			c.objectStore.AddReference(pod.Namespace, name, pod.UID)
+		}
+	} else {
+		prevNames := c.getReferencedObjects(prev)
+		// Add new references
+		for name := range names {
+			if !prevNames.Has(name) {
+				c.objectStore.AddReference(pod.Namespace, name, pod.UID)
+			}
+		}
+		// Remove dropped references
+		for prevName := range prevNames {
+			if !names.Has(prevName) {
+				c.objectStore.DeleteReference(pod.Namespace, prevName, pod.UID)
+			}
 		}
 	}
 }
@@ -252,7 +260,7 @@ func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 	delete(c.registeredPods, key)
 	if prev != nil {
 		for name := range c.getReferencedObjects(prev) {
-			c.objectStore.DeleteReference(prev.Namespace, name)
+			c.objectStore.DeleteReference(prev.Namespace, name, prev.UID)
 		}
 	}
 }

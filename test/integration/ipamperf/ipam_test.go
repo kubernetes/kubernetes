@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -54,7 +57,6 @@ func setupAllocator(ctx context.Context, kubeConfig *restclient.Config, config *
 	ipamController, err := nodeipam.NewNodeIpamController(
 		ctx,
 		sharedInformer.Core().V1().Nodes(),
-		sharedInformer.Networking().V1alpha1().ClusterCIDRs(),
 		config.Cloud, clientSet, []*net.IPNet{clusterCIDR}, serviceCIDR, nil,
 		[]int{subnetMaskSize}, config.AllocatorType,
 	)
@@ -123,7 +125,11 @@ func TestPerformance(t *testing.T) {
 		t.Skip("Skipping because we want to run short tests")
 	}
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}

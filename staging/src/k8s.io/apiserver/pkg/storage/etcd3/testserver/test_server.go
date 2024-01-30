@@ -66,10 +66,10 @@ func NewTestConfig(t testing.TB) *embed.Config {
 	clientURL := url.URL{Scheme: "http", Host: net.JoinHostPort("localhost", strconv.Itoa(ports[0]))}
 	peerURL := url.URL{Scheme: "http", Host: net.JoinHostPort("localhost", strconv.Itoa(ports[1]))}
 
-	cfg.LPUrls = []url.URL{peerURL}
-	cfg.APUrls = []url.URL{peerURL}
-	cfg.LCUrls = []url.URL{clientURL}
-	cfg.ACUrls = []url.URL{clientURL}
+	cfg.ListenPeerUrls = []url.URL{peerURL}
+	cfg.AdvertisePeerUrls = []url.URL{peerURL}
+	cfg.ListenClientUrls = []url.URL{clientURL}
+	cfg.AdvertiseClientUrls = []url.URL{clientURL}
 	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
 
 	cfg.ZapLoggerBuilder = embed.NewZapLoggerBuilder(zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel)).Named("etcd-server"))

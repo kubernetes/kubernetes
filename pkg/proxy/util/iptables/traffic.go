@@ -19,7 +19,6 @@ package iptables
 import (
 	"fmt"
 
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	netutils "k8s.io/utils/net"
 )
 
@@ -34,6 +33,12 @@ type LocalTrafficDetector interface {
 
 	// IfNotLocal returns iptables arguments that will match traffic that is not from a pod
 	IfNotLocal() []string
+
+	// IfLocalNFT returns nftables arguments that will match traffic from a pod
+	IfLocalNFT() []string
+
+	// IfNotLocalNFT returns nftables arguments that will match traffic that is not from a pod
+	IfNotLocalNFT() []string
 }
 
 type noOpLocalDetector struct{}
@@ -55,24 +60,39 @@ func (n *noOpLocalDetector) IfNotLocal() []string {
 	return nil // no-op; matches all traffic
 }
 
+func (n *noOpLocalDetector) IfLocalNFT() []string {
+	return nil // no-op; matches all traffic
+}
+
+func (n *noOpLocalDetector) IfNotLocalNFT() []string {
+	return nil // no-op; matches all traffic
+}
+
 type detectLocalByCIDR struct {
-	ifLocal    []string
-	ifNotLocal []string
+	ifLocal       []string
+	ifNotLocal    []string
+	ifLocalNFT    []string
+	ifNotLocalNFT []string
 }
 
 // NewDetectLocalByCIDR implements the LocalTrafficDetector interface using a CIDR. This can be used when a single CIDR
 // range can be used to capture the notion of local traffic.
-func NewDetectLocalByCIDR(cidr string, ipt utiliptables.Interface) (LocalTrafficDetector, error) {
-	if netutils.IsIPv6CIDRString(cidr) != ipt.IsIPv6() {
-		return nil, fmt.Errorf("CIDR %s has incorrect IP version: expect isIPv6=%t", cidr, ipt.IsIPv6())
-	}
-	_, _, err := netutils.ParseCIDRSloppy(cidr)
+func NewDetectLocalByCIDR(cidr string) (LocalTrafficDetector, error) {
+	_, parsed, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {
 		return nil, err
 	}
+
+	nftFamily := "ip"
+	if netutils.IsIPv6CIDR(parsed) {
+		nftFamily = "ip6"
+	}
+
 	return &detectLocalByCIDR{
-		ifLocal:    []string{"-s", cidr},
-		ifNotLocal: []string{"!", "-s", cidr},
+		ifLocal:       []string{"-s", cidr},
+		ifNotLocal:    []string{"!", "-s", cidr},
+		ifLocalNFT:    []string{nftFamily, "saddr", cidr},
+		ifNotLocalNFT: []string{nftFamily, "saddr", "!=", cidr},
 	}, nil
 }
 
@@ -88,9 +108,19 @@ func (d *detectLocalByCIDR) IfNotLocal() []string {
 	return d.ifNotLocal
 }
 
+func (d *detectLocalByCIDR) IfLocalNFT() []string {
+	return d.ifLocalNFT
+}
+
+func (d *detectLocalByCIDR) IfNotLocalNFT() []string {
+	return d.ifNotLocalNFT
+}
+
 type detectLocalByBridgeInterface struct {
-	ifLocal    []string
-	ifNotLocal []string
+	ifLocal       []string
+	ifNotLocal    []string
+	ifLocalNFT    []string
+	ifNotLocalNFT []string
 }
 
 // NewDetectLocalByBridgeInterface implements the LocalTrafficDetector interface using a bridge interface name.
@@ -100,8 +130,10 @@ func NewDetectLocalByBridgeInterface(interfaceName string) (LocalTrafficDetector
 		return nil, fmt.Errorf("no bridge interface name set")
 	}
 	return &detectLocalByBridgeInterface{
-		ifLocal:    []string{"-i", interfaceName},
-		ifNotLocal: []string{"!", "-i", interfaceName},
+		ifLocal:       []string{"-i", interfaceName},
+		ifNotLocal:    []string{"!", "-i", interfaceName},
+		ifLocalNFT:    []string{"iif", interfaceName},
+		ifNotLocalNFT: []string{"iif", "!=", interfaceName},
 	}, nil
 }
 
@@ -117,9 +149,19 @@ func (d *detectLocalByBridgeInterface) IfNotLocal() []string {
 	return d.ifNotLocal
 }
 
+func (d *detectLocalByBridgeInterface) IfLocalNFT() []string {
+	return d.ifLocalNFT
+}
+
+func (d *detectLocalByBridgeInterface) IfNotLocalNFT() []string {
+	return d.ifNotLocalNFT
+}
+
 type detectLocalByInterfaceNamePrefix struct {
-	ifLocal    []string
-	ifNotLocal []string
+	ifLocal       []string
+	ifNotLocal    []string
+	ifLocalNFT    []string
+	ifNotLocalNFT []string
 }
 
 // NewDetectLocalByInterfaceNamePrefix implements the LocalTrafficDetector interface using an interface name prefix.
@@ -130,8 +172,10 @@ func NewDetectLocalByInterfaceNamePrefix(interfacePrefix string) (LocalTrafficDe
 		return nil, fmt.Errorf("no interface prefix set")
 	}
 	return &detectLocalByInterfaceNamePrefix{
-		ifLocal:    []string{"-i", interfacePrefix + "+"},
-		ifNotLocal: []string{"!", "-i", interfacePrefix + "+"},
+		ifLocal:       []string{"-i", interfacePrefix + "+"},
+		ifNotLocal:    []string{"!", "-i", interfacePrefix + "+"},
+		ifLocalNFT:    []string{"iif", interfacePrefix + "*"},
+		ifNotLocalNFT: []string{"iif", "!=", interfacePrefix + "*"},
 	}, nil
 }
 
@@ -145,4 +189,12 @@ func (d *detectLocalByInterfaceNamePrefix) IfLocal() []string {
 
 func (d *detectLocalByInterfaceNamePrefix) IfNotLocal() []string {
 	return d.ifNotLocal
+}
+
+func (d *detectLocalByInterfaceNamePrefix) IfLocalNFT() []string {
+	return d.ifLocalNFT
+}
+
+func (d *detectLocalByInterfaceNamePrefix) IfNotLocalNFT() []string {
+	return d.ifNotLocalNFT
 }

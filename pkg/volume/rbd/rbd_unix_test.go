@@ -26,9 +26,10 @@ import (
 func (fake *fakeDiskManager) AttachDisk(b rbdMounter) (string, error) {
 	fake.mutex.Lock()
 	defer fake.mutex.Unlock()
-	fake.rbdMapIndex++
 	devicePath := fmt.Sprintf("/dev/rbd%d", fake.rbdMapIndex)
 	fake.rbdDevices[devicePath] = true
+	// Increment rbdMapIndex afterwards, so we can start from rbd0.
+	fake.rbdMapIndex++
 	return devicePath, nil
 }
 

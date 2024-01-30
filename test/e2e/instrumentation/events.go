@@ -19,7 +19,6 @@ package instrumentation
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +34,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -76,7 +76,7 @@ func eventExistsInList(ctx context.Context, client typedeventsv1.EventInterface,
 
 var _ = common.SIGDescribe("Events API", func() {
 	f := framework.NewDefaultFramework("events")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var coreClient corev1.EventInterface
 	var client typedeventsv1.EventInterface
 	var clientAllNamespaces typedeventsv1.EventInterface
@@ -218,7 +218,7 @@ var _ = common.SIGDescribe("Events API", func() {
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
-		framework.ExpectEqual(len(eventList.Items), len(eventNames), fmt.Sprintf("unexpected event list: %#v", eventList))
+		gomega.Expect(eventList.Items).To(gomega.HaveLen(len(eventNames)), "unexpected event list: %#v", eventList)
 
 		ginkgo.By("delete a list of events")
 		framework.Logf("requesting DeleteCollection of events")
@@ -232,6 +232,6 @@ var _ = common.SIGDescribe("Events API", func() {
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
-		framework.ExpectEqual(len(eventList.Items), 0, fmt.Sprintf("unexpected event list: %#v", eventList))
+		gomega.Expect(eventList.Items).To(gomega.BeEmpty(), "unexpected event list: %#v", eventList)
 	})
 })

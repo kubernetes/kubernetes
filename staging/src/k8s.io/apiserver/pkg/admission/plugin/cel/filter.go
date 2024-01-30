@@ -27,24 +27,27 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
 // filterCompiler implement the interface FilterCompiler.
 type filterCompiler struct {
+	compiler Compiler
 }
 
-func NewFilterCompiler() FilterCompiler {
-	return &filterCompiler{}
+func NewFilterCompiler(env *environment.EnvSet) FilterCompiler {
+	return &filterCompiler{compiler: NewCompiler(env)}
 }
 
 type evaluationActivation struct {
-	object, oldObject, params, request, authorizer, requestResourceAuthorizer interface{}
+	object, oldObject, params, request, namespace, authorizer, requestResourceAuthorizer, variables interface{}
 }
 
 // ResolveName returns a value from the activation by qualified name, or false if the name
@@ -59,10 +62,14 @@ func (a *evaluationActivation) ResolveName(name string) (interface{}, bool) {
 		return a.params, true // params may be null
 	case RequestVarName:
 		return a.request, true
+	case NamespaceVarName:
+		return a.namespace, true
 	case AuthorizerVarName:
 		return a.authorizer, a.authorizer != nil
 	case RequestResourceAuthorizerVarName:
 		return a.requestResourceAuthorizer, a.requestResourceAuthorizer != nil
+	case VariableVarName: // variables always present
+		return a.variables, true
 	default:
 		return nil, false
 	}
@@ -75,13 +82,13 @@ func (a *evaluationActivation) Parent() interpreter.Activation {
 }
 
 // Compile compiles the cel expressions defined in the ExpressionAccessors into a Filter
-func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, perCallLimit uint64) Filter {
+func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) Filter {
 	compilationResults := make([]CompilationResult, len(expressionAccessors))
 	for i, expressionAccessor := range expressionAccessors {
 		if expressionAccessor == nil {
 			continue
 		}
-		compilationResults[i] = CompileCELExpression(expressionAccessor, options, perCallLimit)
+		compilationResults[i] = c.compiler.CompileCELExpression(expressionAccessor, options, mode)
 	}
 	return NewFilter(compilationResults)
 }
@@ -122,7 +129,7 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
 // errors per evaluation are returned on the Evaluation object
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
+func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(f.compilationResults))
 	var err error
@@ -152,13 +159,26 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 	if err != nil {
 		return nil, -1, err
 	}
+	namespaceVal, err := objectToResolveVal(namespace)
+	if err != nil {
+		return nil, -1, err
+	}
 	va := &evaluationActivation{
 		object:                    objectVal,
 		oldObject:                 oldObjectVal,
 		params:                    paramsVal,
 		request:                   requestVal.Object,
+		namespace:                 namespaceVal,
 		authorizer:                authorizerVal,
 		requestResourceAuthorizer: requestResourceAuthorizerVal,
+	}
+
+	// composition is an optional feature that only applies for ValidatingAdmissionPolicy.
+	// check if the context allows composition
+	var compositionCtx CompositionContext
+	var ok bool
+	if compositionCtx, ok = ctx.(CompositionContext); ok {
+		va.variables = compositionCtx.Variables(va)
 	}
 
 	remainingBudget := runtimeCELCostBudget
@@ -184,6 +204,17 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 		}
 		t1 := time.Now()
 		evalResult, evalDetails, err := compilationResult.Program.ContextEval(ctx, va)
+		// budget may be spent due to lazy evaluation of composited variables
+		if compositionCtx != nil {
+			compositionCost := compositionCtx.GetAndResetCost()
+			if compositionCost > remainingBudget {
+				return nil, -1, &cel.Error{
+					Type:   cel.ErrorTypeInvalid,
+					Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
+				}
+			}
+			remainingBudget -= compositionCost
+		}
 		elapsed := time.Since(t1)
 		evaluation.Elapsed = elapsed
 		if evalDetails == nil {
@@ -222,10 +253,13 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 }
 
 // TODO: to reuse https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request/admissionreview.go#L154
-func CreateAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionRequest {
-	// FIXME: how to get resource GVK, GVR and subresource?
-	gvk := attr.GetKind()
-	gvr := attr.GetResource()
+func CreateAdmissionRequest(attr admission.Attributes, equivalentGVR metav1.GroupVersionResource, equivalentKind metav1.GroupVersionKind) *admissionv1.AdmissionRequest {
+	// Attempting to use same logic as webhook for constructing resource
+	// GVK, GVR, subresource
+	// Use the GVK, GVR that the matcher decided was equivalent to that of the request
+	// https://github.com/kubernetes/kubernetes/blob/90c362b3430bcbbf8f245fadbcd521dab39f1d7c/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go#L182-L210
+	gvk := equivalentKind
+	gvr := equivalentGVR
 	subresource := attr.GetSubresource()
 
 	requestGVK := attr.GetKind()
@@ -280,6 +314,33 @@ func CreateAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionReq
 		DryRun: &dryRun,
 		Options: runtime.RawExtension{
 			Object: attr.GetOperationOptions(),
+		},
+	}
+}
+
+// CreateNamespaceObject creates a Namespace object that is suitable for the CEL evaluation.
+// If the namespace is nil, CreateNamespaceObject returns nil
+func CreateNamespaceObject(namespace *v1.Namespace) *v1.Namespace {
+	if namespace == nil {
+		return nil
+	}
+
+	return &v1.Namespace{
+		Status: namespace.Status,
+		Spec:   namespace.Spec,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:                       namespace.Name,
+			GenerateName:               namespace.GenerateName,
+			Namespace:                  namespace.Namespace,
+			UID:                        namespace.UID,
+			ResourceVersion:            namespace.ResourceVersion,
+			Generation:                 namespace.Generation,
+			CreationTimestamp:          namespace.CreationTimestamp,
+			DeletionTimestamp:          namespace.DeletionTimestamp,
+			DeletionGracePeriodSeconds: namespace.DeletionGracePeriodSeconds,
+			Labels:                     namespace.Labels,
+			Annotations:                namespace.Annotations,
+			Finalizers:                 namespace.Finalizers,
 		},
 	}
 }

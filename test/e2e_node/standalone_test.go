@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -44,9 +45,9 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
+var _ = SIGDescribe(feature.StandaloneMode, func() {
 	f := framework.NewDefaultFramework("static-pod")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when creating a static pod", func() {
 		var ns, podPath, staticPodName string
 
@@ -88,7 +89,7 @@ var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 					return nil
 				}
 				return fmt.Errorf("pod (%v/%v) still exists", ns, staticPodName)
-			})
+			}).Should(gomega.Succeed())
 		})
 	})
 })

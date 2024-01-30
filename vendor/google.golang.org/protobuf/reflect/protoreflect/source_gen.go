@@ -35,6 +35,8 @@ func (p *SourcePath) appendFileDescriptorProto(b []byte) []byte {
 		b = p.appendSingularField(b, "source_code_info", (*SourcePath).appendSourceCodeInfo)
 	case 12:
 		b = p.appendSingularField(b, "syntax", nil)
+	case 13:
+		b = p.appendSingularField(b, "edition", nil)
 	}
 	return b
 }
@@ -236,6 +238,8 @@ func (p *SourcePath) appendMessageOptions(b []byte) []byte {
 		b = p.appendSingularField(b, "deprecated", nil)
 	case 7:
 		b = p.appendSingularField(b, "map_entry", nil)
+	case 11:
+		b = p.appendSingularField(b, "deprecated_legacy_json_field_conflicts", nil)
 	case 999:
 		b = p.appendRepeatedField(b, "uninterpreted_option", (*SourcePath).appendUninterpretedOption)
 	}
@@ -279,6 +283,8 @@ func (p *SourcePath) appendEnumOptions(b []byte) []byte {
 		b = p.appendSingularField(b, "allow_alias", nil)
 	case 3:
 		b = p.appendSingularField(b, "deprecated", nil)
+	case 6:
+		b = p.appendSingularField(b, "deprecated_legacy_json_field_conflicts", nil)
 	case 999:
 		b = p.appendRepeatedField(b, "uninterpreted_option", (*SourcePath).appendUninterpretedOption)
 	}
@@ -345,10 +351,20 @@ func (p *SourcePath) appendFieldOptions(b []byte) []byte {
 		b = p.appendSingularField(b, "jstype", nil)
 	case 5:
 		b = p.appendSingularField(b, "lazy", nil)
+	case 15:
+		b = p.appendSingularField(b, "unverified_lazy", nil)
 	case 3:
 		b = p.appendSingularField(b, "deprecated", nil)
 	case 10:
 		b = p.appendSingularField(b, "weak", nil)
+	case 16:
+		b = p.appendSingularField(b, "debug_redact", nil)
+	case 17:
+		b = p.appendSingularField(b, "retention", nil)
+	case 18:
+		b = p.appendSingularField(b, "target", nil)
+	case 19:
+		b = p.appendRepeatedField(b, "targets", nil)
 	case 999:
 		b = p.appendRepeatedField(b, "uninterpreted_option", (*SourcePath).appendUninterpretedOption)
 	}
@@ -404,6 +420,10 @@ func (p *SourcePath) appendExtensionRangeOptions(b []byte) []byte {
 	switch (*p)[0] {
 	case 999:
 		b = p.appendRepeatedField(b, "uninterpreted_option", (*SourcePath).appendUninterpretedOption)
+	case 2:
+		b = p.appendRepeatedField(b, "declaration", (*SourcePath).appendExtensionRangeOptions_Declaration)
+	case 3:
+		b = p.appendSingularField(b, "verification", nil)
 	}
 	return b
 }
@@ -456,6 +476,27 @@ func (p *SourcePath) appendUninterpretedOption_NamePart(b []byte) []byte {
 		b = p.appendSingularField(b, "name_part", nil)
 	case 2:
 		b = p.appendSingularField(b, "is_extension", nil)
+	}
+	return b
+}
+
+func (p *SourcePath) appendExtensionRangeOptions_Declaration(b []byte) []byte {
+	if len(*p) == 0 {
+		return b
+	}
+	switch (*p)[0] {
+	case 1:
+		b = p.appendSingularField(b, "number", nil)
+	case 2:
+		b = p.appendSingularField(b, "full_name", nil)
+	case 3:
+		b = p.appendSingularField(b, "type", nil)
+	case 4:
+		b = p.appendSingularField(b, "is_repeated", nil)
+	case 5:
+		b = p.appendSingularField(b, "reserved", nil)
+	case 6:
+		b = p.appendSingularField(b, "repeated", nil)
 	}
 	return b
 }

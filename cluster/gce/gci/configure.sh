@@ -24,18 +24,17 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION='v1.2.0'
-DEFAULT_CNI_HASH='29ea9be8e81e0b4c44469c4307cd8be83647e30ade8b737d94df81477b494662308b2566fce80cfa993c761afb6e5bad9382455260b857c7f941fa18bb7919b4'
-DEFAULT_NPD_VERSION='v0.8.9'
-DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
-DEFAULT_AUTH_PROVIDER_GCP_HASH_AMD64='88d9fa581002973170ca58427763f00355b24fbabd66f7fee725a0845ad88bee644e60eed2d95a5721e6ae0056a81a5990bf02148ea49817c174bcb2cc9c0626'
-DEFAULT_AUTH_PROVIDER_GCP_VERSION='v0.24.0'
-# TODO (SergeyKanzhelev): fill up for npd 0.8.9+
-DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
-DEFAULT_CRICTL_VERSION='v1.26.1'
-DEFAULT_CRICTL_AMD64_SHA512='e3a20c4d18bbbd9f5dc303e90b649181f9b8242758de58d04ea8acd0d3da32919b8859e90b6602354755dc82b79833caf30510e5a27b0ebc6a2b1545d744d4cc'
-DEFAULT_CRICTL_ARM64_SHA512='605d8fe73e7e0b93dfac9ea90548e7334b55dda1f0abeb4c3382ae15d6d250a71fccfde20e8fd68bde59b4c1d54ec69ef295a2aa2119e8579d60d0dbcf380d2e'
+DEFAULT_CNI_VERSION='v1.4.0'
+DEFAULT_CNI_HASH='993cf3284c6ffe5d803692de033d17941cffad8e58a1d8b8a41bba850eaf51a90c8a590b3e61c428a350aae39bcf77ec3901a64a71f6767e8e82c262671362c0'
+DEFAULT_NPD_VERSION='v0.8.13'
+DEFAULT_NPD_HASH_AMD64='f9d8499741f06e76ec2426c8ccebb4b5102e1e45c183b6a19671e1ec61ff2568c354307959c9910a579014807ae674e8633c8c0ea2d878fafae1b136ec7ff5da'
+DEFAULT_NPD_HASH_ARM64='c8f46c8d89a4f17df93d1f62a886de9d22cef29e6971354932cba1fa2837ebcacbd18888c0487034febe0b7f2eea289e3348e0b2f57f2f69a338f6ff8da20ed5'
+DEFAULT_CRICTL_VERSION='v1.29.0'
+DEFAULT_CRICTL_AMD64_SHA512='42ad023036120a95f95e69c5b50e79a6dbd0034f57d7f0124521cbe45502ab3ab8831ca437e05ae35fbd1d3bbe2e6d042eccb9ac9c2c5f7ec51a02234e0364ad'
+DEFAULT_CRICTL_ARM64_SHA512='4faf4b5d704a7701fd09a0106a444da266c77256ff0b7d80b0e3985011c77bbee1eda891b9b94aa1c175a525f38c4ab5afacd63750214deef9265be9982b78f0'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
+AUTH_PROVIDER_GCP_HASH_LINUX_AMD64="${AUTH_PROVIDER_GCP_HASH_LINUX_AMD64:-156058e5b3994cba91c23831774033e0d505d6d8b80f43541ef6af91b320fd9dfaabe42ec8a8887b51d87104c2b57e1eb895649d681575ffc80dd9aee8e563db}"
+AUTH_PROVIDER_GCP_HASH_LINUX_ARM64="${AUTH_PROVIDER_GCP_HASH_LINUX_ARM64:-1aa3b0bea10a9755231989ffc150cbfa770f1d96932db7535473f7bfeb1108bafdae80202ae738d59495982512e716ff7366d5f414d0e76dd50519f98611f9ab}"
 ###
 
 # Standard curl flags.
@@ -518,11 +517,6 @@ function install-containerd-ubuntu {
   # Override to latest versions of containerd and runc
   systemctl stop containerd
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    # TODO(https://github.com/containerd/containerd/issues/2901): Remove this check once containerd has arm64 release.
-    if [[ $(dpkg --print-architecture) != "amd64" ]]; then
-      echo "Unable to automatically install containerd in non-amd64 image. Bailing out..."
-      exit 2
-    fi
     # containerd versions have slightly different url(s), so try both
     # shellcheck disable=SC2086
     ( curl ${CURL_FLAGS} \
@@ -534,11 +528,6 @@ function install-containerd-ubuntu {
     | tar --overwrite -xzv -C /usr/
   fi
   if [[ -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-    # TODO: Remove this check once runc has arm64 release.
-    if [[ $(dpkg --print-architecture) != "amd64" ]]; then
-      echo "Unable to automatically install runc in non-amd64. Bailing out..."
-      exit 2
-    fi
     # shellcheck disable=SC2086
     curl ${CURL_FLAGS} \
       --location \
@@ -549,30 +538,33 @@ function install-containerd-ubuntu {
 }
 
 function install-auth-provider-gcp {
-  local -r auth_provider_tar="auth-provider-gcp-${DEFAULT_AUTH_PROVIDER_GCP_VERSION}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
-  echo "Downloading auth-provider-gcp ${auth_provider_tar}" .
+  local -r filename="auth-provider-gcp"
+  local -r auth_provider_storage_full_path="${AUTH_PROVIDER_GCP_STORAGE_PATH}/${AUTH_PROVIDER_GCP_VERSION}/${HOST_PLATFORM}_${HOST_ARCH}/${filename}"
+  echo "Downloading auth-provider-gcp ${auth_provider_storage_full_path}" .
 
-  local -r auth_provider_release_path="https://storage.googleapis.com/cloud-provider-gcp"
-  download-or-bust "${DEFAULT_AUTH_PROVIDER_GCP_HASH_AMD64}" "${auth_provider_release_path}/${auth_provider_tar}"
+  case "${HOST_ARCH}" in
+    amd64)
+      local -r auth_provider_gcp_hash="${AUTH_PROVIDER_GCP_HASH_LINUX_AMD64}"
+      ;;
+    arm64)
+      local -r auth_provider_gcp_hash="${AUTH_PROVIDER_GCP_HASH_LINUX_ARM64}"
+      ;;
+    *)
+      echo "Unrecognized version and platform/arch combination: ${HOST_PLATFORM}/${HOST_ARCH}"
+      exit 1
+  esac
 
-  # Keep in sync with --image-credential-provider-bin-dir in ../util.sh
-  local auth_provider_dir="${KUBE_HOME}/auth-provider-gcp"
-  mkdir -p "${auth_provider_dir}"
-  tar xzf "${KUBE_HOME}/${auth_provider_tar}" -C "${auth_provider_dir}" --overwrite
-  mv "${auth_provider_dir}/auth-provider-gcp" "${KUBE_BIN}"
-  chmod a+x "${KUBE_BIN}/auth-provider-gcp"
+  download-or-bust "${auth_provider_gcp_hash}" "${auth_provider_storage_full_path}"
 
-  rm -f "${KUBE_HOME}/${auth_provider_tar}"
-  rmdir "${auth_provider_dir}"
+  mv "${KUBE_HOME}/${filename}" "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}"
+  chmod a+x "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}/${filename}"
 
-  # Keep in sync with --image-credential-provider-config in ../util.sh
-  local auth_config_file="${KUBE_HOME}/cri_auth_config.yaml"
-  cat >> "${auth_config_file}" << EOF
+  cat >> "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}" << EOF
 kind: CredentialProviderConfig
-apiVersion: kubelet.config.k8s.io/v1beta1
+apiVersion: kubelet.config.k8s.io/v1
 providers:
   - name: auth-provider-gcp
-    apiVersion: credentialprovider.kubelet.k8s.io/v1alpha1
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
     matchImages:
     - "container.cloud.google.com"
     - "gcr.io"
@@ -717,8 +709,8 @@ function install-kube-binary-config {
   # are presented to kubelet:
   # --image-credential-provider-config=${path-to-config}
   # --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
-  # Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
-  # feature gates are set to true for kubelet to use external credential provider. 
+  # Also, it is required that DisableKubeletCloudCredentialProviders
+  # feature gate is set to true for kubelet to use external credential provider.
   if [[ "${ENABLE_AUTH_PROVIDER_GCP:-}" == "true" ]]; then
     # Install out-of-tree auth-provider-gcp binary to enable kubelet to dynamically
     # retrieve credentials for a container image registry.

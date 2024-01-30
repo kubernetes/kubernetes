@@ -17,6 +17,9 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi"
@@ -62,10 +65,7 @@ func (v *queryParamVerifierV3) HasSupport(gvk schema.GroupVersionKind) error {
 	}
 	gvSpec, err := v.root.GVSpec(gvk.GroupVersion())
 	if err == nil {
-		if supports := supportsQueryParamV3(gvSpec, gvk, v.queryParam); supports {
-			return nil
-		}
-		return NewParamUnsupportedError(gvk, v.queryParam)
+		return supportsQueryParamV3(gvSpec, gvk, v.queryParam)
 	}
 	if _, isErr := err.(*openapi3.GroupVersionNotFoundError); !isErr {
 		return err
@@ -78,9 +78,7 @@ func (v *queryParamVerifierV3) HasSupport(gvk schema.GroupVersionKind) error {
 			// If error retrieving Namespace spec, propagate error.
 			return err
 		}
-		if supports := supportsQueryParamV3(namespaceSpec, namespaceGVK, v.queryParam); supports {
-			return nil
-		}
+		return supportsQueryParamV3(namespaceSpec, namespaceGVK, v.queryParam)
 	}
 	return NewParamUnsupportedError(gvk, v.queryParam)
 }
@@ -103,11 +101,19 @@ func hasGVKExtensionV3(extensions spec.Extensions, gvk schema.GroupVersionKind) 
 
 // supportsQueryParam is a method that let's us look in the OpenAPI if the
 // specific group-version-kind supports the specific query parameter for
-// the PATCH end-point. Returns true if the query param is supported by the
-// spec for the passed GVK; false otherwise.
-func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, queryParam VerifiableQueryParam) bool {
+// the PATCH end-point. Returns nil if the passed GVK supports the passed
+// query parameter; otherwise, a "paramUnsupportedError" is returned (except
+// when an invalid document error is returned when an invalid OpenAPI V3
+// is passed in).
+func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, queryParam VerifiableQueryParam) error {
+	if doc == nil || doc.Paths == nil {
+		return fmt.Errorf("Invalid OpenAPI V3 document")
+	}
 	for _, path := range doc.Paths.Paths {
 		// If operation is not PATCH, then continue.
+		if path == nil {
+			continue
+		}
 		op := path.PathProps.Patch
 		if op == nil {
 			continue
@@ -119,11 +125,21 @@ func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, query
 		// Now look for the query parameter among the parameters
 		// for the PATCH operation.
 		for _, param := range op.OperationProps.Parameters {
-			if param.ParameterProps.Name == string(queryParam) {
-				return true
+			if param.ParameterProps.Name == string(queryParam) && param.In == "query" {
+				return nil
+			}
+
+			// lookup global parameters
+			if ref := param.Refable.Ref.Ref.String(); strings.HasPrefix(ref, "#/parameters/") && doc.Components != nil {
+				k := strings.TrimPrefix(ref, "#/parameters/")
+				if globalParam, ok := doc.Components.Parameters[k]; ok && globalParam != nil {
+					if globalParam.In == "query" && globalParam.Name == string(queryParam) {
+						return nil
+					}
+				}
 			}
 		}
-		return false
+		return NewParamUnsupportedError(gvk, queryParam)
 	}
-	return false
+	return fmt.Errorf("Path not found for GVK (%s) in OpenAPI V3 doc", gvk)
 }

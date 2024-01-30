@@ -32,6 +32,7 @@ kube::golang::setup_env
 DBG_CODEGEN="${DBG_CODEGEN:-0}"
 GENERATED_FILE_PREFIX="${GENERATED_FILE_PREFIX:-zz_generated.}"
 UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS:-}"
+API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR:-"${KUBE_ROOT}/api/api-rules"}"
 
 OUT_DIR="_output"
 PRJ_SRC_PATH="k8s.io/kubernetes"
@@ -106,7 +107,7 @@ function codegen::protobuf() {
             -e '// +k8s:protobuf-gen=package' \
             -- \
             cmd pkg staging \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sed 's|^|k8s.io/kubernetes/|;s|k8s.io/kubernetes/staging/src/||' \
             | sort -u)
 
@@ -147,7 +148,7 @@ function codegen::deepcopy() {
         k8s.io/code-generator/cmd/deepcopy-gen
 
     # The result file, in each pkg, of deep-copy generation.
-    local output_base="${GENERATED_FILE_PREFIX}deepcopy"
+    local output_file="${GENERATED_FILE_PREFIX}deepcopy"
 
     # The tool used to generate deep copies.
     local gen_deepcopy_bin
@@ -160,7 +161,7 @@ function codegen::deepcopy() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
         grep -l --null '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:deepcopy-gen tagged dirs"
@@ -179,13 +180,13 @@ function codegen::deepcopy() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_deepcopy_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         --bounding-dirs "${PRJ_SRC_PATH},k8s.io/api" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -280,7 +281,7 @@ function codegen::prerelease() {
         k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 
     # The result file, in each pkg, of prerelease-lifecycle generation.
-    local output_base="${GENERATED_FILE_PREFIX}prerelease-lifecycle"
+    local output_file="${GENERATED_FILE_PREFIX}prerelease-lifecycle"
 
     # The tool used to generate prerelease-lifecycle code.
     local gen_prerelease_bin
@@ -293,7 +294,7 @@ function codegen::prerelease() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
         grep -l --null '+k8s:prerelease-lifecycle-gen=true' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:prerelease-lifecycle-gen tagged dirs"
@@ -312,13 +313,13 @@ function codegen::prerelease() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_prerelease_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 
@@ -349,7 +350,7 @@ function codegen::defaults() {
         k8s.io/code-generator/cmd/defaulter-gen
 
     # The result file, in each pkg, of defaulter generation.
-    local output_base="${GENERATED_FILE_PREFIX}defaults"
+    local output_file="${GENERATED_FILE_PREFIX}defaults"
 
     # The tool used to generate defaulters.
     local gen_defaulter_bin
@@ -362,7 +363,7 @@ function codegen::defaults() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
         grep -l --null '+k8s:defaulter-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:defaulter-gen tagged dirs"
@@ -381,13 +382,13 @@ function codegen::defaults() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_defaulter_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
@@ -424,7 +425,7 @@ function codegen::conversions() {
         k8s.io/code-generator/cmd/conversion-gen
 
     # The result file, in each pkg, of conversion generation.
-    local output_base="${GENERATED_FILE_PREFIX}conversion"
+    local output_file="${GENERATED_FILE_PREFIX}conversion"
 
     # The tool used to generate conversions.
     local gen_conversion_bin
@@ -437,7 +438,7 @@ function codegen::conversions() {
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(\
         grep -l --null '^// *+k8s:conversion-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:conversion-gen tagged dirs"
@@ -462,13 +463,13 @@ function codegen::conversions() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_conversion_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
-        -h "${BOILERPLATE_FILENAME}" \
-        -O "${output_base}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         $(printf -- " --extra-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
@@ -497,47 +498,6 @@ function k8s_tag_files_except() {
     done
 }
 
-# $@: directories to exclude
-# example:
-#    k8s_tag_files_matching foo bat/qux
-function k8s_tag_files_matching() {
-    for f in "${ALL_K8S_TAG_FILES[@]}"; do
-        for x in "$@"; do
-            if [[ "$f" =~ "${x}"/.* ]]; then
-                echo "$f"
-                break
-            fi
-        done
-    done
-}
-
-# $1: the name of a scalar variable to read
-# example:
-#    FOO_VAR="foo value"
-#    BAR_VAR="bar value"
-#    x=FOO
-#    indirect "${x}_VAR" # -> "foo value\n"
-function indirect() {
-    # This is a trick to get bash to indirectly read a variable.
-    # Thanks StackOverflow!
-    local var="$1"
-    echo "${!var}"
-}
-
-# $1: the name of an array variable to read
-#    FOO_ARR=(a b c)
-#    BAR_ARR=(1 2 3)
-#    x=FOO
-#    indirect_array "${x}_ARR" # -> "a\nb\nc\n"
-function indirect_array() {
-    # This is a trick to get bash to indirectly read an array.
-    # Thanks StackOverflow!
-    local arrayname="$1"
-    # shellcheck disable=SC1087 # intentional
-    local tmp="$arrayname[@]"
-    printf -- "%s\n" "${!tmp}"
-}
-
 # OpenAPI generation
 #
 # Any package that wants open-api functions generated must include a
@@ -549,154 +509,79 @@ function codegen::openapi() {
         k8s.io/code-generator/cmd/openapi-gen
 
     # The result file, in each pkg, of open-api generation.
-    local output_base="${GENERATED_FILE_PREFIX}openapi"
+    local output_file="${GENERATED_FILE_PREFIX}openapi"
 
     # The tool used to generate open apis.
     local gen_openapi_bin
     gen_openapi_bin="$(kube::util::find-binary "openapi-gen")"
 
-    # Standard dirs which all targets need.
-    local apimachinery_dirs=(
-        vendor/k8s.io/apimachinery/pkg/apis/meta/v1
-        vendor/k8s.io/apimachinery/pkg/runtime
-        vendor/k8s.io/apimachinery/pkg/version
-    )
+    local output_dir="pkg/generated/openapi"
+    local known_violations_file="${API_KNOWN_VIOLATIONS_DIR}/violation_exceptions.list"
 
-    # These should probably be configured by tags in code-files somewhere.
-    local targets=(
-        KUBE
-        AGGREGATOR
-        APIEXTENSIONS
-        CODEGEN
-        SAMPLEAPISERVER
-    )
+    local report_file="${OUT_DIR}/api_violations.report"
+    # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
+    # updated API violations to the known API violation exceptions list.
+    if [[ "${UPDATE_API_KNOWN_VIOLATIONS}" == true ]]; then
+        report_file="${known_violations_file}"
+    fi
 
-    # shellcheck disable=SC2034 # used indirectly
-    local KUBE_output_dir="pkg/generated/openapi"
-    # shellcheck disable=SC2034 # used indirectly
-    local KUBE_known_violations_file="api/api-rules/violation_exceptions.list"
-    # shellcheck disable=SC2034 # used indirectly
-    local KUBE_tag_files=()
-    kube::util::read-array KUBE_tag_files < <(
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: finding all +k8s:openapi-gen tags"
+    fi
+
+    local tag_files=()
+    kube::util::read-array tag_files < <(
         k8s_tag_files_except \
             vendor/k8s.io/code-generator \
             vendor/k8s.io/sample-apiserver
         )
 
-    # shellcheck disable=SC2034 # used indirectly
-    local AGGREGATOR_output_dir="staging/src/k8s.io/kube-aggregator/pkg/generated/openapi"
-    # shellcheck disable=SC2034 # used indirectly
-    local AGGREGATOR_known_violations_file="api/api-rules/aggregator_violation_exceptions.list"
-    # shellcheck disable=SC2034 # used indirectly
-    local AGGREGATOR_tag_files=()
-    kube::util::read-array AGGREGATOR_tag_files < <(
-        k8s_tag_files_matching \
-            vendor/k8s.io/kube-aggregator \
-            "${apimachinery_dirs[@]}"
-        )
+    local tag_dirs=()
+    kube::util::read-array tag_dirs < <(
+        grep -l --null '+k8s:openapi-gen=' "${tag_files[@]}" \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
+            | sort -u)
 
-    # shellcheck disable=SC2034 # used indirectly
-    local APIEXTENSIONS_output_dir="staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi"
-    # shellcheck disable=SC2034 # used indirectly
-    local APIEXTENSIONS_known_violations_file="api/api-rules/apiextensions_violation_exceptions.list"
-    # shellcheck disable=SC2034 # used indirectly
-    local APIEXTENSIONS_tag_files=()
-    kube::util::read-array APIEXTENSIONS_tag_files < <(
-        k8s_tag_files_matching \
-            vendor/k8s.io/apiextensions \
-            vendor/k8s.io/api/autoscaling/v1 \
-            "${apimachinery_dirs[@]}"
-        )
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:openapi-gen tagged dirs"
+    fi
 
-    # shellcheck disable=SC2034 # used indirectly
-    local CODEGEN_output_dir="staging/src/k8s.io/code-generator/examples/apiserver/openapi"
-    # shellcheck disable=SC2034 # used indirectly
-    local CODEGEN_known_violations_file="api/api-rules/codegen_violation_exceptions.list"
-    # shellcheck disable=SC2034 # used indirectly
-    local CODEGEN_tag_files=()
-    kube::util::read-array CODEGEN_tag_files < <(
-        k8s_tag_files_matching \
-            vendor/k8s.io/code-generator \
-            "${apimachinery_dirs[@]}"
-        )
+    local tag_pkgs=()
+    for dir in "${tag_dirs[@]}"; do
+        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+    done
 
-    # shellcheck disable=SC2034 # used indirectly
-    local SAMPLEAPISERVER_output_dir="staging/src/k8s.io/sample-apiserver/pkg/generated/openapi"
-    # shellcheck disable=SC2034 # used indirectly
-    local SAMPLEAPISERVER_known_violations_file="api/api-rules/sample_apiserver_violation_exceptions.list"
-    # shellcheck disable=SC2034 # used indirectly
-    local SAMPLEAPISERVER_tag_files=()
-    kube::util::read-array SAMPLEAPISERVER_tag_files < <(
-        k8s_tag_files_matching \
-            vendor/k8s.io/sample-apiserver \
-            "${apimachinery_dirs[@]}"
-        )
-
-    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
-
-    for prefix in "${targets[@]}"; do
-        local report_file="${OUT_DIR}/${prefix}_violations.report"
-        # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
-        # updated API violations to the known API violation exceptions list.
-        if [[ "${UPDATE_API_KNOWN_VIOLATIONS}" == true ]]; then
-            report_file=$(indirect "${prefix}_known_violations_file")
-        fi
-
-        # 2 lines because shellcheck
-        local output_dir
-        output_dir=$(indirect "${prefix}_output_dir")
-
-        if [[ "${DBG_CODEGEN}" == 1 ]]; then
-            kube::log::status "DBG: finding all +k8s:openapi-gen tags for ${prefix}"
-        fi
-
-        local tag_dirs=()
-        kube::util::read-array tag_dirs < <(
-            grep -l --null '+k8s:openapi-gen=' $(indirect_array "${prefix}_tag_files") \
-                | xargs -0 -n1 dirname \
-                | sort -u)
-
-        if [[ "${DBG_CODEGEN}" == 1 ]]; then
-            kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:openapi-gen tagged dirs for ${prefix}"
-        fi
-
-        local tag_pkgs=()
+    kube::log::status "Generating openapi code"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: running ${gen_openapi_bin} for:"
         for dir in "${tag_dirs[@]}"; do
-            tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+            kube::log::status "DBG:     $dir"
         done
+    fi
 
-        kube::log::status "Generating openapi code for ${prefix}"
-        if [[ "${DBG_CODEGEN}" == 1 ]]; then
-            kube::log::status "DBG: running ${gen_openapi_bin} for:"
-            for dir in "${tag_dirs[@]}"; do
-                kube::log::status "DBG:     $dir"
-            done
-        fi
+    git_find -z ':(glob)pkg/generated/**'/"${output_file}.go" | xargs -0 rm -f
 
-        ./hack/run-in-gopath.sh "${gen_openapi_bin}" \
-            --v "${KUBE_VERBOSE}" \
-            --logtostderr \
-            -h "${BOILERPLATE_FILENAME}" \
-            -O "${output_base}" \
-            -p "${PRJ_SRC_PATH}/${output_dir}" \
-            -r "${report_file}" \
-            $(printf -- " -i %s" "${tag_pkgs[@]}") \
-            "$@"
+    ./hack/run-in-gopath.sh "${gen_openapi_bin}" \
+        --v "${KUBE_VERBOSE}" \
+        --logtostderr \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file-base "${output_file}" \
+        --output-package "${PRJ_SRC_PATH}/${output_dir}" \
+        --report-filename "${report_file}" \
+        $(printf -- " -i %s" "${tag_pkgs[@]}") \
+        "$@"
 
-        touch "${report_file}"
-        # 2 lines because shellcheck
-        local known_filename
-        known_filename=$(indirect "${prefix}_known_violations_file")
-        if ! diff -u "${known_filename}" "${report_file}"; then
-            echo -e "ERROR:"
-            echo -e "\t'${prefix}' API rule check failed - reported violations differ from known violations"
-            echo -e "\tPlease read api/api-rules/README.md to resolve the failure in ${known_filename}"
-        fi
+    touch "${report_file}"
+    local known_filename="${known_violations_file}"
+    if ! diff -u "${known_filename}" "${report_file}"; then
+        echo -e "ERROR:"
+        echo -e "\tAPI rule check failed - reported violations differ from known violations"
+        echo -e "\tPlease read api/api-rules/README.md to resolve the failure in ${known_filename}"
+    fi
 
-        if [[ "${DBG_CODEGEN}" == 1 ]]; then
-            kube::log::status "Generated openapi code"
-        fi
-    done # for each prefix
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "Generated openapi code"
+    fi
 }
 
 function codegen::applyconfigs() {
@@ -713,7 +598,7 @@ function codegen::applyconfigs() {
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
         git_find -z ':(glob)k8s.io/api/**/types.go' \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
     ext_apis+=("k8s.io/apimachinery/pkg/apis/meta/v1")
 
@@ -811,7 +696,7 @@ function codegen::listers() {
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
         git_find -z ':(glob)k8s.io/api/**/types.go' \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
     kube::log::status "Generating lister code for ${#ext_apis[@]} targets"
@@ -852,7 +737,7 @@ function codegen::informers() {
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
         git_find -z ':(glob)k8s.io/api/**/types.go' \
-            | xargs -0 -n1 dirname \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
     kube::log::status "Generating informer code for ${#ext_apis[@]} targets"
@@ -898,8 +783,8 @@ function codegen::subprojects() {
         vendor/k8s.io/kube-aggregator
         vendor/k8s.io/sample-apiserver
         vendor/k8s.io/sample-controller
-        vendor/k8s.io/apiextensions-apiserver
         vendor/k8s.io/metrics
+        vendor/k8s.io/apiextensions-apiserver
         vendor/k8s.io/apiextensions-apiserver/examples/client-go
     )
 
@@ -908,7 +793,10 @@ function codegen::subprojects() {
     for sub in "${subs[@]}"; do
         kube::log::status "Generating code for subproject ${sub}"
         pushd "${sub}" >/dev/null
-        CODEGEN_PKG="${codegen}" ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
+        CODEGEN_PKG="${codegen}" \
+        UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS}" \
+        API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR}" \
+            ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
         popd >/dev/null
     done
 }

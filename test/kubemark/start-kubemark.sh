@@ -231,7 +231,7 @@ function resize-node-objects {
   echo "Annotating node objects with ${annotation_size_bytes} byte label"
   label=$( (< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w "$annotation_size_bytes"; true) | head -n 1)
   "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get nodes -o name \
-    | xargs -n10 -P100 -r -I% "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" annotate --overwrite % label="$label" > /dev/null
+    | xargs -P50 -r -I% "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" annotate --overwrite % label="$label"
   echo "Annotating node objects completed"
 }
 

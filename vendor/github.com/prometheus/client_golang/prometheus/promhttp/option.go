@@ -24,14 +24,32 @@ type Option interface {
 	apply(*options)
 }
 
+// LabelValueFromCtx are used to compute the label value from request context.
+// Context can be filled with values from request through middleware.
+type LabelValueFromCtx func(ctx context.Context) string
+
 // options store options for both a handler or round tripper.
 type options struct {
-	extraMethods  []string
-	getExemplarFn func(requestCtx context.Context) prometheus.Labels
+	extraMethods       []string
+	getExemplarFn      func(requestCtx context.Context) prometheus.Labels
+	extraLabelsFromCtx map[string]LabelValueFromCtx
 }
 
 func defaultOptions() *options {
-	return &options{getExemplarFn: func(ctx context.Context) prometheus.Labels { return nil }}
+	return &options{
+		getExemplarFn:      func(ctx context.Context) prometheus.Labels { return nil },
+		extraLabelsFromCtx: map[string]LabelValueFromCtx{},
+	}
+}
+
+func (o *options) emptyDynamicLabels() prometheus.Labels {
+	labels := prometheus.Labels{}
+
+	for label := range o.extraLabelsFromCtx {
+		labels[label] = ""
+	}
+
+	return labels
 }
 
 type optionApplyFunc func(*options)
@@ -48,11 +66,19 @@ func WithExtraMethods(methods ...string) Option {
 	})
 }
 
-// WithExemplarFromContext adds allows to put a hook to all counter and histogram metrics.
-// If the hook function returns non-nil labels, exemplars will be added for that request, otherwise metric
-// will get instrumented without exemplar.
+// WithExemplarFromContext allows to inject function that will get exemplar from context that will be put to counter and histogram metrics.
+// If the function returns nil labels or the metric does not support exemplars, no exemplar will be added (noop), but
+// metric will continue to observe/increment.
 func WithExemplarFromContext(getExemplarFn func(requestCtx context.Context) prometheus.Labels) Option {
 	return optionApplyFunc(func(o *options) {
 		o.getExemplarFn = getExemplarFn
+	})
+}
+
+// WithLabelFromCtx registers a label for dynamic resolution with access to context.
+// See the example for ExampleInstrumentHandlerWithLabelResolver for example usage
+func WithLabelFromCtx(name string, valueFn LabelValueFromCtx) Option {
+	return optionApplyFunc(func(o *options) {
+		o.extraLabelsFromCtx[name] = valueFn
 	})
 }

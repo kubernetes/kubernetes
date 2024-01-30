@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -67,12 +68,12 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	maxPriority := corev1helpers.PodPriority(victims.Pods[0])
 
 	for _, pod := range victims.Pods {
-		if corev1helpers.PodPriority(pod) == maxPriority {
-			if GetPodStartTime(pod).Before(earliestPodStartTime) {
-				earliestPodStartTime = GetPodStartTime(pod)
+		if podPriority := corev1helpers.PodPriority(pod); podPriority == maxPriority {
+			if podStartTime := GetPodStartTime(pod); podStartTime.Before(earliestPodStartTime) {
+				earliestPodStartTime = podStartTime
 			}
-		} else if corev1helpers.PodPriority(pod) > maxPriority {
-			maxPriority = corev1helpers.PodPriority(pod)
+		} else if podPriority > maxPriority {
+			maxPriority = podPriority
 			earliestPodStartTime = GetPodStartTime(pod)
 		}
 	}
@@ -158,4 +159,32 @@ func ClearNominatedNodeName(ctx context.Context, cs kubernetes.Interface, pods .
 func IsScalarResourceName(name v1.ResourceName) bool {
 	return v1helper.IsExtendedResourceName(name) || v1helper.IsHugePageResourceName(name) ||
 		v1helper.IsPrefixedNativeResource(name) || v1helper.IsAttachableVolumeResourceName(name)
+}
+
+// As converts two objects to the given type.
+// Both objects must be of the same type. If not, an error is returned.
+// nil objects are allowed and will be converted to nil.
+// For oldObj, cache.DeletedFinalStateUnknown is handled and the
+// object stored in it will be converted instead.
+func As[T any](oldObj, newobj interface{}) (T, T, error) {
+	var oldTyped T
+	var newTyped T
+	var ok bool
+	if newobj != nil {
+		newTyped, ok = newobj.(T)
+		if !ok {
+			return oldTyped, newTyped, fmt.Errorf("expected %T, but got %T", newTyped, newobj)
+		}
+	}
+
+	if oldObj != nil {
+		if realOldObj, ok := oldObj.(cache.DeletedFinalStateUnknown); ok {
+			oldObj = realOldObj.Obj
+		}
+		oldTyped, ok = oldObj.(T)
+		if !ok {
+			return oldTyped, newTyped, fmt.Errorf("expected %T, but got %T", oldTyped, oldObj)
+		}
+	}
+	return oldTyped, newTyped, nil
 }

@@ -44,7 +44,7 @@ var serverPrintVersion = utilversion.MustParseSemantic("v1.10.0")
 
 var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
@@ -66,10 +66,10 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.Logf("Table: %#v", table)
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">", 2))
-		framework.ExpectEqual(len(table.Rows), 1)
-		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
-		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
-		framework.ExpectEqual(table.Rows[0].Cells[0], podName)
+		gomega.Expect(table.Rows).To(gomega.HaveLen(1))
+		gomega.Expect(table.Rows[0].Cells).To(gomega.HaveLen(len(table.ColumnDefinitions)))
+		gomega.Expect(table.ColumnDefinitions[0].Name).To(gomega.Equal("Name"))
+		gomega.Expect(table.Rows[0].Cells[0]).To(gomega.Equal(podName))
 
 		out := printTable(table)
 		gomega.Expect(out).To(gomega.MatchRegexp("^NAME\\s"))
@@ -111,11 +111,11 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do(ctx).Into(pagedTable)
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
-		framework.ExpectEqual(len(pagedTable.Rows), 2)
-		framework.ExpectNotEqual(pagedTable.ResourceVersion, "")
-		framework.ExpectNotEqual(pagedTable.Continue, "")
-		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0000")
-		framework.ExpectEqual(pagedTable.Rows[1].Cells[0], "template-0001")
+		gomega.Expect(pagedTable.Rows).To(gomega.HaveLen(2))
+		gomega.Expect(pagedTable.ResourceVersion).ToNot(gomega.BeEmpty())
+		gomega.Expect(pagedTable.Continue).ToNot(gomega.BeEmpty())
+		gomega.Expect(pagedTable.Rows[0].Cells[0]).To(gomega.Equal("template-0000"))
+		gomega.Expect(pagedTable.Rows[1].Cells[0]).To(gomega.Equal("template-0001"))
 
 		err = c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Continue: pagedTable.Continue}, metav1.ParameterCodec).
@@ -123,7 +123,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			Do(ctx).Into(pagedTable)
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		gomega.Expect(pagedTable.Rows).ToNot(gomega.BeEmpty())
-		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0002")
+		gomega.Expect(pagedTable.Rows[0].Cells[0]).To(gomega.Equal("template-0002"))
 	})
 
 	ginkgo.It("should return generic metadata details across all namespaces for nodes", func(ctx context.Context) {
@@ -136,9 +136,9 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">=", 2))
 		gomega.Expect(table.Rows).ToNot(gomega.BeEmpty())
-		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
-		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
-		framework.ExpectNotEqual(table.ResourceVersion, "")
+		gomega.Expect(table.Rows[0].Cells).To(gomega.HaveLen(len(table.ColumnDefinitions)))
+		gomega.Expect(table.ColumnDefinitions[0].Name).To(gomega.Equal("Name"))
+		gomega.Expect(table.ResourceVersion).ToNot(gomega.BeEmpty())
 
 		out := printTable(table)
 		gomega.Expect(out).To(gomega.MatchRegexp("^NAME\\s"))
@@ -164,8 +164,8 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			},
 		}
 		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1;g=meta.k8s.io").Body(sar).Do(ctx).Into(table)
-		framework.ExpectError(err, "failed to return error when posting self subject access review: %+v, to a backend that does not implement metadata", sar)
-		framework.ExpectEqual(err.(apierrors.APIStatus).Status().Code, int32(406))
+		gomega.Expect(err).To(gomega.HaveOccurred(), "failed to return error when posting self subject access review: %+v, to a backend that does not implement metadata", sar)
+		gomega.Expect(err.(apierrors.APIStatus)).To(gomega.HaveField("Status().Code", gomega.Equal(int32(406))))
 	})
 })
 

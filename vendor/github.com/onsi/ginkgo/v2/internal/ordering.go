@@ -27,36 +27,43 @@ func (s *SortableSpecs) Swap(i, j int) { s.Indexes[i], s.Indexes[j] = s.Indexes[
 func (s *SortableSpecs) Less(i, j int) bool {
 	a, b := s.Specs[s.Indexes[i]], s.Specs[s.Indexes[j]]
 
-	firstOrderedA := a.Nodes.FirstNodeMarkedOrdered()
-	firstOrderedB := b.Nodes.FirstNodeMarkedOrdered()
-	if firstOrderedA.ID == firstOrderedB.ID && !firstOrderedA.IsZero() {
-		// strictly preserve order in ordered containers.  ID will track this as IDs are generated monotonically
-		return a.FirstNodeWithType(types.NodeTypeIt).ID < b.FirstNodeWithType(types.NodeTypeIt).ID
+	aNodes, bNodes := a.Nodes.WithType(types.NodeTypesForContainerAndIt), b.Nodes.WithType(types.NodeTypesForContainerAndIt)
+
+	firstOrderedAIdx, firstOrderedBIdx := aNodes.IndexOfFirstNodeMarkedOrdered(), bNodes.IndexOfFirstNodeMarkedOrdered()
+	if firstOrderedAIdx > -1 && firstOrderedBIdx > -1 && aNodes[firstOrderedAIdx].ID == bNodes[firstOrderedBIdx].ID {
+		// strictly preserve order within an ordered containers.  ID will track this as IDs are generated monotonically
+		return aNodes.FirstNodeWithType(types.NodeTypeIt).ID < bNodes.FirstNodeWithType(types.NodeTypeIt).ID
 	}
 
-	aCLs := a.Nodes.WithType(types.NodeTypesForContainerAndIt).CodeLocations()
-	bCLs := b.Nodes.WithType(types.NodeTypesForContainerAndIt).CodeLocations()
-	for i := 0; i < len(aCLs) && i < len(bCLs); i++ {
-		aCL, bCL := aCLs[i], bCLs[i]
-		if aCL.FileName < bCL.FileName {
-			return true
-		} else if aCL.FileName > bCL.FileName {
-			return false
+	// if either spec is in an ordered container - only use the nodes up to the outermost ordered container
+	if firstOrderedAIdx > -1 {
+		aNodes = aNodes[:firstOrderedAIdx+1]
+	}
+	if firstOrderedBIdx > -1 {
+		bNodes = bNodes[:firstOrderedBIdx+1]
+	}
+
+	for i := 0; i < len(aNodes) && i < len(bNodes); i++ {
+		aCL, bCL := aNodes[i].CodeLocation, bNodes[i].CodeLocation
+		if aCL.FileName != bCL.FileName {
+			return aCL.FileName < bCL.FileName
 		}
-		if aCL.LineNumber < bCL.LineNumber {
-			return true
-		} else if aCL.LineNumber > bCL.LineNumber {
-			return false
+		if aCL.LineNumber != bCL.LineNumber {
+			return aCL.LineNumber < bCL.LineNumber
 		}
 	}
 	// either everything is equal or we have different lengths of CLs
-	if len(aCLs) < len(bCLs) {
-		return true
-	} else if len(aCLs) > len(bCLs) {
-		return false
+	if len(aNodes) != len(bNodes) {
+		return len(aNodes) < len(bNodes)
 	}
 	// ok, now we are sure everything was equal. so we use the spec text to break ties
-	return a.Text() < b.Text()
+	for i := 0; i < len(aNodes); i++ {
+		if aNodes[i].Text != bNodes[i].Text {
+			return aNodes[i].Text < bNodes[i].Text
+		}
+	}
+	// ok, all those texts were equal.  we'll use the ID of the most deeply nested node as a last resort
+	return aNodes[len(aNodes)-1].ID < bNodes[len(bNodes)-1].ID
 }
 
 type GroupedSpecIndices []SpecIndices

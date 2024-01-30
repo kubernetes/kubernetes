@@ -22,25 +22,37 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type testUserNsPodsManager struct {
+	podDir  string
+	podList []types.UID
 }
 
 func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
-	return "/tmp/non-existant-dir.This-is-not-used-in-tests"
+	if m.podDir == "" {
+		return "/tmp/non-existant-dir.This-is-not-used-in-tests"
+	}
+	return m.podDir
 }
 
 func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
-	return nil, nil
+	if len(m.podList) == 0 {
+		return nil, nil
+	}
+	return m.podList, nil
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesStatelessPodsSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -90,7 +102,7 @@ func TestUserNsManagerAllocate(t *testing.T) {
 }
 
 func TestUserNsManagerParseUserNsFile(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesStatelessPodsSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	cases := []struct {
 		name    string
@@ -170,4 +182,180 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 			t.Errorf("expected success: %v but got error: %v", tc.success, err)
 		})
 	}
+}
+
+func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+
+	trueVal := true
+	falseVal := false
+
+	cases := []struct {
+		name    string
+		pod     *v1.Pod
+		expMode runtimeapi.NamespaceMode
+		success bool
+	}{
+		{
+			name:    "no user namespace",
+			pod:     &v1.Pod{},
+			expMode: runtimeapi.NamespaceMode_NODE,
+			success: true,
+		},
+		{
+			name: "opt-in to host user namespace",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &trueVal,
+				},
+			},
+			expMode: runtimeapi.NamespaceMode_NODE,
+			success: true,
+		},
+		{
+			name: "user namespace",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &falseVal,
+				},
+			},
+			expMode: runtimeapi.NamespaceMode_POD,
+			success: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// These tests will create the userns file, so use an existing podDir.
+			testUserNsPodsManager := &testUserNsPodsManager{podDir: t.TempDir()}
+			m, err := MakeUserNsManager(testUserNsPodsManager)
+			assert.NoError(t, err)
+
+			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod)
+			if (tc.success && err != nil) || (!tc.success && err == nil) {
+				t.Errorf("expected success: %v but got error: %v", tc.success, err)
+			}
+
+			if userns.GetMode() != tc.expMode {
+				t.Errorf("expected mode: %v but got: %v", tc.expMode, userns.GetMode())
+			}
+		})
+	}
+}
+
+func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+
+	cases := []struct {
+		name                 string
+		runningPods          []*kubecontainer.Pod
+		pods                 []*v1.Pod
+		listPods             []types.UID /* pods to list */
+		podSetBeforeCleanup  []types.UID /* pods to record before cleanup */
+		podSetAfterCleanup   []types.UID /* pods set expected after cleanup */
+		podUnsetAfterCleanup []types.UID /* pods set expected after cleanup */
+	}{
+		{
+			name:     "no stale pods",
+			listPods: []types.UID{"pod-1", "pod-2"},
+		},
+		{
+			name:                 "no stale pods set",
+			podSetBeforeCleanup:  []types.UID{"pod-1", "pod-2"},
+			listPods:             []types.UID{"pod-1", "pod-2"},
+			podUnsetAfterCleanup: []types.UID{"pod-1", "pod-2"},
+		},
+		{
+			name:                 "one running pod",
+			listPods:             []types.UID{"pod-1", "pod-2"},
+			podSetBeforeCleanup:  []types.UID{"pod-1", "pod-2"},
+			runningPods:          []*kubecontainer.Pod{{ID: "pod-1"}},
+			podSetAfterCleanup:   []types.UID{"pod-1"},
+			podUnsetAfterCleanup: []types.UID{"pod-2"},
+		},
+		{
+			name:                 "pod set before cleanup but not listed ==> unset",
+			podSetBeforeCleanup:  []types.UID{"pod-1", "pod-2"},
+			runningPods:          []*kubecontainer.Pod{{ID: "pod-1"}},
+			podUnsetAfterCleanup: []types.UID{"pod-1", "pod-2"},
+		},
+		{
+			name:                 "one pod",
+			listPods:             []types.UID{"pod-1", "pod-2"},
+			podSetBeforeCleanup:  []types.UID{"pod-1", "pod-2"},
+			pods:                 []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{UID: "pod-1"}}},
+			podSetAfterCleanup:   []types.UID{"pod-1"},
+			podUnsetAfterCleanup: []types.UID{"pod-2"},
+		},
+		{
+			name:                 "no listed pods ==> all unset",
+			podSetBeforeCleanup:  []types.UID{"pod-1", "pod-2"},
+			podUnsetAfterCleanup: []types.UID{"pod-1", "pod-2"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testUserNsPodsManager := &testUserNsPodsManager{
+				podList: tc.listPods,
+			}
+			m, err := MakeUserNsManager(testUserNsPodsManager)
+			require.NoError(t, err)
+
+			// Record the userns range as used
+			for i, pod := range tc.podSetBeforeCleanup {
+				err := m.record(pod, uint32((i+1)*65536), 65536)
+				require.NoError(t, err)
+			}
+
+			err = m.CleanupOrphanedPodUsernsAllocations(tc.pods, tc.runningPods)
+			require.NoError(t, err)
+
+			for _, pod := range tc.podSetAfterCleanup {
+				ok := m.podAllocated(pod)
+				assert.True(t, ok, "pod %q should be allocated", pod)
+			}
+
+			for _, pod := range tc.podUnsetAfterCleanup {
+				ok := m.podAllocated(pod)
+				assert.False(t, ok, "pod %q should not be allocated", pod)
+			}
+		})
+	}
+}
+
+func TestAllocateMaxPods(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+
+	testUserNsPodsManager := &testUserNsPodsManager{}
+	m, err := MakeUserNsManager(testUserNsPodsManager)
+	require.NoError(t, err)
+
+	// The first maxPods allocations should succeed.
+	for i := 0; i < maxPods; i++ {
+		_, _, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
+		require.NoError(t, err)
+	}
+
+	// The next allocation should fail, hitting maxPods.
+	_, _, err = m.allocateOne(types.UID(fmt.Sprintf("%d", maxPods+1)))
+	assert.Error(t, err)
+}
+
+func TestRecordMaxPods(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+
+	testUserNsPodsManager := &testUserNsPodsManager{}
+	m, err := MakeUserNsManager(testUserNsPodsManager)
+	require.NoError(t, err)
+
+	// The first maxPods allocations should succeed.
+	for i := 0; i < maxPods; i++ {
+		err = m.record(types.UID(fmt.Sprintf("%d", i)), uint32((i+1)*65536), 65536)
+		require.NoError(t, err)
+	}
+
+	// The next allocation should fail, hitting maxPods.
+	err = m.record(types.UID(fmt.Sprintf("%d", maxPods+1)), uint32((maxPods+1)*65536), 65536)
+	assert.Error(t, err)
 }

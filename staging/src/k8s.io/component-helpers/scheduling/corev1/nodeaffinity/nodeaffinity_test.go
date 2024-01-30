@@ -346,6 +346,16 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 			}},
 			out: mustParse("bar<7"),
 		},
+		{
+			in: []v1.NodeSelectorRequirement{{
+				Key:      "baz",
+				Operator: "invalid",
+				Values:   []string{"5"},
+			}},
+			wantErr: []error{
+				field.NotSupported(field.NewPath("root").Index(0).Child("operator"), v1.NodeSelectorOperator("invalid"), validSelectorOperators),
+			},
+		},
 	}
 
 	for i, tc := range tc {

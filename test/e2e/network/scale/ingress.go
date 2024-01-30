@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -437,7 +440,7 @@ func generateScaleTestServiceSpec(suffix string) *v1.Service {
 				Name:       "http",
 				Protocol:   v1.ProtocolTCP,
 				Port:       80,
-				TargetPort: intstr.FromInt(8080),
+				TargetPort: intstr.FromInt32(8080),
 			}},
 			Selector: scaleTestLabels,
 			Type:     v1.ServiceTypeNodePort,
@@ -458,7 +461,7 @@ func generateScaleTestBackendDeploymentSpec(numReplicas int32) *appsv1.Deploymen
 	d.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
 		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
-				Port: intstr.FromInt(8080),
+				Port: intstr.FromInt32(8080),
 				Path: "/healthz",
 			},
 		},

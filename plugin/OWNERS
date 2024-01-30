@@ -6,15 +6,14 @@ options:
 reviewers:
   - dchen1107
   - dims
-  - lavalamp
   - liggitt
   - smarterclayton
   - thockin
   - wojtek-t
+  - jpbetz
 approvers:
   - dchen1107
   - dims
-  - lavalamp
   - liggitt
   - smarterclayton
   - thockin
@@ -22,3 +21,4 @@ approvers:
 emeritus_approvers:
   - davidopp
   - brendandburns
+  - lavalamp

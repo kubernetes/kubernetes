@@ -17,15 +17,28 @@ limitations under the License.
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	listersv1 "k8s.io/client-go/listers/core/v1"
+)
+
+const (
+	// taken from https://github.com/kubernetes/kubernetes/blob/release-1.27/staging/src/k8s.io/kube-aggregator/pkg/apiserver/handler_proxy.go#L47
+	aggregatedDiscoveryTimeout = 5 * time.Second
 )
 
 // findServicePort finds the service port by name or numerically.
@@ -116,4 +129,35 @@ func ResolveCluster(services listersv1.ServiceLister, namespace, id string, port
 	default:
 		return nil, fmt.Errorf("unsupported service type %q", svc.Spec.Type)
 	}
+}
+
+// NewRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
+func NewRequestForProxy(location *url.URL, req *http.Request) (*http.Request, context.CancelFunc) {
+	newCtx := req.Context()
+	cancelFn := func() {}
+
+	if requestInfo, ok := genericapirequest.RequestInfoFrom(req.Context()); ok {
+		// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
+		// segments that we are going to proxy, we have a discovery request.
+		if !requestInfo.IsResourceRequest && len(strings.Split(strings.Trim(requestInfo.Path, "/"), "/")) == 3 {
+			// discovery requests are used by kubectl and others to determine which resources a server has.  This is a cheap call that
+			// should be fast for every aggregated apiserver.  Latency for aggregation is expected to be low (as for all extensions)
+			// so forcing a short timeout here helps responsiveness of all clients.
+			newCtx, cancelFn = context.WithTimeout(newCtx, aggregatedDiscoveryTimeout)
+		}
+	}
+
+	// WithContext creates a shallow clone of the request with the same context.
+	newReq := req.WithContext(newCtx)
+	newReq.Header = utilnet.CloneHeader(req.Header)
+	newReq.URL = location
+	newReq.Host = location.Host
+
+	// If the original request has an audit ID, let's make sure we propagate this
+	// to the aggregated server.
+	if auditID, found := audit.AuditIDFrom(req.Context()); found {
+		newReq.Header.Set(auditinternal.HeaderAuditID, string(auditID))
+	}
+
+	return newReq, cancelFn
 }

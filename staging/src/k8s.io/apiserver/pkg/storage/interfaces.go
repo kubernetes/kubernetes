@@ -236,6 +236,21 @@ type Interface interface {
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
+
+	// RequestWatchProgress requests the a watch stream progress status be sent in the
+	// watch response stream as soon as possible.
+	// Used for monitor watch progress even if watching resources with no changes.
+	//
+	// If watch is lagging, progress status might:
+	// * be pointing to stale resource version. Use etcd KV request to get linearizable resource version.
+	// * not be delivered at all. It's recommended to poll request progress periodically.
+	//
+	// Note: Only watches with matching context grpc metadata will be notified.
+	// https://github.com/kubernetes/kubernetes/blob/9325a57125e8502941d1b0c7379c4bb80a678d5c/vendor/go.etcd.io/etcd/client/v3/watch.go#L1037-L1042
+	//
+	// TODO: Remove when storage.Interface will be separate from etc3.store.
+	// Deprecated: Added temporarily to simplify exposing RequestProgress for watch cache.
+	RequestWatchProgress(ctx context.Context) error
 }
 
 // GetOptions provides the options that may be provided for storage get operations.
@@ -267,6 +282,19 @@ type ListOptions struct {
 	Recursive bool
 	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
 	// be delivered to the users. The option is ignored for non-watch requests.
+	//
+	// Firstly, note that this field is different from the Predicate.AllowWatchBookmarks field.
+	// Secondly, this field is intended for internal clients only such as the watch cache.
+	//
+	// This means that external clients do not have the ability to set this field directly.
+	// For example by setting the allowWatchBookmarks query parameter.
+	//
+	// The motivation for this approach is the fact that the frequency
+	// of bookmark events from a storage like etcd might be very high.
+	// As the number of watch requests increases, the server load would also increase.
+	//
+	// Furthermore, the server is not obligated to provide bookmark events at all,
+	// as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/956-watch-bookmark#proposal
 	ProgressNotify bool
 	// SendInitialEvents, when set together with Watch option,
 	// begin the watch stream with synthetic init events to build the

@@ -23,6 +23,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,6 +135,7 @@ func TestRunRenewCommands(t *testing.T) {
 	// Generate all the kubeconfig files with embedded certs
 	for _, kubeConfig := range []string{
 		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.SuperAdminKubeConfigFileName,
 		kubeadmconstants.SchedulerKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 	} {
@@ -162,6 +164,7 @@ func TestRunRenewCommands(t *testing.T) {
 			},
 			KubeconfigFiles: []string{
 				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.SuperAdminKubeConfigFileName,
 				kubeadmconstants.SchedulerKubeConfigFileName,
 				kubeadmconstants.ControllerManagerKubeConfigFileName,
 			},
@@ -215,6 +218,12 @@ func TestRunRenewCommands(t *testing.T) {
 			},
 		},
 		{
+			command: "super-admin.conf",
+			KubeconfigFiles: []string{
+				kubeadmconstants.SuperAdminKubeConfigFileName,
+			},
+		},
+		{
 			command: "scheduler.conf",
 			KubeconfigFiles: []string{
 				kubeadmconstants.SchedulerKubeConfigFileName,
@@ -261,7 +270,7 @@ func TestRunRenewCommands(t *testing.T) {
 			if len(test.Args) > 0 {
 				args = test.Args + " " + args
 			}
-			err := cmdtestutil.RunSubCommand(t, renewCmds, test.command, args)
+			err := cmdtestutil.RunSubCommand(t, renewCmds, test.command, io.Discard, args)
 			// certs renew doesn't support positional Args
 			if (err != nil) != test.expectedError {
 				t.Errorf("failed to run renew commands, expected error: %t, actual error: %v", test.expectedError, err)

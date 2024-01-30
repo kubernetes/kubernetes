@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -93,7 +94,7 @@ func TestSecretCache(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	_, err := store.Get("ns", "name")
 	if !apierrors.IsNotFound(err) {
 		t.Errorf("Expected NotFound error, got: %v", err)
@@ -138,7 +139,7 @@ func TestSecretCache(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "pod")
 	_, err = store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -163,7 +164,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	// This should trigger List and Watch actions eventually.
 	actionsFn := func() (bool, error) {
 		actions := fakeClient.Actions()
@@ -184,14 +185,14 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 
 	// Next registrations shouldn't trigger any new actions.
 	for i := 0; i < 20; i++ {
-		store.AddReference("ns", "name")
-		store.DeleteReference("ns", "name")
+		store.AddReference("ns", "name", types.UID(fmt.Sprintf("pod-%d", i)))
+		store.DeleteReference("ns", "name", types.UID(fmt.Sprintf("pod-%d", i)))
 	}
 	actions := fakeClient.Actions()
 	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
 
 	// Final delete also doesn't trigger any action.
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "pod")
 	_, err := store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -287,7 +288,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			}
 
 			// AddReference should start reflector.
-			store.AddReference("ns", "name")
+			store.AddReference("ns", "name", "pod")
 			if err := wait.Poll(10*time.Millisecond, time.Second, itemExists); err != nil {
 				t.Errorf("item wasn't added to cache")
 			}
@@ -375,7 +376,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}
@@ -467,7 +468,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}
@@ -497,4 +498,124 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 
 	obj, _ := store.Get("ns", "name")
 	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
+}
+
+func TestRefMapHandlesReferencesCorrectly(t *testing.T) {
+	secret1 := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret1",
+			Namespace: "ns1",
+		},
+	}
+	type step struct {
+		action         string
+		ns             string
+		name           string
+		referencedFrom types.UID
+	}
+	type expect struct {
+		ns             string
+		name           string
+		referencedFrom types.UID
+		expectCount    int
+	}
+	tests := []struct {
+		desc    string
+		steps   []step
+		expects []expect
+	}{
+		{
+			desc: "adding and deleting should works",
+			steps: []step{
+				{"add", "ns1", "secret1", "pod1"},
+				{"add", "ns1", "secret1", "pod1"},
+				{"delete", "ns1", "secret1", "pod1"},
+				{"delete", "ns1", "secret1", "pod1"},
+			},
+			expects: []expect{
+				{"ns1", "secret1", "pod1", 1},
+				{"ns1", "secret1", "pod1", 2},
+				{"ns1", "secret1", "pod1", 1},
+				{"ns1", "secret1", "pod1", 0},
+			},
+		},
+		{
+			desc: "deleting a non-existent reference should have no effect",
+			steps: []step{
+				{"delete", "ns1", "secret1", "pod1"},
+			},
+			expects: []expect{
+				{"ns1", "secret1", "pod1", 0},
+			},
+		},
+		{
+			desc: "deleting more than adding should not lead to negative refcount",
+			steps: []step{
+				{"add", "ns1", "secret1", "pod1"},
+				{"delete", "ns1", "secret1", "pod1"},
+				{"delete", "ns1", "secret1", "pod1"},
+			},
+			expects: []expect{
+				{"ns1", "secret1", "pod1", 1},
+				{"ns1", "secret1", "pod1", 0},
+				{"ns1", "secret1", "pod1", 0},
+			},
+		},
+		{
+			desc: "deleting should not affect refcount of other objects or referencedFrom",
+			steps: []step{
+				{"add", "ns1", "secret1", "pod1"},
+				{"delete", "ns1", "secret1", "pod2"},
+				{"delete", "ns1", "secret2", "pod1"},
+				{"delete", "ns2", "secret1", "pod1"},
+			},
+			expects: []expect{
+				{"ns1", "secret1", "pod1", 1},
+				{"ns1", "secret1", "pod1", 1},
+				{"ns1", "secret1", "pod1", 1},
+				{"ns1", "secret1", "pod1", 1},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			fakeClient := &fake.Clientset{}
+			listReactor := func(a core.Action) (bool, runtime.Object, error) {
+				result := &v1.SecretList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "200",
+					},
+					Items: []v1.Secret{*secret1},
+				}
+				return true, result, nil
+			}
+			fakeClient.AddReactor("list", "secrets", listReactor)
+			fakeWatch := watch.NewFake()
+			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			store := newSecretCache(fakeClient, fakeClock, time.Minute)
+
+			for i, step := range tc.steps {
+				expect := tc.expects[i]
+				switch step.action {
+				case "add":
+					store.AddReference(step.ns, step.name, step.referencedFrom)
+				case "delete":
+					store.DeleteReference(step.ns, step.name, step.referencedFrom)
+				default:
+					t.Errorf("unrecognized action of testcase %v", tc.desc)
+				}
+
+				key := objectKey{namespace: expect.ns, name: expect.name}
+				item, exists := store.items[key]
+				if !exists {
+					if tc.expects[i].expectCount != 0 {
+						t.Errorf("reference to %v/%v from %v should exists", expect.ns, expect.name, expect.referencedFrom)
+					}
+				} else if item.refMap[expect.referencedFrom] != expect.expectCount {
+					t.Errorf("expects %v but got %v", expect.expectCount, item.refMap[expect.referencedFrom])
+				}
+			}
+		})
+	}
 }

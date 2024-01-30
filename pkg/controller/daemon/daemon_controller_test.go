@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -124,7 +125,7 @@ func newDaemonSet(name string) *apps.DaemonSet {
 }
 
 func newRollingUpdateStrategy() *apps.DaemonSetUpdateStrategy {
-	one := intstr.FromInt(1)
+	one := intstr.FromInt32(1)
 	return &apps.DaemonSetUpdateStrategy{
 		Type:          apps.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one},
@@ -275,7 +276,7 @@ func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, templ
 
 	ds := object.(*apps.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	f.expectations.CreationObserved(dsKey)
+	f.expectations.CreationObserved(klog.FromContext(ctx), dsKey)
 
 	return nil
 }
@@ -295,7 +296,7 @@ func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID 
 
 	ds := object.(*apps.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	f.expectations.DeletionObserved(dsKey)
+	f.expectations.DeletionObserved(klog.FromContext(ctx), dsKey)
 
 	return nil
 }
@@ -424,7 +425,7 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.Dae
 		t.Errorf("Could not get key for daemon.")
 		return
 	}
-	manager.expectations.DeleteExpectations(key)
+	manager.expectations.DeleteExpectations(logger, key)
 
 	now := manager.failedPodsBackoff.Clock.Now()
 	hash, _ := currentDSHash(manager, ds)
@@ -480,11 +481,12 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 }
 
 func TestExpectationsOnRecreate(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	client := fake.NewSimpleClientset()
+
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	dsc, err := NewDaemonSetsController(
 		ctx,
@@ -550,8 +552,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Start(stopCh)
-	for ty, ok := range f.WaitForCacheSync(stopCh) {
+	f.Start(ctx.Done())
+	for ty, ok := range f.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			t.Fatalf("caches failed to sync: %v", ty)
 		}
@@ -835,6 +837,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 }
 
 func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	strategies := updateStrategies()
 	for _, strategy := range strategies {
 		ds := newDaemonSet("foo")
@@ -859,7 +862,7 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 			t.Fatalf("error get DaemonSets controller key: %v", err)
 		}
 
-		if !manager.expectations.SatisfiedExpectations(dsKey) {
+		if !manager.expectations.SatisfiedExpectations(logger, dsKey) {
 			t.Errorf("Unsatisfied pod creation expectations. Expected %d", creationExpectations)
 		}
 	}
@@ -2738,75 +2741,128 @@ func TestDeleteUnscheduledPodForNotExistingNode(t *testing.T) {
 }
 
 func TestGetNodesToDaemonPods(t *testing.T) {
-	for _, strategy := range updateStrategies() {
-		ds := newDaemonSet("foo")
-		ds.Spec.UpdateStrategy = *strategy
-		ds2 := newDaemonSet("foo2")
-		ds2.Spec.UpdateStrategy = *strategy
-		_, ctx := ktesting.NewTestContext(t)
-		manager, _, _, err := newTestController(ctx, ds, ds2)
-		if err != nil {
-			t.Fatalf("error creating DaemonSets controller: %v", err)
-		}
-		err = manager.dsStore.Add(ds)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = manager.dsStore.Add(ds2)
-		if err != nil {
-			t.Fatal(err)
-		}
-		addNodes(manager.nodeStore, 0, 2, nil)
-
-		// These pods should be returned.
-		wantedPods := []*v1.Pod{
-			newPod("matching-owned-0-", "node-0", simpleDaemonSetLabel, ds),
-			newPod("matching-orphan-0-", "node-0", simpleDaemonSetLabel, nil),
-			newPod("matching-owned-1-", "node-1", simpleDaemonSetLabel, ds),
-			newPod("matching-orphan-1-", "node-1", simpleDaemonSetLabel, nil),
-		}
-		failedPod := newPod("matching-owned-failed-pod-1-", "node-1", simpleDaemonSetLabel, ds)
-		failedPod.Status = v1.PodStatus{Phase: v1.PodFailed}
-		wantedPods = append(wantedPods, failedPod)
-		for _, pod := range wantedPods {
-			manager.podStore.Add(pod)
-		}
-
-		// These pods should be ignored.
-		ignoredPods := []*v1.Pod{
-			newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
-			newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
-			newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
-		}
-		for _, pod := range ignoredPods {
-			err = manager.podStore.Add(pod)
+	ds := newDaemonSet("foo")
+	ds2 := newDaemonSet("foo2")
+	cases := map[string]struct {
+		includeDeletedTerminal bool
+		wantedPods             []*v1.Pod
+		ignoredPods            []*v1.Pod
+	}{
+		"exclude deleted terminal pods": {
+			wantedPods: []*v1.Pod{
+				newPod("matching-owned-0-", "node-0", simpleDaemonSetLabel, ds),
+				newPod("matching-orphan-0-", "node-0", simpleDaemonSetLabel, nil),
+				newPod("matching-owned-1-", "node-1", simpleDaemonSetLabel, ds),
+				newPod("matching-orphan-1-", "node-1", simpleDaemonSetLabel, nil),
+				func() *v1.Pod {
+					pod := newPod("matching-owned-succeeded-pod-0-", "node-0", simpleDaemonSetLabel, ds)
+					pod.Status = v1.PodStatus{Phase: v1.PodSucceeded}
+					return pod
+				}(),
+				func() *v1.Pod {
+					pod := newPod("matching-owned-failed-pod-1-", "node-1", simpleDaemonSetLabel, ds)
+					pod.Status = v1.PodStatus{Phase: v1.PodFailed}
+					return pod
+				}(),
+			},
+			ignoredPods: []*v1.Pod{
+				newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
+				newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
+				newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
+				func() *v1.Pod {
+					pod := newPod("matching-owned-succeeded-deleted-pod-0-", "node-0", simpleDaemonSetLabel, ds)
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					pod.Status = v1.PodStatus{Phase: v1.PodSucceeded}
+					return pod
+				}(),
+				func() *v1.Pod {
+					pod := newPod("matching-owned-failed-deleted-pod-1-", "node-1", simpleDaemonSetLabel, ds)
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					pod.Status = v1.PodStatus{Phase: v1.PodFailed}
+					return pod
+				}(),
+			},
+		},
+		"include deleted terminal pods": {
+			includeDeletedTerminal: true,
+			wantedPods: []*v1.Pod{
+				newPod("matching-owned-0-", "node-0", simpleDaemonSetLabel, ds),
+				newPod("matching-orphan-0-", "node-0", simpleDaemonSetLabel, nil),
+				newPod("matching-owned-1-", "node-1", simpleDaemonSetLabel, ds),
+				newPod("matching-orphan-1-", "node-1", simpleDaemonSetLabel, nil),
+				func() *v1.Pod {
+					pod := newPod("matching-owned-succeeded-pod-0-", "node-0", simpleDaemonSetLabel, ds)
+					pod.Status = v1.PodStatus{Phase: v1.PodSucceeded}
+					return pod
+				}(),
+				func() *v1.Pod {
+					pod := newPod("matching-owned-failed-deleted-pod-1-", "node-1", simpleDaemonSetLabel, ds)
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					pod.Status = v1.PodStatus{Phase: v1.PodFailed}
+					return pod
+				}(),
+			},
+			ignoredPods: []*v1.Pod{
+				newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
+				newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
+				newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			manager, _, _, err := newTestController(ctx, ds, ds2)
+			if err != nil {
+				t.Fatalf("error creating DaemonSets controller: %v", err)
+			}
+			err = manager.dsStore.Add(ds)
 			if err != nil {
 				t.Fatal(err)
 			}
-		}
+			err = manager.dsStore.Add(ds2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			addNodes(manager.nodeStore, 0, 2, nil)
 
-		nodesToDaemonPods, err := manager.getNodesToDaemonPods(context.TODO(), ds)
-		if err != nil {
-			t.Fatalf("getNodesToDaemonPods() error: %v", err)
-		}
-		gotPods := map[string]bool{}
-		for node, pods := range nodesToDaemonPods {
-			for _, pod := range pods {
-				if pod.Spec.NodeName != node {
-					t.Errorf("pod %v grouped into %v but belongs in %v", pod.Name, node, pod.Spec.NodeName)
+			for _, pod := range tc.wantedPods {
+				manager.podStore.Add(pod)
+			}
+
+			for _, pod := range tc.ignoredPods {
+				err = manager.podStore.Add(pod)
+				if err != nil {
+					t.Fatal(err)
 				}
-				gotPods[pod.Name] = true
 			}
-		}
-		for _, pod := range wantedPods {
-			if !gotPods[pod.Name] {
-				t.Errorf("expected pod %v but didn't get it", pod.Name)
+
+			nodesToDaemonPods, err := manager.getNodesToDaemonPods(context.TODO(), ds, tc.includeDeletedTerminal)
+			if err != nil {
+				t.Fatalf("getNodesToDaemonPods() error: %v", err)
 			}
-			delete(gotPods, pod.Name)
-		}
-		for podName := range gotPods {
-			t.Errorf("unexpected pod %v was returned", podName)
-		}
+			gotPods := map[string]bool{}
+			for node, pods := range nodesToDaemonPods {
+				for _, pod := range pods {
+					if pod.Spec.NodeName != node {
+						t.Errorf("pod %v grouped into %v but belongs in %v", pod.Name, node, pod.Spec.NodeName)
+					}
+					gotPods[pod.Name] = true
+				}
+			}
+			for _, pod := range tc.wantedPods {
+				if !gotPods[pod.Name] {
+					t.Errorf("expected pod %v but didn't get it", pod.Name)
+				}
+				delete(gotPods, pod.Name)
+			}
+			for podName := range gotPods {
+				t.Errorf("unexpected pod %v was returned", podName)
+			}
+		})
 	}
 }
 
@@ -3217,7 +3273,7 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 func TestSurgeDealsWithExistingPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3234,7 +3290,7 @@ func TestSurgeDealsWithExistingPods(t *testing.T) {
 func TestSurgePreservesReadyOldPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3274,7 +3330,7 @@ func TestSurgePreservesReadyOldPods(t *testing.T) {
 func TestSurgeCreatesNewPodWhenAtMaxSurgeAndOldPodDeleted(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3321,7 +3377,7 @@ func TestSurgeCreatesNewPodWhenAtMaxSurgeAndOldPodDeleted(t *testing.T) {
 func TestSurgeDeletesUnreadyOldPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3362,7 +3418,7 @@ func TestSurgePreservesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.MinReadySeconds = 15
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3407,7 +3463,7 @@ func TestSurgeDeletesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.MinReadySeconds = 15
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3522,5 +3578,45 @@ func TestStoreDaemonSetStatus(t *testing.T) {
 				t.Errorf("UpdateStatus() was called %v times, expected %v times", updateCalled, tt.expectedUpdateCalled)
 			}
 		})
+	}
+}
+
+func TestShouldIgnoreNodeUpdate(t *testing.T) {
+	cases := []struct {
+		name           string
+		newNode        *v1.Node
+		oldNode        *v1.Node
+		expectedResult bool
+	}{
+		{
+			name:           "Nothing changed",
+			oldNode:        newNode("node1", nil),
+			newNode:        newNode("node1", nil),
+			expectedResult: true,
+		},
+		{
+			name:           "Node labels changed",
+			oldNode:        newNode("node1", nil),
+			newNode:        newNode("node1", simpleNodeLabel),
+			expectedResult: false,
+		},
+		{
+			name: "Node taints changed",
+			oldNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				setNodeTaint(node, noScheduleTaints)
+				return node
+			}(),
+			newNode:        newNode("node1", nil),
+			expectedResult: false,
+		},
+	}
+
+	for _, c := range cases {
+		result := shouldIgnoreNodeUpdate(*c.oldNode, *c.newNode)
+
+		if result != c.expectedResult {
+			t.Errorf("[%s] unexpected results: %v", c.name, result)
+		}
 	}
 }

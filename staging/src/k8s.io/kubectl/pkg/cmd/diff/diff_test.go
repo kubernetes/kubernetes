@@ -64,13 +64,10 @@ func (f *FakeObject) Live() runtime.Object {
 func TestDiffProgram(t *testing.T) {
 	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
 
-	if oriLang := os.Getenv("LANG"); oriLang != "C" {
-		os.Setenv("LANG", "C")
-		defer os.Setenv("LANG", oriLang)
-	}
+	t.Setenv("LANG", "C")
 
 	for i, c := range externalDiffCommands {
-		os.Setenv("KUBECTL_EXTERNAL_DIFF", c)
+		t.Setenv("KUBECTL_EXTERNAL_DIFF", c)
 		streams, _, stdout, _ := genericiooptions.NewTestIOStreams()
 		diff := DiffProgram{
 			IOStreams: streams,

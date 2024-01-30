@@ -18,7 +18,9 @@ package cronjob
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +37,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/pointer"
+
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
@@ -462,9 +466,21 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        *justAfterTheHour(),
 			jobCreateError:             errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
-			expectErr:                  true,
+			expectErr:                  false,
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, job not present in CJ active status, create job failed, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			jobCreateError:             errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
+			expectErr:                  false,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: false,
 		},
 		"prev ran but done, is time, F": {
 			concurrencyPolicy:          "Forbid",
@@ -1157,6 +1173,26 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
+		"do nothing if the namespace is terminating": {
+			jobCreateError: &errors.StatusError{ErrStatus: metav1.Status{Details: &metav1.StatusDetails{Causes: []metav1.StatusCause{
+				{
+					Type:    v1.NamespaceTerminatingCause,
+					Message: fmt.Sprintf("namespace %s is being terminated", metav1.NamespaceDefault),
+					Field:   "metadata.namespace",
+				}}}}},
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectActive:               0,
+			expectRequeueAfter:         false,
+			expectUpdateStatus:         false,
+			expectErr:                  true,
+			jobPresentInCJActiveStatus: false,
+		},
 	}
 	for name, tc := range testCases {
 		name := name
@@ -1237,7 +1273,8 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					return tc.now
 				},
 			}
-			cjCopy, requeueAfter, updateStatus, err := jm.syncCronJob(context.TODO(), &cj, js)
+			cjCopy := cj.DeepCopy()
+			requeueAfter, updateStatus, err := jm.syncCronJob(context.TODO(), cjCopy, js)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}
@@ -1668,5 +1705,222 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 				t.Errorf("\nExpected %#v,\nbut got %#v", tt.expected, actual)
 			}
 		})
+	}
+}
+
+func TestControllerV2CleanupFinishedJobs(t *testing.T) {
+	tests := []struct {
+		name                string
+		now                 time.Time
+		cronJob             *batchv1.CronJob
+		finishedJobs        []*batchv1.Job
+		jobCreateError      error
+		expectedDeletedJobs []string
+	}{
+		{
+			name: "jobs are still deleted when a cronjob can't create jobs due to jobs quota being reached (avoiding a deadlock)",
+			now:  *justAfterTheHour(),
+			cronJob: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
+				Spec: batchv1.CronJobSpec{
+					Schedule:                   onTheHour,
+					SuccessfulJobsHistoryLimit: pointer.Int32(1),
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
+					},
+				},
+				Status: batchv1.CronJobStatus{LastScheduleTime: &metav1.Time{Time: justAfterThePriorHour()}},
+			},
+			finishedJobs: []*batchv1.Job{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "foo-ns",
+						Name:            "finished-job-started-hour-ago",
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+					},
+					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "foo-ns",
+						Name:            "finished-job-started-minute-ago",
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+					},
+					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeTheHour()}},
+				},
+			},
+			jobCreateError:      errors.NewInternalError(fmt.Errorf("quota for # of jobs reached")),
+			expectedDeletedJobs: []string{"finished-job-started-hour-ago"},
+		},
+		{
+			name: "jobs are not deleted if history limit not reached",
+			now:  justBeforeTheHour(),
+			cronJob: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
+				Spec: batchv1.CronJobSpec{
+					Schedule:                   onTheHour,
+					SuccessfulJobsHistoryLimit: pointer.Int32(2),
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
+					},
+				},
+				Status: batchv1.CronJobStatus{LastScheduleTime: &metav1.Time{Time: justAfterThePriorHour()}},
+			},
+			finishedJobs: []*batchv1.Job{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "foo-ns",
+						Name:            "finished-job-started-hour-ago",
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+					},
+					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
+				},
+			},
+			jobCreateError:      nil,
+			expectedDeletedJobs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			for _, job := range tt.finishedJobs {
+				job.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: v1.ConditionTrue}}
+			}
+
+			client := fake.NewSimpleClientset()
+
+			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+			_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(tt.cronJob)
+			for _, job := range tt.finishedJobs {
+				_ = informerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			}
+
+			jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			jobControl := &fakeJobControl{CreateErr: tt.jobCreateError}
+			jm.jobControl = jobControl
+			jm.now = func() time.Time {
+				return tt.now
+			}
+
+			jm.enqueueController(tt.cronJob)
+			jm.processNextWorkItem(ctx)
+
+			if len(tt.expectedDeletedJobs) != len(jobControl.DeleteJobName) {
+				t.Fatalf("expected '%v' jobs to be deleted, instead deleted '%s'", tt.expectedDeletedJobs, jobControl.DeleteJobName)
+			}
+			sort.Strings(jobControl.DeleteJobName)
+			sort.Strings(tt.expectedDeletedJobs)
+			for i, deletedJob := range jobControl.DeleteJobName {
+				if deletedJob != tt.expectedDeletedJobs[i] {
+					t.Fatalf("expected '%v' jobs to be deleted, instead deleted '%s'", tt.expectedDeletedJobs, jobControl.DeleteJobName)
+				}
+			}
+		})
+	}
+}
+
+// TestControllerV2JobAlreadyExistsButNotInActiveStatus validates that an already created job that was not added to the status
+// of a CronJob initially will be added back on the next sync. Previously, if we failed to update the status after creating a job,
+// cronjob controller would retry continuously because it would attempt to create a job that already exists.
+func TestControllerV2JobAlreadyExistsButNotInActiveStatus(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	cj := cronJob()
+	cj.Spec.ConcurrencyPolicy = "Forbid"
+	cj.Spec.Schedule = everyHour
+	cj.Status.LastScheduleTime = &metav1.Time{Time: justBeforeThePriorHour()}
+	cj.Status.Active = []v1.ObjectReference{}
+	cjCopy := cj.DeepCopy()
+
+	job, err := getJobFromTemplate2(&cj, justAfterThePriorHour())
+	if err != nil {
+		t.Fatalf("Unexpected error creating a job from template: %v", err)
+	}
+	job.UID = "1234"
+	job.Namespace = cj.Namespace
+
+	client := fake.NewSimpleClientset(cjCopy, job)
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
+
+	jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	jobControl := &fakeJobControl{Job: job, CreateErr: errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, "")}
+	jm.jobControl = jobControl
+	cronJobControl := &fakeCJControl{}
+	jm.cronJobControl = cronJobControl
+	jm.now = justBeforeTheHour
+
+	jm.enqueueController(cjCopy)
+	jm.processNextWorkItem(ctx)
+
+	if len(cronJobControl.Updates) != 1 {
+		t.Fatalf("Unexpected updates to cronjob, got: %d, expected 1", len(cronJobControl.Updates))
+	}
+	if len(cronJobControl.Updates[0].Status.Active) != 1 {
+		t.Errorf("Unexpected active jobs count, got: %d, expected 1", len(cronJobControl.Updates[0].Status.Active))
+	}
+
+	expectedActiveRef, err := getRef(job)
+	if err != nil {
+		t.Fatalf("Error getting expected job ref: %v", err)
+	}
+	if !reflect.DeepEqual(cronJobControl.Updates[0].Status.Active[0], *expectedActiveRef) {
+		t.Errorf("Unexpected job reference in cronjob active list, got: %v, expected: %v", cronJobControl.Updates[0].Status.Active[0], expectedActiveRef)
+	}
+}
+
+// TestControllerV2JobAlreadyExistsButDifferentOwnner validates that an already created job
+// not owned by the cronjob controller is ignored.
+func TestControllerV2JobAlreadyExistsButDifferentOwner(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	cj := cronJob()
+	cj.Spec.ConcurrencyPolicy = "Forbid"
+	cj.Spec.Schedule = everyHour
+	cj.Status.LastScheduleTime = &metav1.Time{Time: justBeforeThePriorHour()}
+	cj.Status.Active = []v1.ObjectReference{}
+	cjCopy := cj.DeepCopy()
+
+	job, err := getJobFromTemplate2(&cj, justAfterThePriorHour())
+	if err != nil {
+		t.Fatalf("Unexpected error creating a job from template: %v", err)
+	}
+	job.UID = "1234"
+	job.Namespace = cj.Namespace
+
+	// remove owners for this test since we are testing that jobs not belonging to cronjob
+	// controller are safely ignored
+	job.OwnerReferences = []metav1.OwnerReference{}
+
+	client := fake.NewSimpleClientset(cjCopy, job)
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
+
+	jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	jobControl := &fakeJobControl{Job: job, CreateErr: errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, "")}
+	jm.jobControl = jobControl
+	cronJobControl := &fakeCJControl{}
+	jm.cronJobControl = cronJobControl
+	jm.now = justBeforeTheHour
+
+	jm.enqueueController(cjCopy)
+	jm.processNextWorkItem(ctx)
+
+	if len(cronJobControl.Updates) != 0 {
+		t.Fatalf("Unexpected updates to cronjob, got: %d, expected 0", len(cronJobControl.Updates))
 	}
 }

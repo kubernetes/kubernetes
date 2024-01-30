@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +33,6 @@ func TestFallbackQueryParamVerifier_PrimaryNoFallback(t *testing.T) {
 		crds             []schema.GroupKind      // CRDFinder returns these CRD's
 		gvk              schema.GroupVersionKind // GVK whose OpenAPI spec is checked
 		queryParam       VerifiableQueryParam    // Usually "fieldValidation"
-		primaryError     error
 		expectedSupports bool
 	}{
 		"Field validation query param is supported for batch/v1/Job, primary verifier": {
@@ -119,11 +119,12 @@ func TestFallbackQueryParamVerifier_PrimaryNoFallback(t *testing.T) {
 		},
 	}
 
-	root := openapi3.NewRoot(cached.NewClient(openapitest.NewFileClient(t)))
+	root := openapi3.NewRoot(cached.NewClient(openapitest.NewEmbeddedFileClient()))
 	for tn, tc := range tests {
 		t.Run(tn, func(t *testing.T) {
 			primary := createFakeV3Verifier(tc.crds, root, tc.queryParam)
-			secondary := createFakeLegacyVerifier(tc.crds, &fakeSchema, tc.queryParam)
+			// secondary verifier should not be called.
+			secondary := &failingVerifier{name: "secondary", t: t}
 			verifier := NewFallbackQueryParamVerifier(primary, secondary)
 			err := verifier.HasSupport(tc.gvk)
 			if tc.expectedSupports && err != nil {
@@ -151,6 +152,29 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 				Kind:    "Job",
 			},
 			queryParam:       QueryParamFieldValidation,
+			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
+			expectedSupports: true,
+		},
+		"Field validation query param is supported for batch/v1/Job, invalid v3 document error": {
+			crds: []schema.GroupKind{},
+			gvk: schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			queryParam:       QueryParamFieldValidation,
+			primaryError:     fmt.Errorf("Invalid OpenAPI V3 document"),
+			expectedSupports: true,
+		},
+		"Field validation query param is supported for batch/v1/Job, timeout error": {
+			crds: []schema.GroupKind{},
+			gvk: schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			queryParam:       QueryParamFieldValidation,
+			primaryError:     fmt.Errorf("timeout"),
 			expectedSupports: true,
 		},
 		"Field validation query param supported for core/v1/Namespace, secondary verifier": {
@@ -161,6 +185,7 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 				Kind:    "Namespace",
 			},
 			queryParam:       QueryParamFieldValidation,
+			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
 			expectedSupports: true,
 		},
 		"Field validation unsupported for unknown GVK, secondary verifier": {
@@ -171,6 +196,18 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 				Kind:    "Uknown",
 			},
 			queryParam:       QueryParamFieldValidation,
+			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
+			expectedSupports: false,
+		},
+		"Field validation unsupported for unknown GVK, invalid document causes secondary verifier": {
+			crds: []schema.GroupKind{},
+			gvk: schema.GroupVersionKind{
+				Group:   "bad",
+				Version: "v1",
+				Kind:    "Uknown",
+			},
+			queryParam:       QueryParamFieldValidation,
+			primaryError:     fmt.Errorf("Invalid OpenAPI V3 document"),
 			expectedSupports: false,
 		},
 		"Unknown query param unsupported (for all GVK's), secondary verifier": {
@@ -181,6 +218,7 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 				Kind:    "Deployment",
 			},
 			queryParam:       "UnknownQueryParam",
+			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
 			expectedSupports: false,
 		},
 		"Field validation query param supported for found CRD, secondary verifier": {
@@ -197,6 +235,7 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 				Kind:    "ExampleCRD",
 			},
 			queryParam:       QueryParamFieldValidation,
+			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
 			expectedSupports: true,
 		},
 		"Field validation query param unsupported for missing CRD, secondary verifier": {
@@ -213,6 +252,7 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 				Kind:    "ExampleCRD",
 			},
 			queryParam:       QueryParamFieldValidation,
+			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
 			expectedSupports: false,
 		},
 		"List GVK is specifically unsupported": {
@@ -223,16 +263,17 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 				Kind:    "List",
 			},
 			queryParam:       QueryParamFieldValidation,
+			primaryError:     errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found"),
 			expectedSupports: false,
 		},
 	}
 
 	// Primary OpenAPI client always returns "NotFound" error, so secondary verifier is used.
 	fakeOpenAPIClient := openapitest.NewFakeClient()
-	fakeOpenAPIClient.ForcedErr = errors.NewNotFound(schema.GroupResource{}, "OpenAPI V3 endpoint not found")
 	root := openapi3.NewRoot(fakeOpenAPIClient)
 	for tn, tc := range tests {
 		t.Run(tn, func(t *testing.T) {
+			fakeOpenAPIClient.ForcedErr = tc.primaryError
 			primary := createFakeV3Verifier(tc.crds, root, tc.queryParam)
 			secondary := createFakeLegacyVerifier(tc.crds, &fakeSchema, tc.queryParam)
 			verifier := NewFallbackQueryParamVerifier(primary, secondary)
@@ -268,4 +309,15 @@ func createFakeLegacyVerifier(crds []schema.GroupKind, fakeSchema discovery.Open
 		openAPIGetter: fakeSchema,
 		queryParam:    queryParam,
 	}
+}
+
+// failingVerifier always crashes when called; implements Verifier
+type failingVerifier struct {
+	name string
+	t    *testing.T
+}
+
+func (c *failingVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	c.t.Fatalf("%s verifier should not be called", c.name)
+	return nil
 }

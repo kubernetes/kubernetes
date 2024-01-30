@@ -157,7 +157,7 @@ func NewCIDRRangeAllocator(logger klog.Logger, client clientset.Interface, nodeI
 			}
 			return nil
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			return ra.ReleaseCIDR(logger, node)
 		}),
 	})
@@ -274,7 +274,7 @@ func (r *rangeAllocator) AllocateOrOccupyCIDR(logger klog.Logger, node *v1.Node)
 		podCIDR, err := r.cidrSets[idx].AllocateNext()
 		if err != nil {
 			r.removeNodeFromProcessing(node.Name)
-			controllerutil.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
+			controllerutil.RecordNodeStatusChange(logger, r.recorder, node, "CIDRNotAvailable")
 			return fmt.Errorf("failed to allocate cidr from cluster cidr at idx:%v: %v", idx, err)
 		}
 		allocated.allocatedCIDRs[idx] = podCIDR
@@ -383,7 +383,7 @@ func (r *rangeAllocator) updateCIDRsAllocation(logger klog.Logger, data nodeRese
 	}
 	// failed release back to the pool
 	logger.Error(err, "Failed to update node PodCIDR after multiple attempts", "node", klog.KObj(node), "podCIDRs", cidrsString)
-	controllerutil.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
+	controllerutil.RecordNodeStatusChange(logger, r.recorder, node, "CIDRAssignmentFailed")
 	// We accept the fact that we may leak CIDRs here. This is safer than releasing
 	// them in case when we don't know if request went through.
 	// NodeController restart will return all falsely allocated CIDRs to the pool.

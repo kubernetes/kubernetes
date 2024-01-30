@@ -28,6 +28,8 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/utils/pointer"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -38,7 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
-	"k8s.io/utils/pointer"
+	"k8s.io/apiserver/pkg/cel/environment"
 )
 
 type condition struct {
@@ -91,8 +93,8 @@ func TestCompile(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var c filterCompiler
-			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
+			c := filterCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))}
+			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.NewExpressions)
 			if e == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -147,6 +149,28 @@ func TestFilter(t *testing.T) {
 		},
 	}
 
+	nsObject := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+			Labels: map[string]string{
+				"env": "test",
+				"foo": "demo",
+			},
+			Annotations: map[string]string{
+				"annotation1": "testAnnotation1",
+			},
+			Finalizers: []string{"f1"},
+		},
+		Spec: corev1.NamespaceSpec{
+			Finalizers: []corev1.FinalizerName{
+				corev1.FinalizerKubernetes,
+			},
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceActive,
+		},
+	}
+
 	var nilUnstructured *unstructured.Unstructured
 	cases := []struct {
 		name             string
@@ -157,6 +181,7 @@ func TestFilter(t *testing.T) {
 		hasParamKind     bool
 		authorizer       authorizer.Authorizer
 		testPerCallLimit uint64
+		namespaceObject  *corev1.Namespace
 	}{
 		{
 			name: "valid syntax for object",
@@ -436,11 +461,17 @@ func TestFilter(t *testing.T) {
 				&condition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').errored()",
+				},
 			},
 			attributes: newValidAttribute(&podObject, false),
 			results: []EvaluationResult{
 				{
 					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.False,
 				},
 			},
 			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
@@ -513,6 +544,33 @@ func TestFilter(t *testing.T) {
 				},
 			},
 			authorizer: denyAll,
+		},
+		{
+			name: "test authorizer error",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').errored()",
+				},
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').error() == 'fake authz error'",
+				},
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.False,
+				},
+			},
+			authorizer: errorAll,
 		},
 		{
 			name: "test authorizer allow path check",
@@ -639,15 +697,82 @@ func TestFilter(t *testing.T) {
 			params:           crdParams,
 			testPerCallLimit: 1,
 		},
+		{
+			name: "test namespaceObject",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "namespaceObject.metadata.name == 'test'",
+				},
+				&condition{
+					Expression: "'env' in namespaceObject.metadata.labels && namespaceObject.metadata.labels.env == 'test'",
+				},
+				&condition{
+					Expression: "('fake' in namespaceObject.metadata.labels) && namespaceObject.metadata.labels.fake == 'test'",
+				},
+				&condition{
+					Expression: "namespaceObject.spec.finalizers[0] == 'kubernetes'",
+				},
+				&condition{
+					Expression: "namespaceObject.status.phase == 'Active'",
+				},
+				&condition{
+					Expression: "size(namespaceObject.metadata.managedFields) == 1",
+				},
+				&condition{
+					Expression: "size(namespaceObject.metadata.ownerReferences) == 1",
+				},
+				&condition{
+					Expression: "'env' in namespaceObject.metadata.annotations",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.False,
+				},
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					Error: errors.New("undefined field 'managedFields'"),
+				},
+				{
+					Error: errors.New("undefined field 'ownerReferences'"),
+				},
+				{
+					EvalResult: celtypes.False,
+				},
+			},
+			hasParamKind:    false,
+			namespaceObject: nsObject,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := filterCompiler{}
 			if tc.testPerCallLimit == 0 {
 				tc.testPerCallLimit = celconfig.PerCallLimit
 			}
-			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil}, tc.testPerCallLimit)
+			env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
+				environment.VersionedOptions{
+					IntroducedVersion: environment.DefaultCompatibilityVersion(),
+					ProgramOptions:    []celgo.ProgramOption{celgo.CostLimit(tc.testPerCallLimit)},
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c := NewFilterCompiler(env)
+			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil}, environment.NewExpressions)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -662,7 +787,7 @@ func TestFilter(t *testing.T) {
 
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
 			ctx := context.TODO()
-			evalResults, _, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, celconfig.RuntimeCELCostBudget)
+			evalResults, _, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(versionedAttr.GetResource()), metav1.GroupVersionKind(versionedAttr.VersionedKind)), optionalVars, CreateNamespaceObject(tc.namespaceObject), celconfig.RuntimeCELCostBudget)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -789,8 +914,8 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := filterCompiler{}
-			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: false}, celconfig.PerCallLimit)
+			c := filterCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))}
+			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: false}, environment.NewExpressions)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -808,7 +933,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			}
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
 			ctx := context.TODO()
-			evalResults, remaining, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, tc.testRuntimeCELCostBudget)
+			evalResults, remaining, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(versionedAttr.GetResource()), metav1.GroupVersionKind(versionedAttr.VersionedKind)), optionalVars, nil, tc.testRuntimeCELCostBudget)
 			if tc.exceedBudget && err == nil {
 				t.Errorf("Expected RuntimeCELCostBudge to be exceeded but got nil")
 			}
@@ -963,6 +1088,7 @@ func TestCompilationErrors(t *testing.T) {
 }
 
 var denyAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionDeny, reason: "fake reason", err: nil}}
+var errorAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionNoOpinion, reason: "", err: fmt.Errorf("fake authz error")}}
 
 func newAuthzAllowMatch(match authorizer.AttributesRecord) fakeAuthorizer {
 	return fakeAuthorizer{

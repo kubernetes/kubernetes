@@ -16,10 +16,10 @@ import (
 	"golang.org/x/oauth2/internal"
 )
 
-// expiryDelta determines how earlier a token should be considered
+// defaultExpiryDelta determines how earlier a token should be considered
 // expired than its actual expiration time. It is used to avoid late
 // expirations due to client-server time mismatches.
-const expiryDelta = 10 * time.Second
+const defaultExpiryDelta = 10 * time.Second
 
 // Token represents the credentials used to authorize
 // the requests to access protected resources on the OAuth 2.0
@@ -52,6 +52,11 @@ type Token struct {
 	// raw optionally contains extra metadata from the server
 	// when updating a token.
 	raw interface{}
+
+	// expiryDelta is used to calculate when a token is considered
+	// expired, by subtracting from Expiry. If zero, defaultExpiryDelta
+	// is used.
+	expiryDelta time.Duration
 }
 
 // Type returns t.TokenType if non-empty, else "Bearer".
@@ -127,6 +132,11 @@ func (t *Token) expired() bool {
 	if t.Expiry.IsZero() {
 		return false
 	}
+
+	expiryDelta := defaultExpiryDelta
+	if t.expiryDelta != 0 {
+		expiryDelta = t.expiryDelta
+	}
 	return t.Expiry.Round(0).Add(-expiryDelta).Before(timeNow())
 }
 
@@ -165,14 +175,31 @@ func retrieveToken(ctx context.Context, c *Config, v url.Values) (*Token, error)
 }
 
 // RetrieveError is the error returned when the token endpoint returns a
-// non-2XX HTTP status code.
+// non-2XX HTTP status code or populates RFC 6749's 'error' parameter.
+// https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
 type RetrieveError struct {
 	Response *http.Response
 	// Body is the body that was consumed by reading Response.Body.
 	// It may be truncated.
 	Body []byte
+	// ErrorCode is RFC 6749's 'error' parameter.
+	ErrorCode string
+	// ErrorDescription is RFC 6749's 'error_description' parameter.
+	ErrorDescription string
+	// ErrorURI is RFC 6749's 'error_uri' parameter.
+	ErrorURI string
 }
 
 func (r *RetrieveError) Error() string {
+	if r.ErrorCode != "" {
+		s := fmt.Sprintf("oauth2: %q", r.ErrorCode)
+		if r.ErrorDescription != "" {
+			s += fmt.Sprintf(" %q", r.ErrorDescription)
+		}
+		if r.ErrorURI != "" {
+			s += fmt.Sprintf(" %q", r.ErrorURI)
+		}
+		return s
+	}
 	return fmt.Sprintf("oauth2: cannot fetch token: %v\nResponse: %s", r.Response.Status, r.Body)
 }

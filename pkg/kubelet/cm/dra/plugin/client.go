@@ -18,174 +18,182 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
-	"net"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"k8s.io/apimachinery/pkg/types"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+
 	"k8s.io/klog/v2"
-
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 )
 
-const PluginClientTimeout = 10 * time.Second
+const PluginClientTimeout = 45 * time.Second
 
-type Client interface {
-	NodePrepareResource(
-		ctx context.Context,
-		namespace string,
-		claimUID types.UID,
-		claimName string,
-		resourceHandle string,
-	) (*drapbv1.NodePrepareResourceResponse, error)
-
-	NodeUnprepareResource(
-		ctx context.Context,
-		namespace string,
-		claimUID types.UID,
-		claimName string,
-		resourceHandle string,
-	) (*drapbv1.NodeUnprepareResourceResponse, error)
-}
-
-// Strongly typed address.
-type draAddr string
-
-// draPluginClient encapsulates all dra plugin methods.
-type draPluginClient struct {
-	pluginName          string
-	addr                draAddr
-	nodeV1ClientCreator nodeV1ClientCreator
-}
-
-var _ Client = &draPluginClient{}
-
-type nodeV1ClientCreator func(addr draAddr) (
-	nodeClient drapbv1.NodeClient,
-	closer io.Closer,
-	err error,
-)
-
-// newV1NodeClient creates a new NodeClient with the internally used gRPC
-// connection set up. It also returns a closer which must be called to close
-// the gRPC connection when the NodeClient is not used anymore.
-// This is the default implementation for the nodeV1ClientCreator, used in
-// newDRAPluginClient.
-func newV1NodeClient(addr draAddr) (nodeClient drapbv1.NodeClient, closer io.Closer, err error) {
-	var conn *grpc.ClientConn
-
-	conn, err = newGrpcConn(addr)
-	if err != nil {
-		return nil, nil, err
+type (
+	nodeResourceManager interface {
+		Prepare(context.Context, *grpc.ClientConn, *plugin, *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error)
+		Unprepare(context.Context, *grpc.ClientConn, *plugin, *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error)
 	}
 
-	return drapbv1.NewNodeClient(conn), conn, nil
+	v1alpha2NodeResourceManager struct{}
+	v1alpha3NodeResourceManager struct{}
+)
+
+var nodeResourceManagers = map[string]nodeResourceManager{
+	v1alpha2Version: v1alpha2NodeResourceManager{},
+	v1alpha3Version: v1alpha3NodeResourceManager{},
 }
 
-func NewDRAPluginClient(pluginName string) (Client, error) {
+func (v1alpha2rm v1alpha2NodeResourceManager) Prepare(ctx context.Context, conn *grpc.ClientConn, _ *plugin, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
+	nodeClient := drapbv1alpha2.NewNodeClient(conn)
+	response := &drapb.NodePrepareResourcesResponse{
+		Claims: make(map[string]*drapb.NodePrepareResourceResponse),
+	}
+
+	for _, claim := range req.Claims {
+		res, err := nodeClient.NodePrepareResource(ctx,
+			&drapbv1alpha2.NodePrepareResourceRequest{
+				Namespace:      claim.Namespace,
+				ClaimUid:       claim.Uid,
+				ClaimName:      claim.Name,
+				ResourceHandle: claim.ResourceHandle,
+			})
+		result := &drapb.NodePrepareResourceResponse{}
+		if err != nil {
+			result.Error = err.Error()
+		} else {
+			result.CDIDevices = res.CdiDevices
+		}
+		response.Claims[claim.Uid] = result
+	}
+
+	return response, nil
+}
+
+func (v1alpha2rm v1alpha2NodeResourceManager) Unprepare(ctx context.Context, conn *grpc.ClientConn, _ *plugin, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+	nodeClient := drapbv1alpha2.NewNodeClient(conn)
+	response := &drapb.NodeUnprepareResourcesResponse{
+		Claims: make(map[string]*drapb.NodeUnprepareResourceResponse),
+	}
+
+	for _, claim := range req.Claims {
+		_, err := nodeClient.NodeUnprepareResource(ctx,
+			&drapbv1alpha2.NodeUnprepareResourceRequest{
+				Namespace:      claim.Namespace,
+				ClaimUid:       claim.Uid,
+				ClaimName:      claim.Name,
+				ResourceHandle: claim.ResourceHandle,
+			})
+		result := &drapb.NodeUnprepareResourceResponse{}
+		if err != nil {
+			result.Error = err.Error()
+		}
+		response.Claims[claim.Uid] = result
+	}
+
+	return response, nil
+}
+
+func (v1alpha3rm v1alpha3NodeResourceManager) Prepare(ctx context.Context, conn *grpc.ClientConn, p *plugin, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
+	nodeClient := drapb.NewNodeClient(conn)
+	response, err := nodeClient.NodePrepareResources(ctx, req)
+	if err != nil {
+		status, _ := grpcstatus.FromError(err)
+		if status.Code() == grpccodes.Unimplemented {
+			p.setVersion(v1alpha2Version)
+			return nodeResourceManagers[v1alpha2Version].Prepare(ctx, conn, p, req)
+		}
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (v1alpha3rm v1alpha3NodeResourceManager) Unprepare(ctx context.Context, conn *grpc.ClientConn, p *plugin, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+	nodeClient := drapb.NewNodeClient(conn)
+	response, err := nodeClient.NodeUnprepareResources(ctx, req)
+	if err != nil {
+		status, _ := grpcstatus.FromError(err)
+		if status.Code() == grpccodes.Unimplemented {
+			p.setVersion(v1alpha2Version)
+			return nodeResourceManagers[v1alpha2Version].Unprepare(ctx, conn, p, req)
+		}
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func NewDRAPluginClient(pluginName string) (drapb.NodeClient, error) {
 	if pluginName == "" {
 		return nil, fmt.Errorf("plugin name is empty")
 	}
 
-	existingPlugin := draPlugins.Get(pluginName)
+	existingPlugin := draPlugins.get(pluginName)
 	if existingPlugin == nil {
 		return nil, fmt.Errorf("plugin name %s not found in the list of registered DRA plugins", pluginName)
 	}
 
-	return &draPluginClient{
-		pluginName:          pluginName,
-		addr:                draAddr(existingPlugin.endpoint),
-		nodeV1ClientCreator: newV1NodeClient,
-	}, nil
+	return existingPlugin, nil
 }
 
-func (r *draPluginClient) NodePrepareResource(
+func (p *plugin) NodePrepareResources(
 	ctx context.Context,
-	namespace string,
-	claimUID types.UID,
-	claimName string,
-	resourceHandle string,
-) (*drapbv1.NodePrepareResourceResponse, error) {
-	klog.V(4).InfoS(
-		log("calling NodePrepareResource rpc"),
-		"namespace", namespace,
-		"claimUID", claimUID,
-		"claimName", claimName,
-		"resourceHandle", resourceHandle)
+	req *drapb.NodePrepareResourcesRequest,
+	opts ...grpc.CallOption,
+) (*drapb.NodePrepareResourcesResponse, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(log("calling NodePrepareResources rpc"), "request", req)
 
-	if r.nodeV1ClientCreator == nil {
-		return nil, errors.New("failed to call NodePrepareResource. nodeV1ClientCreator is nil")
-	}
-
-	nodeClient, closer, err := r.nodeV1ClientCreator(r.addr)
+	conn, err := p.getOrCreateGRPCConn()
 	if err != nil {
 		return nil, err
-	}
-	defer closer.Close()
-
-	req := &drapbv1.NodePrepareResourceRequest{
-		Namespace:      namespace,
-		ClaimUid:       string(claimUID),
-		ClaimName:      claimName,
-		ResourceHandle: resourceHandle,
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
 	defer cancel()
 
-	return nodeClient.NodePrepareResource(ctx, req)
-}
-
-func (r *draPluginClient) NodeUnprepareResource(
-	ctx context.Context,
-	namespace string,
-	claimUID types.UID,
-	claimName string,
-	resourceHandle string,
-) (*drapbv1.NodeUnprepareResourceResponse, error) {
-	klog.V(4).InfoS(
-		log("calling NodeUnprepareResource rpc"),
-		"namespace", namespace,
-		"claimUID", claimUID,
-		"claimname", claimName,
-		"resourceHandle", resourceHandle)
-
-	if r.nodeV1ClientCreator == nil {
-		return nil, errors.New("nodeV1ClientCreate is nil")
-	}
-
-	nodeClient, closer, err := r.nodeV1ClientCreator(r.addr)
-	if err != nil {
+	version := p.getVersion()
+	resourceManager, exists := nodeResourceManagers[version]
+	if !exists {
+		err := fmt.Errorf("unsupported plugin version: %s", version)
+		logger.V(4).Info(log("done calling NodePrepareResources rpc"), "response", nil, "err", err)
 		return nil, err
 	}
-	defer closer.Close()
 
-	req := &drapbv1.NodeUnprepareResourceRequest{
-		Namespace:      namespace,
-		ClaimUid:       string(claimUID),
-		ClaimName:      claimName,
-		ResourceHandle: resourceHandle,
+	response, err := resourceManager.Prepare(ctx, conn, p, req)
+	logger.V(4).Info(log("done calling NodePrepareResources rpc"), "response", response, "err", err)
+	return response, err
+}
+
+func (p *plugin) NodeUnprepareResources(
+	ctx context.Context,
+	req *drapb.NodeUnprepareResourcesRequest,
+	opts ...grpc.CallOption,
+) (*drapb.NodeUnprepareResourcesResponse, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(log("calling NodeUnprepareResource rpc"), "request", req)
+
+	conn, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
 	defer cancel()
 
-	return nodeClient.NodeUnprepareResource(ctx, req)
-}
+	version := p.getVersion()
+	resourceManager, exists := nodeResourceManagers[version]
+	if !exists {
+		err := fmt.Errorf("unsupported plugin version: %s", version)
+		logger.V(4).Info(log("done calling NodeUnprepareResources rpc"), "response", nil, "err", err)
+		return nil, err
+	}
 
-func newGrpcConn(addr draAddr) (*grpc.ClientConn, error) {
-	network := "unix"
-	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", addr)
-
-	return grpc.Dial(
-		string(addr),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, target)
-		}),
-	)
+	response, err := resourceManager.Unprepare(ctx, conn, p, req)
+	logger.V(4).Info(log("done calling NodeUnprepareResources rpc"), "response", response, "err", err)
+	return response, err
 }

@@ -115,6 +115,8 @@ type RuntimeService interface {
 	UpdateRuntimeConfig(ctx context.Context, runtimeConfig *runtimeapi.RuntimeConfig) error
 	// Status returns the status of the runtime.
 	Status(ctx context.Context, verbose bool) (*runtimeapi.StatusResponse, error)
+	// RuntimeConfig returns the configuration information of the runtime.
+	RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error)
 }
 
 // ImageManagerService interface should be implemented by a container image
@@ -129,6 +131,6 @@ type ImageManagerService interface {
 	PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// RemoveImage removes the image.
 	RemoveImage(ctx context.Context, image *runtimeapi.ImageSpec) error
-	// ImageFsInfo returns information of the filesystem that is used to store images.
-	ImageFsInfo(ctx context.Context) ([]*runtimeapi.FilesystemUsage, error)
+	// ImageFsInfo returns information of the filesystem(s) used to store the read-only layers and the writeable layer.
+	ImageFsInfo(ctx context.Context) (*runtimeapi.ImageFsInfoResponse, error)
 }

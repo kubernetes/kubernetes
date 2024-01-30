@@ -37,14 +37,14 @@ import (
 // https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/expansion.md
 var _ = SIGDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
 		Testname: Environment variables, expansion
 		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow composing env vars into new env vars [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should allow composing env vars into new env vars", f.WithNodeConformance(), func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "FOO",
@@ -73,7 +73,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command expansion
 		Description: Create a Pod with environment variables and container command using them. Container command using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's command [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should allow substituting values in a container's command", f.WithNodeConformance(), func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",
@@ -92,7 +92,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command argument expansion
 		Description: Create a Pod with environment variables and container command arguments using them. Container command arguments using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's args [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should allow substituting values in a container's args", f.WithNodeConformance(), func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",
@@ -152,7 +152,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath with backticks
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when backticks are supplied.
 	*/
-	framework.ConformanceIt("should fail substituting values in a volume subpath with backticks [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should fail substituting values in a volume subpath with backticks", f.WithSlow(), func(ctx context.Context) {
 
 		envVars := []v1.EnvVar{
 			{
@@ -186,7 +186,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath with absolute path
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
-	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path", f.WithSlow(), func(ctx context.Context) {
 		absolutePath := "/tmp"
 		if framework.NodeOSDistroIs("windows") {
 			// Windows does not typically have a C:\tmp folder.
@@ -225,7 +225,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath ready from failed state
 		Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
 	*/
-	framework.ConformanceIt("should verify that a failing subpath expansion can be modified during the lifecycle of a container [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should verify that a failing subpath expansion can be modified during the lifecycle of a container", f.WithSlow(), func(ctx context.Context) {
 
 		envVars := []v1.EnvVar{
 			{
@@ -297,7 +297,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		3.	successful expansion of the subpathexpr isn't required for volume cleanup
 
 	*/
-	framework.ConformanceIt("should succeed in writing subpaths in container [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should succeed in writing subpaths in container", f.WithSlow(), func(ctx context.Context) {
 
 		envVars := []v1.EnvVar{
 			{

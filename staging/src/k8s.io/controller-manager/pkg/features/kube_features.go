@@ -40,6 +40,7 @@ const (
 
 	// owner: @danwinship
 	// alpha: v1.27
+	// beta: v1.29
 	//
 	// Enables dual-stack values in the
 	// `alpha.kubernetes.io/provided-node-ip` annotation
@@ -48,6 +49,7 @@ const (
 	// owner: @alexanderConstantinescu
 	// kep: http://kep.k8s.io/3458
 	// beta: v1.27
+	// GA: v1.30
 	//
 	// Enables less load balancer re-configurations by the service controller
 	// (KCCM) as an effect of changing node state.
@@ -62,6 +64,6 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
-	CloudDualStackNodeIPs:         {Default: false, PreRelease: featuregate.Alpha},
-	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.Beta},
+	CloudDualStackNodeIPs:         {Default: true, PreRelease: featuregate.Beta},
+	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30, remove in 1.31
 }

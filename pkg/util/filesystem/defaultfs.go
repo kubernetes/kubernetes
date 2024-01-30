@@ -17,8 +17,10 @@ limitations under the License.
 package filesystem
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -75,6 +77,32 @@ func (fs *DefaultFs) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(fs.prefix(path), perm)
 }
 
+// MkdirAllWithPathCheck checks if path exists already. If not, it creates a directory
+// named path, along with any necessary parents, and returns nil, or else returns an error.
+// Permission bits perm (before umask) are used for all directories that
+// MkdirAllWithPathCheck creates.
+// If path is already a directory, MkdirAllWithPathCheck does nothing and returns nil.
+// NOTE: In case of Windows NTFS, mount points are implemented as reparse-point
+// (similar to symlink) and do not represent actual directory. Hence Directory existence
+// check for windows NTFS will NOT check for dir, but for symlink presence.
+func MkdirAllWithPathCheck(path string, perm os.FileMode) error {
+	if dir, err := os.Lstat(path); err == nil {
+		// If the path exists already,
+		// 1. for Unix/Linux OS, check if the path is directory.
+		// 2. for windows NTFS, check if the path is symlink instead of directory.
+		if dir.IsDir() ||
+			(runtime.GOOS == "windows" && (dir.Mode()&os.ModeSymlink != 0)) {
+			return nil
+		}
+		return fmt.Errorf("path %v exists but is not a directory", path)
+	}
+	// If existence of path not known, attempt to create it.
+	if err := os.MkdirAll(path, perm); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Chtimes via os.Chtimes
 func (fs *DefaultFs) Chtimes(name string, atime time.Time, mtime time.Time) error {
 	return os.Chtimes(fs.prefix(name), atime, mtime)
@@ -85,7 +113,7 @@ func (fs *DefaultFs) RemoveAll(path string) error {
 	return os.RemoveAll(fs.prefix(path))
 }
 
-// Remove via os.RemoveAll
+// Remove via os.Remove
 func (fs *DefaultFs) Remove(name string) error {
 	return os.Remove(fs.prefix(name))
 }

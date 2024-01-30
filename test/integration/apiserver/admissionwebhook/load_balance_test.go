@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -46,9 +48,14 @@ const (
 	testLoadBalanceClientUsername = "webhook-balance-integration-client"
 )
 
+type staticURLServiceResolver string
+
+func (u staticURLServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return url.Parse(string(u))
+}
+
 // TestWebhookLoadBalance ensures that the admission webhook opens multiple connections to backends to satisfy concurrent requests
 func TestWebhookLoadBalance(t *testing.T) {
-
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
 		t.Fatal("Failed to append Cert from PEM")
@@ -58,154 +65,191 @@ func TestWebhookLoadBalance(t *testing.T) {
 		t.Fatalf("Failed to build cert with error: %+v", err)
 	}
 
-	localListener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		if localListener, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	trackingListener := &connectionTrackingListener{delegate: localListener}
-
-	recorder := &connectionRecorder{}
-	handler := newLoadBalanceWebhookHandler(recorder)
-	httpServer := &http.Server{
-		Handler: handler,
-		TLSConfig: &tls.Config{
-			RootCAs:      roots,
-			Certificates: []tls.Certificate{cert},
+	tests := []struct {
+		name     string
+		http2    bool
+		expected int64
+	}{
+		{
+			name:     "10 connections when using http1",
+			http2:    false,
+			expected: 10,
+		},
+		{
+			name:     "1 connections when using http2",
+			http2:    true,
+			expected: 1,
 		},
 	}
-	go func() {
-		httpServer.ServeTLS(trackingListener, "", "")
-	}()
-	defer httpServer.Close()
 
-	webhookURL := "https://" + localListener.Addr().String()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			localListener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				if localListener, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			trackingListener := &connectionTrackingListener{delegate: localListener}
 
-	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
-		"--disable-admission-plugins=ServiceAccount",
-	}, framework.SharedEtcd())
-	defer s.TearDownFn()
+			recorder := &connectionRecorder{}
+			handler := newLoadBalanceWebhookHandler(recorder)
+			httpServer := &http.Server{
+				Handler: handler,
+				TLSConfig: &tls.Config{
+					RootCAs:      roots,
+					Certificates: []tls.Certificate{cert},
+				},
+			}
+			go func() {
+				_ = httpServer.ServeTLS(trackingListener, "", "")
+			}()
+			defer func() {
+				_ = httpServer.Close()
+			}()
 
-	// Configure a client with a distinct user name so that it is easy to distinguish requests
-	// made by the client from requests made by controllers. We use this to filter out requests
-	// before recording them to ensure we don't accidentally mistake requests from controllers
-	// as requests made by the client.
-	clientConfig := rest.CopyConfig(s.ClientConfig)
-	clientConfig.QPS = 100
-	clientConfig.Burst = 200
-	clientConfig.Impersonate.UserName = testLoadBalanceClientUsername
-	clientConfig.Impersonate.Groups = []string{"system:masters", "system:authenticated"}
-	client, err := clientset.NewForConfig(clientConfig)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			webhookURL := "https://" + localListener.Addr().String()
+			t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(webhookURL)))
 
-	_, err = client.CoreV1().Pods("default").Create(context.TODO(), loadBalanceMarkerFixture, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
+			s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+				"--disable-admission-plugins=ServiceAccount",
+			}, framework.SharedEtcd())
+			defer s.TearDownFn()
 
-	upCh := recorder.Reset()
-	ns := "load-balance"
-	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
+			// Configure a client with a distinct user name so that it is easy to distinguish requests
+			// made by the client from requests made by controllers. We use this to filter out requests
+			// before recording them to ensure we don't accidentally mistake requests from controllers
+			// as requests made by the client.
+			clientConfig := rest.CopyConfig(s.ClientConfig)
+			clientConfig.QPS = 100
+			clientConfig.Burst = 200
+			clientConfig.Impersonate.UserName = testLoadBalanceClientUsername
+			clientConfig.Impersonate.Groups = []string{"system:masters", "system:authenticated"}
+			client, err := clientset.NewForConfig(clientConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-	fail := admissionregistrationv1.Fail
-	mutatingCfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
-		Webhooks: []admissionregistrationv1.MutatingWebhook{{
-			Name: "admission.integration.test",
-			ClientConfig: admissionregistrationv1.WebhookClientConfig{
-				URL:      &webhookURL,
+			_, err = client.CoreV1().Pods("default").Create(context.TODO(), loadBalanceMarkerFixture, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			upCh := recorder.Reset()
+			ns := "load-balance"
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			webhooksClientConfig := admissionregistrationv1.WebhookClientConfig{
 				CABundle: localhostCert,
-			},
-			Rules: []admissionregistrationv1.RuleWithOperations{{
-				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
-				Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
-			}},
-			FailurePolicy:           &fail,
-			AdmissionReviewVersions: []string{"v1beta1"},
-			SideEffects:             &noSideEffects,
-		}},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	// wait until new webhook is called the first time
-	if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = client.CoreV1().Pods("default").Patch(context.TODO(), loadBalanceMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
-		select {
-		case <-upCh:
-			return true, nil
-		default:
-			t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
-			return false, nil
-		}
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	pod := func() *corev1.Pod {
-		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns,
-				GenerateName: "loadbalance-",
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{
-					Name:  "fake-name",
-					Image: "fakeimage",
+			}
+			if tc.http2 {
+				webhooksClientConfig.URL = &webhookURL
+			} else {
+				webhooksClientConfig.Service = &admissionregistrationv1.ServiceReference{
+					Namespace: "test",
+					Name:      "webhook",
+				}
+			}
+			fail := admissionregistrationv1.Fail
+			mutatingCfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
+				Webhooks: []admissionregistrationv1.MutatingWebhook{{
+					Name:         "admission.integration.test",
+					ClientConfig: webhooksClientConfig,
+					Rules: []admissionregistrationv1.RuleWithOperations{{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+					}},
+					FailurePolicy:           &fail,
+					AdmissionReviewVersions: []string{"v1beta1"},
+					SideEffects:             &noSideEffects,
 				}},
-			},
-		}
-	}
-
-	// Submit 10 parallel requests
-	wg := &sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod(), metav1.CreateOptions{})
+			}, metav1.CreateOptions{})
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
-		}()
-	}
-	wg.Wait()
+			defer func() {
+				err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
 
-	if actual := atomic.LoadInt64(&trackingListener.connections); actual < 10 {
-		t.Errorf("expected at least 10 connections, got %d", actual)
-	}
-	trackingListener.Reset()
-
-	// Submit 10 more parallel requests
-	wg = &sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod(), metav1.CreateOptions{})
-			if err != nil {
-				t.Error(err)
+			// wait until new webhook is called the first time
+			if err := wait.PollUntilContextTimeout(context.TODO(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				_, err = client.CoreV1().Pods("default").Patch(ctx, loadBalanceMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
+				select {
+				case <-upCh:
+					return true, nil
+				default:
+					t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
+					return false, nil
+				}
+			}); err != nil {
+				t.Fatal(err)
 			}
-		}()
-	}
-	wg.Wait()
 
-	if actual := atomic.LoadInt64(&trackingListener.connections); actual > 0 {
-		t.Errorf("expected no additional connections (reusing kept-alive connections), got %d", actual)
+			pod := func() *corev1.Pod {
+				return &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:    ns,
+						GenerateName: "loadbalance-",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						}},
+					},
+				}
+			}
+
+			// Submit 10 parallel requests
+			wg := &sync.WaitGroup{}
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod(), metav1.CreateOptions{})
+					if err != nil {
+						t.Error(err)
+					}
+				}()
+			}
+			wg.Wait()
+
+			actual := atomic.LoadInt64(&trackingListener.connections)
+			if tc.http2 && actual != tc.expected {
+				t.Errorf("expected %d connections, got %d", tc.expected, actual)
+			}
+			if !tc.http2 && actual < tc.expected {
+				t.Errorf("expected at least %d connections, got %d", tc.expected, actual)
+			}
+			trackingListener.Reset()
+
+			// Submit 10 more parallel requests
+			wg = &sync.WaitGroup{}
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					_, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod(), metav1.CreateOptions{})
+					if err != nil {
+						t.Error(err)
+					}
+				}()
+			}
+			wg.Wait()
+
+			if actual := atomic.LoadInt64(&trackingListener.connections); actual > 0 {
+				t.Errorf("expected no additional connections (reusing kept-alive connections), got %d", actual)
+			}
+		})
 	}
+
 }
 
 type connectionRecorder struct {

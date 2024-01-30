@@ -28,7 +28,7 @@ import (
 	_ "k8s.io/component-base/logs/testinit"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-	// "k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/format"
 )
 
 func init() {
@@ -48,13 +48,9 @@ func SetDefaultVerbosity(v int) {
 // specific to Kubernetes.
 func NewTestContext(tl ktesting.TL) (klog.Logger, context.Context) {
 	config := ktesting.NewConfig(
-		// TODO (pohly): merge
-		// https://github.com/kubernetes/klog/pull/363, new klog
-		// release, update and merge
-		// https://github.com/kubernetes/kubernetes/pull/115277, then
-		// uncomment this.
-		//
-		// ktesting.AnyToString(format.AnyToString),
+		ktesting.AnyToString(func(v interface{}) string {
+			return format.Object(v, 1)
+		}),
 		ktesting.VerbosityFlagName("v"),
 		ktesting.VModuleFlagName("vmodule"),
 	)

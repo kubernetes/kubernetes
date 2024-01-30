@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// Run node e2e test
-	outputDir, err := utils.GetK8sBuildOutputDir()
+	outputDir, err := utils.GetK8sBuildOutputDir(builder.IsDockerizedBuild(), builder.GetTargetBuildArch())
 	if err != nil {
 		klog.Fatalf("Failed to get build output directory: %v", err)
 	}

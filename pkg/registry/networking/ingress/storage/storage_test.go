@@ -53,7 +53,7 @@ var (
 	name                = "foo-ingress"
 	defaultHostname     = "foo.bar.com"
 	defaultBackendName  = "default-backend"
-	defaultBackendPort  = intstr.FromInt(80)
+	defaultBackendPort  = intstr.FromInt32(80)
 	defaultLoadBalancer = "127.0.0.1"
 	defaultPath         = "/foo"
 	defaultPathType     = networking.PathTypeImplementationSpecific

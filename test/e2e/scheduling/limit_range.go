@@ -43,6 +43,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -51,7 +52,7 @@ const (
 
 var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.18
@@ -77,7 +78,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for limitRanges")
-		framework.ExpectEqual(len(limitRanges.Items), 0)
+		gomega.Expect(limitRanges.Items).To(gomega.BeEmpty())
 
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -162,12 +163,12 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By("Failing to create a Pod with less than min resources")
 		pod = newTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Failing to create a Pod with more than max resources")
 		pod = newTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Updating a LimitRange")
 		newMin := getResourceList("9m", "49Mi", "49Gi")
@@ -176,7 +177,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying LimitRange updating is effective")
-		err = wait.Poll(time.Second*2, time.Second*20, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second*2, time.Second*20, false, func(ctx context.Context) (bool, error) {
 			limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(ctx, limitRange.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			return reflect.DeepEqual(limitRange.Spec.Limits[0].Min, newMin), nil
@@ -191,14 +192,14 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By("Failing to create a Pod with more than max resources")
 		pod = newTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Deleting a LimitRange")
 		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(ctx, limitRange.Name, *metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying the LimitRange was deleted")
-		err = wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second*5, e2eservice.RespondingTimeout, false, func(ctx context.Context) (bool, error) {
 			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 
 			if err != nil {
@@ -222,7 +223,20 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		ginkgo.By("Creating a Pod with more than former max resources")
 		pod = newTestPod(podName+"2", getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+		// When the LimitRanger admission plugin find 0 items from the LimitRange informer cache,
+		// it will try to lookup LimitRanges from the local LiveLookupCache which liveTTL is 30s.
+		// If a LimitRange was deleted from the apiserver, informer watch the delete event and then
+		// handle it lead to the informer cache doesn't have any other items, but the local LiveLookupCache
+		// has it and not expired at the same time, the LimitRanger admission plugin will use the
+		// deleted LimitRange to validate the request. So the request will be rejected by the plugin
+		// till the item is expired.
+		//
+		// With the following retry, we can make sure the item is expired and the request will be
+		// validated as expected.
+		err = framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			return err
+		}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).ShouldNot(gomega.HaveOccurred())
 		framework.ExpectNoError(err)
 	})
 
@@ -291,7 +305,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By(fmt.Sprintf("Listing all LimitRanges with label %q", e2eLabelSelector))
 		limitRangeList, err := f.ClientSet.CoreV1().LimitRanges("").List(ctx, metav1.ListOptions{LabelSelector: e2eLabelSelector})
 		framework.ExpectNoError(err, "Failed to list any limitRanges: %v", err)
-		framework.ExpectEqual(len(limitRangeList.Items), 2, "Failed to find the correct limitRange count")
+		gomega.Expect(limitRangeList.Items).To(gomega.HaveLen(2), "Failed to find the correct limitRange count")
 		framework.Logf("Found %d limitRanges", len(limitRangeList.Items))
 
 		ginkgo.By(fmt.Sprintf("Patching LimitRange %q in %q namespace", lrName, ns))
@@ -313,7 +327,7 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		patchedLimitRange, err := lrClient.Patch(ctx, lrName, types.StrategicMergePatchType, []byte(limitRangePayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "Failed to patch limitRange %q", lrName)
-		framework.ExpectEqual(patchedLimitRange.Labels[lrName], "patched", "%q label didn't have value 'patched' for this limitRange. Current labels: %v", lrName, patchedLimitRange.Labels)
+		gomega.Expect(patchedLimitRange.Labels[lrName]).To(gomega.Equal("patched"), "%q label didn't have value 'patched' for this limitRange. Current labels: %v", lrName, patchedLimitRange.Labels)
 		checkMinLimitRange := apiequality.Semantic.DeepEqual(patchedLimitRange.Spec.Limits[0].Min, newMin)
 		if !checkMinLimitRange {
 			framework.Failf("LimitRange does not have the correct min limitRange. Currently is %#v ", patchedLimitRange.Spec.Limits[0].Min)
@@ -325,14 +339,14 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err, "failed to delete the LimitRange by Collection")
 
 		ginkgo.By(fmt.Sprintf("Confirm that the limitRange %q has been deleted", lrName))
-		err = wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, checkLimitRangeListQuantity(f, patchedLabelSelector, 0))
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, checkLimitRangeListQuantity(f, patchedLabelSelector, 0))
 		framework.ExpectNoError(err, "failed to count the required limitRanges")
 		framework.Logf("LimitRange %q has been deleted.", lrName)
 
 		ginkgo.By(fmt.Sprintf("Confirm that a single LimitRange still exists with label %q", e2eLabelSelector))
 		limitRangeList, err = f.ClientSet.CoreV1().LimitRanges("").List(ctx, metav1.ListOptions{LabelSelector: e2eLabelSelector})
 		framework.ExpectNoError(err, "Failed to list any limitRanges: %v", err)
-		framework.ExpectEqual(len(limitRangeList.Items), 1, "Failed to find the correct limitRange count")
+		gomega.Expect(limitRangeList.Items).To(gomega.HaveLen(1), "Failed to find the correct limitRange count")
 		framework.Logf("Found %d limitRange", len(limitRangeList.Items))
 	})
 })

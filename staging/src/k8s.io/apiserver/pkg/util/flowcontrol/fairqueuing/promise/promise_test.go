@@ -28,7 +28,7 @@ func TestWriteOnceSet(t *testing.T) {
 	oldTime := time.Now()
 	cval := &oldTime
 	ctx, cancel := context.WithCancel(context.Background())
-	wr := NewWriteOnce(nil, ctx.Done(), cval)
+	wr := NewWriteOnce(nil, ctx, cval)
 	gots := make(chan interface{})
 	goGetExpectNotYet(t, wr, gots, "Set")
 	now := time.Now()
@@ -53,7 +53,7 @@ func TestWriteOnceCancel(t *testing.T) {
 	oldTime := time.Now()
 	cval := &oldTime
 	ctx, cancel := context.WithCancel(context.Background())
-	wr := NewWriteOnce(nil, ctx.Done(), cval)
+	wr := NewWriteOnce(nil, ctx, cval)
 	gots := make(chan interface{})
 	goGetExpectNotYet(t, wr, gots, "cancel")
 	cancel()
@@ -73,7 +73,7 @@ func TestWriteOnceInitial(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	now := time.Now()
 	aval := &now
-	wr := NewWriteOnce(aval, ctx.Done(), cval)
+	wr := NewWriteOnce(aval, ctx, cval)
 	gots := make(chan interface{})
 	goGetAndExpect(t, wr, gots, aval)
 	later := time.Now()

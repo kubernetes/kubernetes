@@ -59,11 +59,11 @@ func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, av
 }
 
 // helper to create RS with given availableReplicas
-func newRSWithAvailable(name string, specReplicas, statusReplicas, availableReplicas int) *apps.ReplicaSet {
+func newRSWithAvailable(name string, specReplicas, statusReplicas, availableReplicas int32) *apps.ReplicaSet {
 	rs := rs(name, specReplicas, nil, metav1.Time{})
 	rs.Status = apps.ReplicaSetStatus{
-		Replicas:          int32(statusReplicas),
-		AvailableReplicas: int32(availableReplicas),
+		Replicas:          statusReplicas,
+		AvailableReplicas: availableReplicas,
 	}
 	return rs
 }

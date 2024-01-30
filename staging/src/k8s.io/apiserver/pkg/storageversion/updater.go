@@ -123,12 +123,12 @@ func setStatusCondition(conditions *[]v1alpha1.StorageVersionCondition, newCondi
 }
 
 // updateStorageVersionFor updates the storage version object for the resource.
-func updateStorageVersionFor(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string) error {
+func updateStorageVersionFor(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, servedVersions []string) error {
 	retries := 3
 	var retry int
 	var err error
 	for retry < retries {
-		err = singleUpdate(c, apiserverID, gr, encodingVersion, decodableVersions)
+		err = singleUpdate(c, apiserverID, gr, encodingVersion, decodableVersions, servedVersions)
 		if err == nil {
 			return nil
 		}
@@ -145,7 +145,7 @@ func updateStorageVersionFor(c Client, apiserverID string, gr schema.GroupResour
 	return err
 }
 
-func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string) error {
+func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, servedVersions []string) error {
 	shouldCreate := false
 	name := fmt.Sprintf("%s.%s", gr.Group, gr.Resource)
 	sv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
@@ -157,7 +157,7 @@ func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodin
 		sv = &v1alpha1.StorageVersion{}
 		sv.ObjectMeta.Name = name
 	}
-	updatedSV := localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions)
+	updatedSV := localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions, servedVersions)
 	if shouldCreate {
 		createdSV, err := c.Create(context.TODO(), updatedSV, metav1.CreateOptions{})
 		if err != nil {
@@ -174,11 +174,12 @@ func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodin
 
 // localUpdateStorageVersion updates the input storageversion with given server storageversion info.
 // The function updates the input storageversion in place.
-func localUpdateStorageVersion(sv *v1alpha1.StorageVersion, apiserverID, encodingVersion string, decodableVersions []string) *v1alpha1.StorageVersion {
+func localUpdateStorageVersion(sv *v1alpha1.StorageVersion, apiserverID, encodingVersion string, decodableVersions []string, servedVersions []string) *v1alpha1.StorageVersion {
 	newSSV := v1alpha1.ServerStorageVersion{
 		APIServerID:       apiserverID,
 		EncodingVersion:   encodingVersion,
 		DecodableVersions: decodableVersions,
+		ServedVersions:    servedVersions,
 	}
 	foundSSV := false
 	for i, ssv := range sv.Status.StorageVersions {

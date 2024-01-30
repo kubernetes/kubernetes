@@ -35,6 +35,8 @@ import (
 )
 
 func TestListPodResourcesV1(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
+
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -213,7 +215,6 @@ func TestListPodResourcesV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(mockCtrl)
@@ -250,8 +251,6 @@ func TestListPodResourcesV1(t *testing.T) {
 }
 
 func TestAllocatableResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGetAllocatable, true)()
-
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -545,6 +544,9 @@ func TestAllocatableResources(t *testing.T) {
 }
 
 func TestGetPodResourcesV1(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
+
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -677,8 +679,6 @@ func TestGetPodResourcesV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, true)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)()
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(mockCtrl)
@@ -705,12 +705,13 @@ func TestGetPodResourcesV1(t *testing.T) {
 			server := NewV1PodResourcesServer(providers)
 			podReq := &podresourcesapi.GetPodResourcesRequest{PodName: podName, PodNamespace: podNamespace}
 			resp, err := server.Get(context.TODO(), podReq)
+
 			if err != nil {
 				if err.Error() != tc.err.Error() {
 					t.Errorf("want exit = %v, got %v", tc.err, err)
 				}
 			} else {
-				if err != err {
+				if err != tc.err {
 					t.Errorf("want exit = %v, got %v", tc.err, err)
 				} else {
 					if !equalGetResponse(tc.expectedResponse, resp) {
@@ -754,7 +755,7 @@ func equalListResponse(respA, respB *podresourcesapi.ListPodResourcesResponse) b
 				return false
 			}
 
-			if !euqalDynamicResources(cntA.DynamicResources, cntB.DynamicResources) {
+			if !equalDynamicResources(cntA.DynamicResources, cntB.DynamicResources) {
 				return false
 			}
 		}
@@ -762,7 +763,7 @@ func equalListResponse(respA, respB *podresourcesapi.ListPodResourcesResponse) b
 	return true
 }
 
-func euqalDynamicResources(draResA, draResB []*podresourcesapi.DynamicResource) bool {
+func equalDynamicResources(draResA, draResB []*podresourcesapi.DynamicResource) bool {
 	if len(draResA) != len(draResB) {
 		return false
 	}
@@ -801,6 +802,7 @@ func euqalDynamicResources(draResA, draResB []*podresourcesapi.DynamicResource) 
 
 	return true
 }
+
 func equalContainerDevices(devA, devB []*podresourcesapi.ContainerDevices) bool {
 	if len(devA) != len(devB) {
 		return false
@@ -890,7 +892,7 @@ func equalGetResponse(ResA, ResB *podresourcesapi.GetPodResourcesResponse) bool 
 			return false
 		}
 
-		if !euqalDynamicResources(cntA.DynamicResources, cntB.DynamicResources) {
+		if !equalDynamicResources(cntA.DynamicResources, cntB.DynamicResources) {
 			return false
 		}
 

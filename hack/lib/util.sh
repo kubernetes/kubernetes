@@ -729,7 +729,8 @@ function kube::util::ensure-cfssl {
 # Check if we have "docker buildx" commands available
 #
 function kube::util::ensure-docker-buildx {
-  if docker buildx >/dev/null 2>&1; then
+  # podman returns 0 on `docker buildx version`, docker on `docker buildx`. One of them must succeed.
+  if docker buildx version >/dev/null 2>&1 || docker buildx >/dev/null 2>&1; then
     return 0
   else
     echo "ERROR: docker buildx not available. Docker 19.03 or higher is required with experimental features enabled"

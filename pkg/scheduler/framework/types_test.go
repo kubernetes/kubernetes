@@ -19,7 +19,6 @@ package framework
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,6 +30,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewResource(t *testing.T) {
@@ -210,49 +211,30 @@ func TestSetMaxResource(t *testing.T) {
 	}
 }
 
-type testingMode interface {
-	Fatalf(format string, args ...interface{})
-}
-
-func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort, volumes []v1.Volume) *v1.Pod {
-	req := v1.ResourceList{}
-	if cpu != "" {
-		req = v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse(cpu),
-			v1.ResourceMemory: resource.MustParse(mem),
-		}
-		if extended != "" {
-			parts := strings.Split(extended, ":")
-			if len(parts) != 2 {
-				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
-			}
-			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
-		}
-	}
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       types.UID(objName),
-			Namespace: "node_info_cache_test",
-			Name:      objName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Resources: v1.ResourceRequirements{
-					Requests: req,
-				},
-				Ports: ports,
-			}},
-			NodeName: nodeName,
-			Volumes:  volumes,
-		},
-	}
-}
-
 func TestNewNodeInfo(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}, nil),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
+		st.MakePod().UID("test-1").Namespace("node_info_cache_test").Name("test-1").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "500",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 80,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
+
+		st.MakePod().UID("test-2").Namespace("node_info_cache_test").Name("test-2").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "200m",
+				v1.ResourceMemory: "1Ki",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 8080,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
 	}
 
 	expected := &NodeInfo{
@@ -513,7 +495,7 @@ func TestNodeInfoClone(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			ni := test.nodeInfo.Clone()
+			ni := test.nodeInfo.Snapshot()
 			// Modify the field to check if the result is a clone of the origin one.
 			test.nodeInfo.Generation += 10
 			test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
@@ -841,10 +823,28 @@ func TestNodeInfoAddPod(t *testing.T) {
 func TestNodeInfoRemovePod(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "",
-			[]v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}},
-			[]v1.Volume{{VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}}}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
+		st.MakePod().UID("test-1").Namespace("node_info_cache_test").Name("test-1").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "500",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 80,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Volumes([]v1.Volume{{VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}}}}).
+			Obj(),
+
+		st.MakePod().UID("test-2").Namespace("node_info_cache_test").Name("test-2").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "200m",
+				v1.ResourceMemory: "1Ki",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 8080,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
 	}
 
 	// add pod Overhead
@@ -861,7 +861,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 		expectedNodeInfo *NodeInfo
 	}{
 		{
-			pod:         makeBasePod(t, nodeName, "non-exist", "0", "0", "", []v1.ContainerPort{{}}, []v1.Volume{}),
+			pod:         st.MakePod().UID("non-exist").Namespace("node_info_cache_test").Node(nodeName).Obj(),
 			errExpected: true,
 			expectedNodeInfo: &NodeInfo{
 				node: &v1.Node{
@@ -1084,10 +1084,11 @@ func TestNodeInfoRemovePod(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			ni := fakeNodeInfo(pods...)
 
 			gen := ni.Generation
-			err := ni.RemovePod(test.pod)
+			err := ni.RemovePod(logger, test.pod)
 			if err != nil {
 				if test.errExpected {
 					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
@@ -1390,8 +1391,32 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
 			},
 			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter.",
+		},
+		{
+			name:        "nodes failed Prefilter plugin and the preemption also failed",
+			numAllNodes: 3,
+			diagnosis: Diagnosis{
+				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
+				// PostFilterMsg will be included.
+				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
+			},
+			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter. Error running PostFilter plugin FailedPostFilter",
 		},
 		{
 			name:        "nodes failed one Filter plugin with an empty PostFilterMsg",
@@ -1418,7 +1443,7 @@ func TestFitError_Error(t *testing.T) {
 				},
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
-			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
+			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
 		},
 		{
 			name:        "nodes failed two Filter plugins with an empty PostFilterMsg",
@@ -1445,7 +1470,29 @@ func TestFitError_Error(t *testing.T) {
 				},
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
-			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
+			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
+		},
+		{
+			name:        "failed to Permit on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Permit plugin Permit-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
+		},
+		{
+			name:        "failed to Reserve on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Reserve plugin Reserve-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Reserve plugin Reserve-1.",
 		},
 	}
 	for _, tt := range tests {

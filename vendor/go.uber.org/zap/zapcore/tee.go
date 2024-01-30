@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Uber Technologies, Inc.
+// Copyright (c) 2016-2022 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,11 @@ import "go.uber.org/multierr"
 
 type multiCore []Core
 
+var (
+	_ leveledEnabler = multiCore(nil)
+	_ Core           = multiCore(nil)
+)
+
 // NewTee creates a Core that duplicates log entries into two or more
 // underlying Cores.
 //
@@ -46,6 +51,16 @@ func (mc multiCore) With(fields []Field) Core {
 		clone[i] = mc[i].With(fields)
 	}
 	return clone
+}
+
+func (mc multiCore) Level() Level {
+	minLvl := _maxLevel // mc is never empty
+	for i := range mc {
+		if lvl := LevelOf(mc[i]); lvl < minLvl {
+			minLvl = lvl
+		}
+	}
+	return minLvl
 }
 
 func (mc multiCore) Enabled(lvl Level) bool {

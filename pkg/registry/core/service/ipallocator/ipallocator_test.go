@@ -588,6 +588,18 @@ func Test_addOffsetAddress(t *testing.T) {
 			want:    netip.MustParseAddr("192.168.0.128"),
 		},
 		{
+			name:    "IPv4 with leading zeros",
+			address: netip.MustParseAddr("0.0.1.8"),
+			offset:  138,
+			want:    netip.MustParseAddr("0.0.1.146"),
+		},
+		{
+			name:    "IPv6 with leading zeros",
+			address: netip.MustParseAddr("00fc::1"),
+			offset:  255,
+			want:    netip.MustParseAddr("fc::100"),
+		},
+		{
 			name:    "IPv6 offset 255",
 			address: netip.MustParseAddr("2001:db8:1::101"),
 			offset:  255,
@@ -642,6 +654,16 @@ func Test_broadcastAddress(t *testing.T) {
 			name:   "ipv6",
 			subnet: netip.MustParsePrefix("fd00:1:2:3::/64"),
 			want:   netip.MustParseAddr("fd00:1:2:3:FFFF:FFFF:FFFF:FFFF"),
+		},
+		{
+			name:   "ipv6 00fc::/112",
+			subnet: netip.MustParsePrefix("00fc::/112"),
+			want:   netip.MustParseAddr("fc::ffff"),
+		},
+		{
+			name:   "ipv6 fc00::/112",
+			subnet: netip.MustParsePrefix("fc00::/112"),
+			want:   netip.MustParseAddr("fc00::ffff"),
 		},
 	}
 	for _, tt := range tests {
@@ -886,6 +908,25 @@ func Test_ipIterator_Number(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAllocateNextFC(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("fc::/112")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("CIDR %s", cidr)
+
+	r, err := newTestAllocator(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+	ip, err := r.AllocateNext()
+	if err != nil {
+		t.Fatalf("wrong ip %s : %v", ip, err)
+	}
+	t.Log(ip.String())
 }
 
 func BenchmarkIPAllocatorAllocateNextIPv4Size1048574(b *testing.B) {

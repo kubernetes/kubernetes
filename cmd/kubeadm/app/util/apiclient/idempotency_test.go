@@ -135,7 +135,7 @@ func TestPatchNode(t *testing.T) {
 					"updatedBy": "test",
 				}
 			}, &lastError)
-			success, err := conditionFunction()
+			success, err := conditionFunction(context.Background())
 			if err != nil {
 				t.Fatalf("did not expect error: %v", err)
 			}

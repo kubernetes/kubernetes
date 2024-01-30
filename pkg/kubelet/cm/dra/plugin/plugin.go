@@ -17,22 +17,81 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
+	"sync"
+	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
 )
 
 const (
 	// DRAPluginName is the name of the in-tree DRA Plugin.
-	DRAPluginName = "kubernetes.io/dra"
+	DRAPluginName   = "kubernetes.io/dra"
+	v1alpha3Version = "v1alpha3"
+	v1alpha2Version = "v1alpha2"
 )
 
-// draPlugins map keeps track of all registered DRA plugins on the node
-// and their corresponding sockets.
-var draPlugins = &PluginsStore{}
+// Plugin is a description of a DRA Plugin, defined by an endpoint
+// and the highest DRA version supported.
+type plugin struct {
+	sync.Mutex
+	conn                    *grpc.ClientConn
+	endpoint                string
+	version                 string
+	highestSupportedVersion *utilversion.Version
+}
+
+func (p *plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.conn != nil {
+		return p.conn, nil
+	}
+
+	network := "unix"
+	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", p.endpoint)
+	conn, err := grpc.Dial(
+		p.endpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, target)
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
+		return nil, errors.New("timed out waiting for gRPC connection to be ready")
+	}
+
+	p.conn = conn
+	return p.conn, nil
+}
+
+func (p *plugin) getVersion() string {
+	p.Lock()
+	defer p.Unlock()
+	return p.version
+}
+
+func (p *plugin) setVersion(version string) {
+	p.Lock()
+	p.version = version
+	p.Unlock()
+}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct{}
@@ -53,53 +112,15 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	draPlugins.Set(pluginName, &Plugin{
+	// By default we assume the supported plugin version is v1alpha3
+	draPlugins.add(pluginName, &plugin{
+		conn:                    nil,
 		endpoint:                endpoint,
+		version:                 v1alpha3Version,
 		highestSupportedVersion: highestSupportedVersion,
 	})
 
 	return nil
-}
-
-// Return the highest supported version.
-func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
-	if len(versions) == 0 {
-		return nil, errors.New(log("DRA plugin reporting empty array for supported versions"))
-	}
-
-	var highestSupportedVersion *utilversion.Version
-
-	var theErr error
-
-	for i := len(versions) - 1; i >= 0; i-- {
-		currentHighestVer, err := utilversion.ParseGeneric(versions[i])
-		if err != nil {
-			theErr = err
-
-			continue
-		}
-
-		if currentHighestVer.Major() > 1 {
-			// DRA currently only has version 1.x
-			continue
-		}
-
-		if highestSupportedVersion == nil || highestSupportedVersion.LessThan(currentHighestVer) {
-			highestSupportedVersion = currentHighestVer
-		}
-	}
-
-	if highestSupportedVersion == nil {
-		return nil, fmt.Errorf(
-			"could not find a highest supported version from versions (%v) reported by this plugin: %+v",
-			versions, theErr)
-	}
-
-	if highestSupportedVersion.Major() != 1 {
-		return nil, fmt.Errorf("highest supported version reported by plugin is %v, must be v1.x", highestSupportedVersion)
-	}
-
-	return highestSupportedVersion, nil
 }
 
 func (h *RegistrationHandler) validateVersions(
@@ -118,7 +139,7 @@ func (h *RegistrationHandler) validateVersions(
 	}
 
 	// Validate version
-	newPluginHighestVersion, err := highestSupportedVersion(versions)
+	newPluginHighestVersion, err := utilversion.HighestSupportedVersion(versions)
 	if err != nil {
 		return nil, errors.New(
 			log(
@@ -131,32 +152,32 @@ func (h *RegistrationHandler) validateVersions(
 		)
 	}
 
-	existingPlugin := draPlugins.Get(pluginName)
-	if existingPlugin != nil {
-		if !existingPlugin.highestSupportedVersion.LessThan(newPluginHighestVersion) {
-			return nil, errors.New(
-				log(
-					"%s for DRA plugin %q failed. Another plugin with the same name is already registered with a higher supported version: %q",
-					callerName,
-					pluginName,
-					existingPlugin.highestSupportedVersion,
-				),
-			)
-		}
+	existingPlugin := draPlugins.get(pluginName)
+	if existingPlugin == nil {
+		return newPluginHighestVersion, nil
 	}
-
-	return newPluginHighestVersion, nil
+	if existingPlugin.highestSupportedVersion.LessThan(newPluginHighestVersion) {
+		return newPluginHighestVersion, nil
+	}
+	return nil, errors.New(
+		log(
+			"%s for DRA plugin %q failed. Another plugin with the same name is already registered with a higher supported version: %q",
+			callerName,
+			pluginName,
+			existingPlugin.highestSupportedVersion,
+		),
+	)
 }
 
-func unregisterPlugin(pluginName string) {
-	draPlugins.Delete(pluginName)
+func deregisterPlugin(pluginName string) {
+	draPlugins.delete(pluginName)
 }
 
 // DeRegisterPlugin is called when a plugin has removed its socket,
 // signaling it is no longer available.
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	klog.InfoS("DeRegister DRA plugin", "name", pluginName)
-	unregisterPlugin(pluginName)
+	deregisterPlugin(pluginName)
 }
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection

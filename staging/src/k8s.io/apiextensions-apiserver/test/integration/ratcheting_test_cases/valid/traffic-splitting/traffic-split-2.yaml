@@ -1,0 +1,20 @@
+#$ Used in:
+#$ - site-src/guides/traffic-splitting.md
+#$ - site-src/api-types/httproute.md
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: foo-route
+  labels:
+    gateway: prod-web-gw
+spec:
+  hostnames:
+  - foo.example.com
+  rules:
+  - backendRefs:
+    - name: foo-v1
+      port: 8080
+      weight: 90
+    - name: foo-v2
+      port: 8080
+      weight: 10

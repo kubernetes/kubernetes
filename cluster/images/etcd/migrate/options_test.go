@@ -23,13 +23,13 @@ import (
 
 func setEnvVar(t *testing.T, env, val string, exists bool) {
 	if exists {
-		if err := os.Setenv(env, val); err != nil {
-			t.Errorf("could't set env %s: %v", env, err)
+		t.Setenv(env, val)
+	} else if prev, ok := os.LookupEnv(env); ok {
+		t.Cleanup(func() { os.Setenv(env, prev) })
+
+		if err := os.Unsetenv(env); err != nil {
+			t.Errorf("couldn't unset env %s: %v", env, err)
 		}
-		return
-	}
-	if err := os.Unsetenv(env); err != nil {
-		t.Errorf("couldn't unset env %s: %v", env, err)
 	}
 }
 
@@ -69,12 +69,6 @@ func TestFallbackToEnv(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
-			prevVal, prevOk := os.LookupEnv(test.env)
-			defer func() {
-				// preserve the original behavior
-				setEnvVar(t, test.env, prevVal, prevOk)
-			}()
-
 			setEnvVar(t, test.env, test.value, test.valueSet)
 			value, err := fallbackToEnv("some-flag", test.env)
 			if test.expectedError {
@@ -130,12 +124,6 @@ func TestFallbackToEnvWithDefault(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
-			prevVal, prevOk := os.LookupEnv(test.env)
-			defer func() {
-				// preserve the original behavior
-				setEnvVar(t, test.env, prevVal, prevOk)
-			}()
-
 			setEnvVar(t, test.env, test.value, test.valueSet)
 			value := fallbackToEnvWithDefault("some-flag", test.env, test.defaultValue)
 			if value != test.expectedValue {

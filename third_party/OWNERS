@@ -5,11 +5,11 @@ options:
   no_parent_owners: true
 reviewers:
   - dims
-  - lavalamp
   - smarterclayton
   - thockin
 approvers:
   - dep-approvers
-  - lavalamp
   - smarterclayton
   - thockin
+emeritus_approvers:
+  - lavalamp

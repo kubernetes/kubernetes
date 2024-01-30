@@ -20,7 +20,7 @@ import (
 	"os"
 	"sync"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 )
 
 // Fake opens and returns a openapi swagger from a file Path. It will

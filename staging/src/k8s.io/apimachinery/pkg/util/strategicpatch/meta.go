@@ -20,11 +20,16 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
 	openapi "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
+
+const patchMergeKey = "x-kubernetes-patch-merge-key"
+const patchStrategy = "x-kubernetes-patch-strategy"
 
 type PatchMeta struct {
 	patchStrategies []string
@@ -146,6 +151,90 @@ func GetTagStructTypeOrDie(dataStruct interface{}) reflect.Type {
 		panic(err)
 	}
 	return t
+}
+
+type PatchMetaFromOpenAPIV3 struct {
+	// SchemaList is required to resolve OpenAPI V3 references
+	SchemaList map[string]*spec.Schema
+	Schema     *spec.Schema
+}
+
+func (s PatchMetaFromOpenAPIV3) traverse(key string) (PatchMetaFromOpenAPIV3, error) {
+	if s.Schema == nil {
+		return PatchMetaFromOpenAPIV3{}, nil
+	}
+	if len(s.Schema.Properties) == 0 {
+		return PatchMetaFromOpenAPIV3{}, fmt.Errorf("unable to find api field \"%s\"", key)
+	}
+	subschema, ok := s.Schema.Properties[key]
+	if !ok {
+		return PatchMetaFromOpenAPIV3{}, fmt.Errorf("unable to find api field \"%s\"", key)
+	}
+	return PatchMetaFromOpenAPIV3{SchemaList: s.SchemaList, Schema: &subschema}, nil
+}
+
+func resolve(l *PatchMetaFromOpenAPIV3) error {
+	if len(l.Schema.AllOf) > 0 {
+		l.Schema = &l.Schema.AllOf[0]
+	}
+	if refString := l.Schema.Ref.String(); refString != "" {
+		str := strings.TrimPrefix(refString, "#/components/schemas/")
+		sch, ok := l.SchemaList[str]
+		if ok {
+			l.Schema = sch
+		} else {
+			return fmt.Errorf("unable to resolve %s in OpenAPI V3", refString)
+		}
+	}
+	return nil
+}
+
+func (s PatchMetaFromOpenAPIV3) LookupPatchMetadataForStruct(key string) (LookupPatchMeta, PatchMeta, error) {
+	l, err := s.traverse(key)
+	if err != nil {
+		return l, PatchMeta{}, err
+	}
+	p := PatchMeta{}
+	f, ok := l.Schema.Extensions[patchMergeKey]
+	if ok {
+		p.SetPatchMergeKey(f.(string))
+	}
+	g, ok := l.Schema.Extensions[patchStrategy]
+	if ok {
+		p.SetPatchStrategies(strings.Split(g.(string), ","))
+	}
+
+	err = resolve(&l)
+	return l, p, err
+}
+
+func (s PatchMetaFromOpenAPIV3) LookupPatchMetadataForSlice(key string) (LookupPatchMeta, PatchMeta, error) {
+	l, err := s.traverse(key)
+	if err != nil {
+		return l, PatchMeta{}, err
+	}
+	p := PatchMeta{}
+	f, ok := l.Schema.Extensions[patchMergeKey]
+	if ok {
+		p.SetPatchMergeKey(f.(string))
+	}
+	g, ok := l.Schema.Extensions[patchStrategy]
+	if ok {
+		p.SetPatchStrategies(strings.Split(g.(string), ","))
+	}
+	if l.Schema.Items != nil {
+		l.Schema = l.Schema.Items.Schema
+	}
+	err = resolve(&l)
+	return l, p, err
+}
+
+func (s PatchMetaFromOpenAPIV3) Name() string {
+	schema := s.Schema
+	if len(schema.Type) > 0 {
+		return strings.Join(schema.Type, "")
+	}
+	return "Struct"
 }
 
 type PatchMetaFromOpenAPI struct {

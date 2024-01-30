@@ -61,6 +61,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.HPAController = in.HPAController
 	out.JobController = in.JobController
 	out.CronJobController = in.CronJobController
+	out.LegacySATokenCleaner = in.LegacySATokenCleaner
 	out.NamespaceController = in.NamespaceController
 	out.NodeIPAMController = in.NodeIPAMController
 	out.NodeLifecycleController = in.NodeLifecycleController
@@ -72,6 +73,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.SAController = in.SAController
 	out.ServiceController = in.ServiceController
 	out.TTLAfterFinishedController = in.TTLAfterFinishedController
+	out.ValidatingAdmissionPolicyStatusController = in.ValidatingAdmissionPolicyStatusController
 	return
 }
 

@@ -6,6 +6,9 @@ import (
 )
 
 func stripTrailingZeros(s string) string {
+	if !strings.ContainsRune(s, '.') {
+		return s
+	}
 	offset := len(s) - 1
 	for offset > 0 {
 		if s[offset] == '.' {

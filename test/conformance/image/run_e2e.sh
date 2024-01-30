@@ -49,7 +49,7 @@ trap shutdown TERM
 
 ginkgo_args=()
 if [[ -n ${E2E_DRYRUN:-} ]]; then
-    ginkgo_args+=("--dryRun=true")
+    ginkgo_args+=("--dry-run=true")
 fi
 
 # NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
@@ -67,7 +67,7 @@ esac
 ginkgo_args+=(
     "--focus=${E2E_FOCUS}"
     "--skip=${E2E_SKIP}"
-    "--noColor=true"
+    "--no-color=true"
 )
 
 set -x

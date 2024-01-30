@@ -134,11 +134,9 @@ func TestValidatePolicy(t *testing.T) {
 	policy := audit.Policy{OmitStages: []audit.Stage{
 		audit.Stage("foo"),
 	},
-		Rules: []audit.PolicyRule{
-			{
-				Level: audit.LevelMetadata,
-			},
-		},
+		Rules: []audit.PolicyRule{{
+			Level: audit.LevelMetadata,
+		}},
 	}
 	errorCases = append(errorCases, policy)
 

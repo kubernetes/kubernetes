@@ -59,8 +59,15 @@ func (c *collector) clearRows() {
 // encodeWithKeys encodes the map by using values
 // only associated with the keys provided.
 func encodeWithKeys(m *tag.Map, keys []tag.Key) []byte {
+	// Compute the buffer length we will need ahead of time to avoid resizing later
+	reqLen := 0
+	for _, k := range keys {
+		s, _ := m.Value(k)
+		// We will store each key + its length
+		reqLen += len(s) + 1
+	}
 	vb := &tagencoding.Values{
-		Buffer: make([]byte, len(keys)),
+		Buffer: make([]byte, reqLen),
 	}
 	for _, k := range keys {
 		v, _ := m.Value(k)

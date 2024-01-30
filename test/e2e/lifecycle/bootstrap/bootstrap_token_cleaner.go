@@ -25,18 +25,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/lifecycle"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var secretNeedClean string
-var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
+var _ = lifecycle.SIGDescribe(feature.BootstrapTokens, func() {
 
 	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("bootstrap-token-cleaner")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet

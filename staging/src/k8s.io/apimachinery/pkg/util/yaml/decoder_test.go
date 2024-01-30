@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -45,7 +44,7 @@ stuff: 1
 	}
 
 	for i, testCase := range testCases {
-		r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(d))))
+		r := NewDocumentDecoder(io.NopCloser(bytes.NewReader([]byte(d))))
 		b := make([]byte, testCase.bufLen)
 		n, err := r.Read(b)
 		if err != testCase.expectErr || n != testCase.expectLen {
@@ -62,7 +61,7 @@ stuff: 1
 	bufferLen := 4 * 1024
 	//  maxLen 5 M
 	dd := strings.Repeat(d, 512*1024)
-	r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(dd[:maxLen-1]))))
+	r := NewDocumentDecoder(io.NopCloser(bytes.NewReader([]byte(dd[:maxLen-1]))))
 	b := make([]byte, bufferLen)
 	n, err := r.Read(b)
 	if err != io.ErrShortBuffer {
@@ -73,7 +72,7 @@ stuff: 1
 	if err != nil {
 		t.Fatalf("expected nil: %d / %v", n, err)
 	}
-	r = NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(dd))))
+	r = NewDocumentDecoder(io.NopCloser(bytes.NewReader([]byte(dd))))
 	b = make([]byte, maxLen)
 	n, err = r.Read(b)
 	if err != bufio.ErrTooLong {
@@ -85,7 +84,7 @@ func TestYAMLDecoderCallsAfterErrShortBufferRestOfFrame(t *testing.T) {
 	d := `---
 stuff: 1
 	test-foo: 1`
-	r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(d))))
+	r := NewDocumentDecoder(io.NopCloser(bytes.NewReader([]byte(d))))
 	b := make([]byte, 12)
 	n, err := r.Read(b)
 	if err != io.ErrShortBuffer || n != 12 {

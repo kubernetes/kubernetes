@@ -21,7 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -971,7 +971,7 @@ func setupDoer(t *testing.T, info *SecureServingInfo) doer {
 		// in this test, we don't depend on the body of the response, so we can
 		// close the Body here to ensure the underlying transport can be reused
 		if response != nil {
-			ioutil.ReadAll(response.Body)
+			io.ReadAll(response.Body)
 			response.Body.Close()
 		}
 		return result{

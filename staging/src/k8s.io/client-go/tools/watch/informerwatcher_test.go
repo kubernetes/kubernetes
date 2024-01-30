@@ -302,7 +302,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			return retval, nil
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			w := watch.NewFake()
+			w := watch.NewRaceFreeFake()
 			if options.ResourceVersion == "1" {
 				go func() {
 					// Close with a "Gone" error when trying to start a watch from the first list
@@ -315,6 +315,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 		},
 	}
 	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+	defer w.Stop()
 
 	// Expect secret add
 	select {

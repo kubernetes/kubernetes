@@ -44,10 +44,11 @@ import (
 // This is the entry point of create_secret.go which will be called by create.go
 func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "secret",
-		Short: i18n.T("Create a secret using specified subcommand"),
-		Long:  i18n.T("Create a secret using specified subcommand."),
-		Run:   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
+		Use:                   "secret (docker-registry | generic | tls)",
+		DisableFlagsInUseLine: true,
+		Short:                 i18n.T("Create a secret using a specified subcommand"),
+		Long:                  secretLong,
+		Run:                   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateSecretTLS(f, ioStreams))
@@ -58,6 +59,15 @@ func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericiooptions.IOStreams)
 
 var (
 	secretLong = templates.LongDesc(i18n.T(`
+		Create a secret with specified type.
+		
+		A docker-registry type secret is for accessing a container registry.
+
+		A generic type secret indicate an Opaque secret type.
+
+		A tls type secret holds TLS certificate and its associated key.`))
+
+	secretForGenericLong = templates.LongDesc(i18n.T(`
 		Create a secret based on a file, directory, or specified literal value.
 
 		A single secret may package one or more key/value pairs.
@@ -70,7 +80,7 @@ var (
 		packaged into the secret. Any directory entries except regular files are ignored (e.g. subdirectories,
 		symlinks, devices, pipes, etc).`))
 
-	secretExample = templates.Examples(i18n.T(`
+	secretForGenericExample = templates.Examples(i18n.T(`
 	  # Create a new secret named my-secret with keys for each file in folder bar
 	  kubectl create secret generic my-secret --from-file=path/to/bar
 
@@ -134,8 +144,8 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericiooptions.IOS
 		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a secret from a local file, directory, or literal value"),
-		Long:                  secretLong,
-		Example:               secretExample,
+		Long:                  secretForGenericLong,
+		Example:               secretForGenericExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

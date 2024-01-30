@@ -22,9 +22,16 @@ type Context struct {
 	// docker root directory.
 	Docker DockerContext
 	Crio   CrioContext
+	Podman PodmanContext
 }
 
 type DockerContext struct {
+	Root         string
+	Driver       string
+	DriverStatus map[string]string
+}
+
+type PodmanContext struct {
 	Root         string
 	Driver       string
 	DriverStatus map[string]string
@@ -50,6 +57,7 @@ const (
 	ZFS          FsType = "zfs"
 	DeviceMapper FsType = "devicemapper"
 	VFS          FsType = "vfs"
+	NFS          FsType = "nfs"
 )
 
 type Fs struct {

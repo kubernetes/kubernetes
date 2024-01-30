@@ -22,13 +22,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 var nsLabelT1 = map[string]string{"team": "team1"}
@@ -385,7 +388,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelAzAz1}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			wantStatus: framework.NewStatus(framework.Skip),
 		},
 		// the node(node1) that have the label {"region": "China"} (match the topology key) and that have existing pods that match the labelSelector get high score
 		// the node(node3) that don't have the label {"region": "whatever the value is"} (mismatch the topology key) but that have existing pods that match the labelSelector get low score
@@ -749,6 +752,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
 			},
 			expectedList:                       []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}},
+			wantStatus:                         framework.NewStatus(framework.Skip),
 			ignorePreferredTermsOfExistingPods: true,
 		},
 		{
@@ -765,39 +769,52 @@ func TestPreferredAffinity(t *testing.T) {
 			expectedList:                       []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: framework.MaxNodeScore}},
 			ignorePreferredTermsOfExistingPods: false,
 		},
+		{
+			name:       "No nodes to score",
+			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+			pods:       []*v1.Pod{},
+			nodes:      []*v1.Node{},
+			wantStatus: framework.NewStatus(framework.Skip),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			state := framework.NewCycleState()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1, IgnorePreferredTermsOfExistingPods: test.ignorePreferredTermsOfExistingPods}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+
 			if !status.IsSuccess() {
+				if status.Code() != test.wantStatus.Code() {
+					t.Errorf("InterPodAffinity#PreScore() returned unexpected status.Code got: %v, want: %v", status.Code(), test.wantStatus.Code())
+				}
+
 				if !strings.Contains(status.Message(), test.wantStatus.Message()) {
-					t.Errorf("unexpected error: %v", status)
+					t.Errorf("InterPodAffinity#PreScore() returned unexpected status.Message got: %v, want: %v", status.Message(), test.wantStatus.Message())
 				}
-			} else {
-				var gotList framework.NodeScoreList
-				for _, n := range test.nodes {
-					nodeName := n.ObjectMeta.Name
-					score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
-					if !status.IsSuccess() {
-						t.Errorf("unexpected error: %v", status)
-					}
-					gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
-				}
-
-				status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
-				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
-				}
-
-				if !reflect.DeepEqual(test.expectedList, gotList) {
-					t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
-				}
+				return
 			}
 
+			var gotList framework.NodeScoreList
+			for _, n := range test.nodes {
+				nodeName := n.ObjectMeta.Name
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
+				if !status.IsSuccess() {
+					t.Errorf("unexpected error from Score: %v", status)
+				}
+				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+			}
+
+			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error from NormalizeScore: %v", status)
+			}
+
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("node score list doesn't match (-want,+got): \n %s", diff)
+			}
 		})
 	}
 }
@@ -850,6 +867,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		hardPodAffinityWeight int32
 		expectedList          framework.NodeScoreList
 		name                  string
+		wantStatus            *framework.Status
 	}{
 		{
 			name: "with default weight",
@@ -879,7 +897,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelAzAz1}},
 			},
 			hardPodAffinityWeight: 0,
-			expectedList:          []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			wantStatus:            framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "with no matching namespace",
@@ -894,7 +912,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelAzAz1}},
 			},
 			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			expectedList:          []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			wantStatus:            framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "with matching NamespaceSelector",
@@ -929,14 +947,19 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			state := framework.NewCycleState()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
-			if !status.IsSuccess() {
-				t.Errorf("unexpected error: %v", status)
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+			if !test.wantStatus.Equal(status) {
+				t.Errorf("InterPodAffinity#PreScore() returned unexpected status.Code got: %v, want: %v", status.Code(), test.wantStatus.Code())
 			}
+			if !status.IsSuccess() {
+				return
+			}
+
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name

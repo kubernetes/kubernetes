@@ -111,7 +111,7 @@ func (kl *Kubelet) runOnce(ctx context.Context, pods []*v1.Pod, retryDelay time.
 	return results, err
 }
 
-// runPod runs a single pod and wait until all containers are running.
+// runPod runs a single pod and waits until all containers are running.
 func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Duration) error {
 	var isTerminal bool
 	delay := retryDelay
@@ -129,7 +129,7 @@ func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Dura
 		klog.InfoS("Pod's containers not running: syncing", "pod", klog.KObj(pod))
 
 		klog.InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
-		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
+		if err := kl.mirrorPodClient.CreateMirrorPod(pod); err != nil {
 			klog.ErrorS(err, "Failed creating a mirror pod", "pod", klog.KObj(pod))
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)

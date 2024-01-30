@@ -72,8 +72,8 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) 
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true, &hostPathFileOrCreate)
 	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec by default)
 	// Flexvolume dir must NOT be readonly as it is used for third-party plugins to integrate with their storage backends via unix domain socket.
-	flexvolumeDirVolumePath, ok := cfg.ControllerManager.ExtraArgs["flex-volume-plugin-dir"]
-	if !ok {
+	flexvolumeDirVolumePath, idx := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, "flex-volume-plugin-dir", -1)
+	if idx == -1 {
 		flexvolumeDirVolumePath = defaultFlexvolumeDirVolumePath
 	}
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)

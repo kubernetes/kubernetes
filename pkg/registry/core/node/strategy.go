@@ -38,7 +38,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -241,7 +240,7 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, err
 	}
 
-	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
+	if err := isProxyableHostname(ctx, info.Hostname); err != nil {
 		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
@@ -259,6 +258,24 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 
 	// Otherwise, return the requested scheme and port, and the proxy transport
 	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
+}
+
+func isProxyableHostname(ctx context.Context, hostname string) error {
+	resp, err := net.DefaultResolver.LookupIPAddr(ctx, hostname)
+	if err != nil {
+		return err
+	}
+
+	if len(resp) == 0 {
+		return fmt.Errorf("no addresses for hostname")
+	}
+	for _, host := range resp {
+		if !host.IP.IsGlobalUnicast() {
+			return fmt.Errorf("address not allowed")
+		}
+	}
+
+	return nil
 }
 
 func fieldIsDeprecatedWarnings(obj runtime.Object) []string {

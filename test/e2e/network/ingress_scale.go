@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -19,6 +22,7 @@ package network
 import (
 	"context"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -34,13 +38,13 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 		ns string
 	)
 	f := framework.NewDefaultFramework("ingress-scale")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name
 	})
 
-	ginkgo.Describe("GCE [Slow] [Serial] [Feature:IngressScale]", func() {
+	f.Describe("GCE", framework.WithSlow(), framework.WithSerial(), feature.IngressScale, func() {
 		var (
 			scaleFramework *scale.IngressScaleFramework
 		)

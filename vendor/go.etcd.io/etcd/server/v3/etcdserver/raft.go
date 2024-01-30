@@ -340,8 +340,9 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 // the applying workflow. But when the client receives the response,
 // it doesn't mean etcd has already successfully saved the data,
 // including BoltDB and WAL, because:
-//    1. etcd commits the boltDB transaction periodically instead of on each request;
-//    2. etcd saves WAL entries in parallel with applying the committed entries.
+//  1. etcd commits the boltDB transaction periodically instead of on each request;
+//  2. etcd saves WAL entries in parallel with applying the committed entries.
+//
 // Accordingly, it might run into a situation of data loss when the etcd crashes
 // immediately after responding to the client and before the boltDB and WAL
 // successfully save the data to disk.

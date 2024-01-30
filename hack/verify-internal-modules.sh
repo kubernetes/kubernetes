@@ -19,28 +19,6 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
 
-kube::util::ensure_clean_working_dir
-
-_tmpdir="$(kube::realpath "$(mktemp -d -t verify-internal-modules.XXXXXX)")"
-#kube::util::trap_add "rm -rf ${_tmpdir}" EXIT
-
-_tmp_gopath="${_tmpdir}/go"
-_tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
-git worktree add -f "${_tmp_kuberoot}" HEAD
-kube::util::trap_add "git worktree remove -f ${_tmp_kuberoot}" EXIT
-
-pushd "${_tmp_kuberoot}" >/dev/null
-./hack/update-internal-modules.sh
-popd
-
-git -C "${_tmp_kuberoot}" add -N .
-diff=$(git -C "${_tmp_kuberoot}" diff HEAD || true)
-
-if [[ -n "${diff}" ]]; then
-  echo "${diff}" >&2
-  echo >&2
-  echo "Run ./hack/update-internal-modules.sh" >&2
-  exit 1
-fi
+kube::verify::generated "" "Run ./hack/update-internal-modules.sh" ./hack/update-internal-modules.sh
