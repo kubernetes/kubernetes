@@ -47,7 +47,7 @@ type containerConfig struct {
 	ContainerIdx int
 }
 
-var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
+var _ = SIGDescribe("Stress test probes", framework.WithSerial(), framework.WithSlow(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("stress-test-probe")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
@@ -67,7 +67,7 @@ var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
 	})
 
 	/*
-		Release: v1.28
+		Release: v1.30
 		Testname: Pod liveness probe stress test, using tcp socket, no restart
 		Description: A Pod is created with MANY containers with liveness probe on tcp socket 8080. Liveness probe MUST not fail to check health and the restart count should remain 0 for all containers.
 	*/
@@ -82,7 +82,7 @@ var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
 	})
 
 	/*
-		Release: v1.28
+		Release: v1.30
 		Testname: Pod liveness probe stress test, using grpc call, no restart
 		Description: A Pod is created with MANY containers with liveness probe on grpc service. Liveness probe MUST not fail to check health and the restart count should remain 0 for all containers.
 	*/
