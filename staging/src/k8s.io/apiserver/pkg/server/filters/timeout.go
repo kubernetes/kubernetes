@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/apiserver/pkg/header"
 	"k8s.io/apiserver/pkg/server/httplog"
 )
 
@@ -93,7 +94,11 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// resultCh is used as both errCh and stopCh
 	resultCh := make(chan interface{})
 	var tw timeoutWriter
-	tw, w = newTimeoutWriter(w)
+	freezeHeaders := func() {}
+	if safeHeaders, ok := header.SafeResponseHeader(r.Context()); ok {
+		freezeHeaders = safeHeaders.Detach
+	}
+	tw, w = newTimeoutWriter(w, freezeHeaders)
 
 	// Make a copy of request and work on it in new goroutine
 	// to avoid race condition when accessing/modifying request (e.g. headers)
@@ -155,8 +160,8 @@ type timeoutWriter interface {
 	timeout(*apierrors.StatusError)
 }
 
-func newTimeoutWriter(w http.ResponseWriter) (timeoutWriter, http.ResponseWriter) {
-	base := &baseTimeoutWriter{w: w, handlerHeaders: w.Header().Clone()}
+func newTimeoutWriter(w http.ResponseWriter, freezeHeaders func()) (timeoutWriter, http.ResponseWriter) {
+	base := &baseTimeoutWriter{w: w, freezeHeaders: freezeHeaders, handlerHeaders: w.Header().Clone()}
 	wrapped := responsewriter.WrapForHTTP1Or2(base)
 
 	return base, wrapped
@@ -170,6 +175,8 @@ type baseTimeoutWriter struct {
 
 	// headers written by the normal handler
 	handlerHeaders http.Header
+	// method to freeze header writes prior to the timeout filter
+	freezeHeaders func()
 
 	mu sync.Mutex
 	// if the timeout handler has timeout
@@ -207,6 +214,9 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	}
 
 	if !tw.wroteHeader {
+		if tw.freezeHeaders != nil {
+			tw.freezeHeaders()
+		}
 		copyHeaders(tw.w.Header(), tw.handlerHeaders)
 		tw.wroteHeader = true
 	}

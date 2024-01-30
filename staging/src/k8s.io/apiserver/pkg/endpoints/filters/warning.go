@@ -24,13 +24,22 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/header"
 	"k8s.io/apiserver/pkg/warning"
 )
 
 // WithWarningRecorder attaches a deduplicating k8s.io/apiserver/pkg/warning#WarningRecorder to the request context.
 func WithWarningRecorder(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		recorder := &recorder{writer: w}
+		// Use a safe response header writer if present in the context
+		var h headerWriter
+		h, ok := header.SafeResponseHeader(req.Context())
+		if !ok {
+			// fallback to using the response writer header directly
+			h = w.Header()
+		}
+
+		recorder := &recorder{header: h}
 		req = req.WithContext(warning.WithWarningRecorder(req.Context(), recorder))
 		handler.ServeHTTP(w, req)
 	})
@@ -44,6 +53,12 @@ var (
 type recordedWarning struct {
 	agent string
 	text  string
+}
+
+type headerWriter interface {
+	Add(key, value string)
+	Set(key, value string)
+	Del(key string)
 }
 
 type recorder struct {
@@ -62,8 +77,8 @@ type recorder struct {
 	// truncating tracks if we have already exceeded truncateAtTotalRunes and are now truncating warning messages as we add them
 	truncating bool
 
-	// writer is the response writer to add warning headers to
-	writer http.ResponseWriter
+	// header is the header writer
+	header headerWriter
 }
 
 func (r *recorder) AddWarning(agent, text string) {
@@ -107,14 +122,14 @@ func (r *recorder) AddWarning(agent, text string) {
 	// if this fits within our limit, or we're already truncating, write and return
 	if r.written+textRuneLength <= truncateAtTotalRunes || r.truncating {
 		r.written += textRuneLength
-		r.writer.Header().Add("Warning", header)
+		r.header.Add("Warning", header)
 		return
 	}
 
 	// otherwise, enable truncation, reset, and replay the existing items as truncated warnings
 	r.truncating = true
 	r.written = 0
-	r.writer.Header().Del("Warning")
+	r.header.Del("Warning")
 	utilruntime.HandleError(fmt.Errorf("exceeded max warning header size, truncating"))
 	for _, w := range r.ordered {
 		agent := w.agent
@@ -127,7 +142,7 @@ func (r *recorder) AddWarning(agent, text string) {
 		}
 		if header, err := net.NewWarningHeader(299, agent, text); err == nil {
 			r.written += textRuneLength
-			r.writer.Header().Add("Warning", header)
+			r.header.Add("Warning", header)
 		}
 	}
 }
