@@ -120,8 +120,12 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		}
 		var updatedVerbtemplate string
 		if _, exists := subresourceDefaultVerbTemplates[e.VerbType]; e.IsSubresource() && exists {
+			//nolint:staticcheck
+			// TODO: convert this to use golang.org/x/text/cases
 			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(subresourceDefaultVerbTemplates[e.VerbType], strings.Title(e.VerbType)+"(")
 		} else {
+			//nolint:staticcheck
+			// TODO: convert this to use golang.org/x/text/cases
 			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(defaultVerbTemplates[e.VerbType], strings.Title(e.VerbType)+"(")
 		}
 		extendedMethod := extendedInterfaceMethod{
@@ -345,7 +349,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
-	return strings.Replace(template, " "+strings.Title(verbType), " "+name, -1)
+	//nolint:staticcheck
+	// TODO: convert this to use golang.org/x/text/cases
+	return strings.ReplaceAll(template, " "+strings.Title(verbType), " "+name)
 }
 
 func generateInterface(defaultVerbTemplates map[string]string, tags util.Tags) string {

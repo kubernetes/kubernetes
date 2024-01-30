@@ -229,9 +229,8 @@ func (p protobufLocator) GoTypeForName(name types.Name) *types.Type {
 
 // ProtoTypeFor locates a Protobuf type for the provided Go type (if possible).
 func (p protobufLocator) ProtoTypeFor(t *types.Type) (*types.Type, error) {
-	switch {
 	// we've already converted the type, or it's a map
-	case t.Kind == types.Protobuf || t.Kind == types.Map:
+	if t.Kind == types.Protobuf || t.Kind == types.Map {
 		p.tracker.AddType(t)
 		return t, nil
 	}
@@ -559,11 +558,11 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 	// protobuf:"bytes,3,opt,name=Id,customtype=github.com/gogo/protobuf/test.Uuid"
 	parts := strings.Split(tag, ",")
 	if len(parts) < 3 {
-		return fmt.Errorf("member %q of %q malformed 'protobuf' tag, not enough segments\n", m.Name, t.Name)
+		return fmt.Errorf("member %q of %q malformed 'protobuf' tag, not enough segments", m.Name, t.Name)
 	}
 	protoTag, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return fmt.Errorf("member %q of %q malformed 'protobuf' tag, field ID is %q which is not an integer: %v\n", m.Name, t.Name, parts[1], err)
+		return fmt.Errorf("member %q of %q malformed 'protobuf' tag, field ID is %q which is not an integer: %w", m.Name, t.Name, parts[1], err)
 	}
 	field.Tag = protoTag
 
@@ -584,7 +583,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			name = types.Name{
 				Name:    parts[0][last+1:],
 				Package: prefix,
-				Path:    strings.Replace(prefix, ".", "/", -1),
+				Path:    strings.ReplaceAll(prefix, ".", "/"),
 			}
 		} else {
 			name = types.Name{
@@ -603,7 +602,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 	for i, extra := range parts[3:] {
 		parts := strings.SplitN(extra, "=", 2)
 		if len(parts) != 2 {
-			return fmt.Errorf("member %q of %q malformed 'protobuf' tag, tag %d should be key=value, got %q\n", m.Name, t.Name, i+4, extra)
+			return fmt.Errorf("member %q of %q malformed 'protobuf' tag, tag %d should be key=value, got %q", m.Name, t.Name, i+4, extra)
 		}
 		switch parts[0] {
 		case "name":
