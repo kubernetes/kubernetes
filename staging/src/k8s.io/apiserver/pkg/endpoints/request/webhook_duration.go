@@ -152,6 +152,13 @@ type LatencyTrackers struct {
 	// The Write method can be invoked multiple times, so we use a
 	// latency tracker that sums up the duration from each call.
 	ResponseWriteTracker DurationTracker
+
+	// DecodeTracker is used to track latency incurred inside the function
+	// that takes an object returned from the underlying storage layer
+	// (etcd) and performs decoding of the response object.
+	// When called multiple times, the latency incurred inside to
+	// decode func each time will be summed up.
+	DecodeTracker DurationTracker
 }
 
 type latencyTrackersKeyType int
@@ -177,6 +184,7 @@ func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) co
 		TransformTracker:         newSumLatencyTracker(c),
 		SerializationTracker:     newSumLatencyTracker(c),
 		ResponseWriteTracker:     newSumLatencyTracker(c),
+		DecodeTracker:            newSumLatencyTracker(c),
 	})
 }
 
@@ -243,6 +251,17 @@ func TrackAPFQueueWaitLatency(ctx context.Context, d time.Duration) {
 	}
 }
 
+// TrackDecodeLatency is used to track latency incurred inside the function
+// that takes an object returned from the underlying storage layer
+// (etcd) and performs decoding of the response object.
+// When called multiple times, the latency incurred inside to
+// decode func each time will be summed up.
+func TrackDecodeLatency(ctx context.Context, d time.Duration) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.DecodeTracker.TrackDuration(d)
+	}
+}
+
 // AuditAnnotationsFromLatencyTrackers will inspect each latency tracker
 // associated with the request context and return a set of audit
 // annotations that can be added to the API audit entry.
@@ -254,6 +273,7 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 		responseWriteLatencyKey     = "apiserver.latency.k8s.io/response-write"
 		mutatingWebhookLatencyKey   = "apiserver.latency.k8s.io/mutating-webhook"
 		validatingWebhookLatencyKey = "apiserver.latency.k8s.io/validating-webhook"
+		decodeLatencyKey            = "apiserver.latency.k8s.io/decode-response-object"
 	)
 
 	tracker, ok := LatencyTrackersFrom(ctx)
@@ -279,6 +299,9 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 	}
 	if latency := tracker.ValidatingWebhookTracker.GetLatency(); latency != 0 {
 		annotations[validatingWebhookLatencyKey] = latency.String()
+	}
+	if latency := tracker.DecodeTracker.GetLatency(); latency != 0 {
+		annotations[decodeLatencyKey] = latency.String()
 	}
 
 	return annotations
