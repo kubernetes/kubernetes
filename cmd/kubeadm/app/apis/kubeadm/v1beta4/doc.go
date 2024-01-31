@@ -33,8 +33,7 @@ limitations under the License.
 //     The change applies to `ClusterConfiguration` - `APIServer.ExtraArgs, `ControllerManager.ExtraArgs`,
 //     `Scheduler.ExtraArgs`, `Etcd.Local.ExtraArgs`. Also to `NodeRegistrationOptions.KubeletExtraArgs`.
 //   - Add `ClusterConfiguration.EncryptionAlgorithm` that can be used to set the asymmetric encryption algorithm
-//     used for this cluster's keys and certificates. Can be "RSA" (default algorithm, key size is 2048) or
-//     "ECDSA" (uses the P-256 elliptic curve).
+//     used for this cluster's keys and certificates. Can be one of "RSA-2048" (default), "RSA-3072", "RSA-4096" or "ECDSA-P256".
 //   - Add `ClusterConfiguration.DNS.Disabled` and `ClusterConfiguration.Proxy.Disabled` that can be used to disable
 //     the CoreDNS and kube-proxy addons during cluster initialization. Skipping the related addons phases,
 //     during cluster creation will set the same fields to `false`.

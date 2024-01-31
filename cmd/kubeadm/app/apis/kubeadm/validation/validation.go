@@ -73,7 +73,7 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateImageRepository(c.ImageRepository, field.NewPath("imageRepository"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
-	allErrs = append(allErrs, ValidateEncryptionAlgorithm(string(c.EncryptionAlgorithm), field.NewPath("encryptionAlgorithm"))...)
+	allErrs = append(allErrs, ValidateEncryptionAlgorithm(c.EncryptionAlgorithm, field.NewPath("encryptionAlgorithm"))...)
 	allErrs = append(allErrs, componentconfigs.Validate(c)...)
 	return allErrs
 }
@@ -341,11 +341,16 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateEncryptionAlgorithm validates the public key algorithm
-func ValidateEncryptionAlgorithm(algo string, fldPath *field.Path) field.ErrorList {
+func ValidateEncryptionAlgorithm(algo kubeadm.EncryptionAlgorithmType, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if algo != string(kubeadm.EncryptionAlgorithmRSA) && algo != string(kubeadm.EncryptionAlgorithmECDSA) {
-		msg := fmt.Sprintf("Invalid encryption algorithm. Must be %q or %q",
-			kubeadm.EncryptionAlgorithmRSA, kubeadm.EncryptionAlgorithmECDSA)
+	knownAlgorithms := sets.New(
+		kubeadm.EncryptionAlgorithmECDSAP256,
+		kubeadm.EncryptionAlgorithmRSA2048,
+		kubeadm.EncryptionAlgorithmRSA3072,
+		kubeadm.EncryptionAlgorithmRSA4096,
+	)
+	if !knownAlgorithms.Has(algo) {
+		msg := fmt.Sprintf("Invalid encryption algorithm %q. Must be one of %v", algo, sets.List(knownAlgorithms))
 		allErrs = append(allErrs, field.Invalid(fldPath, algo, msg))
 	}
 	return allErrs
