@@ -84,46 +84,47 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			_, err := cs.CoreV1().Endpoints(f.Namespace.Name).Create(ctx, endpoints, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
 
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
-					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
-				})
-				if err != nil {
-					framework.Logf("Error listing EndpointSlices: %v", err)
-					return false, nil
-				}
-				if len(esList.Items) == 0 {
-					framework.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
-					return false, nil
-				}
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true,
+				func(ctx context.Context) (bool, error) {
+					esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
+						LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
+					})
+					if err != nil {
+						framework.Logf("Error listing EndpointSlices: %v", err)
+						return false, nil
+					}
+					if len(esList.Items) == 0 {
+						framework.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
+						return false, nil
+					}
 
-				// Due to informer caching, it's possible for the controller
-				// to create a second EndpointSlice if it does not see the
-				// first EndpointSlice that was created during a sync. All
-				// EndpointSlices created should be valid though.
-				for _, epSlice := range esList.Items {
-					if len(epSlice.Ports) != 1 {
-						return false, fmt.Errorf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
+					// Due to informer caching, it's possible for the controller
+					// to create a second EndpointSlice if it does not see the
+					// first EndpointSlice that was created during a sync. All
+					// EndpointSlices created should be valid though.
+					for _, epSlice := range esList.Items {
+						if len(epSlice.Ports) != 1 {
+							return false, fmt.Errorf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
+						}
+						port := epSlice.Ports[0]
+						if *port.Port != int32(80) {
+							return false, fmt.Errorf("Expected port to be 80, got %d", *port.Port)
+						}
+						if len(epSlice.Endpoints) != 1 {
+							return false, fmt.Errorf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
+						}
+						endpoint := epSlice.Endpoints[0]
+						if len(endpoint.Addresses) != 1 {
+							return false, fmt.Errorf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
+						}
+						address := endpoint.Addresses[0]
+						if address != "10.1.2.3" {
+							return false, fmt.Errorf("Expected EndpointSlice to have 10.1.2.3 as address, got %s", address)
+						}
 					}
-					port := epSlice.Ports[0]
-					if *port.Port != int32(80) {
-						return false, fmt.Errorf("Expected port to be 80, got %d", *port.Port)
-					}
-					if len(epSlice.Endpoints) != 1 {
-						return false, fmt.Errorf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
-					}
-					endpoint := epSlice.Endpoints[0]
-					if len(endpoint.Addresses) != 1 {
-						return false, fmt.Errorf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
-					}
-					address := endpoint.Addresses[0]
-					if address != "10.1.2.3" {
-						return false, fmt.Errorf("Expected EndpointSlice to have 10.1.2.3 as address, got %s", address)
-					}
-				}
 
-				return true, nil
-			}); err != nil {
+					return true, nil
+				}); err != nil {
 				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})
@@ -136,44 +137,45 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error updating Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
-					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
-				})
-				if err != nil {
-					return false, err
-				}
-				if len(esList.Items) != 1 {
-					framework.Logf("Waiting for 1 EndpointSlice to exist, got %d", len(esList.Items))
-					return false, nil
-				}
-				epSlice := esList.Items[0]
-				if len(epSlice.Ports) != 1 {
-					framework.Logf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
-					return false, nil
-				}
-				port := epSlice.Ports[0]
-				if *port.Port != int32(80) {
-					framework.Logf("Expected port to be 80, got %d", *port.Port)
-					return false, nil
-				}
-				if len(epSlice.Endpoints) != 1 {
-					framework.Logf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
-					return false, nil
-				}
-				endpoint := epSlice.Endpoints[0]
-				if len(endpoint.Addresses) != 1 {
-					framework.Logf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
-					return false, nil
-				}
-				address := endpoint.Addresses[0]
-				if address != "10.2.3.4" {
-					framework.Logf("Expected EndpointSlice to have 10.2.3.4 as address, got %s", address)
-					return false, nil
-				}
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true,
+				func(ctx context.Context) (bool, error) {
+					esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
+						LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
+					})
+					if err != nil {
+						return false, err
+					}
+					if len(esList.Items) != 1 {
+						framework.Logf("Waiting for 1 EndpointSlice to exist, got %d", len(esList.Items))
+						return false, nil
+					}
+					epSlice := esList.Items[0]
+					if len(epSlice.Ports) != 1 {
+						framework.Logf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
+						return false, nil
+					}
+					port := epSlice.Ports[0]
+					if *port.Port != int32(80) {
+						framework.Logf("Expected port to be 80, got %d", *port.Port)
+						return false, nil
+					}
+					if len(epSlice.Endpoints) != 1 {
+						framework.Logf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
+						return false, nil
+					}
+					endpoint := epSlice.Endpoints[0]
+					if len(endpoint.Addresses) != 1 {
+						framework.Logf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
+						return false, nil
+					}
+					address := endpoint.Addresses[0]
+					if address != "10.2.3.4" {
+						framework.Logf("Expected EndpointSlice to have 10.2.3.4 as address, got %s", address)
+						return false, nil
+					}
 
-				return true, nil
-			}); err != nil {
+					return true, nil
+				}); err != nil {
 				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})
@@ -183,20 +185,21 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error deleting Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
-					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
-				})
-				if err != nil {
-					return false, err
-				}
-				if len(esList.Items) != 0 {
-					framework.Logf("Waiting for 0 EndpointSlices to exist, got %d", len(esList.Items))
-					return false, nil
-				}
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true,
+				func(ctx context.Context) (bool, error) {
+					esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
+						LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
+					})
+					if err != nil {
+						return false, err
+					}
+					if len(esList.Items) != 0 {
+						framework.Logf("Waiting for 0 EndpointSlices to exist, got %d", len(esList.Items))
+						return false, nil
+					}
 
-				return true, nil
-			}); err != nil {
+					return true, nil
+				}); err != nil {
 				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})
@@ -281,20 +284,21 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			_, err := cs.CoreV1().Endpoints(f.Namespace.Name).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
 
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
-				})
-				if err != nil {
-					framework.Logf("Error listing EndpointSlices: %v", err)
-					return false, nil
-				}
-				if len(esList.Items) == 0 {
-					framework.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
-					return false, nil
-				}
-				return true, nil
-			}); err != nil {
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true,
+				func(ctx context.Context) (bool, error) {
+					esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+						LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
+					})
+					if err != nil {
+						framework.Logf("Error listing EndpointSlices: %v", err)
+						return false, nil
+					}
+					if len(esList.Items) == 0 {
+						framework.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
+						return false, nil
+					}
+					return true, nil
+				}); err != nil {
 				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})
@@ -314,20 +318,21 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error deleting Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
-				})
-				if err != nil {
-					return false, err
-				}
-				if len(esList.Items) != 0 {
-					framework.Logf("Waiting for 0 EndpointSlices to exist, got %d", len(esList.Items))
-					return false, nil
-				}
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true,
+				func(ctx context.Context) (bool, error) {
+					esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+						LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
+					})
+					if err != nil {
+						return false, err
+					}
+					if len(esList.Items) != 0 {
+						framework.Logf("Waiting for 0 EndpointSlices to exist, got %d", len(esList.Items))
+						return false, nil
+					}
 
-				return true, nil
-			}); err != nil {
+					return true, nil
+				}); err != nil {
 				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})

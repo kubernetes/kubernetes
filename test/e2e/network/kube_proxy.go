@@ -219,28 +219,29 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		cmd := fmt.Sprintf("conntrack -L -f %s -d %v "+
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
-		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
-			result, err := e2eoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
-			// retry if we can't obtain the conntrack entry
-			if err != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
-				return false, nil
-			}
-			framework.Logf("conntrack entry for node %v and port %v:  %v", serverNodeInfo.nodeIP, testDaemonTCPPort, result)
-			// Timeout in seconds is available as the third column of the matched entry
-			line := strings.Fields(result)
-			if len(line) < 3 {
-				return false, fmt.Errorf("conntrack entry does not have a timeout field: %v", line)
-			}
-			timeoutSeconds, err := strconv.Atoi(line[2])
-			if err != nil {
-				return false, fmt.Errorf("failed to convert matched timeout %s to integer: %w", line[2], err)
-			}
-			if math.Abs(float64(timeoutSeconds-expectedTimeoutSeconds)) < epsilonSeconds {
-				return true, nil
-			}
-			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, epsilonSeconds*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				result, err := e2eoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
+				// retry if we can't obtain the conntrack entry
+				if err != nil {
+					framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
+					return false, nil
+				}
+				framework.Logf("conntrack entry for node %v and port %v:  %v", serverNodeInfo.nodeIP, testDaemonTCPPort, result)
+				// Timeout in seconds is available as the third column of the matched entry
+				line := strings.Fields(result)
+				if len(line) < 3 {
+					return false, fmt.Errorf("conntrack entry does not have a timeout field: %v", line)
+				}
+				timeoutSeconds, err := strconv.Atoi(line[2])
+				if err != nil {
+					return false, fmt.Errorf("failed to convert matched timeout %s to integer: %w", line[2], err)
+				}
+				if math.Abs(float64(timeoutSeconds-expectedTimeoutSeconds)) < epsilonSeconds {
+					return true, nil
+				}
+				return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
+			}); err != nil {
 			// Dump all conntrack entries for debugging
 			result, err2 := e2eoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
 			if err2 != nil {

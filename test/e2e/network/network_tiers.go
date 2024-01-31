@@ -180,14 +180,15 @@ func waitAndVerifyLBWithTier(ctx context.Context, jig *e2eservice.TestJig, exist
 func getLBNetworkTierByIP(ip string) (cloud.NetworkTier, error) {
 	var rule *compute.ForwardingRule
 	// Retry a few times to tolerate flakes.
-	err := wait.PollImmediate(5*time.Second, 15*time.Second, func() (bool, error) {
-		obj, err := getGCEForwardingRuleByIP(ip)
-		if err != nil {
-			return false, err
-		}
-		rule = obj
-		return true, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 15*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			obj, err := getGCEForwardingRuleByIP(ip)
+			if err != nil {
+				return false, err
+			}
+			rule = obj
+			return true, nil
+		})
 	if err != nil {
 		return "", err
 	}

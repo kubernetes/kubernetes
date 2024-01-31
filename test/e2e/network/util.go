@@ -45,14 +45,15 @@ const secondNodePortSvcName = "second-node-port-service"
 // GetHTTPContent returns the content of the given url by HTTP.
 func GetHTTPContent(host string, port int, timeout time.Duration, url string) (string, error) {
 	var body bytes.Buffer
-	pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		result := e2enetwork.PokeHTTP(host, port, url, nil)
-		if result.Status == e2enetwork.HTTPSuccess {
-			body.Write(result.Body)
-			return true, nil
-		}
-		return false, nil
-	})
+	pollErr := wait.PollUntilContextTimeout(context.Background(), framework.Poll, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			result := e2enetwork.PokeHTTP(host, port, url, nil)
+			if result.Status == e2enetwork.HTTPSuccess {
+				body.Write(result.Body)
+				return true, nil
+			}
+			return false, nil
+		})
 	if pollErr != nil {
 		framework.Logf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
@@ -62,7 +63,7 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) (s
 // GetHTTPContentFromTestContainer returns the content of the given url by HTTP via a test container.
 func GetHTTPContentFromTestContainer(ctx context.Context, config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
 	var body string
-	pollFn := func() (bool, error) {
+	pollFn := func(ctx context.Context) (bool, error) {
 		resp, err := config.GetResponseFromTestContainer(ctx, "http", dialCmd, host, port)
 		if err != nil || len(resp.Errors) > 0 || len(resp.Responses) == 0 {
 			return false, nil
@@ -70,7 +71,7 @@ func GetHTTPContentFromTestContainer(ctx context.Context, config *e2enetwork.Net
 		body = resp.Responses[0]
 		return true, nil
 	}
-	if pollErr := wait.PollImmediate(framework.Poll, timeout, pollFn); pollErr != nil {
+	if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollFn); pollErr != nil {
 		return "", pollErr
 	}
 	return body, nil

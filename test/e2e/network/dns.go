@@ -532,7 +532,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		// - Custom search path is appended.
 		// - DNS query is sent to the specified server.
 		cmd = []string{"dig", "+short", "+search", testDNSNameShort}
-		digFunc := func() (bool, error) {
+		digFunc := func(ctx context.Context) (bool, error) {
 			stdout, stderr, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
@@ -552,7 +552,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			}
 			return true, nil
 		}
-		err = wait.PollImmediate(5*time.Second, 3*time.Minute, digFunc)
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 3*time.Minute, true, digFunc)
 		framework.ExpectNoError(err, "failed to verify customized name server and search path")
 
 		// TODO: Add more test cases for other DNSPolicies.
