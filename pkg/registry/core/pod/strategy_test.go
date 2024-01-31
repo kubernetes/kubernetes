@@ -312,7 +312,7 @@ func TestGetPodQOS(t *testing.T) {
 	}
 }
 
-func TestWaitingForGatesCondition(t *testing.T) {
+func TestSchedulingGatedCondition(t *testing.T) {
 	tests := []struct {
 		name           string
 		pod            *api.Pod
