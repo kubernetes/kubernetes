@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"unsafe"
 
@@ -135,6 +136,32 @@ func populateProcessEnvironment(env []string) error {
 	return nil
 }
 
+// verifyCwd ensures that the current directory is actually inside the mount
+// namespace root of the current process.
+func verifyCwd() error {
+	// getcwd(2) on Linux detects if cwd is outside of the rootfs of the
+	// current mount namespace root, and in that case prefixes "(unreachable)"
+	// to the returned string. glibc's getcwd(3) and Go's Getwd() both detect
+	// when this happens and return ENOENT rather than returning a non-absolute
+	// path. In both cases we can therefore easily detect if we have an invalid
+	// cwd by checking the return value of getcwd(3). See getcwd(3) for more
+	// details, and CVE-2024-21626 for the security issue that motivated this
+	// check.
+	//
+	// We have to use unix.Getwd() here because os.Getwd() has a workaround for
+	// $PWD which involves doing stat(.), which can fail if the current
+	// directory is inaccessible to the container process.
+	if wd, err := unix.Getwd(); errors.Is(err, unix.ENOENT) {
+		return errors.New("current working directory is outside of container mount namespace root -- possible container breakout detected")
+	} else if err != nil {
+		return fmt.Errorf("failed to verify if current working directory is safe: %w", err)
+	} else if !filepath.IsAbs(wd) {
+		// We shouldn't ever hit this, but check just in case.
+		return fmt.Errorf("current working directory is not absolute -- possible container breakout detected: cwd is %q", wd)
+	}
+	return nil
+}
+
 // finalizeNamespace drops the caps, sets the correct user
 // and working dir, and closes any leaked file descriptors
 // before executing the command inside the namespace
@@ -192,6 +219,10 @@ func finalizeNamespace(config *initConfig) error {
 		if err := unix.Chdir(config.Cwd); err != nil {
 			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %w", config.Cwd, err)
 		}
+	}
+	// Make sure our final working directory is inside the container.
+	if err := verifyCwd(); err != nil {
+		return err
 	}
 	if err := system.ClearKeepCaps(); err != nil {
 		return fmt.Errorf("unable to clear keep caps: %w", err)
