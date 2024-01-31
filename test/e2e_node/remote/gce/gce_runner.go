@@ -528,7 +528,8 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		var itemFileArgs []string
 		for _, item := range imageConfig.metadata.Items {
 			if strings.HasPrefix(item.Key, "user-") || strings.HasPrefix(item.Key, "startup-") ||
-				strings.HasPrefix(item.Key, "containerd-") || strings.HasPrefix(item.Key, "cni-") {
+				strings.HasPrefix(item.Key, "containerd-") || strings.HasPrefix(item.Key, "cni-") ||
+				strings.ContainsAny(item.Value, ",:") {
 				dataFile, err := os.CreateTemp("", "metadata")
 				if err != nil {
 					return "", fmt.Errorf("unable to create temp file %v", err)
