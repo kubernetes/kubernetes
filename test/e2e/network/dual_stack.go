@@ -272,15 +272,16 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoint belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /*endpoint controller works on primary ip*/)
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, nil
+				}
+				validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /*endpoint controller works on primary ip*/)
 
-			return true, nil
-		}); err != nil {
+				return true, nil
+			}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
@@ -318,14 +319,15 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
-			return true, nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 10*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, nil
+				}
+				validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
+				return true, nil
+			}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
@@ -363,14 +365,15 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, ipv6)
-			return true, nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 10*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, nil
+				}
+				validateEndpointsBelongToIPFamily(svc, endpoint, ipv6)
+				return true, nil
+			}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
@@ -408,14 +411,15 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
-			return true, nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 10*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, nil
+				}
+				validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
+				return true, nil
+			}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
@@ -453,14 +457,15 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
-			return true, nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 10*time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, nil
+				}
+				validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
+				return true, nil
+			}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})

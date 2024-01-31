@@ -85,23 +85,24 @@ var _ = common.SIGDescribe("NoSNAT", feature.NoSNAT, framework.WithSlow(), func(
 		}
 
 		ginkgo.By("waiting for all of the no-snat-test pods to be scheduled and running")
-		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
-			pods, err := pc.List(ctx, metav1.ListOptions{LabelSelector: noSNATTestName})
-			if err != nil {
-				return false, err
-			}
-
-			// check all pods are running
-			for _, pod := range pods.Items {
-				if pod.Status.Phase != v1.PodRunning {
-					if pod.Status.Phase != v1.PodPending {
-						return false, fmt.Errorf("expected pod to be in phase \"Pending\" or \"Running\"")
-					}
-					return false, nil // pod is still pending
+		err = wait.PollUntilContextTimeout(ctx, 10*time.Second, 1*time.Minute, true,
+			func(ctx context.Context) (bool, error) {
+				pods, err := pc.List(ctx, metav1.ListOptions{LabelSelector: noSNATTestName})
+				if err != nil {
+					return false, err
 				}
-			}
-			return true, nil // all pods are running
-		})
+
+				// check all pods are running
+				for _, pod := range pods.Items {
+					if pod.Status.Phase != v1.PodRunning {
+						if pod.Status.Phase != v1.PodPending {
+							return false, fmt.Errorf("expected pod to be in phase \"Pending\" or \"Running\"")
+						}
+						return false, nil // pod is still pending
+					}
+				}
+				return true, nil // all pods are running
+			})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")

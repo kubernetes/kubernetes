@@ -92,10 +92,12 @@ func (t *dnsTestCommon) init(ctx context.Context) {
 func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string) bool, target string, timeout time.Duration) {
 	var actual []string
 
-	err := wait.PollImmediate(
+	err := wait.PollUntilContextTimeout(
+		context.Background(),
 		time.Duration(1)*time.Second,
 		timeout,
-		func() (bool, error) {
+		true,
+		func(ctx context.Context) (bool, error) {
 			actual = t.runDig(name, target)
 			if predicate(actual) {
 				return true, nil

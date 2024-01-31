@@ -615,18 +615,19 @@ var _ = common.SIGDescribe("Networking", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, f.ClientSet, ns, podNames, svcIP, servicePort))
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
-		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
-			result, err = e2essh.SSH(ctx, "sudo iptables-save -t mangle", host, framework.TestContext.Provider)
-			if err != nil || result.Code != 0 {
-				e2essh.LogResult(result)
-				return false, err
-			}
+		err = utilwait.PollUntilContextTimeout(ctx, framework.Poll, framework.RestartNodeReadyAgainTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				result, err = e2essh.SSH(ctx, "sudo iptables-save -t mangle", host, framework.TestContext.Provider)
+				if err != nil || result.Code != 0 {
+					e2essh.LogResult(result)
+					return false, err
+				}
 
-			if strings.Contains(result.Stdout, "\n:KUBE-IPTABLES-HINT") {
-				return true, nil
-			}
-			return false, nil
-		})
+				if strings.Contains(result.Stdout, "\n:KUBE-IPTABLES-HINT") {
+					return true, nil
+				}
+				return false, nil
+			})
 		if err != nil {
 			e2essh.LogResult(result)
 		}

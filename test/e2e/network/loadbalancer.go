@@ -666,22 +666,23 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
-		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-			cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
-			stdout, err := e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
-			if err != nil {
-				framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
-				return false, nil
-			}
+		if pollErr := wait.PollUntilContextTimeout(ctx, pollInterval, createTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
+				stdout, err := e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+				if err != nil {
+					framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
+					return false, nil
+				}
 
-			if !strings.Contains(stdout, "hello") {
-				framework.Logf("Expected output to contain 'hello', got %q; retrying...", stdout)
-				return false, nil
-			}
+				if !strings.Contains(stdout, "hello") {
+					framework.Logf("Expected output to contain 'hello', got %q; retrying...", stdout)
+					return false, nil
+				}
 
-			framework.Logf("Successful curl; stdout: %v", stdout)
-			return true, nil
-		}); pollErr != nil {
+				framework.Logf("Successful curl; stdout: %v", stdout)
+				return true, nil
+			}); pollErr != nil {
 			framework.Failf("ginkgo.Failed to hit ILB IP, err: %v", pollErr)
 		}
 
@@ -691,14 +692,15 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		})
 		framework.ExpectNoError(err)
 		framework.Logf("Waiting up to %v for service %q to have an external LoadBalancer", createTimeout, serviceName)
-		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-			svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			lbIngress = &svc.Status.LoadBalancer.Ingress[0]
-			return !isInternalEndpoint(lbIngress), nil
-		}); pollErr != nil {
+		if pollErr := wait.PollUntilContextTimeout(ctx, pollInterval, createTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				lbIngress = &svc.Status.LoadBalancer.Ingress[0]
+				return !isInternalEndpoint(lbIngress), nil
+			}); pollErr != nil {
 			framework.Failf("Loadbalancer IP not changed to external.")
 		}
 		// should have an external IP.
@@ -725,14 +727,15 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			})
 			framework.ExpectNoError(err)
 			framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
-			if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-				svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				lbIngress = &svc.Status.LoadBalancer.Ingress[0]
-				return isInternalEndpoint(lbIngress), nil
-			}); pollErr != nil {
+			if pollErr := wait.PollUntilContextTimeout(ctx, pollInterval, createTimeout, true,
+				func(ctx context.Context) (bool, error) {
+					svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					lbIngress = &svc.Status.LoadBalancer.Ingress[0]
+					return isInternalEndpoint(lbIngress), nil
+				}); pollErr != nil {
 				framework.Failf("Loadbalancer IP not changed to internal.")
 			}
 			// should have the given static internal IP.
@@ -1039,11 +1042,12 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node " + nodes.Items[0].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			return hostnames.Has(serverPod1.Spec.Hostname), nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				return hostnames.Has(serverPod1.Spec.Hostname), nil
+			}); err != nil {
 			framework.Failf("Failed to connect to backend 1")
 		}
 
@@ -1065,11 +1069,12 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
 		ginkgo.By("checking client pod connected to the backend 2 on Node " + nodes.Items[1].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			return hostnames.Has(serverPod2.Spec.Hostname), nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				return hostnames.Has(serverPod2.Spec.Hostname), nil
+			}); err != nil {
 			framework.Failf("Failed to connect to backend 2")
 		}
 	})
@@ -1171,11 +1176,12 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node " + nodes.Items[0].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			return hostnames.Has(serverPod1.Spec.Hostname), nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				return hostnames.Has(serverPod1.Spec.Hostname), nil
+			}); err != nil {
 			framework.Failf("Failed to connect to backend 1")
 		}
 
@@ -1197,11 +1203,12 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
 		ginkgo.By("checking client pod connected to the backend 2 on Node " + nodes.Items[0].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			return hostnames.Has(serverPod2.Spec.Hostname), nil
-		}); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				return hostnames.Has(serverPod2.Spec.Hostname), nil
+			}); err != nil {
 			framework.Failf("Failed to connect to backend 2")
 		}
 	})
@@ -1460,15 +1467,16 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		var srcIP string
 		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs)
 		ginkgo.By(fmt.Sprintf("Hitting external lb %v from pod %v on node %v", ingressIP, pausePod.Name, pausePod.Spec.NodeName))
-		if pollErr := wait.PollImmediate(framework.Poll, loadBalancerPropagationTimeout, func() (bool, error) {
-			stdout, err := e2eoutput.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
-			if err != nil {
-				framework.Logf("got err: %v, retry until timeout", err)
-				return false, nil
-			}
-			srcIP = strings.TrimSpace(strings.Split(stdout, ":")[0])
-			return srcIP == pausePod.Status.PodIP, nil
-		}); pollErr != nil {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, loadBalancerPropagationTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				stdout, err := e2eoutput.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
+				if err != nil {
+					framework.Logf("got err: %v, retry until timeout", err)
+					return false, nil
+				}
+				srcIP = strings.TrimSpace(strings.Split(stdout, ":")[0])
+				return srcIP == pausePod.Status.PodIP, nil
+			}); pollErr != nil {
 			framework.Failf("Source IP not preserved from %v, expected '%v' got '%v'", pausePod.Name, pausePod.Status.PodIP, srcIP)
 		}
 	})
@@ -1549,7 +1557,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		for nodeName, nodeIP := range endpointNodeMap {
 			ginkgo.By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIP))
 			var body string
-			pollFn := func() (bool, error) {
+			pollFn := func(ctx context.Context) (bool, error) {
 				// we expect connection failure here, but not other errors
 				resp, err := config.GetResponseFromTestContainer(ctx,
 					"http",
@@ -1567,7 +1575,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 				}
 				return false, nil
 			}
-			if pollErr := wait.PollImmediate(framework.Poll, e2eservice.TestTimeout, pollFn); pollErr != nil {
+			if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.TestTimeout, true, pollFn); pollErr != nil {
 				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. body %s",
 					nodeName, healthCheckNodePort, body)
 			}
@@ -1576,27 +1584,28 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		// Poll till kube-proxy re-adds the MASQUERADE rule on the node.
 		ginkgo.By(fmt.Sprintf("checking source ip is NOT preserved through loadbalancer %v", ingressIP))
 		var clientIP string
-		pollErr := wait.PollImmediate(framework.Poll, 3*e2eservice.KubeProxyLagTimeout, func() (bool, error) {
-			clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
-			if err != nil {
+		pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, 3*e2eservice.KubeProxyLagTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
+				if err != nil {
+					return false, nil
+				}
+				// The clientIPPort returned from GetHTTPContent is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
+				host, _, err := net.SplitHostPort(clientIPPort)
+				if err != nil {
+					framework.Logf("SplitHostPort returned unexpected error: %q", clientIPPort)
+					return false, nil
+				}
+				ip := netutils.ParseIPSloppy(host)
+				if ip == nil {
+					framework.Logf("Invalid client IP address format: %q", host)
+					return false, nil
+				}
+				if subnetPrefix.Contains(ip) {
+					return true, nil
+				}
 				return false, nil
-			}
-			// The clientIPPort returned from GetHTTPContent is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
-			host, _, err := net.SplitHostPort(clientIPPort)
-			if err != nil {
-				framework.Logf("SplitHostPort returned unexpected error: %q", clientIPPort)
-				return false, nil
-			}
-			ip := netutils.ParseIPSloppy(host)
-			if ip == nil {
-				framework.Logf("Invalid client IP address format: %q", host)
-				return false, nil
-			}
-			if subnetPrefix.Contains(ip) {
-				return true, nil
-			}
-			return false, nil
-		})
+			})
 		if pollErr != nil {
 			framework.Failf("Source IP WAS preserved even after ESIPP turned off. Got %v, expected a ten-dot cluster ip.", clientIP)
 		}
@@ -1615,28 +1624,29 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		})
 		framework.ExpectNoError(err)
 		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs)
-		pollErr = wait.PollImmediate(framework.PollShortTimeout, loadBalancerPropagationTimeout, func() (bool, error) {
-			clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
-			if err != nil {
+		pollErr = wait.PollUntilContextTimeout(ctx, framework.PollShortTimeout, loadBalancerPropagationTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
+				if err != nil {
+					return false, nil
+				}
+				ginkgo.By(fmt.Sprintf("Endpoint %v:%v%v returned client ip %v", ingressIP, svcTCPPort, path, clientIPPort))
+				// The clientIPPort returned from GetHTTPContent is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
+				host, _, err := net.SplitHostPort(clientIPPort)
+				if err != nil {
+					framework.Logf("SplitHostPort returned unexpected error: %q", clientIPPort)
+					return false, nil
+				}
+				ip := netutils.ParseIPSloppy(host)
+				if ip == nil {
+					framework.Logf("Invalid client IP address format: %q", host)
+					return false, nil
+				}
+				if !subnetPrefix.Contains(ip) {
+					return true, nil
+				}
 				return false, nil
-			}
-			ginkgo.By(fmt.Sprintf("Endpoint %v:%v%v returned client ip %v", ingressIP, svcTCPPort, path, clientIPPort))
-			// The clientIPPort returned from GetHTTPContent is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
-			host, _, err := net.SplitHostPort(clientIPPort)
-			if err != nil {
-				framework.Logf("SplitHostPort returned unexpected error: %q", clientIPPort)
-				return false, nil
-			}
-			ip := netutils.ParseIPSloppy(host)
-			if ip == nil {
-				framework.Logf("Invalid client IP address format: %q", host)
-				return false, nil
-			}
-			if !subnetPrefix.Contains(ip) {
-				return true, nil
-			}
-			return false, nil
-		})
+			})
 		if pollErr != nil {
 			framework.Failf("Source IP (%v) is not the client IP even after ESIPP turned on, expected a public IP.", clientIP)
 		}
@@ -1757,40 +1767,41 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 		framework.ExpectNoError(err)
 
 		framework.Logf("Check that daemon pods are available on every node of the cluster with the updated environment.")
-		err = wait.PollImmediate(framework.Poll, creationTimeout, func() (bool, error) {
-			podList, err := cs.CoreV1().Pods(ds.Namespace).List(context.TODO(), metav1.ListOptions{})
-			if err != nil {
-				return false, err
-			}
-			pods := podList.Items
+		err = wait.PollUntilContextTimeout(ctx, framework.Poll, creationTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				podList, err := cs.CoreV1().Pods(ds.Namespace).List(context.TODO(), metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				pods := podList.Items
 
-			readyPods := 0
-			for _, pod := range pods {
-				if !metav1.IsControlledBy(&pod, ds) {
-					continue
-				}
-				if pod.DeletionTimestamp != nil {
-					continue
-				}
-				podVersion := ""
-				for _, env := range pod.Spec.Containers[0].Env {
-					if env.Name == "VERSION" {
-						podVersion = env.Value
-						break
+				readyPods := 0
+				for _, pod := range pods {
+					if !metav1.IsControlledBy(&pod, ds) {
+						continue
 					}
+					if pod.DeletionTimestamp != nil {
+						continue
+					}
+					podVersion := ""
+					for _, env := range pod.Spec.Containers[0].Env {
+						if env.Name == "VERSION" {
+							podVersion = env.Value
+							break
+						}
+					}
+					if podVersion != fmt.Sprintf("%d", i) {
+						continue
+					}
+					podReady := podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now())
+					if !podReady {
+						continue
+					}
+					readyPods += 1
 				}
-				if podVersion != fmt.Sprintf("%d", i) {
-					continue
-				}
-				podReady := podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now())
-				if !podReady {
-					continue
-				}
-				readyPods += 1
-			}
-			framework.Logf("Number of running nodes: %d, number of updated ready pods: %d in daemonset %s", len(nodeNames), readyPods, ds.Name)
-			return readyPods == len(nodeNames), nil
-		})
+				framework.Logf("Number of running nodes: %d, number of updated ready pods: %d in daemonset %s", len(nodeNames), readyPods, ds.Name)
+				return readyPods == len(nodeNames), nil
+			})
 		framework.ExpectNoError(err, "error waiting for daemon pods to be ready")
 
 		// assert that the HTTP requests success rate is above the acceptable threshold after this rolling update
