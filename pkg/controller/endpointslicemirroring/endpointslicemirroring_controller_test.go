@@ -253,15 +253,16 @@ func TestSyncEndpoints(t *testing.T) {
 
 			numInitialActions := len(tc.endpointSlices)
 			// Wait for the expected event show up in test "Endpoints with 1001 addresses - 1 should not be mirrored"
-			err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
-				actions := client.Actions()
-				numExtraActions := len(actions) - numInitialActions
-				if numExtraActions != tc.expectedNumActions {
-					t.Logf("Expected %d additional client actions, got %d: %#v. Will retry", tc.expectedNumActions, numExtraActions, actions[numInitialActions:])
-					return false, nil
-				}
-				return true, nil
-			})
+			err = wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, true,
+				func(ctx context.Context) (done bool, err error) {
+					actions := client.Actions()
+					numExtraActions := len(actions) - numInitialActions
+					if numExtraActions != tc.expectedNumActions {
+						t.Logf("Expected %d additional client actions, got %d: %#v. Will retry", tc.expectedNumActions, numExtraActions, actions[numInitialActions:])
+						return false, nil
+					}
+					return true, nil
+				})
 			if err != nil {
 				t.Fatal("Timed out waiting for expected actions")
 			}

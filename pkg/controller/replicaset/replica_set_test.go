@@ -1218,10 +1218,11 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
-		return manager.queue.Len() == 1, nil
-	})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, informerSyncTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
+			return manager.queue.Len() == 1, nil
+		})
 	if err != nil {
 		t.Fatalf("initial RS didn't result in new item in the queue: %v", err)
 	}
@@ -1262,10 +1263,11 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
-		return manager.queue.Len() == 1, nil
-	})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, informerSyncTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
+			return manager.queue.Len() == 1, nil
+		})
 	if err != nil {
 		t.Fatalf("Deleting RS didn't result in new item in the queue: %v", err)
 	}
@@ -1304,10 +1306,11 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal("New RS has the same UID as the old one!")
 	}
 
-	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
-		return manager.queue.Len() == 1, nil
-	})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, informerSyncTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
+			return manager.queue.Len() == 1, nil
+		})
 	if err != nil {
 		t.Fatalf("Re-creating RS didn't result in new item in the queue: %v", err)
 	}

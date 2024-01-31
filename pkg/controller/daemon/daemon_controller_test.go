@@ -513,21 +513,22 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	waitForQueueLength := func(expected int, msg string) {
 		t.Helper()
 		i := 0
-		err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-			current := dsc.queue.Len()
-			switch {
-			case current == expected:
-				return true, nil
-			case current > expected:
-				return false, fmt.Errorf("queue length %d exceeded expected length %d", current, expected)
-			default:
-				i++
-				if i > 1 {
-					t.Logf("Waiting for queue to have %d item, currently has: %d", expected, current)
+		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, informerSyncTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				current := dsc.queue.Len()
+				switch {
+				case current == expected:
+					return true, nil
+				case current > expected:
+					return false, fmt.Errorf("queue length %d exceeded expected length %d", current, expected)
+				default:
+					i++
+					if i > 1 {
+						t.Logf("Waiting for queue to have %d item, currently has: %d", expected, current)
+					}
+					return false, nil
 				}
-				return false, nil
-			}
-		})
+			})
 		if err != nil {
 			t.Fatalf("%s: %v", msg, err)
 		}
