@@ -513,7 +513,8 @@ func TestHTTPProbeChecker_PayloadTruncated(t *testing.T) {
 		case "/success":
 			if r.Host == successHostHeader {
 				w.WriteHeader(http.StatusOK)
-				w.Write(oversizePayload)
+				_, err := w.Write(oversizePayload)
+				require.NoError(t, err)
 			} else {
 				http.Error(w, "", http.StatusBadRequest)
 			}
@@ -550,7 +551,8 @@ func TestHTTPProbeChecker_PayloadTruncatedAndTimeout(t *testing.T) {
 		case "/success":
 			if r.Host == successHostHeader {
 				w.WriteHeader(http.StatusOK)
-				w.Write(oversizePayload)
+				_, err := w.Write(oversizePayload)
+				require.NoError(t, err)
 				time.Sleep(2 * time.Second)
 			} else {
 				http.Error(w, "", http.StatusBadRequest)
