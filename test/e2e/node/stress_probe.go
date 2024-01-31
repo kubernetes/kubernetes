@@ -162,7 +162,7 @@ func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	podClient := e2epod.NewPodClient(f)
 	ns := f.Namespace.Name
 	numContainersInPod := len(pod.Spec.Containers)
-	gomega.Expect(numContainersInPod).To(gomega.Equal(numContainers), "pod sould have a %v countainers but have %v", numContainers, numContainersInPod)
+	gomega.Expect(numContainersInPod).To(gomega.Equal(numContainers), "pod should have a %v countainers but have %v", numContainers, numContainersInPod)
 	// At the end of the test, clean up by removing the pod.
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("deleting the pod")
