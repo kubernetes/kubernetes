@@ -291,6 +291,7 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
 	defer rq.missingUsageQueue.ShutDown()
+	defer rq.fullSyncQueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 
