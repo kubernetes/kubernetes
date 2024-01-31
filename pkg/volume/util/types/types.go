@@ -102,6 +102,23 @@ func IsFailedPreconditionError(err error) bool {
 	return errors.As(err, &failedPreconditionError)
 }
 
+type OperationNotSupported struct {
+	msg string
+}
+
+func (err *OperationNotSupported) Error() string {
+	return err.msg
+}
+
+func NewOperationNotSupportedError(msg string) *OperationNotSupported {
+	return &OperationNotSupported{msg: msg}
+}
+
+func IsOperationNotSupportedError(err error) bool {
+	var operationNotSupportedError *OperationNotSupported
+	return errors.As(err, &operationNotSupportedError)
+}
+
 // TransientOperationFailure indicates operation failed with a transient error
 // and may fix itself when retried.
 type TransientOperationFailure struct {
