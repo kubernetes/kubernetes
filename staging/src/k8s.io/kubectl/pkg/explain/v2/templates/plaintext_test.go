@@ -650,13 +650,13 @@ func TestPlaintext(t *testing.T) {
 		},
 		{
 			// show that extractEnum can skip empty enum slice
-			Name:        "Enum",
+			Name:        "extractEmptyEnum",
 			Subtemplate: "extractEnum",
 			Context: map[string]any{
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum":        []int{},
+					"enum":        []any{},
 				},
 			},
 			Checks: []check{
@@ -665,34 +665,87 @@ func TestPlaintext(t *testing.T) {
 		},
 		{
 			// show that extractEnum can extract any enum slice and style it uppercase
-			Name:        "Enum",
+			Name:        "extractEnumSimpleForm",
 			Subtemplate: "extractEnum",
 			Context: map[string]any{
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum":        []int{1, 2, 3},
+					"enum":        []any{0, 1, 2, 3},
 				},
-				"singleView": true,
+				"longFormView": false,
 			},
 			Checks: []check{
-				checkEquals("ENUM: 1, 2, 3"),
+				checkEquals("ENUM: 0, 1, 2, 3"),
 			},
 		},
 		{
 			// show that extractEnum can extract any enum slice and style it lowercase
-			Name:        "Enum",
+			Name:        "extractEnumLongFormWithIndent",
 			Subtemplate: "extractEnum",
 			Context: map[string]any{
 				"schema": map[string]any{
 					"type":        "string",
 					"description": "a description that should not be printed",
-					"enum":        []int{1, 2, 3},
+					"enum":        []any{0, 1, 2, 3},
 				},
-				"singleView": false,
+				"longFormView": true,
+				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals(" enum: 1, 2, 3"),
+				checkEquals("\n  enum: 0, 1, 2, 3"),
+			},
+		},
+		{
+			// show that extractEnum can extract any enum slice and style it with truncated enums
+			Name:        "extractEnumLongFormWithLimitAndIndent",
+			Subtemplate: "extractEnum",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"enum":        []any{0, 1, 2, 3},
+				},
+				"longFormView": true,
+				"limit":        2,
+				"indentAmount": 2,
+			},
+			Checks: []check{
+				checkEquals("\n  enum: 0, 1,.."),
+			},
+		},
+		{
+			// show that extractEnum can extract any enum slice and style it with truncated enums
+			Name:        "extractEnumSimpleFormWithLimitAndIndent",
+			Subtemplate: "extractEnum",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"enum":        []any{0, 1, 2, 3},
+				},
+				"longFormView": false,
+				"limit":        2,
+				"indentAmount": 2,
+			},
+			Checks: []check{
+				checkEquals("ENUM: 0, 1,.."),
+			},
+		},
+		{
+			// show that extractEnum can extract any enum slice and style it with empty string
+			Name:        "extractEnumSimpleFormEmptyString",
+			Subtemplate: "extractEnum",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"enum":        []any{"Block", "File", ""},
+				},
+				"longFormView": false,
+			},
+			Checks: []check{
+				checkEquals("ENUM: Block, File, \"\""),
 			},
 		},
 	}

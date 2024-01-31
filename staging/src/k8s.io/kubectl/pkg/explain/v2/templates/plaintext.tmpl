@@ -110,7 +110,7 @@ Takes dictionary as argument with keys:
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
             FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
-            {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "singleView" true) -}}{{"\n"}}
+            {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "longFormView" false "limit" 3) -}}{{"\n"}}
             {{- "\n" -}}
         {{- end -}}
 
@@ -205,7 +205,7 @@ Takes dictionary as argument with keys:
     {{- $fieldSchema := index $.schema.properties $.name -}}
     {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
-    {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "singleView" false) -}}
+    {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "longFormView" true "limit" -1 "indentAmount" $indentAmount) -}}
     {{- "\n" -}}
     {{- if not $.short -}}
         {{- or $fieldSchema.description "<no description>" | wrap (sub 78 $indentAmount) | indent (add $indentAmount 2) -}}{{- "\n" -}}
@@ -287,28 +287,45 @@ Takes dictionary as argument with keys:
 
 {{- /* Check if there is any enum returns it in this format e.g.:
 
-        ENUM: !=, =, =~, !~
-         enum: !=, =, =~, !~
+    ENUM: "", BlockDevice, CharDevice, Directory
+    enum: "", BlockDevice, CharDevice, Directory
 
     Can change the style of enum in future by modifying this function
 
 Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema
     Document: openapi document
-    singleView: determine if ENUM should be printed uppercase or not, used in single Field view
+    longFormView: (boolean) prints the enums in extended long form view or not
+    limit: (int) truncate the amount of enums that can be printed in simple view, -1 means all items
+    indentAmount: intent of the beginning enum line in longform view
 */ -}}
 {{- define "extractEnum" -}}
     {{- with $.schema -}}
         {{- if .enum -}}
-            {{- if $.singleView -}}
-                {{- "ENUM: " -}}
+            {{- $enumLen := len .enum -}}
+            {{- $limit := or $.limit -1 -}}
+            {{- if $.longFormView -}}
+                {{- "\n" -}}
+                {{- "" | indent $.indentAmount -}}
+                {{- "enum: " -}}
             {{- else -}}
-                {{- " enum: " -}}
+                {{- "ENUM: " -}}
             {{- end -}}
             {{- range $index, $element := .enum -}}
+                {{- if and (gt $limit -1) (ge $index $limit) -}}
+                    {{- /* Prints ,..  and return the range when it goes over the limit */ -}}
+                    {{- ",.." -}}
+                    {{- break -}}
+                {{- end -}}
+                {{- /* Use to reflect "" when we see empty string */ -}}
+                {{- $elementType := printf "%T" $element -}}
                 {{- if gt $index 0 -}} {{- ", " -}} {{- end -}}
-                {{- $element -}}
-            {{- end -}}
+                {{- if and (eq "string" $elementType) (eq $element "") -}}
+                    {{- `""` -}}
+                {{- else -}}
+                    {{- $element -}}
+                {{- end -}}
+        {{- end -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}
