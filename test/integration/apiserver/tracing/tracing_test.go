@@ -338,7 +338,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 						"client": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "127.0.0.1"
+							return v.GetStringValue() == "192.168.0.1"
 						},
 						"accept": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
@@ -457,7 +457,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 						"client": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "127.0.0.1"
+							return v.GetStringValue() == "192.168.0.1"
 						},
 						"accept": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
@@ -547,7 +547,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 						"client": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "127.0.0.1"
+							return v.GetStringValue() == "192.168.0.1"
 						},
 						"accept": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
@@ -665,7 +665,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 						"client": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "127.0.0.1"
+							return v.GetStringValue() == "192.168.0.1"
 						},
 						"accept": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
@@ -809,7 +809,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 						"client": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "127.0.0.1"
+							return v.GetStringValue() == "192.168.0.1"
 						},
 						"accept": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
@@ -930,7 +930,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() != ""
 						},
 						"client": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "127.0.0.1"
+							return v.GetStringValue() == "192.168.0.1"
 						},
 						"accept": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"

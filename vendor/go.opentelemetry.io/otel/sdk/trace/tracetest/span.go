@@ -162,6 +162,7 @@ func (s spanSnapshot) Resource() *resource.Resource     { return s.resource }
 func (s spanSnapshot) InstrumentationScope() instrumentation.Scope {
 	return s.instrumentationScope
 }
+
 func (s spanSnapshot) InstrumentationLibrary() instrumentation.Library {
 	return s.instrumentationScope
 }

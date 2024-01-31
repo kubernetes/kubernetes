@@ -35,6 +35,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.etcd.io/etcd/server/v3/config"
+	"go.etcd.io/etcd/server/v3/wal/walpb"
 	"go.uber.org/zap"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
@@ -392,7 +393,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 	}
 
 	defer func() {
-		if err != nil {
+		if be != nil && err != nil {
 			be.Close()
 		}
 	}()
@@ -485,13 +486,14 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		}
 
 		// Find a snapshot to start/restart a raft node
-		walSnaps, err := wal.ValidSnapshotEntries(cfg.Logger, cfg.WALDir())
+		var walSnaps []walpb.Snapshot
+		walSnaps, err = wal.ValidSnapshotEntries(cfg.Logger, cfg.WALDir())
 		if err != nil {
 			return nil, err
 		}
 		// snapshot files can be orphaned if etcd crashes after writing them but before writing the corresponding
 		// wal log entries
-		snapshot, err := ss.LoadNewestAvailable(walSnaps)
+		snapshot, err = ss.LoadNewestAvailable(walSnaps)
 		if err != nil && err != snap.ErrNoSnapshot {
 			return nil, err
 		}
@@ -724,6 +726,10 @@ func (s *EtcdServer) Logger() *zap.Logger {
 	return l
 }
 
+func (s *EtcdServer) Config() config.ServerConfig {
+	return s.Cfg
+}
+
 func tickToDur(ticks int, tickMs uint) string {
 	return fmt.Sprintf("%v", time.Duration(ticks)*time.Duration(tickMs)*time.Millisecond)
 }
@@ -869,8 +875,8 @@ func (s *EtcdServer) purgeFile() {
 	var dberrc, serrc, werrc <-chan error
 	var dbdonec, sdonec, wdonec <-chan struct{}
 	if s.Cfg.MaxSnapFiles > 0 {
-		dbdonec, dberrc = fileutil.PurgeFileWithDoneNotify(lg, s.Cfg.SnapDir(), "snap.db", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
-		sdonec, serrc = fileutil.PurgeFileWithDoneNotify(lg, s.Cfg.SnapDir(), "snap", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
+		dbdonec, dberrc = fileutil.PurgeFileWithoutFlock(lg, s.Cfg.SnapDir(), "snap.db", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
+		sdonec, serrc = fileutil.PurgeFileWithoutFlock(lg, s.Cfg.SnapDir(), "snap", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
 	}
 	if s.Cfg.MaxWALFiles > 0 {
 		wdonec, werrc = fileutil.PurgeFileWithDoneNotify(lg, s.Cfg.WALDir(), "wal", s.Cfg.MaxWALFiles, purgeFileInterval, s.stopping)
@@ -2148,6 +2154,7 @@ func (s *EtcdServer) apply(
 			zap.Stringer("type", e.Type))
 		switch e.Type {
 		case raftpb.EntryNormal:
+			// gofail: var beforeApplyOneEntryNormal struct{}
 			s.applyEntryNormal(&e)
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)
