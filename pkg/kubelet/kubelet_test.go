@@ -71,6 +71,7 @@ import (
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
@@ -3098,7 +3099,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		DynamicPluginProber:  prober,
 		TLSOptions:           tlsOptions,
 	}
-	crOptions := &config.ContainerRuntimeOptions{}
+	crOptions := &kubeletconfig.ContainerRuntimeOptions{}
 
 	testMainKubelet, err := NewMainKubelet(
 		kubeCfg,
