@@ -748,6 +748,54 @@ func TestPlaintext(t *testing.T) {
 				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
 			},
 		},
+		{
+			// show that extractMergeStrategy can skip empty merge strategy
+			Name:        "empytMergeStrategyEmpty",
+			Subtemplate: "extractMergeStrategy",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":                         "object",
+					"x-kubernetes-patch-merge-key": "",
+					"x-kubernetes-patch-strategy":  "",
+					"description":                  "a description that should not be printed",
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// show that extractMergeStrategy can skip if one of the keys(merge key, strategy) are empty
+			Name:        "empytMergeStrategyEmpty",
+			Subtemplate: "extractMergeStrategy",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":                         "object",
+					"x-kubernetes-patch-merge-key": "name",
+					"x-kubernetes-patch-strategy":  "",
+					"description":                  "a description that should not be printed",
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// show that extractMergeStrategy can print merge strategy
+			Name:        "empytMergeStrategyPrint",
+			Subtemplate: "extractMergeStrategy",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":                         "object",
+					"x-kubernetes-patch-merge-key": "name",
+					"x-kubernetes-patch-strategy":  "merge,retainKeys",
+					"description":                  "a description that should not be printed",
+				},
+			},
+			Checks: []check{
+				checkEquals("X_KUBERNETES_PATCH_MARGE_KEY: name\nX_KUBERNETES_PATCH_STRATEGY: merge,retainKeys\n"),
+			},
+		},
 	}
 
 	tmpl, err := v2.WithBuiltinTemplateFuncs(template.New("")).Parse(plaintextSource)

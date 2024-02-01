@@ -110,7 +110,11 @@ Takes dictionary as argument with keys:
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
             FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
+<<<<<<< HEAD
             {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1) -}}{{"\n"}}
+=======
+            {{- template "extractMergeStrategy" (dict "schema" $subschema) -}}
+>>>>>>> 02a25bf9e62 (Add merge key and strategy to kubectl explain)
             {{- "\n" -}}
         {{- end -}}
 
@@ -334,6 +338,33 @@ Takes dictionary as argument with keys:
                     {{- $element -}}
                 {{- end -}}
         {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* Check if there is any patch strategy returns it in this format e.g.:
+
+    X_KUBERNETES_PATCH_MARGE_KEY: name
+    X_KUBERNETES_PATCH_STRATEGY: merge,retainKeys
+
+Takes dictionary as argument with keys:
+    schema: openapiv3 JSON schema
+*/ -}}
+{{- define "extractMergeStrategy" -}}
+    {{- with $.schema -}}
+        {{- /* TODO: maybe there is a way so we do not define keys here and get them in another way */ -}}
+        {{- /* Define the names here so when they got changed in future we can fix them easier */ -}}
+        {{- $mergeKeyName := "x-kubernetes-patch-merge-key" -}}
+        {{- $mergeStrategyName := "x-kubernetes-patch-strategy" -}}
+
+        {{- /* Use the keys we define earlier to get the values */ -}}
+        {{- $mergeKey := index $.schema $mergeKeyName -}}
+        {{- $mergeStrategy := index $.schema $mergeStrategyName -}}
+
+        {{- /* If there is any value we can print them out */ -}}
+        {{- if and $mergeKey $mergeStrategy -}}
+            {{- "X_KUBERNETES_PATCH_MARGE_KEY: " -}} {{- $mergeKey -}} {{- "\n" -}}
+            {{- "X_KUBERNETES_PATCH_STRATEGY: " -}} {{- $mergeStrategy -}} {{- "\n" -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}
