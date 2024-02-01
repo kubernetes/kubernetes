@@ -1236,10 +1236,10 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 
 	// NewMainKubelet should have set up a pod source config if one didn't exist
 	// when the builder was run. This is just a precaution.
-	if kubeDeps.PodConfig == nil {
+	if kubeDeps.PodSource == nil {
 		return fmt.Errorf("failed to create kubelet, pod source config was nil")
 	}
-	podCfg := kubeDeps.PodConfig
+	podCfg := kubeDeps.PodSource
 
 	if err := rlimit.SetNumFiles(uint64(kubeServer.MaxOpenFiles)); err != nil {
 		klog.ErrorS(err, "Failed to set rlimit on max file handles")
@@ -1258,7 +1258,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	return nil
 }
 
-func startKubelet(k kubelet.Bootstrap, podCfg *podsource.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
+func startKubelet(k kubelet.Bootstrap, podCfg *podsource.PodSource, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
 	// start the kubelet
 	go k.Run(podCfg.Updates())
 

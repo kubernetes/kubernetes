@@ -262,7 +262,7 @@ type Dependencies struct {
 	HostUtil                  hostutil.HostUtils
 	OOMAdjuster               *oom.OOMAdjuster
 	OSInterface               kubecontainer.OSInterface
-	PodConfig                 *podsource.PodConfig
+	PodSource                 *podsource.PodSource
 	ProbeManager              prober.Manager
 	Recorder                  record.EventRecorder
 	Subpather                 subpath.Interface
@@ -278,9 +278,9 @@ type Dependencies struct {
 	useLegacyCadvisorStats bool
 }
 
-// makePodSourceConfig creates a config.PodConfig from the given
+// makePodSource creates a PodSource from the given
 // KubeletConfiguration or returns an error.
-func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*podsource.PodConfig, error) {
+func makePodSource(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*podsource.PodSource, error) {
 	manifestURLHeader := make(http.Header)
 	if len(kubeCfg.StaticPodURLHeader) > 0 {
 		for k, v := range kubeCfg.StaticPodURLHeader {
@@ -291,7 +291,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	}
 
 	// source of all configuration
-	cfg := podsource.NewPodConfig(podsource.PodConfigNotificationIncremental, kubeDeps.Recorder, kubeDeps.PodStartupLatencyTracker)
+	src := podsource.NewPodSource(podsource.PodSourceNotificationIncremental, kubeDeps.Recorder, kubeDeps.PodStartupLatencyTracker)
 
 	// TODO:  it needs to be replaced by a proper context in the future
 	ctx := context.TODO()
@@ -299,20 +299,20 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	// define file config source
 	if kubeCfg.StaticPodPath != "" {
 		klog.InfoS("Adding static pod path", "path", kubeCfg.StaticPodPath)
-		podsource.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.FileSource))
+		podsource.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, src.Channel(ctx, kubetypes.FileSource))
 	}
 
 	// define url config source
 	if kubeCfg.StaticPodURL != "" {
 		klog.InfoS("Adding pod URL with HTTP header", "URL", kubeCfg.StaticPodURL, "header", manifestURLHeader)
-		podsource.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.HTTPSource))
+		podsource.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, src.Channel(ctx, kubetypes.HTTPSource))
 	}
 
 	if kubeDeps.KubeClient != nil {
 		klog.InfoS("Adding apiserver pod source")
-		podsource.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
+		podsource.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, src.Channel(ctx, kubetypes.ApiserverSource))
 	}
-	return cfg, nil
+	return src, nil
 }
 
 // PreInitRuntimeService will init runtime service before RunKubelet.
@@ -402,9 +402,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klog.InfoS("Kubelet is running in standalone mode, will skip API server sync")
 	}
 
-	if kubeDeps.PodConfig == nil {
+	if kubeDeps.PodSource == nil {
 		var err error
-		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName, nodeHasSynced)
+		kubeDeps.PodSource, err = makePodSource(kubeCfg, kubeDeps, nodeName, nodeHasSynced)
 		if err != nil {
 			return nil, err
 		}
@@ -520,7 +520,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
 		rootDirectory:                  filepath.Clean(rootDirectory),
 		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
-		sourcesReady:                   podsource.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
+		sourcesReady:                   podsource.NewSourcesReady(kubeDeps.PodSource.SeenAllSources),
 		registerNode:                   registerNode,
 		registerWithTaints:             registerWithTaints,
 		registerSchedulable:            registerSchedulable,
