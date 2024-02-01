@@ -2533,9 +2533,7 @@ func TestCRDsOnStartup(t *testing.T) {
 	// Start the server.
 	server = apiservertesting.StartTestServerOrDie(
 		t,
-		&apiservertesting.TestServerInstanceOptions{
-			SkipHealthzCheck: true,
-		},
+		&apiservertesting.TestServerInstanceOptions{},
 		[]string{
 			"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			"--authorization-mode=RBAC",
