@@ -673,10 +673,10 @@ func TestPlaintext(t *testing.T) {
 					"description": "a description that should not be printed",
 					"enum":        []any{0, 1, 2, 3},
 				},
-				"longFormView": false,
+				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM: 0, 1, 2, 3"),
+				checkEquals("ENUM:\n    0\n    1\n    2\n    3"),
 			},
 		},
 		{
@@ -689,7 +689,7 @@ func TestPlaintext(t *testing.T) {
 					"description": "a description that should not be printed",
 					"enum":        []any{0, 1, 2, 3},
 				},
-				"longFormView": true,
+				"isLongView":   false,
 				"indentAmount": 2,
 			},
 			Checks: []check{
@@ -706,12 +706,12 @@ func TestPlaintext(t *testing.T) {
 					"description": "a description that should not be printed",
 					"enum":        []any{0, 1, 2, 3},
 				},
-				"longFormView": true,
+				"isLongView":   false,
 				"limit":        2,
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1,.."),
+				checkEquals("\n  enum: 0, 1, ...."),
 			},
 		},
 		{
@@ -724,12 +724,12 @@ func TestPlaintext(t *testing.T) {
 					"description": "a description that should not be printed",
 					"enum":        []any{0, 1, 2, 3},
 				},
-				"longFormView": false,
+				"isLongView":   true,
 				"limit":        2,
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("ENUM: 0, 1,.."),
+				checkEquals("ENUM:\n    0\n    1, ...."),
 			},
 		},
 		{
@@ -742,10 +742,10 @@ func TestPlaintext(t *testing.T) {
 					"description": "a description that should not be printed",
 					"enum":        []any{"Block", "File", ""},
 				},
-				"longFormView": false,
+				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM: Block, File, \"\""),
+				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
 			},
 		},
 	}
