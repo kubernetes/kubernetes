@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -55,6 +56,8 @@ type TypeCheckingContext struct {
 	declTypes     []*apiservercel.DeclType
 	paramGVK      schema.GroupVersionKind
 	paramDeclType *apiservercel.DeclType
+
+	variables []v1beta1.Variable
 }
 
 type typeOverwrite struct {
@@ -68,7 +71,7 @@ type TypeCheckingResult struct {
 	// GVK is the associated GVK
 	GVK schema.GroupVersionKind
 	// Issues contain machine-readable information about the typechecking result.
-	Issues *cel.Issues
+	Issues error
 	// Err is the possible error that was encounter during type checking.
 	Err error
 }
@@ -168,7 +171,27 @@ func (c *TypeChecker) CreateContext(policy *v1beta1.ValidatingAdmissionPolicy) *
 	}
 	ctx.paramGVK = paramsGVK
 	ctx.paramDeclType = paramsDeclType
+	ctx.variables = policy.Spec.Variables
 	return ctx
+}
+
+func (c *TypeChecker) compiler(ctx *TypeCheckingContext, typeOverwrite typeOverwrite) (*plugincel.CompositedCompiler, error) {
+	envSet, err := buildEnvSet(
+		/* hasParams */ ctx.paramDeclType != nil,
+		/* hasAuthorizer */ true,
+		typeOverwrite)
+	if err != nil {
+		return nil, err
+	}
+	env, err := plugincel.NewCompositionEnv(plugincel.VariablesTypeName, envSet)
+	if err != nil {
+		return nil, err
+	}
+	compiler := &plugincel.CompositedCompiler{
+		Compiler:       &typeCheckingCompiler{typeOverwrite: typeOverwrite},
+		CompositionEnv: env,
+	}
+	return compiler, nil
 }
 
 // CheckExpression type checks a single expression, given the context
@@ -176,18 +199,42 @@ func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression strin
 	var results TypeCheckingResults
 	for i, gvk := range ctx.gvks {
 		declType := ctx.declTypes[i]
-		// TODO(jiahuif) hasAuthorizer always true for now, will change after expending type checking to all fields.
-		issues, err := c.checkExpression(expression, ctx.paramDeclType != nil, true, typeOverwrite{
+		compiler, err := c.compiler(ctx, typeOverwrite{
 			object: declType,
 			params: ctx.paramDeclType,
 		})
-		if issues != nil || err != nil {
-			results = append(results, &TypeCheckingResult{Issues: issues, Err: err, GVK: gvk})
+		if err != nil {
+			utilruntime.HandleError(err)
+			continue
+		}
+		options := plugincel.OptionalVariableDeclarations{
+			HasParams:     ctx.paramDeclType != nil,
+			HasAuthorizer: true,
+		}
+		compiler.CompileAndStoreVariables(convertv1beta1Variables(ctx.variables), options, environment.StoredExpressions)
+		result := compiler.CompileCELExpression(celExpression(expression), options, environment.StoredExpressions)
+		if err := result.Error; err != nil {
+			typeCheckingResult := &TypeCheckingResult{GVK: gvk}
+			if err.Type == apiservercel.ErrorTypeInvalid {
+				typeCheckingResult.Issues = err
+			} else {
+				typeCheckingResult.Err = err
+			}
+			results = append(results, typeCheckingResult)
 		}
 	}
 	return results
 }
 
+type celExpression string
+
+func (c celExpression) GetExpression() string {
+	return string(c)
+}
+
+func (c celExpression) ReturnTypes() []*cel.Type {
+	return []*cel.Type{cel.AnyType}
+}
 func generateUniqueTypeName(kind string) string {
 	return fmt.Sprintf("%s%d", kind, time.Now().Nanosecond())
 }
@@ -212,23 +259,6 @@ func (c *TypeChecker) paramsGVK(policy *v1beta1.ValidatingAdmissionPolicy) schem
 		return schema.GroupVersionKind{}
 	}
 	return gv.WithKind(policy.Spec.ParamKind.Kind)
-}
-
-func (c *TypeChecker) checkExpression(expression string, hasParams, hasAuthorizer bool, types typeOverwrite) (*cel.Issues, error) {
-	env, err := buildEnv(hasParams, hasAuthorizer, types)
-	if err != nil {
-		return nil, err
-	}
-
-	// We cannot reuse an AST that is parsed by another env, so reparse it here.
-	// Compile = Parse + Check, we especially want the results of Check.
-	//
-	// Paradoxically, we discard the type-checked result and let the admission
-	// controller use the dynamic typed program.
-	// This is a compromise that is defined in the KEP. We can revisit this
-	// decision and expect a change with limited size.
-	_, issues := env.Compile(expression)
-	return issues, nil
 }
 
 // typesToCheck extracts a list of GVKs that needs type checking from the policy
@@ -360,7 +390,7 @@ func (c *TypeChecker) tryRefreshRESTMapper() {
 	}
 }
 
-func buildEnv(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*cel.Env, error) {
+func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*environment.EnvSet, error) {
 	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	requestType := plugincel.BuildRequestType()
 	namespaceType := plugincel.BuildNamespaceType()
@@ -392,7 +422,7 @@ func buildEnv(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*cel.Env
 		varOpts = append(varOpts, cel.Variable("authorizer", library.AuthorizerType))
 	}
 
-	env, err := baseEnv.Extend(
+	return baseEnv.Extend(
 		environment.VersionedOptions{
 			// Feature epoch was actually 1.26, but we artificially set it to 1.0 because these
 			// options should always be present.
@@ -401,10 +431,6 @@ func buildEnv(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*cel.Env
 			DeclTypes:         declTypes,
 		},
 	)
-	if err != nil {
-		return nil, err
-	}
-	return env.Env(environment.StoredExpressions)
 }
 
 // createVariableOpts creates a slice of EnvOption
@@ -421,3 +447,41 @@ func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []
 	}
 	return opts
 }
+
+type typeCheckingCompiler struct {
+	typeOverwrite typeOverwrite
+}
+
+// CompileCELExpression compiles the given expression.
+// The implementation is the same as that of staging/src/k8s.io/apiserver/pkg/admission/plugin/cel/compile.go
+// except that:
+// - object, oldObject, and params are typed instead of Dyn
+// - compiler does not enforce the output type
+// - the compiler does not initialize the program
+func (c *typeCheckingCompiler) CompileCELExpression(expressionAccessor plugincel.ExpressionAccessor, options plugincel.OptionalVariableDeclarations, mode environment.Type) plugincel.CompilationResult {
+	resultError := func(errorString string, errType apiservercel.ErrorType) plugincel.CompilationResult {
+		return plugincel.CompilationResult{
+			Error: &apiservercel.Error{
+				Type:   errType,
+				Detail: errorString,
+			},
+			ExpressionAccessor: expressionAccessor,
+		}
+	}
+	envSet, err := buildEnvSet(options.HasParams, options.HasAuthorizer, c.typeOverwrite)
+	if err != nil {
+		return resultError(fmt.Sprintf("fail to build env set: %v", err), apiservercel.ErrorTypeInternal)
+	}
+	env, err := envSet.Env(mode)
+	if err != nil {
+		return resultError(fmt.Sprintf("fail to build env: %v", err), apiservercel.ErrorTypeInternal)
+	}
+	_, issues := env.Compile(expressionAccessor.GetExpression())
+	if issues != nil {
+		return resultError(issues.String(), apiservercel.ErrorTypeInvalid)
+	}
+	// type checker does not require the program, an empty result indicates successful compilation.
+	return plugincel.CompilationResult{}
+}
+
+var _ plugincel.Compiler = (*typeCheckingCompiler)(nil)
