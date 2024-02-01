@@ -854,7 +854,7 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 	for i, c := range calls {
 		if i >= len(expectedCallSequence) {
 			// Log all unexpected calls first, return error below outside the loop.
-			framework.Logf("Unexpected CSI driver call: %s (%d)", c.Method, c.FullError)
+			framework.Logf("Unexpected CSI driver call: %s (%v)", c.Method, c.FullError)
 			continue
 		}
 
