@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -40,7 +41,9 @@ import (
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/mux"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -48,6 +51,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
@@ -672,443 +676,594 @@ func TestApfWithRequestDigest(t *testing.T) {
 	}
 }
 
-func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
+func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) {
+	// scenario:
+	// a) priority level nominal concurrency is set to 1
+	// b) the handler of the first request panics while it is being executed
+	// c) next request that follows should not be rejected
+	epmetrics.Register()
+	fcmetrics.Register()
+
+	tests := []struct {
+		perHandlerReadWriteTimeoutEnabled bool
+	}{
+		{perHandlerReadWriteTimeoutEnabled: false},
+		{perHandlerReadWriteTimeoutEnabled: true},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
+
+			const (
+				userName                                              = "alice"
+				fsName                                                = "test-fs"
+				plName                                                = "test-pl"
+				serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
+			)
+
+			apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
+			stopCh := make(chan struct{})
+			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+
+			headerMatcher := headerMatcher{}
+			// we will raise a panic for the first request.
+			firstRequestPathPanic, secondRequestPathShouldWork := "/request/first/panic-as-expected", "/request/second/should-succeed-as-expected"
+			firstHandlerDoneCh, secondHandlerDoneCh := make(chan struct{}), make(chan struct{})
+			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headerMatcher.inspect(t, w, fsName, plName)
+				switch {
+				case r.URL.Path == firstRequestPathPanic:
+					close(firstHandlerDoneCh)
+					panic(fmt.Errorf("request handler panic'd as expected - %#v", r.RequestURI))
+				case r.URL.Path == secondRequestPathShouldWork:
+					close(secondHandlerDoneCh)
+				}
+			})
+
+			// NOTE: the server will enforce a 1m timeout on every incoming
+			//  request, and the client enforces a timeout of 2m.
+			handler := newHandlerChain(t, requestHandler, controller, userName, time.Minute)
+			server, requestGetter := newHTTP2ServerWithClient(handler, 2*time.Minute)
+			defer server.Close()
+
+			// we send two requests synchronously, one at a time
+			//  - the first request is expected to panic, and
+			//  - the second request is expected to succeed
+			_, err := requestGetter(firstRequestPathPanic)
+
+			// did the handler of the first request panic, as expected?
+			select {
+			case <-firstHandlerDoneCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the server handler to panic for request: %q", firstRequestPathPanic)
+			}
+			if isClientTimeout(err) {
+				t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", firstRequestPathPanic, err.Error())
+			}
+			expectStreamResetError(t, err)
+
+			// the second request should be served successfully.
+			response, err := requestGetter(secondRequestPathShouldWork)
+			expectStatusCode(t, http.StatusOK, secondRequestPathShouldWork, response, err)
+
+			select {
+			case <-secondHandlerDoneCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the server handler to have completed: %q", secondRequestPathShouldWork)
+			}
+
+			close(stopCh)
+			t.Log("Waiting for the controller to shutdown")
+
+			controllerErr := <-controllerCompletedCh
+			if controllerErr != nil {
+				t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
+			}
+		})
+	}
+}
+
+func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1
+	// b) request times out before its handler writes to the
+	// underlying ResponseWriter object.
+	epmetrics.Register()
+	fcmetrics.Register()
+
+	tests := []struct {
+		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
+	}{
+		{perHandlerReadWriteTimeoutEnabled: false, statusCodeExpected: http.StatusGatewayTimeout},
+		{perHandlerReadWriteTimeoutEnabled: true}, // we expect a stream reset error
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
+
+			const (
+				userName                                              = "alice"
+				fsName                                                = "test-fs"
+				plName                                                = "test-pl"
+				serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
+			)
+
+			apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
+			stopCh := make(chan struct{})
+			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+
+			headerMatcher := headerMatcher{}
+			rquestTimesOutPath := "/request/time-out-as-expected"
+			reqHandlerCompletedCh, callerRoundTripDoneCh := make(chan struct{}), make(chan struct{})
+			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headerMatcher.inspect(t, w, fsName, plName)
+
+				if r.URL.Path == rquestTimesOutPath {
+					defer close(reqHandlerCompletedCh)
+
+					// this will force the request to time out.
+					<-callerRoundTripDoneCh
+				}
+			})
+
+			// NOTE: the server will enforce a 1s timeout on every
+			//  incoming request, and the client enforces a timeout of 1m.
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
+			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
+			defer server.Close()
+
+			// send a request synchronously with a client timeout of 1m,  this minimizes the
+			// chance of a flake in ci, the cient waits long enough for the server to send a
+			// timeout response to the client.
+			var (
+				response *http.Response
+				err      error
+			)
+			func() {
+				defer close(callerRoundTripDoneCh)
+
+				t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
+				response, err = requestGetter(rquestTimesOutPath)
+				if isClientTimeout(err) {
+					t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
+				}
+			}()
+
+			t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
+			select {
+			case <-reqHandlerCompletedCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
+			}
+
+			switch {
+			case test.statusCodeExpected > 0:
+				expectStatusCode(t, test.statusCodeExpected, rquestTimesOutPath, response, err)
+			default:
+				expectStreamResetError(t, err)
+			}
+
+			close(stopCh)
+			t.Log("Waiting for the controller to shutdown")
+
+			controllerErr := <-controllerCompletedCh
+			if controllerErr != nil {
+				t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
+			}
+		})
+	}
+}
+
+func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1
+	// b) the request being executed times out first, and
+	// b) then the inner hander of the request panics
+	epmetrics.Register()
+	fcmetrics.Register()
+
+	tests := []struct {
+		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
+		writeErrContains                  string
+	}{
+		{
+			perHandlerReadWriteTimeoutEnabled: false,
+			statusCodeExpected:                http.StatusGatewayTimeout,
+			writeErrContains:                  "http: Handler timeout",
+		},
+		{
+			// we expect a stream reset error, no http status code
+			perHandlerReadWriteTimeoutEnabled: true,
+			writeErrContains:                  "i/o timeout",
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
+
+			const (
+				userName                                              = "alice"
+				fsName                                                = "test-fs"
+				plName                                                = "test-pl"
+				serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
+			)
+
+			apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
+			stopCh := make(chan struct{})
+			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+
+			headerMatcher := headerMatcher{}
+			reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
+			rquestTimesOutPath := "/request/time-out-as-expected"
+			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headerMatcher.inspect(t, w, fsName, plName)
+
+				if r.URL.Path == rquestTimesOutPath {
+					<-callerRoundTripDoneCh
+
+					// a) with the timeout filter, we expect
+					// the timeout handler to have timed out
+					// this request by now and any attempt
+					// to write to the ResponseWriter should
+					// return a http.ErrHandlerTimeout error.
+					// b) with per handler read/write timeout
+					// write will eventually return error.
+					if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+							reqHandlerErrCh <- err
+							return true, nil
+						}
+						return false, nil
+					}); err != nil {
+						t.Errorf("timeout while waiting for ResponseWriter.Write to return an error: %v", err)
+						reqHandlerErrCh <- err
+					}
+					panic(http.ErrAbortHandler)
+				}
+			})
+			// NOTE: the server will enforce a 1s timeout on every
+			//  incoming request, and the client enforces a timeout of 1m.
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
+			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
+			defer server.Close()
+
+			// send a request synchronously with a client timeout of 1m, this minimizes the
+			// chance of a flake in ci, the cient waits long enough for the server to send a
+			// timeout response to the client.
+			var (
+				response *http.Response
+				err      error
+			)
+			func() {
+				defer close(callerRoundTripDoneCh)
+				t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
+				response, err = requestGetter(rquestTimesOutPath)
+				if isClientTimeout(err) {
+					t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
+				}
+			}()
+
+			t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
+			select {
+			case innerHandlerWriteErr := <-reqHandlerErrCh:
+				if innerHandlerWriteErr == nil || !strings.Contains(innerHandlerWriteErr.Error(), test.writeErrContains) {
+					t.Errorf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, innerHandlerWriteErr)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
+			}
+
+			switch {
+			case test.statusCodeExpected > 0:
+				expectStatusCode(t, test.statusCodeExpected, rquestTimesOutPath, response, err)
+			default:
+				expectStreamResetError(t, err)
+			}
+
+			close(stopCh)
+			t.Log("Waiting for the controller to shutdown")
+
+			controllerErr := <-controllerCompletedCh
+			if controllerErr != nil {
+				t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
+			}
+		})
+	}
+}
+
+func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1
+	// b) the handler of the request writes to the ResponseWriter object first
+	// c) the request times out
+	epmetrics.Register()
+	fcmetrics.Register()
+
+	tests := []struct {
+		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
+		writeErrContains                  string
+	}{
+		{
+			// we expect a stream reset error, no http status code
+			// since the handler writes to the ResponseWriter
+			// before the timeout filter times out the request.
+			perHandlerReadWriteTimeoutEnabled: false,
+			writeErrContains:                  "http: Handler timeout",
+		},
+		{
+			// we expect a stream reset error, no http status code
+			perHandlerReadWriteTimeoutEnabled: true,
+			writeErrContains:                  "i/o timeout",
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
+
+			const (
+				userName                                              = "alice"
+				fsName                                                = "test-fs"
+				plName                                                = "test-pl"
+				serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
+			)
+
+			apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
+			stopCh := make(chan struct{})
+			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+
+			headerMatcher := headerMatcher{}
+			rquestTimesOutPath := "/request/time-out-as-expected"
+			reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
+			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headerMatcher.inspect(t, w, fsName, plName)
+
+				if r.URL.Path == rquestTimesOutPath {
+					// after the inner handler writes, we let the request time out.
+					w.WriteHeader(http.StatusBadRequest)
+					if _, err := w.Write([]byte("hello world")); err != nil {
+						t.Errorf("Did not expect ResponseWriter.Write to return an error: %v", err)
+					}
+					<-callerRoundTripDoneCh
+
+					// a) with the timeout filter, we expect
+					// the timeout handler to have timed out
+					// this request by now and any attempt
+					// to write to the ResponseWriter should
+					// return a http.ErrHandlerTimeout error.
+					// b) with per handler read/write timeout
+					// write will eventually return error.
+					if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+							reqHandlerErrCh <- err
+							return true, nil
+						}
+						return false, nil
+					}); err != nil {
+						t.Errorf("timeout while waiting for ResponseWriter.Write to return an error: %v", err)
+						reqHandlerErrCh <- err
+					}
+				}
+			})
+
+			// NOTE: the server will enforce a 1s timeout on every
+			//  incoming request, and the client enforces a timeout of 1m.
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
+			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
+			defer server.Close()
+
+			// send a request synchronously with a client timeout of 1m, this minimizes the
+			// chance of a flake in ci, the cient waits long enough for the server to send a
+			// timeout response to the client.
+			var err error
+			func() {
+				defer close(callerRoundTripDoneCh)
+				t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
+				_, err = requestGetter(rquestTimesOutPath)
+				if isClientTimeout(err) {
+					t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
+				}
+			}()
+			expectStreamResetError(t, err)
+
+			t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
+			select {
+			case innerHandlerWriteErr := <-reqHandlerErrCh:
+				if innerHandlerWriteErr == nil || !strings.Contains(innerHandlerWriteErr.Error(), test.writeErrContains) {
+					t.Errorf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, innerHandlerWriteErr)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
+			}
+
+			close(stopCh)
+			t.Log("Waiting for the controller to shutdown")
+
+			controllerErr := <-controllerCompletedCh
+			if controllerErr != nil {
+				t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
+			}
+		})
+	}
+}
+
+func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1, and queue length is 1
+	// b) the first request arrives and is being executed
+	// c) the second request arrives and is is enqueued
+	// d) the first request handler blocks indefinitely
+	// e) the second request should be rejected by APF
+	// f) the first request eventually times out
 	epmetrics.Register()
 	fcmetrics.Register()
 	timeFmt := "15:04:05.999"
 
-	t.Run("priority level concurrency is set to 1, request handler panics, next request should not be rejected", func(t *testing.T) {
-		const (
-			userName                                              = "alice"
-			fsName                                                = "test-fs"
-			plName                                                = "test-pl"
-			serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
-		)
+	type result struct {
+		err      error
+		response *http.Response
+	}
 
-		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+	tests := []struct {
+		perHandlerReadWriteTimeoutEnabled bool
+		statusCodeExpected                int
+		writeErrContains                  string
+	}{
+		{
+			perHandlerReadWriteTimeoutEnabled: false,
+			statusCodeExpected:                http.StatusGatewayTimeout,
+			writeErrContains:                  "http: Handler timeout",
+		},
+		{
+			// we expect a stream reset error, no http status code
+			perHandlerReadWriteTimeoutEnabled: true,
+			writeErrContains:                  "i/o timeout",
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s=%t", string(features.PerHandlerReadWriteTimeout), test.perHandlerReadWriteTimeoutEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, test.perHandlerReadWriteTimeoutEnabled)()
 
-		headerMatcher := headerMatcher{}
-		// we will raise a panic for the first request.
-		firstRequestPathPanic, secondRequestPathShouldWork := "/request/panic-as-designed", "/request/should-succeed-as-expected"
-		firstHandlerDoneCh, secondHandlerDoneCh := make(chan struct{}), make(chan struct{})
-		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			headerMatcher.inspect(t, w, fsName, plName)
+			const (
+				userName                                                           = "alice"
+				fsName                                                             = "test-fs"
+				plName                                                             = "test-pl"
+				serverConcurrency, plConcurrencyShares, plConcurrency, queueLength = 1, 1, 1, 1
+			)
+
+			apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
+			stopCh := make(chan struct{})
+			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+
+			headerMatcher := headerMatcher{}
+			firstRequestTimesOutPath, secondRequestEnqueuedPath := "/request/first/time-out-as-expected", "/request/second/enqueued-as-expected"
+			firstReqHandlerErrCh, firstReqInProgressCh := make(chan error, 1), make(chan struct{})
+			firstReqRoundTripDoneCh, secondReqRoundTripDoneCh := make(chan struct{}), make(chan struct{})
+			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headerMatcher.inspect(t, w, fsName, plName)
+				switch {
+				case r.URL.Path == firstRequestTimesOutPath:
+					close(firstReqInProgressCh)
+					<-firstReqRoundTripDoneCh
+
+					// make sure we wait until the caller of the second request returns, this is to
+					// ensure that second request never has a chance to be executed (to avoid flakes)
+					<-secondReqRoundTripDoneCh
+
+					// a) with the timeout filter, we expect
+					// the timeout handler to have timed out
+					// this request by now and any attempt
+					// to write to the ResponseWriter should
+					// return a http.ErrHandlerTimeout error.
+					// b) with per handler read/write timeout
+					// write will eventually return error.
+					if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						if _, err := w.Write(bytes.Repeat([]byte("a"), 1024)); err != nil {
+							firstReqHandlerErrCh <- err
+							return true, nil
+						}
+						return false, nil
+					}); err != nil {
+						t.Errorf("timeout while waiting for ResponseWriter.Write to return an error: %v", err)
+						firstReqHandlerErrCh <- err
+					}
+				case r.URL.Path == secondRequestEnqueuedPath:
+					// we expect the concurrency to be set to 1 and so this request should never be executed.
+					t.Errorf("Expected second request to be enqueued: %q", secondRequestEnqueuedPath)
+				}
+			})
+
+			// NOTE: the server will enforce a 1s timeout on every
+			//  incoming request, and the client enforces a timeout of 1m.
+			handler := newHandlerChain(t, requestHandler, controller, userName, 1*time.Second)
+			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
+			defer server.Close()
+
+			// This test involves two requests sent to the same priority level, which has 1 queue and
+			// a concurrency limit of 1.  The handler chain include the timeout filter.
+			// Each request is sent from a separate goroutine, with a client-side timeout of 1m, on
+			// the other hand, the server enforces a timeout of 5s (via the timeout filter).
+			// The first request should get dispatched immediately; execution (a) starts with closing
+			// the channel that triggers the second client goroutine to send its request and then (b)
+			// waits for both client goroutines to have gotten a response (expected to be timeouts).
+			// The second request sits in the queue until the timeout filter does its thing, which
+			// it does concurrently to both requests.  For the first request this should make the client
+			// get a timeout response without directly affecting execution.  For the second request, the
+			// fact that the timeout filter closes the request's Context.Done() causes the request to be
+			// promptly ejected from its queue.  The goroutine doing the APF handling writes an HTTP
+			// response message with status 429.
+			// The timeout handler invokes its inner handler in one goroutine while reacting to the
+			// passage of time in its original goroutine.  That reaction to a time out consists of either
+			// (a) writing an HTTP response message with status 504 to indicate the timeout or (b) doing an
+			// HTTP/2 stream close; the latter is done if either the connection has been "hijacked" or some
+			// other goroutine (e.g., the one running the inner handler) has started to write a response.
+			// In the scenario tested here, there is thus a race between two goroutines to respond to
+			// the second request and any of their responses is allowed by the test.
+			firstReqResultCh, secondReqResultCh := make(chan result, 1), make(chan result, 1)
+			go func() {
+				defer close(firstReqRoundTripDoneCh)
+				t.Logf("At %s, Sending request: %q", time.Now().Format(timeFmt), firstRequestTimesOutPath)
+				resp, err := requestGetter(firstRequestTimesOutPath)
+				t.Logf("At %s, RoundTrip of request: %q has completed", time.Now().Format(timeFmt), firstRequestTimesOutPath)
+				firstReqResultCh <- result{err: err, response: resp}
+			}()
+			go func() {
+				// we must wait for the "first" request to start executing before
+				// we can initiate the "second".
+				defer close(secondReqRoundTripDoneCh)
+
+				<-firstReqInProgressCh
+				t.Logf("At %s, Sending request: %q", time.Now().Format(timeFmt), secondRequestEnqueuedPath)
+				resp, err := requestGetter(secondRequestEnqueuedPath)
+				t.Logf("At %s, RoundTrip of request: %q has completed", time.Now().Format(timeFmt), secondRequestEnqueuedPath)
+				secondReqResultCh <- result{err: err, response: resp}
+			}()
+
+			firstReqResult := <-firstReqResultCh
+			if isClientTimeout(firstReqResult.err) {
+				t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", firstRequestTimesOutPath, fmtError(firstReqResult.err))
+			}
+			t.Logf("Waiting for the inner handler of the request: %q to complete", firstRequestTimesOutPath)
+			select {
+			case firstRequestInnerHandlerWriteErr := <-firstReqHandlerErrCh:
+				if firstRequestInnerHandlerWriteErr == nil || !strings.Contains(firstRequestInnerHandlerWriteErr.Error(), test.writeErrContains) {
+					t.Errorf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, fmtError(firstRequestInnerHandlerWriteErr))
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the server handler to have completed: %q", firstRequestTimesOutPath)
+			}
+
+			// first request is expected to time out:
+			// a) with legacy timeout filter we expect an http.StatusGatewayTimeout code
+			// b) with per handler read/write timeout, a stream reset error.
 			switch {
-			case r.URL.Path == firstRequestPathPanic:
-				close(firstHandlerDoneCh)
-				panic(fmt.Errorf("request handler panic'd as designed - %#v", r.RequestURI))
-			case r.URL.Path == secondRequestPathShouldWork:
-				close(secondHandlerDoneCh)
+			case test.statusCodeExpected > 0:
+				expectStatusCode(t, test.statusCodeExpected, firstRequestTimesOutPath, firstReqResult.response, firstReqResult.err)
+			default:
+				expectStreamResetError(t, firstReqResult.err)
+			}
 
+			secondReqResult := <-secondReqResultCh
+			if isClientTimeout(secondReqResult.err) {
+				t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", secondRequestEnqueuedPath, fmtError(secondReqResult.err))
+			}
+			// second request is expected to be rejected by APF with http.StatusTooManyRequests
+			// a) we don't expect the timeout filter to time it out with http.StatusGatewayTimeout
+			// b) we don't expect a stream reset error, since the second request
+			// handler never panics or writes to the ResponseWriter object.
+			expectStatusCode(t, http.StatusTooManyRequests, secondRequestEnqueuedPath, secondReqResult.response, secondReqResult.err)
+
+			close(stopCh)
+			t.Log("Waiting for the controller to shutdown")
+
+			controllerErr := <-controllerCompletedCh
+			if controllerErr != nil {
+				t.Errorf("Expected no error from the controller, but got: %s", fmtError(controllerErr))
 			}
 		})
-
-		// NOTE: the server will enforce a 1m timeout on every incoming
-		//  request, and the client enforces a timeout of 2m.
-		handler := newHandlerChain(t, requestHandler, controller, userName, time.Minute)
-		server, requestGetter := newHTTP2ServerWithClient(handler, 2*time.Minute)
-		defer server.Close()
-
-		// we send two requests synchronously, one at a time
-		//  - first request is expected to panic as designed
-		//  - second request is expected to succeed
-		_, err := requestGetter(firstRequestPathPanic)
-
-		// did the server handler panic, as expected?
-		select {
-		case <-firstHandlerDoneCh:
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected the server handler to panic for request: %q", firstRequestPathPanic)
-		}
-		if isClientTimeout(err) {
-			t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", firstRequestPathPanic, err.Error())
-		}
-		expectResetStreamError(t, err)
-
-		// the second request should be served successfully.
-		response, err := requestGetter(secondRequestPathShouldWork)
-		if err != nil {
-			t.Fatalf("Expected request: %q to get a response, but got error: %#v", secondRequestPathShouldWork, err)
-		}
-		if response.StatusCode != http.StatusOK {
-			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusOK, secondRequestPathShouldWork, response)
-		}
-		select {
-		case <-secondHandlerDoneCh:
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected the server handler to have completed: %q", secondRequestPathShouldWork)
-		}
-
-		close(stopCh)
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
-	})
-
-	t.Run("priority level concurrency is set to 1, request times out and inner handler hasn't written to the response yet", func(t *testing.T) {
-		t.Parallel()
-		const (
-			userName                                              = "alice"
-			fsName                                                = "test-fs"
-			plName                                                = "test-pl"
-			serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
-		)
-
-		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
-
-		headerMatcher := headerMatcher{}
-		rquestTimesOutPath := "/request/time-out-as-designed"
-		reqHandlerCompletedCh, callerRoundTripDoneCh := make(chan struct{}), make(chan struct{})
-		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			headerMatcher.inspect(t, w, fsName, plName)
-
-			if r.URL.Path == rquestTimesOutPath {
-				defer close(reqHandlerCompletedCh)
-
-				// this will force the request to time out.
-				<-callerRoundTripDoneCh
-			}
-		})
-
-		// NOTE: the server will enforce a 5s timeout on every
-		//  incoming request, and the client enforces a timeout of 1m.
-		handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-		server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
-		defer server.Close()
-
-		// send a request synchronously with a client timeout of 1m,  this minimizes the
-		// chance of a flake in ci, the cient waits long enough for the server to send a
-		// timeout response to the client.
-		var (
-			response *http.Response
-			err      error
-		)
-		func() {
-			defer close(callerRoundTripDoneCh)
-
-			t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
-			response, err = requestGetter(rquestTimesOutPath)
-			if isClientTimeout(err) {
-				t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
-			}
-		}()
-
-		t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
-		select {
-		case <-reqHandlerCompletedCh:
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
-		}
-
-		if err != nil {
-			t.Fatalf("Expected request: %q to get a response, but got error: %#v", rquestTimesOutPath, err)
-		}
-		if response.StatusCode != http.StatusGatewayTimeout {
-			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
-		}
-
-		close(stopCh)
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
-	})
-
-	t.Run("priority level concurrency is set to 1, inner handler panics after the request times out", func(t *testing.T) {
-		t.Parallel()
-		const (
-			userName                                              = "alice"
-			fsName                                                = "test-fs"
-			plName                                                = "test-pl"
-			serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
-		)
-
-		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
-
-		headerMatcher := headerMatcher{}
-		reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
-		rquestTimesOutPath := "/request/time-out-as-designed"
-		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			headerMatcher.inspect(t, w, fsName, plName)
-
-			if r.URL.Path == rquestTimesOutPath {
-				<-callerRoundTripDoneCh
-
-				// we expect the timeout handler to have timed out this request by now and any attempt
-				// to write to the response should return a http.ErrHandlerTimeout error.
-				_, innerHandlerWriteErr := w.Write([]byte("foo"))
-				reqHandlerErrCh <- innerHandlerWriteErr
-
-				panic(http.ErrAbortHandler)
-			}
-		})
-
-		// NOTE: the server will enforce a 5s timeout on every
-		//  incoming request, and the client enforces a timeout of 1m.
-		handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-		server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
-		defer server.Close()
-
-		// send a request synchronously with a client timeout of 1m, this minimizes the
-		// chance of a flake in ci, the cient waits long enough for the server to send a
-		// timeout response to the client.
-		var (
-			response *http.Response
-			err      error
-		)
-		func() {
-			defer close(callerRoundTripDoneCh)
-			t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
-			response, err = requestGetter(rquestTimesOutPath)
-			if isClientTimeout(err) {
-				t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
-			}
-		}()
-
-		t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
-		select {
-		case innerHandlerWriteErr := <-reqHandlerErrCh:
-			if innerHandlerWriteErr != http.ErrHandlerTimeout {
-				t.Fatalf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, err)
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
-		}
-
-		if err != nil {
-			t.Fatalf("Expected request: %q to get a response, but got error: %#v", rquestTimesOutPath, err)
-		}
-		if response.StatusCode != http.StatusGatewayTimeout {
-			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
-		}
-
-		close(stopCh)
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
-	})
-
-	t.Run("priority level concurrency is set to 1, inner handler writes to the response before request times out", func(t *testing.T) {
-		t.Parallel()
-		const (
-			userName                                              = "alice"
-			fsName                                                = "test-fs"
-			plName                                                = "test-pl"
-			serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
-		)
-
-		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
-
-		headerMatcher := headerMatcher{}
-		rquestTimesOutPath := "/request/time-out-as-designed"
-		reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
-		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			headerMatcher.inspect(t, w, fsName, plName)
-
-			if r.URL.Path == rquestTimesOutPath {
-
-				// inner handler writes header and then let the request time out.
-				w.WriteHeader(http.StatusBadRequest)
-				<-callerRoundTripDoneCh
-
-				// we expect the timeout handler to have timed out this request by now and any attempt
-				// to write to the response should return a http.ErrHandlerTimeout error.
-				_, innerHandlerWriteErr := w.Write([]byte("foo"))
-				reqHandlerErrCh <- innerHandlerWriteErr
-			}
-		})
-
-		// NOTE: the server will enforce a 5s timeout on every
-		//  incoming request, and the client enforces a timeout of 1m.
-		handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-		server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
-		defer server.Close()
-
-		// send a request synchronously with a client timeout of 1m, this minimizes the
-		// chance of a flake in ci, the cient waits long enough for the server to send a
-		// timeout response to the client.
-		var err error
-		func() {
-			defer close(callerRoundTripDoneCh)
-			t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
-			_, err = requestGetter(rquestTimesOutPath)
-			if isClientTimeout(err) {
-				t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
-			}
-		}()
-
-		t.Logf("Waiting for the inner handler of the request: %q to complete", rquestTimesOutPath)
-		select {
-		case innerHandlerWriteErr := <-reqHandlerErrCh:
-			if innerHandlerWriteErr != http.ErrHandlerTimeout {
-				t.Fatalf("Expected error: %#v, but got: %#v", http.ErrHandlerTimeout, err)
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected the server handler to have completed: %q", rquestTimesOutPath)
-		}
-
-		expectResetStreamError(t, err)
-
-		close(stopCh)
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
-	})
-
-	t.Run("priority level concurrency is set to 1, queue length is 1, first request should time out and second (enqueued) request should time out as well", func(t *testing.T) {
-		t.Parallel()
-
-		type result struct {
-			err      error
-			response *http.Response
-		}
-
-		const (
-			userName                                                           = "alice"
-			fsName                                                             = "test-fs"
-			plName                                                             = "test-pl"
-			serverConcurrency, plConcurrencyShares, plConcurrency, queueLength = 1, 1, 1, 1
-		)
-
-		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
-
-		headerMatcher := headerMatcher{}
-		firstRequestTimesOutPath, secondRequestEnqueuedPath := "/request/first/time-out-as-designed", "/request/second/enqueued-as-designed"
-		firstReqHandlerErrCh, firstReqInProgressCh := make(chan error, 1), make(chan struct{})
-		firstReqRoundTripDoneCh, secondReqRoundTripDoneCh := make(chan struct{}), make(chan struct{})
-		requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			headerMatcher.inspect(t, w, fsName, plName)
-			switch {
-			case r.URL.Path == firstRequestTimesOutPath:
-				close(firstReqInProgressCh)
-				<-firstReqRoundTripDoneCh
-
-				// make sure we wait until the caller of the second request returns, this is to
-				// ensure that second request never has a chance to be executed (to avoid flakes)
-				<-secondReqRoundTripDoneCh
-
-				// we expect the timeout handler to have timed out this request by now and any attempt
-				// to write to the response should return a http.ErrHandlerTimeout error.
-				_, firstRequestInnerHandlerWriteErr := w.Write([]byte("foo"))
-				firstReqHandlerErrCh <- firstRequestInnerHandlerWriteErr
-
-			case r.URL.Path == secondRequestEnqueuedPath:
-				// we expect the concurrency to be set to 1 and so this request should never be executed.
-				t.Errorf("Expected second request to be enqueued: %q", secondRequestEnqueuedPath)
-			}
-		})
-
-		// NOTE: the server will enforce a 5s timeout on every
-		//  incoming request, and the client enforces a timeout of 1m.
-		handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-		server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
-		defer server.Close()
-
-		// This test involves two requests sent to the same priority level, which has 1 queue and
-		// a concurrency limit of 1.  The handler chain include the timeout filter.
-		// Each request is sent from a separate goroutine, with a client-side timeout of 1m, on
-		// the other hand, the server enforces a timeout of 5s (via the timeout filter).
-		// The first request should get dispatched immediately; execution (a) starts with closing
-		// the channel that triggers the second client goroutine to send its request and then (b)
-		// waits for both client goroutines to have gotten a response (expected to be timeouts).
-		// The second request sits in the queue until the timeout filter does its thing, which
-		// it does concurrently to both requests.  For the first request this should make the client
-		// get a timeout response without directly affecting execution.  For the second request, the
-		// fact that the timeout filter closes the request's Context.Done() causes the request to be
-		// promptly ejected from its queue.  The goroutine doing the APF handling writes an HTTP
-		// response message with status 429.
-		// The timeout handler invokes its inner handler in one goroutine while reacting to the
-		// passage of time in its original goroutine.  That reaction to a time out consists of either
-		// (a) writing an HTTP response message with status 504 to indicate the timeout or (b) doing an
-		// HTTP/2 stream close; the latter is done if either the connection has been "hijacked" or some
-		// other goroutine (e.g., the one running the inner handler) has started to write a response.
-		// In the scenario tested here, there is thus a race between two goroutines to respond to
-		// the second request and any of their responses is allowed by the test.
-		firstReqResultCh, secondReqResultCh := make(chan result, 1), make(chan result, 1)
-		go func() {
-			defer close(firstReqRoundTripDoneCh)
-			t.Logf("At %s, Sending request: %q", time.Now().Format(timeFmt), firstRequestTimesOutPath)
-			resp, err := requestGetter(firstRequestTimesOutPath)
-			t.Logf("At %s, RoundTrip of request: %q has completed", time.Now().Format(timeFmt), firstRequestTimesOutPath)
-			firstReqResultCh <- result{err: err, response: resp}
-		}()
-		go func() {
-			// we must wait for the "first" request to start executing before
-			// we can initiate the "second".
-			defer close(secondReqRoundTripDoneCh)
-
-			<-firstReqInProgressCh
-			t.Logf("At %s, Sending request: %q", time.Now().Format(timeFmt), secondRequestEnqueuedPath)
-			resp, err := requestGetter(secondRequestEnqueuedPath)
-			t.Logf("At %s, RoundTrip of request: %q has completed", time.Now().Format(timeFmt), secondRequestEnqueuedPath)
-			secondReqResultCh <- result{err: err, response: resp}
-		}()
-
-		firstReqResult := <-firstReqResultCh
-		if isClientTimeout(firstReqResult.err) {
-			t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", firstRequestTimesOutPath, fmtError(firstReqResult.err))
-		}
-		t.Logf("Waiting for the inner handler of the request: %q to complete", firstRequestTimesOutPath)
-		select {
-		case firstRequestInnerHandlerWriteErr := <-firstReqHandlerErrCh:
-			if firstRequestInnerHandlerWriteErr != http.ErrHandlerTimeout {
-				t.Fatalf("Expected error: %#v, but got: %s", http.ErrHandlerTimeout, fmtError(firstRequestInnerHandlerWriteErr))
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected the server handler to have completed: %q", firstRequestTimesOutPath)
-		}
-
-		// first request is expected to time out.
-		if isStreamReset(firstReqResult.err) || firstReqResult.response.StatusCode != http.StatusGatewayTimeout {
-			// got what was expected
-		} else if firstReqResult.err != nil {
-			t.Fatalf("Expected request: %q to get a response or stream reset, but got error: %s", firstRequestTimesOutPath, fmtError(firstReqResult.err))
-		} else if firstReqResult.response.StatusCode != http.StatusGatewayTimeout {
-			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#+v", http.StatusGatewayTimeout, firstRequestTimesOutPath, firstReqResult.response)
-		}
-
-		// second request is expected to either be rejected (ideal behavior) or time out (current approximation of the ideal behavior)
-		secondReqResult := <-secondReqResultCh
-		if isClientTimeout(secondReqResult.err) {
-			t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", secondRequestEnqueuedPath, fmtError(secondReqResult.err))
-		}
-		if isStreamReset(secondReqResult.err) || secondReqResult.response.StatusCode == http.StatusTooManyRequests || secondReqResult.response.StatusCode == http.StatusGatewayTimeout {
-			// got what was expected
-		} else if secondReqResult.err != nil {
-			t.Fatalf("Expected request: %q to get a response or stream reset, but got error: %s", secondRequestEnqueuedPath, fmtError(secondReqResult.err))
-		} else if !(secondReqResult.response.StatusCode == http.StatusTooManyRequests || secondReqResult.response.StatusCode == http.StatusGatewayTimeout) {
-			t.Errorf("Expected HTTP status code: %d or %d for request: %q, but got: %#+v", http.StatusTooManyRequests, http.StatusGatewayTimeout, secondRequestEnqueuedPath, secondReqResult.response)
-		}
-
-		close(stopCh)
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %s", fmtError(controllerErr))
-		}
-	})
+	}
 }
 
 func fmtError(err error) string {
@@ -1143,7 +1298,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	// read the metrics and ensure the concurrency limit for our priority level is set to the expected value.
 	pollErr := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
 		if err := gaugeValueMatch("apiserver_flowcontrol_nominal_limit_seats", map[string]string{"priority_level": plName}, plConcurrency); err != nil {
-			t.Logf("polling retry - error: %s", err)
+			t.Logf("controller has not synced yet, polling will continue - error: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -1195,14 +1350,15 @@ func (m *headerMatcher) inspect(t *testing.T, w http.ResponseWriter, expectedFS,
 }
 
 // when a request panics, http2 resets the stream with an INTERNAL_ERROR message
-func expectResetStreamError(t *testing.T, err error) {
+func expectStreamResetError(t *testing.T, err error) {
+	t.Helper()
 	if err == nil {
-		t.Fatalf("expected the server to send an error, but got nil")
-	}
-	if isStreamReset(err) {
+		t.Errorf("expected the server to return an error, but got nil")
 		return
 	}
-	t.Fatalf("expected a stream reset error, but got %#+v=%s", err, err.Error())
+	if !isStreamReset(err) {
+		t.Errorf("expected a stream reset error, but got %#+v=%s", err, err.Error())
+	}
 }
 
 func newClientset(t *testing.T, objects ...runtime.Object) clientset.Interface {
@@ -1232,7 +1388,9 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 		apfHandler.ServeHTTP(w, r)
 	})
 
-	handler = WithTimeoutForNonLongRunningRequests(handler, longRunningRequestCheck)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PerHandlerReadWriteTimeout) {
+		handler = WithTimeoutForNonLongRunningRequests(handler, longRunningRequestCheck)
+	}
 	// we don't have any request with invalid timeout, so leaving audit policy and sink nil.
 	handler = apifilters.WithRequestDeadline(handler, nil, nil, longRunningRequestCheck, nil, requestTimeout)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
@@ -1390,11 +1548,22 @@ func isStreamReset(err error) bool {
 		return false
 	}
 	if urlErr, ok := err.(*url.Error); ok {
-		// Sadly, the client does not receive a more specific indication
-		// of stream reset.
+		// the client does not receive a more specific
+		// indication of a stream reset by the server.
 		return strings.Contains(urlErr.Err.Error(), "INTERNAL_ERROR")
 	}
 	return false
+}
+
+func expectStatusCode(t *testing.T, want int, path string, resp *http.Response, err error) {
+	t.Helper()
+	if err != nil {
+		t.Errorf("Expected request: %q to get a response, but got error: %#v", path, err)
+		return
+	}
+	if resp.StatusCode != want {
+		t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", want, path, resp)
+	}
 }
 
 func TestGetRequestWaitContext(t *testing.T) {

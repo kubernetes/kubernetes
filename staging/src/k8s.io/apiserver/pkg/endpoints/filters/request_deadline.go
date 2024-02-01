@@ -32,6 +32,8 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -58,7 +60,7 @@ func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.Pol
 
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {
-			handleError(w, req, http.StatusInternalServerError, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
+			handleError(w, req, http.StatusInternalServerError, "no RequestInfo found in context, handler chain must be wrong", nil)
 			return
 		}
 		if longRunning(req, requestInfo) {
@@ -93,8 +95,27 @@ func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.Pol
 			started = requestStartedTimestamp
 		}
 
-		ctx, cancel := context.WithDeadline(ctx, started.Add(timeout))
+		deadline := started.Add(timeout)
+		ctx, cancel := context.WithDeadline(ctx, deadline)
 		defer cancel()
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PerHandlerReadWriteTimeout) {
+			// per handler read and write timeout deadline,
+			// they are set to the overall request timeout.
+			ctrl := http.NewResponseController(w)
+			// TODO: once https://github.com/golang/go/issues/58237
+			// is fixed, we can remove the content length check
+			if req.ContentLength != 0 {
+				if err := ctrl.SetReadDeadline(deadline); err != nil {
+					handleError(w, req, http.StatusInternalServerError, "failed to set request read deadline", err)
+					return
+				}
+			}
+			if err := ctrl.SetWriteDeadline(deadline); err != nil {
+				handleError(w, req, http.StatusInternalServerError, "failed to set request write deadline", err)
+				return
+			}
+		}
 
 		req = req.WithContext(ctx)
 		handler.ServeHTTP(w, req)
@@ -166,8 +187,12 @@ func parseTimeout(req *http.Request) (time.Duration, bool, error) {
 	return timeout, true, nil
 }
 
-func handleError(w http.ResponseWriter, r *http.Request, code int, err error) {
-	errorMsg := fmt.Sprintf("Error - %s: %#v", err.Error(), r.RequestURI)
-	http.Error(w, errorMsg, code)
-	klog.Errorf(errorMsg)
+// handleError does the following:
+// a) it writes the specified error code, and msg to the ResponseWriter
+// object, it does not print the given err into the ResponseWriter object.
+// b) additionally, it prints the given msg, and err to the log with other
+// request scoped data that helps identify the given request.
+func handleError(w http.ResponseWriter, r *http.Request, code int, msg string, err error) {
+	http.Error(w, msg, code)
+	klog.ErrorS(err, msg, "method", r.Method, "URI", r.RequestURI, "auditID", audit.GetAuditIDTruncated(r.Context()))
 }

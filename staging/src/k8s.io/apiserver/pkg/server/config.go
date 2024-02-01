@@ -1011,9 +1011,15 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 
-	// WithTimeoutForNonLongRunningRequests will call the rest of the request handling in a go-routine with the
-	// context with deadline. The go-routine can keep running, while the timeout logic will return a timeout to the client.
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+	// if PerHandlerReadWriteTimeout is enabled, we no longer
+	// need the legacy timeout filter.
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.PerHandlerReadWriteTimeout) {
+		// WithTimeoutForNonLongRunningRequests will call the rest of
+		// the request handling in a go-routine with the context with
+		// deadline. The go-routine can keep running, while the timeout
+		// logic will return a timeout to the client.
+		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+	}
 
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
