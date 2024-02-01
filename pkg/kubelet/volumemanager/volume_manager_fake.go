@@ -20,8 +20,8 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -44,7 +44,7 @@ func NewFakeVolumeManager(initialVolumes []v1.UniqueVolumeName) *FakeVolumeManag
 }
 
 // Run is not implemented
-func (f *FakeVolumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (f *FakeVolumeManager) Run(sourcesReady podsource.SourcesReady, stopCh <-chan struct{}) {
 }
 
 // WaitForAttachAndMount is not implemented

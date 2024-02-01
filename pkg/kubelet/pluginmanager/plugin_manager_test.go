@@ -32,8 +32,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 )
 
 var (
@@ -131,7 +131,7 @@ func TestPluginRegistration(t *testing.T) {
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 	go func() {
-		sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+		sourcesReady := podsource.NewSourcesReady(func(_ sets.String) bool { return true })
 		pluginManager.Run(sourcesReady, stopChan)
 	}()
 

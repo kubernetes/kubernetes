@@ -76,7 +76,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
@@ -96,6 +95,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	plugincache "k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -262,7 +262,7 @@ type Dependencies struct {
 	HostUtil                  hostutil.HostUtils
 	OOMAdjuster               *oom.OOMAdjuster
 	OSInterface               kubecontainer.OSInterface
-	PodConfig                 *config.PodConfig
+	PodConfig                 *podsource.PodConfig
 	ProbeManager              prober.Manager
 	Recorder                  record.EventRecorder
 	Subpather                 subpath.Interface
@@ -280,7 +280,7 @@ type Dependencies struct {
 
 // makePodSourceConfig creates a config.PodConfig from the given
 // KubeletConfiguration or returns an error.
-func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*config.PodConfig, error) {
+func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*podsource.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
 	if len(kubeCfg.StaticPodURLHeader) > 0 {
 		for k, v := range kubeCfg.StaticPodURLHeader {
@@ -291,7 +291,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	}
 
 	// source of all configuration
-	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder, kubeDeps.PodStartupLatencyTracker)
+	cfg := podsource.NewPodConfig(podsource.PodConfigNotificationIncremental, kubeDeps.Recorder, kubeDeps.PodStartupLatencyTracker)
 
 	// TODO:  it needs to be replaced by a proper context in the future
 	ctx := context.TODO()
@@ -299,18 +299,18 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	// define file config source
 	if kubeCfg.StaticPodPath != "" {
 		klog.InfoS("Adding static pod path", "path", kubeCfg.StaticPodPath)
-		config.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.FileSource))
+		podsource.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.FileSource))
 	}
 
 	// define url config source
 	if kubeCfg.StaticPodURL != "" {
 		klog.InfoS("Adding pod URL with HTTP header", "URL", kubeCfg.StaticPodURL, "header", manifestURLHeader)
-		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.HTTPSource))
+		podsource.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.HTTPSource))
 	}
 
 	if kubeDeps.KubeClient != nil {
 		klog.InfoS("Adding apiserver pod source")
-		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
+		podsource.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
@@ -520,7 +520,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
 		rootDirectory:                  filepath.Clean(rootDirectory),
 		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
-		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
+		sourcesReady:                   podsource.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                   registerNode,
 		registerWithTaints:             registerWithTaints,
 		registerSchedulable:            registerSchedulable,
@@ -1048,7 +1048,7 @@ type Kubelet struct {
 	resyncInterval time.Duration
 
 	// sourcesReady records the sources seen by the kubelet, it is thread-safe.
-	sourcesReady config.SourcesReady
+	sourcesReady podsource.SourcesReady
 
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler

@@ -42,10 +42,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -71,7 +71,7 @@ func (ra *noopWindowsResourceAllocator) Admit(attrs *lifecycle.PodAdmitAttribute
 
 func (cm *containerManagerImpl) Start(node *v1.Node,
 	activePods ActivePodsFunc,
-	sourcesReady config.SourcesReady,
+	sourcesReady podsource.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService,
 	localStorageCapacityIsolation bool) error {

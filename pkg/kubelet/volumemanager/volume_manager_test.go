@@ -36,9 +36,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -543,7 +543,7 @@ func runVolumeManager(manager VolumeManager) chan struct{} {
 	stopCh := make(chan struct{})
 	//readyCh := make(chan bool, 1)
 	//readyCh <- true
-	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	sourcesReady := podsource.NewSourcesReady(func(_ sets.String) bool { return true })
 	go manager.Run(sourcesReady, stopCh)
 	return stopCh
 }

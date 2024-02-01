@@ -46,9 +46,9 @@ import (
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -313,7 +313,7 @@ func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) plugin
 
 func runPluginManager(pluginManager pluginmanager.PluginManager) {
 	// FIXME: Replace sets.String with sets.Set[string]
-	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	sourcesReady := podsource.NewSourcesReady(func(_ sets.String) bool { return true })
 	go pluginManager.Run(sourcesReady, wait.NeverStop)
 }
 

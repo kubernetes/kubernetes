@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package podsource
 
 import (
 	"fmt"
@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"

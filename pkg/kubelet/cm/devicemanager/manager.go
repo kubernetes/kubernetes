@@ -40,10 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -69,7 +69,7 @@ type ManagerImpl struct {
 
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
-	sourcesReady config.SourcesReady
+	sourcesReady podsource.SourcesReady
 
 	// allDevices holds all the devices currently registered to the device manager
 	allDevices ResourceDeviceInstances
@@ -292,7 +292,7 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
+func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady podsource.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
 	klog.V(2).InfoS("Starting Device Plugin manager")
 
 	m.activePods = activePods

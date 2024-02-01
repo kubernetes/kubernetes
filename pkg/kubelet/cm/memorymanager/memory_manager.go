@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -56,7 +56,7 @@ func (s *sourcesReadyStub) AllReady() bool          { return true }
 // Manager interface provides methods for Kubelet to manage pod memory.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(activePods ActivePodsFunc, sourcesReady podsource.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the memory allocation during the container removal
@@ -119,7 +119,7 @@ type manager struct {
 
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
-	sourcesReady config.SourcesReady
+	sourcesReady podsource.SourcesReady
 
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
@@ -166,7 +166,7 @@ func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAll
 }
 
 // Start starts the memory manager under the kubelet and calls policy start
-func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(activePods ActivePodsFunc, sourcesReady podsource.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
 	klog.InfoS("Starting memorymanager", "policy", m.policy.Name())
 	m.sourcesReady = sourcesReady
 	m.activePods = activePods
