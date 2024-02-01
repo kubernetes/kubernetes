@@ -273,7 +273,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		mainfs.AddFlagSet(fs)
 	}()
 
-	f.ContainerRuntimeOptions.AddFlags(fs)
+	addContainerRuntimeFlags(fs, &f.ContainerRuntimeOptions)
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
@@ -315,6 +315,18 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("experimental-mounter-path", "will be removed in 1.25 or later. in favor of using CSI.")
 	fs.BoolVar(&f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "experimental-allocatable-ignore-eviction", f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "When set to 'true', Hard Eviction Thresholds will be ignored while calculating Node Allocatable. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details. [default=false]")
 	fs.MarkDeprecated("experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
+}
+
+// addContainerRuntimeFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
+func addContainerRuntimeFlags(fs *pflag.FlagSet, o *kubeletconfig.ContainerRuntimeOptions) {
+	// General settings.
+	fs.StringVar(&o.RuntimeCgroups, "runtime-cgroups", o.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
+	_ = fs.String("pod-infra-container-image", "", "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
+	_ = fs.MarkDeprecated("pod-infra-container-image", "will be removed in 1.35. Image garbage collector will get sandbox image information from CRI.")
+
+	// Image credential provider settings.
+	fs.StringVar(&o.ImageCredentialProviderConfigPath, "image-credential-provider-config", o.ImageCredentialProviderConfigPath, "Path to a credential provider plugin config file (JSON/YAML/YML) or a directory of such files (merged in lexicographical order; non-recursive search).")
+	fs.StringVar(&o.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", o.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
 }
 
 // AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
