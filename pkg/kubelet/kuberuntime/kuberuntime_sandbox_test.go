@@ -161,7 +161,7 @@ func TestGeneratePodSandboxLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 		description:    "SupplementalGroups=Unsupported should raise an error",
 		pod:            newSupplementalGroupsPolicyPod(&supplementalGroupsPolicyUnSupported),
 		expectedErr:    true,
-		expectedErrMsg: "Unsupported supplementalGroupsPolicy: UnSupported",
+		expectedErrMsg: "unsupported supplementalGroupsPolicy: UnSupported",
 	},
 	}
 

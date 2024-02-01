@@ -767,7 +767,7 @@ func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 			},
 		},
 		expectErr:      true,
-		expectedErrMsg: "Unsupported supplementalGroupsPolicy: UnSupported",
+		expectedErrMsg: "unsupported supplementalGroupsPolicy: UnSupported",
 	},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

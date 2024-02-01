@@ -211,11 +211,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 			}
 		}
 		if sc.SupplementalGroupsPolicy != nil {
-			policy_value, ok := runtimeapi.SupplementalGroupsPolicy_value[string(*sc.SupplementalGroupsPolicy)]
+			policyValue, ok := runtimeapi.SupplementalGroupsPolicy_value[string(*sc.SupplementalGroupsPolicy)]
 			if !ok {
-				return nil, fmt.Errorf("Unsupported supplementalGroupsPolicy: %s", string(*sc.SupplementalGroupsPolicy))
+				return nil, fmt.Errorf("unsupported supplementalGroupsPolicy: %s", string(*sc.SupplementalGroupsPolicy))
 			}
-			lc.SecurityContext.SupplementalGroupsPolicy = runtimeapi.SupplementalGroupsPolicy(policy_value)
+			lc.SecurityContext.SupplementalGroupsPolicy = runtimeapi.SupplementalGroupsPolicy(policyValue)
 		}
 
 		if sc.SELinuxOptions != nil && runtime.GOOS != "windows" {

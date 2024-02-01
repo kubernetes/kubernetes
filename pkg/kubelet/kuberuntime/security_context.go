@@ -73,11 +73,11 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 		}
 
 		if podSc.SupplementalGroupsPolicy != nil {
-			policy_value, ok := runtimeapi.SupplementalGroupsPolicy_value[string(*podSc.SupplementalGroupsPolicy)]
+			policyValue, ok := runtimeapi.SupplementalGroupsPolicy_value[string(*podSc.SupplementalGroupsPolicy)]
 			if !ok {
-				return nil, fmt.Errorf("Unsupported supplementalGroupsPolicy: %s", string(*podSc.SupplementalGroupsPolicy))
+				return nil, fmt.Errorf("unsupported supplementalGroupsPolicy: %s", string(*podSc.SupplementalGroupsPolicy))
 			}
-			synthesized.SupplementalGroupsPolicy = runtimeapi.SupplementalGroupsPolicy(policy_value)
+			synthesized.SupplementalGroupsPolicy = runtimeapi.SupplementalGroupsPolicy(policyValue)
 		}
 	}
 	if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
