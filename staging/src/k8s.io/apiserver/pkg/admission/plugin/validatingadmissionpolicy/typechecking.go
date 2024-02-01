@@ -188,7 +188,7 @@ func (c *TypeChecker) compiler(ctx *TypeCheckingContext, typeOverwrite typeOverw
 		return nil, err
 	}
 	compiler := &plugincel.CompositedCompiler{
-		Compiler:       &typeCheckingCompiler{typeOverwrite: typeOverwrite},
+		Compiler:       &typeCheckingCompiler{typeOverwrite: typeOverwrite, compositionEnv: env},
 		CompositionEnv: env,
 	}
 	return compiler, nil
@@ -449,7 +449,8 @@ func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []
 }
 
 type typeCheckingCompiler struct {
-	typeOverwrite typeOverwrite
+	compositionEnv *plugincel.CompositionEnv
+	typeOverwrite  typeOverwrite
 }
 
 // CompileCELExpression compiles the given expression.
@@ -468,20 +469,18 @@ func (c *typeCheckingCompiler) CompileCELExpression(expressionAccessor plugincel
 			ExpressionAccessor: expressionAccessor,
 		}
 	}
-	envSet, err := buildEnvSet(options.HasParams, options.HasAuthorizer, c.typeOverwrite)
-	if err != nil {
-		return resultError(fmt.Sprintf("fail to build env set: %v", err), apiservercel.ErrorTypeInternal)
-	}
-	env, err := envSet.Env(mode)
+	env, err := c.compositionEnv.Env(mode)
 	if err != nil {
 		return resultError(fmt.Sprintf("fail to build env: %v", err), apiservercel.ErrorTypeInternal)
 	}
-	_, issues := env.Compile(expressionAccessor.GetExpression())
+	ast, issues := env.Compile(expressionAccessor.GetExpression())
 	if issues != nil {
 		return resultError(issues.String(), apiservercel.ErrorTypeInvalid)
 	}
-	// type checker does not require the program, an empty result indicates successful compilation.
-	return plugincel.CompilationResult{}
+	// type checker does not require the program, however the type must still be set.
+	return plugincel.CompilationResult{
+		OutputType: ast.OutputType(),
+	}
 }
 
 var _ plugincel.Compiler = (*typeCheckingCompiler)(nil)
