@@ -23,6 +23,8 @@ import (
 	"k8s.io/utils/clock"
 )
 
+// Interface defines a basic queue.
+// See RateLimitingInterface for the full workqueue behavior.
 type Interface interface {
 	Add(item interface{})
 	Len() int
@@ -31,6 +33,22 @@ type Interface interface {
 	ShutDown()
 	ShutDownWithDrain()
 	ShuttingDown() bool
+}
+
+// PeekableQueue extends the basic queue interface with the ability to
+// query for presence of a given item, consume the result with the queue's lock held,
+// and get the item added if desired.
+type PeekableQueue interface {
+	Interface
+
+	// ConditionalAdd will call wantAddLocked with indications of whether the
+	// queue is shuting down and whether the given item is already in the queue.
+	// wantAddLocked is called with the queue's lock held, and can
+	// request addition of the item to the queue.
+	// If the item is absent and wantAddLocked requests its addition
+	// and the queue is not shut down,
+	// then the item gets added to the queue.
+	ConditionalAdd(item interface{}, wantAddLocked func(shuttingDown, has bool) bool)
 }
 
 // QueueConfig specifies optional configurations to customize an Interface.
@@ -111,7 +129,7 @@ func newQueue(c clock.WithTicker, metrics queueMetrics, updatePeriod time.Durati
 
 const defaultUnfinishedWorkUpdatePeriod = 500 * time.Millisecond
 
-// Type is a work queue (see the package comment).
+// Type implements PeekableQueue and is the basis of a work queue (see the package comment).
 type Type struct {
 	// queue defines the order in which we will work on items. Every
 	// element of queue should be in the dirty set and not in the
@@ -138,6 +156,8 @@ type Type struct {
 	clock                      clock.WithTicker
 }
 
+var _ PeekableQueue = &Type{}
+
 type empty struct{}
 type t interface{}
 type set map[t]empty
@@ -161,12 +181,16 @@ func (s set) len() int {
 
 // Add marks item as needing processing.
 func (q *Type) Add(item interface{}) {
+	q.ConditionalAdd(item, func(bool, bool) bool { return true })
+}
+
+// Add marks item as needing processing.
+func (q *Type) ConditionalAdd(item interface{}, wantAddLocked func(shuttingDown, has bool) bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
-	if q.shuttingDown {
-		return
-	}
-	if q.dirty.has(item) {
+	has := q.dirty.has(item)
+	wantAdd := wantAddLocked(q.shuttingDown, has)
+	if q.shuttingDown || has || !wantAdd {
 		return
 	}
 
