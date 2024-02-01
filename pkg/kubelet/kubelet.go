@@ -360,6 +360,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerSchedulable bool,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
+	nodeAnnotation map[string]string,
 	nodeStatusMaxImages int32,
 	seccompDefault bool,
 ) (*Kubelet, error) {
@@ -536,6 +537,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		providerID:                     providerID,
 		nodeRef:                        nodeRef,
 		nodeLabels:                     nodeLabels,
+		nodeAnnotation:                 nodeAnnotation,
 		nodeStatusUpdateFrequency:      kubeCfg.NodeStatusUpdateFrequency.Duration,
 		nodeStatusReportFrequency:      kubeCfg.NodeStatusReportFrequency.Duration,
 		os:                             kubeDeps.OSInterface,
@@ -1081,6 +1083,8 @@ type Kubelet struct {
 	nodeHasSynced cache.InformerSynced
 	// a list of node labels to register
 	nodeLabels map[string]string
+	// an additional node annotation to register
+	nodeAnnotation map[string]string
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
