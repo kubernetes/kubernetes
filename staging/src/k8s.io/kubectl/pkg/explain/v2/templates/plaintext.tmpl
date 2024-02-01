@@ -344,8 +344,8 @@ Takes dictionary as argument with keys:
 
 {{- /* Check if there is any patch strategy returns it in this format e.g.:
 
-    X_KUBERNETES_PATCH_MARGE_KEY: name
-    X_KUBERNETES_PATCH_STRATEGY: merge,retainKeys
+    PATCH_MARGE_KEY: name
+    PATCH_STRATEGY: merge,retainKeys
 
 Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema
@@ -363,8 +363,8 @@ Takes dictionary as argument with keys:
 
         {{- /* If there is any value we can print them out */ -}}
         {{- if and $mergeKey $mergeStrategy -}}
-            {{- "X_KUBERNETES_PATCH_MARGE_KEY: " -}} {{- $mergeKey -}} {{- "\n" -}}
-            {{- "X_KUBERNETES_PATCH_STRATEGY: " -}} {{- $mergeStrategy -}} {{- "\n" -}}
+            {{- "PATCH_MARGE_KEY: " -}} {{- $mergeKey -}} {{- "\n" -}}
+            {{- "PATCH_STRATEGY: " -}} {{- $mergeStrategy -}} {{- "\n" -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}

@@ -793,7 +793,7 @@ func TestPlaintext(t *testing.T) {
 				},
 			},
 			Checks: []check{
-				checkEquals("X_KUBERNETES_PATCH_MARGE_KEY: name\nX_KUBERNETES_PATCH_STRATEGY: merge,retainKeys\n"),
+				checkEquals("PATCH_MARGE_KEY: name\nPATCH_STRATEGY: merge,retainKeys\n"),
 			},
 		},
 	}
