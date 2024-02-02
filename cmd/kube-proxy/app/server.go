@@ -197,7 +197,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
-		"A list of CIDR ranges that contain valid node IPs. If set, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If unset, NodePort connections will be accepted on all local IPs. This parameter is ignored if a config file is specified by --config.")
+		"A list of CIDR ranges that contain valid node IPs. If set, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If this is unset and --nodeport-addresses-primary is true, then NodePort connections will be accepted only on the node's primary IP(s). If this is unset and --nodeport-addresses-primary is false, then NodePort connections will be accepted on all local IPs. This parameter is ignored if a config file is specified by --config.")
+	fs.BoolVar(&o.config.NodePortAddressesPrimary, "nodeport-addresses-primary", o.config.NodePortAddressesPrimary, "Indicates that NodePort service connections should only be accepted on the node's primary IP(s) as indicated by the Node object. This must be false if --node-port-addresses is non-empty. This parameter is ignored if a config file is specified by --config.")
 
 	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", ptr.Deref(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]. This parameter is ignored if a config file is specified by --config.")
 	fs.Int32Var(o.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
@@ -630,6 +631,17 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 
 	rawNodeIPs := getNodeIPs(logger, s.Client, s.Hostname)
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(logger, rawNodeIPs, config.BindAddress)
+
+	if config.NodePortAddressesPrimary {
+		var nodePortAddresses []string
+		if nodeIP := s.NodeIPs[v1.IPv4Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
+			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/32", nodeIP.String()))
+		}
+		if nodeIP := s.NodeIPs[v1.IPv6Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
+			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/128", nodeIP.String()))
+		}
+		config.NodePortAddresses = nodePortAddresses
+	}
 
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")

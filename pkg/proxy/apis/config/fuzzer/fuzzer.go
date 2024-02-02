@@ -47,7 +47,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.MetricsBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
 			obj.OOMScoreAdj = ptr.To(c.Int31())
 			obj.ClientConnection.ContentType = "bar"
-			obj.NodePortAddresses = []string{"1.2.3.0/24"}
+			if obj.NodePortAddressesPrimary {
+				obj.NodePortAddresses = []string{}
+			} else {
+				obj.NodePortAddresses = []string{"1.2.3.0/24"}
+			}
 			if obj.Logging.Format == "" {
 				obj.Logging.Format = "text"
 			}

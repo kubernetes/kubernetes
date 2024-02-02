@@ -240,6 +240,48 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				Format: "text",
 			},
 		},
+		"NodePortAddresses": {
+			BindAddress:        "192.168.59.103",
+			HealthzBindAddress: "0.0.0.0:10256",
+			MetricsBindAddress: "127.0.0.1:10249",
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore:            ptr.To[int32](1),
+				Min:                   ptr.To[int32](1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+			Logging: logsapi.LoggingConfiguration{
+				Format: "text",
+			},
+			NodePortAddresses: []string{"192.168.59.0/24", "fd00:192:168:59::/64"},
+		},
+		"NodePortAddressesPrimary": {
+			BindAddress:        "192.168.59.103",
+			HealthzBindAddress: "0.0.0.0:10256",
+			MetricsBindAddress: "127.0.0.1:10249",
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore:            ptr.To[int32](1),
+				Min:                   ptr.To[int32](1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+			Logging: logsapi.LoggingConfiguration{
+				Format: "text",
+			},
+			NodePortAddressesPrimary: true,
+		},
 	}
 
 	for name, successCase := range successCases {
@@ -527,6 +569,31 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("logging.format"), "unsupported format", "Unsupported log format")},
+		},
+		"NodePortAddresses with NodePortAddressesPrimary": {
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "192.168.59.103",
+				HealthzBindAddress: "0.0.0.0:10256",
+				MetricsBindAddress: "127.0.0.1:10249",
+				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+				Logging: logsapi.LoggingConfiguration{
+					Format: "text",
+				},
+				NodePortAddresses:        []string{"192.168.59.0/24", "fd00:192:168:59::/64"},
+				NodePortAddressesPrimary: true,
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses"), []string{"192.168.59.0/24", "fd00:192:168:59::/64"}, "must not be set when nodePortAddressesPrimary is true")},
 		},
 	}
 
@@ -988,7 +1055,7 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 	}
 
 	for _, successCase := range successCases {
-		if errs := validateKubeProxyNodePortAddress(successCase.addresses, newPath.Child("NodePortAddresses")); len(errs) != 0 {
+		if errs := validateKubeProxyNodePortAddress(successCase.addresses, false, newPath.Child("NodePortAddresses")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1025,7 +1092,7 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		errs := validateKubeProxyNodePortAddress(testCase.addresses, newPath.Child("NodePortAddresses"))
+		errs := validateKubeProxyNodePortAddress(testCase.addresses, false, newPath.Child("NodePortAddresses"))
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Errorf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
 		}
