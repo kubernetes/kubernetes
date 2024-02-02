@@ -620,7 +620,7 @@ func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.I
 	}
 
 	// Fetches the init configuration
-	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, nil, "preflight", true, false)
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, nil, "preflight", true, false, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

@@ -513,6 +513,15 @@ type ResetConfiguration struct {
 	// +optional
 	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
 
+	// LocalAPIEndpoint represents the endpoint of the API server instance that's deployed on this control plane node
+	// In HA setups, this differs from ClusterConfiguration.ControlPlaneEndpoint in the sense that ControlPlaneEndpoint
+	// is the global endpoint for the cluster, which then loadbalances the requests to each individual API server. This
+	// configuration object lets you customize what IP/DNS name and port the local API server advertises it's accessible
+	// on. By default, kubeadm tries to auto-detect the IP of the default interface and use that, but in case that process
+	// fails you may set the desired value here.
+	// +optional
+	LocalAPIEndpoint APIEndpoint `json:"localAPIEndpoint,omitempty"`
+
 	// SkipPhases is a list of phases to skip during command execution.
 	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
 	// +optional

@@ -37,6 +37,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -45,7 +46,7 @@ import (
 )
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
-func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool, apiEndpoint *v1beta4.APIEndpoint) (*kubeadmapi.InitConfiguration, error) {
 	if printer == nil {
 		printer = &output.TextPrinter{}
 	}
@@ -56,6 +57,11 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
 	if err != nil {
 		return nil, err
+	}
+
+	if apiEndpoint != nil {
+		cfg.LocalAPIEndpoint.AdvertiseAddress = apiEndpoint.AdvertiseAddress
+		cfg.LocalAPIEndpoint.BindPort = apiEndpoint.BindPort
 	}
 
 	// Apply dynamic defaults

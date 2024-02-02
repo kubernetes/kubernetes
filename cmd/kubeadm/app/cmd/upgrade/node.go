@@ -148,7 +148,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 	// Fetches the cluster configuration
 	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
-	cfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !options.isControlPlaneNode, false)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !options.isControlPlaneNode, false, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

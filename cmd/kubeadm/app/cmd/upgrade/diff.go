@@ -120,7 +120,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 		}
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade/diff", false, false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade/diff", false, false, nil)
 	}
 	if err != nil {
 		return err

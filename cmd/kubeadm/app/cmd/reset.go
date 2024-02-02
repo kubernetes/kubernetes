@@ -119,7 +119,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 	client, err := cmdutil.GetClientSet(opts.kubeconfigPath, false)
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", opts.kubeconfigPath)
-		initCfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)
+		initCfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false, &opts.externalcfg.LocalAPIEndpoint)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
@@ -167,6 +167,13 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		forceReset:            cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.ForceReset, resetCfg.Force, opts.externalcfg.Force).(bool),
 		cleanupTmpDir:         cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir, opts.externalcfg.CleanupTmpDir).(bool),
 	}, nil
+}
+
+func AddResetOtherFlags(flagSet *flag.FlagSet, cfg *v1beta4.ResetConfiguration) {
+	flagSet.StringVar(
+		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
+		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
+	)
 }
 
 // AddResetFlags adds reset flags
@@ -223,6 +230,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 		},
 	}
 
+	AddResetOtherFlags(cmd.Flags(), resetOptions.externalcfg)
 	AddResetFlags(cmd.Flags(), resetOptions)
 	// initialize the workflow runner with the list of phases
 	resetRunner.AppendPhase(phases.NewPreflightPhase())

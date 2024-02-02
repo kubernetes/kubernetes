@@ -338,7 +338,7 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.Clus
 	if cfgPath == "" {
 		client, err := kubeconfigutil.ClientSetFromFile(kubeconfigPath)
 		if err == nil {
-			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, logPrefix, false, false)
+			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, logPrefix, false, false, nil)
 			if err == nil {
 				fmt.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 				// certificate renewal or expiration checking doesn't depend on a running cluster, which means the CertificatesDir
