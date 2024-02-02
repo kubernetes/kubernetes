@@ -54,10 +54,15 @@ type TestDriver interface {
 }
 
 // TestVolume is the result of PreprovisionedVolumeTestDriver.CreateVolume.
-// The only common functionality is to delete it. Individual driver interfaces
-// have additional methods that work with volumes created by them.
+// The usual function is to delete it, but for the driver of the cloud provider,
+// it provides a method to obtain their VolumeClaim.
+// Individual driver interfaces have additional methods that work with volumes created by them.
 type TestVolume interface {
 	DeleteVolume(ctx context.Context)
+	// GetVolumeClaim is used to get the VolumeClaim of the cloud provider,
+	// we removed the dependency on the cloud provider,
+	// and need to dynamically provision the PVs to preserve test coverage.
+	GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim
 }
 
 // PreprovisionedVolumeTestDriver represents an interface for a TestDriver that has pre-provisioned volume
