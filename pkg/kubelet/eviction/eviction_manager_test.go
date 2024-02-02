@@ -986,6 +986,9 @@ func TestPIDPressure(t *testing.T) {
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
 
+	// create a best effort pod to test admission
+	podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, 50)
+
 	// synchronize
 	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
@@ -996,6 +999,11 @@ func TestPIDPressure(t *testing.T) {
 	// we should not have disk pressure
 	if manager.IsUnderDiskPressure() {
 		t.Fatalf("Manager should not report disk pressure")
+	}
+
+	// try to admit our pod (should succeed)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+		t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 	}
 
 	// induce soft threshold for PID pressure
@@ -1087,6 +1095,11 @@ func TestPIDPressure(t *testing.T) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
 	}
 
+	// try to admit our pod (should fail)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+		t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
+	}
+
 	// reduce PID pressure
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2000", "300", podStats)
@@ -1107,6 +1120,11 @@ func TestPIDPressure(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
 	}
 
+	// try to admit our pod (should fail)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+		t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
+	}
+
 	// move the clock past the transition period
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2000", "300", podStats)
@@ -1124,6 +1142,11 @@ func TestPIDPressure(t *testing.T) {
 	// no pod should have been killed
 	if podKiller.pod != nil {
 		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+	}
+
+	// try to admit our pod (should succeed)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+		t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 	}
 }
 
