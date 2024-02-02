@@ -768,9 +768,6 @@ func newLegacyServiceAccountTokenCleanerControllerDescriptor() *ControllerDescri
 		name:     names.LegacyServiceAccountTokenCleanerController,
 		aliases:  []string{"legacy-service-account-token-cleaner"},
 		initFunc: startLegacyServiceAccountTokenCleanerController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.LegacyServiceAccountTokenCleanUp, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
-		},
 	}
 }
 

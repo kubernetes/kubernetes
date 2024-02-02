@@ -30,15 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	clientinformers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -53,7 +50,6 @@ const (
 )
 
 func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.LegacyServiceAccountTokenCleanUp, true)()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c, config, stopFunc, informers, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)

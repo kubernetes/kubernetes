@@ -478,15 +478,14 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.LegacyServiceAccountTokenCleanUp) {
-		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "legacy-service-account-token-cleaner"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("configmaps").Names(legacytokentracking.ConfigMapName).RuleOrDie(),
-				rbacv1helpers.NewRule("patch", "delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
-			},
-		})
-	}
+
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "legacy-service-account-token-cleaner"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("configmaps").Names(legacytokentracking.ConfigMapName).RuleOrDie(),
+			rbacv1helpers.NewRule("patch", "delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+		},
+	})
 
 	return controllerRoles, controllerRoleBindings
 }
