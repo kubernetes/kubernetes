@@ -17,10 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
-	"sort"
-	"strings"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -265,17 +261,6 @@ const (
 	ProxyModeKernelspace ProxyMode = "kernelspace"
 )
 
-// LocalMode represents modes to detect local traffic from the node
-type LocalMode string
-
-// Currently supported modes for LocalMode
-const (
-	LocalModeClusterCIDR         LocalMode = "ClusterCIDR"
-	LocalModeNodeCIDR            LocalMode = "NodeCIDR"
-	LocalModeBridgeInterface     LocalMode = "BridgeInterface"
-	LocalModeInterfaceNamePrefix LocalMode = "InterfaceNamePrefix"
-)
-
 func (m *ProxyMode) Set(s string) error {
 	*m = ProxyMode(s)
 	return nil
@@ -292,6 +277,17 @@ func (m *ProxyMode) Type() string {
 	return "ProxyMode"
 }
 
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string
+
+// Currently supported modes for LocalMode
+const (
+	LocalModeClusterCIDR         LocalMode = "ClusterCIDR"
+	LocalModeNodeCIDR            LocalMode = "NodeCIDR"
+	LocalModeBridgeInterface     LocalMode = "BridgeInterface"
+	LocalModeInterfaceNamePrefix LocalMode = "InterfaceNamePrefix"
+)
+
 func (m *LocalMode) Set(s string) error {
 	*m = LocalMode(s)
 	return nil
@@ -306,34 +302,4 @@ func (m *LocalMode) String() string {
 
 func (m *LocalMode) Type() string {
 	return "LocalMode"
-}
-
-type ConfigurationMap map[string]string
-
-func (m *ConfigurationMap) String() string {
-	pairs := []string{}
-	for k, v := range *m {
-		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
-	}
-	sort.Strings(pairs)
-	return strings.Join(pairs, ",")
-}
-
-func (m *ConfigurationMap) Set(value string) error {
-	for _, s := range strings.Split(value, ",") {
-		if len(s) == 0 {
-			continue
-		}
-		arr := strings.SplitN(s, "=", 2)
-		if len(arr) == 2 {
-			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
-		} else {
-			(*m)[strings.TrimSpace(arr[0])] = ""
-		}
-	}
-	return nil
-}
-
-func (*ConfigurationMap) Type() string {
-	return "mapStringString"
 }
