@@ -661,6 +661,11 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 		return nil, err
 	}
 
+	err = checkBadConfig(s)
+	if err != nil {
+		logger.Error(err, "Kube-proxy configuration may be incomplete or incorrect")
+	}
+
 	ipv4Supported, ipv6Supported, dualStackSupported, err := s.platformCheckSupported()
 	if err != nil {
 		return nil, err
@@ -672,7 +677,7 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 		logger.Info("kube-proxy running in single-stack mode", "ipFamily", s.PrimaryIPFamily)
 	}
 
-	err, fatal := checkIPConfig(s, dualStackSupported)
+	err, fatal := checkBadIPConfig(s, dualStackSupported)
 	if err != nil {
 		if fatal {
 			return nil, fmt.Errorf("kube-proxy configuration is incorrect: %v", err)
@@ -688,8 +693,42 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 	return s, nil
 }
 
-// checkIPConfig confirms that s has proper configuration for its primary IP family.
-func checkIPConfig(s *ProxyServer, dualStackSupported bool) (error, bool) {
+// checkBadConfig checks for bad/deprecated configuation
+func checkBadConfig(s *ProxyServer) error {
+	var errors []error
+
+	// At this point we haven't seen any actual Services or EndpointSlices, so we
+	// don't really know if the cluster is expected to be single- or dual-stack. But
+	// we can at least take note of whether there is any explicitly-dual-stack
+	// configuration.
+	anyDualStackConfig := false
+	clusterCIDRs := strings.Split(s.Config.ClusterCIDR, ",")
+	for _, config := range [][]string{clusterCIDRs, s.Config.NodePortAddresses, s.Config.IPVS.ExcludeCIDRs, s.podCIDRs} {
+		if dual, _ := netutils.IsDualStackCIDRStrings(config); dual {
+			anyDualStackConfig = true
+			break
+		}
+	}
+
+	// Warn if NodePortAddresses does not limit connections on all IP families that
+	// seem to be in use.
+	cidrsByFamily := proxyutil.MapCIDRsByIPFamily(s.Config.NodePortAddresses)
+	if len(s.Config.NodePortAddresses) == 0 {
+		errors = append(errors, fmt.Errorf("nodePortAddresses is unset; NodePort connections will be accepted on all local IPs. Consider using `--nodeport-addresses primary`"))
+	} else if anyDualStackConfig && len(cidrsByFamily[s.PrimaryIPFamily]) == len(s.Config.NodePortAddresses) {
+		errors = append(errors, fmt.Errorf("cluster appears to be dual-stack but nodePortAddresses contains only %s addresses; NodePort connections will be accepted on all local %s IPs", s.PrimaryIPFamily, proxyutil.OtherIPFamily(s.PrimaryIPFamily)))
+	} else if len(cidrsByFamily[s.PrimaryIPFamily]) == 0 {
+		errors = append(errors, fmt.Errorf("cluster appears to be %s-primary but nodePortAddresses contains only %s addresses; NodePort connections will be accepted on all local %s IPs", s.PrimaryIPFamily, proxyutil.OtherIPFamily(s.PrimaryIPFamily), s.PrimaryIPFamily))
+	}
+
+	return utilerrors.NewAggregate(errors)
+}
+
+// checkBadIPConfig checks for bad configuration relative to s.PrimaryIPFamily.
+// Historically, we did not check most of the config options, so we cannot retroactively
+// make IP family mismatches in those options be fatal. When we add new options to check
+// here, we should make problems with those options be fatal.
+func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal bool) {
 	var errors []error
 	var badFamily netutils.IPFamily
 
@@ -706,11 +745,6 @@ func checkIPConfig(s *ProxyServer, dualStackSupported bool) (error, bool) {
 		clusterType = fmt.Sprintf("%s-only", s.PrimaryIPFamily)
 	}
 
-	// Historically, we did not check most of the config options, so we cannot
-	// retroactively make IP family mismatches in those options be fatal. When we add
-	// new options to check here, we should make problems with those options be fatal.
-	fatal := false
-
 	if s.Config.ClusterCIDR != "" {
 		clusterCIDRs := strings.Split(s.Config.ClusterCIDR, ",")
 		if badCIDRs(clusterCIDRs, badFamily) {
@@ -720,10 +754,6 @@ func checkIPConfig(s *ProxyServer, dualStackSupported bool) (error, bool) {
 				fatal = true
 			}
 		}
-	}
-
-	if badCIDRs(s.Config.NodePortAddresses, badFamily) {
-		errors = append(errors, fmt.Errorf("cluster is %s but nodePortAddresses contains only IPv%s addresses", clusterType, badFamily))
 	}
 
 	if badCIDRs(s.podCIDRs, badFamily) {
@@ -752,6 +782,9 @@ func checkIPConfig(s *ProxyServer, dualStackSupported bool) (error, bool) {
 			errors = append(errors, fmt.Errorf("cluster is %s but metricsBindAddress is IPv%s", clusterType, badFamily))
 		}
 	}
+
+	// Note that s.Config.NodePortAddresses gets checked as part of checkBadConfig()
+	// so it doesn't need to be checked here.
 
 	return utilerrors.NewAggregate(errors), fatal
 }
