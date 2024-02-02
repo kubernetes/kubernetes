@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -132,16 +134,13 @@ func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, 
 	}
 	return result, output, err
 }
-
-func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
-	timeout := time.Duration(p.TimeoutSeconds) * time.Second
-	if p.Exec != nil {
-		klog.V(4).InfoS("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
-		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
-		return pb.exec.Probe(pb.newExecInContainer(ctx, container, containerID, command, timeout))
-	}
-	if p.HTTPGet != nil {
-		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
+func (pb *prober) runHTTPProbe(p *v1.Probe, status v1.PodStatus, container *v1.Container, timeout time.Duration) (probe.Result, string, error) {
+	var err error
+	var result probe.Result
+	var output string
+	var req *http.Request
+	for _, podIP := range status.PodIPs {
+		req, err = httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, container, podIP.IP, "probe")
 		if err != nil {
 			return probe.Unknown, "", err
 		}
@@ -153,19 +152,56 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			headers := p.HTTPGet.HTTPHeaders
 			klogV4.InfoS("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers)
 		}
-		return pb.http.Probe(req, timeout)
+		if result, output, err = pb.http.Probe(req, timeout); err != nil {
+			break
+		}
+		if result != probe.Success && result != probe.Warning {
+			// https://github.com/kubernetes/kubernetes/issues/101324
+			// In dual-stack the application may listen to the other family.
+			// Note that only "connection refused" can indicate this.
+			if !strings.Contains(output, "connection refused") {
+				break
+			}
+		}
+	}
+	return result, output, err
+}
+func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+	timeout := time.Duration(p.TimeoutSeconds) * time.Second
+	if p.Exec != nil {
+		klog.V(4).InfoS("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
+		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
+		return pb.exec.Probe(pb.newExecInContainer(ctx, container, containerID, command, timeout))
+	}
+	if p.HTTPGet != nil {
+		return pb.runHTTPProbe(p, status, &container, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := probe.ResolveContainerPort(p.TCPSocket.Port, &container)
 		if err != nil {
 			return probe.Unknown, "", err
 		}
-		host := p.TCPSocket.Host
-		if host == "" {
-			host = status.PodIP
+		if p.TCPSocket.Host != "" {
+			klog.V(4).InfoS("TCP-Probe", "host", p.TCPSocket.Host, "port", port, "timeout", timeout)
+			return pb.tcp.Probe(p.TCPSocket.Host, port, timeout)
 		}
-		klog.V(4).InfoS("TCP-Probe", "host", host, "port", port, "timeout", timeout)
-		return pb.tcp.Probe(host, port, timeout)
+		var result probe.Result
+		var output string
+		for _, podIP := range status.PodIPs {
+			klog.V(4).InfoS("TCP-Probe", "podIP", podIP.IP, "port", port, "timeout", timeout)
+			if result, output, err = pb.tcp.Probe(podIP.IP, port, timeout); err != nil {
+				break
+			}
+			if result != probe.Success && result != probe.Warning {
+				// https://github.com/kubernetes/kubernetes/issues/101324
+				// In dual-stack the application may listen to the other family.
+				// Note that only "connection refused" can indicate this.
+				if !strings.Contains(output, "connection refused") {
+					break
+				}
+			}
+		}
+		return result, output, err
 	}
 
 	if p.GRPC != nil {
