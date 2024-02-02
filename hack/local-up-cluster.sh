@@ -822,10 +822,6 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
-    container_runtime_endpoint_args=()
-    if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
-      container_runtime_endpoint_args=("--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}")
-    fi
 
     image_service_endpoint_args=()
     if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
@@ -840,7 +836,6 @@ function start_kubelet {
       "${cloud_config_arg[@]}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
       "--kubeconfig=${CERT_DIR}/kubelet-rotated.kubeconfig"
-      ${container_runtime_endpoint_args[@]+"${container_runtime_endpoint_args[@]}"}
       ${image_service_endpoint_args[@]+"${image_service_endpoint_args[@]}"}
       ${KUBELET_FLAGS}
     )
@@ -864,6 +859,7 @@ address: "${KUBELET_HOST}"
 cgroupDriver: "${CGROUP_DRIVER}"
 cgroupRoot: "${CGROUP_ROOT}"
 cgroupsPerQOS: ${CGROUPS_PER_QOS}
+containerRuntimeEndpoint: ${CONTAINER_RUNTIME_ENDPOINT}
 cpuCFSQuota: ${CPU_CFS_QUOTA}
 enableControllerAttachDetach: ${ENABLE_CONTROLLER_ATTACH_DETACH}
 localStorageCapacityIsolation: ${LOCAL_STORAGE_CAPACITY_ISOLATION}
