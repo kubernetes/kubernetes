@@ -58,10 +58,7 @@ func usageNow(first procCPUStats, second procCPUStats) int64 {
 
 func main() {
 	flag.Parse()
-	phandle, err := syswin.GetCurrentProcess()
-	if err != nil {
-		panic(err)
-	}
+	phandle := syswin.CurrentProcess()
 	handle := syscall.Handle(phandle)
 
 	duration := time.Duration(*durationSec) * time.Second
