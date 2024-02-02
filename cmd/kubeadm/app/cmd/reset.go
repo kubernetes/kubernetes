@@ -169,6 +169,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 	}, nil
 }
 
+// AddResetOtherFlags adds reset flags that are not part of the ResetConfiguration
 func AddResetOtherFlags(flagSet *flag.FlagSet, cfg *v1beta4.ResetConfiguration) {
 	flagSet.StringVar(
 		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
