@@ -842,7 +842,82 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 }
 
-func Test_checkIPConfig(t *testing.T) {
+func Test_checkBadConfig(t *testing.T) {
+	cases := []struct {
+		name  string
+		proxy *ProxyServer
+		err   bool
+	}{
+		{
+			name: "NodePortAddressesPrimary",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses:        []string{},
+					NodePortAddressesPrimary: true,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: false,
+		},
+		{
+			name: "single-stack NodePortAddresses with single-stack config",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:       "10.0.0.0/8",
+					NodePortAddresses: []string{"192.168.0.0/24"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: false,
+		},
+		{
+			name: "dual-stack NodePortAddresses with dual-stack config",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:       "10.0.0.0/8,fd09::/64",
+					NodePortAddresses: []string{"192.168.0.0/24", "fd03::/64"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: false,
+		},
+		{
+			name: "empty NodePortAddresses, not NodePortAddressesPrimary",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses:        []string{},
+					NodePortAddressesPrimary: false,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: true,
+		},
+		{
+			name: "single-stack NodePortAddresses with dual-stack config",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:       "10.0.0.0/8,fd09::/64",
+					NodePortAddresses: []string{"192.168.0.0/24"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := checkBadConfig(c.proxy)
+			if err != nil && !c.err {
+				t.Errorf("unexpected error: %v", err)
+			} else if err == nil && c.err {
+				t.Errorf("unexpected lack of error")
+			}
+		})
+	}
+}
+
+func Test_checkBadIPConfig(t *testing.T) {
 	cases := []struct {
 		name    string
 		proxy   *ProxyServer
@@ -1126,7 +1201,7 @@ func Test_checkIPConfig(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err, fatal := checkIPConfig(c.proxy, false)
+			err, fatal := checkBadIPConfig(c.proxy, false)
 			if err != nil && !c.ssErr {
 				t.Errorf("unexpected error in single-stack case: %v", err)
 			} else if err == nil && c.ssErr {
@@ -1135,7 +1210,7 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("expected fatal=%v, got %v", c.ssFatal, fatal)
 			}
 
-			err, fatal = checkIPConfig(c.proxy, true)
+			err, fatal = checkBadIPConfig(c.proxy, true)
 			if err != nil && !c.dsErr {
 				t.Errorf("unexpected error in dual-stack case: %v", err)
 			} else if err == nil && c.dsErr {
