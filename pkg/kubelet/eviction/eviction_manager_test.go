@@ -448,14 +448,14 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
 				}
 
-				// synchronize to detect the memory pressure
+				// synchronize to detect the PID pressure
 				_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 				if err != nil {
 					t.Fatalf("Manager expects no error but got %v", err)
 				}
 
-				// verify pid pressure is detected
+				// verify PID pressure is detected
 				if !manager.IsUnderPIDPressure() {
 					t.Fatalf("Manager should have detected PID pressure")
 				}
@@ -1097,7 +1097,7 @@ func TestPIDPressure(t *testing.T) {
 		t.Fatalf("Manager expects no error but got %v", err)
 	}
 
-	// we should have memory pressure (because transition period not yet met)
+	// we should have PID pressure (because transition period not yet met)
 	if !manager.IsUnderPIDPressure() {
 		t.Errorf("Manager should report PID pressure")
 	}
@@ -1118,7 +1118,7 @@ func TestPIDPressure(t *testing.T) {
 
 	// we should not have PID pressure (because transition period met)
 	if manager.IsUnderPIDPressure() {
-		t.Errorf("Manager should not report memory pressure")
+		t.Errorf("Manager should not report PID pressure")
 	}
 
 	// no pod should have been killed
