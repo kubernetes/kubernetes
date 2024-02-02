@@ -86,6 +86,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		serviceCIDRs = "fd00:10:96::/112"
 	}
 	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR)
+	nodePortAddresses := []string{fmt.Sprintf("%s/32", testNodeIP), fmt.Sprintf("%s/128", testNodeIPv6)}
 
 	networkInterfacer := proxyutiltest.NewFakeNetwork()
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
@@ -125,7 +126,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		hostname:            testHostname,
 		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
 		nodeIP:              nodeIP,
-		nodePortAddresses:   proxyutil.NewNodePortAddresses(ipFamily, nil, nodeIP),
+		nodePortAddresses:   proxyutil.NewNodePortAddresses(ipFamily, nodePortAddresses, nodeIP),
 		networkInterfacer:   networkInterfacer,
 		staleChains:         make(map[string]time.Time),
 		serviceCIDRs:        serviceCIDRs,
