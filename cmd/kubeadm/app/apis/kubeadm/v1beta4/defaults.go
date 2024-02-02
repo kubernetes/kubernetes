@@ -60,7 +60,7 @@ const (
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
 
 	// DefaultEncryptionAlgorithm is the default encryption algorithm.
-	DefaultEncryptionAlgorithm = EncryptionAlgorithmRSA
+	DefaultEncryptionAlgorithm = EncryptionAlgorithmRSA2048
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {

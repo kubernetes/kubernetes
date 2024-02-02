@@ -262,7 +262,7 @@ func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 				}
 			}
 
-			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, kubeadmapi.EncryptionAlgorithmRSA)
+			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, kubeadmapi.EncryptionAlgorithmRSA2048)
 			if (err != nil) != tt.expectedErr {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tt.expectedErr, err != nil, err)
 			} else if tt.expectedErr {

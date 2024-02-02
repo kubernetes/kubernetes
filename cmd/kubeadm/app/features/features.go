@@ -43,8 +43,9 @@ const (
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
 	PublicKeysECDSA: {
-		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
-		DeprecationMessage: "The PublicKeysECDSA feature gate is deprecated and will be removed after the feature 'ClusterConfiguration.EncryptionAlgorithm' is added.",
+		FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
+		DeprecationMessage: "The PublicKeysECDSA feature gate is deprecated and will be removed when v1beta3 is removed." +
+			" v1beta4 supports a new option 'ClusterConfiguration.EncryptionAlgorithm'.",
 	},
 	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	EtcdLearnerMode:      {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},

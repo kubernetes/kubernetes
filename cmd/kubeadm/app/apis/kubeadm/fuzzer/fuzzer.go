@@ -94,7 +94,7 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Scheduler.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
-	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
+	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	obj.Proxy.Disabled = false
 }
 
