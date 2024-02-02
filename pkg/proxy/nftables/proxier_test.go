@@ -3986,6 +3986,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
 		add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
 		add set ip kube-proxy nodeport-ips { type ipv4_addr ; comment "IPs that accept NodePort traffic" ; }
+		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
 
 		add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
@@ -4058,7 +4059,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
 
@@ -4111,7 +4111,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
@@ -4145,7 +4144,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
@@ -4174,7 +4172,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
@@ -4211,7 +4208,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 
@@ -4251,7 +4247,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4290,7 +4285,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4332,7 +4326,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4372,7 +4365,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy no-endpoint-services { 172.30.0.43 . tcp . 80 comment "ns3/svc3:p80" : goto reject-chain }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
@@ -4408,7 +4400,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
