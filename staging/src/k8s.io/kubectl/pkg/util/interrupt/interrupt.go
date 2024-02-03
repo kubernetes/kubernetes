@@ -17,6 +17,7 @@ limitations under the License.
 package interrupt
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -76,6 +77,8 @@ func (h *Handler) Signal(s os.Signal) {
 			fn()
 		}
 		if h.final == nil {
+			// Add new line before exiting to fix kubectl #1544
+			fmt.Print("\n")
 			os.Exit(1)
 		}
 		h.final(s)
