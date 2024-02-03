@@ -1,6 +1,0 @@
-# Ignore binaries without extension
-//example/client/client
-//example/server/server
-//internal/v2/fakes2av2_server/fakes2av2_server
-
-.idea/

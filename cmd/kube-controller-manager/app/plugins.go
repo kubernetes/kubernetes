@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 	"k8s.io/utils/exec"
 )
@@ -48,12 +47,7 @@ import (
 // The list of plugins is manually compiled. This code and the plugin
 // initialization code for kubelet really, really need a through refactor.
 func ProbeAttachableVolumePlugins(logger klog.Logger) ([]volume.VolumePlugin, error) {
-	var err error
 	allPlugins := []volume.VolumePlugin{}
-	allPlugins, err = appendAttachableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
-	if err != nil {
-		return allPlugins, err
-	}
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
@@ -69,12 +63,7 @@ func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) v
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
 func ProbeExpandableVolumePlugins(logger klog.Logger, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
-	var err error
 	allPlugins := []volume.VolumePlugin{}
-	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
-	if err != nil {
-		return allPlugins, err
-	}
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	return allPlugins, nil
 }
@@ -116,13 +105,6 @@ func ProbeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
-
-	var err error
-	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
-	if err != nil {
-		return allPlugins, err
-	}
-
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 
