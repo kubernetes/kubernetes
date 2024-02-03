@@ -615,12 +615,16 @@ func CoreDump(dir string) {
 		return
 	}
 	var cmd *exec.Cmd
+	logDumpScript := os.Getenv("LOG_DUMP_SCRIPT_PATH")
+	if logDumpScript == "" {
+		logDumpScript = path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh")
+	}
 	if TestContext.LogexporterGCSPath != "" {
 		Logf("Dumping logs from nodes to GCS directly at path: %s", TestContext.LogexporterGCSPath)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, TestContext.LogexporterGCSPath)
+		cmd = exec.Command(logDumpScript, dir, TestContext.LogexporterGCSPath)
 	} else {
 		Logf("Dumping logs locally to: %s", dir)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+		cmd = exec.Command(logDumpScript, dir)
 	}
 	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
 	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
@@ -628,7 +632,7 @@ func CoreDump(dir string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		Logf("Error running cluster/log-dump/log-dump.sh: %v", err)
+		Logf("Error running %s: %v", logDumpScript, err)
 	}
 }
 

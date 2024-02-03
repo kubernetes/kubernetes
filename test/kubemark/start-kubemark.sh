@@ -34,7 +34,7 @@ fi
 
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
-KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+KUBECTL="${KUBE_ROOT}/hack/kubectl.sh"
 KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.kubemark"

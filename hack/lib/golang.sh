@@ -79,7 +79,6 @@ kube::golang::server_targets() {
     vendor/k8s.io/component-base/logs/kube-log-runner
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
-    cluster/gce/gci/mounter
   )
   echo "${targets[@]}"
 }

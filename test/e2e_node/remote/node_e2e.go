@@ -59,7 +59,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter", "gcp-credential-provider"}
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "gcp-credential-provider"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		klog.V(2).Infof("Copying binaries from %s", source)

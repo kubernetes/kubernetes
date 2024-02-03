@@ -39,7 +39,6 @@ var buildCGOTargets = []string{
 var buildNoCGOTargets = []string{
 	"test/e2e_node/e2e_node.test",
 	"github.com/onsi/ginkgo/v2/ginkgo",
-	"cluster/gce/gci/mounter",
 	"test/e2e_node/plugins/gcp-credential-provider",
 }
 
