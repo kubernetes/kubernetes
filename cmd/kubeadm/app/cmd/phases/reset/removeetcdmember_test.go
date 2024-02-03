@@ -118,8 +118,6 @@ func TestGetEtcdDataDir(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
 
 			dataDir, err := getEtcdDataDir(test.etcdPod)
 
@@ -223,7 +221,9 @@ func TestGetEtcdPod(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			defer func() {
+				_ = os.RemoveAll(tmpdir)
+			}()
 
 			manifestPath := filepath.Join(tmpdir, "etcd.yaml")
 
