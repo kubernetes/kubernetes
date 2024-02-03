@@ -76,6 +76,8 @@ func (pl *CSILimits) Name() string {
 // failed by this plugin schedulable.
 func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
+		// We don't register any `QueueingHintFn` intentionally
+		// because any new CSINode could make pods that were rejected by CSI volumes schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
 	}
