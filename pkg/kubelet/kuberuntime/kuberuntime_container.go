@@ -53,6 +53,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -208,6 +209,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	containerStatus := podStatus.FindContainerStatusByName(container.Name)
 	if containerStatus != nil {
 		restartCount = containerStatus.RestartCount + 1
+		metrics.ContainerRestartCount.WithLabelValues(pod.Name, container.Name).Inc()
 	} else {
 		// The container runtime keeps state on container statuses and
 		// what the container restart count is. When nodes are rebooted
@@ -225,6 +227,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 			klog.InfoS("Cannot calculate restartCount from the log directory", "logDir", logDir, "err", err)
 			restartCount = 0
 		}
+		metrics.ContainerRestartCount.WithLabelValues(pod.Name, container.Name).Add(float64(restartCount))
 	}
 
 	target, err := spec.getTargetID(podStatus)
@@ -778,6 +781,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	}
 	klog.V(3).InfoS("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
 		"containerName", containerName, "containerID", containerID.String())
+	metrics.ContainerRestartCount.DeleteLabelValues(pod.Name, containerName)
 
 	if ordering != nil {
 		ordering.containerTerminated(containerName)

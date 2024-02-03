@@ -602,6 +602,16 @@ var (
 		},
 		[]string{"static"},
 	)
+	// ContainerRestartCount is a Counter that tracks the cumulative number of container restart count.
+	ContainerRestartCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "pod_container_restart_count",
+			Help:           "Cumulative number of container restart count by pod and container name.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"pod_name", "container_name"},
+	)
 	// StartedPodsTotal is a counter that tracks pod sandbox creation operations
 	StartedPodsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
