@@ -217,9 +217,9 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 // AFTER it has checked all the admissionAttributes.  The method breaks down into phase like this:
 //  0. make a copy of the quotas to act as a "running" quota so we know what we need to update and can still compare against the
 //     originals
-//  1. check each admission attribute to see if it fits within *all* the quotas.  If it doesn't fit, mark the waiter as failed
-//     and the running quota don't change.  If it did fit, check to see if any quota was changed.  It there was no quota change
-//     mark the waiter as succeeded.  If some quota did change, update the running quotas
+//  1. check each admission attribute to see if it fits within *all* the quotas.  If it didn't fit, mark the waiter as failed
+//     and the running quota doesn't change.  If it did fit, check to see if any quota was changed.  If there was no quota change
+//     mark the waiter as succeeded.  If some quota did change, update the running quotas.
 //  2. If no running quota was changed, return now since no updates are needed.
 //  3. for each quota that has changed, attempt an update.  If all updates succeeded, update all unset waiters to success status and return.  If the some
 //     updates failed on conflict errors and we have retries left, re-get the failed quota from our cache for the latest version
@@ -312,10 +312,10 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 		return
 	}
 
-	// this retry logic has the same bug that its possible to be checking against quota in a state that never actually exists where
-	// you've added a new documented, then updated an old one, your resource matches both and you're only checking one
-	// updates for these quota names failed.  Get the current quotas in the namespace, compare by name, check to see if the
-	// resource versions have changed.  If not, we're going to fall through an fail everything.  If they all have, then we can try again
+	// this retry logic has the same bug: it's possible to be checking against quota in a state that never actually exists where
+	// you've added a new document, then updated an old one. Your resource matches both, and you're only checking one.
+	// Updates for these quota names failed. Get the current quotas in the namespace, compare by name, check to see if the
+	// resource versions have changed. If not, we're going to fall through and fail everything. If they all have, then we can try again.
 	newQuotas, err := e.quotaAccessor.GetQuotas(quotas[0].Namespace)
 	if err != nil {
 		// this means that updates failed.  Anything with a default deny error has failed and we need to let them know
