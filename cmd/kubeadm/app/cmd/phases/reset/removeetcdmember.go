@@ -18,14 +18,15 @@ package phases
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -55,11 +56,28 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 		return errors.New("remove-etcd-member-phase phase invoked with an invalid data struct")
 	}
 	cfg := r.Cfg()
+	var etcdDataDir string
 
 	// Only clear etcd data when using local etcd.
 	klog.V(1).Infoln("[reset] Checking for etcd config")
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
-	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
+	etcdPod, err := getEtcdPod(etcdManifestPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get etcd pod manifest from %s", etcdManifestPath)
+	}
+
+	etcdAdvertiseAddress, err := getEtcdAdvertiseAddress(etcdPod)
+
+	if etcdAdvertiseAddress != "" {
+		cfg.LocalAPIEndpoint.AdvertiseAddress = etcdAdvertiseAddress
+	}
+
+	if cfg != nil && cfg.Etcd.Local != nil {
+		etcdDataDir = cfg.Etcd.Local.DataDir
+	} else {
+		etcdDataDir, err = getEtcdDataDir(etcdPod)
+	}
+	klog.Warningln("[reset] No kubeadm config, using etcd pod spec to get data directory")
 	if err == nil {
 		if cfg != nil {
 			if !r.DryRun() {
@@ -96,25 +114,33 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	return nil
 }
 
-func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (string, error) {
+// getEtcdPod returns the etcd pod manifest from the file system
+func getEtcdPod(manifestPath string) (*v1.Pod, error) {
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		// Fall back to use the default cluster config if etcd.yaml doesn't exist, this could happen that
+		// etcd.yaml is removed by other reset phases, e.g. cleanup-node.
+		klog.Infof("[reset] No etcd pod manifest found at %s", manifestPath)
+
+		return nil, nil
+	}
+	etcdPod, err := utilstaticpod.ReadStaticPodFromDisk(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	return etcdPod, nil
+}
+
+// getEtcdDataDir returns the etcd data directory from the etcd pod manifest
+func getEtcdDataDir(etcdPod *v1.Pod) (string, error) {
 	const etcdVolumeName = "etcd-data"
 	var dataDir string
 
-	if cfg != nil && cfg.Etcd.Local != nil {
-		return cfg.Etcd.Local.DataDir, nil
-	}
-	klog.Warningln("[reset] No kubeadm config, using etcd pod spec to get data directory")
-
-	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+	if etcdPod == nil {
 		// Fall back to use the default cluster config if etcd.yaml doesn't exist, this could happen that
 		// etcd.yaml is removed by other reset phases, e.g. cleanup-node.
 		cfg := &v1beta3.ClusterConfiguration{}
 		scheme.Scheme.Default(cfg)
 		return cfg.Etcd.Local.DataDir, nil
-	}
-	etcdPod, err := utilstaticpod.ReadStaticPodFromDisk(manifestPath)
-	if err != nil {
-		return "", err
 	}
 	for _, volumeMount := range etcdPod.Spec.Volumes {
 		if volumeMount.Name == etcdVolumeName {
@@ -126,4 +152,18 @@ func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (str
 		return dataDir, errors.New("invalid etcd pod manifest")
 	}
 	return dataDir, nil
+}
+
+// getEtcdAdvertiseAddress returns the etcd advertise address from the etcd pod manifest
+func getEtcdAdvertiseAddress(etcdPod *v1.Pod) (string, error) {
+	etcdAdvertiseClientUrls := etcdPod.Annotations[kubeadmconstants.EtcdAdvertiseClientUrlsAnnotationKey]
+
+	if etcdAdvertiseClientUrls != "" {
+		u, err := url.Parse(etcdAdvertiseClientUrls)
+		if err != nil || (err == nil && u.Hostname() == "") {
+			return "", fmt.Errorf("failed to parse etcd advertise client urls: %s", etcdAdvertiseClientUrls)
+		}
+		return u.Hostname(), nil
+	}
+	return "", nil
 }
