@@ -38,7 +38,7 @@ func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode 
 
 	updatedNode, err := c.Nodes().Patch(context.TODO(), string(nodeName), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to patch status %q for node %q: %v", patchBytes, nodeName, err)
+		return nil, nil, fmt.Errorf("failed to patch status %q for node %q: %w", patchBytes, nodeName, err)
 	}
 	return updatedNode, patchBytes, nil
 }

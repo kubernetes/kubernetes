@@ -40,7 +40,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -535,9 +534,11 @@ func (kl *Kubelet) syncNodeStatus() {
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
+	useCache := true
 	klog.V(5).InfoS("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(ctx, i); err != nil {
+		if err := kl.tryUpdateNodeStatus(ctx, useCache); err != nil {
+			useCache = !apierrors.IsConflict(err)
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
@@ -551,20 +552,25 @@ func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error {
+func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, useCache bool) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
-	// To reduce the load on etcd, we are serving GET operations from
-	// apiserver cache (the data might be slightly delayed but it doesn't
-	// seem to cause more conflict - the delays are pretty small).
-	// If it result in a conflict, all retries are served directly from etcd.
-	opts := metav1.GetOptions{}
-	if tryNumber == 0 {
-		util.FromApiserverCache(&opts)
-	}
-	originalNode, err := kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
+	// To reduce the load on both apiserver and etcd, we are getting Node
+	// object from local cache, which is synchronized via informer/watch (the
+	// data might be slightly delayed but it doesn't seem to cause more
+	// conflict - the delays are pretty small).
+	// If it result in a conflict, the following retry will be served directly
+	// from etcd.
+	originalNode, err := kl.GetNode()
 	if err != nil {
-		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
+		klog.ErrorS(err, "Error getting the current node from lister")
+	}
+
+	if !useCache {
+		originalNode, err = kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("error getting node %q: %w", kl.nodeName, err)
+		}
 	}
 	if originalNode == nil {
 		return fmt.Errorf("nil %q node object", kl.nodeName)
