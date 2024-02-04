@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/scheduler/util"
-
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -120,7 +119,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	}
 
 	schedulingPodAttachedVolumes := make(map[string]string)
-	if err := pl.filterAttachableVolumes(logger, pod, csiNode, false /* new pod */, schedulingPodAttachedVolumes); err != nil {
+	if err := pl.filterAttachableVolumes(logger, pod, csiNode, true /* new pod */, schedulingPodAttachedVolumes); err != nil {
 		return framework.Queue, fmt.Errorf("failed to filter attachable volumes from %v: %w", klog.KObj(pod), err)
 	}
 	schedulingPodDrivers := sets.Set[string]{}
@@ -128,12 +127,9 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		schedulingPodDrivers.Insert(driverName)
 	}
 
-	for deletedPodDriverName := range deletedPodDrivers {
-		if schedulingPodDrivers.Has(deletedPodDriverName) {
-			// This event may make Pod schedulable because the deleted Pod used the same CSI driver as the new Pod.
-			return framework.Queue, nil
-
-		}
+	if deletedPodDrivers.Intersection(schedulingPodDrivers).Len() != 0 {
+		// This event may make Pod schedulable because the deleted Pod used the same CSI driver as the new Pod.
+		return framework.Queue, nil
 	}
 
 	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", klog.KObj(pod), "pod", klog.KObj(pod))
