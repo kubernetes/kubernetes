@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,6 +56,7 @@ type TopPodOptions struct {
 	Sum                bool
 
 	PodClient       corev1client.PodsGetter
+	NodeClient      corev1client.CoreV1Interface
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
 	MetricsClient   metricsclientset.Interface
@@ -151,6 +153,7 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	}
 
 	o.PodClient = clientset.CoreV1()
+	o.NodeClient = clientset.CoreV1()
 
 	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
 	return nil
@@ -200,7 +203,93 @@ func (o TopPodOptions) RunTopPod() error {
 		return err
 	}
 
-	// First we check why no metrics have been received.
+	// Get Pod
+	podMap := make(map[string]corev1.Pod)
+	nodeMap := make(map[string]*corev1.Node)
+	if o.AllNamespaces {
+		o.Namespace = metav1.NamespaceAll
+	}
+
+	if o.PrintContainers {
+		nodeName := ""
+		if len(o.ResourceName) > 0 {
+			pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			podMap[pod.Name] = *pod
+
+			node, err := o.NodeClient.Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			nodeMap[node.Name] = node
+			nodeName = pod.Spec.NodeName
+		} else {
+			pods, err := o.PodClient.Pods(o.Namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: labelSelector.String(),
+				FieldSelector: "status.phase=Running," + fieldSelector.String(),
+			})
+			if err != nil {
+				return err
+			}
+			for _, pod := range pods.Items {
+				podMap[pod.Name] = pod
+			}
+			nodes, err := o.NodeClient.Nodes().List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			for _, node := range nodes.Items {
+				nodeMap[node.Name] = &node
+			}
+		}
+
+		nodeMetricMap := make(map[string]*metricsapi.NodeMetrics)
+		nodeMetrics, err := getNodeMetricsFromMetricsAPI(o.MetricsClient, nodeName, labels.Everything())
+		if err != nil {
+			return err
+		}
+		for _, nodeMetric := range nodeMetrics.Items {
+			nodeMetricMap[nodeMetric.Name] = &nodeMetric
+		}
+
+		podMetricMap := make(map[string]*metricsapi.PodMetrics)
+		for _, podMetric := range metrics.Items {
+			podMetricCopy := podMetric
+			podMetricMap[podMetric.Name] = &podMetricCopy
+		}
+
+		for podName, pod := range podMap {
+			for index, container := range pod.Spec.Containers {
+				// If container has no limits, then create
+				if container.Resources.Limits == nil {
+					container.Resources.Limits = make(map[corev1.ResourceName]resource.Quantity)
+				}
+
+				// Use free resources of nodes and usages of containers as limit
+				if _, ok := container.Resources.Limits[corev1.ResourceCPU]; !ok {
+					cpuQuantity := *nodeMap[pod.Spec.NodeName].Status.Capacity.Cpu()
+					if nodeMetric := nodeMetricMap[pod.Spec.NodeName]; nodeMetric != nil {
+						cpuQuantity.Sub(*nodeMetric.Usage.Cpu())
+						cpuQuantity.Add(*podMetricMap[podName].Containers[index].Usage.Cpu())
+					}
+					container.Resources.Limits[corev1.ResourceCPU] = cpuQuantity
+				}
+				if _, ok := container.Resources.Limits[corev1.ResourceMemory]; !ok {
+					memoryQuantity := *nodeMap[pod.Spec.NodeName].Status.Capacity.Memory()
+					if nodeMetric := nodeMetricMap[pod.Spec.NodeName]; nodeMetric != nil {
+						memoryQuantity.Sub(*nodeMetric.Usage.Memory())
+						memoryQuantity.Add(*podMetricMap[podName].Containers[index].Usage.Memory())
+					}
+					container.Resources.Limits[corev1.ResourceMemory] = memoryQuantity
+				}
+				pod.Spec.Containers[index] = container
+			}
+			podMap[podName] = pod
+		}
+	}
+
 	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
@@ -217,7 +306,7 @@ func (o TopPodOptions) RunTopPod() error {
 		}
 	}
 
-	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
+	return o.Printer.PrintPodMetrics(metrics.Items, podMap, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
 }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
