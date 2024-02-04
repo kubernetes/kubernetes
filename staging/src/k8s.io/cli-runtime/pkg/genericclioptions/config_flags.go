@@ -221,7 +221,12 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 		overrides.Context.AuthInfo = *f.AuthInfoName
 	}
 	if f.Namespace != nil {
-		overrides.Context.Namespace = *f.Namespace
+		namespaceWithoutPrefix, err := clientcmd.RemoveNamespacesPrefix(*f.Namespace)
+		if err != nil {
+			overrides.Context.Namespace = *f.Namespace
+		} else {
+			overrides.Context.Namespace = namespaceWithoutPrefix
+		}
 	}
 
 	if f.Timeout != nil {
