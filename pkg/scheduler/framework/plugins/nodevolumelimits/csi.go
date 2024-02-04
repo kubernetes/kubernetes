@@ -120,6 +120,11 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 	schedulingPodAttachedVolumes := make(map[string]string)
 	if err := pl.filterAttachableVolumes(logger, pod, csiNode, true /* new pod */, schedulingPodAttachedVolumes); err != nil {
+		if apierrors.IsNotFound(err) {
+			// pod requires non-existing PVC - pod will never be schedulable until PVC is created.
+			// We return QueueSkip here and catch the moment that a required PVC is created via PVC/Added event.
+			return framework.QueueSkip, nil
+		}
 		return framework.Queue, fmt.Errorf("failed to filter attachable volumes from %v: %w", klog.KObj(pod), err)
 	}
 	schedulingPodDrivers := sets.Set[string]{}
