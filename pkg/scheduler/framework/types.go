@@ -144,6 +144,13 @@ func (ce ClusterEvent) IsWildCard() bool {
 	return ce.Resource == WildCard && ce.ActionType == All
 }
 
+// Match returns true if ClusterEvent is matched with the coming event.
+// If the ce.Resource is "*", there's no requirement for the coming event' Resource.
+// Contrarily, if the coming event's Resource is "*", the ce.Resource should only be "*".
+func (ce ClusterEvent) Match(event ClusterEvent) bool {
+	return ce.IsWildCard() || (ce.Resource == WildCard || ce.Resource == event.Resource) && ce.ActionType&event.ActionType != 0
+}
+
 func UnrollWildCardResource() []ClusterEventWithHint {
 	return []ClusterEventWithHint{
 		{Event: ClusterEvent{Resource: Pod, ActionType: All}},

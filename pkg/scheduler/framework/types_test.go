@@ -1608,3 +1608,52 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		})
 	}
 }
+
+func TestCloudEvent_Match(t *testing.T) {
+	testCases := []struct {
+		name        string
+		event       ClusterEvent
+		comingEvent ClusterEvent
+		wantResult  bool
+	}{
+		{
+			name:        "wildcard event matches with all kinds of coming events",
+			event:       ClusterEvent{Resource: WildCard, ActionType: All},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = '*' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = '*' matching with coming events carries different actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeAllocatable},
+			wantResult:  false,
+		},
+		{
+			name:        "event matching with coming events carries '*' resources",
+			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			wantResult:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.event.Match(tc.comingEvent)
+			if got != tc.wantResult {
+				t.Fatalf("unexpected result")
+			}
+		})
+	}
+}

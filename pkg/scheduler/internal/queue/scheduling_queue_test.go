@@ -3550,6 +3550,50 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "If event with '*' Resource, queueing hint function for specified Resource is also executed",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
+			},
+			event:                  framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add},
+			oldObj:                 nil,
+			newObj:                 st.MakeNode().Obj(),
+			expected:               queueAfterBackoff,
+			expectedExecutionCount: 1,
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					framework.ClusterEvent{Resource: framework.WildCard, ActionType: framework.Add}: {
+						{
+							PluginName:     "fooPlugin1",
+							QueueingHintFn: queueHintReturnQueue,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "If event is a wildcard one, queueing hint function for all kinds of events is executed",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
+			},
+			event:                  framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel | framework.UpdateNodeTaint},
+			oldObj:                 nil,
+			newObj:                 st.MakeNode().Obj(),
+			expected:               queueAfterBackoff,
+			expectedExecutionCount: 1,
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					framework.ClusterEvent{Resource: framework.WildCard, ActionType: framework.All}: {
+						{
+							PluginName:     "fooPlugin1",
+							QueueingHintFn: queueHintReturnQueue,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
