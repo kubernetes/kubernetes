@@ -33,10 +33,12 @@ import (
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/test/integration/util"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -2073,4 +2075,100 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTopologySpreadMinDomainEnablement(t *testing.T) {
+	// enable the feature gate
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, true)()
+	testCtx := initTest(t, "min-domains")
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node-1").Label("kubernetes.io/hostname", "node-1").Obj(),
+		st.MakeNode().Name("node-2").Label("kubernetes.io/hostname", "node-2").Obj(),
+		st.MakeNode().Name("node-3").Label("kubernetes.io/hostname", "node-3").Obj(),
+	}
+
+	for i := range nodes {
+		if _, err := createNode(testCtx.ClientSet, nodes[i]); err != nil {
+			t.Fatalf("Cannot create node: %v", err)
+		}
+	}
+
+	pause := imageutils.GetPauseImageName()
+	// create pods spread across nodes as 2/2/1
+	existingPods := []*v1.Pod{
+		st.MakePod().Name("p1").Label("foo", "").Node("node-1").Container(pause).Obj(),
+		st.MakePod().Name("p2").Label("foo", "").Node("node-1").Container(pause).Obj(),
+		st.MakePod().Name("p3").Label("foo", "").Node("node-2").Container(pause).Obj(),
+		st.MakePod().Name("p4").Label("foo", "").Node("node-2").Container(pause).Obj(),
+		st.MakePod().Name("p5").Label("foo", "").Node("node-3").Container(pause).Obj(),
+	}
+
+	for i := range existingPods {
+		existingPods[i].SetNamespace(testCtx.NS.Name)
+		if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, existingPods[i], metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Error while creating pod during test: %v", err)
+		}
+	}
+
+	// create new Pod that has a TopologySpreadConstraints: maxSkew is 1, topologyKey is `kubernetes.io/hostname`, and minDomains is 4 (larger than the number of domains (= 3)).
+	// This Pod should be unschedulable because the feature gate is enabled and the situation doesn't satisfy minDomain requirement.
+	pod := st.MakePod().Namespace(testCtx.NS.Name).Name("p6").Label("foo", "").SpreadConstraint(1, "kubernetes.io/hostname", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), ptr.To[int32](4), nil, nil, nil).Container(pause).Obj()
+	if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+
+	if err := waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+		t.Fatalf("Pod %v got scheduled: %v", pod.Name, err)
+	}
+
+	// disable the feature gate and restart the scheduler.
+	// We have to restart the scheduler because the feature gate is checked in the plugins only at the time of the scheduler initialization.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, false)()
+	testCtx = restartTestScheduler(t, testCtx)
+
+	// Now, pod should be scheduled because MinDomain is ignored.
+	if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+		t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
+	}
+
+	// check the pod still has minDomain field set.
+	// The disablement of the feature gate should keep the minDomain field in existing Pods untouched.
+	pod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+	if minDomains := pod.Spec.TopologySpreadConstraints[0].MinDomains; minDomains == nil || *minDomains != 4 {
+		t.Fatalf("Pod %v has wrong minDomains: %v", pod.Name, minDomains)
+	}
+
+	// create the same Pod as p6.
+	// This Pod should be schedulable because the feature gate is disabled and minDomain should be dropped from the Pod in kube-apiserver.
+	pod = st.MakePod().Namespace(testCtx.NS.Name).Name("p7").Label("foo", "").SpreadConstraint(1, "kubernetes.io/hostname", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), ptr.To[int32](4), nil, nil, nil).Container(pause).Obj()
+	if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+	// pod should be scheduled because it shouldn't have MinDomain in the first place.
+	if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+		t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
+	}
+
+	// check the pod doesn't have minDomain.
+	pod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+	if pod.Spec.TopologySpreadConstraints[0].MinDomains != nil {
+		t.Fatalf("Pod %v has non-empty minDomains: %v", pod.Name, pod.Spec.TopologySpreadConstraints[0].MinDomains)
+	}
+}
+
+func restartTestScheduler(t *testing.T, testCtx *util.TestContext) *util.TestContext {
+	// stop old scheduler.
+	testCtx.SchedulerCloseFn()
+	testCtx = util.InitTestSchedulerWithOptions(t, testCtx, 0)
+	util.SyncSchedulerInformerFactory(testCtx)
+
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+
+	return testCtx
 }
