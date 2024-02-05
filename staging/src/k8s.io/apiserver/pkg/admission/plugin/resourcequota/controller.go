@@ -217,8 +217,8 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 // AFTER it has checked all the admissionAttributes.  The method breaks down into phase like this:
 //  0. make a copy of the quotas to act as a "running" quota so we know what we need to update and can still compare against the
 //     originals
-//  1. check each admission attribute to see if it fits within *all* the quotas.  If it doesn't fit, mark the waiter as failed
-//     and the running quota don't change.  If it did fit, check to see if any quota was changed.  It there was no quota change
+//  1. check each admission attribute to see if it fits within *all* the quotas.  If it didn't fit, mark the waiter as failed
+//     and the running quota doesn't change.  If it did fit, check to see if any quota was changed.  If there was no quota change
 //     mark the waiter as succeeded.  If some quota did change, update the running quotas
 //  2. If no running quota was changed, return now since no updates are needed.
 //  3. for each quota that has changed, attempt an update.  If all updates succeeded, update all unset waiters to success status and return.  If the some
