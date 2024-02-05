@@ -433,7 +433,7 @@ func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, erro
 	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey, NamespaceSelector: nsSelector}, nil
 }
 
-// getAffinityTerms receives a Pod and affinity terms and returns the namespaces and
+// GetAffinityTerms receives a Pod and affinity terms and returns the namespaces and
 // selectors of the terms.
 func GetAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm, error) {
 	if v1Terms == nil {
