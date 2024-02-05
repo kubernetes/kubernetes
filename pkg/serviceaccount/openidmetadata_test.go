@@ -25,11 +25,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
-	restful "github.com/emicklei/go-restful/v3"
+	"github.com/emicklei/go-restful/v3"
 	"github.com/google/go-cmp/cmp"
-	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2"
 
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -247,7 +248,21 @@ func TestURLBoundaries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
+			if strings.HasSuffix(tt.Path, "/") {
+				// Validate URL is not redirected
+				pathWithoutTrailingSlash := tt.Path[:len(tt.Path)-1]
+				respWithoutTrailingSlash, err := http.Get(s.URL + pathWithoutTrailingSlash)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resp, err := http.Get(s.URL + tt.Path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if resp != respWithoutTrailingSlash {
+					t.Fatal("URL redirected unexpectedly")
+				}
+			}
 			if tt.WantOK && (resp.StatusCode != http.StatusOK) {
 				t.Errorf("Get(%v)= %v, want %v", tt.Path, resp.StatusCode, http.StatusOK)
 			}
