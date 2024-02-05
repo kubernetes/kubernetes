@@ -35,6 +35,8 @@ type Handler struct {
 	notify []func()
 	final  func(os.Signal)
 	once   sync.Once
+	// if true adds new line before termination, default false
+	addNewLineAfterTermination bool
 }
 
 // Chain creates a new handler that invokes all notify functions when the critical section exits
@@ -59,6 +61,12 @@ func New(final func(os.Signal), notify ...func()) *Handler {
 	}
 }
 
+// NewLineAfterTermination updates the Handler bulder to add the  addNewLineAfterTermination
+func (h *Handler) NewLineAfterTermination(addNewLine bool) *Handler {
+	h.addNewLineAfterTermination = addNewLine
+	return h
+}
+
 // Close executes all the notification handlers if they have not yet been executed.
 func (h *Handler) Close() {
 	h.once.Do(func() {
@@ -78,7 +86,7 @@ func (h *Handler) Signal(s os.Signal) {
 		}
 		if h.final == nil {
 			// Add new line before exiting to fix kubectl #1544
-			fmt.Print("\n")
+			h.checkToAddNewLine()
 			os.Exit(1)
 		}
 		h.final(s)
@@ -104,4 +112,12 @@ func (h *Handler) Run(fn func() error) error {
 	}()
 	defer h.Close()
 	return fn()
+}
+
+// checkToAddNewLine checks if we defined the addNewLineAfterTermination with true value
+// adds a new line
+func (h *Handler) checkToAddNewLine() {
+	if h.addNewLineAfterTermination {
+		fmt.Print("\n")
+	}
 }
