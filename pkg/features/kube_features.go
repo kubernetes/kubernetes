@@ -694,6 +694,7 @@ const (
 	// owner: @munnerz
 	// kep: http://kep.k8s.io/4193
 	// alpha: v1.29
+	// beta: v1.30
 	//
 	// Controls whether JTIs (UUIDs) are embedded into generated service account tokens, and whether these JTIs are
 	// recorded into the audit log for future requests made by these tokens.
@@ -709,6 +710,7 @@ const (
 	// owner: @munnerz
 	// kep: http://kep.k8s.io/4193
 	// alpha: v1.29
+	// beta: v1.30
 	//
 	// Controls whether the apiserver will validate Node claims in service account tokens.
 	ServiceAccountTokenNodeBindingValidation featuregate.Feature = "ServiceAccountTokenNodeBindingValidation"
@@ -716,6 +718,7 @@ const (
 	// owner: @munnerz
 	// kep: http://kep.k8s.io/4193
 	// alpha: v1.29
+	// beta: v1.30
 	//
 	// Controls whether the apiserver embeds the node name and uid for the associated node when issuing
 	// service account tokens bound to Pod objects.
@@ -1101,13 +1104,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SeparateTaintEvictionController: {Default: true, PreRelease: featuregate.Beta},
 
-	ServiceAccountTokenJTI: {Default: false, PreRelease: featuregate.Alpha},
+	ServiceAccountTokenJTI: {Default: true, PreRelease: featuregate.Beta},
 
-	ServiceAccountTokenPodNodeInfo: {Default: false, PreRelease: featuregate.Alpha},
+	ServiceAccountTokenPodNodeInfo: {Default: true, PreRelease: featuregate.Beta},
 
 	ServiceAccountTokenNodeBinding: {Default: false, PreRelease: featuregate.Alpha},
 
-	ServiceAccountTokenNodeBindingValidation: {Default: false, PreRelease: featuregate.Alpha},
+	ServiceAccountTokenNodeBindingValidation: {Default: true, PreRelease: featuregate.Beta},
 
 	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
