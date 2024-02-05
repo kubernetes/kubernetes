@@ -543,7 +543,7 @@ func runVolumeManager(manager VolumeManager) chan struct{} {
 	stopCh := make(chan struct{})
 	//readyCh := make(chan bool, 1)
 	//readyCh <- true
-	sourcesReady := podsource.NewSourcesReady(func(_ sets.String) bool { return true })
+	sourcesReady := podsource.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(sourcesReady, stopCh)
 	return stopCh
 }

@@ -313,21 +313,27 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	// DEPRECATED FLAGS
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
-	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+	mustMarkDeprecated(fs, "minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
-	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+	mustMarkDeprecated(fs, "maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxContainerCount, "maximum-dead-containers", f.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")
-	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+	mustMarkDeprecated(fs, "maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.BoolVar(&f.RegisterSchedulable, "register-schedulable", f.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false.")
-	fs.MarkDeprecated("register-schedulable", "will be removed in a future version")
+	mustMarkDeprecated(fs, "register-schedulable", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
-	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
+	mustMarkDeprecated(fs, "keep-terminated-pod-volumes", "will be removed in a future version")
 	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
-	fs.MarkDeprecated("experimental-mounter-path", "will be removed in 1.25 or later. in favor of using CSI.")
+	mustMarkDeprecated(fs, "experimental-mounter-path", "will be removed in 1.25 or later. in favor of using CSI.")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file. Empty string for no configuration file.")
-	fs.MarkDeprecated("cloud-config", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
+	mustMarkDeprecated(fs, "cloud-config", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
 	fs.BoolVar(&f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "experimental-allocatable-ignore-eviction", f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "When set to 'true', Hard Eviction Thresholds will be ignored while calculating Node Allocatable. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details. [default=false]")
-	fs.MarkDeprecated("experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
+	mustMarkDeprecated(fs, "experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
+}
+
+func mustMarkDeprecated(fs *pflag.FlagSet, name, userMessage string) {
+	if err := fs.MarkDeprecated(name, userMessage); err != nil {
+		panic(err)
+	}
 }
 
 // addContainerRuntimeFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
@@ -335,7 +341,7 @@ func addContainerRuntimeFlags(fs *pflag.FlagSet, o *kubeletconfig.ContainerRunti
 	// General settings.
 	fs.StringVar(&o.RuntimeCgroups, "runtime-cgroups", o.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 	fs.StringVar(&o.PodSandboxImage, "pod-infra-container-image", o.PodSandboxImage, "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
-	fs.MarkDeprecated("pod-infra-container-image", "will be removed in a future release. Image garbage collector will get sandbox image information from CRI.")
+	mustMarkDeprecated(fs, "pod-infra-container-image", "will be removed in a future release. Image garbage collector will get sandbox image information from CRI.")
 
 	// Image credential provider settings.
 	fs.StringVar(&o.ImageCredentialProviderConfigFile, "image-credential-provider-config", o.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")

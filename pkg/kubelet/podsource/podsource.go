@@ -67,7 +67,7 @@ type PodSource struct {
 
 	// contains the list of all configured sources
 	sourcesLock sync.Mutex
-	sources     sets.String
+	sources     sets.Set[string]
 }
 
 // NewPodSource creates an object that can merge many configuration sources into a stream
@@ -79,7 +79,7 @@ func NewPodSource(mode PodSourceNotificationMode, recorder record.EventRecorder,
 		pods:    storage,
 		mux:     newMux(storage),
 		updates: updates,
-		sources: sets.String{},
+		sources: sets.New[string](),
 	}
 	return podSource
 }
@@ -95,14 +95,14 @@ func (c *PodSource) Channel(ctx context.Context, source string) chan<- interface
 
 // SeenAllSources returns true if seenSources contains all sources in the
 // config, and also this config has received a SET message from each source.
-func (c *PodSource) SeenAllSources(seenSources sets.String) bool {
+func (c *PodSource) SeenAllSources(seenSources sets.Set[string]) bool {
 	if c.pods == nil {
 		return false
 	}
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
-	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.List(), "seenSources", seenSources)
-	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
+	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.UnsortedList(), "seenSources", seenSources)
+	return seenSources.IsSuperset(c.sources) && c.pods.seenSources(c.sources)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
@@ -132,7 +132,7 @@ type podStorage struct {
 
 	// contains the set of all sources that have sent at least one SET
 	sourcesSeenLock sync.RWMutex
-	sourcesSeen     sets.String
+	sourcesSeen     sets.Set[string]
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
@@ -148,7 +148,7 @@ func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodSourceNotificatio
 		pods:               make(map[string]map[types.UID]*v1.Pod),
 		mode:               mode,
 		updates:            updates,
-		sourcesSeen:        sets.String{},
+		sourcesSeen:        sets.New[string](),
 		recorder:           recorder,
 		startupSLIObserver: startupSLIObserver,
 	}
@@ -324,14 +324,14 @@ func (s *podStorage) markSourceSet(source string) {
 	s.sourcesSeen.Insert(source)
 }
 
-func (s *podStorage) seenSources(sources ...string) bool {
+func (s *podStorage) seenSources(sources sets.Set[string]) bool {
 	s.sourcesSeenLock.RLock()
 	defer s.sourcesSeenLock.RUnlock()
-	return s.sourcesSeen.HasAll(sources...)
+	return s.sourcesSeen.IsSuperset(sources)
 }
 
 func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {
-	names := sets.String{}
+	names := sets.New[string]()
 	for i, pod := range pods {
 		// Pods from each source are assumed to have passed validation individually.
 		// This function only checks if there is any naming conflict.

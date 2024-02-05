@@ -131,7 +131,7 @@ func TestPluginRegistration(t *testing.T) {
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 	go func() {
-		sourcesReady := podsource.NewSourcesReady(func(_ sets.String) bool { return true })
+		sourcesReady := podsource.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 		pluginManager.Run(sourcesReady, stopChan)
 	}()
 
