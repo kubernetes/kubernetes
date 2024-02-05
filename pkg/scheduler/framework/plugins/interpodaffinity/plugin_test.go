@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -116,13 +117,13 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 		{
 			name:         "delete a pod which doesn't match pod's anti-affinity",
 			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			oldPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
 			expectedHint: framework.QueueSkip,
 		},
 		{
 			name:         "delete a pod which matches pod's anti-affinity",
 			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			oldPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
 			expectedHint: framework.Queue,
 		},
 	}
@@ -154,8 +155,14 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 		expectedHint     framework.QueueingHint
 	}{
 		{
-			name:         "add a new node with matched topologyKey",
+			name:         "add a new node with matched pod affinity topologyKey",
 			pod:          st.MakePod().Name("p").PodAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name:         "add a new node with matched pod anti-affinity topologyKey",
+			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
 			expectedHint: framework.Queue,
 		},

@@ -166,6 +166,8 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	}
 
 	// Pod is updated. Return Queue when the updated pod matching the target pod's affinity or not matching anti-affinity.
+	// Note that, we don't need to check each affinity individually when the Pod has more than one affinity
+	// because the current PodAffinity looks for a **single** existing pod that can satisfy **all** the terms of inter-pod affinity of an incoming pod.
 	if modifiedPod != nil && originalPod != nil {
 		if !podMatchesAllAffinityTerms(terms, originalPod) && podMatchesAllAffinityTerms(terms, modifiedPod) {
 			logger.V(5).Info("a scheduled pod was updated to match the target pod's affinity, and the pod may be schedulable now",
@@ -195,12 +197,12 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	}
 
 	// Pod is deleted. Return Queue when the deleted pod matching the target pod's anti-affinity.
-	if podMatchesAllAffinityTerms(antiTerms, originalPod) {
-		logger.V(5).Info("a scheduled pod was deteled but it matches the target pod's anti-affinity",
+	if !podMatchesAllAffinityTerms(antiTerms, originalPod) {
+		logger.V(5).Info("a scheduled pod was deleted but it doesn't match the target pod's anti-affinity",
 			"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 		return framework.QueueSkip, nil
 	}
-	logger.V(5).Info("a scheduled pod was deleted but it doesn't match the target pod's anti-affinity, and the pod may be schedulable now",
+	logger.V(5).Info("a scheduled pod was deleted and it matches the target pod's anti-affinity. The pod may be schedulable now",
 		"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return framework.Queue, nil
 }
@@ -218,10 +220,25 @@ func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod
 
 	for _, term := range terms {
 		if _, ok := modifiedNode.Labels[term.TopologyKey]; ok {
-			logger.V(5).Info("a node with topologyKey was added/updated and it may make pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			logger.V(5).Info("a node with matched pod affinity topologyKey was added/updated and it may make pod schedulable",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 			return framework.Queue, err
 		}
 	}
-	logger.V(5).Info("a node is added/updated but doesn't have any topologyKey of pod affinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+
+	antiTerms, err := framework.GetAffinityTerms(pod, framework.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	for _, term := range antiTerms {
+		if _, ok := modifiedNode.Labels[term.TopologyKey]; ok {
+			logger.V(5).Info("a node with matched pod anti-affinity topologyKey was added/updated and it may make pod schedulable",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return framework.Queue, err
+		}
+	}
+	logger.V(5).Info("a node is added/updated but doesn't have any topologyKey which matches pod affinity/anti-affinity",
+		"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 	return framework.QueueSkip, nil
 }
