@@ -39,6 +39,12 @@ const (
 	// CredentialIDKey is the key used in a user's "extra" to specify the unique
 	// identifier for this identity document).
 	CredentialIDKey = "authentication.kubernetes.io/credential-id"
+	// IssuedCredentialIDAuditAnnotationKey is the annotation key used in the audit event that is persisted to the
+	// '/token' endpoint for service accounts.
+	// This annotation indicates the generated credential identifier for the service account token being issued.
+	// This is useful when tracing back the origin of tokens that have gone on to make request that have persisted
+	// their credential-identifier into the audit log via the user's extra info stored on subsequent audit events.
+	IssuedCredentialIDAuditAnnotationKey = "authentication.kubernetes.io/issued-credential-id"
 	// PodNameKey is the key used in a user's "extra" to specify the pod name of
 	// the authenticating request.
 	PodNameKey = "authentication.kubernetes.io/pod-name"
