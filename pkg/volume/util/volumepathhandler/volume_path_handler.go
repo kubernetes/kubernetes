@@ -283,9 +283,6 @@ func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string
 		return nil, err
 	}
 	for _, file := range files {
-		if file.Type()&os.ModeDevice != os.ModeDevice {
-			continue
-		}
 		filename := file.Name()
 		// TODO: Might need to check if the file is actually linked to devPath
 		refs = append(refs, filepath.Join(mapPath, filename))
