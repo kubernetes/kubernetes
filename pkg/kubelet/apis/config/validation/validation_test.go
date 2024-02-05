@@ -549,7 +549,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validation.ValidateKubeletConfiguration(tc.configure(successConfig.DeepCopy()), featureGate)
+			errs := validation.ValidateKubeletConfiguration(tc.configure(successConfig.DeepCopy()), featureGate, nil)
 
 			if len(tc.errMsg) == 0 {
 				if errs != nil {
