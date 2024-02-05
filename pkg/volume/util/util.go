@@ -498,18 +498,18 @@ func MapBlockVolume(
 	volumeMapName string,
 	podUID utypes.UID,
 ) error {
-	// map devicePath to global node path as bind mount
-	mapErr := blkUtil.MapDevice(devicePath, globalMapPath, string(podUID), true /* bindMount */)
-	if mapErr != nil {
-		return fmt.Errorf("blkUtil.MapDevice failed. devicePath: %s, globalMapPath:%s, podUID: %s, bindMount: %v: %v",
-			devicePath, globalMapPath, string(podUID), true, mapErr)
-	}
-
 	// map devicePath to pod volume path
-	mapErr = blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName, false /* bindMount */)
+	mapErr := blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName, false /* bindMount */)
 	if mapErr != nil {
 		return fmt.Errorf("blkUtil.MapDevice failed. devicePath: %s, podVolumeMapPath:%s, volumeMapName: %s, bindMount: %v: %v",
 			devicePath, podVolumeMapPath, volumeMapName, false, mapErr)
+	}
+
+	// map devicePath to global node path as bind mount
+	mapErr = blkUtil.MapDevice(devicePath, globalMapPath, string(podUID), true /* bindMount */)
+	if mapErr != nil {
+		return fmt.Errorf("blkUtil.MapDevice failed. devicePath: %s, globalMapPath:%s, podUID: %s, bindMount: %v: %v",
+			devicePath, globalMapPath, string(podUID), true, mapErr)
 	}
 
 	// Take file descriptor lock to keep a block device opened. Otherwise, there is a case
@@ -542,19 +542,20 @@ func UnmapBlockVolume(
 			globalUnmapPath, string(podUID), err)
 	}
 
+	// unmap devicePath from global node path
+	unmapDeviceErr := blkUtil.UnmapDevice(globalUnmapPath, string(podUID), true /* bindMount */)
+	if unmapDeviceErr != nil {
+		return fmt.Errorf("blkUtil.DetachFileDevice failed. globalUnmapPath:%s, podUID: %s, bindMount: %v: %v",
+			globalUnmapPath, string(podUID), true, unmapDeviceErr)
+	}
+
 	// unmap devicePath from pod volume path
-	unmapDeviceErr := blkUtil.UnmapDevice(podDeviceUnmapPath, volumeMapName, false /* bindMount */)
+	unmapDeviceErr = blkUtil.UnmapDevice(podDeviceUnmapPath, volumeMapName, false /* bindMount */)
 	if unmapDeviceErr != nil {
 		return fmt.Errorf("blkUtil.DetachFileDevice failed. podDeviceUnmapPath:%s, volumeMapName: %s, bindMount: %v: %v",
 			podDeviceUnmapPath, volumeMapName, false, unmapDeviceErr)
 	}
 
-	// unmap devicePath from global node path
-	unmapDeviceErr = blkUtil.UnmapDevice(globalUnmapPath, string(podUID), true /* bindMount */)
-	if unmapDeviceErr != nil {
-		return fmt.Errorf("blkUtil.DetachFileDevice failed. globalUnmapPath:%s, podUID: %s, bindMount: %v: %v",
-			globalUnmapPath, string(podUID), true, unmapDeviceErr)
-	}
 	return nil
 }
 
