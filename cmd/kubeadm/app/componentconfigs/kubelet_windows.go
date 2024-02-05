@@ -27,8 +27,15 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// Mutate modifies absolute path fields in the KubeletConfiguration to be Windows compatible absolute paths.
+// Mutate modifies fields in the KubeletConfiguration to be Windows compatible.
+// Note that this is currently bound to KubeletConfiguration v1beta1.
 func (kc *kubeletConfig) Mutate() error {
+	// Some kubelet defaults work on Linux but don't on Windows. Make sure such fields
+	// are always mutated to values that work. Discussion on this topic have indicated that
+	// different defaults for different OSes is not desired:
+	//   https://github.com/kubernetes/kubernetes/pull/77710#issuecomment-491450781
+	mutateDefaults(&kc.config)
+
 	// When "kubeadm join" downloads the KubeletConfiguration from the cluster on Windows
 	// nodes, it would contain absolute paths that may lack drive letters, since the config
 	// could have been generated on a Linux control-plane node. On Windows the
@@ -39,7 +46,6 @@ func (kc *kubeletConfig) Mutate() error {
 	//   https://github.com/kubernetes/kubernetes/pull/77710#issuecomment-491989621
 	//
 	// Thus, a workaround here is to adapt the KubeletConfiguration paths for Windows.
-	// Note this is currently bound to KubeletConfiguration v1beta1.
 	klog.V(2).Infoln("[componentconfig] Adapting the paths in the KubeletConfiguration for Windows...")
 
 	// Get the drive from where the kubeadm binary was called.
@@ -53,6 +59,13 @@ func (kc *kubeletConfig) Mutate() error {
 	// Mutate the paths in the config.
 	mutatePaths(&kc.config, drive)
 	return nil
+}
+
+func mutateDefaults(cfg *kubeletconfig.KubeletConfiguration) {
+	klog.V(2).Infof("[componentconfig] kubelet/Windows: changing field \"enforceNodeAllocatable\" to []string{}")
+	cfg.EnforceNodeAllocatable = []string{}
+	klog.V(2).Infof("[componentconfig] kubelet/Windows: changing field \"cgroupsPerQOS\" to false")
+	cfg.CgroupsPerQOS = ptr.To(false)
 }
 
 func mutatePaths(cfg *kubeletconfig.KubeletConfiguration, drive string) {

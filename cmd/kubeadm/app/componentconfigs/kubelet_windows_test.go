@@ -18,8 +18,9 @@ package componentconfigs
 
 import (
 	"path/filepath"
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/utils/ptr"
@@ -81,9 +82,37 @@ func TestMutatePaths(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mutatePaths(test.cfg, drive)
-			if !reflect.DeepEqual(test.cfg, test.expected) {
-				t.Errorf("Missmatch between expected and got:\nExpected:\n%+v\n---\nGot:\n%+v",
-					test.expected, test.cfg)
+			if diff := cmp.Diff(test.cfg, test.expected); len(diff) > 0 {
+				t.Errorf("Mismatch between expected (-) and got (+):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestMutateDefaults(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfg      *kubeletconfig.KubeletConfiguration
+		expected *kubeletconfig.KubeletConfiguration
+	}{
+		{
+			name: "fields of interest get mutated",
+			cfg: &kubeletconfig.KubeletConfiguration{
+				EnforceNodeAllocatable: []string{"pods"},
+				CgroupsPerQOS:          ptr.To(true),
+			},
+			expected: &kubeletconfig.KubeletConfiguration{
+				EnforceNodeAllocatable: []string{},
+				CgroupsPerQOS:          ptr.To(false),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mutateDefaults(test.cfg)
+			if diff := cmp.Diff(test.cfg, test.expected); len(diff) > 0 {
+				t.Errorf("Mismatch between expected (-) and got (+):\n%s", diff)
 			}
 		})
 	}
