@@ -37,3 +37,8 @@ func (b *GroupSubjectApplyConfiguration) WithName(value string) *GroupSubjectApp
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *GroupSubjectApplyConfiguration) GetName() *string {
+	return b.Name
+}

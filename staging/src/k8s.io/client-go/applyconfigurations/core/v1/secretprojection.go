@@ -40,6 +40,11 @@ func (b *SecretProjectionApplyConfiguration) WithName(value string) *SecretProje
 	return b
 }
 
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *SecretProjectionApplyConfiguration) GetName() *string {
+	return b.Name
+}
+
 // WithItems adds the given value to the Items field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Items field.

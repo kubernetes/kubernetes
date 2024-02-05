@@ -37,3 +37,8 @@ func (b *PriorityLevelConfigurationReferenceApplyConfiguration) WithName(value s
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *PriorityLevelConfigurationReferenceApplyConfiguration) GetName() *string {
+	return b.Name
+}

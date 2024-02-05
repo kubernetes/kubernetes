@@ -43,6 +43,11 @@ func (b *AttachedVolumeApplyConfiguration) WithName(value v1.UniqueVolumeName) *
 	return b
 }
 
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *AttachedVolumeApplyConfiguration) GetName() *v1.UniqueVolumeName {
+	return b.Name
+}
+
 // WithDevicePath sets the DevicePath field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DevicePath field is set to the value of the last call.

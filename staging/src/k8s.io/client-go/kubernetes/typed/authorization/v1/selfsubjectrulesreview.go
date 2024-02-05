@@ -19,12 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-
 	v1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	generic "k8s.io/client-go/generic"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // SelfSubjectRulesReviewsGetter has a method to return a SelfSubjectRulesReviewInterface.
@@ -35,30 +32,22 @@ type SelfSubjectRulesReviewsGetter interface {
 
 // SelfSubjectRulesReviewInterface has methods to work with SelfSubjectRulesReview resources.
 type SelfSubjectRulesReviewInterface interface {
-	Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview, opts metav1.CreateOptions) (*v1.SelfSubjectRulesReview, error)
+	generic.Creator[*v1.SelfSubjectRulesReview]
 	SelfSubjectRulesReviewExpansion
 }
 
 // selfSubjectRulesReviews implements SelfSubjectRulesReviewInterface
 type selfSubjectRulesReviews struct {
-	client rest.Interface
+	*generic.TypeClient[*v1.SelfSubjectRulesReview]
 }
 
 // newSelfSubjectRulesReviews returns a SelfSubjectRulesReviews
 func newSelfSubjectRulesReviews(c *AuthorizationV1Client) *selfSubjectRulesReviews {
 	return &selfSubjectRulesReviews{
-		client: c.RESTClient(),
+		generic.NewNonNamespaced[*v1.SelfSubjectRulesReview](
+			"selfsubjectrulesreviews",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			func() *v1.SelfSubjectRulesReview { return &v1.SelfSubjectRulesReview{} }),
 	}
-}
-
-// Create takes the representation of a selfSubjectRulesReview and creates it.  Returns the server's representation of the selfSubjectRulesReview, and an error, if there is any.
-func (c *selfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview, opts metav1.CreateOptions) (result *v1.SelfSubjectRulesReview, err error) {
-	result = &v1.SelfSubjectRulesReview{}
-	err = c.client.Post().
-		Resource("selfsubjectrulesreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(selfSubjectRulesReview).
-		Do(ctx).
-		Into(result)
-	return
 }

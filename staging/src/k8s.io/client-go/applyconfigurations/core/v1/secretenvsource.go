@@ -39,6 +39,11 @@ func (b *SecretEnvSourceApplyConfiguration) WithName(value string) *SecretEnvSou
 	return b
 }
 
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *SecretEnvSourceApplyConfiguration) GetName() *string {
+	return b.Name
+}
+
 // WithOptional sets the Optional field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Optional field is set to the value of the last call.

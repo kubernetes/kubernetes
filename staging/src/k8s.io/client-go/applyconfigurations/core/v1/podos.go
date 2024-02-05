@@ -41,3 +41,8 @@ func (b *PodOSApplyConfiguration) WithName(value v1.OSName) *PodOSApplyConfigura
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *PodOSApplyConfiguration) GetName() *v1.OSName {
+	return b.Name
+}

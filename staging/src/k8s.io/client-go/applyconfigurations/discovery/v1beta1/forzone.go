@@ -37,3 +37,8 @@ func (b *ForZoneApplyConfiguration) WithName(value string) *ForZoneApplyConfigur
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ForZoneApplyConfiguration) GetName() *string {
+	return b.Name
+}

@@ -39,6 +39,11 @@ func (b *VolumeApplyConfiguration) WithName(value string) *VolumeApplyConfigurat
 	return b
 }
 
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *VolumeApplyConfiguration) GetName() *string {
+	return b.Name
+}
+
 // WithHostPath sets the HostPath field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HostPath field is set to the value of the last call.

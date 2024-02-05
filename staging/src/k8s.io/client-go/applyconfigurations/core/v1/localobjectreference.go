@@ -37,3 +37,8 @@ func (b *LocalObjectReferenceApplyConfiguration) WithName(value string) *LocalOb
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *LocalObjectReferenceApplyConfiguration) GetName() *string {
+	return b.Name
+}

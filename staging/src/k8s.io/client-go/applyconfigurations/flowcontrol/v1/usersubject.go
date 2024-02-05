@@ -37,3 +37,8 @@ func (b *UserSubjectApplyConfiguration) WithName(value string) *UserSubjectApply
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *UserSubjectApplyConfiguration) GetName() *string {
+	return b.Name
+}

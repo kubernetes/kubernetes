@@ -52,6 +52,11 @@ func (b *ContainerStatusApplyConfiguration) WithName(value string) *ContainerSta
 	return b
 }
 
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ContainerStatusApplyConfiguration) GetName() *string {
+	return b.Name
+}
+
 // WithState sets the State field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the State field is set to the value of the last call.
