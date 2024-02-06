@@ -1212,6 +1212,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 		accessModes                  []v1.PersistentVolumeAccessMode
 		existingContainerSELinuxOpts *v1.SELinuxOptions
 		newContainerSELinuxOpts      *v1.SELinuxOptions
+		seLinuxMountFeatureEnabled   bool
 		pluginSupportsSELinux        bool
 		expectError                  bool
 		expectedContext              string
@@ -1231,14 +1232,22 @@ func TestCheckVolumeSELinux(t *testing.T) {
 			expectedContext:         "system_u:object_r:container_file_t:s0:c3,c4",
 		},
 		{
-			name:                    "RWX with plugin with SELinux with fill context in pod",
+			name:                    "RWX with plugin with SELinux with full context in pod and SELinuxMount feature disabled",
 			accessModes:             []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
 			newContainerSELinuxOpts: fullOpts,
 			pluginSupportsSELinux:   true,
 			expectedContext:         "", // RWX volumes don't support SELinux
 		},
 		{
-			name:                    "RWOP with plugin with no SELinux with fill context in pod",
+			name:                       "RWX with plugin with SELinux with full context in pod and SELinuxMount feature enabled",
+			accessModes:                []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+			newContainerSELinuxOpts:    fullOpts,
+			pluginSupportsSELinux:      true,
+			seLinuxMountFeatureEnabled: true,
+			expectedContext:            "system_u:object_r:container_file_t:s0:c1,c2",
+		},
+		{
+			name:                    "RWOP with plugin with no SELinux with full context in pod",
 			accessModes:             []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
 			newContainerSELinuxOpts: fullOpts,
 			pluginSupportsSELinux:   false,
@@ -1266,6 +1275,25 @@ func TestCheckVolumeSELinux(t *testing.T) {
 			newContainerSELinuxOpts:      differentFullOpts,
 			pluginSupportsSELinux:        true,
 			expectedContext:              "",
+		},
+		{
+			name:                         "mismatched SELinux with RWX and SELinuxMount feature disabled",
+			accessModes:                  []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+			existingContainerSELinuxOpts: fullOpts,
+			newContainerSELinuxOpts:      differentFullOpts,
+			pluginSupportsSELinux:        true,
+			expectedContext:              "",
+		},
+		{
+			name:                         "mismatched SELinux with RWX and SELinuxMount feature enabled",
+			accessModes:                  []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+			existingContainerSELinuxOpts: fullOpts,
+			newContainerSELinuxOpts:      differentFullOpts,
+			pluginSupportsSELinux:        true,
+			seLinuxMountFeatureEnabled:   true,
+			expectError:                  true,
+			// The original seLinuxOpts are kept in DSW
+			expectedContext: "system_u:object_r:container_file_t:s0:c1,c2",
 		},
 		{
 			name:                         "mismatched SELinux with RWOP - failure",
@@ -1319,6 +1347,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 					},
 				},
 			}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMount, tc.seLinuxMountFeatureEnabled)()
 
 			fakeVolumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			plugin.SupportsSELinux = tc.pluginSupportsSELinux
