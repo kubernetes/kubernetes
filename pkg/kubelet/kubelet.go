@@ -2918,6 +2918,24 @@ func (kl *Kubelet) updateRuntimeUp() {
 
 	kl.runtimeState.setRuntimeState(nil)
 	kl.runtimeState.setRuntimeHandlers(s.Handlers)
+
+	// Load optional conditions
+	// https://github.com/kubernetes/cri-api/blob/v0.29.1/pkg/apis/runtime/v1/api.proto#L1496-L1517
+	// > 2. Optional conditions: Conditions are informative to the user, but kubelet
+	// > will not rely on. Since condition type is an arbitrary string, all conditions
+	// > not required are optional. These conditions will be exposed to users to help
+	// > them understand the status of the system.
+	var optionalConditions []kubecontainer.RuntimeCondition
+	for _, f := range s.Conditions {
+		switch f.Type {
+		case kubecontainer.RuntimeReady, kubecontainer.NetworkReady:
+			// NOP
+		default:
+			optionalConditions = append(optionalConditions, f)
+		}
+	}
+	kl.runtimeState.setOptionalConditions(optionalConditions)
+
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }

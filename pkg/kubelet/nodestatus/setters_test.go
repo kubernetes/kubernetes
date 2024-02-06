@@ -2179,6 +2179,86 @@ func TestDaemonEndpoints(t *testing.T) {
 	}
 }
 
+func TestOptional(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testKubeletHostname,
+		},
+		Spec: v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeConditionType("FooReady"),
+					Status:             v1.ConditionFalse,
+					LastHeartbeatTime:  metav1.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					LastTransitionTime: metav1.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					Reason:             "failed to connect to foo",
+					Message:            "foo refused connection",
+				},
+				{
+					Type:               v1.NodeConditionType("BarReady"),
+					Status:             v1.ConditionTrue,
+					LastHeartbeatTime:  metav1.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					LastTransitionTime: metav1.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+	}
+
+	rtConds := []kubecontainer.RuntimeCondition{
+		{
+			Type:   "FooReady",
+			Status: true,
+		},
+		{
+			Type:   "BarReady",
+			Status: true,
+		},
+		{
+			Type:    "BazReady",
+			Status:  false,
+			Reason:  "failed to connect to baz",
+			Message: "baz refused connection",
+		},
+	}
+
+	setter := Optional(func() time.Time {
+		return metav1.Date(2024, 1, 1, 0, 42, 0, 0, time.UTC).Time
+	}, func() []kubecontainer.RuntimeCondition {
+		return rtConds
+	})
+
+	ctx := context.Background()
+	if err := setter(ctx, node); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedConds := []v1.NodeCondition{
+		{
+			Type:               v1.NodeConditionType("FooReady"),
+			Status:             v1.ConditionTrue,
+			LastHeartbeatTime:  metav1.Date(2024, 1, 1, 0, 42, 0, 0, time.UTC),
+			LastTransitionTime: metav1.Date(2024, 1, 1, 0, 42, 0, 0, time.UTC),
+		},
+		{
+			Type:               v1.NodeConditionType("BarReady"),
+			Status:             v1.ConditionTrue,
+			LastHeartbeatTime:  metav1.Date(2024, 1, 1, 0, 42, 0, 0, time.UTC),
+			LastTransitionTime: metav1.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			Type:               v1.NodeConditionType("BazReady"),
+			Status:             v1.ConditionFalse,
+			LastHeartbeatTime:  metav1.Date(2024, 1, 1, 0, 42, 0, 0, time.UTC),
+			LastTransitionTime: metav1.Date(2024, 1, 1, 0, 42, 0, 0, time.UTC),
+			Reason:             "failed to connect to baz",
+			Message:            "baz refused connection",
+		},
+	}
+
+	assert.Equal(t, expectedConds, node.Status.Conditions)
+}
+
 // Test Helpers:
 
 // testEvent is used to record events for tests

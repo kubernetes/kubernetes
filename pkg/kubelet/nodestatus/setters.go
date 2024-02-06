@@ -806,3 +806,48 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 		return nil
 	}
 }
+
+// Optional returns a Setter that updates the CRI optional conditions on the node.
+//
+// https://github.com/kubernetes/cri-api/blob/v0.29.1/pkg/apis/runtime/v1/api.proto#L1496-L1517
+// > 2. Optional conditions: Conditions are informative to the user, but kubelet
+// > will not rely on. Since condition type is an arbitrary string, all conditions
+// > not required are optional. These conditions will be exposed to users to help
+// > them understand the status of the system.
+func Optional(nowFunc func() time.Time, // typically Kubelet.clock.Now
+	fn func() []kubecontainer.RuntimeCondition, // typically "ContainerdHasNoDeprecationWarnings"
+) Setter {
+	return func(ctx context.Context, node *v1.Node) error {
+		currentTime := metav1.NewTime(nowFunc())
+		conds := fn()
+		for _, f := range conds {
+			cond := v1.NodeCondition{
+				Type:               v1.NodeConditionType(f.Type),
+				Status:             v1.ConditionFalse,
+				LastHeartbeatTime:  currentTime,
+				LastTransitionTime: currentTime,
+				Reason:             f.Reason,
+				Message:            f.Message,
+			}
+			if f.Status {
+				cond.Status = v1.ConditionTrue
+			}
+			newCondition := true
+			for j, g := range node.Status.Conditions {
+				if g.Type == cond.Type {
+					if g.Status == cond.Status && g.Reason == cond.Reason && g.Message == cond.Message {
+						node.Status.Conditions[j].LastHeartbeatTime = currentTime
+					} else {
+						node.Status.Conditions[j] = cond
+					}
+					newCondition = false
+					break
+				}
+			}
+			if newCondition {
+				node.Status.Conditions = append(node.Status.Conditions, cond)
+			}
+		}
+		return nil
+	}
+}
