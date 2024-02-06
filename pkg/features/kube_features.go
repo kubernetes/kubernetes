@@ -1211,7 +1211,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
-	genericfeatures.ZeroLimitedNominalConcurrencyShares: {Default: false, PreRelease: featuregate.Beta},
+	genericfeatures.ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
