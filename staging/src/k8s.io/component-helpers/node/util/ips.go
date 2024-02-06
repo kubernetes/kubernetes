@@ -21,7 +21,6 @@ import (
 	"net"
 	"strings"
 
-	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
 
@@ -31,8 +30,9 @@ const (
 )
 
 // parseNodeIP implements ParseNodeIPArgument and ParseNodeIPAnnotation
-func parseNodeIP(nodeIP string, allowDual, sloppy bool) ([]net.IP, error) {
+func parseNodeIP(nodeIP string, allowDual, sloppy bool) ([]net.IP, []string, error) {
 	var nodeIPs []net.IP
+	var invalidIPs []string
 	if nodeIP != "" || !sloppy {
 		for _, ip := range strings.Split(nodeIP, ",") {
 			if sloppy {
@@ -40,10 +40,9 @@ func parseNodeIP(nodeIP string, allowDual, sloppy bool) ([]net.IP, error) {
 			}
 			parsedNodeIP := netutils.ParseIPSloppy(ip)
 			if parsedNodeIP == nil {
-				if sloppy {
-					klog.InfoS("Could not parse node IP. Ignoring", "IP", ip)
-				} else {
-					return nil, fmt.Errorf("could not parse %q", ip)
+				invalidIPs = append(invalidIPs, ip)
+				if !sloppy {
+					return nil, invalidIPs, fmt.Errorf("could not parse %q", ip)
 				}
 			} else {
 				nodeIPs = append(nodeIPs, parsedNodeIP)
@@ -52,20 +51,22 @@ func parseNodeIP(nodeIP string, allowDual, sloppy bool) ([]net.IP, error) {
 	}
 
 	if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && netutils.IsIPv6(nodeIPs[0]) == netutils.IsIPv6(nodeIPs[1])) {
-		return nil, fmt.Errorf("must contain either a single IP or a dual-stack pair of IPs")
+		return nil, invalidIPs, fmt.Errorf("must contain either a single IP or a dual-stack pair of IPs")
 	} else if len(nodeIPs) == 2 && !allowDual {
-		return nil, fmt.Errorf("dual-stack not supported in this configuration")
+		return nil, invalidIPs, fmt.Errorf("dual-stack not supported in this configuration")
 	} else if len(nodeIPs) == 2 && (nodeIPs[0].IsUnspecified() || nodeIPs[1].IsUnspecified()) {
-		return nil, fmt.Errorf("dual-stack node IP cannot include '0.0.0.0' or '::'")
+		return nil, invalidIPs, fmt.Errorf("dual-stack node IP cannot include '0.0.0.0' or '::'")
 	}
 
-	return nodeIPs, nil
+	return nodeIPs, invalidIPs, nil
 }
 
-// ParseNodeIPArgument parses kubelet's --node-ip argument. If nodeIP contains invalid
-// values, they will be logged and ignored. Dual-stack node IPs are allowed if
+// ParseNodeIPArgument parses kubelet's --node-ip argument.
+// If nodeIP contains invalid values, they will be returned as strings.
+// This is done also when an error is returned.
+// The caller then can decide what to do with the invalid values.
 // cloudProvider is unset, or if it is `"external"` and allowCloudDualStack is true.
-func ParseNodeIPArgument(nodeIP, cloudProvider string, allowCloudDualStack bool) ([]net.IP, error) {
+func ParseNodeIPArgument(nodeIP, cloudProvider string, allowCloudDualStack bool) ([]net.IP, []string, error) {
 	var allowDualStack bool
 	if (cloudProvider == cloudProviderNone) || (cloudProvider == cloudProviderExternal && allowCloudDualStack) {
 		allowDualStack = true
@@ -78,5 +79,6 @@ func ParseNodeIPArgument(nodeIP, cloudProvider string, allowCloudDualStack bool)
 // comma-separated pair of IP addresses. Unlike with ParseNodeIPArgument, invalid values
 // are considered an error.
 func ParseNodeIPAnnotation(nodeIP string, allowDualStack bool) ([]net.IP, error) {
-	return parseNodeIP(nodeIP, allowDualStack, false)
+	nodeIps, _, err := parseNodeIP(nodeIP, allowDualStack, false)
+	return nodeIps, err
 }

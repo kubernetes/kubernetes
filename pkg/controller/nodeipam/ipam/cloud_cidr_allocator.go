@@ -172,7 +172,7 @@ func (ca *cloudCIDRAllocator) worker(ctx context.Context) {
 				logger.Info("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			if err := ca.updateCIDRAllocation(logger, workItem); err == nil {
+			if err := ca.updateCIDRAllocation(ctx, workItem); err == nil {
 				logger.V(3).Info("Updated CIDR", "workItem", workItem)
 			} else {
 				logger.Error(err, "Error updating CIDR", "workItem", workItem)
@@ -246,6 +246,7 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(logger klog.Logger, node *v1.
 	if node == nil {
 		return nil
 	}
+
 	if !ca.insertNodeToProcessing(node.Name) {
 		logger.V(2).Info("Node is already in a process of CIDR assignment", "node", klog.KObj(node))
 		return nil
@@ -257,7 +258,8 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(logger klog.Logger, node *v1.
 }
 
 // updateCIDRAllocation assigns CIDR to Node and sends an update to the API server.
-func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName string) error {
+func (ca *cloudCIDRAllocator) updateCIDRAllocation(ctx context.Context, nodeName string) error {
+	logger := klog.FromContext(ctx)
 	node, err := ca.nodeLister.Get(nodeName)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -304,7 +306,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
 		for i := 0; i < cidrUpdateRetries; i++ {
-			if err = nodeutil.PatchNodeCIDRs(ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
+			if err = nodeutil.PatchNodeCIDRs(ctx, ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
 				logger.Info("Set the node PodCIDRs", "node", klog.KObj(node), "cidrStrings", cidrStrings)
 				break
 			}

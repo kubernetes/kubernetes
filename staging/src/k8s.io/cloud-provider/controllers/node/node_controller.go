@@ -389,7 +389,7 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 		}
 	}
 	// If kubelet provided a node IP, prefer it in the node address list
-	nodeAddresses, err := updateNodeAddressesFromNodeIP(node, nodeAddresses)
+	nodeAddresses, err := updateNodeAddressesFromNodeIP(ctx, node, nodeAddresses)
 	if err != nil {
 		klog.Errorf("Failed to update node addresses for node %q: %v", node.Name, err)
 		return
@@ -534,7 +534,7 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 	// If kubelet annotated the node with a node IP, ensure that it is valid
 	// and can be applied to the discovered node addresses before removing
 	// the taint on the node.
-	_, err := updateNodeAddressesFromNodeIP(node, instanceMeta.NodeAddresses)
+	_, err := updateNodeAddressesFromNodeIP(ctx, node, instanceMeta.NodeAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("provided node ip for node %q is not valid: %w", node.Name, err)
 	}
@@ -743,7 +743,7 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 	return false
 }
 
-func updateNodeAddressesFromNodeIP(node *v1.Node, nodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
+func updateNodeAddressesFromNodeIP(ctx context.Context, node *v1.Node, nodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
 	var err error
 
 	providedNodeIP, exists := node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr]
