@@ -56,11 +56,13 @@ const (
 	ProfileNetadmin = "netadmin"
 	// ProfileSysadmin offers elevated privileges for debugging.
 	ProfileSysadmin = "sysadmin"
+	// ProfileAuto is a special profile that automatically selects the most appropriate profile.
+	ProfileAuto = "auto"
 )
 
 type ProfileApplier interface {
 	// Apply applies the profile to the given container in the pod.
-	Apply(pod *corev1.Pod, containerName string, target runtime.Object) error
+	Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error
 }
 
 // NewProfileApplier returns a new Options for the given profile name.
@@ -78,6 +80,8 @@ func NewProfileApplier(profile string) (ProfileApplier, error) {
 		return &netadminProfile{}, nil
 	case ProfileSysadmin:
 		return &sysadminProfile{}, nil
+	case ProfileAuto:
+		return &autoProfile{}, nil
 	}
 
 	return nil, fmt.Errorf("unknown profile: %s", profile)
@@ -101,7 +105,10 @@ type netadminProfile struct {
 type sysadminProfile struct {
 }
 
-func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+type autoProfile struct {
+}
+
+func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error {
 	switch target.(type) {
 	case *corev1.Pod:
 		// do nothing to the copied pod
@@ -130,7 +137,7 @@ func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
 	return unsupported, fmt.Errorf("objects of type %T are not supported", target)
 }
 
-func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
 		return fmt.Errorf("general profile: %s", err)
@@ -154,7 +161,7 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 	return nil
 }
 
-func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
 		return fmt.Errorf("baseline profile: %s", err)
@@ -174,7 +181,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	return nil
 }
 
-func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
 		return fmt.Errorf("restricted profile: %s", err)
@@ -197,7 +204,7 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	return nil
 }
 
-func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
 		return fmt.Errorf("netadmin profile: %s", err)
@@ -219,7 +226,7 @@ func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	return nil
 }
 
-func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
 		return fmt.Errorf("sysadmin profile: %s", err)
@@ -240,6 +247,25 @@ func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	}
 
 	return nil
+}
+
+func (p *autoProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object, enforce string) error {
+	_, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("auto profile: %s", err)
+	}
+
+	var autoProfile ProfileApplier
+
+	switch enforce {
+	case "baseline":
+		autoProfile = &baselineProfile{}
+	case "restricted":
+		autoProfile = &restrictedProfile{}
+	default:
+		autoProfile = &generalProfile{}
+	}
+	return autoProfile.Apply(pod, containerName, target, enforce)
 }
 
 // removeLabelsAndProbes removes labels from the pod and remove probes
