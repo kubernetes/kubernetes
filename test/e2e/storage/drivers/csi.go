@@ -61,6 +61,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -311,6 +312,7 @@ type mockCSIDriver struct {
 	embeddedCSIDriver             *mockdriver.CSIDriver
 	enableSELinuxMount            *bool
 	enableRecoverExpansionFailure bool
+	enableHonorPVReclaimPolicy    bool
 
 	// Additional values set during PrepareTest
 	clientSet       clientset.Interface
@@ -359,6 +361,7 @@ type CSIMockDriverOpts struct {
 	FSGroupPolicy                 *storagev1.FSGroupPolicy
 	EnableSELinuxMount            *bool
 	EnableRecoverExpansionFailure bool
+	EnableHonorPVReclaimPolicy    bool
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -513,6 +516,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		enableVolumeMountGroup:        driverOpts.EnableVolumeMountGroup,
 		enableSELinuxMount:            driverOpts.EnableSELinuxMount,
 		enableRecoverExpansionFailure: driverOpts.EnableRecoverExpansionFailure,
+		enableHonorPVReclaimPolicy:    driverOpts.EnableHonorPVReclaimPolicy,
 		embedded:                      driverOpts.Embedded,
 		hooks:                         driverOpts.Hooks,
 	}
@@ -673,6 +677,10 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 	if m.enableRecoverExpansionFailure {
 		o.Features["csi-resizer"] = []string{"RecoverVolumeExpansionFailure=true"}
 	}
+	if m.enableHonorPVReclaimPolicy {
+		o.Features["csi-provisioner"] = append(o.Features["csi-provisioner"], fmt.Sprintf("%s=true", features.HonorPVReclaimPolicy))
+	}
+
 	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
 			return err
@@ -688,6 +696,18 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 					APIGroups: []string{""},
 					Resources: []string{"secrets"},
 					Verbs:     []string{"get", "list"},
+				})
+			}
+			if m.enableHonorPVReclaimPolicy && strings.HasPrefix(item.Name, "external-provisioner-runner") {
+				// The update verb is needed for testing the HonorPVReclaimPolicy feature gate.
+				// The feature gate is an alpha stage and is not enabled by default, so the verb
+				// is not added to the default rbac manifest.
+				// TODO: Remove this when the feature gate is promoted to beta or stable, and the
+				// verb is added to the default rbac manifest in the external-provisioner.
+				item.Rules = append(item.Rules, rbacv1.PolicyRule{
+					APIGroups: []string{""},
+					Resources: []string{"persistentvolumes"},
+					Verbs:     []string{"update"},
 				})
 			}
 		}

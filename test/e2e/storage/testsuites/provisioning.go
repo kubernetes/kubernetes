@@ -70,6 +70,7 @@ type StorageClassTest struct {
 	AllowVolumeExpansion bool
 	NodeSelection        e2epod.NodeSelection
 	MountOptions         []string
+	ReclaimPolicy        *v1.PersistentVolumeReclaimPolicy
 }
 
 type provisioningTestSuite struct {
