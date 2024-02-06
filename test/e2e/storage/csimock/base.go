@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -101,7 +102,9 @@ type testParameters struct {
 	fsGroupPolicy                 *storagev1.FSGroupPolicy
 	enableSELinuxMount            *bool
 	enableRecoverExpansionFailure bool
+	enableHonorPVReclaimPolicy    bool
 	enableCSINodeExpandSecret     bool
+	reclaimPolicy                 *v1.PersistentVolumeReclaimPolicy
 }
 
 type mockDriverSetup struct {
@@ -109,6 +112,7 @@ type mockDriverSetup struct {
 	config      *storageframework.PerTestConfig
 	pods        []*v1.Pod
 	pvcs        []*v1.PersistentVolumeClaim
+	pvs         []*v1.PersistentVolume
 	sc          map[string]*storagev1.StorageClass
 	vsc         map[string]*unstructured.Unstructured
 	driver      drivers.MockCSITestDriver
@@ -171,6 +175,7 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 		FSGroupPolicy:                 tp.fsGroupPolicy,
 		EnableSELinuxMount:            tp.enableSELinuxMount,
 		EnableRecoverExpansionFailure: tp.enableRecoverExpansionFailure,
+		EnableHonorPVReclaimPolicy:    tp.enableHonorPVReclaimPolicy,
 	}
 
 	// At the moment, only tests which need hooks are
@@ -235,6 +240,11 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 		}
 	}
 
+	for _, pv := range m.pvs {
+		ginkgo.By(fmt.Sprintf("Deleting pv %s", pv.Name))
+		errs = append(errs, e2epv.DeletePersistentVolume(ctx, cs, pv.Name))
+	}
+
 	for _, sc := range m.sc {
 		ginkgo.By(fmt.Sprintf("Deleting storageclass %s", sc.Name))
 		cs.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, metav1.DeleteOptions{})
@@ -286,6 +296,7 @@ func (m *mockDriverSetup) createPod(ctx context.Context, withVolume volumeType) 
 		ExpectedSize:         "1Gi",
 		DelayBinding:         m.tp.lateBinding,
 		AllowVolumeExpansion: m.tp.enableResizing,
+		ReclaimPolicy:        m.tp.reclaimPolicy,
 	}
 
 	// The mock driver only works when everything runs on a single node.
@@ -319,6 +330,92 @@ func (m *mockDriverSetup) createPod(ctx context.Context, withVolume volumeType) 
 	return // result variables set above
 }
 
+func (m *mockDriverSetup) createPVC(ctx context.Context) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim) {
+	ginkgo.By("Creating pvc")
+	f := m.f
+
+	sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
+	if m.tp.enableCSINodeExpandSecret {
+		if sc.Parameters == nil {
+			parameters := map[string]string{
+				csiNodeExpandSecretKey:          "test-secret",
+				csiNodeExpandSecretNamespaceKey: f.Namespace.Name,
+			}
+			sc.Parameters = parameters
+		} else {
+			sc.Parameters[csiNodeExpandSecretKey] = "test-secret"
+			sc.Parameters[csiNodeExpandSecretNamespaceKey] = f.Namespace.Name
+		}
+	}
+	scTest := testsuites.StorageClassTest{
+		Name:                 m.driver.GetDriverInfo().Name,
+		Timeouts:             f.Timeouts,
+		Provisioner:          sc.Provisioner,
+		Parameters:           sc.Parameters,
+		ClaimSize:            "1Gi",
+		ExpectedSize:         "1Gi",
+		DelayBinding:         m.tp.lateBinding,
+		AllowVolumeExpansion: m.tp.enableResizing,
+		ReclaimPolicy:        m.tp.reclaimPolicy,
+	}
+
+	// The mock driver only works when everything runs on a single node.
+	nodeSelection := m.config.ClientNodeSelection
+	class, claim = createClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, nil)
+	if class != nil {
+		m.sc[class.Name] = class
+	}
+	if claim != nil {
+		m.pvcs = append(m.pvcs, claim)
+	}
+
+	return class, claim
+}
+
+func (m *mockDriverSetup) createPVPVC(ctx context.Context) (class *storagev1.StorageClass, volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) {
+	ginkgo.By("Creating the PV and PVC manually")
+	f := m.f
+
+	sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
+	if m.tp.enableCSINodeExpandSecret {
+		if sc.Parameters == nil {
+			parameters := map[string]string{
+				csiNodeExpandSecretKey:          "test-secret",
+				csiNodeExpandSecretNamespaceKey: f.Namespace.Name,
+			}
+			sc.Parameters = parameters
+		} else {
+			sc.Parameters[csiNodeExpandSecretKey] = "test-secret"
+			sc.Parameters[csiNodeExpandSecretNamespaceKey] = f.Namespace.Name
+		}
+	}
+	scTest := testsuites.StorageClassTest{
+		Name:                 m.driver.GetDriverInfo().Name,
+		Timeouts:             f.Timeouts,
+		Provisioner:          sc.Provisioner,
+		Parameters:           sc.Parameters,
+		ClaimSize:            "1Gi",
+		ExpectedSize:         "1Gi",
+		DelayBinding:         m.tp.lateBinding,
+		AllowVolumeExpansion: m.tp.enableResizing,
+		ReclaimPolicy:        m.tp.reclaimPolicy,
+	}
+
+	// The mock driver only works when everything runs on a single node.
+	nodeSelection := m.config.ClientNodeSelection
+	class, volume, claim = createVolumeAndClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, nil)
+	if class != nil {
+		m.sc[class.Name] = class
+	}
+	if volume != nil {
+		m.pvs = append(m.pvs, volume)
+	}
+	if claim != nil {
+		m.pvcs = append(m.pvcs, claim)
+	}
+	return class, volume, claim
+}
+
 func (m *mockDriverSetup) createPodWithPVC(pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
 	f := m.f
 
@@ -344,6 +441,7 @@ func (m *mockDriverSetup) createPodWithFSGroup(ctx context.Context, fsGroup *int
 		ExpectedSize:         "1Gi",
 		DelayBinding:         m.tp.lateBinding,
 		AllowVolumeExpansion: m.tp.enableResizing,
+		ReclaimPolicy:        m.tp.reclaimPolicy,
 	}
 	class, claim, pod := startBusyBoxPod(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, fsGroup)
 
@@ -375,6 +473,7 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 		DelayBinding:         m.tp.lateBinding,
 		AllowVolumeExpansion: m.tp.enableResizing,
 		MountOptions:         mountOptions,
+		ReclaimPolicy:        m.tp.reclaimPolicy,
 	}
 	class, claim := createClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
 	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts)
@@ -441,7 +540,7 @@ func newStorageClass(t testsuites.StorageClassTest, ns string, prefix string) *s
 		}
 	}
 
-	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, t.MountOptions, ns, prefix)
+	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, t.MountOptions, t.ReclaimPolicy, ns, prefix)
 	if t.AllowVolumeExpansion {
 		sc.AllowVolumeExpansion = &t.AllowVolumeExpansion
 	}
@@ -453,6 +552,7 @@ func getStorageClass(
 	parameters map[string]string,
 	bindingMode *storagev1.VolumeBindingMode,
 	mountOptions []string,
+	reclaimPolicy *v1.PersistentVolumeReclaimPolicy,
 	ns string,
 	prefix string,
 ) *storagev1.StorageClass {
@@ -472,6 +572,7 @@ func getStorageClass(
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
 		MountOptions:      mountOptions,
+		ReclaimPolicy:     reclaimPolicy,
 	}
 }
 
@@ -521,6 +622,44 @@ func createClaim(ctx context.Context, cs clientset.Interface, t testsuites.Stora
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
 	}
 	return class, claim
+}
+
+func createVolumeAndClaim(ctx context.Context, cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, accessModes []v1.PersistentVolumeAccessMode) (*storagev1.StorageClass, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	class := createSC(cs, t, scName, ns)
+
+	volumeMode := v1.PersistentVolumeFilesystem
+	if t.VolumeMode != "" {
+		volumeMode = t.VolumeMode
+	}
+
+	pvConfig := e2epv.PersistentVolumeConfig{
+		Capacity:         t.ClaimSize,
+		StorageClassName: class.Name,
+		VolumeMode:       &volumeMode,
+		AccessModes:      accessModes,
+		ReclaimPolicy:    ptr.Deref(class.ReclaimPolicy, v1.PersistentVolumeReclaimDelete),
+		PVSource: v1.PersistentVolumeSource{
+			CSI: &v1.CSIPersistentVolumeSource{
+				Driver:       class.Provisioner,
+				VolumeHandle: "test-volume-handle",
+			},
+		},
+	}
+
+	pvcConfig := e2epv.PersistentVolumeClaimConfig{
+		ClaimSize:        t.ClaimSize,
+		StorageClassName: &(class.Name),
+		VolumeMode:       &volumeMode,
+		AccessModes:      accessModes,
+	}
+
+	volume, claim, err := e2epv.CreatePVPVC(ctx, cs, t.Timeouts, pvConfig, pvcConfig, ns, true)
+	framework.ExpectNoError(err, "Failed to create PV and PVC")
+
+	err = e2epv.WaitOnPVandPVC(ctx, cs, t.Timeouts, ns, volume, claim)
+	framework.ExpectNoError(err, "Failed waiting for PV and PVC to be bound each other")
+
+	return class, volume, claim
 }
 
 func startPausePod(ctx context.Context, cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
