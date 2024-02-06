@@ -78,36 +78,34 @@ func waitForDeploymentCompleteMaybeCheckRolling(c clientset.Interface, d *apps.D
 		reason     string
 	)
 
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		var err error
-		deployment, err = c.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		// If during a rolling update, make sure rolling update strategy isn't broken at any times.
-		if rolling {
-			reason, err = checkRollingUpdateStatus(c, deployment, logf)
+	err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			var err error
+			deployment, err = c.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
+
+			// If during a rolling update, make sure rolling update strategy isn't broken at any times.
+			if rolling {
+				reason, err = checkRollingUpdateStatus(c, deployment, logf)
+				if err != nil {
+					return false, err
+				}
+				logf(reason)
+			}
+
+			// When the deployment status and its underlying resources reach the desired state, we're done
+			if deploymentutil.DeploymentComplete(d, &deployment.Status) {
+				return true, nil
+			}
+
+			reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
 			logf(reason)
-		}
 
-		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deploymentutil.DeploymentComplete(d, &deployment.Status) {
-			return true, nil
-		}
+			return false, nil
+		})
 
-		reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
-		logf(reason)
-
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("%s", reason)
-	}
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.Name, err)
 	}
@@ -206,25 +204,26 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	var deployment *apps.Deployment
 	var newRS *apps.ReplicaSet
 	var reason string
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		var err error
-		deployment, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
-		newRS, err = GetNewReplicaSet(deployment, c)
-		if err != nil {
-			return false, err
-		}
-		if err := checkRevisionAndImage(deployment, newRS, revision, image); err != nil {
-			reason = err.Error()
-			logf(reason)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err == wait.ErrWaitTimeout {
+	err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			var err error
+			deployment, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
+			newRS, err = GetNewReplicaSet(deployment, c)
+			if err != nil {
+				return false, err
+			}
+			if err := checkRevisionAndImage(deployment, newRS, revision, image); err != nil {
+				reason = err.Error()
+				logf(reason)
+				return false, nil
+			}
+			return true, nil
+		})
+	if wait.Interrupted(err) {
 		LogReplicaSetsOfDeployment(deployment, nil, newRS, logf)
 		err = fmt.Errorf(reason)
 	}
@@ -302,21 +301,22 @@ type UpdateDeploymentFunc func(d *apps.Deployment)
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateDeploymentFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.Deployment, error) {
 	var deployment *apps.Deployment
 	var updateErr error
-	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		var err error
-		if deployment, err = c.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
-			return false, err
-		}
-		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(deployment)
-		if deployment, err = c.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{}); err == nil {
-			logf("Updating deployment %s", name)
-			return true, nil
-		}
-		updateErr = err
-		return false, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			var err error
+			if deployment, err = c.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
+				return false, err
+			}
+			// Apply the update, then attempt to push it to the apiserver.
+			applyUpdate(deployment)
+			if deployment, err = c.AppsV1().Deployments(namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{}); err == nil {
+				logf("Updating deployment %s", name)
+				return true, nil
+			}
+			updateErr = err
+			return false, nil
+		})
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to deployment %q: %v", name, updateErr)
 	}
 	return deployment, pollErr
@@ -330,17 +330,18 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 
 // WaitForDeploymentRollbackCleared waits for given deployment either started rolling back or doesn't need to rollback.
 func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName string, pollInterval, pollTimeout time.Duration) error {
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		deployment, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		// Rollback not set or is kicked off
-		if deployment.Annotations[apps.DeprecatedRollbackTo] == "" {
-			return true, nil
-		}
-		return false, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			deployment, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			// Rollback not set or is kicked off
+			if deployment.Annotations[apps.DeprecatedRollbackTo] == "" {
+				return true, nil
+			}
+			return false, nil
+		})
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %s rollbackTo to be cleared: %v", deploymentName, err)
 	}
@@ -350,14 +351,15 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 // WaitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
 func WaitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64, pollInterval, pollTimeout time.Duration) error {
 	var deployment *apps.Deployment
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		d, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		deployment = d
-		return deployment.Status.ObservedGeneration >= desiredGeneration && deployment.Status.UpdatedReplicas >= minUpdatedReplicas, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			d, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			deployment = d
+			return deployment.Status.ObservedGeneration >= desiredGeneration && deployment.Status.UpdatedReplicas >= minUpdatedReplicas, nil
+		})
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %q to have at least %d updatedReplicas: %v; latest .status.updatedReplicas: %d", deploymentName, minUpdatedReplicas, err, deployment.Status.UpdatedReplicas)
 	}
@@ -366,16 +368,17 @@ func WaitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentNa
 
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType apps.DeploymentConditionType, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
 	var deployment *apps.Deployment
-	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		d, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		deployment = d
-		cond := deploymentutil.GetDeploymentCondition(deployment.Status, condType)
-		return cond != nil && cond.Reason == reason, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
+	pollErr := wait.PollUntilContextTimeout(context.Background(), pollInterval, pollTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			d, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			deployment = d
+			cond := deploymentutil.GetDeploymentCondition(deployment.Status, condType)
+			return cond != nil && cond.Reason == reason, nil
+		})
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason, latest deployment conditions: %+v", deployment.Name, deployment.Status.Conditions)
 		_, allOldRSs, newRS, err := GetAllReplicaSets(deployment, c)
 		if err == nil {

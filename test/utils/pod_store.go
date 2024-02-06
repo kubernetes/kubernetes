@@ -56,12 +56,13 @@ func NewPodStore(c clientset.Interface, namespace string, label labels.Selector,
 	stopCh := make(chan struct{})
 	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0)
 	go reflector.Run(stopCh)
-	if err := wait.PollImmediate(50*time.Millisecond, 2*time.Minute, func() (bool, error) {
-		if len(reflector.LastSyncResourceVersion()) != 0 {
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			if len(reflector.LastSyncResourceVersion()) != 0 {
+				return true, nil
+			}
+			return false, nil
+		}); err != nil {
 		close(stopCh)
 		return nil, err
 	}
