@@ -20,12 +20,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	gojson "encoding/json"
+	"fmt"
 	"io"
 	"math/rand"
 	"reflect"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -34,9 +33,13 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -46,6 +49,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/yaml"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
@@ -622,4 +627,162 @@ func BenchmarkDecodeIntoYAML(b *testing.B) {
 		}
 	}
 	b.StopTimer()
+}
+
+func BenchmarkSerializer(b *testing.B) {
+	items := benchmarkItems(b)
+	width := len(items)
+
+	pods := make([]runtime.Object, width)
+	for i := range items {
+		pods[i] = &items[i]
+	}
+
+	unstructureds := make([]runtime.Object, width)
+	for i := range pods {
+		c, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pods[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		unstructureds[i] = &unstructured.Unstructured{Object: c}
+	}
+
+	for offset, tc := range []struct {
+		s      runtime.Serializer
+		corpus []runtime.Object
+	}{
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{}),
+			corpus: pods,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{}),
+			corpus: unstructureds,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Strict: true, Pretty: true}),
+			corpus: pods,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Strict: true, Pretty: true}),
+			corpus: unstructureds,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Strict: true}),
+			corpus: pods,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Strict: true}),
+			corpus: unstructureds,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Pretty: true}),
+			corpus: pods,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Pretty: true}),
+			corpus: unstructureds,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Yaml: true}),
+			corpus: pods,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Yaml: true}),
+			corpus: unstructureds,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Yaml: true, Strict: true}),
+			corpus: pods,
+		},
+		{
+			s:      json.NewSerializerWithOptions(json.DefaultMetaFactory, legacyscheme.Scheme, legacyscheme.Scheme, json.SerializerOptions{Yaml: true, Strict: true}),
+			corpus: unstructureds,
+		},
+		{
+			s:      unstructured.UnstructuredJSONScheme,
+			corpus: unstructureds,
+		},
+		{
+			s:      protobuf.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme),
+			corpus: pods,
+		},
+		{
+			s:      cbor.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme),
+			corpus: pods,
+		},
+		{
+			s:      cbor.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme),
+			corpus: unstructureds,
+		},
+		{
+			s:      cbor.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme, cbor.Strict(true)),
+			corpus: pods,
+		},
+		{
+			s:      cbor.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme, cbor.Strict(true)),
+			corpus: unstructureds,
+		},
+	} {
+		if len(tc.corpus) == 0 {
+			b.Fatalf("case at offset %d has empty corpus", offset)
+		}
+
+		// For benchstat-friendliness, sub-benchmark names follow the convention from:
+		// https://go.googlesource.com/proposal/+/master/design/14313-benchmark-format.md#benchmark-name-configuration
+		b.Run(fmt.Sprintf("id=%s/type=%s", tc.s.Identifier(), reflect.TypeOf(tc.corpus[0]).Elem().Name()), func(b *testing.B) {
+			b.Run("action=encode", func(b *testing.B) {
+				b.ReportAllocs()
+
+				var i int
+				for b.Loop() {
+					if err := tc.s.Encode(tc.corpus[i%width], io.Discard); err != nil {
+						b.Fatal(err)
+					}
+					i++
+				}
+			})
+
+			if nde, ok := tc.s.(runtime.NondeterministicEncoder); ok {
+				b.Run("action=encode-nondeterministic", func(b *testing.B) {
+					b.ReportAllocs()
+
+					var i int
+					for b.Loop() {
+						if err := nde.EncodeNondeterministic(tc.corpus[i%width], io.Discard); err != nil {
+							b.Fatal(err)
+						}
+						i++
+					}
+				})
+			}
+
+			b.Run("action=decode", func(b *testing.B) {
+				b.ReportAllocs()
+
+				var buf bytes.Buffer
+				encoded := make([][]byte, width)
+				for i := range tc.corpus {
+					buf.Reset()
+					if err := tc.s.Encode(tc.corpus[i], &buf); err != nil {
+						b.Fatal(err)
+					}
+					encoded[i] = make([]byte, buf.Len())
+					copy(encoded[i], buf.Bytes())
+				}
+
+				gvk := tc.corpus[0].GetObjectKind().GroupVersionKind()
+
+				var i int
+				for b.Loop() {
+					into := reflect.New(reflect.TypeOf(tc.corpus[0]).Elem()).Interface().(runtime.Object)
+					_, _, err := tc.s.Decode(encoded[i%width], &gvk, into)
+					if err != nil {
+						b.Fatal(err)
+					}
+					i++
+				}
+			})
+		})
+	}
 }
