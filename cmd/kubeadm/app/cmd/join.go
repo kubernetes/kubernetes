@@ -220,6 +220,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	joinRunner.AppendPhase(phases.NewCheckEtcdPhase())
 	joinRunner.AppendPhase(phases.NewKubeletStartPhase())
 	joinRunner.AppendPhase(phases.NewControlPlaneJoinPhase())
+	joinRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
