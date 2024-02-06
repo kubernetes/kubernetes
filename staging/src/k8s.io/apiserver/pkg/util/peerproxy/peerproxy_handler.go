@@ -162,24 +162,20 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 			return
 		}
 
-		// no peer endpoints found could mean one of the following things:
-		// 1. apiservers were found in storage version informer but either they had no endpoint
-		//    lease or their endpoint lease had invalid hostport information. Serve 503 in this case.
-		// 2. no apiservers were found in storage version informer cache meaning
-		//    this resource is not served by anything in this cluster. Pass request to
-		//    next handler, that should eventually serve 404.
+		gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
+
+		if serviceableByResp.errorFetchingAddressFromLease {
+			klog.ErrorS(err, "error fetching ip and port of remote server while proxying")
+			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gv, w, r)
+			return
+		}
+
+		// no apiservers were found that could serve the request, pass request to
+		// next handler, that should eventually serve 404
 
 		// TODO: maintain locally serviceable GVRs somewhere so that we dont have to
 		// consult the storageversion-informed map for those
 		if len(serviceableByResp.peerEndpoints) == 0 {
-			gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
-
-			if serviceableByResp.errorFetchingAddressFromLease {
-				klog.ErrorS(err, "error fetching ip and port of remote server while proxying")
-				responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gv, w, r)
-				return
-			}
-
 			klog.Errorf(fmt.Sprintf("GVR %v is not served by anything in this cluster", gvr))
 			handler.ServeHTTP(w, r)
 			return
@@ -207,6 +203,7 @@ func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResou
 	apiservers.Range(func(key, value interface{}) bool {
 		apiserverKey := key.(string)
 		if apiserverKey == localAPIServerId {
+			response.errorFetchingAddressFromLease = true
 			response.locallyServiceable = true
 			// stop iteration
 			return false
@@ -232,10 +229,7 @@ func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResou
 		return true
 	})
 
-	if len(peerServerEndpoints) > 0 {
-		response.errorFetchingAddressFromLease = false
-		response.peerEndpoints = peerServerEndpoints
-	}
+	response.peerEndpoints = peerServerEndpoints
 	return response, nil
 }
 

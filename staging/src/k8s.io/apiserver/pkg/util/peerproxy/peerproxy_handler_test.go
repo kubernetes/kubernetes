@@ -59,8 +59,8 @@ const (
 )
 
 type FakeSVMapData struct {
-	gvr       schema.GroupVersionResource
-	serverIds []string
+	gvr      schema.GroupVersionResource
+	serverId string
 }
 
 type reconciler struct {
@@ -116,7 +116,7 @@ func TestPeerProxy(t *testing.T) {
 					Group:    "core",
 					Version:  "bar",
 					Resource: "baz"},
-				serverIds: []string{}},
+				serverId: ""},
 		},
 		{
 			desc:                 "503 if no endpoint fetched from lease",
@@ -128,7 +128,7 @@ func TestPeerProxy(t *testing.T) {
 					Group:    "core",
 					Version:  "foo",
 					Resource: "bar"},
-				serverIds: []string{remoteServerId}},
+				serverId: remoteServerId},
 		},
 		{
 			desc:                 "200 if locally serviceable",
@@ -140,7 +140,7 @@ func TestPeerProxy(t *testing.T) {
 					Group:    "core",
 					Version:  "foo",
 					Resource: "bar"},
-				serverIds: []string{localServerId}},
+				serverId: localServerId},
 		},
 		{
 			desc:                 "503 unreachable peer bind address",
@@ -152,7 +152,7 @@ func TestPeerProxy(t *testing.T) {
 					Group:    "core",
 					Version:  "foo",
 					Resource: "bar"},
-				serverIds: []string{remoteServerId}},
+				serverId: remoteServerId},
 			reconcilerConfig: reconciler{
 				do:       true,
 				publicIP: "1.2.3.4",
@@ -177,7 +177,7 @@ func TestPeerProxy(t *testing.T) {
 					Group:    "core",
 					Version:  "foo",
 					Resource: "bar"},
-				serverIds: []string{remoteServerId}},
+				serverId: remoteServerId},
 			reconcilerConfig: reconciler{
 				do:       true,
 				publicIP: "1.2.3.4",
@@ -191,23 +191,6 @@ func TestPeerProxy(t *testing.T) {
 			# TYPE apiserver_rerouted_request_total counter
 			apiserver_rerouted_request_total{code="503"} 2
 			`,
-		},
-		{
-			desc:                 "503 if one apiserver's endpoint lease wasnt found but another valid apiserver was found",
-			requestPath:          "/api/foo/bar",
-			expectedStatus:       http.StatusServiceUnavailable,
-			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "foo",
-					Resource: "bar"},
-				serverIds: []string{"aggregated-apiserver", remoteServerId}},
-			reconcilerConfig: reconciler{
-				do:       true,
-				publicIP: "1.2.3.4",
-				serverId: remoteServerId,
-			},
 		},
 	}
 
@@ -307,18 +290,16 @@ func newFakePeerProxyHandler(informerFinishedSync bool, reconciler reconcilers.P
 	}
 	ppI := NewPeerProxyHandler(informerFactory, storageversion.NewDefaultManager(), proxyRoundTripper, id, reconciler, s)
 	if testDataExists(svdata.gvr) {
-		ppI.addToStorageVersionMap(svdata.gvr, svdata.serverIds)
+		ppI.addToStorageVersionMap(svdata.gvr, svdata.serverId)
 	}
 	return ppI, nil
 }
 
-func (h *peerProxyHandler) addToStorageVersionMap(gvr schema.GroupVersionResource, serverIds []string) {
+func (h *peerProxyHandler) addToStorageVersionMap(gvr schema.GroupVersionResource, serverId string) {
 	apiserversi, _ := h.svMap.LoadOrStore(gvr, &sync.Map{})
 	apiservers := apiserversi.(*sync.Map)
-	for _, serverId := range serverIds {
-		if serverId != "" {
-			apiservers.Store(serverId, true)
-		}
+	if serverId != "" {
+		apiservers.Store(serverId, true)
 	}
 }
 

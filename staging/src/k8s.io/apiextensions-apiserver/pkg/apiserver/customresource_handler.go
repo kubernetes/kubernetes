@@ -194,7 +194,7 @@ type storageVersionUpdate struct {
 	// channel is closed.
 	processedCh <-chan struct{}
 
-	// processedCh is closed by the storage version manager when it
+	// errCh is closed by the storage version manager when it
 	// encounters an error while trying to update a storage version.
 	// The API server will block the serve 503 for CR write requests if
 	// this channel is closed.
@@ -456,16 +456,17 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 		if justCreated {
 			time.Sleep(2 * time.Second)
 		}
-		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
-			err := apierrors.NewServiceUnavailable(err.Error())
-			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
-			return nil
-		}
 		// Get the latest CRD to make sure it's not terminating or deleted
 		crd, err := r.crdLister.Get(crdName)
 		if err != nil || crd.UID != crdUID || apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating) {
 			err := apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb)
 			err.ErrStatus.Message = fmt.Sprintf("%v not allowed while custom resource definition is terminating", requestInfo.Verb)
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
+
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
 			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
 			return nil
 		}
@@ -590,12 +591,10 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
-		processedCh := make(chan struct{})
-		errCh := make(chan struct{})
 		ctx := apirequest.NewContext()
 		// customStorageLock will be released even if UpdateStorageVersion() fails. This is safe
 		// since we are deleting the old storage here and not creating a new one.
-		err := r.storageVersionManager.UpdateStorageVersion(ctx, crd, tearDownFinishedCh, processedCh, errCh)
+		err := r.storageVersionManager.UpdateStorageVersion(ctx, crd, tearDownFinishedCh, nil, nil)
 		if err != nil {
 			klog.Errorf("error updating storage version for %v: %v", crd, err)
 		}
@@ -644,10 +643,8 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	// Update storage version with the latest info in the watch event
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
-		processedCh := make(chan struct{})
-		errCh := make(chan struct{})
 		ctx := apirequest.NewContext()
-		err := r.storageVersionManager.UpdateStorageVersion(ctx, newCRD, tearDownFinishedCh, processedCh, errCh)
+		err := r.storageVersionManager.UpdateStorageVersion(ctx, newCRD, tearDownFinishedCh, nil, nil)
 		if err != nil {
 			klog.Errorf("error updating storage version for %v: %v", newCRD, err)
 		}
@@ -1187,27 +1184,13 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		var processedCh, errCh chan struct{}
 		ctx := apirequest.NewContext()
-		var retry int
-		retries := 3
 
-		done := false
-		for retry < retries {
-			// spawn storage version update in background and use channels to make handlers wait
-			processedCh = make(chan struct{})
-			errCh = make(chan struct{})
-			err = r.storageVersionManager.UpdateStorageVersion(ctx, crd, nil, processedCh, errCh)
-			select {
-			case <-errCh:
-				klog.Errorf("retry %d, failed to update storage version for %v : %v", retry, crd, err)
-				retry++
-				continue
-			case <-processedCh:
-				done = true
-			}
-
-			if done {
-				break
-			}
+		// spawn storage version update in background and use channels to make handlers wait
+		processedCh = make(chan struct{})
+		errCh = make(chan struct{})
+		err = r.storageVersionManager.UpdateStorageVersion(ctx, crd, nil, processedCh, errCh)
+		if err != nil {
+			klog.Errorf("error updating storage version for %v: %v", crd, err)
 		}
 
 		ret.storageVersionUpdate = &storageVersionUpdate{

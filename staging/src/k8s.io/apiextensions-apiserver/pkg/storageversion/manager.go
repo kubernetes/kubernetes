@@ -81,10 +81,14 @@ func (m *manager) UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1
 			case <-waitCh:
 				done = true
 			case <-ctx.Done():
-				close(errCh)
+				if errCh != nil {
+					close(errCh)
+				}
 				return fmt.Errorf("aborted updating CRD storage version update: %v", ctx.Err())
 			case <-time.After(1 * time.Minute):
-				close(errCh)
+				if errCh != nil {
+					close(errCh)
+				}
 				return fmt.Errorf("timeout waiting for waitCh to close before proceeding with storageversion update for %v", crd)
 			}
 			if done {
@@ -95,7 +99,9 @@ func (m *manager) UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1
 
 	if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
 		utilruntime.HandleError(err)
-		close(errCh)
+		if errCh != nil {
+			close(errCh)
+		}
 		return fmt.Errorf("error while updating storage version for crd %v: %v", crd, err)
 	}
 	// close processCh after the update is done
