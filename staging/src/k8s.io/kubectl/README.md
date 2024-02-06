@@ -23,7 +23,7 @@ cli client. That client will eventually move here too.
   Not only for developers on the project, but also for external users of these packages.
 
 - When reviewing PRs, you are encouraged to use Golang's [code review
-  comments](https://github.com/golang/go/wiki/CodeReviewComments) page.
+  comments](https://go.dev/wiki/CodeReviewComments) page.
 
 - Packages in this repository should aspire to implement sensible, small
   interfaces and import a limited set of dependencies.
