@@ -2455,9 +2455,9 @@ func TestGetEligibleNodes(t *testing.T) {
 		eligibleNodes := testEnv.binder.GetEligibleNodes(logger, scenario.pvcs)
 
 		// Validate
-		if reflect.DeepEqual(scenario.eligibleNodes, eligibleNodes) {
-			fmt.Println("foo")
-		}
+        if diff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.Set[string]) bool {
+            return reflect.DeepEqual(a, b)
+        })); diff != "" {
 
 		if compDiff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.Set[string]) bool {
 			return reflect.DeepEqual(a, b)

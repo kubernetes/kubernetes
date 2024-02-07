@@ -19,7 +19,6 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -447,7 +446,8 @@ func TestEnoughRequests(t *testing.T) {
 					ScalarResources: map[v1.ResourceName]int64{
 						extendedResourceB:     1,
 						kubernetesIOResourceA: 1,
-					}}),
+					},
+				}),
 			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com"},
@@ -471,9 +471,11 @@ func TestEnoughRequests(t *testing.T) {
 					Memory:   1,
 					ScalarResources: map[v1.ResourceName]int64{
 						extendedResourceA: 0,
-					}}),
+					},
+				}),
 			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{
-				MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 6}})),
+				MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 6},
+			})),
 			name:                      "skip checking extended resource request with quantity zero via resource groups",
 			wantInsufficientResources: []InsufficientResource{},
 		},
@@ -482,9 +484,11 @@ func TestEnoughRequests(t *testing.T) {
 				framework.Resource{
 					ScalarResources: map[v1.ResourceName]int64{
 						extendedResourceA: 1,
-					}}),
+					},
+				}),
 			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{
-				MilliCPU: 20, Memory: 30, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}})),
+				MilliCPU: 20, Memory: 30, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			})),
 			name:                      "skip checking resource request with quantity zero",
 			wantInsufficientResources: []InsufficientResource{},
 		},
@@ -513,13 +517,13 @@ func TestEnoughRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
 
 			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
-			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
-				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
+			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
+				t.Errorf("unexpected insufficient resources (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -540,8 +544,8 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterNodeResourcesFit" from cycleState: %w`, framework.ErrNotFound))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
+		t.Errorf("unexpected status (-want, +got):\n%s", diff)
 	}
 }
 
@@ -597,12 +601,11 @@ func TestNotEnoughRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
-
 }
 
 func TestStorageRequests(t *testing.T) {
@@ -658,12 +661,11 @@ func TestStorageRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
-
 }
 
 func TestRestartableInitContainers(t *testing.T) {
@@ -748,7 +750,6 @@ func TestRestartableInitContainers(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestFitScore(t *testing.T) {
@@ -964,9 +965,8 @@ func TestFitScore(t *testing.T) {
 				}
 				gotPriorities = append(gotPriorities, framework.NodeScore{Name: n.Name, Score: score})
 			}
-
-			if !reflect.DeepEqual(test.expectedPriorities, gotPriorities) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedPriorities, gotPriorities)
+			if diff := cmp.Diff(test.expectedPriorities, gotPriorities); diff != "" {
+				t.Errorf("unexpected priorities (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -1070,7 +1070,7 @@ func BenchmarkTestFitScore(b *testing.B) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
 			}
 			state := framework.NewCycleState()
-			var nodeResourcesFunc = runtime.FactoryAdapter(plfeature.Features{}, NewFit)
+			nodeResourcesFunc := runtime.FactoryAdapter(plfeature.Features{}, NewFit)
 			pl := plugintesting.SetupPlugin(ctx, b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
 			p := pl.(*Fit)
 
@@ -1252,7 +1252,8 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 		},
 		"skip-queue-on-node-add-without-required-resource-type": {
 			pod: newResourcePod(framework.Resource{
-				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}},
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			},
 			),
 			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
 				extendedResourceB: "1",

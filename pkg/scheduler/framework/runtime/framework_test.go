@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -66,8 +65,10 @@ const (
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
 // TestScorePlugin only implements ScorePlugin interface.
-var _ framework.ScorePlugin = &TestScoreWithNormalizePlugin{}
-var _ framework.ScorePlugin = &TestScorePlugin{}
+var (
+	_ framework.ScorePlugin = &TestScoreWithNormalizePlugin{}
+	_ framework.ScorePlugin = &TestScorePlugin{}
+)
 
 var cmpOpts = []cmp.Option{
 	cmp.Comparer(func(s1 *framework.Status, s2 *framework.Status) bool {
@@ -177,6 +178,7 @@ type TestPlugin struct {
 func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreFilterAddPodStatus), injectReason)
 }
+
 func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreFilterRemovePodStatus), injectReason)
 }
@@ -293,13 +295,15 @@ func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, stat
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo,
+) *framework.Status {
 	pl.AddCalled++
 	return nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo,
+) *framework.Status {
 	pl.RemoveCalled++
 	return nil
 }
@@ -308,8 +312,7 @@ func (pl *TestPreFilterWithExtensionsPlugin) PreFilterExtensions() framework.Pre
 	return pl
 }
 
-type TestDuplicatePlugin struct {
-}
+type TestDuplicatePlugin struct{}
 
 func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
@@ -337,6 +340,7 @@ type TestPermitPlugin struct {
 func (pp *TestPermitPlugin) Name() string {
 	return permitPlugin
 }
+
 func (pp *TestPermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
 	return framework.NewStatus(framework.Wait), 10 * time.Second
 }
@@ -412,21 +416,28 @@ var defaultWeights = map[string]int32{
 var state = &framework.CycleState{}
 
 // Pod is only used for logging errors.
-var pod = &v1.Pod{}
-var node = &v1.Node{
-	ObjectMeta: metav1.ObjectMeta{
-		Name: nodeName,
-	},
-}
-var lowPriority, highPriority = int32(0), int32(1000)
-var lowPriorityPod = &v1.Pod{
-	ObjectMeta: metav1.ObjectMeta{UID: "low"},
-	Spec:       v1.PodSpec{Priority: &lowPriority},
-}
+var (
+	pod  = &v1.Pod{}
+	node = &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+		},
+	}
+)
+
+var (
+	lowPriority, highPriority = int32(0), int32(1000)
+	lowPriorityPod            = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "low"},
+		Spec:       v1.PodSpec{Priority: &lowPriority},
+	}
+)
+
 var highPriorityPod = &v1.Pod{
 	ObjectMeta: metav1.ObjectMeta{UID: "high"},
 	Spec:       v1.PodSpec{Priority: &highPriority},
 }
+
 var nodes = []*v1.Node{
 	{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
 	{ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
@@ -971,8 +982,8 @@ func TestPreEnqueuePlugins(t *testing.T) {
 			}
 
 			got := f.PreEnqueuePlugins()
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("PreEnqueuePlugins(): want %v, but got %v", tt.want, got)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected PreEnqueuePlugins (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -1501,8 +1512,8 @@ func TestRunScorePlugins(t *testing.T) {
 			if !status.IsSuccess() {
 				t.Errorf("Expected status to be success.")
 			}
-			if !reflect.DeepEqual(res, tt.want) {
-				t.Errorf("Score map after RunScorePlugin. got: %+v, want: %+v.", res, tt.want)
+			if diff := cmp.Diff(tt.want, res); diff != "" {
+				t.Errorf("unexpected scores (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -1947,7 +1958,8 @@ func TestFilterPlugins(t *testing.T) {
 				{
 					name: "TestPlugin",
 					inj: injectedResult{
-						FilterStatus: int(framework.UnschedulableAndUnresolvable)},
+						FilterStatus: int(framework.UnschedulableAndUnresolvable),
+					},
 				},
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, injectFilterReason).WithPlugin("TestPlugin"),
@@ -2043,7 +2055,6 @@ func TestFilterPlugins(t *testing.T) {
 			name: "SuccessAndErrorFilters",
 			plugins: []*TestPlugin{
 				{
-
 					name: "TestPlugin1",
 					inj:  injectedResult{FilterStatus: int(framework.Success)},
 				},
@@ -2221,8 +2232,8 @@ func TestPostFilterPlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 			_, gotStatus := f.RunPostFilterPlugins(ctx, nil, pod, nil)
-			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
-				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected status (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -2531,8 +2542,8 @@ func TestPreBindPlugins(t *testing.T) {
 
 			status := f.RunPreBindPlugins(ctx, nil, pod, "")
 
-			if !reflect.DeepEqual(status, tt.wantStatus) {
-				t.Errorf("wrong status code. got %v, want %v", status, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, status, cmpOpts...); diff != "" {
+				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2689,8 +2700,8 @@ func TestReservePlugins(t *testing.T) {
 
 			status := f.RunReservePluginsReserve(ctx, nil, pod, "")
 
-			if !reflect.DeepEqual(status, tt.wantStatus) {
-				t.Errorf("wrong status code. got %v, want %v", status, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, status, cmpOpts...); diff != "" {
+				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2816,8 +2827,8 @@ func TestPermitPlugins(t *testing.T) {
 			}
 
 			status := f.RunPermitPlugins(ctx, nil, pod, "")
-			if !reflect.DeepEqual(status, tt.want) {
-				t.Errorf("wrong status code. got %v, want %v", status, tt.want)
+			if diff := cmp.Diff(tt.want, status, cmpOpts...); diff != "" {
+				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -3239,8 +3250,8 @@ func TestWaitOnPermit(t *testing.T) {
 			go tt.action(f)
 
 			got := f.WaitOnPermit(ctx, pod)
-			if !reflect.DeepEqual(tt.want, got) {
-				t.Errorf("Unexpected status: want %v, but got %v", tt.want, got)
+			if diff := cmp.Diff(tt.want, got, cmpOpts...); diff != "" {
+				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}

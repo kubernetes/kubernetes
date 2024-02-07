@@ -352,8 +352,10 @@ type TestPlugin struct {
 	name string
 }
 
-var _ framework.ScorePlugin = &TestPlugin{}
-var _ framework.FilterPlugin = &TestPlugin{}
+var (
+	_ framework.ScorePlugin  = &TestPlugin{}
+	_ framework.FilterPlugin = &TestPlugin{}
+)
 
 func (t *TestPlugin) Name() string {
 	return t.name
@@ -400,7 +402,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	// We use a fake filter that only allows one particular node. We create two
 	// profiles, each with a different node in the filter configuration.
 	objs := append([]runtime.Object{
-		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, nodes...)
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}},
+	}, nodes...)
 	client := clientsetfake.NewSimpleClientset(objs...)
 	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -414,7 +417,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		nil,
 		profile.NewRecorderFactory(broadcaster),
 		WithProfiles(
-			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-node2",
+			schedulerapi.KubeSchedulerProfile{
+				SchedulerName: "match-node2",
 				Plugins: &schedulerapi.Plugins{
 					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelector"}}},
 					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
@@ -548,7 +552,8 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 		nil,
 		profile.NewRecorderFactory(broadcaster),
 		WithProfiles(
-			schedulerapi.KubeSchedulerProfile{SchedulerName: fakeSchedulerName,
+			schedulerapi.KubeSchedulerProfile{
+				SchedulerName: fakeSchedulerName,
 				Plugins: &schedulerapi.Plugins{
 					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelectorDependOnPodAnnotation"}}},
 					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
@@ -808,17 +813,17 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			}
 			sched.scheduleOne(ctx)
 			<-called
-			if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
-				t.Errorf("assumed pod: wanted %v, got %v", e, a)
+			if diff := cmp.Diff(item.expectAssumedPod, gotAssumedPod); diff != "" {
+				t.Errorf("assumed pod diff (-want, +got): %s", diff)
 			}
-			if e, a := item.expectErrorPod, gotPod; !reflect.DeepEqual(e, a) {
-				t.Errorf("error pod: wanted %v, got %v", e, a)
+			if diff := cmp.Diff(item.expectErrorPod, gotPod); diff != "" {
+				t.Errorf("error pod diff (-want, +got): %s", diff)
 			}
-			if e, a := item.expectForgetPod, gotForgetPod; !reflect.DeepEqual(e, a) {
-				t.Errorf("forget pod: wanted %v, got %v", e, a)
+			if diff := cmp.Diff(item.expectForgetPod, gotForgetPod); diff != "" {
+				t.Errorf("forget pod diff (-want, +got): %s", diff)
 			}
-			if e, a := item.expectError, gotError; !reflect.DeepEqual(e, a) {
-				t.Errorf("error: wanted %v, got %v", e, a)
+			if diff := cmp.Diff(item.expectError, gotError); diff != "" {
+				t.Errorf("got error diff (-want, +got): %s", diff)
 			}
 			if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
 				t.Errorf("got binding diff (-want, +got): %s", diff)
@@ -886,8 +891,8 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar", UID: types.UID("bar")},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
-		if !reflect.DeepEqual(expectBinding, b) {
-			t.Errorf("binding want=%v, get=%v", expectBinding, b)
+		if diff := cmp.Diff(expectBinding, b); diff != "" {
+			t.Errorf("binding diff (-want, +got): %s", diff)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout in binding after %v", wait.ForeverTestTimeout)
@@ -929,8 +934,8 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				UnschedulablePlugins: sets.New(nodeports.Name),
 			},
 		}
-		if !reflect.DeepEqual(expectErr, err) {
-			t.Errorf("err want=%v, get=%v", expectErr, err)
+		if diff := cmp.Diff(expectErr, err); diff != "" {
+			t.Errorf("err diff (-want, +got): %s", diff)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout in fitting after %v", wait.ForeverTestTimeout)
@@ -956,8 +961,8 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar", UID: types.UID("bar")},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
-		if !reflect.DeepEqual(expectBinding, b) {
-			t.Errorf("binding want=%v, get=%v", expectBinding, b)
+		if diff := cmp.Diff(expectBinding, b); diff != "" {
+			t.Errorf("binding diff (-want, +got): %s", diff)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout in binding after %v", wait.ForeverTestTimeout)
@@ -972,8 +977,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	scache := internalcache.New(ctx, 10*time.Minute)
 
 	// Design the baseline for the pods, and we will make nodes that don't fit it later.
-	var cpu = int64(4)
-	var mem = int64(500)
+	cpu := int64(4)
+	mem := int64(500)
 	podWithTooBigResourceRequests := podWithResources("bar", "", v1.ResourceList{
 		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
 		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
@@ -999,7 +1004,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 					v1.ResourceCPU:    *(resource.NewQuantity(cpu/2, resource.DecimalSI)),
 					v1.ResourceMemory: *(resource.NewQuantity(mem/5, resource.DecimalSI)),
 					v1.ResourcePods:   *(resource.NewQuantity(10, resource.DecimalSI)),
-				}},
+				},
+			},
 		}
 		scache.AddNode(logger, &node)
 		nodes = append(nodes, &node)
@@ -1039,8 +1045,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		if len(fmt.Sprint(expectErr)) > 150 {
 			t.Errorf("message is too spammy ! %v ", len(fmt.Sprint(expectErr)))
 		}
-		if !reflect.DeepEqual(expectErr, err) {
-			t.Errorf("\n err \nWANT=%+v,\nGOT=%+v", expectErr, err)
+		if diff := cmp.Diff(expectErr, err); diff != "" {
+			t.Errorf("err diff (-want, +got): %s", diff)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
@@ -1284,7 +1290,6 @@ func TestSchedulerBinding(t *testing.T) {
 					t.Errorf("got bound with extender #%d: %v, want %v", i, gotBound, wantBound)
 				}
 			}
-
 		})
 	}
 }
@@ -2719,8 +2724,10 @@ func TestZeroRequest(t *testing.T) {
 			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
 			name:  "test priority of zero-request pod with node with zero-request pod",
 			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
+				{Spec: large1},
+				{Spec: noResources1},
+				{Spec: large2},
+				{Spec: small2},
 			},
 			expectedScore: 150,
 		},
@@ -2729,8 +2736,10 @@ func TestZeroRequest(t *testing.T) {
 			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
 			name:  "test priority of nonzero-request pod with node with zero-request pod",
 			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
+				{Spec: large1},
+				{Spec: noResources1},
+				{Spec: large2},
+				{Spec: small2},
 			},
 			expectedScore: 150,
 		},
@@ -2740,8 +2749,10 @@ func TestZeroRequest(t *testing.T) {
 			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
 			name:  "test priority of larger pod with node with zero-request pod",
 			pods: []*v1.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
+				{Spec: large1},
+				{Spec: noResources1},
+				{Spec: large2},
+				{Spec: small2},
 			},
 			expectedScore: 130,
 		},
@@ -2939,7 +2950,6 @@ func Test_prioritizeNodes(t *testing.T) {
 				{
 					Name: "node1",
 					Scores: []framework.PluginScore{
-
 						{
 							Name:  "FakeExtender1",
 							Score: 300,
@@ -3105,7 +3115,8 @@ func Test_prioritizeNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10, imageStatus1...),
+			nodes: []*v1.Node{
+				makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10, imageStatus1...),
 				makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10, imageStatus2...),
 				makeNode("node3", 1000, schedutil.DefaultMemoryRequest*10, imageStatus3...),
 			},
@@ -3459,7 +3470,6 @@ func makeNode(node string, milliCPU, memory int64, images ...v1.ContainerImage) 
 				"pods":            *resource.NewQuantity(100, resource.DecimalSI),
 			},
 			Allocatable: v1.ResourceList{
-
 				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 				"pods":            *resource.NewQuantity(100, resource.DecimalSI),
@@ -3472,7 +3482,8 @@ func makeNode(node string, milliCPU, memory int64, images ...v1.ContainerImage) 
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
-	pod *v1.Pod, node *v1.Node, fns ...tf.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
+	pod *v1.Pod, node *v1.Node, fns ...tf.RegisterPluginFunc,
+) (*Scheduler, chan *v1.Binding, chan error) {
 	scheduler, bindingChan, errChan := setupTestScheduler(ctx, t, queuedPodStore, scache, nil, nil, fns...)
 
 	queuedPodStore.Add(pod)
@@ -3489,8 +3500,8 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queue
 			ObjectMeta: metav1.ObjectMeta{Name: pod.Name, UID: types.UID(pod.Name)},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node.Name},
 		}
-		if !reflect.DeepEqual(expectBinding, b) {
-			t.Errorf("binding want=%v, get=%v", expectBinding, b)
+		if diff := cmp.Diff(expectBinding, b); diff != "" {
+			t.Errorf("unexpected binding (-want, +got): %v", diff)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
@@ -3566,8 +3577,10 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, volu
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")
 	pod.Namespace = "foo-ns"
-	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
-		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+		Name:         "testVol",
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}},
+	})
 	queuedPodStore.Add(pod)
 	scache := internalcache.New(ctx, 10*time.Minute)
 	scache.AddNode(logger, &testNode)
