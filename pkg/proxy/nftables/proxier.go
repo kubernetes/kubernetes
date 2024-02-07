@@ -353,7 +353,7 @@ type nftablesJumpChain struct {
 var nftablesJumpChains = []nftablesJumpChain{
 	// We can't jump to endpointsCheckChain from filter-prerouting like
 	// firewallCheckChain because reject action is only valid in chains using the
-	// input, forward or output hooks.
+	// input, forward or output hooks with kernels before 5.9.
 	{nodePortEndpointsCheckChain, filterInputChain, "ct state new"},
 	{serviceEndpointsCheckChain, filterInputChain, "ct state new"},
 	{serviceEndpointsCheckChain, filterForwardChain, "ct state new"},
