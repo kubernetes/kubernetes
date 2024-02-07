@@ -273,6 +273,8 @@ type servicePortInfo struct {
 	localPolicyChainName   string
 	externalChainName      string
 	firewallChainName      string
+	affinityMapToEPName    string
+	affinityMapToChainName string
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
@@ -289,6 +291,8 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 	svcPort.localPolicyChainName = servicePortPolicyLocalChainNamePrefix + chainNameBase
 	svcPort.externalChainName = serviceExternalChainNamePrefix + chainNameBase
 	svcPort.firewallChainName = servicePortFirewallChainNamePrefix + chainNameBase
+	svcPort.affinityMapToChainName = servicePortAffinityChainMapNamePrefix + chainNameBase
+	svcPort.affinityMapToEPName = servicePortAffinityNamePrefix + chainNameBase
 
 	return svcPort
 }
@@ -297,8 +301,7 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 type endpointInfo struct {
 	*proxy.BaseEndpointInfo
 
-	chainName       string
-	affinitySetName string
+	chainName string
 }
 
 // returns a new proxy.Endpoint which abstracts a endpointInfo
@@ -307,7 +310,6 @@ func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.Servic
 	return &endpointInfo{
 		BaseEndpointInfo: baseInfo,
 		chainName:        servicePortEndpointChainNamePrefix + chainNameBase,
-		affinitySetName:  servicePortEndpointAffinityNamePrefix + chainNameBase,
 	}
 }
 
@@ -852,8 +854,9 @@ const (
 	servicePortPolicyLocalChainNamePrefix   = "local-"
 	serviceExternalChainNamePrefix          = "external-"
 	servicePortEndpointChainNamePrefix      = "endpoint-"
-	servicePortEndpointAffinityNamePrefix   = "affinity-"
 	servicePortFirewallChainNamePrefix      = "firewall-"
+	servicePortAffinityChainMapNamePrefix   = "affinityGotoChain-"
+	servicePortAffinityNamePrefix           = "affinityMapToEP-"
 )
 
 // hashAndTruncate prefixes name with a hash of itself and then truncates to
@@ -947,8 +950,8 @@ func isServiceChainName(chainString string) bool {
 	return strings.Contains(chainString, "/")
 }
 
-func isAffinitySetName(set string) bool {
-	return strings.HasPrefix(set, servicePortEndpointAffinityNamePrefix)
+func isAffinityMapName(set string) bool {
+	return (strings.HasPrefix(set, servicePortAffinityChainMapNamePrefix) || strings.HasPrefix(set, servicePortAffinityNamePrefix))
 }
 
 // This is where all of the nftables calls happen.
@@ -1047,9 +1050,9 @@ func (proxier *Proxier) syncProxyRules() {
 		Name: serviceNodePortsMap,
 	})
 
-	// Accumulate service/endpoint chains and affinity sets to keep.
+	// Accumulate service/endpoint chains and affinity maps to keep.
 	activeChains := sets.New[string]()
-	activeAffinitySets := sets.New[string]()
+	activeAffinityMaps := sets.New[string]()
 
 	// Compute total number of endpoint chains across all services
 	// to get a sense of how big the cluster is.
@@ -1458,7 +1461,36 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-			// Generate the per-endpoint affinity sets
+			// Create a per-service map to store cached source IPs
+			tx.Add(&knftables.Map{
+				Name: svcInfo.affinityMapToEPName,
+				Type: ipvX_addr + " : " + ipvX_addr,
+				Flags: []knftables.SetFlag{
+					knftables.DynamicFlag,
+					knftables.TimeoutFlag,
+				},
+				Comment: ptr.To("map to store known source IPs mapped to respective endpoint IPs"),
+				Timeout: ptr.To(time.Duration(svcInfo.StickyMaxAgeSeconds()) * time.Second),
+			})
+			activeAffinityMaps.Insert(svcInfo.affinityMapToEPName)
+
+			// Create a per-service affinity verdict map
+			tx.Add(&knftables.Map{
+				Name: svcInfo.affinityMapToChainName,
+				Type: ipvX_addr + " : verdict",
+				Flags: []knftables.SetFlag{
+					knftables.DynamicFlag,
+				},
+				Comment: ptr.To("vmap between endpoint IPs and their coresponding endpoint chains"),
+			})
+			activeAffinityMaps.Insert(svcInfo.affinityMapToChainName)
+
+			// Flush all endpoints
+			tx.Flush(&knftables.Map{
+				Name: svcInfo.affinityMapToChainName,
+			})
+
+			// Add available endpoints to the verdict map
 			for _, ep := range allLocallyReachableEndpoints {
 				epInfo, ok := ep.(*endpointInfo)
 				if !ok {
@@ -1466,31 +1498,15 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 
-				// Create a set to store current affinity mappings. As
-				// with the iptables backend, endpoint affinity is
-				// recorded for connections from a particular source IP
-				// (without regard to source port) to a particular
-				// ServicePort (without regard to which service IP was
-				// used to reach the service). This may be changed in the
-				// future.
-				tx.Add(&knftables.Set{
-					Name: epInfo.affinitySetName,
-					Type: ipvX_addr,
-					Flags: []knftables.SetFlag{
-						// The nft docs say "dynamic" is only
-						// needed for sets containing stateful
-						// objects (eg counters), but (at least on
-						// RHEL8) if we create the set without
-						// "dynamic", it later gets mutated to
-						// have it, and then the next attempt to
-						// tx.Add() it here fails because it looks
-						// like we're trying to change the flags.
-						knftables.DynamicFlag,
-						knftables.TimeoutFlag,
+				tx.Add(&knftables.Element{
+					Map: svcInfo.affinityMapToChainName,
+					Key: []string{
+						epInfo.IP(),
 					},
-					Timeout: ptr.To(time.Duration(svcInfo.StickyMaxAgeSeconds()) * time.Second),
+					Value: []string{
+						fmt.Sprintf("goto %s", epInfo.chainName),
+					},
 				})
-				activeAffinitySets.Insert(epInfo.affinitySetName)
 			}
 		}
 
@@ -1530,8 +1546,8 @@ func (proxier *Proxier) syncProxyRules() {
 				tx.Add(&knftables.Rule{
 					Chain: endpointChain,
 					Rule: knftables.Concat(
-						"update", "@", epInfo.affinitySetName,
-						"{", ipX, "saddr", "}",
+						"update", "@", svcInfo.affinityMapToEPName,
+						"{", ipX, "saddr : ", epInfo.IP(), "}",
 					),
 				})
 			}
@@ -1571,18 +1587,18 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.ErrorS(err, "Failed to list nftables chains: stale chains will not be deleted")
 	}
 
-	// OTOH, we can immediately delete any stale affinity sets
-	existingSets, err := proxier.nftables.List(context.TODO(), "sets")
+	// OTOH, we can immediately delete any stale affinity maps
+	existingMaps, err := proxier.nftables.List(context.TODO(), "maps")
 	if err == nil {
-		for _, set := range existingSets {
-			if isAffinitySetName(set) && !activeAffinitySets.Has(set) {
-				tx.Delete(&knftables.Set{
-					Name: set,
+		for _, m := range existingMaps {
+			if isAffinityMapName(m) && !activeAffinityMaps.Has(m) {
+				tx.Delete(&knftables.Map{
+					Name: m,
 				})
 			}
 		}
 	} else if !knftables.IsNotFound(err) {
-		klog.ErrorS(err, "Failed to list nftables sets: stale affinity sets will not be deleted")
+		klog.ErrorS(err, "Failed to list nftables maps: stale affinity maps will not be deleted")
 	}
 
 	// Sync rules.
@@ -1639,20 +1655,31 @@ func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, s
 			ipX = "ip6"
 		}
 
-		for _, ep := range endpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				continue
-			}
+		// Rule to map an known source IP to an endpoint IP.
+		tx.Add(&knftables.Rule{
+			Chain: svcChain,
+			Rule: knftables.Concat(
+				ipX, "daddr set", ipX, "saddr map", "@", svcInfo.affinityMapToEPName,
+			),
+		})
 
-			tx.Add(&knftables.Rule{
-				Chain: svcChain,
-				Rule: knftables.Concat(
-					ipX, "saddr", "@", epInfo.affinitySetName,
-					"goto", epInfo.chainName,
-				),
-			})
-		}
+		// Rule to look up endpoint chain from an endpoint IP.
+		tx.Add(&knftables.Rule{
+			Chain: svcChain,
+			Rule: knftables.Concat(
+				ipX, "daddr vmap", "@", svcInfo.affinityMapToChainName,
+			),
+		})
+
+		// Fallback rule to delete affinity IP associated with an unavailable endpoint IP
+		// due to endpoint scale-in or failure
+		tx.Add(&knftables.Rule{
+			Chain: svcChain,
+			Rule: knftables.Concat(
+				ipX, "daddr !=", svcInfo.ClusterIP(), "delete", "@", svcInfo.affinityMapToEPName, "{", ipX, "saddr : ", ipX, "daddr }",
+			),
+		})
+
 	}
 
 	// Now write loadbalancing rule
