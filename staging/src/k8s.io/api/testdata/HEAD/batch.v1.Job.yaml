@@ -425,6 +425,7 @@ spec:
           mountPropagation: mountPropagationValue
           name: nameValue
           readOnly: true
+          recursiveReadOnly: recursiveReadOnlyValue
           subPath: subPathValue
           subPathExpr: subPathExprValue
         workingDir: workingDirValue
@@ -637,6 +638,7 @@ spec:
           mountPropagation: mountPropagationValue
           name: nameValue
           readOnly: true
+          recursiveReadOnly: recursiveReadOnlyValue
           subPath: subPathValue
           subPathExpr: subPathExprValue
         workingDir: workingDirValue
@@ -849,6 +851,7 @@ spec:
           mountPropagation: mountPropagationValue
           name: nameValue
           readOnly: true
+          recursiveReadOnly: recursiveReadOnlyValue
           subPath: subPathValue
           subPathExpr: subPathExprValue
         workingDir: workingDirValue

@@ -877,6 +877,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ResourceQuotaStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceRequirements"):
 		return &applyconfigurationscorev1.ResourceRequirementsApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("RuntimeClass"):
+		return &applyconfigurationscorev1.RuntimeClassApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("RuntimeClassFeatures"):
+		return &applyconfigurationscorev1.RuntimeClassFeaturesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ScaleIOPersistentVolumeSource"):
 		return &applyconfigurationscorev1.ScaleIOPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ScaleIOVolumeSource"):
@@ -947,6 +951,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.VolumeDeviceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeMount"):
 		return &applyconfigurationscorev1.VolumeMountApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("VolumeMountStatus"):
+		return &applyconfigurationscorev1.VolumeMountStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeNodeAffinity"):
 		return &applyconfigurationscorev1.VolumeNodeAffinityApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeProjection"):
