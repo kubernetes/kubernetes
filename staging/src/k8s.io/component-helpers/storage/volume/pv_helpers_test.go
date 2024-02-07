@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -165,6 +166,11 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 			pv.Spec.StorageClassName = "wait"
 			pv.Spec.NodeAffinity = makeNodeAffinity("key1", "value4")
 		}),
+		makeTestVolume("affinity-pv2-vac", "affinity002-vac", "150G", true, func(pv *v1.PersistentVolume) {
+			pv.Spec.StorageClassName = "wait"
+			pv.Spec.VolumeAttributesClassName = ptr.To("vac")
+			pv.Spec.NodeAffinity = makeNodeAffinity("key1", "value1")
+		}),
 	}
 
 	node1 := &v1.Node{
@@ -193,11 +199,28 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 		claim           *v1.PersistentVolumeClaim
 		node            *v1.Node
 		excludedVolumes map[string]*v1.PersistentVolume
+		vacEnabled      bool
 	}{
 		"success-match": {
 			expectedMatch: "affinity-pv",
 			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:          node1,
+		},
+		"success-match-empty-vac": {
+			vacEnabled:    true,
+			expectedMatch: "affinity-pv",
+			claim: makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.VolumeAttributesClassName = ptr.To("")
+			}),
+			node: node1,
+		},
+		"success-match-vac": {
+			vacEnabled:    true,
+			expectedMatch: "affinity-pv2-vac",
+			claim: makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.VolumeAttributesClassName = ptr.To("vac")
+			}),
+			node: node1,
 		},
 		"success-prebound": {
 			expectedMatch: "affinity-prebound",
@@ -214,12 +237,20 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 			expectedMatch:   "",
 			claim:           makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, nil),
 			node:            node1,
-			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil, "affinity002": nil},
+			excludedVolumes: map[string]*v1.PersistentVolume{"affinity001": nil, "affinity002": nil, "affinity002-vac": nil},
 		},
 		"fail-accessmode": {
 			expectedMatch: "",
 			claim:         makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}, nil),
 			node:          node1,
+		},
+		"fail-nonexistent-vac": {
+			vacEnabled:    true,
+			expectedMatch: "",
+			claim: makeTestPersistentVolumeClaim("claim01", "100G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.VolumeAttributesClassName = ptr.To("nonexistent-vac")
+			}),
+			node: node1,
 		},
 		"fail-nodeaffinity": {
 			expectedMatch: "",
@@ -244,7 +275,7 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		volume, err := FindMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true, false)
+		volume, err := FindMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true, scenario.vacEnabled)
 		if err != nil {
 			t.Errorf("Unexpected error matching volume by claim: %v", err)
 		}
