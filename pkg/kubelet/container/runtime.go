@@ -337,6 +337,8 @@ type ContainerResources struct {
 }
 
 // Status represents the status of a container.
+//
+// Status does not contain VolumeMap because CRI API is unaware of volume names.
 type Status struct {
 	// ID of the container.
 	ID ContainerID
