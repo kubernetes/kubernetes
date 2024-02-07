@@ -242,7 +242,7 @@ func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
 }
 
 // makeMounts determines the mount points for the given container.
-func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain string, podIPs []string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
+func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain string, podIPs []string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar, supportsRRO bool) ([]kubecontainer.Mount, func(), error) {
 	mountEtcHostsFile := shouldMountHostsFile(pod, podIPs)
 	klog.V(3).InfoS("Creating hosts mount for container", "pod", klog.KObj(pod), "containerName", container.Name, "podIPs", podIPs, "path", mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
@@ -343,13 +343,19 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		klog.V(5).InfoS("Mount has propagation", "pod", klog.KObj(pod), "containerName", container.Name, "volumeMountName", mount.Name, "propagation", propagation)
 		mustMountRO := vol.Mounter.GetAttributes().ReadOnly
 
+		rro, err := resolveRecursiveReadOnly(mount, supportsRRO, utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts))
+		if err != nil {
+			return nil, cleanupAction, fmt.Errorf("failed to resolve recursive read-only mode: %w", err)
+		}
+
 		mounts = append(mounts, kubecontainer.Mount{
-			Name:           mount.Name,
-			ContainerPath:  containerPath,
-			HostPath:       hostPath,
-			ReadOnly:       mount.ReadOnly || mustMountRO,
-			SELinuxRelabel: relabelVolume,
-			Propagation:    propagation,
+			Name:              mount.Name,
+			ContainerPath:     containerPath,
+			HostPath:          hostPath,
+			ReadOnly:          mount.ReadOnly || mustMountRO,
+			RecursiveReadOnly: rro,
+			SELinuxRelabel:    relabelVolume,
+			Propagation:       propagation,
 		})
 	}
 	if mountEtcHostsFile {
@@ -554,6 +560,8 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
+	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(pod)
+
 	opts, err := kl.containerManager.GetResources(pod, container)
 	if err != nil {
 		return nil, nil, err
@@ -587,7 +595,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	opts.Envs = append(opts.Envs, envs...)
 
 	// only podIPs is sent to makeMounts, as podIPs is populated even if dual-stack feature flag is not enabled.
-	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs, volumes, kl.hostutil, kl.subpather, opts.Envs)
+	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIPs, volumes, kl.hostutil, kl.subpather, opts.Envs, supportsRRO)
 	if err != nil {
 		return nil, cleanupAction, err
 	}
@@ -2130,6 +2138,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: PodInitializing}}
 	}
 
+	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(pod)
+
 	for _, container := range containers {
 		status := &v1.ContainerStatus{
 			Name:  container.Name,
@@ -2146,6 +2156,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 			if vol.ReadOnly {
 				rroMode := v1.RecursiveReadOnlyDisabled
+				if b, err := resolveRecursiveReadOnly(vol, supportsRRO,
+					utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts)); err != nil {
+					klog.ErrorS(err, "failed to resolve recursive read-only mode", "mode", *vol.RecursiveReadOnly)
+				} else if b {
+					rroMode = v1.RecursiveReadOnlyEnabled
+				}
 				volStatus.RecursiveReadOnly = &rroMode // Disabled or Enabled
 			}
 			status.VolumeMounts = append(status.VolumeMounts, volStatus)
@@ -2432,5 +2448,61 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupP
 		// We ignore errors thrown by the method, as the housekeeping loop would
 		// again try to delete these unwanted pod cgroups
 		go pcm.Destroy(val)
+	}
+}
+
+func (kl *Kubelet) runtimeClassSupportsRecursiveReadOnlyMounts(pod *v1.Pod) bool {
+	var runtimeClassName string
+	if pod.Spec.RuntimeClassName != nil {
+		runtimeClassName = *pod.Spec.RuntimeClassName
+	}
+	rtClasses := kl.runtimeState.runtimeClasses()
+	return runtimeClassSupportsRecursiveReadOnlyMounts(runtimeClassName, rtClasses)
+}
+
+// runtimeClassSupportsRecursiveReadOnlyMounts checks whether the runtime class supports recursive read-only mounts.
+// The kubelet feature gate is not checked here.
+func runtimeClassSupportsRecursiveReadOnlyMounts(runtimeClassName string, runtimeClasses []v1.RuntimeClass) bool {
+	for _, f := range runtimeClasses {
+		if f.Name == runtimeClassName {
+			return f.Features != nil && f.Features.RecursiveReadOnlyMounts != nil && *f.Features.RecursiveReadOnlyMounts
+		}
+	}
+	klog.ErrorS(nil, "unknown runtime class", "runtimeClassName", runtimeClassName)
+	return false
+}
+
+// resolveRecursiveReadOnly resolves the recursive read-only mount mode.
+func resolveRecursiveReadOnly(m v1.VolumeMount, runtimeSupportsRRO, featureGateEnabled bool) (bool, error) {
+	if m.RecursiveReadOnly == nil {
+		return false, nil
+	}
+	switch rroMode := *m.RecursiveReadOnly; rroMode {
+	case v1.RecursiveReadOnlyDisabled:
+		return false, nil
+	case v1.RecursiveReadOnlyIfPossible:
+		propNone := true
+		if m.MountPropagation != nil {
+			propNone = *m.MountPropagation == v1.MountPropagationNone
+		}
+		return featureGateEnabled && runtimeSupportsRRO && m.ReadOnly && propNone, nil
+	case v1.RecursiveReadOnlyEnabled:
+		if !featureGateEnabled {
+			return false, fmt.Errorf("volume %q requested recursive read-only mode, but it is not enabled by kubelet feature gate (%q)",
+				m.Name, features.RecursiveReadOnlyMounts)
+		}
+		if !runtimeSupportsRRO {
+			return false, fmt.Errorf("volume %q requested recursive read-only mode, but it is not supported by the runtime", m.Name)
+		}
+		if !m.ReadOnly {
+			return false, fmt.Errorf("volume %q requested recursive read-only mode, but it is not read-only", m.Name)
+		}
+		if m.MountPropagation != nil && *m.MountPropagation != v1.MountPropagationNone {
+			return false, fmt.Errorf("volume %q requested recursive read-only mode, but it is not compatible with propagation %q",
+				m.Name, *m.MountPropagation)
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf("unknown recursive read-only mode %q", rroMode)
 	}
 }
