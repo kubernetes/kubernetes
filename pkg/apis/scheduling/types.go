@@ -69,7 +69,8 @@ type PriorityClass struct {
 	Description string
 
 	// preemptionPolicy it the Policy for preempting pods with lower priority.
-	// This field is beta-level.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
 	// +optional
 	PreemptionPolicy *core.PreemptionPolicy
 }
