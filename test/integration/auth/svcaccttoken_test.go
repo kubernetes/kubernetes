@@ -237,8 +237,14 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
 		info := doTokenReview(t, cs, treq, false)
+		// we are not testing the credential-id feature, so delete this value from the returned extra info map
 		if info.Extra != nil {
-			t.Fatalf("expected Extra to be nil but got: %#v", info.Extra)
+			if _, ok := info.Extra[apiserverserviceaccount.CredentialIDKey]; ok {
+				delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+			}
+		}
+		if len(info.Extra) > 0 {
+			t.Fatalf("expected Extra to be empty but got: %#v", info.Extra)
 		}
 		delSvcAcct()
 		doTokenReview(t, cs, treq, true)
