@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -402,25 +403,25 @@ func validateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 	}
 	if status.UncountedTerminatedPods != nil {
 		path := fldPath.Child("uncountedTerminatedPods")
-		seen := sets.NewString()
+		seen := sets.New[types.UID]()
 		for i, k := range status.UncountedTerminatedPods.Succeeded {
 			p := path.Child("succeeded").Index(i)
 			if k == "" {
 				allErrs = append(allErrs, field.Invalid(p, k, "must not be empty"))
-			} else if seen.Has(string(k)) {
+			} else if seen.Has(k) {
 				allErrs = append(allErrs, field.Duplicate(p, k))
 			} else {
-				seen.Insert(string(k))
+				seen.Insert(k)
 			}
 		}
 		for i, k := range status.UncountedTerminatedPods.Failed {
 			p := path.Child("failed").Index(i)
 			if k == "" {
 				allErrs = append(allErrs, field.Invalid(p, k, "must not be empty"))
-			} else if seen.Has(string(k)) {
+			} else if seen.Has(k) {
 				allErrs = append(allErrs, field.Duplicate(p, k))
 			} else {
-				seen.Insert(string(k))
+				seen.Insert(k)
 			}
 		}
 	}
