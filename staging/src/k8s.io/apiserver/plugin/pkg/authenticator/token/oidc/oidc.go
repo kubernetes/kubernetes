@@ -221,7 +221,7 @@ var allowedSigningAlgs = map[string]bool{
 	oidc.PS512: true,
 }
 
-func New(opts Options) (*Authenticator, error) {
+func New(opts Options) (authenticator.Token, error) {
 	celMapper, fieldErr := apiservervalidation.CompileAndValidateJWTAuthenticator(opts.JWTAuthenticator)
 	if err := fieldErr.ToAggregate(); err != nil {
 		return nil, err
@@ -313,17 +313,18 @@ func New(opts Options) (*Authenticator, error) {
 		requiredClaims:   requiredClaims,
 	}
 
+	issuerURL := opts.JWTAuthenticator.Issuer.URL
 	if opts.KeySet != nil {
 		// We already have a key set, synchronously initialize the verifier.
 		authenticator.setVerifier(&idTokenVerifier{
-			oidc.NewVerifier(opts.JWTAuthenticator.Issuer.URL, opts.KeySet, verifierConfig),
+			oidc.NewVerifier(issuerURL, opts.KeySet, verifierConfig),
 			audiences,
 		})
 	} else {
 		// Asynchronously attempt to initialize the authenticator. This enables
 		// self-hosted providers, providers that run on top of Kubernetes itself.
 		go wait.PollImmediateUntil(10*time.Second, func() (done bool, err error) {
-			provider, err := oidc.NewProvider(ctx, opts.JWTAuthenticator.Issuer.URL)
+			provider, err := oidc.NewProvider(ctx, issuerURL)
 			if err != nil {
 				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
 				return false, nil
@@ -335,7 +336,7 @@ func New(opts Options) (*Authenticator, error) {
 		}, ctx.Done())
 	}
 
-	return authenticator, nil
+	return newInstrumentedAuthenticator(issuerURL, authenticator), nil
 }
 
 // untrustedIssuer extracts an untrusted "iss" claim from the given JWT token,

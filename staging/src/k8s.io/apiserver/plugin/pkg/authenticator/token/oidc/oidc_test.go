@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 )
@@ -2954,8 +2955,21 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{},
 		},
 	}
+
+	var successTestCount, failureTestCount int
 	for _, test := range tests {
 		t.Run(test.name, test.run)
+		if test.wantSkip || test.wantInitErr != "" {
+			continue
+		}
+		// check metrics for success and failure
+		if test.wantErr == "" {
+			successTestCount++
+			testutil.AssertHistogramTotalCount(t, "apiserver_authentication_jwt_authenticator_latency_seconds", map[string]string{"result": "success"}, successTestCount)
+		} else {
+			failureTestCount++
+			testutil.AssertHistogramTotalCount(t, "apiserver_authentication_jwt_authenticator_latency_seconds", map[string]string{"result": "failure"}, failureTestCount)
+		}
 	}
 }
 
