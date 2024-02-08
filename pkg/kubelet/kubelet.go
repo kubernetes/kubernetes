@@ -843,6 +843,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		keepTerminatedPodVolumes,
 		volumepathhandler.NewBlockVolumePathHandler())
 
+	klet.admitHandlers.AddPodAdmitHandler(klet.volumeManager.GetVolumeAdmitHandler())
+
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	// setup eviction manager

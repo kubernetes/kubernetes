@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/volume/csi"
 
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
@@ -135,6 +136,12 @@ type DesiredStateOfWorld interface {
 	// so as it can be compared against actual size and volume expansion performed
 	// if necessary
 	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size *resource.Quantity)
+
+	// AdmitPodVolumes checks all volumes of a new pod and returns an error if
+	// the Pod's volumes are incompatible with current desired state of the world
+	// (e.g. the new pod is trying to mount a volume that is already mounted by
+	// another pod with different SELinux context.
+	AdmitPodVolumes(pod *v1.Pod, podVolumeInfos *util.PodVolumeInfos) lifecycle.PodAdmitResult
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -648,6 +655,63 @@ func (dsw *desiredStateOfWorld) getUniqueVolumeName(podName types.UniquePodName,
 	// namespace and name and the name of the volume within the pod.
 	volumeName := util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	return volumeName, attachable, deviceMountable, nil
+}
+
+func (dsw *desiredStateOfWorld) AdmitPodVolumes(pod *v1.Pod, podVolumeInfos *util.PodVolumeInfos) lifecycle.PodAdmitResult {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	for _, volume := range pod.Spec.Volumes {
+		volumeInfo, err := podVolumeInfos.GetVolumeInfo(&volume)
+		if err != nil {
+			return lifecycle.PodAdmitResult{
+				Admit:   false,
+				Reason:  "SELinuxCheckFailed",
+				Message: fmt.Sprintf("failed to get volume info for volume %q: %v", volume.Name, err),
+			}
+		}
+
+		if err := dsw.admitVolume(volumeInfo); err != nil {
+			return lifecycle.PodAdmitResult{
+				Admit:   false,
+				Reason:  "SELinuxCheckFailed",
+				Message: err.Error(),
+			}
+		}
+	}
+	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+func (dsw *desiredStateOfWorld) admitVolume(volumeInfo *util.VolumeSpecInfo) error {
+	if !volumeInfo.Mounted {
+		return nil
+	}
+
+	// Check if the pod's volumes are compatible with the current desired state of the world.
+	seLinuxFileLabel, pluginSupportsSELinuxContextMount, err := dsw.getSELinuxLabel(volumeInfo.Spec, volumeInfo.SELinuxContexts)
+	if err != nil {
+		return err
+	}
+	if !pluginSupportsSELinuxContextMount {
+		klog.V(4).Infof("Volume %s admitted, plugin %s does not support SELinux", volumeInfo.Spec.Name(), volumeInfo.VolumePlugin.GetPluginName())
+		return nil
+	}
+
+	volumeName, _, _, err := dsw.getUniqueVolumeName(volumeInfo.PodName, volumeInfo.Spec, volumeInfo.VolumePlugin)
+	if err != nil {
+		return err
+	}
+
+	volumeToMount, volumeExists := dsw.volumesToMount[volumeName]
+	if !volumeExists {
+		klog.V(4).Infof("Volume %s admitted, it's the first pod to use it", volumeInfo.Spec.Name())
+		return nil
+	}
+
+	if volumeToMount.effectiveSELinuxMountFileLabel != seLinuxFileLabel {
+		return fmt.Errorf("volume %q is already used the node by a pod with a different SELinux label", volumeInfo.Spec.Name())
+	}
+	return nil
 }
 
 // Based on isRWOP, bump the right warning / error metric and either consume the error or return it.

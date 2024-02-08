@@ -27,6 +27,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -147,6 +148,10 @@ type VolumeManager interface {
 	// Marks the specified volume as having successfully been reported as "in
 	// use" in the nodes's volume status.
 	MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName)
+
+	// Returns an admit handlers that inspects volumes of a new pod and their
+	// compatibility with the existing volumes.
+	GetVolumeAdmitHandler() lifecycle.PodAdmitHandler
 }
 
 // podStateProvider can determine if a pod is going to be terminated
@@ -517,6 +522,16 @@ func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, e
 			return true, errors.New(strings.Join(errs, "; "))
 		}
 		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
+	}
+}
+
+func (vm *volumeManager) GetVolumeAdmitHandler() lifecycle.PodAdmitHandler {
+	return &volumeAdmitHandler{
+		desiredStateOfWorld:      vm.desiredStateOfWorld,
+		csiMigratedPluginManager: vm.csiMigratedPluginManager,
+		intreeToCSITranslator:    vm.intreeToCSITranslator,
+		volumePluginMgr:          vm.volumePluginMgr,
+		kubeClient:               vm.kubeClient,
 	}
 }
 
