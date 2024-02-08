@@ -613,6 +613,7 @@ func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
 	uid2PodStats := map[string]statsapi.PodStats{}
 	for i := range podStats {
 		uid2PodStats[podStats[i].PodRef.UID] = podStats[i]
+		klog.InfoS("StatsFunc", "i", i, "podStats[i].PodRef.UID", podStats[i].PodRef.UID, "podStats", podStats[i])
 	}
 	return func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		stats, found := uid2PodStats[string(pod.UID)]
