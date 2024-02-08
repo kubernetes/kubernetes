@@ -21,22 +21,16 @@ caches in sync with the "ground truth".
 package populator
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -304,18 +298,22 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	}
 
 	allVolumesAdded := true
-	mounts, devices, seLinuxContainerContexts := util.GetPodVolumeNames(pod)
+	podVolumeInfo := util.NewPodVolumeInfos(
+		pod,
+		dswp.csiMigratedPluginManager,
+		dswp.intreeToCSITranslator,
+		dswp.volumePluginMgr,
+		dswp.kubeClient)
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
-		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
+		if !podVolumeInfo.IsVolumeMounted(podVolume.Name) && !podVolumeInfo.IsVolumeMapped(podVolume.Name) {
 			// Volume is not used in the pod, ignore it.
 			klog.V(4).InfoS("Skipping unused volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 			continue
 		}
 
-		pvc, volumeSpec, volumeGidValue, err :=
-			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
+		volumeInfo, err := podVolumeInfo.GetVolumeInfo(&podVolume)
 		if err != nil {
 			klog.ErrorS(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
@@ -324,14 +322,13 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		}
 
 		// Add volume to desired state of world
-		uniqueVolumeName, err := dswp.desiredStateOfWorld.AddPodToVolume(
-			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue, seLinuxContainerContexts[podVolume.Name])
+		uniqueVolumeName, err := dswp.desiredStateOfWorld.AddPodToVolume(pod, volumeInfo)
 		if err != nil {
-			klog.ErrorS(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
+			klog.ErrorS(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeInfo.Spec.Name())
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
 		} else {
-			klog.V(4).InfoS("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
+			klog.V(4).InfoS("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeInfo.Spec.Name())
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
 			// sync reconstructed volume. This is necessary only when the old-style reconstruction is still used.
@@ -340,7 +337,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			dswp.actualStateOfWorld.SyncReconstructedVolume(uniqueVolumeName, uniquePodName, podVolume.Name)
 		}
 
-		dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec, uniquePodName, mountedVolumesForPod)
+		dswp.checkVolumeFSResize(pod, podVolume, volumeInfo.PVC, volumeInfo.Spec, uniquePodName, mountedVolumesForPod)
 	}
 
 	// some of the volume additions may have failed, should not mark this pod as fully processed
@@ -463,172 +460,4 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 	defer dswp.pods.Unlock()
 
 	delete(dswp.pods.processedPods, podName)
-}
-
-// createVolumeSpec creates and returns a mutable volume.Spec object for the
-// specified volume. It dereference any PVC to get PV objects, if needed.
-// Returns an error if unable to obtain the volume at this time.
-func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.String) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
-	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
-	isEphemeral := pvcSource == nil && podVolume.VolumeSource.Ephemeral != nil
-	if isEphemeral {
-		// Generic ephemeral inline volumes are handled the
-		// same way as a PVC reference. The only additional
-		// constraint (checked below) is that the PVC must be
-		// owned by the pod.
-		pvcSource = &v1.PersistentVolumeClaimVolumeSource{
-			ClaimName: ephemeral.VolumeClaimName(pod, &podVolume),
-		}
-	}
-	if pvcSource != nil {
-		klog.V(5).InfoS("Found PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName))
-		// If podVolume is a PVC, fetch the real PV behind the claim
-		pvc, err := dswp.getPVCExtractPV(
-			pod.Namespace, pvcSource.ClaimName)
-		if err != nil {
-			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %s/%s: %v",
-				pod.Namespace,
-				pvcSource.ClaimName,
-				err)
-		}
-		if isEphemeral {
-			if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
-				return nil, nil, "", err
-			}
-		}
-		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
-		klog.V(5).InfoS("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName)
-		// Fetch actual PV object
-		volumeSpec, volumeGidValue, err :=
-			dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
-		if err != nil {
-			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %s/%s: %v",
-				pod.Namespace,
-				pvcSource.ClaimName,
-				err)
-		}
-		klog.V(5).InfoS("Extracted volumeSpec from bound PV and PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName, "volumeSpecName", volumeSpec.Name())
-		migratable, err := dswp.csiMigratedPluginManager.IsMigratable(volumeSpec)
-		if err != nil {
-			return nil, nil, "", err
-		}
-		if migratable {
-			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, pod.Namespace, dswp.intreeToCSITranslator)
-			if err != nil {
-				return nil, nil, "", err
-			}
-		}
-
-		volumeMode, err := util.GetVolumeMode(volumeSpec)
-		if err != nil {
-			return nil, nil, "", err
-		}
-		// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem.
-		if mounts.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeFilesystem {
-			return nil, nil, "", fmt.Errorf(
-				"volume %s has volumeMode %s, but is specified in volumeMounts",
-				podVolume.Name,
-				volumeMode)
-		}
-		// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
-		if devices.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeBlock {
-			return nil, nil, "", fmt.Errorf(
-				"volume %s has volumeMode %s, but is specified in volumeDevices",
-				podVolume.Name,
-				volumeMode)
-		}
-		return pvc, volumeSpec, volumeGidValue, nil
-	}
-
-	// Do not return the original volume object, since the source could mutate it
-	clonedPodVolume := podVolume.DeepCopy()
-
-	spec := volume.NewSpecFromVolume(clonedPodVolume)
-	migratable, err := dswp.csiMigratedPluginManager.IsMigratable(spec)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	if migratable {
-		spec, err = csimigration.TranslateInTreeSpecToCSI(spec, pod.Namespace, dswp.intreeToCSITranslator)
-		if err != nil {
-			return nil, nil, "", err
-		}
-	}
-	return nil, spec, "", nil
-}
-
-// getPVCExtractPV fetches the PVC object with the given namespace and name from
-// the API server, checks whether PVC is being deleted, extracts the name of the PV
-// it is pointing to and returns it.
-// An error is returned if the PVC object's phase is not "Bound".
-func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
-	namespace string, claimName string) (*v1.PersistentVolumeClaim, error) {
-	pvc, err :=
-		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
-	if err != nil || pvc == nil {
-		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
-	}
-
-	// Pods that uses a PVC that is being deleted must not be started.
-	//
-	// In case an old kubelet is running without this check or some kubelets
-	// have this feature disabled, the worst that can happen is that such
-	// pod is scheduled. This was the default behavior in 1.8 and earlier
-	// and users should not be that surprised.
-	// It should happen only in very rare case when scheduler schedules
-	// a pod and user deletes a PVC that's used by it at the same time.
-	if pvc.ObjectMeta.DeletionTimestamp != nil {
-		return nil, errors.New("PVC is being deleted")
-	}
-
-	if pvc.Status.Phase != v1.ClaimBound {
-		return nil, errors.New("PVC is not bound")
-	}
-	if pvc.Spec.VolumeName == "" {
-		return nil, errors.New("PVC has empty pvc.Spec.VolumeName")
-	}
-
-	return pvc, nil
-}
-
-// getPVSpec fetches the PV object with the given name from the API server
-// and returns a volume.Spec representing it.
-// An error is returned if the call to fetch the PV object fails.
-func (dswp *desiredStateOfWorldPopulator) getPVSpec(
-	name string,
-	pvcReadOnly bool,
-	expectedClaimUID types.UID) (*volume.Spec, string, error) {
-	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil || pv == nil {
-		return nil, "", fmt.Errorf(
-			"failed to fetch PV %s from API server: %v", name, err)
-	}
-
-	if pv.Spec.ClaimRef == nil {
-		return nil, "", fmt.Errorf(
-			"found PV object %s but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
-			name)
-	}
-
-	if pv.Spec.ClaimRef.UID != expectedClaimUID {
-		return nil, "", fmt.Errorf(
-			"found PV object %s but its pv.Spec.ClaimRef.UID %s does not point to claim.UID %s",
-			name,
-			pv.Spec.ClaimRef.UID,
-			expectedClaimUID)
-	}
-
-	volumeGidValue := getPVVolumeGidAnnotationValue(pv)
-	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
-}
-
-func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {
-	if volumeGid, ok := pv.Annotations[util.VolumeGidAnnotationKey]; ok {
-		return volumeGid
-	}
-
-	return ""
 }
