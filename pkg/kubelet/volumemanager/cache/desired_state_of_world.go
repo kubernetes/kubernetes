@@ -265,29 +265,9 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 
 	volumePluginName := getVolumePluginNameWithDriver(volumeInfo.VolumePlugin, volumeInfo.Spec)
 
-	var volumeName v1.UniqueVolumeName
-	var err error
-
-	// The unique volume name used depends on whether the volume is attachable/device-mountable
-	// or not.
-	attachable := util.IsAttachableVolume(volumeInfo.Spec, dsw.volumePluginMgr)
-	deviceMountable := util.IsDeviceMountableVolume(volumeInfo.Spec, dsw.volumePluginMgr)
-	if attachable || deviceMountable {
-		// For attachable/device-mountable volumes, use the unique volume name as reported by
-		// the plugin.
-		volumeName, err =
-			util.GetUniqueVolumeNameFromSpec(volumeInfo.VolumePlugin, volumeInfo.Spec)
-		if err != nil {
-			return "", fmt.Errorf(
-				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
-				volumeInfo.Spec.Name(),
-				volumeInfo.VolumePlugin.GetPluginName(),
-				err)
-		}
-	} else {
-		// For non-attachable and non-device-mountable volumes, generate a unique name based on the pod
-		// namespace and name and the name of the volume within the pod.
-		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(volumeInfo.PodName, volumeInfo.VolumePlugin, volumeInfo.Spec)
+	volumeName, attachable, deviceMountable, err := dsw.getUniqueVolumeName(volumeInfo.PodName, volumeInfo.Spec, volumeInfo.VolumePlugin)
+	if err != nil {
+		return "", err
 	}
 
 	seLinuxFileLabel, pluginSupportsSELinuxContextMount, err := dsw.getSELinuxLabel(volumeInfo.Spec, volumeInfo.SELinuxContexts)
@@ -643,6 +623,31 @@ func (dsw *desiredStateOfWorld) MarkVolumeAttachability(volumeName v1.UniqueVolu
 
 func (dsw *desiredStateOfWorld) getSELinuxMountSupport(volumeSpec *volume.Spec) (bool, error) {
 	return util.SupportsSELinuxContextMount(volumeSpec, dsw.volumePluginMgr)
+}
+
+func (dsw *desiredStateOfWorld) getUniqueVolumeName(podName types.UniquePodName, volumeSpec *volume.Spec, volumePlugin volume.VolumePlugin) (v1.UniqueVolumeName, bool, bool, error) {
+	// The unique volume name used depends on whether the volume is attachable/device-mountable
+	// or not.
+	attachable := util.IsAttachableVolume(volumeSpec, dsw.volumePluginMgr)
+	deviceMountable := util.IsDeviceMountableVolume(volumeSpec, dsw.volumePluginMgr)
+	if attachable || deviceMountable {
+		// For attachable/device-mountable volumes, use the unique volume name as reported by
+		// the plugin.
+		volumeName, err := util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
+		if err != nil {
+			return "", attachable, deviceMountable, fmt.Errorf(
+				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
+				volumeSpec.Name(),
+				volumePlugin.GetPluginName(),
+				err)
+		}
+		return volumeName, attachable, deviceMountable, nil
+	}
+
+	// For non-attachable and non-device-mountable volumes, generate a unique name based on the pod
+	// namespace and name and the name of the volume within the pod.
+	volumeName := util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
+	return volumeName, attachable, deviceMountable, nil
 }
 
 // Based on isRWOP, bump the right warning / error metric and either consume the error or return it.
