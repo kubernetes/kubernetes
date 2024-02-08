@@ -146,6 +146,16 @@ var (
 		},
 		[]string{"resource"},
 	)
+
+	WatchCacheReadWait = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "read_wait_seconds",
+			Help:           "Histogram of time spent waiting for a watch cache to become fresh.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3},
+		}, []string{"resource"})
 )
 
 var registerMetrics sync.Once
@@ -165,6 +175,7 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
 		legacyregistry.MustRegister(WatchCacheInitializations)
+		legacyregistry.MustRegister(WatchCacheReadWait)
 	})
 }
 
