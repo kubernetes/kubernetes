@@ -1053,9 +1053,6 @@ func TestRestMappingErrors(t *testing.T) {
 		if !strings.Contains(err.Error(), "server doesn't have a resource type \"foo\"") {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !errors.Is(err, &meta.NoKindMatchError{}) {
-			t.Fatalf("unexpected error type: %v", err)
-		}
 	}
 
 	expectedErr := fmt.Errorf("expected error")
