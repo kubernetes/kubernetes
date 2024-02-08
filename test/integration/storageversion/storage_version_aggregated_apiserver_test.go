@@ -70,6 +70,9 @@ func TestStorageVersionAPI(t *testing.T) {
 			StorageVersionWrapFunc: storageVersionManagerWrapperFunc(storageVersionManagerConfigAggregatedServer),
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer tearDown()
 
 	signalStorageVersionUpdate(storageVersionManagerConfigAggregatedServer)

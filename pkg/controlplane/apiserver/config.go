@@ -55,6 +55,7 @@ import (
 
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
 func BuildGenericConfig(
+	name string,
 	s controlplaneapiserver.CompletedOptions,
 	schemes []*runtime.Scheme,
 	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
@@ -65,7 +66,7 @@ func BuildGenericConfig(
 
 	lastErr error,
 ) {
-	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs, name)
 	genericConfig.MergedResourceConfig = controlplane.DefaultAPIResourceConfigSource()
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {

@@ -135,7 +135,9 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	}
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
-	fs.Parse(customFlags)
+	if err := fs.Parse(customFlags); err != nil {
+		return result, err
+	}
 
 	if err := s.Complete(); err != nil {
 		return result, fmt.Errorf("failed to set default options: %v", err)

@@ -34,6 +34,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	server "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
@@ -102,7 +103,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs, server.KubeAPIExtensionsAPIServer)
 	if err := o.ServerRunOptions.ApplyTo(&serverConfig.Config); err != nil {
 		return nil, err
 	}

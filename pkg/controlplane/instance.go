@@ -63,6 +63,7 @@ import (
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -312,7 +313,7 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
 	cfg := completedConfig{
-		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
+		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers, nil),
 		&c.ExtraConfig,
 	}
 
@@ -369,7 +370,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
+	s, err := c.GenericConfig.New(server.KubeAPIServer, delegationTarget)
 	if err != nil {
 		return nil, err
 	}
