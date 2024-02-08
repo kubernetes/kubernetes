@@ -279,6 +279,91 @@ func TestSecretCacheWithLargeBookmark(t *testing.T) {
 	}
 }
 
+func TestSecretCacheWithTooOld(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+
+	getCurrentResourceVersion := func() int {
+		return 123
+	}
+
+	secretList := &v1.SecretList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "123",
+		},
+		Items: []v1.Secret{
+			v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "ns", ResourceVersion: "123"},
+			},
+		},
+	}
+
+	listReactor := func(a core.Action) (bool, runtime.Object, error) {
+		if listAction, ok := a.(core.ListActionImpl); ok {
+			listResourceVersion := listAction.ListRestrictions.ResourceVersion
+			if listResourceVersion != "" && listResourceVersion != "0" {
+				resourceVersionInt, err := strconv.Atoi(listResourceVersion)
+				if err != nil {
+					return true, nil, fmt.Errorf("Failed to parse resource version")
+				}
+				if resourceVersionInt < getCurrentResourceVersion() {
+					return true, nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %s (%d)", listResourceVersion, 125))
+				}
+			}
+		}
+
+		return true, secretList, nil
+	}
+	fakeClient.AddReactor("list", "secrets", listReactor)
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+
+	store.AddReference("ns", "name", "pod")
+	_, err := store.Get("ns", "name")
+	if err != nil {
+		t.Errorf("Unexpected error, got: %v", err)
+	}
+
+	// change the bookmark
+	fakeWatch.Action(watch.Bookmark, &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{ResourceVersion: "125"},
+	})
+
+	// stop the reflector
+	fakeClock.Step(90 * time.Second)
+	store.startRecycleIdleWatch()
+
+	// mock secret updated
+	secretList.Items[0].ResourceVersion = "126"
+	getCurrentResourceVersion = func() int {
+		return 126
+	}
+
+	// restart the reflector
+	store.AddReference("ns", "name", "pod")
+
+	// Eventually we should be able to read added secret.
+	getFn := func() (bool, error) {
+		object, err := store.Get("ns", "name")
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		secret := object.(*v1.Secret)
+		if secret == nil || secret.Name != "name" || secret.Namespace != "ns" {
+			return false, fmt.Errorf("unexpected secret: %v", secret)
+		}
+		return true, nil
+	}
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, getFn); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestImmutableSecretStopsTheReflector(t *testing.T) {
 	secret := func(rv string, immutable bool) *v1.Secret {
 		result := &v1.Secret{
