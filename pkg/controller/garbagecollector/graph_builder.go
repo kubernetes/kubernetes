@@ -85,7 +85,7 @@ type GraphBuilder struct {
 	// dependencyGraphBuilder
 	monitors    monitors
 	monitorLock sync.RWMutex
-	// informersStarted is closed after after all of the controllers have been initialized and are running.
+	// informersStarted is closed after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
 
