@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 var nodeLabels = map[string]string{
@@ -212,5 +213,49 @@ func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.VolumeNodeAffinity) *
 		Spec: v1.PersistentVolumeSpec{
 			NodeAffinity: affinity,
 		},
+	}
+}
+
+func TestPersistentVolumeClaimHasClass(t *testing.T) {
+	testCases := []struct {
+		name string
+		pvc  *v1.PersistentVolumeClaim
+		want bool
+	}{
+		{
+			name: "no storage class",
+			pvc:  &v1.PersistentVolumeClaim{},
+			want: false,
+		},
+		{
+			name: "storage class set on annotation",
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.BetaStorageClassAnnotation: "",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "storage class set on spec",
+			pvc: &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: pointer.StringPtr(""),
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := PersistentVolumeClaimHasClass(tc.pvc)
+			if got != tc.want {
+				t.Errorf("PersistentVolumeClaimHasClass() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
