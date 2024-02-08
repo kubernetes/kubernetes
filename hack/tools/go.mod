@@ -8,6 +8,7 @@ require (
 	github.com/client9/misspell v0.3.4
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.55.2
+	github.com/jcchavezs/porto v0.6.0
 	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
 	honnef.co/go/tools v0.4.6
