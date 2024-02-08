@@ -515,7 +515,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir:     "/some/cert/dir",
-					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
@@ -531,7 +531,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir:     "/some/cert/dir",
-					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
@@ -547,7 +547,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir:     "/some/other/cert/dir",
-					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 				},
 			}, false},
 		{"valid InitConfiguration with incorrect IPv4 pod subnet",
@@ -563,7 +563,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						PodSubnet:     "10.0.1.15",
 					},
 					CertificatesDir:     "/some/other/cert/dir",
-					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
@@ -586,7 +586,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						PodSubnet:     "10.0.1.15/16",
 					},
 					CertificatesDir:     "/some/other/cert/dir",
-					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
@@ -608,7 +608,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir:     "/some/other/cert/dir",
-					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSA,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
@@ -1197,11 +1197,13 @@ func TestValidateEtcd(t *testing.T) {
 func TestValidateEncryptionAlgorithm(t *testing.T) {
 	var tests = []struct {
 		name           string
-		algo           string
+		algo           kubeadmapi.EncryptionAlgorithmType
 		expectedErrors bool
 	}{
-		{name: "valid RSA", algo: string(kubeadmapi.EncryptionAlgorithmRSA), expectedErrors: false},
-		{name: "valid ECDSA", algo: string(kubeadmapi.EncryptionAlgorithmECDSA), expectedErrors: false},
+		{name: "valid RSA-2048", algo: kubeadmapi.EncryptionAlgorithmRSA2048, expectedErrors: false},
+		{name: "valid RSA-3072", algo: kubeadmapi.EncryptionAlgorithmRSA3072, expectedErrors: false},
+		{name: "valid RSA-4096", algo: kubeadmapi.EncryptionAlgorithmRSA4096, expectedErrors: false},
+		{name: "valid ECDSA-P256", algo: kubeadmapi.EncryptionAlgorithmECDSAP256, expectedErrors: false},
 		{name: "invalid algorithm", algo: "foo", expectedErrors: true},
 		{name: "empty algorithm returns an error", algo: "", expectedErrors: true},
 	}

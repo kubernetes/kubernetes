@@ -18,7 +18,6 @@ package filters
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -39,7 +38,7 @@ func WithLatencyTrackers(handler http.Handler) http.Handler {
 		ctx := req.Context()
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {
-			handleError(w, req, http.StatusInternalServerError, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
+			handleError(w, req, http.StatusInternalServerError, nil, "no RequestInfo found in context, handler chain must be wrong")
 			return
 		}
 

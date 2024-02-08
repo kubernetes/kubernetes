@@ -114,7 +114,7 @@ function is-explicitly-chosen {
   index=0
   for e in "${TARGET_LIST[@]}"; do
     if [[ "${e}" == "${name}" ]]; then
-      TARGET_LIST[${index}]=""
+      TARGET_LIST[index]=""
       return
     fi
     index=$((index + 1))

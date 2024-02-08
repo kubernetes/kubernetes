@@ -1295,7 +1295,12 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		// pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
 		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceMapPath()
 		// plugins/kubernetes.io/{PluginName}/volumeDevices/{volumePluginDependentPath}/{podUID}
-		globalUnmapPath := volumeToUnmount.DeviceMountPath
+		globalUnmapPath, err := blockVolumeUnmapper.GetGlobalMapPath(volumeToUnmount.VolumeSpec)
+		if err != nil {
+			// On failure, return error. Caller will log and retry.
+			eventErr, detailedErr := volumeToUnmount.GenerateError("UnmapVolume.GetGlobalMapPath failed", err)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
 
 		// Mark the device as uncertain to make sure kubelet calls UnmapDevice again in all the "return err"
 		// cases below. The volume is marked as fully un-mapped at the end of this function, when everything
@@ -2205,6 +2210,14 @@ func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOp
 
 	_, resizeErr := expandableVolumePlugin.NodeExpand(rsOpts)
 	if resizeErr != nil {
+		// This is a workaround for now, until RecoverFromVolumeExpansionFailure feature goes GA.
+		// If RecoverFromVolumeExpansionFailure feature is enabled, we will not ever hit this state, because
+		// we will wait for VolumeExpansionPendingOnNode before trying to expand volume in kubelet.
+		if volumetypes.IsOperationNotSupportedError(resizeErr) {
+			klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.NodeExpandVolume failed", "NodeExpandVolume not supported"), "pod", klog.KObj(volumeToMount.Pod))
+			return true, nil
+		}
+
 		// if driver returned FailedPrecondition error that means
 		// volume expansion should not be retried on this node but
 		// expansion operation should not block mounting

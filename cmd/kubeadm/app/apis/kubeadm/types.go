@@ -147,7 +147,7 @@ type ClusterConfiguration struct {
 	ClusterName string
 
 	// EncryptionAlgorithm holds the type of asymmetric encryption algorithm used for keys and certificates.
-	// Can be "RSA" (default algorithm, key size is 2048) or "ECDSA" (uses the P-256 elliptic curve).
+	// Can be one of "RSA-2048" (default), "RSA-3072", "RSA-4096" or "ECDSA-P256".
 	EncryptionAlgorithm EncryptionAlgorithmType
 }
 
@@ -433,9 +433,9 @@ func (cfg *ClusterConfiguration) EncryptionAlgorithmType() EncryptionAlgorithmTy
 	// TODO: remove this function when the feature gate is removed.
 	if enabled, ok := cfg.FeatureGates[features.PublicKeysECDSA]; ok {
 		if enabled {
-			return EncryptionAlgorithmECDSA
+			return EncryptionAlgorithmECDSAP256
 		}
-		return EncryptionAlgorithmRSA
+		return EncryptionAlgorithmRSA2048
 	}
 	return cfg.EncryptionAlgorithm
 }
@@ -570,10 +570,14 @@ type EnvVar struct {
 type EncryptionAlgorithmType string
 
 const (
-	// EncryptionAlgorithmECDSA defines the ECDSA encryption algorithm type.
-	EncryptionAlgorithmECDSA EncryptionAlgorithmType = "ECDSA"
-	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
-	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
+	// EncryptionAlgorithmECDSAP256 defines the ECDSA encryption algorithm type with curve P256.
+	EncryptionAlgorithmECDSAP256 EncryptionAlgorithmType = "ECDSA-P256"
+	// EncryptionAlgorithmRSA2048 defines the RSA encryption algorithm type with key size 2048 bits.
+	EncryptionAlgorithmRSA2048 EncryptionAlgorithmType = "RSA-2048"
+	// EncryptionAlgorithmRSA3072 defines the RSA encryption algorithm type with key size 3072 bits.
+	EncryptionAlgorithmRSA3072 EncryptionAlgorithmType = "RSA-3072"
+	// EncryptionAlgorithmRSA4096 defines the RSA encryption algorithm type with key size 4096 bits.
+	EncryptionAlgorithmRSA4096 EncryptionAlgorithmType = "RSA-4096"
 )
 
 // Timeouts holds various timeouts that apply to kubeadm commands.

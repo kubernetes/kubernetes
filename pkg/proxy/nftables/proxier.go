@@ -103,51 +103,39 @@ const (
 	masqueradingChain = "masquerading"
 )
 
-// internal struct for string service information
-type servicePortInfo struct {
-	*proxy.BaseServicePortInfo
-	// The following fields are computed and stored for performance reasons.
-	nameString             string
-	clusterPolicyChainName string
-	localPolicyChainName   string
-	externalChainName      string
-	firewallChainName      string
-}
-
-// returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
-	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
-
-	// Store the following for performance reasons.
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
-	svcPort.nameString = svcPortName.String()
-
-	chainNameBase := servicePortChainNameBase(&svcPortName, strings.ToLower(string(svcPort.Protocol())))
-	svcPort.clusterPolicyChainName = servicePortPolicyClusterChainNamePrefix + chainNameBase
-	svcPort.localPolicyChainName = servicePortPolicyLocalChainNamePrefix + chainNameBase
-	svcPort.externalChainName = serviceExternalChainNamePrefix + chainNameBase
-	svcPort.firewallChainName = servicePortFirewallChainNamePrefix + chainNameBase
-
-	return svcPort
-}
-
-// internal struct for endpoints information
-type endpointInfo struct {
-	*proxy.BaseEndpointInfo
-
-	chainName       string
-	affinitySetName string
-}
-
-// returns a new proxy.Endpoint which abstracts a endpointInfo
-func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
-	chainNameBase := servicePortEndpointChainNameBase(svcPortName, strings.ToLower(string(svcPortName.Protocol)), baseInfo.String())
-	return &endpointInfo{
-		BaseEndpointInfo: baseInfo,
-		chainName:        servicePortEndpointChainNamePrefix + chainNameBase,
-		affinitySetName:  servicePortEndpointAffinityNamePrefix + chainNameBase,
+// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
+func NewDualStackProxier(
+	sysctl utilsysctl.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	masqueradeBit int,
+	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
+	hostname string,
+	nodeIPs map[v1.IPFamily]net.IP,
+	recorder events.EventRecorder,
+	healthzServer *healthcheck.ProxierHealthServer,
+	nodePortAddresses []string,
+	initOnly bool,
+) (proxy.Provider, error) {
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, sysctl,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
+		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
+
+	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, sysctl,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
+		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
+	}
+	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // Proxier is an nftables based proxy
@@ -174,6 +162,7 @@ type Proxier struct {
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
+	flushed              bool
 
 	// These are effectively const and do not need the mutex to be held.
 	nftables       knftables.Interface
@@ -276,39 +265,51 @@ func NewProxier(ipFamily v1.IPFamily,
 	return proxier, nil
 }
 
-// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
-func NewDualStackProxier(
-	sysctl utilsysctl.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
-	hostname string,
-	nodeIPs map[v1.IPFamily]net.IP,
-	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
-	nodePortAddresses []string,
-	initOnly bool,
-) (proxy.Provider, error) {
-	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, sysctl,
-		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
-	}
+// internal struct for string service information
+type servicePortInfo struct {
+	*proxy.BaseServicePortInfo
+	// The following fields are computed and stored for performance reasons.
+	nameString             string
+	clusterPolicyChainName string
+	localPolicyChainName   string
+	externalChainName      string
+	firewallChainName      string
+}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, sysctl,
-		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+// returns a new proxy.ServicePort which abstracts a serviceInfo
+func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
+	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
+
+	// Store the following for performance reasons.
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
+	svcPort.nameString = svcPortName.String()
+
+	chainNameBase := servicePortChainNameBase(&svcPortName, strings.ToLower(string(svcPort.Protocol())))
+	svcPort.clusterPolicyChainName = servicePortPolicyClusterChainNamePrefix + chainNameBase
+	svcPort.localPolicyChainName = servicePortPolicyLocalChainNamePrefix + chainNameBase
+	svcPort.externalChainName = serviceExternalChainNamePrefix + chainNameBase
+	svcPort.firewallChainName = servicePortFirewallChainNamePrefix + chainNameBase
+
+	return svcPort
+}
+
+// internal struct for endpoints information
+type endpointInfo struct {
+	*proxy.BaseEndpointInfo
+
+	chainName       string
+	affinitySetName string
+}
+
+// returns a new proxy.Endpoint which abstracts a endpointInfo
+func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+	chainNameBase := servicePortEndpointChainNameBase(svcPortName, strings.ToLower(string(svcPortName.Protocol)), baseInfo.String())
+	return &endpointInfo{
+		BaseEndpointInfo: baseInfo,
+		chainName:        servicePortEndpointChainNamePrefix + chainNameBase,
+		affinitySetName:  servicePortEndpointAffinityNamePrefix + chainNameBase,
 	}
-	if initOnly {
-		return nil, nil
-	}
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // nftablesBaseChains lists our "base chains"; those that are directly connected to the
@@ -352,7 +353,7 @@ type nftablesJumpChain struct {
 var nftablesJumpChains = []nftablesJumpChain{
 	// We can't jump to endpointsCheckChain from filter-prerouting like
 	// firewallCheckChain because reject action is only valid in chains using the
-	// input, forward or output hooks.
+	// input, forward or output hooks with kernels before 5.9.
 	{nodePortEndpointsCheckChain, filterInputChain, "ct state new"},
 	{serviceEndpointsCheckChain, filterInputChain, "ct state new"},
 	{serviceEndpointsCheckChain, filterForwardChain, "ct state new"},
@@ -398,6 +399,20 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	tx.Add(&knftables.Table{
 		Comment: ptr.To("rules for kube-proxy"),
 	})
+
+	// Do an extra "add+delete" once to ensure all previous base chains in the table
+	// will be recreated. Otherwise, altering properties (e.g. priority) of these
+	// chains would fail the transaction.
+	if !proxier.flushed {
+		for _, bc := range nftablesBaseChains {
+			chain := &knftables.Chain{
+				Name: bc.name,
+			}
+			tx.Add(chain)
+			tx.Delete(chain)
+		}
+		proxier.flushed = true
+	}
 
 	// Create and flush base chains
 	for _, bc := range nftablesBaseChains {

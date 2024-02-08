@@ -191,7 +191,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			// Because the detach operation updates the ActualStateOfWorld before
 			// marking itself complete, it's possible for the volume to be removed
 			// from the ActualStateOfWorld between the GetAttachedVolumes() check
-			// and the IsOperationPending() check above.
+			// and the IsOperationSafeToRetry() check above.
 			// Check the ActualStateOfWorld again to avoid issuing an unnecessary
 			// detach.
 			// See https://github.com/kubernetes/kubernetes/issues/93902

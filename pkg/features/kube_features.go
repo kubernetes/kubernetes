@@ -66,6 +66,7 @@ const (
 	// owner: @danwinship
 	// alpha: v1.27
 	// beta: v1.29
+	// GA: v1.30
 	//
 	// Enables dual-stack --node-ip in kubelet with external cloud providers
 	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
@@ -421,15 +422,17 @@ const (
 	// owner: @alexanderConstantinescu
 	// kep: http://kep.k8s.io/3836
 	// alpha: v1.28
+	// beta: v1.30
 	//
 	// Implement connection draining for terminating nodes for
 	// `externalTrafficPolicy: Cluster` services.
 	KubeProxyDrainingTerminatingNodes featuregate.Feature = "KubeProxyDrainingTerminatingNodes"
 
 	// owner: @yt2985
-	// kep: http://kep.k8s.io/2800
+	// kep: http://kep.k8s.io/2799
 	// alpha: v1.28
 	// beta: v1.29
+	// GA: v1.30
 	//
 	// Enables cleaning up of secret-based service account tokens.
 	LegacyServiceAccountTokenCleanUp featuregate.Feature = "LegacyServiceAccountTokenCleanUp"
@@ -748,6 +751,7 @@ const (
 	// owner: @alexanderConstantinescu
 	// kep: http://kep.k8s.io/3458
 	// beta: v1.27
+	// GA: v1.30
 	//
 	// Enables less load balancer re-configurations by the service controller
 	// (KCCM) as an effect of changing node state.
@@ -932,7 +936,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
-	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.Beta},
+	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	ClusterTrustBundle: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1030,7 +1034,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeProxyDrainingTerminatingNodes: {Default: true, PreRelease: featuregate.Beta},
 
-	LegacyServiceAccountTokenCleanUp: {Default: true, PreRelease: featuregate.Beta},
+	LegacyServiceAccountTokenCleanUp: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1112,7 +1116,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
 
-	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.Beta},
+	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30, remove in 1.31
 
 	StatefulSetAutoDeletePVC: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1207,7 +1211,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
-	genericfeatures.ZeroLimitedNominalConcurrencyShares: {Default: false, PreRelease: featuregate.Beta},
+	genericfeatures.ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

@@ -32,7 +32,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -145,22 +144,6 @@ func TestRenewUsingLocalCA(t *testing.T) {
 				return writeTestKubeconfig(t, dir, "admin.conf", testCACert, testCAKey)
 			},
 			expectedOrganization: testCertOrganization,
-		},
-		{
-			name:     "apiserver-etcd-client cert should not contain SystemPrivilegedGroup after renewal",
-			certName: "apiserver-etcd-client",
-			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver-etcd-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
-			},
-			expectedOrganization: []string{},
-		},
-		{
-			name:     "apiserver-kubelet-client cert should replace SystemPrivilegedGroup with ClusterAdminsGroup after renewal",
-			certName: "apiserver-kubelet-client",
-			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver-kubelet-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
-			},
-			expectedOrganization: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 		},
 	}
 

@@ -66,7 +66,7 @@ func Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in *ku
 func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
 	// Required to pass validation and fuzzer tests. The field is missing in v1beta3, thus we have to
 	// default it to a sane (default) value in the internal type.
-	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
+	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
