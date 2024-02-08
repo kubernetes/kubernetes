@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,23 +30,18 @@ import (
 	"github.com/spf13/pflag"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	sserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
 	"k8s.io/sample-apiserver/pkg/cmd/server"
 )
-
-// StorageVersionPostStartHookName is the name of the storage version updater post start hook.
-const StorageVersionPostStartHookName = "built-in-resources-storage-version-updater"
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
@@ -203,6 +198,9 @@ func StartTestAggregatedServer(t Logger, kubeconfig *rest.Config, instanceOption
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 	completedConfig := config.Complete()
+	// check if there's a better way to pass KAS config here
+	completedConfig.GenericConfig.ClientConfig = kubeconfig
+
 	server, err := completedConfig.New()
 	if err != nil {
 		return result, fmt.Errorf("failed to create server: %v", err)
@@ -217,31 +215,6 @@ func StartTestAggregatedServer(t Logger, kubeconfig *rest.Config, instanceOption
 		aggregatedServerOptions.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
-
-	// TODO: chek if this needs to be a part of genericapiserver flow??
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
-		// Spawn a goroutine in aggregator apiserver to update storage version for
-		// all built-in resources
-		server.GenericAPIServer.AddPostStartHookOrDie(StorageVersionPostStartHookName, func(hookContext genericapiserver.PostStartHookContext) error {
-			// TODO: figure out how can we wait for apiserver identity lease to be created here before updating Svs
-			go wait.PollImmediateUntil(10*time.Minute, func() (bool, error) {
-				// All apiservers (aggregator-apiserver, kube-apiserver, apiextensions-apiserver)
-				// share the same generic apiserver config. The same StorageVersion manager is used
-				// to register all built-in resources when the generic apiservers install APIs.
-				server.GenericAPIServer.StorageVersionManager.UpdateStorageVersions(kubeconfig, server.GenericAPIServer.APIServerID)
-				return false, nil
-			}, hookContext.StopCh)
-			// Once the storage version updater finishes the first round of update,
-			// the PostStartHook will return to unblock /healthz. The handler chain
-			// won't block write requests anymore. Check every second since it's not
-			// expensive.
-			wait.PollImmediateUntil(1*time.Second, func() (bool, error) {
-				return server.GenericAPIServer.StorageVersionManager.Completed(), nil
-			}, hookContext.StopCh)
-			return nil
-		})
-	}
 
 	errCh = make(chan error)
 	go func(stopCh <-chan struct{}) {
@@ -269,7 +242,7 @@ func StartTestAggregatedServer(t Logger, kubeconfig *rest.Config, instanceOption
 		if instanceOptions.StorageVersionWrapFunc != nil {
 			// We hardcode the param instead of having a new instanceOptions field
 			// to avoid confusing users with more options.
-			storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
+			storageVersionCheck := fmt.Sprintf("poststarthook/%s-%s", sserver.StorageVersionPostStartHookName, sserver.KubeAggregatedAPIServer)
 			req.Param("exclude", storageVersionCheck)
 		}
 
@@ -286,7 +259,6 @@ func StartTestAggregatedServer(t Logger, kubeconfig *rest.Config, instanceOption
 	}
 
 	// from here the caller must call tearDown
-	result.ClientConfig = server.GenericAPIServer.LoopbackClientConfig
 	result.ServerOpts = aggregatedServerOptions
 	result.TearDownFn = tearDown
 

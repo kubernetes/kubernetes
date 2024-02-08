@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -205,7 +206,7 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 		return []admission.PluginInitializer{wardleinitializer.New(informerFactory)}, nil
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs, server.KubeAggregatedAPIServer)
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(sampleopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "Wardle"
 	serverConfig.OpenAPIConfig.Info.Version = "0.1"

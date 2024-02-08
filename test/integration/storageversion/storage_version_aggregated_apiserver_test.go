@@ -29,7 +29,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/sample-apiserver/test/integration/fixtures"
 )
 
 type storageVersionManagerConfig struct {
@@ -70,6 +69,9 @@ func TestStorageVersionAPI(t *testing.T) {
 			StorageVersionWrapFunc: storageVersionManagerWrapperFunc(storageVersionManagerConfigAggregatedServer),
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer tearDown()
 
 	signalStorageVersionUpdate(storageVersionManagerConfigAggregatedServer)
