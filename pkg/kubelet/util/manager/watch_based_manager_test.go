@@ -19,12 +19,14 @@ package manager
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -199,6 +201,82 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	}
 	actions = fakeClient.Actions()
 	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+}
+
+func TestSecretCacheWithLargeBookmark(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+
+	currentResourceVersion := 123
+	listReactor := func(a core.Action) (bool, runtime.Object, error) {
+		if listAction, ok := a.(core.ListActionImpl); ok {
+			listResourceVersion := listAction.ListRestrictions.ResourceVersion
+			if listResourceVersion != "" {
+				resourceVersionInt, err := strconv.Atoi(listResourceVersion)
+				if err != nil {
+					return true, nil, fmt.Errorf("Failed to parse resource version")
+				}
+				if resourceVersionInt > currentResourceVersion {
+					// mock the "too large resource version" latency
+					time.Sleep(1 * time.Second)
+					return true, nil, errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %d, current: %d", resourceVersionInt, currentResourceVersion), 3)
+				}
+			}
+		}
+		result := &v1.SecretList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: "123",
+			},
+			Items: []v1.Secret{
+				v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "ns", ResourceVersion: "123"},
+				},
+			},
+		}
+		return true, result, nil
+	}
+	fakeClient.AddReactor("list", "secrets", listReactor)
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+
+	store.AddReference("ns", "name", "pod")
+	_, err := store.Get("ns", "name")
+	if err != nil {
+		t.Errorf("Unexpected error, got: %v", err)
+	}
+
+	// change the bookmark
+	fakeWatch.Action(watch.Bookmark, &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{ResourceVersion: "125"},
+	})
+
+	// stop the reflector
+	fakeClock.Step(90 * time.Second)
+	store.startRecycleIdleWatch()
+
+	// restart the reflector, mock connecting to another apiserver with small Bookmark resourceversion
+	store.AddReference("ns", "name", "pod")
+
+	// Eventually we should be able to read added secret.
+	getFn := func() (bool, error) {
+		object, err := store.Get("ns", "name")
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		secret := object.(*v1.Secret)
+		if secret == nil || secret.Name != "name" || secret.Namespace != "ns" {
+			return false, fmt.Errorf("unexpected secret: %v", secret)
+		}
+		return true, nil
+	}
+	if err := wait.PollImmediate(10*time.Millisecond, time.Second, getFn); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 }
 
 func TestImmutableSecretStopsTheReflector(t *testing.T) {
