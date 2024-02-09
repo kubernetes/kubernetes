@@ -19,7 +19,9 @@ package apiserver
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -98,12 +100,15 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	httpStatus := http.StatusOK
-	serviceName := ""
+	httpStatus := 0
+	resourceName := ""
 	extensionApiserverStart := time.Now()
 	ctx := req.Context()
 	defer func() {
-		recordExtensionApiserverMetrics(ctx, httpStatus, extensionApiserverStart, serviceName)
+		if httpStatus == 0 {
+			httpStatus, _ = strconv.Atoi(w.Header().Get("Status"))
+		}
+		recordExtensionApiserverMetrics(ctx, httpStatus, extensionApiserverStart, resourceName)
 	}()
 	value := r.handlingInfo.Load()
 	if value == nil {
@@ -111,7 +116,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	handlingInfo := value.(proxyHandlingInfo)
-	serviceName = handlingInfo.serviceName
+	resourceName = handlingInfo.serviceNamespace + "/" + handlingInfo.serviceName
 	if handlingInfo.local {
 		if r.localDelegate == nil {
 			http.Error(w, "", http.StatusNotFound)
