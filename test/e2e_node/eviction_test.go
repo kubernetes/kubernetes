@@ -619,7 +619,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 		})
 
-		ginkgo.It("wait for the pods to be available in summary stats", func(ctx context.Context) {
+		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
+
+			ginkgo.By("wait for the pods to be available in summary stats")
 			summary := eventuallyGetSummary(ctx)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				if len(summary.Pods) == len(testSpecs) {
@@ -627,8 +629,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				}
 				return fmt.Errorf("Summary Pods %d doesn't match testspecs %d", len(summary.Pods), len(testSpecs))
 			}, podSummaryPeriod, evictionPollInterval).Should(gomega.BeNil())
-		})
-		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
+
 			ginkgo.By("all pods should be created before evictions")
 			expectedLength := len(testSpecs)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -642,6 +643,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					return fmt.Errorf("mismatch of expected pods %d with actual pods %d", expectedLength, len(updatedPodList.Items))
 				}
 			}, podCreationPeriod, evictionPollInterval).Should(gomega.Succeed())
+
 			ginkgo.By(fmt.Sprintf("Waiting for node to have NodeCondition: %s", expectedNodeCondition))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				logFunc(ctx)
