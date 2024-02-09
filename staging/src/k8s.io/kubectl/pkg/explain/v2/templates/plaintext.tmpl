@@ -110,11 +110,8 @@ Takes dictionary as argument with keys:
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
             FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
-<<<<<<< HEAD
-            {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1) -}}{{"\n"}}
-=======
+            {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1) -}}
             {{- template "extractMergeStrategy" (dict "schema" $subschema) -}}
->>>>>>> 02a25bf9e62 (Add merge key and strategy to kubectl explain)
             {{- "\n" -}}
         {{- end -}}
 
@@ -337,7 +334,11 @@ Takes dictionary as argument with keys:
                 {{- else -}}
                     {{- $element -}}
                 {{- end -}}
-        {{- end -}}
+            {{- end -}}
+            {{- /* Move new line in LongView to here, to make it style better if there is no enum defined */ -}}
+            {{- if $.isLongView -}}
+                {{- "\n" -}}
+            {{- end -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}
