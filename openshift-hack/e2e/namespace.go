@@ -28,10 +28,14 @@ func CreateTestingNS(ctx context.Context, baseName string, c kclientset.Interfac
 		baseName = "e2e-" + baseName
 	}
 
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	// turn off the OpenShift label syncer so that it does not attempt to sync
+	// the PodSecurity admission labels
+	labels["security.openshift.io/scc.podSecurityLabelSync"] = "false"
+
 	if isKubeNamespace {
-		if labels == nil {
-			labels = map[string]string{}
-		}
 		labels["security.openshift.io/disable-securitycontextconstraints"] = "true"
 	}
 
