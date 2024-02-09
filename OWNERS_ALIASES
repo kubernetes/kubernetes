@@ -490,6 +490,7 @@ aliases:
   feature-approvers:
     - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
+    - aojea # Network, Testing
     - danwinship # Network
     - dchen1107 # Node
     - deads2k # API Machinery
