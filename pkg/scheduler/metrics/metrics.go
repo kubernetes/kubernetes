@@ -124,7 +124,7 @@ var (
 			// Start with 10ms with the last bucket being [~88m, Inf).
 			Buckets:           metrics.ExponentialBuckets(0.01, 2, 20),
 			StabilityLevel:    metrics.STABLE,
-			DeprecatedVersion: "1.28.0",
+			DeprecatedVersion: "1.29.0",
 		},
 		[]string{"attempts"})
 
