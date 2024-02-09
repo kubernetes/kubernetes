@@ -353,7 +353,7 @@ func (m *kubeGenericRuntimeManager) Status(ctx context.Context) (*kubecontainer.
 	if resp.GetStatus() == nil {
 		return nil, errors.New("runtime status is nil")
 	}
-	return toKubeRuntimeStatus(resp.GetStatus()), nil
+	return toKubeRuntimeStatus(resp.GetStatus(), resp.GetRuntimeHandlers()), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter
