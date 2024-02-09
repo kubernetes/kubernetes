@@ -676,7 +676,7 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1\n    2\n    3"),
+				checkEquals("ENUM:\n    0\n    1\n    2\n    3\n"),
 			},
 		},
 		{
@@ -729,7 +729,7 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1, ...."),
+				checkEquals("ENUM:\n    0\n    1, ....\n"),
 			},
 		},
 		{
@@ -745,7 +745,7 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
+				checkEquals("ENUM:\n    Block\n    File\n    \"\"\n"),
 			},
 		},
 		{
