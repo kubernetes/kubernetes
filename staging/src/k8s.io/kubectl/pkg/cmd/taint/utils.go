@@ -36,7 +36,7 @@ const (
 
 // parseTaints takes a spec which is an array and creates slices for new taints to be added, taints to be deleted.
 // It also validates the spec. For example, the form `<key>` may be used to remove a taint, but not to add one.
-func parseTaints(spec []string) ([]corev1.Taint, []corev1.Taint, error) {
+func ParseTaints(spec []string) ([]corev1.Taint, []corev1.Taint, error) {
 	var taints, taintsToRemove []corev1.Taint
 	uniqueTaints := map[corev1.TaintEffect]sets.String{}
 
