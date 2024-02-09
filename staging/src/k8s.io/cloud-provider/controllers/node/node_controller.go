@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -569,6 +570,30 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 			}
 			n.Labels[v1.LabelFailureDomainBetaRegion] = instanceMeta.Region
 			n.Labels[v1.LabelTopologyRegion] = instanceMeta.Region
+		})
+	}
+
+	if len(instanceMeta.AdditionalLabels) > 0 {
+		klog.V(2).Infof("Adding additional node label(s) from cloud provider: %v", instanceMeta.AdditionalLabels)
+		nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
+			if n.Labels == nil {
+				n.Labels = map[string]string{}
+			}
+
+			k8sNamespaceRegex := regexp.MustCompile("(kubernetes|k8s).io/")
+			for k, v := range instanceMeta.AdditionalLabels {
+				// Cloud provider should not be using kubernetes namespaces in labels
+				if isK8sNamespace := k8sNamespaceRegex.MatchString(k); isK8sNamespace {
+					klog.Warningf("Discarding node label %s with kubernetes namespace", k)
+					continue
+				} else if originalVal, ok := n.Labels[k]; ok {
+					if originalVal != v {
+						klog.Warningf("Discarding node label %s that is already present", k)
+					}
+					continue
+				}
+				n.Labels[k] = v
+			}
 		})
 	}
 
