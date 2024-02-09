@@ -53,7 +53,7 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 	m, err := MakeUserNsManager(testUserNsPodsManager)
 	require.NoError(t, err)
 
-	userns, err := m.GetOrCreateUserNamespaceMappings(nil)
+	userns, err := m.GetOrCreateUserNamespaceMappings(nil, "")
 	assert.NoError(t, err)
 	assert.Nil(t, userns)
 }

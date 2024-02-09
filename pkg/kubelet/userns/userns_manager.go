@@ -49,6 +49,7 @@ const maxPods = 1024
 const mapReInitializeThreshold = 1000
 
 type userNsPodsManager interface {
+	HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error)
 	GetPodDir(podUID types.UID) string
 	ListPodsFromDisk() ([]types.UID, error)
 }
@@ -379,19 +380,40 @@ func (m *UsernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err err
 }
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
+
+	if pod == nil || pod.Spec.HostUsers == nil {
+		// if the feature is enabled, specify to use the node mode...
+		if featureEnabled {
+			return &runtimeapi.UserNamespace{
+				Mode: runtimeapi.NamespaceMode_NODE,
+			}, nil
+		}
+		// ...otherwise don't even specify it
 		return nil, nil
 	}
-
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	if pod.Spec.HostUsers == nil || *pod.Spec.HostUsers {
+	// pod.Spec.HostUsers is set to true/false
+	if !featureEnabled {
+		return nil, fmt.Errorf("the feature gate %q is disabled: can't set spec.HostUsers", features.UserNamespacesSupport)
+	}
+	if *pod.Spec.HostUsers {
 		return &runtimeapi.UserNamespace{
 			Mode: runtimeapi.NamespaceMode_NODE,
 		}, nil
 	}
+
+	// From here onwards, hostUsers=false and the feature gate is enabled.
+
+	// if the pod requested a user namespace and the runtime doesn't support user namespaces then return an error.
+	if handlerSupportsUserns, err := m.kl.HandlerSupportsUserNamespaces(runtimeHandler); err != nil {
+		return nil, err
+	} else if !handlerSupportsUserns {
+		return nil, fmt.Errorf("RuntimeClass handler %q does not support user namespaces", runtimeHandler)
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	content, err := m.readMappingsFromFile(pod.UID)
 	if err != nil && err != utilstore.ErrKeyNotFound {

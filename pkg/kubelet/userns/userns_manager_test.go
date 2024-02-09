@@ -52,6 +52,10 @@ func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 	return m.podList, nil
 }
 
+func (m *testUserNsPodsManager) HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error) {
+	return true, nil
+}
+
 func TestUserNsManagerAllocate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
@@ -232,7 +236,7 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 			m, err := MakeUserNsManager(testUserNsPodsManager)
 			assert.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod)
+			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod, "")
 			if (tc.success && err != nil) || (!tc.success && err == nil) {
 				t.Errorf("expected success: %v but got error: %v", tc.success, err)
 			}
