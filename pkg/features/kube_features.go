@@ -616,6 +616,7 @@ const (
 	// owner: @RomanBednar
 	// kep: https://kep.k8s.io/3762
 	// alpha: v1.28
+	// beta: v1.29
 	//
 	// Adds a new field to persistent volumes which holds a timestamp of when the volume last transitioned its phase.
 	PersistentVolumeLastPhaseTransitionTime featuregate.Feature = "PersistentVolumeLastPhaseTransitionTime"
