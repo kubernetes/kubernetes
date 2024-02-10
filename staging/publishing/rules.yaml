@@ -2392,4 +2392,4 @@ rules:
       - staging/src/k8s.io/endpointslice
 recursive-delete-patterns:
 - '*/.gitattributes'
-default-go-version: 1.21.6
+default-go-version: 1.22.0

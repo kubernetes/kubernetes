@@ -18,4 +18,4 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=example.crd.code-generator.k8s.io
 
-package v1
+package v1 // import "k8s.io/code-generator/examples/crd/apis/example/v1"

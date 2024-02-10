@@ -413,6 +413,124 @@ func TestTypeCheck(t *testing.T) {
 				toContain("found no matching overload for 'allowed' applied to 'kubernetes.authorization.Authorizer"),
 			},
 		},
+		{
+			name: "variables valid",
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
+					{
+						Name:       "works",
+						Expression: "true",
+					},
+				},
+				Validations: []v1beta1.Validation{
+					{
+						Expression: "variables.works",
+					},
+				},
+				MatchConstraints: deploymentPolicy.Spec.MatchConstraints,
+			},
+			},
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"foo": *spec.Int64Property(),
+					},
+				},
+			},
+			assertions: []assertionFunc{toHaveLengthOf(0)},
+		},
+		{
+			name: "variables missing field",
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
+					{
+						Name:       "works",
+						Expression: "true",
+					},
+				},
+				Validations: []v1beta1.Validation{
+					{
+						Expression: "variables.nonExisting",
+					},
+				},
+				MatchConstraints: deploymentPolicy.Spec.MatchConstraints,
+			},
+			},
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"foo": *spec.Int64Property(),
+					},
+				},
+			},
+			assertions: []assertionFunc{
+				toHaveLengthOf(1),
+				toHaveFieldRef("spec.validations[0].expression"),
+				toContain("undefined field 'nonExisting'"),
+			},
+		},
+		{
+			name: "variables field wrong type",
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
+					{
+						Name:       "name",
+						Expression: "'something'",
+					},
+				},
+				Validations: []v1beta1.Validation{
+					{
+						Expression: "variables.name == object.foo", // foo is int64
+					},
+				},
+				MatchConstraints: deploymentPolicy.Spec.MatchConstraints,
+			},
+			},
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"foo": *spec.Int64Property(),
+					},
+				},
+			},
+			assertions: []assertionFunc{
+				toHaveLengthOf(1),
+				toHaveFieldRef("spec.validations[0].expression"),
+				toContain("found no matching overload for '_==_' applied to '(string, int)"),
+			},
+		},
+		{
+			name: "error in variables, not reported during type checking.",
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
+					{
+						Name:       "name",
+						Expression: "object.foo == 'str'",
+					},
+				},
+				Validations: []v1beta1.Validation{
+					{
+						Expression: "variables.name == object.foo", // foo is int64
+					},
+				},
+				MatchConstraints: deploymentPolicy.Spec.MatchConstraints,
+			},
+			},
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"foo": *spec.Int64Property(),
+					},
+				},
+			},
+			assertions: []assertionFunc{
+				toHaveLengthOf(0),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			typeChecker := buildTypeChecker(tc.schemaToReturn)

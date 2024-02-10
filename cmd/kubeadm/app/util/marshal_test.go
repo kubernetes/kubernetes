@@ -431,3 +431,35 @@ func TestGroupVersionKindsHasResetConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupVersionKindsHasClusterConfiguration(t *testing.T) {
+	tests := []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		expected bool
+	}{
+		{
+			name: "does not have ClusterConfiguraiton",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "has ClusterConfiguraiton",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "foo.k8s.io", Version: "v1", Kind: "ClusterConfiguration"},
+			},
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			actual := GroupVersionKindsHasClusterConfiguration(rt.gvks...)
+			if rt.expected != actual {
+				t.Errorf("expected gvks to have a ClusterConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
+	}
+}

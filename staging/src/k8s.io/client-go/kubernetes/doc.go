@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package kubernetes holds packages which implement a clientset for Kubernetes
 // APIs.
-package kubernetes
+package kubernetes // import "k8s.io/client-go/kubernetes"

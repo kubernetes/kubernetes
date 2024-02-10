@@ -19,4 +19,4 @@ limitations under the License.
 // Package scheme contains a runtime.Scheme to be used for serializing
 // and deserializing different versions of Scale, and for converting
 // in between them.
-package scheme
+package scheme // import "k8s.io/client-go/scale/scheme"
