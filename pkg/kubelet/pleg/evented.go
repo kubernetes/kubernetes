@@ -264,8 +264,10 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			}
 			shouldSendPLEGEvent = true
 		} else {
-			if e.cache.Set(podID, status, err, time.Unix(event.GetCreatedAt(), 0)) {
-				shouldSendPLEGEvent = true
+			if event.ContainerEventType != runtimeapi.ContainerEventType_CONTAINER_CREATED_EVENT {
+				if e.cache.Set(podID, status, err, time.Unix(event.GetCreatedAt(), 0)) {
+					shouldSendPLEGEvent = true
+				}
 			}
 		}
 
