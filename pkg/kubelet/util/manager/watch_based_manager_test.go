@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -218,7 +217,7 @@ func TestSecretCacheWithLargeBookmark(t *testing.T) {
 				if resourceVersionInt > currentResourceVersion {
 					// mock the "too large resource version" latency
 					time.Sleep(1 * time.Second)
-					return true, nil, errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %d, current: %d", resourceVersionInt, currentResourceVersion), 3)
+					return true, nil, apierrors.NewTimeoutError(fmt.Sprintf("Too large resource version: %d, current: %d", resourceVersionInt, currentResourceVersion), 3)
 				}
 			}
 		}
@@ -227,7 +226,7 @@ func TestSecretCacheWithLargeBookmark(t *testing.T) {
 				ResourceVersion: "123",
 			},
 			Items: []v1.Secret{
-				v1.Secret{
+				{
 					ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "ns", ResourceVersion: "123"},
 				},
 			},
@@ -291,7 +290,7 @@ func TestSecretCacheWithTooOld(t *testing.T) {
 			ResourceVersion: "123",
 		},
 		Items: []v1.Secret{
-			v1.Secret{
+			{
 				ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "ns", ResourceVersion: "123"},
 			},
 		},
@@ -306,7 +305,7 @@ func TestSecretCacheWithTooOld(t *testing.T) {
 					return true, nil, fmt.Errorf("Failed to parse resource version")
 				}
 				if resourceVersionInt < getCurrentResourceVersion() {
-					return true, nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %s (%d)", listResourceVersion, 125))
+					return true, nil, apierrors.NewResourceExpired(fmt.Sprintf("too old resource version: %s (%d)", listResourceVersion, 125))
 				}
 			}
 		}
