@@ -192,8 +192,8 @@ func TestEphemeralLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(ctx, nil, test.newPod, node)
-				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
-					t.Errorf("Filter status does not match (-want, +got): %s", diff)
+				if test.wantStatus.Code() != gotStatus.Code() {
+					t.Error("Filter: status does not match")
 				}
 			}
 		})

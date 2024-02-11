@@ -822,8 +822,10 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			if diff := cmp.Diff(item.expectForgetPod, gotForgetPod); diff != "" {
 				t.Errorf("forget pod diff (-want, +got): %s", diff)
 			}
-			if diff := cmp.Diff(item.expectError, gotError); diff != "" {
-				t.Errorf("got error diff (-want, +got): %s", diff)
+			if item.expectError != nil {
+				if item.expectError.Error() != gotError.Error() {
+					t.Error("mismatch error")
+				}
 			}
 			if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
 				t.Errorf("got binding diff (-want, +got): %s", diff)

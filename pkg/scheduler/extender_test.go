@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -345,7 +346,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 					return
 				}
-				if diff := cmp.Diff(test.expectedResult, result); diff != "" {
+				if diff := cmp.Diff(test.expectedResult, result, cmpopts.EquateComparable(ScheduleResult{})); diff != "" {
 					t.Errorf("Unexpected result (-want +got):\n%s", diff)
 				}
 			}

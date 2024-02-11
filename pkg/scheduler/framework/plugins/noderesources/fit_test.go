@@ -544,8 +544,11 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterNodeResourcesFit" from cycleState: %w`, framework.ErrNotFound))
-	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
-		t.Errorf("unexpected status (-want, +got):\n%s", diff)
+	if wantStatus.Code() != gotStatus.Code() {
+		t.Error("Filter: status does not match")
+	}
+	if wantStatus.AsError().Error() != gotStatus.AsError().Error() {
+		t.Error("Filter: status does not match")
 	}
 }
 

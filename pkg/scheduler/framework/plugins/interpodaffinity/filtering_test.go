@@ -985,8 +985,11 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterInterPodAffinity" from cycleState: %w`, framework.ErrNotFound))
-	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
-		t.Errorf("status does not match (-want,+got):\n%s", diff)
+	if wantStatus.Code() != gotStatus.Code() {
+		t.Error("Filter: status does not match")
+	}
+	if wantStatus.AsError().Error() != gotStatus.AsError().Error() {
+		t.Error("Filter: status does not match")
 	}
 }
 
@@ -1267,24 +1270,24 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				t.Errorf("failed to get preFilterState from cycleState: %v", err)
 			}
 
-			if diff := cmp.Diff(test.expectedAntiAffinity, newState.antiAffinityCounts); diff != "" {
-				t.Errorf("antiAffinityCounts does not match (-want,+got):\n%s", diff)
+			if !cmp.Equal(test.expectedAntiAffinity, newState.antiAffinityCounts) {
+				t.Error("AntiAffinityCounts does not match")
 			}
 
 			if diff := cmp.Diff(test.expectedAffinity, newState.affinityCounts); diff != "" {
 				t.Errorf("affinityCounts does not match (-want,+got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(allPodsState, state); diff != "" {
-				t.Errorf("State does not match (-want,+got):\n%s", diff)
+			if !cmp.Equal(allPodsState, state, cmp.AllowUnexported(preFilterState{})) {
+				t.Error("State does not match")
 			}
 
 			// Remove the added pod pod and make sure it is equal to the original state.
 			if err := ipa.RemovePod(context.Background(), cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
 				t.Errorf("error removing pod from meta: %v", err)
 			}
-			if diff := cmp.Diff(originalState, state); diff != "" {
-				t.Errorf("State does not match (-want,+got):\n%s", diff)
+			if !cmp.Equal(originalState, state, cmp.AllowUnexported(preFilterState{})) {
+				t.Error("State does not match")
 			}
 		})
 	}
@@ -1310,8 +1313,8 @@ func TestPreFilterStateClone(t *testing.T) {
 	if clone == source {
 		t.Errorf("Clone returned the exact same object!")
 	}
-	if diff := cmp.Diff(clone, source); diff != "" {
-		t.Errorf("Clone does not match (-want,+got):\n%s", diff)
+	if !cmp.Equal(clone, source, cmp.AllowUnexported(preFilterState{})) {
+		t.Error("Clone does not match original")
 	}
 }
 

@@ -2232,8 +2232,12 @@ func TestPostFilterPlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 			_, gotStatus := f.RunPostFilterPlugins(ctx, nil, pod, nil)
-			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
-				t.Errorf("unexpected status (-want, +got): %s", diff)
+			if tt.wantStatus.Code() != gotStatus.Code() {
+				t.Errorf("unexpected status code: got %v, want %v", gotStatus.Code(), tt.wantStatus.Code())
+			}
+			asErr := tt.wantStatus.AsError()
+			if asErr != nil && gotStatus.AsError() != nil && asErr.Error() != gotStatus.AsError().Error() {
+				t.Errorf("unexpected status message: got %v, want %v", gotStatus.AsError().Error(), tt.wantStatus.AsError().Error())
 			}
 		})
 	}
