@@ -228,9 +228,6 @@ func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.TaintEvictionController,
 		initFunc: startTaintEvictionController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.SeparateTaintEvictionController,
-		},
 	}
 }
 
