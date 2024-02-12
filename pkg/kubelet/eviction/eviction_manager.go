@@ -389,7 +389,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return nil, nil
 	}
 
-	klog.InfoS("Eviction manager: pods before ranked for eviction", "pods", klog.KObjSlice(activePods))
+	klog.V(4).InfoS("Eviction manager: pods before ranked for eviction", "pods", klog.KObjSlice(activePods))
 
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
