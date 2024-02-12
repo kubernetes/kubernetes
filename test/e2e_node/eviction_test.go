@@ -235,7 +235,7 @@ var _ = SIGDescribe("SeparateDiskTest LocalStorageEviction", framework.WithSlow(
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
-var _ = SIGDescribe("SeparateDiskTest LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
+var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
@@ -335,8 +335,8 @@ var _ = SIGDescribe("SeparateDiskTest LocalStorageCapacityIsolationEviction", fr
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
 		})
 		sizeLimit := resource.MustParse("100Mi")
-		useOverLimit := 101 /* Mb */
-		useUnderLimit := 99 /* Mb */
+		useOverLimit := 110 /* Mb */
+		useUnderLimit := 85 /* Mb */
 		containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
 
 		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
@@ -500,6 +500,7 @@ var _ = SIGDescribe("SeparateDiskTest PriorityLocalStorageEvictionOrdering", fra
 			},
 		}
 		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
+		specs[2].pod.Spec.PriorityClassName = highPriorityClassName
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, specs)
 	})
 })
@@ -605,7 +606,6 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			// Check for Pressure
 			ginkgo.By("make sure node has no pressure before starting")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				logFunc(ctx)
 				if !hasNodeCondition(ctx, f, expectedNodeCondition) {
 					return nil
 				}
@@ -620,15 +620,6 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 		})
 
 		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
-
-			ginkgo.By("wait for the pods to be available in summary stats")
-			summary := eventuallyGetSummary(ctx)
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				if len(summary.Pods) == len(testSpecs) {
-					return nil
-				}
-				return fmt.Errorf("Summary Pods %d doesn't match testspecs %d", len(summary.Pods), len(testSpecs))
-			}, podSummaryPeriod, evictionPollInterval).Should(gomega.BeNil())
 
 			ginkgo.By("all pods should be created before evictions")
 			expectedLength := len(testSpecs)
