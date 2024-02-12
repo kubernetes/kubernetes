@@ -181,8 +181,8 @@ github.com/fsnotify/fsnotify
 # github.com/fvbommel/sortorder v1.1.0
 ## explicit; go 1.13
 github.com/fvbommel/sortorder
-# github.com/fxamacker/cbor/v2 v2.5.0
-## explicit; go 1.12
+# github.com/fxamacker/cbor/v2 v2.6.0
+## explicit; go 1.17
 github.com/fxamacker/cbor/v2
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14

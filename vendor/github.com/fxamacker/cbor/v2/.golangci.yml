@@ -41,16 +41,17 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+    - bidichk
     - errcheck
     - goconst
     - gocyclo
-    # - gofmt       # handled by safer-golangci-lint.yml
-    # - goimports   # handled by safer-golangci-lint.yml
+    - gofmt
+    - goimports
     - gosec
     - govet
     - ineffassign
     - misspell
-    # - revive      # temporarily disabled to reduce noise in golangci-lint 1.52.2
+    - revive
     - staticcheck
     - typecheck
     - unconvert

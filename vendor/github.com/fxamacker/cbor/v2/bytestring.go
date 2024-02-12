@@ -57,6 +57,7 @@ func (bs *ByteString) UnmarshalCBOR(data []byte) error {
 		return &UnmarshalTypeError{CBORType: typ.String(), GoType: typeByteString.String()}
 	}
 
-	*bs = ByteString(d.parseByteString())
+	b, _ := d.parseByteString()
+	*bs = ByteString(b)
 	return nil
 }

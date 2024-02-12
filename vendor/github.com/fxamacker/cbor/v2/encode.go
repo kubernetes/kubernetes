@@ -110,6 +110,16 @@ func (e *UnsupportedTypeError) Error() string {
 	return "cbor: unsupported type: " + e.Type.String()
 }
 
+// UnsupportedValueError is returned by Marshal when attempting to encode an
+// unsupported value.
+type UnsupportedValueError struct {
+	msg string
+}
+
+func (e *UnsupportedValueError) Error() string {
+	return "cbor: unsupported value: " + e.msg
+}
+
 // SortMode identifies supported sorting order.
 type SortMode int
 
@@ -143,7 +153,28 @@ const (
 )
 
 func (sm SortMode) valid() bool {
-	return sm < maxSortMode
+	return sm >= 0 && sm < maxSortMode
+}
+
+// StringMode specifies how to encode Go string values.
+type StringMode int
+
+const (
+	// StringToTextString encodes Go string to CBOR text string (major type 3).
+	StringToTextString StringMode = iota
+
+	// StringToByteString encodes Go string to CBOR byte string (major type 2).
+	StringToByteString
+)
+
+func (st StringMode) cborType() (cborType, error) {
+	switch st {
+	case StringToTextString:
+		return cborTypeTextString, nil
+	case StringToByteString:
+		return cborTypeByteString, nil
+	}
+	return 0, errors.New("cbor: invalid StringType " + strconv.Itoa(int(st)))
 }
 
 // ShortestFloatMode specifies which floating-point format should
@@ -168,7 +199,7 @@ const (
 )
 
 func (sfm ShortestFloatMode) valid() bool {
-	return sfm < maxShortestFloat
+	return sfm >= 0 && sfm < maxShortestFloat
 }
 
 // NaNConvertMode specifies how to encode NaN and overrides ShortestFloatMode.
@@ -196,7 +227,7 @@ const (
 )
 
 func (ncm NaNConvertMode) valid() bool {
-	return ncm < maxNaNConvert
+	return ncm >= 0 && ncm < maxNaNConvert
 }
 
 // InfConvertMode specifies how to encode Infinity and overrides ShortestFloatMode.
@@ -214,7 +245,7 @@ const (
 )
 
 func (icm InfConvertMode) valid() bool {
-	return icm < maxInfConvert
+	return icm >= 0 && icm < maxInfConvert
 }
 
 // TimeMode specifies how to encode time.Time values.
@@ -241,7 +272,7 @@ const (
 )
 
 func (tm TimeMode) valid() bool {
-	return tm < maxTimeMode
+	return tm >= 0 && tm < maxTimeMode
 }
 
 // BigIntConvertMode specifies how to encode big.Int values.
@@ -261,7 +292,7 @@ const (
 )
 
 func (bim BigIntConvertMode) valid() bool {
-	return bim < maxBigIntConvert
+	return bim >= 0 && bim < maxBigIntConvert
 }
 
 // NilContainersMode specifies how to encode nil slices and maps.
@@ -280,7 +311,50 @@ const (
 )
 
 func (m NilContainersMode) valid() bool {
-	return m < maxNilContainersMode
+	return m >= 0 && m < maxNilContainersMode
+}
+
+// OmitEmptyMode specifies how to encode struct fields with omitempty tag.
+// The default behavior omits if field value would encode as empty CBOR value.
+type OmitEmptyMode int
+
+const (
+	// OmitEmptyCBORValue specifies that struct fields tagged with "omitempty"
+	// should be omitted from encoding if the field would be encoded as an empty
+	// CBOR value, such as CBOR false, 0, 0.0, nil, empty byte, empty string,
+	// empty array, or empty map.
+	OmitEmptyCBORValue OmitEmptyMode = iota
+
+	// OmitEmptyGoValue specifies that struct fields tagged with "omitempty"
+	// should be omitted from encoding if the field has an empty Go value,
+	// defined as false, 0, 0.0, a nil pointer, a nil interface value, and
+	// any empty array, slice, map, or string.
+	// This behavior is the same as the current (aka v1) encoding/json package
+	// included in Go.
+	OmitEmptyGoValue
+
+	maxOmitEmptyMode
+)
+
+func (om OmitEmptyMode) valid() bool {
+	return om >= 0 && om < maxOmitEmptyMode
+}
+
+// FieldNameMode specifies the CBOR type to use when encoding struct field names.
+type FieldNameMode int
+
+const (
+	// FieldNameToTextString encodes struct fields to CBOR text string (major type 3).
+	FieldNameToTextString FieldNameMode = iota
+
+	// FieldNameToTextString encodes struct fields to CBOR byte string (major type 2).
+	FieldNameToByteString
+
+	maxFieldNameMode
+)
+
+func (fnm FieldNameMode) valid() bool {
+	return fnm >= 0 && fnm < maxFieldNameMode
 }
 
 // EncOptions specifies encoding options.
@@ -316,24 +390,34 @@ type EncOptions struct {
 
 	// TagsMd specifies whether to allow CBOR tags (major type 6).
 	TagsMd TagsMode
+
+	// OmitEmptyMode specifies how to encode struct fields with omitempty tag.
+	OmitEmpty OmitEmptyMode
+
+	// String specifies which CBOR type to use when encoding Go strings.
+	// - CBOR text string (major type 3) is default
+	// - CBOR byte string (major type 2)
+	String StringMode
+
+	// FieldName specifies the CBOR type to use when encoding struct field names.
+	FieldName FieldNameMode
 }
 
 // CanonicalEncOptions returns EncOptions for "Canonical CBOR" encoding,
 // defined in RFC 7049 Section 3.9 with the following rules:
 //
-//     1. "Integers must be as small as possible."
-//     2. "The expression of lengths in major types 2 through 5 must be as short as possible."
-//     3. The keys in every map must be sorted in length-first sorting order.
-//        See SortLengthFirst for details.
-//     4. "Indefinite-length items must be made into definite-length items."
-//     5. "If a protocol allows for IEEE floats, then additional canonicalization rules might
-//        need to be added.  One example rule might be to have all floats start as a 64-bit
-//        float, then do a test conversion to a 32-bit float; if the result is the same numeric
-//        value, use the shorter value and repeat the process with a test conversion to a
-//        16-bit float.  (This rule selects 16-bit float for positive and negative Infinity
-//        as well.)  Also, there are many representations for NaN.  If NaN is an allowed value,
-//        it must always be represented as 0xf97e00."
-//
+//  1. "Integers must be as small as possible."
+//  2. "The expression of lengths in major types 2 through 5 must be as short as possible."
+//  3. The keys in every map must be sorted in length-first sorting order.
+//     See SortLengthFirst for details.
+//  4. "Indefinite-length items must be made into definite-length items."
+//  5. "If a protocol allows for IEEE floats, then additional canonicalization rules might
+//     need to be added.  One example rule might be to have all floats start as a 64-bit
+//     float, then do a test conversion to a 32-bit float; if the result is the same numeric
+//     value, use the shorter value and repeat the process with a test conversion to a
+//     16-bit float.  (This rule selects 16-bit float for positive and negative Infinity
+//     as well.)  Also, there are many representations for NaN.  If NaN is an allowed value,
+//     it must always be represented as 0xf97e00."
 func CanonicalEncOptions() EncOptions {
 	return EncOptions{
 		Sort:          SortCanonical,
@@ -347,14 +431,13 @@ func CanonicalEncOptions() EncOptions {
 // CTAP2EncOptions returns EncOptions for "CTAP2 Canonical CBOR" encoding,
 // defined in CTAP specification, with the following rules:
 //
-//     1. "Integers must be encoded as small as possible."
-//     2. "The representations of any floating-point values are not changed."
-//     3. "The expression of lengths in major types 2 through 5 must be as short as possible."
-//     4. "Indefinite-length items must be made into definite-length items.""
-//     5. The keys in every map must be sorted in bytewise lexicographic order.
-//        See SortBytewiseLexical for details.
-//     6. "Tags as defined in Section 2.4 in [RFC7049] MUST NOT be present."
-//
+//  1. "Integers must be encoded as small as possible."
+//  2. "The representations of any floating-point values are not changed."
+//  3. "The expression of lengths in major types 2 through 5 must be as short as possible."
+//  4. "Indefinite-length items must be made into definite-length items.""
+//  5. The keys in every map must be sorted in bytewise lexicographic order.
+//     See SortBytewiseLexical for details.
+//  6. "Tags as defined in Section 2.4 in [RFC7049] MUST NOT be present."
 func CTAP2EncOptions() EncOptions {
 	return EncOptions{
 		Sort:          SortCTAP2,
@@ -369,14 +452,13 @@ func CTAP2EncOptions() EncOptions {
 // CoreDetEncOptions returns EncOptions for "Core Deterministic" encoding,
 // defined in RFC 7049bis with the following rules:
 //
-//     1. "Preferred serialization MUST be used. In particular, this means that arguments
-//        (see Section 3) for integers, lengths in major types 2 through 5, and tags MUST
-//        be as short as possible"
-//        "Floating point values also MUST use the shortest form that preserves the value"
-//     2. "Indefinite-length items MUST NOT appear."
-//     3. "The keys in every map MUST be sorted in the bytewise lexicographic order of
-//        their deterministic encodings."
-//
+//  1. "Preferred serialization MUST be used. In particular, this means that arguments
+//     (see Section 3) for integers, lengths in major types 2 through 5, and tags MUST
+//     be as short as possible"
+//     "Floating point values also MUST use the shortest form that preserves the value"
+//  2. "Indefinite-length items MUST NOT appear."
+//  3. "The keys in every map MUST be sorted in the bytewise lexicographic order of
+//     their deterministic encodings."
 func CoreDetEncOptions() EncOptions {
 	return EncOptions{
 		Sort:          SortCoreDeterministic,
@@ -390,19 +472,18 @@ func CoreDetEncOptions() EncOptions {
 // PreferredUnsortedEncOptions returns EncOptions for "Preferred Serialization" encoding,
 // defined in RFC 7049bis with the following rules:
 //
-//     1. "The preferred serialization always uses the shortest form of representing the argument
-//        (Section 3);"
-//     2. "it also uses the shortest floating-point encoding that preserves the value being
-//        encoded (see Section 5.5)."
-//        "The preferred encoding for a floating-point value is the shortest floating-point encoding
-//        that preserves its value, e.g., 0xf94580 for the number 5.5, and 0xfa45ad9c00 for the
-//        number 5555.5, unless the CBOR-based protocol specifically excludes the use of the shorter
-//        floating-point encodings. For NaN values, a shorter encoding is preferred if zero-padding
-//        the shorter significand towards the right reconstitutes the original NaN value (for many
-//        applications, the single NaN encoding 0xf97e00 will suffice)."
-//     3. "Definite length encoding is preferred whenever the length is known at the time the
-//        serialization of the item starts."
-//
+//  1. "The preferred serialization always uses the shortest form of representing the argument
+//     (Section 3);"
+//  2. "it also uses the shortest floating-point encoding that preserves the value being
+//     encoded (see Section 5.5)."
+//     "The preferred encoding for a floating-point value is the shortest floating-point encoding
+//     that preserves its value, e.g., 0xf94580 for the number 5.5, and 0xfa45ad9c00 for the
+//     number 5555.5, unless the CBOR-based protocol specifically excludes the use of the shorter
+//     floating-point encodings. For NaN values, a shorter encoding is preferred if zero-padding
+//     the shorter significand towards the right reconstitutes the original NaN value (for many
+//     applications, the single NaN encoding 0xf97e00 will suffice)."
+//  3. "Definite length encoding is preferred whenever the length is known at the time the
+//     serialization of the item starts."
 func PreferredUnsortedEncOptions() EncOptions {
 	return EncOptions{
 		Sort:          SortNone,
@@ -495,17 +576,31 @@ func (opts EncOptions) encMode() (*encMode, error) {
 	if opts.TagsMd == TagsForbidden && opts.TimeTag == EncTagRequired {
 		return nil, errors.New("cbor: cannot set TagsMd to TagsForbidden when TimeTag is EncTagRequired")
 	}
+	if !opts.OmitEmpty.valid() {
+		return nil, errors.New("cbor: invalid OmitEmpty " + strconv.Itoa(int(opts.OmitEmpty)))
+	}
+	stringMajorType, err := opts.String.cborType()
+	if err != nil {
+		return nil, err
+	}
+	if !opts.FieldName.valid() {
+		return nil, errors.New("cbor: invalid FieldName " + strconv.Itoa(int(opts.FieldName)))
+	}
 	em := encMode{
-		sort:          opts.Sort,
-		shortestFloat: opts.ShortestFloat,
-		nanConvert:    opts.NaNConvert,
-		infConvert:    opts.InfConvert,
-		bigIntConvert: opts.BigIntConvert,
-		time:          opts.Time,
-		timeTag:       opts.TimeTag,
-		indefLength:   opts.IndefLength,
-		nilContainers: opts.NilContainers,
-		tagsMd:        opts.TagsMd,
+		sort:            opts.Sort,
+		shortestFloat:   opts.ShortestFloat,
+		nanConvert:      opts.NaNConvert,
+		infConvert:      opts.InfConvert,
+		bigIntConvert:   opts.BigIntConvert,
+		time:            opts.Time,
+		timeTag:         opts.TimeTag,
+		indefLength:     opts.IndefLength,
+		nilContainers:   opts.NilContainers,
+		tagsMd:          opts.TagsMd,
+		omitEmpty:       opts.OmitEmpty,
+		stringType:      opts.String,
+		stringMajorType: stringMajorType,
+		fieldName:       opts.FieldName,
 	}
 	return &em, nil
 }
@@ -518,20 +613,24 @@ type EncMode interface {
 }
 
 type encMode struct {
-	tags          tagProvider
-	sort          SortMode
-	shortestFloat ShortestFloatMode
-	nanConvert    NaNConvertMode
-	infConvert    InfConvertMode
-	bigIntConvert BigIntConvertMode
-	time          TimeMode
-	timeTag       EncTagMode
-	indefLength   IndefLengthMode
-	nilContainers NilContainersMode
-	tagsMd        TagsMode
+	tags            tagProvider
+	sort            SortMode
+	shortestFloat   ShortestFloatMode
+	nanConvert      NaNConvertMode
+	infConvert      InfConvertMode
+	bigIntConvert   BigIntConvertMode
+	time            TimeMode
+	timeTag         EncTagMode
+	indefLength     IndefLengthMode
+	nilContainers   NilContainersMode
+	tagsMd          TagsMode
+	omitEmpty       OmitEmptyMode
+	stringType      StringMode
+	stringMajorType cborType
+	fieldName       FieldNameMode
 }
 
-var defaultEncMode = &encMode{}
+var defaultEncMode, _ = EncOptions{}.encMode()
 
 // EncOptions returns user specified options used to create this EncMode.
 func (em *encMode) EncOptions() EncOptions {
@@ -544,7 +643,11 @@ func (em *encMode) EncOptions() EncOptions {
 		Time:          em.time,
 		TimeTag:       em.timeTag,
 		IndefLength:   em.indefLength,
+		NilContainers: em.nilContainers,
 		TagsMd:        em.tagsMd,
+		OmitEmpty:     em.omitEmpty,
+		String:        em.stringType,
+		FieldName:     em.fieldName,
 	}
 }
 
@@ -604,7 +707,7 @@ func putEncoderBuffer(e *encoderBuffer) {
 }
 
 type encodeFunc func(e *encoderBuffer, em *encMode, v reflect.Value) error
-type isEmptyFunc func(v reflect.Value) (empty bool, err error)
+type isEmptyFunc func(em *encMode, v reflect.Value) (empty bool, err error)
 
 var (
 	cborFalse            = []byte{0xf4}
@@ -841,7 +944,7 @@ func encodeString(e *encoderBuffer, em *encMode, v reflect.Value) error {
 		e.Write(b)
 	}
 	s := v.String()
-	encodeHead(e, byte(cborTypeTextString), uint64(len(s)))
+	encodeHead(e, byte(em.stringMajorType), uint64(len(s)))
 	e.WriteString(s)
 	return nil
 }
@@ -871,8 +974,13 @@ func (ae arrayEncodeFunc) encode(e *encoderBuffer, em *encMode, v reflect.Value)
 	return nil
 }
 
+// encodeKeyValueFunc encodes key/value pairs in map (v).
+// If kvs is provided (having the same length as v), length of encoded key and value are stored in kvs.
+// kvs is used for canonical encoding of map.
+type encodeKeyValueFunc func(e *encoderBuffer, em *encMode, v reflect.Value, kvs []keyValue) error
+
 type mapEncodeFunc struct {
-	kf, ef encodeFunc
+	e encodeKeyValueFunc
 }
 
 func (me mapEncodeFunc) encode(e *encoderBuffer, em *encMode, v reflect.Value) error {
@@ -891,16 +999,8 @@ func (me mapEncodeFunc) encode(e *encoderBuffer, em *encMode, v reflect.Value) e
 		return me.encodeCanonical(e, em, v)
 	}
 	encodeHead(e, byte(cborTypeMap), uint64(mlen))
-	iter := v.MapRange()
-	for iter.Next() {
-		if err := me.kf(e, em, iter.Key()); err != nil {
-			return err
-		}
-		if err := me.ef(e, em, iter.Value()); err != nil {
-			return err
-		}
-	}
-	return nil
+
+	return me.e(e, em, v, nil)
 }
 
 type keyValue struct {
@@ -969,26 +1069,17 @@ func putKeyValues(x *[]keyValue) {
 }
 
 func (me mapEncodeFunc) encodeCanonical(e *encoderBuffer, em *encMode, v reflect.Value) error {
-	kve := getEncoderBuffer()     // accumulated cbor encoded key-values
+	kve := getEncoderBuffer() // accumulated cbor encoded key-values
+	defer putEncoderBuffer(kve)
+
 	kvsp := getKeyValues(v.Len()) // for sorting keys
+	defer putKeyValues(kvsp)
+
 	kvs := *kvsp
-	iter := v.MapRange()
-	for i := 0; iter.Next(); i++ {
-		off := kve.Len()
-		if err := me.kf(kve, em, iter.Key()); err != nil {
-			putEncoderBuffer(kve)
-			putKeyValues(kvsp)
-			return err
-		}
-		n1 := kve.Len() - off
-		if err := me.ef(kve, em, iter.Value()); err != nil {
-			putEncoderBuffer(kve)
-			putKeyValues(kvsp)
-			return err
-		}
-		n2 := kve.Len() - off
-		// Save key and keyvalue length to create slice later.
-		kvs[i] = keyValue{keyLen: n1, keyValueLen: n2}
+
+	err := me.e(kve, em, v, kvs)
+	if err != nil {
+		return err
 	}
 
 	b := kve.Bytes()
@@ -1009,8 +1100,6 @@ func (me mapEncodeFunc) encodeCanonical(e *encoderBuffer, em *encMode, v reflect
 		e.Write(kvs[i].keyValueCBORData)
 	}
 
-	putEncoderBuffer(kve)
-	putKeyValues(kvsp)
 	return nil
 }
 
@@ -1061,7 +1150,11 @@ func encodeFixedLengthStruct(e *encoderBuffer, em *encMode, v reflect.Value, fld
 
 	for i := 0; i < len(flds); i++ {
 		f := flds[i]
-		e.Write(f.cborName)
+		if !f.keyAsInt && em.fieldName == FieldNameToByteString {
+			e.Write(f.cborNameByteString)
+		} else { // int or text string
+			e.Write(f.cborName)
+		}
 
 		fv := v.Field(f.idx[0])
 		if err := f.ef(e, em, fv); err != nil {
@@ -1102,9 +1195,8 @@ func encodeStruct(e *encoderBuffer, em *encMode, v reflect.Value) (err error) {
 				continue
 			}
 		}
-
 		if f.omitEmpty {
-			empty, err := f.ief(fv)
+			empty, err := f.ief(em, fv)
 			if err != nil {
 				putEncoderBuffer(kve)
 				return err
@@ -1114,7 +1206,11 @@ func encodeStruct(e *encoderBuffer, em *encMode, v reflect.Value) (err error) {
 			}
 		}
 
-		kve.Write(f.cborName)
+		if !f.keyAsInt && em.fieldName == FieldNameToByteString {
+			kve.Write(f.cborNameByteString)
+		} else { // int or text string
+			kve.Write(f.cborName)
+		}
 
 		if err := f.ef(kve, em, fv); err != nil {
 			putEncoderBuffer(kve)
@@ -1270,19 +1366,7 @@ func encodeTag(e *encoderBuffer, em *encMode, v reflect.Value) error {
 	encodeHead(e, byte(cborTypeTag), t.Number)
 
 	// Marshal tag content
-	if err := encode(e, em, reflect.ValueOf(t.Content)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func encodeSimpleValue(e *encoderBuffer, em *encMode, v reflect.Value) error {
-	if b := em.encTagBytes(v.Type()); b != nil {
-		e.Write(b)
-	}
-	encodeHead(e, byte(cborTypePrimitives), v.Uint())
-	return nil
+	return encode(e, em, reflect.ValueOf(t.Content))
 }
 
 func encodeHead(e *encoderBuffer, t byte, n uint64) {
@@ -1327,7 +1411,7 @@ func getEncodeFuncInternal(t reflect.Type) (encodeFunc, isEmptyFunc) {
 	}
 	switch t {
 	case typeSimpleValue:
-		return encodeSimpleValue, isEmptyUint
+		return encodeMarshalerType, isEmptyUint
 	case typeTag:
 		return encodeTag, alwaysNotEmpty
 	case typeTime:
@@ -1366,12 +1450,11 @@ func getEncodeFuncInternal(t reflect.Type) (encodeFunc, isEmptyFunc) {
 		}
 		return arrayEncodeFunc{f: f}.encode, isEmptySlice
 	case reflect.Map:
-		kf, _ := getEncodeFunc(t.Key())
-		ef, _ := getEncodeFunc(t.Elem())
-		if kf == nil || ef == nil {
+		f := getEncodeMapFunc(t)
+		if f == nil {
 			return nil, nil
 		}
-		return mapEncodeFunc{kf: kf, ef: ef}.encode, isEmptyMap
+		return f, isEmptyMap
 	case reflect.Struct:
 		// Get struct's special field "_" tag options
 		if f, ok := t.FieldByName("_"); ok {
@@ -1409,50 +1492,54 @@ func getEncodeIndirectValueFunc(t reflect.Type) encodeFunc {
 	}
 }
 
-func alwaysNotEmpty(v reflect.Value) (empty bool, err error) {
+func alwaysNotEmpty(_ *encMode, _ reflect.Value) (empty bool, err error) {
 	return false, nil
 }
 
-func isEmptyBool(v reflect.Value) (bool, error) {
+func isEmptyBool(_ *encMode, v reflect.Value) (bool, error) {
 	return !v.Bool(), nil
 }
 
-func isEmptyInt(v reflect.Value) (bool, error) {
+func isEmptyInt(_ *encMode, v reflect.Value) (bool, error) {
 	return v.Int() == 0, nil
 }
 
-func isEmptyUint(v reflect.Value) (bool, error) {
+func isEmptyUint(_ *encMode, v reflect.Value) (bool, error) {
 	return v.Uint() == 0, nil
 }
 
-func isEmptyFloat(v reflect.Value) (bool, error) {
+func isEmptyFloat(_ *encMode, v reflect.Value) (bool, error) {
 	return v.Float() == 0.0, nil
 }
 
-func isEmptyString(v reflect.Value) (bool, error) {
+func isEmptyString(_ *encMode, v reflect.Value) (bool, error) {
 	return v.Len() == 0, nil
 }
 
-func isEmptySlice(v reflect.Value) (bool, error) {
+func isEmptySlice(_ *encMode, v reflect.Value) (bool, error) {
 	return v.Len() == 0, nil
 }
 
-func isEmptyMap(v reflect.Value) (bool, error) {
+func isEmptyMap(_ *encMode, v reflect.Value) (bool, error) {
 	return v.Len() == 0, nil
 }
 
-func isEmptyPtr(v reflect.Value) (bool, error) {
+func isEmptyPtr(_ *encMode, v reflect.Value) (bool, error) {
 	return v.IsNil(), nil
 }
 
-func isEmptyIntf(v reflect.Value) (bool, error) {
+func isEmptyIntf(_ *encMode, v reflect.Value) (bool, error) {
 	return v.IsNil(), nil
 }
 
-func isEmptyStruct(v reflect.Value) (bool, error) {
+func isEmptyStruct(em *encMode, v reflect.Value) (bool, error) {
 	structType, err := getEncodingStructType(v.Type())
 	if err != nil {
 		return false, err
+	}
+
+	if em.omitEmpty == OmitEmptyGoValue {
+		return false, nil
 	}
 
 	if structType.toArray {
@@ -1481,7 +1568,7 @@ func isEmptyStruct(v reflect.Value) (bool, error) {
 			}
 		}
 
-		empty, err := f.ief(fv)
+		empty, err := f.ief(em, fv)
 		if err != nil {
 			return false, err
 		}
@@ -1492,7 +1579,7 @@ func isEmptyStruct(v reflect.Value) (bool, error) {
 	return true, nil
 }
 
-func isEmptyBinaryMarshaler(v reflect.Value) (bool, error) {
+func isEmptyBinaryMarshaler(_ *encMode, v reflect.Value) (bool, error) {
 	m, ok := v.Interface().(encoding.BinaryMarshaler)
 	if !ok {
 		pv := reflect.New(v.Type())
