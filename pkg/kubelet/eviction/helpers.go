@@ -493,7 +493,6 @@ func diskUsage(fsStats *statsapi.FsStats) *resource.Quantity {
 		return &resource.Quantity{Format: resource.BinarySI}
 	}
 	usage := int64(*fsStats.UsedBytes)
-	klog.InfoS("DiskUsage", "diskUsage", usage)
 	return resource.NewQuantity(usage, resource.BinarySI)
 }
 
@@ -503,7 +502,6 @@ func inodeUsage(fsStats *statsapi.FsStats) *resource.Quantity {
 		return &resource.Quantity{Format: resource.DecimalSI}
 	}
 	usage := int64(*fsStats.InodesUsed)
-	klog.InfoS("INodeUsage", "INodeUsage", usage)
 	return resource.NewQuantity(usage, resource.DecimalSI)
 }
 
@@ -513,7 +511,6 @@ func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 		return &resource.Quantity{Format: resource.BinarySI}
 	}
 	usage := int64(*memStats.WorkingSetBytes)
-	klog.InfoS("MemoryUsage", "memoryUsage", usage)
 	return resource.NewQuantity(usage, resource.BinarySI)
 }
 
@@ -523,7 +520,6 @@ func processUsage(processStats *statsapi.ProcessStats) uint64 {
 		return 0
 	}
 	usage := uint64(*processStats.ProcessCount)
-	klog.InfoS("ProcessUsage", "usage", usage)
 	return usage
 }
 
@@ -554,7 +550,6 @@ func containerUsage(podStats statsapi.PodStats, statsToMeasure []fsStatsType) v1
 			inodes.Add(*inodeUsage(container.Logs))
 		}
 	}
-	klog.InfoS("Container Disk Usage", "disk", disk.String(), "inodes", inodes.String())
 	return v1.ResourceList{
 		v1.ResourceEphemeralStorage: disk,
 		resourceInodes:              inodes,
@@ -574,7 +569,6 @@ func podLocalVolumeUsage(volumeNames []string, podStats statsapi.PodStats) v1.Re
 			}
 		}
 	}
-	klog.InfoS("PodLocalVolume", "disk", disk.String(), "inodes", inodes)
 	return v1.ResourceList{
 		v1.ResourceEphemeralStorage: disk,
 		resourceInodes:              inodes,
@@ -596,7 +590,6 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 		disk.Add(podLocalVolumeUsageList[v1.ResourceEphemeralStorage])
 		inodes.Add(podLocalVolumeUsageList[resourceInodes])
 	}
-	klog.InfoS("Pod Disk Usage", "disk", disk.String(), "inodes", inodes.String())
 	return v1.ResourceList{
 		v1.ResourceEphemeralStorage: disk,
 		resourceInodes:              inodes,
@@ -613,7 +606,6 @@ func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
 	uid2PodStats := map[string]statsapi.PodStats{}
 	for i := range podStats {
 		uid2PodStats[podStats[i].PodRef.UID] = podStats[i]
-		klog.InfoS("StatsFunc", "i", i, "podStats[i].PodRef.UID", podStats[i].PodRef.UID, "podStats", podStats[i])
 	}
 	return func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		stats, found := uid2PodStats[string(pod.UID)]
@@ -747,7 +739,6 @@ func process(stats statsFunc) cmpFunc {
 		p1Process := processUsage(p1Stats.ProcessStats)
 		p2Process := processUsage(p2Stats.ProcessStats)
 		// prioritize evicting the pod which has the larger consumption of process
-		klog.InfoS("ProcessStats", "P2Process", p2Process, "P1Process", p1Process)
 		return int(p2Process - p1Process)
 	}
 }
@@ -759,7 +750,7 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
 			// prioritize evicting the pod for which no stats were found
-			klog.V(4).InfoS("NoStatsFound", "P1Found", p1Found, "p2found", p2Found)
+			klog.V(4).InfoS("Error getting stats from pods", "P1Found", p1Found, "p2found", p2Found)
 			return cmpBool(!p1Found, !p2Found)
 		}
 
