@@ -475,6 +475,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 
 	highPriorityClassName := f.BaseName + "-high-priority"
 	highPriority := int32(999999999)
+	processes := 30000
 
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -497,7 +498,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 		specs := []podEvictSpec{
 			{
 				evictionPriority: 2,
-				pod:              pidConsumingPod("fork-bomb-container-with-low-priority", 12000),
+				pod:              pidConsumingPod("fork-bomb-container-with-low-priority", processes),
 			},
 			{
 				evictionPriority: 0,
@@ -505,7 +506,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 			},
 			{
 				evictionPriority: 1,
-				pod:              pidConsumingPod("fork-bomb-container-with-high-priority", 12000),
+				pod:              pidConsumingPod("fork-bomb-container-with-high-priority", processes),
 			},
 		}
 		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
@@ -524,7 +525,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 		specs := []podEvictSpec{
 			{
 				evictionPriority:           1,
-				pod:                        pidConsumingPod("fork-bomb-container", 30000),
+				pod:                        pidConsumingPod("fork-bomb-container", processes),
 				wantPodDisruptionCondition: ptr.To(v1.DisruptionTarget),
 			},
 		}
