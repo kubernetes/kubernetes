@@ -606,7 +606,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			// Check for Pressure
 			ginkgo.By("make sure node has no pressure before starting")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				if !hasNodeCondition(ctx, f, expectedNodeCondition) {
+				if expectedNodeCondition == noPressure || !hasNodeCondition(ctx, f, expectedNodeCondition) {
 					return nil
 				}
 				return fmt.Errorf("NodeCondition: %s encountered", expectedNodeCondition)
@@ -621,12 +621,17 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 
 		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
 
-			ginkgo.By("all pods should be created before evictions")
+			ginkgo.By("all pods should be running before evictions")
 			expectedLength := len(testSpecs)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return fmt.Errorf("Error getting pods %v", err)
+				}
+				for _, pod := range updatedPodList.Items {
+					if pod.Status.Phase != v1.PodRunning {
+						return fmt.Errorf("pods should be running")
+					}
 				}
 				if expectedLength == len(updatedPodList.Items) {
 					return nil
