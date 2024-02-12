@@ -137,7 +137,7 @@ main(){
     mkdir -p "${ARTIFACTS}"
 
     export GO111MODULE=on;
-    go install sigs.k8s.io/kind@v0.17.0;
+    go install sigs.k8s.io/kind@latest;
     go install sigs.k8s.io/kubetest2@latest;
     go install sigs.k8s.io/kubetest2/kubetest2-kind@latest;
     go install sigs.k8s.io/kubetest2/kubetest2-tester-ginkgo@latest;
