@@ -142,7 +142,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 			result.Memory.AvailableBytes = &stats.Memory.AvailableBytes.Value
 		}
 		if stats.Memory.PageFaults != nil {
-			result.Memory.AvailableBytes = &stats.Memory.PageFaults.Value
+			result.Memory.PageFaults = &stats.Memory.PageFaults.Value
 		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
