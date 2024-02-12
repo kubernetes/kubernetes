@@ -47,7 +47,6 @@ import (
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
-	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/resize"
@@ -68,7 +67,6 @@ var AllOrderedPlugins = []string{
 	autoprovision.PluginName,                // NamespaceAutoProvision
 	lifecycle.PluginName,                    // NamespaceLifecycle
 	exists.PluginName,                       // NamespaceExists
-	scdeny.PluginName,                       // SecurityContextDeny
 	antiaffinity.PluginName,                 // LimitPodHardAntiAffinityTopology
 	limitranger.PluginName,                  // LimitRanger
 	serviceaccount.PluginName,               // ServiceAccount
@@ -132,7 +130,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	resourcequota.Register(plugins)
 	podsecurity.Register(plugins)
 	podpriority.Register(plugins)
-	scdeny.Register(plugins)
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
 	resize.Register(plugins)

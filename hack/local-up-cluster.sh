@@ -30,7 +30,6 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 export DOCKER=(docker "${DOCKER_OPTS[@]}")
 DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
-DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
@@ -509,14 +508,6 @@ function generate_kubelet_certs {
 }
 
 function start_apiserver {
-    security_admission=""
-    if [[ -n "${DENY_SECURITY_CONTEXT_ADMISSION}" ]]; then
-      security_admission=",SecurityContextDeny"
-    fi
-
-    # Append security_admission plugin
-    ENABLE_ADMISSION_PLUGINS="${ENABLE_ADMISSION_PLUGINS}${security_admission}"
-
     authorizer_args=()
     if [[ -n "${AUTHORIZATION_CONFIG:-}" ]]; then
       authorizer_args+=("--authorization-config=${AUTHORIZATION_CONFIG}")

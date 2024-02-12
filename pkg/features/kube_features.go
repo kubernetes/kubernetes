@@ -677,14 +677,6 @@ const (
 	// which benefits to reduce the useless requeueing.
 	SchedulerQueueingHints featuregate.Feature = "SchedulerQueueingHints"
 
-	// owner: @mtardy
-	// alpha: v1.0
-	//
-	// Putting this admission plugin behind a feature gate is part of the
-	// deprecation process. For details about the removal see:
-	// https://github.com/kubernetes/kubernetes/issues/111516
-	SecurityContextDeny featuregate.Feature = "SecurityContextDeny"
-
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	// beta: v1.29
@@ -1097,8 +1089,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ElasticIndexedJob: {Default: true, PreRelease: featuregate.Beta},
 
 	SchedulerQueueingHints: {Default: false, PreRelease: featuregate.Beta},
-
-	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
 	SeparateTaintEvictionController: {Default: true, PreRelease: featuregate.Beta},
 
