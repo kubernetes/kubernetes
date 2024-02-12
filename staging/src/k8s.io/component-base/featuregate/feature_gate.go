@@ -203,7 +203,7 @@ func (f *featureGate) Set(value string) error {
 		v := strings.TrimSpace(arr[1])
 		boolValue, err := strconv.ParseBool(v)
 		if err != nil {
-			return fmt.Errorf("invalid value of %s=%s, err: %v", k, v, err)
+			return fmt.Errorf("invalid value of %s=%s, err: %w", k, v, err)
 		}
 		m[k] = boolValue
 	}

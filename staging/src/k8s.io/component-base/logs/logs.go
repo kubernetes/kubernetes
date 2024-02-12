@@ -194,7 +194,7 @@ func GlogSetter(val string) (string, error) {
 
 	var level klog.Level
 	if err := level.Set(val); err != nil {
-		return "", fmt.Errorf("failed set klog.logging.verbosity %s: %v", val, err)
+		return "", fmt.Errorf("failed set klog.logging.verbosity %s: %w", val, err)
 	}
 
 	setverbositylevel.Mutex.Lock()

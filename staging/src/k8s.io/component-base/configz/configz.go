@@ -116,7 +116,7 @@ func write(w http.ResponseWriter) error {
 		b, err = json.Marshal(configs)
 	}()
 	if err != nil {
-		return fmt.Errorf("error marshaling json: %v", err)
+		return fmt.Errorf("error marshaling json: %w", err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Content-Type-Options", "nosniff")

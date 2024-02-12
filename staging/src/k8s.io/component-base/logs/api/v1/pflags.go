@@ -63,7 +63,7 @@ func (wrapper vmoduleConfigurationPFlag) Set(value string) error {
 		// 31 instead of 32 to ensure that it also fits into int32.
 		v, err := strconv.ParseUint(patLev[1], 10, 31)
 		if err != nil {
-			return fmt.Errorf("parsing verbosity in %q: %v", pat, err)
+			return fmt.Errorf("parsing verbosity in %q: %w", pat, err)
 		}
 		*wrapper.value = append(*wrapper.value, VModuleItem{FilePattern: pattern, Verbosity: VerbosityLevel(v)})
 	}

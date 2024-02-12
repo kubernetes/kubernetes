@@ -72,7 +72,7 @@ var testingFuncs = map[string]testingFunc{
 func VerifyExternalTypePackage(pkginfo *ComponentConfigPackage) error {
 	scheme, err := setup(pkginfo)
 	if err != nil {
-		return fmt.Errorf("test setup error: %v", err)
+		return fmt.Errorf("test setup error: %w", err)
 	}
 	extraFns := map[string]testingFunc{
 		verifyExternalAPIVersion: verifyExternalAPIVersionFunc,
@@ -90,7 +90,7 @@ func VerifyExternalTypePackage(pkginfo *ComponentConfigPackage) error {
 func VerifyInternalTypePackage(pkginfo *ComponentConfigPackage) error {
 	scheme, err := setup(pkginfo)
 	if err != nil {
-		return fmt.Errorf("test setup error: %v", err)
+		return fmt.Errorf("test setup error: %w", err)
 	}
 	extraFns := map[string]testingFunc{
 		verifyInternalAPIVersion:        verifyInternalAPIVersionFunc,
@@ -109,7 +109,7 @@ func setup(pkginfo *ComponentConfigPackage) (*runtime.Scheme, error) {
 
 	scheme := runtime.NewScheme()
 	if err := pkginfo.AddToScheme(scheme); err != nil {
-		return nil, fmt.Errorf("AddToScheme must not return an error: %v", err)
+		return nil, fmt.Errorf("AddToScheme must not return an error: %w", err)
 	}
 	if len(scheme.AllKnownTypes()) == 0 {
 		return nil, fmt.Errorf("AddToScheme doesn't register any type")

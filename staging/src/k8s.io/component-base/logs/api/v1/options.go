@@ -257,10 +257,10 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 		klog.SetLoggerWithOptions(log, klog.ContextualLogger(p.ContextualLoggingEnabled), klog.FlushLogger(control.Flush))
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(VerbosityLevelPflag(&c.Verbosity).String()); err != nil {
-		return fmt.Errorf("internal error while setting klog verbosity: %v", err)
+		return fmt.Errorf("internal error while setting klog verbosity: %w", err)
 	}
 	if err := loggingFlags.Lookup("vmodule").Value.Set(VModuleConfigurationPflag(&c.VModule).String()); err != nil {
-		return fmt.Errorf("internal error while setting klog vmodule: %v", err)
+		return fmt.Errorf("internal error while setting klog vmodule: %w", err)
 	}
 	klog.StartFlushDaemon(c.FlushFrequency.Duration.Duration)
 	klog.EnableContextualLogging(p.ContextualLoggingEnabled)
@@ -291,7 +291,7 @@ func ResetForTest(featureGate featuregate.FeatureGate) error {
 	// Restore defaults. Shouldn't fail, but check anyway.
 	config := NewLoggingConfiguration()
 	if err := ValidateAndApply(config, featureGate); err != nil {
-		return fmt.Errorf("apply default configuration: %v", err)
+		return fmt.Errorf("apply default configuration: %w", err)
 	}
 
 	// And again...

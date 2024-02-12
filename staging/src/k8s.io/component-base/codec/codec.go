@@ -31,7 +31,7 @@ func NewLenientSchemeAndCodecs(addToSchemeFns ...func(s *runtime.Scheme) error) 
 	lenientScheme := runtime.NewScheme()
 	for _, s := range addToSchemeFns {
 		if err := s(lenientScheme); err != nil {
-			return nil, nil, fmt.Errorf("unable to add API to lenient scheme: %v", err)
+			return nil, nil, fmt.Errorf("unable to add API to lenient scheme: %w", err)
 		}
 	}
 	lenientCodecs := serializer.NewCodecFactory(lenientScheme, serializer.DisableStrict)
