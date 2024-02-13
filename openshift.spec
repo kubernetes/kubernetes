@@ -69,15 +69,47 @@ Kubernetes allowing you to safely host many different applications and workloads
 on a unified cluster.
 
 %package hyperkube
-Summary:        OpenShift Kubernetes server commands
+Summary:        OpenShift Kubernetes server commands, via deps
 Requires:       util-linux
 Requires:       socat
 Requires:       iptables
+Requires:       hyperkube-kube-scheduler = %{version}
+Requires:       hyperkube-kube-kubelet = %{version}
+Requires:       hyperkube-kube-controller-manager = %{version}
+Requires:       hyperkube-kube-apiserver = %{version}
 Provides:       hyperkube = %{version}
 Obsoletes:      atomic-openshift-hyperkube <= %{version}
 Obsoletes:      atomic-openshift-node <= %{version}
 
+%package hyperkube-kube-scheduler
+Summary:        OpenShift Kubernetes Scheduler
+Provides:       hyperkube-kube-scheduler = %{version}
+
+%package hyperkube-kubelet
+Summary:        OpenShift Kubernetes Kubelet
+Provides:       hyperkube-kube-kubelet = %{version}
+
+%package hyperkube-kube-controller-manager
+Summary:        OpenShift Kubernetes Controller Manager
+Provides:       hyperkube-kube-controller-manager = %{version}
+
+%package hyperkube-kube-apiserver
+Summary:        OpenShift Kubernetes API Server
+Provides:       hyperkube-kube-apiserver = %{version}
+
 %description hyperkube
+%{summary}
+
+%description hyperkube-kube-scheduler
+%{summary}
+
+%description hyperkube-kubelet
+%{summary}
+
+%description hyperkube-kube-controller-manager
+%{summary}
+
+%description hyperkube-kube-apiserver
 %{summary}
 
 %prep
@@ -126,12 +158,23 @@ install -p -m 755 openshift-hack/sysctls/50-kubelet.conf %{buildroot}%{_sysctldi
 %files hyperkube
 %license LICENSE
 %{_bindir}/hyperkube
-%{_bindir}/kube-apiserver
-%{_bindir}/kube-controller-manager
-%{_bindir}/kube-scheduler
+%defattr(-,root,root,0700)
+
+%files hyperkube-kubelet
 %{_bindir}/kubelet
 %{_bindir}/kubensenter
 %{_sysctldir}/50-kubelet.conf
 %defattr(-,root,root,0700)
+
+%files hyperkube-kube-scheduler
+%{_bindir}/kube-scheduler
+
+%files hyperkube-kube-controller-manager
+%{_bindir}/kube-controller-manager
+
+%files hyperkube-kube-apiserver
+%{_bindir}/kube-apiserver
+
+
 
 %changelog
