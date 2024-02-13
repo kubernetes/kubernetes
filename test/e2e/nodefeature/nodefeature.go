@@ -23,6 +23,8 @@ import (
 )
 
 var (
+	// Please keep the list in alphabetical order.
+
 	AppArmor                               = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("AppArmor"))
 	CheckpointContainer                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CheckpointContainer"))
 	CriticalPod                            = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CriticalPod"))
@@ -49,6 +51,8 @@ var (
 	RuntimeHandler                         = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
 	SidecarContainers                      = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
 	SystemNodeCriticalPod                  = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
+
+	// Please keep the list in alphabetical order.
 )
 
 func init() {

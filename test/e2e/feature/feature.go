@@ -23,6 +23,8 @@ import (
 )
 
 var (
+	// Please keep the list in alphabetical order.
+
 	APIServerIdentity                       = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
 	AppArmor                                = framework.WithFeature(framework.ValidFeatures.Add("AppArmor"))
 	BootstrapTokens                         = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
@@ -35,6 +37,7 @@ var (
 	ClusterAutoscalerScalability5           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability5"))
 	ClusterAutoscalerScalability6           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability6"))
 	ClusterDowngrade                        = framework.WithFeature(framework.ValidFeatures.Add("ClusterDowngrade"))
+	ClusterScaleUpBypassScheduler           = framework.WithFeature(framework.ValidFeatures.Add("ClusterScaleUpBypassScheduler"))
 	ClusterSizeAutoscalingGpu               = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingGpu"))
 	ClusterSizeAutoscalingScaleDown         = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleDown"))
 	ClusterSizeAutoscalingScaleUp           = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
@@ -132,7 +135,8 @@ var (
 	Windows                                 = framework.WithFeature(framework.ValidFeatures.Add("Windows"))
 	WindowsHostProcessContainers            = framework.WithFeature(framework.ValidFeatures.Add("WindowsHostProcessContainers"))
 	WindowsHyperVContainers                 = framework.WithFeature(framework.ValidFeatures.Add("WindowsHyperVContainers"))
-	ClusterScaleUpBypassScheduler           = framework.WithFeature(framework.ValidFeatures.Add("ClusterScaleUpBypassScheduler"))
+
+	// Please keep the list in alphabetical order.
 )
 
 func init() {
