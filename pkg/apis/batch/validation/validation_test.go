@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"errors"
 	_ "time/tzdata"
 
 	"fmt"
@@ -1349,6 +1350,46 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.ManualSelector = pointer.Bool(true)
 			},
 		},
+		"invalid attempt to update managed-by label": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: metav1.NamespaceDefault,
+					Labels:    map[string]string{},
+				},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Labels[batch.JobManagedByLabel] = "custom-controller"
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "metadata.labels.batch.kubernetes.io/managed-by",
+			},
+		},
+		"update managed-by label; feature enabled": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: metav1.NamespaceDefault,
+					Labels:    map[string]string{},
+				},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Labels[batch.JobManagedByLabel] = "custom-controller"
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "metadata.labels.batch.kubernetes.io/managed-by",
+			},
+		},
 		"immutable completions for non-indexed jobs": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -2014,6 +2055,8 @@ func TestValidateJobUpdate(t *testing.T) {
 
 func TestValidateJobUpdateStatus(t *testing.T) {
 	cases := map[string]struct {
+		opts JobStatusValidationOptions
+
 		old      batch.Job
 		update   batch.Job
 		wantErrs field.ErrorList
@@ -2045,6 +2088,52 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					Ready:       pointer.Int32(1),
 					Terminating: pointer.Int32(4),
 				},
+			},
+		},
+		"invalid attempt to set managed-by label": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: metav1.NamespaceDefault,
+					Labels:    map[string]string{},
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+					Labels: map[string]string{
+						batch.JobManagedByLabel: "custom-job-controller",
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "metadata.labels.batch.kubernetes.io/managed-by"},
+			},
+		},
+		"invalid attempt to update managed-by label": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: metav1.NamespaceDefault,
+					Labels: map[string]string{
+						batch.JobManagedByLabel: "custom-job-controller1",
+					},
+				},
+			},
+			update: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "1",
+					Labels: map[string]string{
+						batch.JobManagedByLabel: "custom-job-controller2",
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "metadata.labels.batch.kubernetes.io/managed-by"},
 			},
 		},
 		"nil ready and terminating": {
@@ -2141,7 +2230,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateJobUpdateStatus(&tc.update, &tc.old)
+			errs := ValidateJobUpdateStatus(&tc.update, &tc.old, tc.opts)
 			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
@@ -3585,5 +3674,90 @@ func TestTimeZones(t *testing.T) {
 		if len(errs) > 0 {
 			t.Errorf("%s failed: %v", tz, errs)
 		}
+	}
+}
+
+func TestValidateIndexesString(t *testing.T) {
+	testCases := map[string]struct {
+		indexesString string
+		completions   int
+		wantError     error
+	}{
+		"empty is valid": {
+			indexesString: "",
+			completions:   6,
+		},
+		"single number is valid": {
+			indexesString: "1",
+			completions:   6,
+		},
+		"single interval is valid": {
+			indexesString: "1-3",
+			completions:   6,
+		},
+		"mixed intervals valid": {
+			indexesString: "0,1-3,5,7-10",
+			completions:   12,
+		},
+		"invalid due to extra space": {
+			indexesString: "0,1-3, 5",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: " 5"`),
+		},
+		"invalid due to too large index": {
+			indexesString: "0,1-3,5",
+			completions:   5,
+			wantError:     errors.New(`too large index: "5"`),
+		},
+		"invalid due to non-increasing order of intervals": {
+			indexesString: "1-3,0,5",
+			completions:   6,
+			wantError:     errors.New(`non-increasing order, previous: 3, current: 0`),
+		},
+		"invalid due to non-increasing order between intervals": {
+			indexesString: "0,0,5",
+			completions:   6,
+			wantError:     errors.New(`non-increasing order, previous: 0, current: 0`),
+		},
+		"invalid due to non-increasing order within interval": {
+			indexesString: "0,1-1,5",
+			completions:   6,
+			wantError:     errors.New(`non-increasing order, previous: 1, current: 1`),
+		},
+		"invalid due to starting with '-'": {
+			indexesString: "-1,0",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: ""`),
+		},
+		"invalid due to ending with '-'": {
+			indexesString: "0,1-",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: ""`),
+		},
+		"invalid due to repeated '-'": {
+			indexesString: "0,1--3",
+			completions:   6,
+			wantError:     errors.New(`the fragment "1--3" violates the requirement that an index interval can have at most two parts separated by '-'`),
+		},
+		"invalid due to repeated ','": {
+			indexesString: "0,,1,3",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: ""`),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validateIndexesFormat(tc.indexesString, tc.completions)
+			if tc.wantError == nil && gotErr != nil {
+				t.Errorf("unexpected error: %s", gotErr)
+			} else if tc.wantError != nil && gotErr == nil {
+				t.Errorf("missing error: %s", tc.wantError)
+			} else if tc.wantError != nil && gotErr != nil {
+				if diff := cmp.Diff(tc.wantError.Error(), gotErr.Error()); diff != "" {
+					t.Errorf("unexpected error, diff: %s", diff)
+				}
+			}
+		})
 	}
 }

@@ -47,6 +47,11 @@ const (
 	// Historically the job controller uses unprefixed labels for job-name and controller-uid and
 	// Kubernetes continutes to recognize those unprefixed labels for consistency.
 	JobNameLabel = labelPrefix + "job-name"
+	// Label indicating the controller that manages a Job. The k8s Job controller
+	// reconciles jobs which don't have this label at all or the label value is
+	// the reserved string `job-controller.k8s.io`, but skips reconciling Jobs
+	// with a custom value for this label.
+	JobManagedByLabel = labelPrefix + "managed-by"
 	// ControllerUid is used to programatically get pods corresponding to a Job.
 	// There is a corresponding label without the batch.kubernetes.io that we support for legacy reasons.
 	ControllerUidLabel = labelPrefix + "controller-uid"
@@ -57,6 +62,9 @@ const (
 	// to the pod, which don't count towards the backoff limit, according to the
 	// pod failure policy. When the annotation is absent zero is implied.
 	JobIndexIgnoredFailureCountAnnotation = labelPrefix + "job-index-ignored-failure-count"
+	// JobControllerName reserved value for the managed-by label for the built-in
+	// Job controller.
+	JobControllerName = "job-controller.k8s.io"
 )
 
 // +genclient

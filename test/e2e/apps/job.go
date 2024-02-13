@@ -52,6 +52,8 @@ import (
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -562,6 +564,33 @@ done`}
 		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
 		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(1)))
 		gomega.Expect(job.Status.Succeeded).Should(gomega.Equal(int32(1)))
+	})
+
+	/*
+		Testcase: Skip reconciling a job that has a custom managed-by label
+		Description: We create a job with a custom value of the managed-by label.
+		We verify the Job is not reconciled by the built-in Job controller.
+		If it was, then some status fields, such as "startTime" or "active" would be set.
+	*/
+	ginkgo.It("should not reconcile a job managed by an external controller", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(2)
+		backoffLimit := int32(6)
+
+		ginkgo.By("Creating a job with a custom value of the managed-by label")
+		job := e2ejob.NewTestJob("succeed", "custom-managed-by", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Labels = map[string]string{batchv1.JobManagedByLabel: "custom-job-controller"}
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verify the job status remains not updated")
+		gomega.Consistently(func() string {
+			newJob, err := e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+			framework.ExpectNoError(err, "should retrieve the job")
+			return cmp.Diff(batchv1.JobStatus{}, newJob.Status, cmpopts.EquateEmpty())
+			// Wait 2s which to account for 1s worker syncJob interval and the
+			// time consumed by the sync itself.
+		}).WithPolling(100 * time.Millisecond).WithTimeout(2 * time.Second).Should(gomega.BeEmpty())
 	})
 
 	/*

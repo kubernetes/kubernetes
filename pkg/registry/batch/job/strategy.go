@@ -44,6 +44,7 @@ import (
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -331,7 +332,74 @@ func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 }
 
 func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return batchvalidation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
+	newJob := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
+
+	opts := getStatusValidationOptions(newJob, oldJob)
+	return batchvalidation.ValidateJobUpdateStatus(newJob, oldJob, opts)
+}
+
+// getStatusValidationOptions returns validation options for Job status
+func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobStatusValidationOptions {
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobManagedByLabel) {
+		// A strengthened validation of the Job status transitions is needed since the
+		// Job managed-by label let's the Job object be controlled by external
+		// controllers. We want to make sure the transitions done by the external
+		// controllers meet the expectations of the clients of the Job API.
+		// For example, we verify that a Job in terminal state (Failed or Complete)
+		// does not flip to a non-terminal state.
+		// In the checks below we fail validation for Job status fields (or conditions) only if they change their values
+		// (compared to the oldJob). This allows proceeding with status updates unrelated to the fields violating the
+		// checks, while blocking bad status updates for jobs with correct status.
+		isIndexed := ptr.Deref(newJob.Spec.CompletionMode, batch.NonIndexedCompletion) == batch.IndexedCompletion
+
+		isJobFinishedChanged := batchvalidation.IsJobFinished(oldJob) != batchvalidation.IsJobFinished(newJob)
+		isJobCompleteChanged := batchvalidation.IsJobComplete(oldJob) != batchvalidation.IsJobComplete(newJob)
+		isJobFailedChanged := batchvalidation.IsJobFailed(oldJob) != batchvalidation.IsJobFailed(newJob)
+		isCompletedIndexesChanged := oldJob.Status.CompletedIndexes != newJob.Status.CompletedIndexes
+		isFailedIndexesChanged := !ptr.Equal(oldJob.Status.FailedIndexes, newJob.Status.FailedIndexes)
+		isActiveChanged := oldJob.Status.Active != newJob.Status.Active
+		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
+		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
+		isStartTimeChanged := !ptr.Equal(oldJob.Status.StartTime, newJob.Status.StartTime)
+		isCompletionTimeChanged := !ptr.Equal(oldJob.Status.CompletionTime, newJob.Status.CompletionTime)
+		isUncountedTerminatedPodsChanged := isUncountedTerminatedPodsChanged(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
+
+		return batchvalidation.JobStatusValidationOptions{
+			// We allow to decrease the counter for succeeded pods for jobs which
+			// have equal parallelism and completions, as they can be scaled-down.
+			RejectDecreasingSucceededCounter:             !isIndexed || !ptr.Equal(newJob.Spec.Completions, oldJob.Spec.Parallelism),
+			RejectDecreasingFailedCounter:                true,
+			RejectDisablingTerminalCondition:             true,
+			RejectInvalidCompletedIndexes:                isCompletedIndexesChanged,
+			RejectInvalidFailedIndexes:                   isFailedIndexesChanged,
+			RejectCompletedIndexesForNonIndexedJob:       isCompletedIndexesChanged,
+			RejectFailedIndexesForNoBackoffLimitPerIndex: isFailedIndexesChanged,
+			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
+			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
+			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
+			RejectFinishedJobWithoutStartTime:            isJobFinishedChanged || isStartTimeChanged,
+			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
+			RejectRemovingStartTimeForUnsuspendedJob:     isStartTimeChanged,
+			RejectCompletionTimeBeforeStartTime:          isStartTimeChanged || isCompletionTimeChanged,
+			RejectMutatingCompletionTime:                 true,
+			RejectNotCompleteJobWithCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
+			RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
+			RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
+			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailedChanged,
+		}
+	} else {
+		return batchvalidation.JobStatusValidationOptions{}
+	}
+}
+
+func isUncountedTerminatedPodsChanged(old, new *batch.UncountedTerminatedPods) bool {
+	if (old == nil && new != nil) || (old != nil && new == nil) {
+		return true
+	} else if old != nil && new != nil {
+		return len(old.Failed) != len(new.Failed) || len(old.Succeeded) != len(new.Succeeded)
+	}
+	return false
 }
 
 // WarningsOnUpdate returns warnings for the given update.

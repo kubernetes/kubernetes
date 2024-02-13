@@ -350,6 +350,13 @@ const (
 	JobBackoffLimitPerIndex featuregate.Feature = "JobBackoffLimitPerIndex"
 
 	// owner: @mimowo
+	// kep: https://kep.k8s.io/4368
+	// beta: v1.30
+	//
+	// Allows to delegate reconciliation of a Job object to an external controller.
+	JobManagedByLabel featuregate.Feature = "JobManagedByLabel"
+
+	// owner: @mimowo
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
 	// beta: v1.26
@@ -1030,6 +1037,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	JobBackoffLimitPerIndex: {Default: true, PreRelease: featuregate.Beta},
+
+	JobManagedByLabel: {Default: true, PreRelease: featuregate.Beta},
 
 	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 

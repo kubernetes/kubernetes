@@ -44,6 +44,11 @@ const (
 	JobNameLabel = labelPrefix + LegacyJobNameLabel
 	// Controller UID is used for selectors and labels for jobs
 	ControllerUidLabel = labelPrefix + LegacyControllerUidLabel
+	// Label indicating the controller that manages a Job. The k8s Job controller
+	// reconciles jobs which don't have this label at all or the label value is
+	// the reserved string `job-controller.k8s.io`, but skips reconciling Jobs
+	// with a custom value for this label.
+	JobManagedByLabel = labelPrefix + "managed-by"
 	// Annotation indicating the number of failures for the index corresponding
 	// to the pod, which are counted towards the backoff limit.
 	JobIndexFailureCountAnnotation = labelPrefix + "job-index-failure-count"
@@ -51,6 +56,9 @@ const (
 	// to the pod, which don't count towards the backoff limit, according to the
 	// pod failure policy. When the annotation is absent zero is implied.
 	JobIndexIgnoredFailureCountAnnotation = labelPrefix + "job-index-ignored-failure-count"
+	// JobControllerName reserved value for the managed-by label for the built-in
+	// Job controller.
+	JobControllerName = "job-controller.k8s.io"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
