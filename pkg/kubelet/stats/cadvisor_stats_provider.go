@@ -182,7 +182,13 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
+	for _, val := range infos {
+		klog.InfoS("CAdvisorSpec", val.Spec, "CAdvisorStats", val.Stats)
+	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
+	for _, val := range infos {
+		klog.InfoS("FilteredInfo CAdvisorSpec", val.Spec, "FilteredInfo CAdvisorStats", val.Stats)
+	}
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range filteredInfos {
