@@ -919,8 +919,6 @@ func makeContainersByQOS(class v1.PodQOSClass) []v1.Container {
 }
 
 func TestPIDPressure(t *testing.T) {
-
-	// Define test cases
 	testCases := []struct {
 		name                               string
 		podsToMake                         []podToMake
