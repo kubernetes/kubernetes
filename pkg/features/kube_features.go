@@ -971,7 +971,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SkipReadOnlyValidationGCE: {Default: true, PreRelease: featuregate.Deprecated}, // remove in 1.31
 
-	TranslateStreamCloseWebsocketRequests: {Default: false, PreRelease: featuregate.Alpha},
+	TranslateStreamCloseWebsocketRequests: {Default: true, PreRelease: featuregate.Beta},
 
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 
