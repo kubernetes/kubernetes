@@ -96,7 +96,6 @@ create_cluster_and_run_test() {
     --cluster-name "${cluster_name}" \
     --test=ginkgo \
     -- \
-    --v=5 \
     --focus-regex='\[Conformance\]' \
     --skip-regex='\[Serial\]' \
     --parallel 20 \
