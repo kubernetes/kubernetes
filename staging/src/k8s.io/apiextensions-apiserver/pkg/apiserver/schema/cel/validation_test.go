@@ -899,6 +899,48 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded.metadata.namespace)": "undefined field 'namespace'",
 			},
 		},
+		{name: "embedded object with usage of reserved keywords",
+			obj: map[string]interface{}{
+				"embedded": map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]interface{}{
+						"name":         "foo",
+						"generateName": "pickItForMe",
+						"namespace":    "reserved_keyword_namespace",
+					},
+					"spec": map[string]interface{}{
+						"if": "reserved_keyword_if",
+					},
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"embedded": {
+					Generic: schema.Generic{Type: "object"},
+					Extensions: schema.Extensions{
+						XEmbeddedResource: true,
+					},
+					Properties: map[string]schema.Structural{
+						"kind":       stringType,
+						"apiVersion": stringType,
+						"metadata": objectType(map[string]schema.Structural{
+							"name":         stringType,
+							"generateName": stringType,
+							"namespace":    stringType,
+						}),
+						"spec": objectType(map[string]schema.Structural{
+							"if": stringType,
+						}),
+					},
+				},
+			}),
+			valid: []string{
+				"has(self.embedded.metadata.namespace)",
+				"self.embedded.metadata.namespace == 'reserved_keyword_namespace'",
+				"has(self.embedded.spec.if)",
+				"self.embedded.spec.if == 'reserved_keyword_if'",
+			},
+		},
 		{name: "embedded object with preserve unknown",
 			obj: map[string]interface{}{
 				"embedded": map[string]interface{}{

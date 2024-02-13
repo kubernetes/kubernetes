@@ -453,6 +453,10 @@ func (rt *DeclTypeProvider) FindFieldType(typeName, fieldName string) (*ref.Fiel
 	}
 
 	f, found := st.Fields[fieldName]
+	if !found {
+		f, found = st.Fields["__"+fieldName+"__"]
+	}
+
 	if found {
 		ft := f.Type
 		expT, err := ft.ExprType()

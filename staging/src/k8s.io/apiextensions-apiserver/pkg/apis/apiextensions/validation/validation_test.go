@@ -8572,35 +8572,19 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid x-kubernetes-validations for escaping",
+			name: "invalid x-kubernetes-validations for unknown property",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
 					XValidations: apiextensions.ValidationRules{
 						{
-							Rule: "self.if > 0",
-						},
-						{
-							Rule: "self.namespace > 0",
-						},
-						{
 							Rule: "self.unknownProp > 0",
-						},
-					},
-					Properties: map[string]apiextensions.JSONSchemaProps{
-						"if": {
-							Type: "integer",
-						},
-						"namespace": {
-							Type: "integer",
 						},
 					},
 				},
 			},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[0].rule"),
-				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[1].rule"),
-				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[2].rule"),
 			},
 			opts: validationOptions{
 				requireStructuralSchema: true,
