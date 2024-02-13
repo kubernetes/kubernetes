@@ -108,6 +108,11 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	return w.getAllEventsSinceLocked(resourceVersion, opts)
 }
 
+// supports mocks the feature support.
+func supports(feature storage.Feature) (bool, error) {
+	return true, nil
+}
+
 // newTestWatchCache just adds a fake clock.
 func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
@@ -127,7 +132,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	wc.stopCh = make(chan struct{})
 	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"}, pr)
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"}, pr, supports)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity

@@ -29,6 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Feature is the name of each feature in storage that we check in feature_support_checker.
+type Feature = string
+
+// RequestWatchProgress is an etcd feature that may use to check if it supported or not.
+var RequestWatchProgress Feature = "RequestWatchProgress"
+
 // Versioner abstracts setting and retrieving metadata fields from database response
 // onto the object ot list. It is required to maintain storage invariants - updating an
 // object twice with the same data except for the ResourceVersion and SelfLink must be
@@ -251,6 +257,10 @@ type Interface interface {
 	// TODO: Remove when storage.Interface will be separate from etc3.store.
 	// Deprecated: Added temporarily to simplify exposing RequestProgress for watch cache.
 	RequestWatchProgress(ctx context.Context) error
+
+	// Supports checks whether the etcd instance supports the specified feature.
+	// The function accepts one Feature parameter representing the features to check.
+	Supports(feature Feature) (bool, error)
 }
 
 // GetOptions provides the options that may be provided for storage get operations.
