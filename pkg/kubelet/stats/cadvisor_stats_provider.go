@@ -90,11 +90,18 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
 	infos, err := getCadvisorContainerInfo(p.cadvisor)
+	klog.InfoS("CAdvisorInfoPreFilter", len(infos))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-
+	for _, val := range infos {
+		klog.InfoS("CAdvisorSpec", val.Spec, "CAdvisorStats", val.Stats)
+	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
+	klog.InfoS("CAdvisorInfoPostFilter", len(infos))
+	for _, val := range infos {
+		klog.InfoS("FilteredInfo CAdvisorSpec", val.Spec, "FilteredInfo CAdvisorStats", val.Stats)
+	}
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range filteredInfos {
@@ -181,9 +188,6 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 	infos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
-	}
-	for _, val := range infos {
-		klog.InfoS("CAdvisorSpec", val.Spec, "CAdvisorStats", val.Stats)
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
 	for _, val := range infos {
