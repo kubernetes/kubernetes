@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lithammer/dedent"
 
@@ -113,6 +114,14 @@ func TestEnsureProxyAddon(t *testing.T) {
 			expClusterCIDR: "2001:101::/96",
 		},
 	}
+
+	// Override the default timeouts to be shorter
+	defaultTimeouts := kubeadmapi.GetActiveTimeouts()
+	defaultAPICallTimeout := defaultTimeouts.KubernetesAPICall
+	defaultTimeouts.KubernetesAPICall = &metav1.Duration{Duration: time.Microsecond * 500}
+	defer func() {
+		defaultTimeouts.KubernetesAPICall = defaultAPICallTimeout
+	}()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

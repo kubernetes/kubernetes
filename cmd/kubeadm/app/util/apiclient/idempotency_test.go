@@ -18,25 +18,813 @@ package apiclient
 
 import (
 	"context"
-	"reflect"
+	"os"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
-	core "k8s.io/client-go/testing"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clientgotesting "k8s.io/client-go/testing"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-const configMapName = "configmap"
+func TestMain(m *testing.M) {
+	// Override the default interval and timeouts during tests
+	defaultRetryInterval := apiCallRetryInterval
+	apiCallRetryInterval = time.Millisecond * 50
 
-func TestPatchNode(t *testing.T) {
+	defaultTimeouts := kubeadmapi.GetActiveTimeouts()
+	defaultAPICallTimeout := defaultTimeouts.KubernetesAPICall
+	defaultTimeouts.KubernetesAPICall = &metav1.Duration{Duration: apiCallRetryInterval}
+
+	exitVal := m.Run()
+
+	// Restore the default interval and timeouts
+	apiCallRetryInterval = defaultRetryInterval
+	defaultTimeouts.KubernetesAPICall = defaultAPICallTimeout
+
+	os.Exit(exitVal)
+}
+
+func TestCreateOrUpdateConfigMap(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create configmap success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create configmap returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "configmap exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "configmap exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateConfigMap(client, &v1.ConfigMap{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrMutateConfigMap(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		mutator       func(*v1.ConfigMap) error
+		expectedError bool
+	}{
+		{
+			name: "create configmap",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create configmap error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "configmap exists, mutate returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, &v1.ConfigMap{}, nil
+				})
+			},
+			mutator:       func(*v1.ConfigMap) error { return errors.New("") },
+			expectedError: true,
+		},
+		{
+			name: "configmap exists, get returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "configmap exists, mutate returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, &v1.ConfigMap{}, nil
+				})
+				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			mutator:       func(*v1.ConfigMap) error { return nil },
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrMutateConfigMap(client, &v1.ConfigMap{}, tc.mutator)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrRetainConfigMap(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "configmap exists",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, &v1.ConfigMap{}, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "configmap get returns an error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "configmap is not found, create it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "configmap is not found, create returns an error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrRetainConfigMap(client, &v1.ConfigMap{}, "some-cm")
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateSecret(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create secret success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create secret returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "secret exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "secret exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateSecret(client, &v1.Secret{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateServiceAccount(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create serviceaccount success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create serviceaccount returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "serviceaccount exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "serviceaccount exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateServiceAccount(client, &v1.ServiceAccount{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateDeployment(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create deployment success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create deployment returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "deployment exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "deployment exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateDeployment(client, &apps.Deployment{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrRetainDeployment(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "deployment exists",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, &apps.Deployment{}, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "deployment get returns an error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "deployment is not found, create it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "deployment is not found, create returns an error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrRetainDeployment(client, &apps.Deployment{}, "some-deployment")
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateDaemonSet(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create daemonset success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create daemonset returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "daemonset exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "daemonset exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateDaemonSet(client, &apps.DaemonSet{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateRole(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create role success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create role returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "role exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "role exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateRole(client, &rbac.Role{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateRoleBindings(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create rolebinding success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create rolebinding returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "rolebinding exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "rolebinding exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateClusterRole(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create clusterrole success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create clusterrole returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "clusterrole exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "clusterrole exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateClusterRole(client, &rbac.ClusterRole{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateClusterRoleBindings(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "create clusterrolebinding success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "create clusterrolebinding returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			name: "clusterrolebinding exists, update it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "clusterrolebinding exists, update error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("update", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			err := CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{})
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestPatchNodeOnce(t *testing.T) {
 	testcases := []struct {
 		name       string
 		lookupName string
@@ -118,17 +906,29 @@ func TestPatchNode(t *testing.T) {
 			success:   false,
 			fakeError: apierrors.NewServiceUnavailable("fake service unavailable"),
 		},
+		{
+			name:       "patch node failed with unknown error",
+			lookupName: "testnode",
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "testnode",
+					Labels: map[string]string{v1.LabelHostname: ""},
+				},
+			},
+			success:   false,
+			fakeError: errors.New("unknown error"),
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			_, err := client.CoreV1().Nodes().Create(context.TODO(), &tc.node, metav1.CreateOptions{})
+			client := clientsetfake.NewSimpleClientset()
+			_, err := client.CoreV1().Nodes().Create(context.Background(), &tc.node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}
 			if tc.fakeError != nil {
-				client.PrependReactor("patch", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				client.PrependReactor("patch", "nodes", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, nil, tc.fakeError
 				})
 			}
@@ -139,7 +939,7 @@ func TestPatchNode(t *testing.T) {
 				}
 			}, &lastError)
 			success, err := conditionFunction(context.Background())
-			if err != nil {
+			if err != nil && tc.success {
 				t.Fatalf("did not expect error: %v", err)
 			}
 			if success != tc.success {
@@ -149,306 +949,102 @@ func TestPatchNode(t *testing.T) {
 	}
 }
 
-func TestCreateOrMutateConfigMap(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	err := CreateOrMutateConfigMap(client, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: metav1.NamespaceSystem,
+func TestPatchNode(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupClient   func(*clientsetfake.Clientset)
+		expectedError bool
+	}{
+		{
+			name: "success",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "nodes", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, &v1.Node{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "some-node",
+							Labels: map[string]string{v1.LabelHostname: ""},
+						},
+					}, nil
+				})
+				client.PrependReactor("patch", "nodes", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
 		},
-		Data: map[string]string{
-			"key": "some-value",
+		{
+			name: "error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "nodes", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("unknown error")
+				})
+			},
+			expectedError: true,
 		},
-	}, func(cm *v1.ConfigMap) error {
-		t.Fatal("mutate should not have been called, since the ConfigMap should have been created instead of mutated")
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("error creating ConfigMap: %v", err)
-	}
-	_, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("error retrieving ConfigMap: %v", err)
-	}
-}
-
-func createClientAndConfigMap(t *testing.T) *fake.Clientset {
-	client := fake.NewSimpleClientset()
-	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: metav1.NamespaceSystem,
-		},
-		Data: map[string]string{
-			"key": "some-value",
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("error creating ConfigMap: %v", err)
-	}
-	return client
-}
-
-func TestMutateConfigMap(t *testing.T) {
-	client := createClientAndConfigMap(t)
-
-	err := MutateConfigMap(client, metav1.ObjectMeta{
-		Name:      configMapName,
-		Namespace: metav1.NamespaceSystem,
-	}, func(cm *v1.ConfigMap) error {
-		cm.Data["key"] = "some-other-value"
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("error mutating regular ConfigMap: %v", err)
 	}
 
-	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
-	if cm.Data["key"] != "some-other-value" {
-		t.Fatalf("ConfigMap mutation was invalid, has: %q", cm.Data["key"])
-	}
-}
-
-func TestMutateConfigMapWithConflict(t *testing.T) {
-	client := createClientAndConfigMap(t)
-
-	// Mimic that the first 5 updates of the ConfigMap returns a conflict, whereas the sixth update
-	// succeeds
-	conflict := 5
-	client.PrependReactor("update", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		if conflict > 0 {
-			conflict--
-			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), configMapName, errors.New("conflict"))
-		}
-		return false, update.GetObject(), nil
-	})
-
-	err := MutateConfigMap(client, metav1.ObjectMeta{
-		Name:      configMapName,
-		Namespace: metav1.NamespaceSystem,
-	}, func(cm *v1.ConfigMap) error {
-		cm.Data["key"] = "some-other-value"
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("error mutating conflicting ConfigMap: %v", err)
-	}
-
-	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
-	if cm.Data["key"] != "some-other-value" {
-		t.Fatalf("ConfigMap mutation with conflict was invalid, has: %q", cm.Data["key"])
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			patchFn := func(*v1.Node) {}
+			err := PatchNode(client, "some-node", patchFn)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
 	}
 }
 
 func TestGetConfigMapWithShortRetry(t *testing.T) {
-	type args struct {
-		client    clientset.Interface
-		namespace string
-		name      string
+	expectedConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns",
+			Name:      "some-cm",
+		},
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    *v1.ConfigMap
-		wantErr bool
+		name              string
+		setupClient       func(*clientsetfake.Clientset)
+		expectedConfigMap *v1.ConfigMap
+		expectedError     bool
 	}{
 		{
-			name: "ConfigMap exists",
-			args: args{
-				client:    newMockClientForTest(t, "default", "foo", "ConfigMap"),
-				namespace: "default",
-				name:      "foo",
+			name: "configmap exists",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, expectedConfigMap, nil
+				})
 			},
-			want: &v1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       configMapName,
-					APIVersion: "v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "default",
-				},
-			},
-			wantErr: false,
+			expectedConfigMap: expectedConfigMap,
+			expectedError:     false,
 		},
 		{
-			name: "ConfigMap does not exist",
-			args: args{
-				client:    fake.NewSimpleClientset(),
-				namespace: "default",
-				name:      "foo",
+			name: "configmap get returns an error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
 			},
-			want:    nil,
-			wantErr: true,
+			expectedError: true,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetConfigMapWithShortRetry(tt.args.client, tt.args.namespace, tt.args.name)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetConfigMapWithShortRetry() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client)
+			actual, err := GetConfigMapWithShortRetry(client, "ns", "some-cm")
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+			if err != nil {
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetConfigMapWithShortRetry() = %v, want %v", got, tt.want)
+			diff := cmp.Diff(tc.expectedConfigMap, actual)
+			if len(diff) > 0 {
+				t.Fatalf("got a diff with the expected config (-want,+got):\n%s", diff)
 			}
 		})
 	}
-}
-
-func TestCreateOrUpdateClusterRole(t *testing.T) {
-	testClusterRole := &rbac.ClusterRole{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterRole",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-	}
-
-	type args struct {
-		client      clientset.Interface
-		clusterRole *rbac.ClusterRole
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "ClusterRole does not exist",
-			args: args{
-				client:      fake.NewSimpleClientset(),
-				clusterRole: testClusterRole,
-			},
-			wantErr: false,
-		},
-		{
-			name: "ClusterRole exists",
-			args: args{
-				client:      newMockClientForTest(t, "", "foo", "ClusterRole"),
-				clusterRole: testClusterRole,
-			},
-			wantErr: false,
-		},
-		{
-			name: "ClusterRole is invalid",
-			args: args{
-				client:      fake.NewSimpleClientset(),
-				clusterRole: nil,
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := CreateOrUpdateClusterRole(tt.args.client, tt.args.clusterRole); (err != nil) != tt.wantErr {
-				t.Errorf("CreateOrUpdateClusterRole() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestCreateOrUpdateClusterRoleBinding(t *testing.T) {
-	testClusterRoleBinding := &rbac.ClusterRoleBinding{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterRoleBinding",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-	}
-
-	type args struct {
-		client             clientset.Interface
-		clusterRoleBinding *rbac.ClusterRoleBinding
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "ClusterRoleBinding does not exist",
-			args: args{
-				client:             fake.NewSimpleClientset(),
-				clusterRoleBinding: testClusterRoleBinding,
-			},
-			wantErr: false,
-		},
-		{
-			name: "ClusterRoleBinding exists",
-			args: args{
-				client:             newMockClientForTest(t, "", "foo", "ClusterRoleBinding"),
-				clusterRoleBinding: testClusterRoleBinding,
-			},
-			wantErr: false,
-		},
-		{
-			name: "ClusterRoleBinding is invalid",
-			args: args{
-				client:             fake.NewSimpleClientset(),
-				clusterRoleBinding: nil,
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := CreateOrUpdateClusterRoleBinding(tt.args.client, tt.args.clusterRoleBinding); (err != nil) != tt.wantErr {
-				t.Errorf("CreateOrUpdateClusterRoleBinding() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func newMockClientForTest(t *testing.T, namepsace string, name string, kind string) *fake.Clientset {
-	client := fake.NewSimpleClientset()
-
-	switch kind {
-	case "ConfigMap":
-		_, err := client.CoreV1().ConfigMaps(namepsace).Create(context.Background(), &v1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       configMapName,
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namepsace,
-			},
-		}, metav1.CreateOptions{})
-		if err != nil {
-			t.Fatalf("error creating ConfigMap: %v", err)
-		}
-	case "ClusterRole":
-		_, err := client.RbacV1().ClusterRoles().Create(context.Background(), &rbac.ClusterRole{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ClusterRole",
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
-		}, metav1.CreateOptions{})
-		if err != nil {
-			t.Fatalf("error creating ClusterRole: %v", err)
-		}
-	case "ClusterRoleBinding":
-		_, err := client.RbacV1().ClusterRoleBindings().Create(context.Background(), &rbac.ClusterRoleBinding{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ClusterRoleBinding",
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
-		}, metav1.CreateOptions{})
-		if err != nil {
-			t.Fatalf("error creating ClusterRoleBinding: %v", err)
-		}
-	}
-	return client
 }
