@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
@@ -196,8 +197,11 @@ func (a *Authenticator) Close() {
 	a.cancel()
 }
 
-// whitelist of signing algorithms to ensure users don't mistakenly pass something
-// goofy.
+func AllValidSigningAlgorithms() []string {
+	return sets.List(sets.KeySet(allowedSigningAlgs))
+}
+
+// allowlist of signing algorithms to ensure users don't mistakenly pass something goofy.
 var allowedSigningAlgs = map[string]bool{
 	oidc.RS256: true,
 	oidc.RS384: true,

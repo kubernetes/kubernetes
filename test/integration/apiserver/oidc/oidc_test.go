@@ -18,6 +18,8 @@ package oidc
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -279,6 +281,34 @@ jwt:
 
 	for _, tt := range tests {
 		t.Run(tt.name, singleTestRunner(useAuthenticationConfig, rsaGenerateKey, tt))
+	}
+
+	for _, tt := range []singleTest[*ecdsa.PrivateKey, *ecdsa.PublicKey]{
+		{
+			name:                    "ID token is ok",
+			configureInfrastructure: configureTestInfrastructure[*ecdsa.PrivateKey, *ecdsa.PublicKey],
+			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *ecdsa.PrivateKey) {
+				idTokenLifetime := time.Second * 1200
+				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+					t,
+					signingPrivateKey,
+					map[string]interface{}{
+						"iss": oidcServer.URL(),
+						"sub": defaultOIDCClaimedUsername,
+						"aud": defaultOIDCClientID,
+						"exp": time.Now().Add(idTokenLifetime).Unix(),
+					},
+					defaultStubAccessToken,
+					defaultStubRefreshToken,
+				))
+			},
+			configureClient: configureClientFetchingOIDCCredentials,
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+		},
+	} {
+		t.Run(tt.name, singleTestRunner(useAuthenticationConfig, ecdsaGenerateKey, tt))
 	}
 }
 
@@ -750,6 +780,15 @@ func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 	t.Helper()
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, rsaKeyBitSize)
+	require.NoError(t, err)
+
+	return privateKey, &privateKey.PublicKey
+}
+
+func ecdsaGenerateKey(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
+	t.Helper()
+
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
 	return privateKey, &privateKey.PublicKey
