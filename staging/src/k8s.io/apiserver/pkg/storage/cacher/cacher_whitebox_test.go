@@ -106,6 +106,10 @@ func (d *dummyStorage) getRequestWatchProgressCounter() int {
 	return d.requestWatchProgressCounter
 }
 
+func (d *dummyStorage) Supports(feature storage.Feature) (bool, error) {
+	return true, nil
+}
+
 type dummyWatch struct {
 	ch chan watch.Event
 }

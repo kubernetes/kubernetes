@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/etcd3/etcdfeature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
@@ -330,6 +331,10 @@ func (c *Cacher) RequestWatchProgress(ctx context.Context) error {
 	return c.storage.RequestWatchProgress(ctx)
 }
 
+func (c *Cacher) Supports(feature storage.Feature) (bool, error) {
+	return c.storage.Supports(feature)
+}
+
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
 // given configuration.
@@ -408,7 +413,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	progressRequester := newConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache := newWatchCache(
-		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource, progressRequester)
+		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource, progressRequester, cacher.Supports)
 	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -442,6 +447,16 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			}, time.Second, stopCh,
 		)
 	}()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+		supports, err := cacher.Supports(storage.RequestWatchProgress)
+		if err != nil {
+			klog.ErrorS(err, "Couldn't check features supported by etcd. Needed to use ConsistentListFromCache", "resource", cacher.groupResource.String())
+		}
+		if !supports {
+			klog.InfoS("RequestWatchProgress feature is not supported by provided etcd. This will prevent ConsistentListFromCache from working", "resource", cacher.groupResource.String())
+		}
+	}
 
 	return cacher, nil
 }
@@ -728,9 +743,10 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	pred := opts.Predicate
 	match := opts.ResourceVersionMatch
 	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+	requestWatchProgressSupported, _ := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 
 	// Serve consistent reads from storage if ConsistentListFromCache is disabled
-	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled
+	consistentReadFromStorage := resourceVersion == "" && !(consistentListFromCacheEnabled && requestWatchProgressSupported)
 	// Watch cache doesn't support continuations, so serve them from etcd.
 	hasContinuation := len(pred.Continue) > 0
 	// Serve paginated requests about revision "0" from watch cache to avoid overwhelming etcd.
@@ -773,7 +789,11 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		// minimal resource version, simply forward the request to storage.
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
-	if resourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+	requestWatchProgressSupported, err := c.Supports(storage.RequestWatchProgress)
+	if err != nil {
+		return err
+	}
+	if listRV == 0 && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported {
 		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
 		if err != nil {
 			return err
