@@ -357,6 +357,7 @@ resources:
 	wantMetricStrings := []string{
 		`apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 		`apiserver_encryption_config_controller_automatic_reload_success_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795"} 2`,
+		`apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 2`,
 	}
 
 	test.secret, err = test.createSecret(testSecret, testNamespace)
