@@ -185,7 +185,8 @@ build() {
         "${SED}" -i '/CROSS_BUILD_/d' Dockerfile
     fi
 
-    docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
+    # `--provenance=false --sbom=false` is set to avoid creating a manifest list: https://github.com/kubernetes/kubernetes/issues/123266
+    docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" --provenance=false --sbom=false \
         --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" \
         -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" \
 	--label "image_version=${TAG}" --label "commit_id=${GIT_COMMIT_ID}" \
