@@ -104,10 +104,12 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 		// entries in our summary. For details on .mount units:
 		// http://man7.org/linux/man-pages/man5/systemd.mount.5.html
 		if strings.HasSuffix(key, ".mount") {
+			klog.InfoS("pod is being skipped", cinfo)
 			continue
 		}
 		// Build the Pod key if this container is managed by a Pod
 		if !isPodManagedContainer(&cinfo) {
+			klog.InfoS("pod is being skipped", cinfo)
 			continue
 		}
 		ref := buildPodRef(cinfo.Spec.Labels)
@@ -164,6 +166,9 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			podStats.StartTime = *status.StartTime
 			// only append stats if we were able to get the start time of the pod
 			result = append(result, *podStats)
+		}
+		if !found {
+			klog.InfoS("Missing pod argg", podUID, "Status", status)
 		}
 	}
 
@@ -486,6 +491,8 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 				}
 			}
 		}
+	}
+	if cstat.DiskIo != nil {
 	}
 	if cstat.CpuInst == nil || cstat.Memory == nil {
 		return true

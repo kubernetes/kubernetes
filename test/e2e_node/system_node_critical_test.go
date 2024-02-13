@@ -36,7 +36,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("SeparateDiskTest SystemNodeCriticalPod", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.SystemNodeCriticalPod, func() {
+var _ = SIGDescribe("SystemNodeCriticalPod", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.SystemNodeCriticalPod, func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	// this test only manipulates pods in kube-system
