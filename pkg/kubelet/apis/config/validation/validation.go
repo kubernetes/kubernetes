@@ -279,5 +279,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			fmt.Errorf("invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery"))
 	}
 
+	if kc.ContainerLogMaxWorkers < 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMaxWorkers must be greater than or equal to 1"))
+	}
+
+	if kc.ContainerLogMonitorInterval.Duration.Seconds() < 3 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s"))
+	}
 	return utilerrors.NewAggregate(allErrors)
 }
