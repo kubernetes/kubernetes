@@ -84,6 +84,7 @@ linters:
     - ginkgolinter
     - gocritic
     - govet
+    - errorlint
     - ineffassign
     - logcheck
     - revive
