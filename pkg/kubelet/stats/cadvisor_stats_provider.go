@@ -497,7 +497,12 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 		}
 	}
 	klog.V(4).InfoS("stats", "cstat", cstat)
+
 	if cstat.CpuInst == nil || cstat.Memory == nil {
+		// cadvisor seems to report CPuInst as nill pretty often.
+		if cstat.Memory != nil {
+			return cstat.Memory.RSS == 0
+		}
 		return true
 	}
 	return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0
