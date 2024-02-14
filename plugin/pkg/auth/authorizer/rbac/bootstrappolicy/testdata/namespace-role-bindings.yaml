@@ -60,6 +60,9 @@ items:
   - kind: ServiceAccount
     name: kube-controller-manager
     namespace: kube-system
+  - kind: ServiceAccount
+    name: leader-election-controller
+    namespace: kube-system
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:

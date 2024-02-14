@@ -22,17 +22,17 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/spf13/cobra"
 
-	v1 "k8s.io/api/coordination/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -44,7 +44,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
-	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
@@ -74,9 +73,9 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -265,9 +264,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	if err != nil {
 		return err
 	}
+	// Special characters may not be used for names of resources
+	id = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(id, "")
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
-	id = id + "_" + string(uuid.NewUUID())
+	id = id + "-" + string(uuid.NewUUID())
 
 	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
 	var leaderMigrator *leadermigration.LeaderMigrator = nil
@@ -290,22 +291,29 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 	}
 
-	// Start component identity lease management
-	//identityLease := &identityLease{
-	//	leaseClient:          c.Client.CoordinationV1().Leases("kube-system"),
-	//	holderIdentity:       "kube-controller-manager-a",
-	//	leaseName:            "kube-controller-manager-a", // TODO: safely append uids
-	//	leaseNamespace:       "kube-system",               // TODO: put this in kube-system once RBAC is set up for that
-	//	leaseDurationSeconds: 10,
-	//	clock:                clock.RealClock{},
-	//	canLeadLeases:        "kube-system/kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
-	//	renewInterval:        5,
-	//}
-	//// TODO: Wrap this in a Run/sync() loop like lease.controller.Run()/sync()
-	//go identityLease.backoffEnsureLease(ctx)
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
+
+		// TODO: This should be a shared informer factory
+		kubeInformerFactory := informers.NewSharedInformerFactory(c.Client, time.Second*30)
+		// Start component identity lease management
+		identityLease := &leaderelection.IdentityLease{
+			LeaseClient:           c.Client.CoordinationV1alpha1().IdentityLeases("kube-system"),
+			IdentityLeaseInformer: kubeInformerFactory.Coordination().V1alpha1().IdentityLeases(),
+			HolderIdentity:        id,
+			LeaseName:             "kube-controller-manager-" + id, // TODO: safely append uids
+			LeaseNamespace:        "kube-system",                   // TODO: put this in kube-system once RBAC is set up for that
+			LeaseDurationSeconds:  10,
+			Clock:                 clock.RealClock{},
+			CanLeadLeases:         "kube-system/kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
+			RenewInterval:         5,
+			BinaryVersion:         version.Get().Major + "." + version.Get().Minor,
+			CompatibilityVersion:  version.Get().Major + "." + version.Get().Minor,
+		}
+		go identityLease.Run(ctx)
+	}
 
 	// Start the main lock
-	go leaderElectAndRun(ctx, c, id, electionChecker,
+	go leaderElectAndRun(ctx, c, "kube-controller-manager-"+id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
@@ -356,127 +364,6 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	<-stopCh
 	return nil
-}
-
-type identityLease struct {
-	leaseClient    coordinationv1client.LeaseInterface
-	holderIdentity string
-
-	// identity lease
-	leaseName      string
-	leaseNamespace string
-
-	// controller lease
-	canLeadLeases string
-
-	leaseDurationSeconds int32
-	renewInterval        time.Duration
-	clock                clock.Clock
-}
-
-// backoffEnsureLease attempts to create the lease if it does not exist,
-// and uses exponentially increasing waits to prevent overloading the API server
-// with retries. Returns the lease, and true if this call created the lease,
-// false otherwise.
-func (c *identityLease) backoffEnsureLease(ctx context.Context) (*v1.Lease, bool) {
-	klog.Infof("Starting identity lease management")
-	var (
-		lease   *v1.Lease
-		created bool
-		err     error
-	)
-	sleep := 100 * time.Millisecond
-	for {
-		lease, created, err = c.ensureLease(ctx)
-		if err == nil {
-			break
-		}
-		sleep = minDuration(2*sleep, maxBackoff)
-		klog.FromContext(ctx).Error(err, "Failed to ensure identity lease exists, will retry", "interval", sleep)
-		// backoff wait with early return if the context gets canceled
-		select {
-		case <-ctx.Done():
-			return nil, false
-		case <-time.After(sleep):
-		}
-	}
-	klog.Infof("Shutting down identity lease management")
-	return lease, created
-}
-
-const maxBackoff = 7 * time.Second
-
-func minDuration(a, b time.Duration) time.Duration {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// ensureLease creates the lease if it does not exist. Returns the lease and
-// a bool (true if this call created the lease), or any error that occurs.
-func (c *identityLease) ensureLease(ctx context.Context) (*v1.Lease, bool, error) {
-	lease, err := c.leaseClient.Get(ctx, c.leaseName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		klog.Infof("Creating identity lease")
-		// lease does not exist, create it.
-		leaseToCreate, err := c.newLease(nil)
-		// An error occurred during allocating the new lease (likely from newLeasePostProcessFunc).
-		// Given that we weren't able to set the lease correctly, we simply
-		// not create it this time - we will retry in the next iteration.
-		if err != nil {
-			return nil, false, nil
-		}
-		lease, err := c.leaseClient.Create(ctx, leaseToCreate, metav1.CreateOptions{})
-		if err != nil {
-			return nil, false, err
-		}
-		return lease, true, nil
-	} else if err != nil {
-		// unexpected error getting lease
-		return nil, false, err
-	}
-	klog.Infof("identity lease exists.. doing nothing")
-	// lease already existed
-	return lease, false, nil
-}
-
-// newLease constructs a new lease if base is nil, or returns a copy of base
-// with desired state asserted on the copy.
-// Note that an error will block lease CREATE, causing the CREATE to be retried in
-// the next iteration; but the error won't block lease refresh (UPDATE).
-func (c *identityLease) newLease(base *v1.Lease) (*v1.Lease, error) {
-	// Use the bare minimum set of fields; other fields exist for debugging/legacy,
-	// but we don't need to make component heartbeats more complicated by using them.
-	var lease *v1.Lease
-	if base == nil {
-		lease = &v1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      c.leaseName,
-				Namespace: c.leaseNamespace,
-				Annotations: map[string]string{
-					// TODO: use constants
-					"coordination.k8s.io/can-lead-leases":       c.canLeadLeases,
-					"coordination.k8s.io/binary-version":        version.Get().Major + "." + version.Get().Minor, // TODO: wire this in
-					"coordination.k8s.io/compatibility-version": version.Get().Major + "." + version.Get().Minor, // TODO: wire this in
-				},
-			},
-			Spec: v1.LeaseSpec{
-				HolderIdentity:       ptr.To(c.holderIdentity),
-				LeaseDurationSeconds: ptr.To(c.leaseDurationSeconds),
-			},
-		}
-	} else {
-		lease = base.DeepCopy()
-	}
-	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
-
-	//if c.newLeasePostProcessFunc != nil {
-	//	err := c.newLeasePostProcessFunc(lease)
-	//	return lease, err
-	//}
-
-	return lease, nil
 }
 
 // ControllerContext defines the context object for controller
@@ -711,9 +598,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
 		}
 	}
-	// TODO: Add feature gate
-	register(names.LeaderElectionController, startLeaderElectionController)
-
 	return controllers
 }
 
@@ -1016,13 +900,14 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 	}
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks:     callbacks,
-		WatchDog:      electionChecker,
-		Name:          leaseName,
+		Lock:                      rl,
+		LeaseDuration:             c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline:             c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:               c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks:                 callbacks,
+		WatchDog:                  electionChecker,
+		Name:                      leaseName,
+		CoordinatedLeaderElection: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
 	})
 
 	panic("unreachable")

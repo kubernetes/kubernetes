@@ -39,7 +39,7 @@ k get -n kube-system lease kube-controller-manager -oyaml
 
 - Keep identity leases alive, don't attempt to elect if identity lease is stale
 - Don't pick a leader from equivalents, instead, favor keeping the current leader
-- Funnel all reconciliation to main lease. If a identity lease is reconciled, enqueue the main lease for reconcilation..
+- Funnel all reconciliation to main lease. If a identity lease is reconciled, enqueue the main lease for reconciliation..
 - Move election controller to apiserver
 - [x] Create a variant of leaselock to do coordinated elections
 - Create a variant of leaderelection that can be used for coorindated elections

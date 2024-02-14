@@ -1,0 +1,24 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "coordination.k8s.io/v1alpha1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "IdentityLease",
+      "name": "identityleases",
+      "namespaced": true,
+      "singularName": "identitylease",
+      "storageVersionHash": "71n8GyGNsoc=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}
