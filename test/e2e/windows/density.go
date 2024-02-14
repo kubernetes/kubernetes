@@ -23,15 +23,19 @@ import (
 	"sync"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -73,6 +77,41 @@ var _ = sigDescribe(feature.Windows, "Density", framework.WithSerial(), framewor
 		}
 	})
 
+	ginkgo.Context("A new Windows scheduled deployment", func() {
+		var (
+			initialReplicas = int32(3)
+			zeroReplicas    = int32(0)
+			tries           = 20
+		)
+		ginkgo.It("must be able to be scaled down and up multiple times", func(ctx context.Context) {
+			var scale *autoscalingv1.Scale
+
+			deploymentSpec := newDensityDeployment(initialReplicas, imageutils.GetE2EImage(imageutils.BusyBox))
+			ns := f.Namespace.GetName()
+
+			// Create the deployment object
+			deploy, err := f.ClientSet.AppsV1().Deployments(ns).Create(ctx, deploymentSpec, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			// Wait for deployment to complete
+			framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(f.ClientSet, deploy))
+
+			// Get scale object from deployment
+			scale, err = f.ClientSet.AppsV1().Deployments(ns).GetScale(ctx, deploy.GetName(), metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			for tries >= 0 {
+				ginkgo.By("scaling deployment to zero")
+				framework.ExpectNoError(scaleDeployReplicas(f.ClientSet, zeroReplicas, scale, deploy))
+				ginkgo.By("scaling deployment to initial replica number")
+				framework.ExpectNoError(scaleDeployReplicas(f.ClientSet, initialReplicas, scale, deploy))
+
+				err = e2edeployment.WaitForDeploymentComplete(f.ClientSet, deploy)
+				framework.ExpectNoError(err)
+				tries--
+			}
+		})
+	})
 }))
 
 type densityTest struct {
@@ -282,4 +321,50 @@ func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod)
 		}(pod)
 	}
 	wg.Wait()
+}
+
+// newDensityDeployment returns the specification for a Deployment with argument specified replicas
+func newDensityDeployment(replicas int32, imageName string) *appsv1.Deployment {
+	deployName := "density-" + string(uuid.NewUUID())
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   deployName,
+			Labels: map[string]string{"app": "scale"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "scale"},
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "scale"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "density",
+							Image: imageName,
+						},
+					},
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "windows",
+					},
+				},
+			},
+		},
+	}
+}
+
+// scaleDeployReplicas scale a Scale object to a specific replicas number.
+func scaleDeployReplicas(c clientset.Interface, replicas int32, scale *autoscalingv1.Scale, deploy *appsv1.Deployment) error {
+	var ctx = context.Background()
+	scale.ResourceVersion = "" // indicate the scale update should be unconditional
+	scale.Spec.Replicas = replicas
+	result, err := c.AppsV1().Deployments(deploy.GetNamespace()).UpdateScale(ctx, deploy.GetName(), scale, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	gomega.Expect(result.Spec.Replicas).To(gomega.Equal(replicas))
+	return nil
 }
