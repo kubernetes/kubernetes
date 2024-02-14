@@ -104,12 +104,12 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 		// entries in our summary. For details on .mount units:
 		// http://man7.org/linux/man-pages/man5/systemd.mount.5.html
 		if strings.HasSuffix(key, ".mount") {
-			klog.InfoS("pod is being skipped", cinfo)
+			klog.InfoS("pod is being skipped", "ContainerInfo", cinfo)
 			continue
 		}
 		// Build the Pod key if this container is managed by a Pod
 		if !isPodManagedContainer(&cinfo) {
-			klog.InfoS("pod is being skipped", cinfo)
+			klog.InfoS("pod is being skipped", "ContainerInfo", cinfo)
 			continue
 		}
 		ref := buildPodRef(cinfo.Spec.Labels)
@@ -168,7 +168,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			result = append(result, *podStats)
 		}
 		if !found {
-			klog.InfoS("Missing pod argg", podUID, "Status", status)
+			klog.InfoS("Missing pod argg", "PodUID", podUID, "Status", status)
 		}
 	}
 
@@ -190,9 +190,6 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
-	for _, val := range infos {
-		klog.InfoS("FilteredInfo CAdvisorSpec", val.Spec, "FilteredInfo CAdvisorStats", val.Stats)
-	}
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range filteredInfos {
@@ -205,7 +202,6 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 		}
 		// Build the Pod key if this container is managed by a Pod
 		if !isPodManagedContainer(&cinfo) {
-			klog.InfoS("pod is being skipped", cinfo)
 			continue
 		}
 		ref := buildPodRef(cinfo.Spec.Labels)
@@ -391,6 +387,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		}
 		cinfosByPodCgroupKey[podCgroupKey] = cinfo
 		if !isPodManagedContainer(&cinfo) {
+			klog.InfoS("Pod is skipped", "ContainerInfo", cinfo.Spec)
 			continue
 		}
 		cinfoID := containerID{
@@ -403,7 +400,9 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		})
 	}
 	result := make(map[string]cadvisorapiv2.ContainerInfo)
-	for _, refs := range cinfoMap {
+	klog.InfoS("CinfoMap", "LenOfMap", len(cinfoMap))
+	for idx, refs := range cinfoMap {
+		klog.InfoS("CInfo", "Idx", idx)
 		if len(refs) == 1 {
 			// ContainerInfo with no CPU/memory/network usage for uncleaned cgroups of
 			// already terminated containers, which should not be shown in the results.
@@ -491,8 +490,6 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 				}
 			}
 		}
-	}
-	if cstat.DiskIo != nil {
 	}
 	if cstat.CpuInst == nil || cstat.Memory == nil {
 		return true
