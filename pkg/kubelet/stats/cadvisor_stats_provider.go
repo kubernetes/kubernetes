@@ -110,6 +110,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 		// Build the Pod key if this container is managed by a Pod
 		if !isPodManagedContainer(&cinfo) {
 			klog.InfoS("pod is being skipped", "ContainerInfo", cinfo)
+			klog.InfoS("pod labels", "Labels", cinfo.Spec.Labels)
 			continue
 		}
 		ref := buildPodRef(cinfo.Spec.Labels)
@@ -388,6 +389,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		cinfosByPodCgroupKey[podCgroupKey] = cinfo
 		if !isPodManagedContainer(&cinfo) {
 			klog.InfoS("Pod is skipped", "ContainerInfo", cinfo.Spec)
+			klog.InfoS("Pod Labels", "Labels", cinfo.Spec.Labels)
 			continue
 		}
 		cinfoID := containerID{
