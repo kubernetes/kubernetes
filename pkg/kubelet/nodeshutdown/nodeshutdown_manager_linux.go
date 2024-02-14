@@ -234,7 +234,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		}
 	}
 
-	err = m.aquireInhibitLock()
+	err = m.acquireInhibitLock()
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +287,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 
 					m.processShutdownEvent()
 				} else {
-					m.aquireInhibitLock()
+					_ = m.acquireInhibitLock()
 				}
 			}
 		}
@@ -295,7 +295,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 	return stop, nil
 }
 
-func (m *managerImpl) aquireInhibitLock() error {
+func (m *managerImpl) acquireInhibitLock() error {
 	lock, err := m.dbusCon.InhibitShutdown()
 	if err != nil {
 		return err
