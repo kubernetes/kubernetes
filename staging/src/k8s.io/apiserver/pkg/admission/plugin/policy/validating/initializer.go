@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package validating
 
 import (
-	celgo "github.com/google/cel-go/cel"
-	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"context"
+
+	"k8s.io/apiserver/pkg/admission"
 )
 
-var _ cel.ExpressionAccessor = (*MessageExpressionCondition)(nil)
+type CELPolicyEvaluator interface {
+	admission.InitializationValidator
 
-type MessageExpressionCondition struct {
-	MessageExpression string
-}
-
-func (m *MessageExpressionCondition) GetExpression() string {
-	return m.MessageExpression
-}
-
-func (m *MessageExpressionCondition) ReturnTypes() []*celgo.Type {
-	return []*celgo.Type{celgo.StringType}
+	Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error
+	HasSynced() bool
+	Run(stopCh <-chan struct{})
 }

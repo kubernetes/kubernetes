@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,20 +17,22 @@ limitations under the License.
 package generic
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ Informer[runtime.Object] = informer[runtime.Object]{}
-
-type informer[T runtime.Object] struct {
-	cache.SharedIndexInformer
-	lister[T]
+type PolicyAccessor interface {
+	GetName() string
+	GetNamespace() string
+	GetParamKind() *schema.GroupVersionKind
 }
 
-func NewInformer[T runtime.Object](informe cache.SharedIndexInformer) Informer[T] {
-	return informer[T]{
-		SharedIndexInformer: informe,
-		lister:              NewLister[T](informe.GetIndexer()),
-	}
+type BindingAccessor interface {
+	GetName() string
+	GetNamespace() string
+
+	// GetPolicyName returns the name of the (Validating/Mutating)AdmissionPolicy,
+	// which is cluster-scoped, so namespace is usually left blank.
+	// But we leave the door open to add a namespaced vesion in the future
+	GetPolicyName() types.NamespacedName
 }

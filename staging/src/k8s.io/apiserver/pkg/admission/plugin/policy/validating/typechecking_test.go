@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package validating
 
 import (
 	"fmt"
@@ -26,10 +26,34 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
+
+var (
+	scheme *runtime.Scheme = func() *runtime.Scheme {
+		res := runtime.NewScheme()
+		if err := v1beta1.AddToScheme(res); err != nil {
+			panic(err)
+		}
+
+		if err := fake.AddToScheme(res); err != nil {
+			panic(err)
+		}
+
+		return res
+	}()
+)
+
+func must3[T any, I any](val T, _ I, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
 
 func TestExtractTypeNames(t *testing.T) {
 	for _, tc := range []struct {
