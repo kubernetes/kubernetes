@@ -392,6 +392,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 			klog.InfoS("Pod Labels", "Labels", cinfo.Spec.Labels)
 			continue
 		}
+		klog.InfoS("Pod Labels Not Skipped", "Labels", cinfo.Spec.Labels)
 		cinfoID := containerID{
 			podRef:        buildPodRef(cinfo.Spec.Labels),
 			containerName: kubetypes.GetContainerName(cinfo.Spec.Labels),
