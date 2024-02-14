@@ -67,3 +67,51 @@ type LeaseList struct {
 	// items is a list of schema objects.
 	Items []Lease
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IdentityLease defines an identity lease concept.
+type IdentityLease struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+	Spec IdentityLeaseSpec
+}
+
+// IdentityLeaseSpec is a specification of a Lease.
+type IdentityLeaseSpec struct {
+	// BinaryVersion is the binary version
+	BinaryVersion string
+	// CompatibilityVersion is the compatibility version
+	CompatibilityVersion string
+	// CanLeadLease is a name/namespace pair of the lease that the identity lease can lead
+	CanLeadLease string
+
+	// holderIdentity contains the identity of the holder of a current lease.
+	// +optional
+	HolderIdentity *string
+	// leaseDurationSeconds is a duration that candidates for a lease need
+	// to wait to force acquire it. This is measure against time of last
+	// observed renewTime.
+	// +optional
+	LeaseDurationSeconds *int32
+	// acquireTime is a time when the current lease was acquired.
+	// +optional
+	AcquireTime *metav1.MicroTime
+	// renewTime is a time when the current holder of a lease has last
+	// updated the lease.
+	// +optional
+	RenewTime *metav1.MicroTime
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IdentityLeaseList is a list of Lease objects.
+type IdentityLeaseList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// items is a list of schema objects.
+	Items []IdentityLease
+}

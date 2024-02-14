@@ -84,5 +84,4 @@ const (
 	ValidatingAdmissionPolicyStatusController    = "validatingadmissionpolicy-status-controller"
 	ServiceCIDRController                        = "service-cidr-controller"
 	StorageVersionMigratorController             = "storage-version-migrator-controller"
-	LeaderElectionController                     = "leadeelection-controller"
 )

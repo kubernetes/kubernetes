@@ -172,6 +172,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/coordination/v1alpha1
+		gvr("coordination.k8s.io", "v1alpha1", "identityleases"): {
+			Stub:             `{"metadata": {"name": "identityleasev1alpha1"}, "spec": {"canLeadLease": "kube-system/lease", "leaseDurationSeconds": 5}}`,
+			ExpectedEtcdPath: "/registry/identityleases/" + namespace + "/identityleasev1alpha1",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/discovery/v1
 		gvr("discovery.k8s.io", "v1", "endpointslices"): {
 			Stub:             `{"metadata": {"name": "slicev1"}, "addressType": "IPv4", "protocol": "TCP", "ports": [], "endpoints": []}`,

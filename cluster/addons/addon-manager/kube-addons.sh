@@ -274,6 +274,7 @@ function is_leader() {
   # shellcheck disable=SC2086
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get leases.v1.coordination.k8s.io kube-controller-manager -o "jsonpath={.spec.holderIdentity}")
+  return 1
 
   case "${KUBE_CONTROLLER_MANAGER_LEADER}" in
   "")

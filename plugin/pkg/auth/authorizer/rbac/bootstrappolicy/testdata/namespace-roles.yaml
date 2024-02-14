@@ -83,6 +83,16 @@ items:
     verbs:
     - get
     - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - get
+    - list
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:

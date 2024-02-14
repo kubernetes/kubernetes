@@ -42,6 +42,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/leaderelection"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/features"
@@ -144,6 +145,24 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	_, publicServicePort, err := c.Generic.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
+		le, err := leaderelection.NewController(
+			c.Extra.VersionedInformers.Coordination().V1().Leases(),
+			c.Extra.VersionedInformers.Coordination().V1alpha1().IdentityLeases(),
+			client.CoordinationV1(),
+		)
+		if err != nil {
+			runtime.HandleError(err)
+		}
+
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-coordinated-leader-election-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			ctx := hookContext
+			le.Sync(ctx)
+			go le.Run(ctx, 1)
+			return nil
+		})
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {

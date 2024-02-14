@@ -168,9 +168,6 @@ type KubeControllerManagerConfiguration struct {
 	// ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for
 	// ValidatingAdmissionPolicyStatusController related features.
 	ValidatingAdmissionPolicyStatusController ValidatingAdmissionPolicyStatusControllerConfiguration
-	//LeaderElectionControllerConfiguration holds configuration for
-	// LeaderElectionController related features.
-	LeaderElectionController LeaderElectionControllerConfiguration
 }
 
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
@@ -489,13 +486,4 @@ type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
 	// but more CPU (and network) load.
 	// The default value is 5.
 	ConcurrentPolicySyncs int32
-}
-
-// LeaderElectionControllerConfiguration contains elements describing LeaderElectionController.
-type LeaderElectionControllerConfiguration struct {
-	// LeaderElectionConcurrentLeaseSyncs is the number of lease objects that are
-	// allowed to sync concurrently. Larger number = quicker type checking,
-	// but more CPU (and network) load.
-	// The default value is 5.
-	LeaderElectionConcurrentLeaseSyncs int32
 }
