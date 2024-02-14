@@ -1892,6 +1892,26 @@
           "freshness": "Current",
           "resources": [
             {
+              "resource": "noderesourceslices",
+              "responseKind": {
+                "group": "",
+                "kind": "NodeResourceSlice",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "noderesourceslice",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "podschedulingcontexts",
               "responseKind": {
                 "group": "",
@@ -1915,6 +1935,26 @@
                   ]
                 }
               ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaimparameters",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaimParameters",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaimparameters",
               "verbs": [
                 "create",
                 "delete",
@@ -1990,6 +2030,26 @@
               },
               "scope": "Cluster",
               "singularResource": "resourceclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclassparameters",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClassParameters",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclassparameters",
               "verbs": [
                 "create",
                 "delete",

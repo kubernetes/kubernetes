@@ -38,6 +38,7 @@ parametersRef:
   kind: kindValue
   name: nameValue
   namespace: namespaceValue
+structuredParameters: true
 suitableNodes:
   nodeSelectorTerms:
   - matchExpressions:

@@ -50,6 +50,66 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.AllocationResultModel)(nil), (*resource.AllocationResultModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_AllocationResultModel_To_resource_AllocationResultModel(a.(*v1alpha2.AllocationResultModel), b.(*resource.AllocationResultModel), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.AllocationResultModel)(nil), (*v1alpha2.AllocationResultModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_AllocationResultModel_To_v1alpha2_AllocationResultModel(a.(*resource.AllocationResultModel), b.(*v1alpha2.AllocationResultModel), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.DriverAllocationResult)(nil), (*resource.DriverAllocationResult)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_DriverAllocationResult_To_resource_DriverAllocationResult(a.(*v1alpha2.DriverAllocationResult), b.(*resource.DriverAllocationResult), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DriverAllocationResult)(nil), (*v1alpha2.DriverAllocationResult)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DriverAllocationResult_To_v1alpha2_DriverAllocationResult(a.(*resource.DriverAllocationResult), b.(*v1alpha2.DriverAllocationResult), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.DriverRequests)(nil), (*resource.DriverRequests)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_DriverRequests_To_resource_DriverRequests(a.(*v1alpha2.DriverRequests), b.(*resource.DriverRequests), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DriverRequests)(nil), (*v1alpha2.DriverRequests)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DriverRequests_To_v1alpha2_DriverRequests(a.(*resource.DriverRequests), b.(*v1alpha2.DriverRequests), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.NodeResourceModel)(nil), (*resource.NodeResourceModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_NodeResourceModel_To_resource_NodeResourceModel(a.(*v1alpha2.NodeResourceModel), b.(*resource.NodeResourceModel), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.NodeResourceModel)(nil), (*v1alpha2.NodeResourceModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_NodeResourceModel_To_v1alpha2_NodeResourceModel(a.(*resource.NodeResourceModel), b.(*v1alpha2.NodeResourceModel), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.NodeResourceSlice)(nil), (*resource.NodeResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_NodeResourceSlice_To_resource_NodeResourceSlice(a.(*v1alpha2.NodeResourceSlice), b.(*resource.NodeResourceSlice), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.NodeResourceSlice)(nil), (*v1alpha2.NodeResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_NodeResourceSlice_To_v1alpha2_NodeResourceSlice(a.(*resource.NodeResourceSlice), b.(*v1alpha2.NodeResourceSlice), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.NodeResourceSliceList)(nil), (*resource.NodeResourceSliceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_NodeResourceSliceList_To_resource_NodeResourceSliceList(a.(*v1alpha2.NodeResourceSliceList), b.(*resource.NodeResourceSliceList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.NodeResourceSliceList)(nil), (*v1alpha2.NodeResourceSliceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_NodeResourceSliceList_To_v1alpha2_NodeResourceSliceList(a.(*resource.NodeResourceSliceList), b.(*v1alpha2.NodeResourceSliceList), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingContext)(nil), (*resource.PodSchedulingContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha2_PodSchedulingContext_To_resource_PodSchedulingContext(a.(*v1alpha2.PodSchedulingContext), b.(*resource.PodSchedulingContext), scope)
 	}); err != nil {
@@ -117,6 +177,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*resource.ResourceClaimList)(nil), (*v1alpha2.ResourceClaimList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_ResourceClaimList_To_v1alpha2_ResourceClaimList(a.(*resource.ResourceClaimList), b.(*v1alpha2.ResourceClaimList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceClaimParameters)(nil), (*resource.ResourceClaimParameters)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceClaimParameters_To_resource_ResourceClaimParameters(a.(*v1alpha2.ResourceClaimParameters), b.(*resource.ResourceClaimParameters), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceClaimParameters)(nil), (*v1alpha2.ResourceClaimParameters)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceClaimParameters_To_v1alpha2_ResourceClaimParameters(a.(*resource.ResourceClaimParameters), b.(*v1alpha2.ResourceClaimParameters), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceClaimParametersList)(nil), (*resource.ResourceClaimParametersList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceClaimParametersList_To_resource_ResourceClaimParametersList(a.(*v1alpha2.ResourceClaimParametersList), b.(*resource.ResourceClaimParametersList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceClaimParametersList)(nil), (*v1alpha2.ResourceClaimParametersList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceClaimParametersList_To_v1alpha2_ResourceClaimParametersList(a.(*resource.ResourceClaimParametersList), b.(*v1alpha2.ResourceClaimParametersList), scope)
 	}); err != nil {
 		return err
 	}
@@ -210,6 +290,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceClassParameters)(nil), (*resource.ResourceClassParameters)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceClassParameters_To_resource_ResourceClassParameters(a.(*v1alpha2.ResourceClassParameters), b.(*resource.ResourceClassParameters), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceClassParameters)(nil), (*v1alpha2.ResourceClassParameters)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceClassParameters_To_v1alpha2_ResourceClassParameters(a.(*resource.ResourceClassParameters), b.(*v1alpha2.ResourceClassParameters), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceClassParametersList)(nil), (*resource.ResourceClassParametersList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceClassParametersList_To_resource_ResourceClassParametersList(a.(*v1alpha2.ResourceClassParametersList), b.(*resource.ResourceClassParametersList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceClassParametersList)(nil), (*v1alpha2.ResourceClassParametersList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceClassParametersList_To_v1alpha2_ResourceClassParametersList(a.(*resource.ResourceClassParametersList), b.(*v1alpha2.ResourceClassParametersList), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceClassParametersReference)(nil), (*resource.ResourceClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha2_ResourceClassParametersReference_To_resource_ResourceClassParametersReference(a.(*v1alpha2.ResourceClassParametersReference), b.(*resource.ResourceClassParametersReference), scope)
 	}); err != nil {
@@ -217,6 +317,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*resource.ResourceClassParametersReference)(nil), (*v1alpha2.ResourceClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_ResourceClassParametersReference_To_v1alpha2_ResourceClassParametersReference(a.(*resource.ResourceClassParametersReference), b.(*v1alpha2.ResourceClassParametersReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceFilter)(nil), (*resource.ResourceFilter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceFilter_To_resource_ResourceFilter(a.(*v1alpha2.ResourceFilter), b.(*resource.ResourceFilter), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceFilter)(nil), (*v1alpha2.ResourceFilter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceFilter_To_v1alpha2_ResourceFilter(a.(*resource.ResourceFilter), b.(*v1alpha2.ResourceFilter), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceFilterModel)(nil), (*resource.ResourceFilterModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceFilterModel_To_resource_ResourceFilterModel(a.(*v1alpha2.ResourceFilterModel), b.(*resource.ResourceFilterModel), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceFilterModel)(nil), (*v1alpha2.ResourceFilterModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceFilterModel_To_v1alpha2_ResourceFilterModel(a.(*resource.ResourceFilterModel), b.(*v1alpha2.ResourceFilterModel), scope)
 	}); err != nil {
 		return err
 	}
@@ -230,11 +350,61 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceRequest)(nil), (*resource.ResourceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceRequest_To_resource_ResourceRequest(a.(*v1alpha2.ResourceRequest), b.(*resource.ResourceRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceRequest)(nil), (*v1alpha2.ResourceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceRequest_To_v1alpha2_ResourceRequest(a.(*resource.ResourceRequest), b.(*v1alpha2.ResourceRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceRequestModel)(nil), (*resource.ResourceRequestModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceRequestModel_To_resource_ResourceRequestModel(a.(*v1alpha2.ResourceRequestModel), b.(*resource.ResourceRequestModel), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceRequestModel)(nil), (*v1alpha2.ResourceRequestModel)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceRequestModel_To_v1alpha2_ResourceRequestModel(a.(*resource.ResourceRequestModel), b.(*v1alpha2.ResourceRequestModel), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.StructuredResourceHandle)(nil), (*resource.StructuredResourceHandle)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_StructuredResourceHandle_To_resource_StructuredResourceHandle(a.(*v1alpha2.StructuredResourceHandle), b.(*resource.StructuredResourceHandle), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.StructuredResourceHandle)(nil), (*v1alpha2.StructuredResourceHandle)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_StructuredResourceHandle_To_v1alpha2_StructuredResourceHandle(a.(*resource.StructuredResourceHandle), b.(*v1alpha2.StructuredResourceHandle), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.VendorParameters)(nil), (*resource.VendorParameters)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_VendorParameters_To_resource_VendorParameters(a.(*v1alpha2.VendorParameters), b.(*resource.VendorParameters), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.VendorParameters)(nil), (*v1alpha2.VendorParameters)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_VendorParameters_To_v1alpha2_VendorParameters(a.(*resource.VendorParameters), b.(*v1alpha2.VendorParameters), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_v1alpha2_AllocationResult_To_resource_AllocationResult(in *v1alpha2.AllocationResult, out *resource.AllocationResult, s conversion.Scope) error {
-	out.ResourceHandles = *(*[]resource.ResourceHandle)(unsafe.Pointer(&in.ResourceHandles))
+	if in.ResourceHandles != nil {
+		in, out := &in.ResourceHandles, &out.ResourceHandles
+		*out = make([]resource.ResourceHandle, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_ResourceHandle_To_resource_ResourceHandle(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ResourceHandles = nil
+	}
 	out.AvailableOnNodes = (*core.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
 	out.Shareable = in.Shareable
 	return nil
@@ -246,7 +416,17 @@ func Convert_v1alpha2_AllocationResult_To_resource_AllocationResult(in *v1alpha2
 }
 
 func autoConvert_resource_AllocationResult_To_v1alpha2_AllocationResult(in *resource.AllocationResult, out *v1alpha2.AllocationResult, s conversion.Scope) error {
-	out.ResourceHandles = *(*[]v1alpha2.ResourceHandle)(unsafe.Pointer(&in.ResourceHandles))
+	if in.ResourceHandles != nil {
+		in, out := &in.ResourceHandles, &out.ResourceHandles
+		*out = make([]v1alpha2.ResourceHandle, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceHandle_To_v1alpha2_ResourceHandle(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ResourceHandles = nil
+	}
 	out.AvailableOnNodes = (*v1.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
 	out.Shareable = in.Shareable
 	return nil
@@ -255,6 +435,172 @@ func autoConvert_resource_AllocationResult_To_v1alpha2_AllocationResult(in *reso
 // Convert_resource_AllocationResult_To_v1alpha2_AllocationResult is an autogenerated conversion function.
 func Convert_resource_AllocationResult_To_v1alpha2_AllocationResult(in *resource.AllocationResult, out *v1alpha2.AllocationResult, s conversion.Scope) error {
 	return autoConvert_resource_AllocationResult_To_v1alpha2_AllocationResult(in, out, s)
+}
+
+func autoConvert_v1alpha2_AllocationResultModel_To_resource_AllocationResultModel(in *v1alpha2.AllocationResultModel, out *resource.AllocationResultModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha2_AllocationResultModel_To_resource_AllocationResultModel is an autogenerated conversion function.
+func Convert_v1alpha2_AllocationResultModel_To_resource_AllocationResultModel(in *v1alpha2.AllocationResultModel, out *resource.AllocationResultModel, s conversion.Scope) error {
+	return autoConvert_v1alpha2_AllocationResultModel_To_resource_AllocationResultModel(in, out, s)
+}
+
+func autoConvert_resource_AllocationResultModel_To_v1alpha2_AllocationResultModel(in *resource.AllocationResultModel, out *v1alpha2.AllocationResultModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_resource_AllocationResultModel_To_v1alpha2_AllocationResultModel is an autogenerated conversion function.
+func Convert_resource_AllocationResultModel_To_v1alpha2_AllocationResultModel(in *resource.AllocationResultModel, out *v1alpha2.AllocationResultModel, s conversion.Scope) error {
+	return autoConvert_resource_AllocationResultModel_To_v1alpha2_AllocationResultModel(in, out, s)
+}
+
+func autoConvert_v1alpha2_DriverAllocationResult_To_resource_DriverAllocationResult(in *v1alpha2.DriverAllocationResult, out *resource.DriverAllocationResult, s conversion.Scope) error {
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.VendorRequestParameters, &out.VendorRequestParameters, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha2_AllocationResultModel_To_resource_AllocationResultModel(&in.AllocationResultModel, &out.AllocationResultModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha2_DriverAllocationResult_To_resource_DriverAllocationResult is an autogenerated conversion function.
+func Convert_v1alpha2_DriverAllocationResult_To_resource_DriverAllocationResult(in *v1alpha2.DriverAllocationResult, out *resource.DriverAllocationResult, s conversion.Scope) error {
+	return autoConvert_v1alpha2_DriverAllocationResult_To_resource_DriverAllocationResult(in, out, s)
+}
+
+func autoConvert_resource_DriverAllocationResult_To_v1alpha2_DriverAllocationResult(in *resource.DriverAllocationResult, out *v1alpha2.DriverAllocationResult, s conversion.Scope) error {
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.VendorRequestParameters, &out.VendorRequestParameters, s); err != nil {
+		return err
+	}
+	if err := Convert_resource_AllocationResultModel_To_v1alpha2_AllocationResultModel(&in.AllocationResultModel, &out.AllocationResultModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_resource_DriverAllocationResult_To_v1alpha2_DriverAllocationResult is an autogenerated conversion function.
+func Convert_resource_DriverAllocationResult_To_v1alpha2_DriverAllocationResult(in *resource.DriverAllocationResult, out *v1alpha2.DriverAllocationResult, s conversion.Scope) error {
+	return autoConvert_resource_DriverAllocationResult_To_v1alpha2_DriverAllocationResult(in, out, s)
+}
+
+func autoConvert_v1alpha2_DriverRequests_To_resource_DriverRequests(in *v1alpha2.DriverRequests, out *resource.DriverRequests, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.VendorParameters, &out.VendorParameters, s); err != nil {
+		return err
+	}
+	if in.Requests != nil {
+		in, out := &in.Requests, &out.Requests
+		*out = make([]resource.ResourceRequest, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_ResourceRequest_To_resource_ResourceRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Requests = nil
+	}
+	return nil
+}
+
+// Convert_v1alpha2_DriverRequests_To_resource_DriverRequests is an autogenerated conversion function.
+func Convert_v1alpha2_DriverRequests_To_resource_DriverRequests(in *v1alpha2.DriverRequests, out *resource.DriverRequests, s conversion.Scope) error {
+	return autoConvert_v1alpha2_DriverRequests_To_resource_DriverRequests(in, out, s)
+}
+
+func autoConvert_resource_DriverRequests_To_v1alpha2_DriverRequests(in *resource.DriverRequests, out *v1alpha2.DriverRequests, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.VendorParameters, &out.VendorParameters, s); err != nil {
+		return err
+	}
+	if in.Requests != nil {
+		in, out := &in.Requests, &out.Requests
+		*out = make([]v1alpha2.ResourceRequest, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceRequest_To_v1alpha2_ResourceRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Requests = nil
+	}
+	return nil
+}
+
+// Convert_resource_DriverRequests_To_v1alpha2_DriverRequests is an autogenerated conversion function.
+func Convert_resource_DriverRequests_To_v1alpha2_DriverRequests(in *resource.DriverRequests, out *v1alpha2.DriverRequests, s conversion.Scope) error {
+	return autoConvert_resource_DriverRequests_To_v1alpha2_DriverRequests(in, out, s)
+}
+
+func autoConvert_v1alpha2_NodeResourceModel_To_resource_NodeResourceModel(in *v1alpha2.NodeResourceModel, out *resource.NodeResourceModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha2_NodeResourceModel_To_resource_NodeResourceModel is an autogenerated conversion function.
+func Convert_v1alpha2_NodeResourceModel_To_resource_NodeResourceModel(in *v1alpha2.NodeResourceModel, out *resource.NodeResourceModel, s conversion.Scope) error {
+	return autoConvert_v1alpha2_NodeResourceModel_To_resource_NodeResourceModel(in, out, s)
+}
+
+func autoConvert_resource_NodeResourceModel_To_v1alpha2_NodeResourceModel(in *resource.NodeResourceModel, out *v1alpha2.NodeResourceModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_resource_NodeResourceModel_To_v1alpha2_NodeResourceModel is an autogenerated conversion function.
+func Convert_resource_NodeResourceModel_To_v1alpha2_NodeResourceModel(in *resource.NodeResourceModel, out *v1alpha2.NodeResourceModel, s conversion.Scope) error {
+	return autoConvert_resource_NodeResourceModel_To_v1alpha2_NodeResourceModel(in, out, s)
+}
+
+func autoConvert_v1alpha2_NodeResourceSlice_To_resource_NodeResourceSlice(in *v1alpha2.NodeResourceSlice, out *resource.NodeResourceSlice, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.NodeName = in.NodeName
+	out.DriverName = in.DriverName
+	if err := Convert_v1alpha2_NodeResourceModel_To_resource_NodeResourceModel(&in.NodeResourceModel, &out.NodeResourceModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha2_NodeResourceSlice_To_resource_NodeResourceSlice is an autogenerated conversion function.
+func Convert_v1alpha2_NodeResourceSlice_To_resource_NodeResourceSlice(in *v1alpha2.NodeResourceSlice, out *resource.NodeResourceSlice, s conversion.Scope) error {
+	return autoConvert_v1alpha2_NodeResourceSlice_To_resource_NodeResourceSlice(in, out, s)
+}
+
+func autoConvert_resource_NodeResourceSlice_To_v1alpha2_NodeResourceSlice(in *resource.NodeResourceSlice, out *v1alpha2.NodeResourceSlice, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.NodeName = in.NodeName
+	out.DriverName = in.DriverName
+	if err := Convert_resource_NodeResourceModel_To_v1alpha2_NodeResourceModel(&in.NodeResourceModel, &out.NodeResourceModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_resource_NodeResourceSlice_To_v1alpha2_NodeResourceSlice is an autogenerated conversion function.
+func Convert_resource_NodeResourceSlice_To_v1alpha2_NodeResourceSlice(in *resource.NodeResourceSlice, out *v1alpha2.NodeResourceSlice, s conversion.Scope) error {
+	return autoConvert_resource_NodeResourceSlice_To_v1alpha2_NodeResourceSlice(in, out, s)
+}
+
+func autoConvert_v1alpha2_NodeResourceSliceList_To_resource_NodeResourceSliceList(in *v1alpha2.NodeResourceSliceList, out *resource.NodeResourceSliceList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]resource.NodeResourceSlice)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha2_NodeResourceSliceList_To_resource_NodeResourceSliceList is an autogenerated conversion function.
+func Convert_v1alpha2_NodeResourceSliceList_To_resource_NodeResourceSliceList(in *v1alpha2.NodeResourceSliceList, out *resource.NodeResourceSliceList, s conversion.Scope) error {
+	return autoConvert_v1alpha2_NodeResourceSliceList_To_resource_NodeResourceSliceList(in, out, s)
+}
+
+func autoConvert_resource_NodeResourceSliceList_To_v1alpha2_NodeResourceSliceList(in *resource.NodeResourceSliceList, out *v1alpha2.NodeResourceSliceList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1alpha2.NodeResourceSlice)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_resource_NodeResourceSliceList_To_v1alpha2_NodeResourceSliceList is an autogenerated conversion function.
+func Convert_resource_NodeResourceSliceList_To_v1alpha2_NodeResourceSliceList(in *resource.NodeResourceSliceList, out *v1alpha2.NodeResourceSliceList, s conversion.Scope) error {
+	return autoConvert_resource_NodeResourceSliceList_To_v1alpha2_NodeResourceSliceList(in, out, s)
 }
 
 func autoConvert_v1alpha2_PodSchedulingContext_To_resource_PodSchedulingContext(in *v1alpha2.PodSchedulingContext, out *resource.PodSchedulingContext, s conversion.Scope) error {
@@ -413,7 +759,17 @@ func Convert_resource_ResourceClaimConsumerReference_To_v1alpha2_ResourceClaimCo
 
 func autoConvert_v1alpha2_ResourceClaimList_To_resource_ResourceClaimList(in *v1alpha2.ResourceClaimList, out *resource.ResourceClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resource.ResourceClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resource.ResourceClaim, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_ResourceClaim_To_resource_ResourceClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -424,13 +780,111 @@ func Convert_v1alpha2_ResourceClaimList_To_resource_ResourceClaimList(in *v1alph
 
 func autoConvert_resource_ResourceClaimList_To_v1alpha2_ResourceClaimList(in *resource.ResourceClaimList, out *v1alpha2.ResourceClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha2.ResourceClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1alpha2.ResourceClaim, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceClaim_To_v1alpha2_ResourceClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
 // Convert_resource_ResourceClaimList_To_v1alpha2_ResourceClaimList is an autogenerated conversion function.
 func Convert_resource_ResourceClaimList_To_v1alpha2_ResourceClaimList(in *resource.ResourceClaimList, out *v1alpha2.ResourceClaimList, s conversion.Scope) error {
 	return autoConvert_resource_ResourceClaimList_To_v1alpha2_ResourceClaimList(in, out, s)
+}
+
+func autoConvert_v1alpha2_ResourceClaimParameters_To_resource_ResourceClaimParameters(in *v1alpha2.ResourceClaimParameters, out *resource.ResourceClaimParameters, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.GeneratedFrom = (*resource.ResourceClaimParametersReference)(unsafe.Pointer(in.GeneratedFrom))
+	out.Shareable = in.Shareable
+	if in.DriverRequests != nil {
+		in, out := &in.DriverRequests, &out.DriverRequests
+		*out = make([]resource.DriverRequests, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_DriverRequests_To_resource_DriverRequests(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.DriverRequests = nil
+	}
+	return nil
+}
+
+// Convert_v1alpha2_ResourceClaimParameters_To_resource_ResourceClaimParameters is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceClaimParameters_To_resource_ResourceClaimParameters(in *v1alpha2.ResourceClaimParameters, out *resource.ResourceClaimParameters, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceClaimParameters_To_resource_ResourceClaimParameters(in, out, s)
+}
+
+func autoConvert_resource_ResourceClaimParameters_To_v1alpha2_ResourceClaimParameters(in *resource.ResourceClaimParameters, out *v1alpha2.ResourceClaimParameters, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.GeneratedFrom = (*v1alpha2.ResourceClaimParametersReference)(unsafe.Pointer(in.GeneratedFrom))
+	out.Shareable = in.Shareable
+	if in.DriverRequests != nil {
+		in, out := &in.DriverRequests, &out.DriverRequests
+		*out = make([]v1alpha2.DriverRequests, len(*in))
+		for i := range *in {
+			if err := Convert_resource_DriverRequests_To_v1alpha2_DriverRequests(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.DriverRequests = nil
+	}
+	return nil
+}
+
+// Convert_resource_ResourceClaimParameters_To_v1alpha2_ResourceClaimParameters is an autogenerated conversion function.
+func Convert_resource_ResourceClaimParameters_To_v1alpha2_ResourceClaimParameters(in *resource.ResourceClaimParameters, out *v1alpha2.ResourceClaimParameters, s conversion.Scope) error {
+	return autoConvert_resource_ResourceClaimParameters_To_v1alpha2_ResourceClaimParameters(in, out, s)
+}
+
+func autoConvert_v1alpha2_ResourceClaimParametersList_To_resource_ResourceClaimParametersList(in *v1alpha2.ResourceClaimParametersList, out *resource.ResourceClaimParametersList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resource.ResourceClaimParameters, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_ResourceClaimParameters_To_resource_ResourceClaimParameters(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_v1alpha2_ResourceClaimParametersList_To_resource_ResourceClaimParametersList is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceClaimParametersList_To_resource_ResourceClaimParametersList(in *v1alpha2.ResourceClaimParametersList, out *resource.ResourceClaimParametersList, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceClaimParametersList_To_resource_ResourceClaimParametersList(in, out, s)
+}
+
+func autoConvert_resource_ResourceClaimParametersList_To_v1alpha2_ResourceClaimParametersList(in *resource.ResourceClaimParametersList, out *v1alpha2.ResourceClaimParametersList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1alpha2.ResourceClaimParameters, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceClaimParameters_To_v1alpha2_ResourceClaimParameters(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_resource_ResourceClaimParametersList_To_v1alpha2_ResourceClaimParametersList is an autogenerated conversion function.
+func Convert_resource_ResourceClaimParametersList_To_v1alpha2_ResourceClaimParametersList(in *resource.ResourceClaimParametersList, out *v1alpha2.ResourceClaimParametersList, s conversion.Scope) error {
+	return autoConvert_resource_ResourceClaimParametersList_To_v1alpha2_ResourceClaimParametersList(in, out, s)
 }
 
 func autoConvert_v1alpha2_ResourceClaimParametersReference_To_resource_ResourceClaimParametersReference(in *v1alpha2.ResourceClaimParametersReference, out *resource.ResourceClaimParametersReference, s conversion.Scope) error {
@@ -505,7 +959,15 @@ func Convert_resource_ResourceClaimSpec_To_v1alpha2_ResourceClaimSpec(in *resour
 
 func autoConvert_v1alpha2_ResourceClaimStatus_To_resource_ResourceClaimStatus(in *v1alpha2.ResourceClaimStatus, out *resource.ResourceClaimStatus, s conversion.Scope) error {
 	out.DriverName = in.DriverName
-	out.Allocation = (*resource.AllocationResult)(unsafe.Pointer(in.Allocation))
+	if in.Allocation != nil {
+		in, out := &in.Allocation, &out.Allocation
+		*out = new(resource.AllocationResult)
+		if err := Convert_v1alpha2_AllocationResult_To_resource_AllocationResult(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Allocation = nil
+	}
 	out.ReservedFor = *(*[]resource.ResourceClaimConsumerReference)(unsafe.Pointer(&in.ReservedFor))
 	out.DeallocationRequested = in.DeallocationRequested
 	return nil
@@ -518,7 +980,15 @@ func Convert_v1alpha2_ResourceClaimStatus_To_resource_ResourceClaimStatus(in *v1
 
 func autoConvert_resource_ResourceClaimStatus_To_v1alpha2_ResourceClaimStatus(in *resource.ResourceClaimStatus, out *v1alpha2.ResourceClaimStatus, s conversion.Scope) error {
 	out.DriverName = in.DriverName
-	out.Allocation = (*v1alpha2.AllocationResult)(unsafe.Pointer(in.Allocation))
+	if in.Allocation != nil {
+		in, out := &in.Allocation, &out.Allocation
+		*out = new(v1alpha2.AllocationResult)
+		if err := Convert_resource_AllocationResult_To_v1alpha2_AllocationResult(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Allocation = nil
+	}
 	out.ReservedFor = *(*[]v1alpha2.ResourceClaimConsumerReference)(unsafe.Pointer(&in.ReservedFor))
 	out.DeallocationRequested = in.DeallocationRequested
 	return nil
@@ -608,6 +1078,7 @@ func autoConvert_v1alpha2_ResourceClass_To_resource_ResourceClass(in *v1alpha2.R
 	out.DriverName = in.DriverName
 	out.ParametersRef = (*resource.ResourceClassParametersReference)(unsafe.Pointer(in.ParametersRef))
 	out.SuitableNodes = (*core.NodeSelector)(unsafe.Pointer(in.SuitableNodes))
+	out.StructuredParameters = (*bool)(unsafe.Pointer(in.StructuredParameters))
 	return nil
 }
 
@@ -621,6 +1092,7 @@ func autoConvert_resource_ResourceClass_To_v1alpha2_ResourceClass(in *resource.R
 	out.DriverName = in.DriverName
 	out.ParametersRef = (*v1alpha2.ResourceClassParametersReference)(unsafe.Pointer(in.ParametersRef))
 	out.SuitableNodes = (*v1.NodeSelector)(unsafe.Pointer(in.SuitableNodes))
+	out.StructuredParameters = (*bool)(unsafe.Pointer(in.StructuredParameters))
 	return nil
 }
 
@@ -651,6 +1123,94 @@ func Convert_resource_ResourceClassList_To_v1alpha2_ResourceClassList(in *resour
 	return autoConvert_resource_ResourceClassList_To_v1alpha2_ResourceClassList(in, out, s)
 }
 
+func autoConvert_v1alpha2_ResourceClassParameters_To_resource_ResourceClassParameters(in *v1alpha2.ResourceClassParameters, out *resource.ResourceClassParameters, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.GeneratedFrom = (*resource.ResourceClassParametersReference)(unsafe.Pointer(in.GeneratedFrom))
+	if in.VendorParameters != nil {
+		in, out := &in.VendorParameters, &out.VendorParameters
+		*out = make([]resource.VendorParameters, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_VendorParameters_To_resource_VendorParameters(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VendorParameters = nil
+	}
+	out.Filters = *(*[]resource.ResourceFilter)(unsafe.Pointer(&in.Filters))
+	return nil
+}
+
+// Convert_v1alpha2_ResourceClassParameters_To_resource_ResourceClassParameters is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceClassParameters_To_resource_ResourceClassParameters(in *v1alpha2.ResourceClassParameters, out *resource.ResourceClassParameters, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceClassParameters_To_resource_ResourceClassParameters(in, out, s)
+}
+
+func autoConvert_resource_ResourceClassParameters_To_v1alpha2_ResourceClassParameters(in *resource.ResourceClassParameters, out *v1alpha2.ResourceClassParameters, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.GeneratedFrom = (*v1alpha2.ResourceClassParametersReference)(unsafe.Pointer(in.GeneratedFrom))
+	if in.VendorParameters != nil {
+		in, out := &in.VendorParameters, &out.VendorParameters
+		*out = make([]v1alpha2.VendorParameters, len(*in))
+		for i := range *in {
+			if err := Convert_resource_VendorParameters_To_v1alpha2_VendorParameters(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VendorParameters = nil
+	}
+	out.Filters = *(*[]v1alpha2.ResourceFilter)(unsafe.Pointer(&in.Filters))
+	return nil
+}
+
+// Convert_resource_ResourceClassParameters_To_v1alpha2_ResourceClassParameters is an autogenerated conversion function.
+func Convert_resource_ResourceClassParameters_To_v1alpha2_ResourceClassParameters(in *resource.ResourceClassParameters, out *v1alpha2.ResourceClassParameters, s conversion.Scope) error {
+	return autoConvert_resource_ResourceClassParameters_To_v1alpha2_ResourceClassParameters(in, out, s)
+}
+
+func autoConvert_v1alpha2_ResourceClassParametersList_To_resource_ResourceClassParametersList(in *v1alpha2.ResourceClassParametersList, out *resource.ResourceClassParametersList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resource.ResourceClassParameters, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_ResourceClassParameters_To_resource_ResourceClassParameters(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_v1alpha2_ResourceClassParametersList_To_resource_ResourceClassParametersList is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceClassParametersList_To_resource_ResourceClassParametersList(in *v1alpha2.ResourceClassParametersList, out *resource.ResourceClassParametersList, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceClassParametersList_To_resource_ResourceClassParametersList(in, out, s)
+}
+
+func autoConvert_resource_ResourceClassParametersList_To_v1alpha2_ResourceClassParametersList(in *resource.ResourceClassParametersList, out *v1alpha2.ResourceClassParametersList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1alpha2.ResourceClassParameters, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceClassParameters_To_v1alpha2_ResourceClassParameters(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_resource_ResourceClassParametersList_To_v1alpha2_ResourceClassParametersList is an autogenerated conversion function.
+func Convert_resource_ResourceClassParametersList_To_v1alpha2_ResourceClassParametersList(in *resource.ResourceClassParametersList, out *v1alpha2.ResourceClassParametersList, s conversion.Scope) error {
+	return autoConvert_resource_ResourceClassParametersList_To_v1alpha2_ResourceClassParametersList(in, out, s)
+}
+
 func autoConvert_v1alpha2_ResourceClassParametersReference_To_resource_ResourceClassParametersReference(in *v1alpha2.ResourceClassParametersReference, out *resource.ResourceClassParametersReference, s conversion.Scope) error {
 	out.APIGroup = in.APIGroup
 	out.Kind = in.Kind
@@ -677,9 +1237,62 @@ func Convert_resource_ResourceClassParametersReference_To_v1alpha2_ResourceClass
 	return autoConvert_resource_ResourceClassParametersReference_To_v1alpha2_ResourceClassParametersReference(in, out, s)
 }
 
+func autoConvert_v1alpha2_ResourceFilter_To_resource_ResourceFilter(in *v1alpha2.ResourceFilter, out *resource.ResourceFilter, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	if err := Convert_v1alpha2_ResourceFilterModel_To_resource_ResourceFilterModel(&in.ResourceFilterModel, &out.ResourceFilterModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha2_ResourceFilter_To_resource_ResourceFilter is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceFilter_To_resource_ResourceFilter(in *v1alpha2.ResourceFilter, out *resource.ResourceFilter, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceFilter_To_resource_ResourceFilter(in, out, s)
+}
+
+func autoConvert_resource_ResourceFilter_To_v1alpha2_ResourceFilter(in *resource.ResourceFilter, out *v1alpha2.ResourceFilter, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	if err := Convert_resource_ResourceFilterModel_To_v1alpha2_ResourceFilterModel(&in.ResourceFilterModel, &out.ResourceFilterModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_resource_ResourceFilter_To_v1alpha2_ResourceFilter is an autogenerated conversion function.
+func Convert_resource_ResourceFilter_To_v1alpha2_ResourceFilter(in *resource.ResourceFilter, out *v1alpha2.ResourceFilter, s conversion.Scope) error {
+	return autoConvert_resource_ResourceFilter_To_v1alpha2_ResourceFilter(in, out, s)
+}
+
+func autoConvert_v1alpha2_ResourceFilterModel_To_resource_ResourceFilterModel(in *v1alpha2.ResourceFilterModel, out *resource.ResourceFilterModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha2_ResourceFilterModel_To_resource_ResourceFilterModel is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceFilterModel_To_resource_ResourceFilterModel(in *v1alpha2.ResourceFilterModel, out *resource.ResourceFilterModel, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceFilterModel_To_resource_ResourceFilterModel(in, out, s)
+}
+
+func autoConvert_resource_ResourceFilterModel_To_v1alpha2_ResourceFilterModel(in *resource.ResourceFilterModel, out *v1alpha2.ResourceFilterModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_resource_ResourceFilterModel_To_v1alpha2_ResourceFilterModel is an autogenerated conversion function.
+func Convert_resource_ResourceFilterModel_To_v1alpha2_ResourceFilterModel(in *resource.ResourceFilterModel, out *v1alpha2.ResourceFilterModel, s conversion.Scope) error {
+	return autoConvert_resource_ResourceFilterModel_To_v1alpha2_ResourceFilterModel(in, out, s)
+}
+
 func autoConvert_v1alpha2_ResourceHandle_To_resource_ResourceHandle(in *v1alpha2.ResourceHandle, out *resource.ResourceHandle, s conversion.Scope) error {
 	out.DriverName = in.DriverName
 	out.Data = in.Data
+	if in.StructuredData != nil {
+		in, out := &in.StructuredData, &out.StructuredData
+		*out = new(resource.StructuredResourceHandle)
+		if err := Convert_v1alpha2_StructuredResourceHandle_To_resource_StructuredResourceHandle(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.StructuredData = nil
+	}
 	return nil
 }
 
@@ -691,10 +1304,147 @@ func Convert_v1alpha2_ResourceHandle_To_resource_ResourceHandle(in *v1alpha2.Res
 func autoConvert_resource_ResourceHandle_To_v1alpha2_ResourceHandle(in *resource.ResourceHandle, out *v1alpha2.ResourceHandle, s conversion.Scope) error {
 	out.DriverName = in.DriverName
 	out.Data = in.Data
+	if in.StructuredData != nil {
+		in, out := &in.StructuredData, &out.StructuredData
+		*out = new(v1alpha2.StructuredResourceHandle)
+		if err := Convert_resource_StructuredResourceHandle_To_v1alpha2_StructuredResourceHandle(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.StructuredData = nil
+	}
 	return nil
 }
 
 // Convert_resource_ResourceHandle_To_v1alpha2_ResourceHandle is an autogenerated conversion function.
 func Convert_resource_ResourceHandle_To_v1alpha2_ResourceHandle(in *resource.ResourceHandle, out *v1alpha2.ResourceHandle, s conversion.Scope) error {
 	return autoConvert_resource_ResourceHandle_To_v1alpha2_ResourceHandle(in, out, s)
+}
+
+func autoConvert_v1alpha2_ResourceRequest_To_resource_ResourceRequest(in *v1alpha2.ResourceRequest, out *resource.ResourceRequest, s conversion.Scope) error {
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.VendorParameters, &out.VendorParameters, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha2_ResourceRequestModel_To_resource_ResourceRequestModel(&in.ResourceRequestModel, &out.ResourceRequestModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha2_ResourceRequest_To_resource_ResourceRequest is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceRequest_To_resource_ResourceRequest(in *v1alpha2.ResourceRequest, out *resource.ResourceRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceRequest_To_resource_ResourceRequest(in, out, s)
+}
+
+func autoConvert_resource_ResourceRequest_To_v1alpha2_ResourceRequest(in *resource.ResourceRequest, out *v1alpha2.ResourceRequest, s conversion.Scope) error {
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.VendorParameters, &out.VendorParameters, s); err != nil {
+		return err
+	}
+	if err := Convert_resource_ResourceRequestModel_To_v1alpha2_ResourceRequestModel(&in.ResourceRequestModel, &out.ResourceRequestModel, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_resource_ResourceRequest_To_v1alpha2_ResourceRequest is an autogenerated conversion function.
+func Convert_resource_ResourceRequest_To_v1alpha2_ResourceRequest(in *resource.ResourceRequest, out *v1alpha2.ResourceRequest, s conversion.Scope) error {
+	return autoConvert_resource_ResourceRequest_To_v1alpha2_ResourceRequest(in, out, s)
+}
+
+func autoConvert_v1alpha2_ResourceRequestModel_To_resource_ResourceRequestModel(in *v1alpha2.ResourceRequestModel, out *resource.ResourceRequestModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha2_ResourceRequestModel_To_resource_ResourceRequestModel is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceRequestModel_To_resource_ResourceRequestModel(in *v1alpha2.ResourceRequestModel, out *resource.ResourceRequestModel, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceRequestModel_To_resource_ResourceRequestModel(in, out, s)
+}
+
+func autoConvert_resource_ResourceRequestModel_To_v1alpha2_ResourceRequestModel(in *resource.ResourceRequestModel, out *v1alpha2.ResourceRequestModel, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_resource_ResourceRequestModel_To_v1alpha2_ResourceRequestModel is an autogenerated conversion function.
+func Convert_resource_ResourceRequestModel_To_v1alpha2_ResourceRequestModel(in *resource.ResourceRequestModel, out *v1alpha2.ResourceRequestModel, s conversion.Scope) error {
+	return autoConvert_resource_ResourceRequestModel_To_v1alpha2_ResourceRequestModel(in, out, s)
+}
+
+func autoConvert_v1alpha2_StructuredResourceHandle_To_resource_StructuredResourceHandle(in *v1alpha2.StructuredResourceHandle, out *resource.StructuredResourceHandle, s conversion.Scope) error {
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.VendorClassParameters, &out.VendorClassParameters, s); err != nil {
+		return err
+	}
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.VendorClaimParameters, &out.VendorClaimParameters, s); err != nil {
+		return err
+	}
+	out.NodeName = in.NodeName
+	if in.Results != nil {
+		in, out := &in.Results, &out.Results
+		*out = make([]resource.DriverAllocationResult, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_DriverAllocationResult_To_resource_DriverAllocationResult(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Results = nil
+	}
+	return nil
+}
+
+// Convert_v1alpha2_StructuredResourceHandle_To_resource_StructuredResourceHandle is an autogenerated conversion function.
+func Convert_v1alpha2_StructuredResourceHandle_To_resource_StructuredResourceHandle(in *v1alpha2.StructuredResourceHandle, out *resource.StructuredResourceHandle, s conversion.Scope) error {
+	return autoConvert_v1alpha2_StructuredResourceHandle_To_resource_StructuredResourceHandle(in, out, s)
+}
+
+func autoConvert_resource_StructuredResourceHandle_To_v1alpha2_StructuredResourceHandle(in *resource.StructuredResourceHandle, out *v1alpha2.StructuredResourceHandle, s conversion.Scope) error {
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.VendorClassParameters, &out.VendorClassParameters, s); err != nil {
+		return err
+	}
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.VendorClaimParameters, &out.VendorClaimParameters, s); err != nil {
+		return err
+	}
+	out.NodeName = in.NodeName
+	if in.Results != nil {
+		in, out := &in.Results, &out.Results
+		*out = make([]v1alpha2.DriverAllocationResult, len(*in))
+		for i := range *in {
+			if err := Convert_resource_DriverAllocationResult_To_v1alpha2_DriverAllocationResult(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Results = nil
+	}
+	return nil
+}
+
+// Convert_resource_StructuredResourceHandle_To_v1alpha2_StructuredResourceHandle is an autogenerated conversion function.
+func Convert_resource_StructuredResourceHandle_To_v1alpha2_StructuredResourceHandle(in *resource.StructuredResourceHandle, out *v1alpha2.StructuredResourceHandle, s conversion.Scope) error {
+	return autoConvert_resource_StructuredResourceHandle_To_v1alpha2_StructuredResourceHandle(in, out, s)
+}
+
+func autoConvert_v1alpha2_VendorParameters_To_resource_VendorParameters(in *v1alpha2.VendorParameters, out *resource.VendorParameters, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Parameters, &out.Parameters, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha2_VendorParameters_To_resource_VendorParameters is an autogenerated conversion function.
+func Convert_v1alpha2_VendorParameters_To_resource_VendorParameters(in *v1alpha2.VendorParameters, out *resource.VendorParameters, s conversion.Scope) error {
+	return autoConvert_v1alpha2_VendorParameters_To_resource_VendorParameters(in, out, s)
+}
+
+func autoConvert_resource_VendorParameters_To_v1alpha2_VendorParameters(in *resource.VendorParameters, out *v1alpha2.VendorParameters, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Parameters, &out.Parameters, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_resource_VendorParameters_To_v1alpha2_VendorParameters is an autogenerated conversion function.
+func Convert_resource_VendorParameters_To_v1alpha2_VendorParameters(in *resource.VendorParameters, out *v1alpha2.VendorParameters, s conversion.Scope) error {
+	return autoConvert_resource_VendorParameters_To_v1alpha2_VendorParameters(in, out, s)
 }

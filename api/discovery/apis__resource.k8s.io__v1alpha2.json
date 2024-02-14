@@ -4,6 +4,23 @@
   "kind": "APIResourceList",
   "resources": [
     {
+      "kind": "NodeResourceSlice",
+      "name": "noderesourceslices",
+      "namespaced": false,
+      "singularName": "noderesourceslice",
+      "storageVersionHash": "KmjmPdo2jrQ=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
       "kind": "PodSchedulingContext",
       "name": "podschedulingcontexts",
       "namespaced": true,
@@ -29,6 +46,23 @@
         "get",
         "patch",
         "update"
+      ]
+    },
+    {
+      "kind": "ResourceClaimParameters",
+      "name": "resourceclaimparameters",
+      "namespaced": true,
+      "singularName": "resourceclaimparameters",
+      "storageVersionHash": "DWM408h+ZHE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
       ]
     },
     {
@@ -82,6 +116,23 @@
       "namespaced": false,
       "singularName": "resourceclass",
       "storageVersionHash": "wkt0Tpte++U=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourceClassParameters",
+      "name": "resourceclassparameters",
+      "namespaced": true,
+      "singularName": "resourceclassparameters",
+      "storageVersionHash": "MDq5XoTnXWQ=",
       "verbs": [
         "create",
         "delete",

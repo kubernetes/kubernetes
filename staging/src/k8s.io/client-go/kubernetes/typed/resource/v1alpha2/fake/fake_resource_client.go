@@ -28,6 +28,10 @@ type FakeResourceV1alpha2 struct {
 	*testing.Fake
 }
 
+func (c *FakeResourceV1alpha2) NodeResourceSlices() v1alpha2.NodeResourceSliceInterface {
+	return &FakeNodeResourceSlices{c}
+}
+
 func (c *FakeResourceV1alpha2) PodSchedulingContexts(namespace string) v1alpha2.PodSchedulingContextInterface {
 	return &FakePodSchedulingContexts{c, namespace}
 }
@@ -36,12 +40,20 @@ func (c *FakeResourceV1alpha2) ResourceClaims(namespace string) v1alpha2.Resourc
 	return &FakeResourceClaims{c, namespace}
 }
 
+func (c *FakeResourceV1alpha2) ResourceClaimParameters(namespace string) v1alpha2.ResourceClaimParametersInterface {
+	return &FakeResourceClaimParameters{c, namespace}
+}
+
 func (c *FakeResourceV1alpha2) ResourceClaimTemplates(namespace string) v1alpha2.ResourceClaimTemplateInterface {
 	return &FakeResourceClaimTemplates{c, namespace}
 }
 
 func (c *FakeResourceV1alpha2) ResourceClasses() v1alpha2.ResourceClassInterface {
 	return &FakeResourceClasses{c}
+}
+
+func (c *FakeResourceV1alpha2) ResourceClassParameters(namespace string) v1alpha2.ResourceClassParametersInterface {
+	return &FakeResourceClassParameters{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

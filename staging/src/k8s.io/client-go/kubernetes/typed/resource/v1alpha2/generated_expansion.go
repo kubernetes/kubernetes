@@ -18,10 +18,16 @@ limitations under the License.
 
 package v1alpha2
 
+type NodeResourceSliceExpansion interface{}
+
 type PodSchedulingContextExpansion interface{}
 
 type ResourceClaimExpansion interface{}
 
+type ResourceClaimParametersExpansion interface{}
+
 type ResourceClaimTemplateExpansion interface{}
 
 type ResourceClassExpansion interface{}
+
+type ResourceClassParametersExpansion interface{}

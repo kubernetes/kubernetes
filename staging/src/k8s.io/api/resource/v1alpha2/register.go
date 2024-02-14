@@ -52,6 +52,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ResourceClaimTemplateList{},
 		&PodSchedulingContext{},
 		&PodSchedulingContextList{},
+		&NodeResourceSlice{},
+		&NodeResourceSliceList{},
+		&ResourceClaimParameters{},
+		&ResourceClaimParametersList{},
+		&ResourceClassParameters{},
+		&ResourceClassParametersList{},
 	)
 
 	// Add common types

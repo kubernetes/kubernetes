@@ -380,6 +380,81 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			},
 		},
+		"valid-add-empty-allocation-structured": {
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.DriverName = "valid"
+				claim.Status.Allocation = &resource.AllocationResult{
+					ResourceHandles: []resource.ResourceHandle{
+						{
+							DriverName: "valid",
+							StructuredData: &resource.StructuredResourceHandle{
+								NodeName: "worker",
+							},
+						},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-add-allocation-structured": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "resourceHandles").Index(0).Child("structuredData", "nodeName"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.DriverName = "valid"
+				claim.Status.Allocation = &resource.AllocationResult{
+					ResourceHandles: []resource.ResourceHandle{
+						{
+							DriverName: "valid",
+							StructuredData: &resource.StructuredResourceHandle{
+								Results: []resource.DriverAllocationResult{
+									// TODO: empty AllocationResultMode
+								},
+							},
+						},
+					},
+				}
+				return claim
+			},
+		},
+		"valid-add-allocation-structured": {
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.DriverName = "valid"
+				claim.Status.Allocation = &resource.AllocationResult{
+					ResourceHandles: []resource.ResourceHandle{
+						{
+							DriverName: "valid",
+							StructuredData: &resource.StructuredResourceHandle{
+								NodeName: "worker",
+							},
+						},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-duplicated-data": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "resourceHandles").Index(0), nil, "data and structuredData are mutually exclusive")},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.DriverName = "valid"
+				claim.Status.Allocation = &resource.AllocationResult{
+					ResourceHandles: []resource.ResourceHandle{
+						{
+							DriverName: "valid",
+							Data:       "something",
+							StructuredData: &resource.StructuredResourceHandle{
+								NodeName: "worker",
+							},
+						},
+					},
+				}
+				return claim
+			},
+		},
 		"invalid-allocation-resourceHandles": {
 			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "resourceHandles"), resource.AllocationResultResourceHandlesMaxSize+1, resource.AllocationResultResourceHandlesMaxSize)},
 			oldClaim:     validClaim,
@@ -413,7 +488,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-allocation-resource-handle-data": {
-			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "resourceHandles[0]", "data"), resource.ResourceHandleDataMaxSize+1, resource.ResourceHandleDataMaxSize)},
+			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "resourceHandles").Index(0).Child("data"), resource.ResourceHandleDataMaxSize+1, resource.ResourceHandleDataMaxSize)},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.DriverName = "valid"

@@ -1523,6 +1523,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=resource.k8s.io, Version=v1alpha2
 	case v1alpha2.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha2.AllocationResultApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("DriverAllocationResult"):
+		return &resourcev1alpha2.DriverAllocationResultApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("DriverRequests"):
+		return &resourcev1alpha2.DriverRequestsApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceSlice"):
+		return &resourcev1alpha2.NodeResourceSliceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContext"):
 		return &resourcev1alpha2.PodSchedulingContextApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContextSpec"):
@@ -1533,6 +1539,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.ResourceClaimApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimConsumerReference"):
 		return &resourcev1alpha2.ResourceClaimConsumerReferenceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimParameters"):
+		return &resourcev1alpha2.ResourceClaimParametersApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimParametersReference"):
 		return &resourcev1alpha2.ResourceClaimParametersReferenceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClaimSchedulingStatus"):
@@ -1547,10 +1555,20 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.ResourceClaimTemplateSpecApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClass"):
 		return &resourcev1alpha2.ResourceClassApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClassParameters"):
+		return &resourcev1alpha2.ResourceClassParametersApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceClassParametersReference"):
 		return &resourcev1alpha2.ResourceClassParametersReferenceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceFilter"):
+		return &resourcev1alpha2.ResourceFilterApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceHandle"):
 		return &resourcev1alpha2.ResourceHandleApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceRequest"):
+		return &resourcev1alpha2.ResourceRequestApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("StructuredResourceHandle"):
+		return &resourcev1alpha2.StructuredResourceHandleApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("VendorParameters"):
+		return &resourcev1alpha2.VendorParametersApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):
