@@ -75,7 +75,7 @@ func BeRunningNoRetries() types.GomegaMatcher {
 		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed, v1.PodSucceeded:
-				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead.", v1.PodRunning, pod.Status.Phase))
+				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
 			default:
 				return true, nil
 			}
