@@ -35,7 +35,7 @@ import (
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
 	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports map[tlsCacheKey]http.RoundTripper
 }
 
 // ControllerStopCtx is a stop context object that is passed down to
@@ -49,10 +49,11 @@ var ControllerStopCtx = wait.NeverStopCtx
 
 const idleConnsPerHost = 25
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)}
 
 type tlsCacheKey struct {
 	insecure           bool
+	caFile             string
 	caData             string
 	certData           string
 	keyData            string `datapolicy:"security-key"`
@@ -139,13 +140,20 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		DialContext:         dial,
 		DisableCompression:  config.DisableCompression,
 	})
+	var rt http.RoundTripper = transport
+	if config.TLS.ReloadCAFile && tlsConfig != nil {
+		reloadable := newDynamicRootCATransport(transport)
+		rt = reloadable
+		controller := newDynamicRootCATransportController(newRootCASyncer(reloadable, config.TLS.CAFile, config.TLS.CAData))
+		go controller.Run(ControllerStopCtx)
+	}
 
 	if canCache {
 		// Cache a single transport for these options
-		c.transports[key] = transport
+		c.transports[key] = rt
 	}
 
-	return transport, nil
+	return rt, nil
 }
 
 // tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor
@@ -162,7 +170,6 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 
 	k := tlsCacheKey{
 		insecure:           c.TLS.Insecure,
-		caData:             string(c.TLS.CAData),
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
@@ -176,6 +183,12 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	} else {
 		k.certData = string(c.TLS.CertData)
 		k.keyData = string(c.TLS.KeyData)
+	}
+
+	if c.TLS.ReloadCAFile {
+		k.caFile = c.TLS.CAFile
+	} else {
+		k.caData = string(c.TLS.CAData)
 	}
 
 	return k, true, nil

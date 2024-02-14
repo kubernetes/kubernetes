@@ -82,14 +82,21 @@ func TestTLSConfigKey(t *testing.T) {
 	keyFile2, removeKeyFile2Fn := writeBytesToFile(t, []byte{2})
 	defer removeKeyFile2Fn(t)
 
+	caFile1, removeCAFile1Fn := writeBytesToFile(t, []byte{1})
+	defer removeCAFile1Fn(t)
+	caFile2, removeCAFile2Fn := writeBytesToFile(t, []byte{2})
+	defer removeCAFile2Fn(t)
+
 	uniqueConfigurations := map[string]*Config{
-		"proxy":    {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
-		"no tls":   {},
-		"dialer":   {DialHolder: &DialHolder{Dial: dialer.DialContext}},
-		"dialer2":  {DialHolder: &DialHolder{Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }}},
-		"insecure": {TLS: TLSConfig{Insecure: true}},
-		"cadata 1": {TLS: TLSConfig{CAData: []byte{1}}},
-		"cadata 2": {TLS: TLSConfig{CAData: []byte{2}}},
+		"proxy":     {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
+		"no tls":    {},
+		"dialer":    {DialHolder: &DialHolder{Dial: dialer.DialContext}},
+		"dialer2":   {DialHolder: &DialHolder{Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }}},
+		"insecure":  {TLS: TLSConfig{Insecure: true}},
+		"cadata 1":  {TLS: TLSConfig{CAData: []byte{1}}},
+		"cadata 2":  {TLS: TLSConfig{CAData: []byte{2}}},
+		"ca file 1": {TLS: TLSConfig{CAFile: caFile1}},
+		"ca file 2": {TLS: TLSConfig{CAFile: caFile2}},
 		"cert 1, key 1": {
 			TLS: TLSConfig{
 				CertData: []byte{1},
@@ -142,6 +149,20 @@ func TestTLSConfigKey(t *testing.T) {
 				KeyData:  []byte{1},
 			},
 		},
+		"ca file 1, cert 1, key 1": {
+			TLS: TLSConfig{
+				CAFile:   caFile1,
+				CertData: []byte{1},
+				KeyData:  []byte{1},
+			},
+		},
+		"ca file 2, cert 1, key 1": {
+			TLS: TLSConfig{
+				CAFile:   caFile2,
+				CertData: []byte{1},
+				KeyData:  []byte{1},
+			},
+		},
 		"cert file 1, key file 1": {
 			TLS: TLSConfig{
 				CertFile: certFile1,
@@ -158,6 +179,14 @@ func TestTLSConfigKey(t *testing.T) {
 		"cadata 1, cert file 1, key file 1, servername 1": {
 			TLS: TLSConfig{
 				CAData:     []byte{1},
+				CertFile:   certFile1,
+				KeyFile:    keyFile1,
+				ServerName: "1",
+			},
+		},
+		"ca file 1, cert file 1, key file 1, servername 1": {
+			TLS: TLSConfig{
+				CAFile:     caFile1,
 				CertFile:   certFile1,
 				KeyFile:    keyFile1,
 				ServerName: "1",
@@ -191,6 +220,13 @@ func TestTLSConfigKey(t *testing.T) {
 		"cadata 1, cert file 1, key file 1": {
 			TLS: TLSConfig{
 				CAData:   []byte{1},
+				CertFile: certFile1,
+				KeyFile:  keyFile1,
+			},
+		},
+		"ca file 1, cert file 1, key file 1": {
+			TLS: TLSConfig{
+				CAFile:   caFile1,
 				CertFile: certFile1,
 				KeyFile:  keyFile1,
 			},

@@ -211,6 +211,10 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 // KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
 // either populated or were empty to start.
 func loadTLSFiles(c *Config) error {
+	if len(c.TLS.CAFile) > 0 && len(c.TLS.CAData) == 0 {
+		c.TLS.ReloadCAFile = true
+	}
+
 	var err error
 	c.TLS.CAData, err = dataFromSliceOrFile(c.TLS.CAData, c.TLS.CAFile)
 	if err != nil {

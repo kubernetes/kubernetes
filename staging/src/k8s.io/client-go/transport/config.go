@@ -132,6 +132,7 @@ func (c *Config) Wrap(fn WrapperFunc) {
 // TLSConfig holds the information needed to set up a TLS transport.
 type TLSConfig struct {
 	CAFile         string // Path of the PEM-encoded server trusted root certificates.
+	ReloadCAFile   bool   // Set to indicate that the root CA file should be reloaded.
 	CertFile       string // Path of the PEM-encoded client certificate.
 	KeyFile        string // Path of the PEM-encoded client key.
 	ReloadTLSFiles bool   // Set to indicate that the original config provided files, and that they should be reloaded

@@ -356,6 +356,18 @@ func TestNew(t *testing.T) {
 	}
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
+			// the Close method of httptest Server mutates the
+			// `http.DefaultTransport` object, the 'TLSClientConfig'
+			// field mutates from nil to a non nil instance. To work
+			// around it we reset the TLSClientConfig field.
+			// See: https://github.com/golang/go/issues/65796
+			//
+			// This implies that running tests in this package in
+			// parallel will introduce flake and data race.
+			if testCase.Default {
+				http.DefaultTransport.(*http.Transport).TLSClientConfig = nil
+			}
+
 			rt, err := New(testCase.Config)
 			switch {
 			case testCase.Err && err == nil:
@@ -375,7 +387,7 @@ func TestNew(t *testing.T) {
 			}
 
 			// We only know how to check TLSConfig on http.Transports
-			transport := rt.(*http.Transport)
+			transport := mustGetHTTPTransport(t, rt)
 			switch {
 			case testCase.TLS && transport.TLSClientConfig == nil:
 				t.Fatalf("got %#v, expected TLSClientConfig", transport)
@@ -416,6 +428,24 @@ func TestNew(t *testing.T) {
 				t.Errorf("got error from GetClientCertificate: %q, expected nil", err)
 			}
 		})
+	}
+}
+
+func mustGetHTTPTransport(t *testing.T, rt http.RoundTripper) *http.Transport {
+	t.Helper()
+	for {
+		if rt == nil {
+			t.Fatalf("expected the given RoundTripper object to have an embedded %T", &http.Transport{})
+		}
+
+		switch transport := rt.(type) {
+		case *http.Transport:
+			return transport
+		case interface{ WrappedRoundTripper() http.RoundTripper }:
+			rt = transport.WrappedRoundTripper()
+		default:
+			t.Fatalf("expected the given RoundTripper %T to have an embedded %T", transport, &http.Transport{})
+		}
 	}
 }
 
