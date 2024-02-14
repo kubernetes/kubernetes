@@ -1952,6 +1952,8 @@ func BenchmarkRatcheting(b *testing.B) {
 }
 
 func TestRatchetingDropFields(t *testing.T) {
+	// Field dropping only takes effect when feature is disabled
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, false)()
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -1982,6 +1984,7 @@ func TestRatchetingDropFields(t *testing.T) {
 										Type: "string",
 										XValidations: []apiextensionsv1.ValidationRule{
 											{
+												// Results in error if field wasn't dropped
 												Rule:            "self == oldSelf",
 												OptionalOldSelf: ptr(true),
 											},

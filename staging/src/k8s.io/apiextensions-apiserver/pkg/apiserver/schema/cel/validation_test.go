@@ -3622,6 +3622,106 @@ func TestRatcheting(t *testing.T) {
 				`rule compile error: compilation failed: ERROR: <input>:1:1: undeclared reference to 'asdausidyhASDNJm'`,
 			},
 		},
+		{
+			name: "typemeta fields are not ratcheted",
+			schema: mustSchema(`
+				type: object
+				properties:
+					apiVersion:
+						type: string
+						x-kubernetes-validations:
+						- rule: self == "v1"
+					kind:
+						type: string
+						x-kubernetes-validations:
+						- rule: self == "Pod"
+			`),
+			oldObj: mustUnstructured(`
+				apiVersion: v2
+				kind: Baz
+			`),
+			newObj: mustUnstructured(`
+				apiVersion: v2
+				kind: Baz
+			`),
+			errors: []string{
+				`root.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.kind: Invalid value: "string": failed rule: self == "Pod"`,
+			},
+		},
+		{
+			name: "nested typemeta fields may still be ratcheted",
+			schema: mustSchema(`
+				type: object
+				properties:
+					list:
+						type: array
+						x-kubernetes-list-type: map
+						x-kubernetes-list-map-keys: ["name"]
+						maxItems: 2
+						items:
+							type: object
+							properties:
+								name:
+									type: string
+								apiVersion:
+									type: string
+									x-kubernetes-validations:
+									- rule: self == "v1"
+								kind:
+									type: string
+									x-kubernetes-validations:
+									- rule: self == "Pod"
+					subField:
+						type: object
+						properties:
+							apiVersion:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "v1"
+							kind:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "Pod"
+							otherField:
+								type: string
+			`),
+			oldObj: mustUnstructured(`
+				subField:
+					apiVersion: v2
+					kind: Baz
+				list:	
+				- name: entry1
+				  apiVersion: v2
+				  kind: Baz
+				- name: entry2
+				  apiVersion: v3
+				  kind: Bar
+			`),
+			newObj: mustUnstructured(`
+				subField:
+					apiVersion: v2
+					kind: Baz
+					otherField: newValue
+				list:	
+				- name: entry1
+				  apiVersion: v2
+				  kind: Baz
+				  otherField: newValue2
+				- name: entry2
+				  apiVersion: v3
+				  kind: Bar
+				  otherField: newValue3
+			`),
+			warnings: []string{
+				`root.subField.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.subField.kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.list[0].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.list[0].kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.list[1].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.list[1].kind: Invalid value: "string": failed rule: self == "Pod"`,
+			},
+		},
 	}
 
 	for _, c := range cases {
