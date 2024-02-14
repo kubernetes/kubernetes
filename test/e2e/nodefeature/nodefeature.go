@@ -23,32 +23,87 @@ import (
 )
 
 var (
-	AppArmor                               = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("AppArmor"))
-	CheckpointContainer                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CheckpointContainer"))
-	CriticalPod                            = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CriticalPod"))
-	DeviceManager                          = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DeviceManager"))
-	DevicePluginProbe                      = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DevicePluginProbe"))
-	DownwardAPIHugePages                   = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DownwardAPIHugePages"))
-	DynamicResourceAllocation              = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DynamicResourceAllocation"))
-	Eviction                               = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("Eviction"))
-	FSGroup                                = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("FSGroup"))
-	GarbageCollect                         = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GarbageCollect"))
-	GracefulNodeShutdown                   = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GracefulNodeShutdown"))
+	// Please keep the list in alphabetical order.
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	AppArmor = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("AppArmor"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	CheckpointContainer = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CheckpointContainer"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	CriticalPod = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CriticalPod"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	DeviceManager = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DeviceManager"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	DevicePluginProbe = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DevicePluginProbe"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	DownwardAPIHugePages = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DownwardAPIHugePages"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	DynamicResourceAllocation = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DynamicResourceAllocation"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Eviction = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("Eviction"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	FSGroup = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("FSGroup"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GarbageCollect = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GarbageCollect"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GracefulNodeShutdown = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GracefulNodeShutdown"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	GracefulNodeShutdownBasedOnPodPriority = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GracefulNodeShutdownBasedOnPodPriority"))
-	HostAccess                             = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("HostAccess"))
-	ImageID                                = framework.WithNodeFeature(framework.ValidNodeFeatures.Add(" ImageID"))
-	KubeletConfigDropInDir                 = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletConfigDropInDir"))
-	LSCIQuotaMonitoring                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("LSCIQuotaMonitoring"))
-	NodeAllocatable                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeAllocatable"))
-	NodeProblemDetector                    = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeProblemDetector"))
-	OOMScoreAdj                            = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
-	PodDisruptionConditions                = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodDisruptionConditions"))
-	PodHostIPs                             = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodHostIPs"))
-	PodResources                           = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
-	ResourceMetrics                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))
-	RuntimeHandler                         = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
-	SidecarContainers                      = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
-	SystemNodeCriticalPod                  = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	HostAccess = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("HostAccess"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ImageID = framework.WithNodeFeature(framework.ValidNodeFeatures.Add(" ImageID"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	KubeletConfigDropInDir = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletConfigDropInDir"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	LSCIQuotaMonitoring = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("LSCIQuotaMonitoring"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NodeAllocatable = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeAllocatable"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NodeProblemDetector = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeProblemDetector"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	OOMScoreAdj = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodDisruptionConditions = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodDisruptionConditions"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodHostIPs = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodHostIPs"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodResources = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ResourceMetrics = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	RuntimeHandler = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	SidecarContainers = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	SystemNodeCriticalPod = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
+
+	// Please keep the list in alphabetical order.
 )
 
 func init() {
