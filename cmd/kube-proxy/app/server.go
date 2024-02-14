@@ -1046,7 +1046,8 @@ func getNodeIPs(logger klog.Logger, client clientset.Interface, name string) []n
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		// Improve the efficiency by setting ResourceVersion "0", which means "serve the current version held by the API server cache".
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{ResourceVersion: "0"})
 		if err != nil {
 			logger.Error(err, "Failed to retrieve node info")
 			return false, nil
