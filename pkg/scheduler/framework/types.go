@@ -389,7 +389,7 @@ func (f *FitError) Error() string {
 		}
 		sortedFilterMsg := sortReasonsHistogram()
 		if len(sortedFilterMsg) != 0 {
-			reasonMsg += fmt.Sprintf(" %v.", strings.Join(sortedFilterMsg, ", "))
+			reasonMsg += fmt.Sprintf(" %v", strings.Join(sortedFilterMsg, ", "))
 		}
 	}
 

@@ -179,7 +179,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod"),
 		},
 		{
 			name: "preemption should respect filteredNodesStatuses",
@@ -194,7 +194,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling"),
 		},
 		{
 			name: "pod can be made schedulable on one node",
@@ -252,7 +252,7 @@ func TestPostFilter(t *testing.T) {
 				"node2": framework.NewStatus(framework.Unschedulable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/2 nodes are available: 2 Insufficient cpu."),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/2 nodes are available: 2 Insufficient cpu"),
 		},
 		{
 			name: "no candidate nodes found with mixed reasons, no lower priority pod and no enough CPU resource",
@@ -273,7 +273,7 @@ func TestPostFilter(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/3 nodes are available: 1 Insufficient cpu, 2 No preemption victims found for incoming pod."),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/3 nodes are available: 1 Insufficient cpu, 2 No preemption victims found for incoming pod"),
 		},
 		{
 			name: "no candidate nodes found with mixed reason, 2 UnschedulableAndUnresolvable nodes and 2 nodes don't have enough CPU resource",
@@ -293,7 +293,7 @@ func TestPostFilter(t *testing.T) {
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling"),
 		},
 		{
 			name: "only one node but failed with TestPlugin",
