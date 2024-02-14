@@ -500,7 +500,6 @@ var _ = SIGDescribe("SeparateDiskTest PriorityLocalStorageEvictionOrdering", fra
 			},
 		}
 		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
-		specs[2].pod.Spec.PriorityClassName = highPriorityClassName
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, specs)
 	})
 })

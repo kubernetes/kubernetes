@@ -475,30 +475,29 @@ func hasMemoryAndCPUInstUsage(info *cadvisorapiv2.ContainerInfo) bool {
 // 3. both zero CPU instantaneous usage zero memory RSS usage and zero network usage,
 // and false otherwise.
 func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
-	return false
-	// if !info.Spec.HasCpu && !info.Spec.HasMemory && !info.Spec.HasNetwork {
-	// 	return true
-	// }
-	// cstat, found := latestContainerStats(info)
-	// if !found {
-	// 	return true
-	// }
-	// if cstat.Network != nil {
-	// 	iStats := cadvisorInfoToNetworkStats(info)
-	// 	if iStats != nil {
-	// 		for _, iStat := range iStats.Interfaces {
-	// 			if *iStat.RxErrors != 0 || *iStat.TxErrors != 0 || *iStat.RxBytes != 0 || *iStat.TxBytes != 0 {
-	// 				return false
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// if cstat.DiskIo != nil {
-	// }
-	// if cstat.CpuInst == nil || cstat.Memory == nil {
-	// 	return true
-	// }
-	// return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0
+	if !info.Spec.HasCpu && !info.Spec.HasMemory && !info.Spec.HasNetwork {
+		return true
+	}
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return true
+	}
+	if cstat.Network != nil {
+		iStats := cadvisorInfoToNetworkStats(info)
+		if iStats != nil {
+			for _, iStat := range iStats.Interfaces {
+				if *iStat.RxErrors != 0 || *iStat.TxErrors != 0 || *iStat.RxBytes != 0 || *iStat.TxBytes != 0 {
+					return false
+				}
+			}
+		}
+	}
+	if cstat.DiskIo != nil {
+	}
+	if cstat.CpuInst == nil || cstat.Memory == nil {
+		return true
+	}
+	return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0
 }
 
 func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.ContainerInfo, error) {
