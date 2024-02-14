@@ -354,7 +354,7 @@ func (di *diagnose) item() error { //nolint:gocyclo
 		return di.writeString(strconv.FormatInt(nValue, 10))
 
 	case cborTypeByteString:
-		b := di.d.parseByteString()
+		b, _ := di.d.parseByteString()
 		return di.encodeByteString(b)
 
 	case cborTypeTextString:
@@ -418,7 +418,7 @@ func (di *diagnose) item() error { //nolint:gocyclo
 				return errors.New("cbor: tag number 2 must be followed by byte string, got " + nt.String())
 			}
 
-			b := di.d.parseByteString()
+			b, _ := di.d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
 			return di.writeString(bi.String())
 
@@ -427,7 +427,7 @@ func (di *diagnose) item() error { //nolint:gocyclo
 				return errors.New("cbor: tag number 3 must be followed by byte string, got " + nt.String())
 			}
 
-			b := di.d.parseByteString()
+			b, _ := di.d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
 			bi.Add(bi, big.NewInt(1))
 			bi.Neg(bi)

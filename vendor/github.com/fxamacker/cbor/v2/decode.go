@@ -51,6 +51,7 @@ import (
 //	CBOR null and undefined values decode to nil.
 //	CBOR times (tag 0 and 1) decode to time.Time.
 //	CBOR bignums (tag 2 and 3) decode to big.Int.
+//	CBOR tags with an unrecognized number decode to cbor.Tag
 //
 // To unmarshal a CBOR array into a slice, Unmarshal allocates a new slice
 // if the CBOR array is empty or slice capacity is less than CBOR array length.
@@ -226,7 +227,7 @@ const (
 )
 
 func (dmkm DupMapKeyMode) valid() bool {
-	return dmkm < maxDupMapKeyMode
+	return dmkm >= 0 && dmkm < maxDupMapKeyMode
 }
 
 // IndefLengthMode specifies whether to allow indefinite length items.
@@ -243,7 +244,7 @@ const (
 )
 
 func (m IndefLengthMode) valid() bool {
-	return m < maxIndefLengthMode
+	return m >= 0 && m < maxIndefLengthMode
 }
 
 // TagsMode specifies whether to allow CBOR tags.
@@ -260,29 +261,48 @@ const (
 )
 
 func (tm TagsMode) valid() bool {
-	return tm < maxTagsMode
+	return tm >= 0 && tm < maxTagsMode
 }
 
-// IntDecMode specifies which Go int type (int64 or uint64) should
-// be used when decoding CBOR int (major type 0 and 1) to Go interface{}.
+// IntDecMode specifies which Go type (int64, uint64, or big.Int) should
+// be used when decoding CBOR integers (major type 0 and 1) to Go interface{}.
 type IntDecMode int
 
 const (
-	// IntDecConvertNone affects how CBOR int (major type 0 and 1) decodes to Go interface{}.
-	// It makes CBOR positive int (major type 0) decode to uint64 value, and
-	// CBOR negative int (major type 1) decode to int64 value.
+	// IntDecConvertNone affects how CBOR integers (major type 0 and 1) decode to Go interface{}.
+	// It decodes CBOR unsigned integer (major type 0) to:
+	// - uint64
+	// It decodes CBOR negative integer (major type 1) to:
+	// - int64 if value fits
+	// - big.Int or *big.Int (see BigIntDecMode) if value doesn't fit into int64
 	IntDecConvertNone IntDecMode = iota
 
-	// IntDecConvertSigned affects how CBOR int (major type 0 and 1) decodes to Go interface{}.
-	// It makes CBOR positive/negative int (major type 0 and 1) decode to int64 value.
-	// If value overflows int64, UnmarshalTypeError is returned.
+	// IntDecConvertSigned affects how CBOR integers (major type 0 and 1) decode to Go interface{}.
+	// It decodes CBOR integers (major type 0 and 1) to:
+	// - int64 if value fits
+	// - big.Int or *big.Int (see BigIntDecMode) if value < math.MinInt64
+	// - return UnmarshalTypeError if value > math.MaxInt64
+	// Deprecated: IntDecConvertSigned should not be used.
+	// Please use other options, such as IntDecConvertSignedOrError, IntDecConvertSignedOrBigInt, IntDecConvertNone.
 	IntDecConvertSigned
+
+	// IntDecConvertSignedOrFail affects how CBOR integers (major type 0 and 1) decode to Go interface{}.
+	// It decodes CBOR integers (major type 0 and 1) to:
+	// - int64 if value fits
+	// - return UnmarshalTypeError if value doesn't fit into int64
+	IntDecConvertSignedOrFail
+
+	// IntDecConvertSigned affects how CBOR integers (major type 0 and 1) decode to Go interface{}.
+	// It makes CBOR integers (major type 0 and 1) decode to:
+	// - int64 if value fits
+	// - big.Int or *big.Int (see BigIntDecMode) if value doesn't fit into int64
+	IntDecConvertSignedOrBigInt
 
 	maxIntDec
 )
 
 func (idm IntDecMode) valid() bool {
-	return idm < maxIntDec
+	return idm >= 0 && idm < maxIntDec
 }
 
 // MapKeyByteStringMode specifies how to decode CBOR byte string (major type 2)
@@ -312,7 +332,7 @@ const (
 )
 
 func (mkbsm MapKeyByteStringMode) valid() bool {
-	return mkbsm < maxMapKeyByteStringMode
+	return mkbsm >= 0 && mkbsm < maxMapKeyByteStringMode
 }
 
 // ExtraDecErrorCond specifies extra conditions that should be treated as errors.
@@ -350,7 +370,100 @@ const (
 )
 
 func (um UTF8Mode) valid() bool {
-	return um < maxUTF8Mode
+	return um >= 0 && um < maxUTF8Mode
+}
+
+// FieldNameMatchingMode specifies how string keys in CBOR maps are matched to Go struct field names.
+type FieldNameMatchingMode int
+
+const (
+	// FieldNameMatchingPreferCaseSensitive prefers to decode map items into struct fields whose names (or tag
+	// names) exactly match the item's key. If there is no such field, a map item will be decoded into a field whose
+	// name is a case-insensitive match for the item's key.
+	FieldNameMatchingPreferCaseSensitive FieldNameMatchingMode = iota
+
+	// FieldNameMatchingCaseSensitive decodes map items only into a struct field whose name (or tag name) is an
+	// exact match for the item's key.
+	FieldNameMatchingCaseSensitive
+
+	maxFieldNameMatchingMode
+)
+
+func (fnmm FieldNameMatchingMode) valid() bool {
+	return fnmm >= 0 && fnmm < maxFieldNameMatchingMode
+}
+
+// BigIntDecMode specifies how to decode CBOR bignum to Go interface{}.
+type BigIntDecMode int
+
+const (
+	// BigIntDecodeValue makes CBOR bignum decode to big.Int (instead of *big.Int)
+	// when unmarshalling into a Go interface{}.
+	BigIntDecodeValue BigIntDecMode = iota
+
+	// BigIntDecodePointer makes CBOR bignum decode to *big.Int when
+	// unmarshalling into a Go interface{}.
+	BigIntDecodePointer
+
+	maxBigIntDecMode
+)
+
+func (bidm BigIntDecMode) valid() bool {
+	return bidm >= 0 && bidm < maxBigIntDecMode
+}
+
+// ByteStringToStringMode specifies the behavior when decoding a CBOR byte string into a Go string.
+type ByteStringToStringMode int
+
+const (
+	// ByteStringToStringForbidden generates an error on an attempt to decode a CBOR byte string into a Go string.
+	ByteStringToStringForbidden ByteStringToStringMode = iota
+
+	// ByteStringToStringAllowed permits decoding a CBOR byte string into a Go string.
+	ByteStringToStringAllowed
+
+	maxByteStringToStringMode
+)
+
+func (bstsm ByteStringToStringMode) valid() bool {
+	return bstsm >= 0 && bstsm < maxByteStringToStringMode
+}
+
+// FieldNameByteStringMode specifies the behavior when decoding a CBOR byte string map key as a Go struct field name.
+type FieldNameByteStringMode int
+
+const (
+	// FieldNameByteStringForbidden generates an error on an attempt to decode a CBOR byte string map key as a Go struct field name.
+	FieldNameByteStringForbidden FieldNameByteStringMode = iota
+
+	// FieldNameByteStringAllowed permits CBOR byte string map keys to be recognized as Go struct field names.
+	FieldNameByteStringAllowed
+
+	maxFieldNameByteStringMode
+)
+
+func (fnbsm FieldNameByteStringMode) valid() bool {
+	return fnbsm >= 0 && fnbsm < maxFieldNameByteStringMode
+}
+
+// UnrecognizedTagToAnyMode specifies how to decode unrecognized CBOR tag into an empty interface (any).
+// Currently, recognized CBOR tag numbers are 0, 1, 2, 3, or registered by TagSet.
+type UnrecognizedTagToAnyMode int
+
+const (
+	// UnrecognizedTagNumAndContentToAny decodes CBOR tag number and tag content to cbor.Tag
+	// when decoding unrecognized CBOR tag into an empty interface.
+	UnrecognizedTagNumAndContentToAny UnrecognizedTagToAnyMode = iota
+
+	// UnrecognizedTagContentToAny decodes only CBOR tag content (into its default type)
+	// when decoding unrecognized CBOR tag into an empty interface.
+	UnrecognizedTagContentToAny
+
+	maxUnrecognizedTagToAny
+)
+
+func (uttam UnrecognizedTagToAnyMode) valid() bool {
+	return uttam >= 0 && uttam < maxUnrecognizedTagToAny
 }
 
 // DecOptions specifies decoding options.
@@ -402,6 +515,29 @@ type DecOptions struct {
 	// UTF8 specifies if decoder should decode CBOR Text containing invalid UTF-8.
 	// By default, unmarshal rejects CBOR text containing invalid UTF-8.
 	UTF8 UTF8Mode
+
+	// FieldNameMatching specifies how string keys in CBOR maps are matched to Go struct field names.
+	FieldNameMatching FieldNameMatchingMode
+
+	// BigIntDec specifies how to decode CBOR bignum to Go interface{}.
+	BigIntDec BigIntDecMode
+
+	// DefaultByteStringType is the Go type that should be produced when decoding a CBOR byte
+	// string into an empty interface value. Types to which a []byte is convertible are valid
+	// for this option, except for array and pointer-to-array types. If nil, the default is
+	// []byte.
+	DefaultByteStringType reflect.Type
+
+	// ByteStringToString specifies the behavior when decoding a CBOR byte string into a Go string.
+	ByteStringToString ByteStringToStringMode
+
+	// FieldNameByteString specifies the behavior when decoding a CBOR byte string map key as a
+	// Go struct field name.
+	FieldNameByteString FieldNameByteStringMode
+
+	// UnrecognizedTagToAny specifies how to decode unrecognized CBOR tag into an empty interface.
+	// Currently, recognized CBOR tag numbers are 0, 1, 2, 3, or registered by TagSet.
+	UnrecognizedTagToAny UnrecognizedTagToAnyMode
 }
 
 // DecMode returns DecMode with immutable options and no tags (safe for concurrency).
@@ -510,19 +646,43 @@ func (opts DecOptions) decMode() (*decMode, error) {
 	if !opts.UTF8.valid() {
 		return nil, errors.New("cbor: invalid UTF8 " + strconv.Itoa(int(opts.UTF8)))
 	}
+	if !opts.FieldNameMatching.valid() {
+		return nil, errors.New("cbor: invalid FieldNameMatching " + strconv.Itoa(int(opts.FieldNameMatching)))
+	}
+	if !opts.BigIntDec.valid() {
+		return nil, errors.New("cbor: invalid BigIntDec " + strconv.Itoa(int(opts.BigIntDec)))
+	}
+	if opts.DefaultByteStringType != nil && opts.DefaultByteStringType.Kind() != reflect.String && (opts.DefaultByteStringType.Kind() != reflect.Slice || opts.DefaultByteStringType.Elem().Kind() != reflect.Uint8) {
+		return nil, fmt.Errorf("cbor: invalid DefaultByteStringType: %s is not of kind string or []uint8", opts.DefaultByteStringType)
+	}
+	if !opts.ByteStringToString.valid() {
+		return nil, errors.New("cbor: invalid ByteStringToString " + strconv.Itoa(int(opts.ByteStringToString)))
+	}
+	if !opts.FieldNameByteString.valid() {
+		return nil, errors.New("cbor: invalid FieldNameByteString " + strconv.Itoa(int(opts.FieldNameByteString)))
+	}
+	if !opts.UnrecognizedTagToAny.valid() {
+		return nil, errors.New("cbor: invalid UnrecognizedTagToAnyMode " + strconv.Itoa(int(opts.UnrecognizedTagToAny)))
+	}
 	dm := decMode{
-		dupMapKey:         opts.DupMapKey,
-		timeTag:           opts.TimeTag,
-		maxNestedLevels:   opts.MaxNestedLevels,
-		maxArrayElements:  opts.MaxArrayElements,
-		maxMapPairs:       opts.MaxMapPairs,
-		indefLength:       opts.IndefLength,
-		tagsMd:            opts.TagsMd,
-		intDec:            opts.IntDec,
-		mapKeyByteString:  opts.MapKeyByteString,
-		extraReturnErrors: opts.ExtraReturnErrors,
-		defaultMapType:    opts.DefaultMapType,
-		utf8:              opts.UTF8,
+		dupMapKey:             opts.DupMapKey,
+		timeTag:               opts.TimeTag,
+		maxNestedLevels:       opts.MaxNestedLevels,
+		maxArrayElements:      opts.MaxArrayElements,
+		maxMapPairs:           opts.MaxMapPairs,
+		indefLength:           opts.IndefLength,
+		tagsMd:                opts.TagsMd,
+		intDec:                opts.IntDec,
+		mapKeyByteString:      opts.MapKeyByteString,
+		extraReturnErrors:     opts.ExtraReturnErrors,
+		defaultMapType:        opts.DefaultMapType,
+		utf8:                  opts.UTF8,
+		fieldNameMatching:     opts.FieldNameMatching,
+		bigIntDec:             opts.BigIntDec,
+		defaultByteStringType: opts.DefaultByteStringType,
+		byteStringToString:    opts.ByteStringToString,
+		fieldNameByteString:   opts.FieldNameByteString,
+		unrecognizedTagToAny:  opts.UnrecognizedTagToAny,
 	}
 	return &dm, nil
 }
@@ -574,19 +734,25 @@ type DecMode interface {
 }
 
 type decMode struct {
-	tags              tagProvider
-	dupMapKey         DupMapKeyMode
-	timeTag           DecTagMode
-	maxNestedLevels   int
-	maxArrayElements  int
-	maxMapPairs       int
-	indefLength       IndefLengthMode
-	tagsMd            TagsMode
-	intDec            IntDecMode
-	mapKeyByteString  MapKeyByteStringMode
-	extraReturnErrors ExtraDecErrorCond
-	defaultMapType    reflect.Type
-	utf8              UTF8Mode
+	tags                  tagProvider
+	dupMapKey             DupMapKeyMode
+	timeTag               DecTagMode
+	maxNestedLevels       int
+	maxArrayElements      int
+	maxMapPairs           int
+	indefLength           IndefLengthMode
+	tagsMd                TagsMode
+	intDec                IntDecMode
+	mapKeyByteString      MapKeyByteStringMode
+	extraReturnErrors     ExtraDecErrorCond
+	defaultMapType        reflect.Type
+	utf8                  UTF8Mode
+	fieldNameMatching     FieldNameMatchingMode
+	bigIntDec             BigIntDecMode
+	defaultByteStringType reflect.Type
+	byteStringToString    ByteStringToStringMode
+	fieldNameByteString   FieldNameByteStringMode
+	unrecognizedTagToAny  UnrecognizedTagToAnyMode
 }
 
 var defaultDecMode, _ = DecOptions{}.decMode()
@@ -594,17 +760,24 @@ var defaultDecMode, _ = DecOptions{}.decMode()
 // DecOptions returns user specified options used to create this DecMode.
 func (dm *decMode) DecOptions() DecOptions {
 	return DecOptions{
-		DupMapKey:         dm.dupMapKey,
-		TimeTag:           dm.timeTag,
-		MaxNestedLevels:   dm.maxNestedLevels,
-		MaxArrayElements:  dm.maxArrayElements,
-		MaxMapPairs:       dm.maxMapPairs,
-		IndefLength:       dm.indefLength,
-		TagsMd:            dm.tagsMd,
-		IntDec:            dm.intDec,
-		MapKeyByteString:  dm.mapKeyByteString,
-		ExtraReturnErrors: dm.extraReturnErrors,
-		UTF8:              dm.utf8,
+		DupMapKey:             dm.dupMapKey,
+		TimeTag:               dm.timeTag,
+		MaxNestedLevels:       dm.maxNestedLevels,
+		MaxArrayElements:      dm.maxArrayElements,
+		MaxMapPairs:           dm.maxMapPairs,
+		IndefLength:           dm.indefLength,
+		TagsMd:                dm.tagsMd,
+		IntDec:                dm.intDec,
+		MapKeyByteString:      dm.mapKeyByteString,
+		ExtraReturnErrors:     dm.extraReturnErrors,
+		DefaultMapType:        dm.defaultMapType,
+		UTF8:                  dm.utf8,
+		FieldNameMatching:     dm.fieldNameMatching,
+		BigIntDec:             dm.bigIntDec,
+		DefaultByteStringType: dm.defaultByteStringType,
+		ByteStringToString:    dm.byteStringToString,
+		FieldNameByteString:   dm.fieldNameByteString,
+		UnrecognizedTagToAny:  dm.unrecognizedTagToAny,
 	}
 }
 
@@ -757,6 +930,13 @@ const (
 // and does not perform bounds checking.
 func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolint:gocyclo
 
+	// Decode CBOR nil or CBOR undefined to pointer value by setting pointer value to nil.
+	if d.nextCBORNil() && v.Kind() == reflect.Ptr {
+		d.skip()
+		v.Set(reflect.Zero(v.Type()))
+		return nil
+	}
+
 	if tInfo.spclType == specialTypeIface {
 		if !v.IsNil() {
 			// Use value type
@@ -787,18 +967,17 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 		}
 	}
 
-	// Create new value for the pointer v to point to if CBOR value is not nil/undefined.
-	if !d.nextCBORNil() {
-		for v.Kind() == reflect.Ptr {
-			if v.IsNil() {
-				if !v.CanSet() {
-					d.skip()
-					return errors.New("cbor: cannot set new value for " + v.Type().String())
-				}
-				v.Set(reflect.New(v.Type().Elem()))
+	// Create new value for the pointer v to point to.
+	// At this point, CBOR value is not nil/undefined if v is a pointer.
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			if !v.CanSet() {
+				d.skip()
+				return errors.New("cbor: cannot set new value for " + v.Type().String())
 			}
-			v = v.Elem()
+			v.Set(reflect.New(v.Type().Elem()))
 		}
+		v = v.Elem()
 	}
 
 	// Strip self-described CBOR tag number.
@@ -872,6 +1051,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 	case cborTypePositiveInt:
 		_, _, val := d.getHead()
 		return fillPositiveInt(t, val, v)
+
 	case cborTypeNegativeInt:
 		_, _, val := d.getHead()
 		if val > math.MaxInt64 {
@@ -893,15 +1073,18 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 		}
 		nValue := int64(-1) ^ int64(val)
 		return fillNegativeInt(t, nValue, v)
+
 	case cborTypeByteString:
-		b := d.parseByteString()
-		return fillByteString(t, b, v)
+		b, copied := d.parseByteString()
+		return fillByteString(t, b, !copied, v, d.dm.byteStringToString)
+
 	case cborTypeTextString:
 		b, err := d.parseTextString()
 		if err != nil {
 			return err
 		}
 		return fillTextString(t, b, v)
+
 	case cborTypePrimitives:
 		_, ai, val := d.getHead()
 		switch ai {
@@ -915,11 +1098,6 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 			f := math.Float64frombits(val)
 			return fillFloat(t, f, v)
 		default: // ai <= 24
-			// Decode simple values (including false, true, null, and undefined)
-			if tInfo.nonPtrType == typeSimpleValue {
-				v.SetUint(val)
-				return nil
-			}
 			switch ai {
 			case 20, 21:
 				return fillBool(t, ai == 21, v)
@@ -935,7 +1113,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 		switch tagNum {
 		case 2:
 			// Bignum (tag 2) can be decoded to uint, int, float, slice, array, or big.Int.
-			b := d.parseByteString()
+			b, copied := d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
 
 			if tInfo.nonPtrType == typeBigInt {
@@ -943,7 +1121,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 				return nil
 			}
 			if tInfo.nonPtrKind == reflect.Slice || tInfo.nonPtrKind == reflect.Array {
-				return fillByteString(t, b, v)
+				return fillByteString(t, b, !copied, v, ByteStringToStringForbidden)
 			}
 			if bi.IsUint64() {
 				return fillPositiveInt(t, bi.Uint64(), v)
@@ -955,7 +1133,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 			}
 		case 3:
 			// Bignum (tag 3) can be decoded to int, float, slice, array, or big.Int.
-			b := d.parseByteString()
+			b, copied := d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
 			bi.Add(bi, big.NewInt(1))
 			bi.Neg(bi)
@@ -965,7 +1143,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 				return nil
 			}
 			if tInfo.nonPtrKind == reflect.Slice || tInfo.nonPtrKind == reflect.Array {
-				return fillByteString(t, b, v)
+				return fillByteString(t, b, !copied, v, ByteStringToStringForbidden)
 			}
 			if bi.IsInt64() {
 				return fillNegativeInt(t, bi.Int64(), v)
@@ -977,6 +1155,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 			}
 		}
 		return d.parseToValue(v, tInfo)
+
 	case cborTypeArray:
 		if tInfo.nonPtrKind == reflect.Slice {
 			return d.parseArrayToSlice(v, tInfo)
@@ -987,6 +1166,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 		}
 		d.skip()
 		return &UnmarshalTypeError{CBORType: t.String(), GoType: tInfo.nonPtrType.String()}
+
 	case cborTypeMap:
 		if tInfo.nonPtrKind == reflect.Struct {
 			return d.parseMapToStruct(v, tInfo)
@@ -996,6 +1176,7 @@ func (d *decoder) parseToValue(v reflect.Value, tInfo *typeInfo) error { //nolin
 		d.skip()
 		return &UnmarshalTypeError{CBORType: t.String(), GoType: tInfo.nonPtrType.String()}
 	}
+
 	return nil
 }
 
@@ -1136,30 +1317,87 @@ func (d *decoder) parse(skipSelfDescribedTag bool) (interface{}, error) { //noli
 	switch t {
 	case cborTypePositiveInt:
 		_, _, val := d.getHead()
-		if d.dm.intDec == IntDecConvertNone {
+
+		switch d.dm.intDec {
+		case IntDecConvertNone:
 			return val, nil
-		}
-		if val > math.MaxInt64 {
-			return nil, &UnmarshalTypeError{
-				CBORType: t.String(),
-				GoType:   reflect.TypeOf(int64(0)).String(),
-				errorMsg: strconv.FormatUint(val, 10) + " overflows Go's int64",
+
+		case IntDecConvertSigned, IntDecConvertSignedOrFail:
+			if val > math.MaxInt64 {
+				return nil, &UnmarshalTypeError{
+					CBORType: t.String(),
+					GoType:   reflect.TypeOf(int64(0)).String(),
+					errorMsg: strconv.FormatUint(val, 10) + " overflows Go's int64",
+				}
 			}
+
+			return int64(val), nil
+
+		case IntDecConvertSignedOrBigInt:
+			if val > math.MaxInt64 {
+				bi := new(big.Int).SetUint64(val)
+				if d.dm.bigIntDec == BigIntDecodePointer {
+					return bi, nil
+				}
+				return *bi, nil
+			}
+
+			return int64(val), nil
+
+		default:
+			// not reachable
 		}
-		return int64(val), nil
+
 	case cborTypeNegativeInt:
 		_, _, val := d.getHead()
+
 		if val > math.MaxInt64 {
 			// CBOR negative integer value overflows Go int64, use big.Int instead.
 			bi := new(big.Int).SetUint64(val)
 			bi.Add(bi, big.NewInt(1))
 			bi.Neg(bi)
+
+			if d.dm.intDec == IntDecConvertSignedOrFail {
+				return nil, &UnmarshalTypeError{
+					CBORType: t.String(),
+					GoType:   reflect.TypeOf(int64(0)).String(),
+					errorMsg: bi.String() + " overflows Go's int64",
+				}
+			}
+
+			if d.dm.bigIntDec == BigIntDecodePointer {
+				return bi, nil
+			}
 			return *bi, nil
 		}
+
 		nValue := int64(-1) ^ int64(val)
 		return nValue, nil
+
 	case cborTypeByteString:
-		return d.parseByteString(), nil
+		switch d.dm.defaultByteStringType {
+		case nil, typeByteSlice:
+			b, copied := d.parseByteString()
+			if copied {
+				return b, nil
+			}
+			clone := make([]byte, len(b))
+			copy(clone, b)
+			return clone, nil
+		case typeString:
+			b, _ := d.parseByteString()
+			return string(b), nil
+		default:
+			b, copied := d.parseByteString()
+			if copied || d.dm.defaultByteStringType.Kind() == reflect.String {
+				// Avoid an unnecessary copy since the conversion to string must
+				// copy the underlying bytes.
+				return reflect.ValueOf(b).Convert(d.dm.defaultByteStringType).Interface(), nil
+			}
+			clone := make([]byte, len(b))
+			copy(clone, b)
+			return reflect.ValueOf(clone).Convert(d.dm.defaultByteStringType).Interface(), nil
+		}
 	case cborTypeTextString:
 		b, err := d.parseTextString()
 		if err != nil {
@@ -1176,14 +1414,22 @@ func (d *decoder) parse(skipSelfDescribedTag bool) (interface{}, error) { //noli
 			d.off = tagOff
 			return d.parseToTime()
 		case 2:
-			b := d.parseByteString()
+			b, _ := d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
+
+			if d.dm.bigIntDec == BigIntDecodePointer {
+				return bi, nil
+			}
 			return *bi, nil
 		case 3:
-			b := d.parseByteString()
+			b, _ := d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
 			bi.Add(bi, big.NewInt(1))
 			bi.Neg(bi)
+
+			if d.dm.bigIntDec == BigIntDecodePointer {
+				return bi, nil
+			}
 			return *bi, nil
 		}
 
@@ -1210,6 +1456,9 @@ func (d *decoder) parse(skipSelfDescribedTag bool) (interface{}, error) { //noli
 		content, err := d.parse(false)
 		if err != nil {
 			return nil, err
+		}
+		if d.dm.unrecognizedTagToAny == UnrecognizedTagContentToAny {
+			return content, nil
 		}
 		return Tag{tagNum, content}, nil
 	case cborTypePrimitives:
@@ -1248,15 +1497,16 @@ func (d *decoder) parse(skipSelfDescribedTag bool) (interface{}, error) { //noli
 	return nil, nil
 }
 
-// parseByteString parses CBOR encoded byte string.  It returns a byte slice
-// pointing to a copy of parsed data.
-func (d *decoder) parseByteString() []byte {
+// parseByteString parses a CBOR encoded byte string. The returned byte slice
+// may be backed directly by the input. The second return value will be true if
+// and only if the slice is backed by a copy of the input. Callers are
+// responsible for making a copy if necessary.
+func (d *decoder) parseByteString() ([]byte, bool) {
 	_, ai, val := d.getHead()
 	if ai != 31 {
-		b := make([]byte, int(val))
-		copy(b, d.data[d.off:d.off+int(val)])
+		b := d.data[d.off : d.off+int(val)]
 		d.off += int(val)
-		return b
+		return b, false
 	}
 	// Process indefinite length string chunks.
 	b := []byte{}
@@ -1265,7 +1515,7 @@ func (d *decoder) parseByteString() []byte {
 		b = append(b, d.data[d.off:d.off+int(val)]...)
 		d.off += int(val)
 	}
-	return b
+	return b, true
 }
 
 // parseTextString parses CBOR encoded text string.  It returns a byte slice
@@ -1659,15 +1909,19 @@ func (d *decoder) parseMapToStruct(v reflect.Value, tInfo *typeInfo) error { //n
 		var k interface{} // Used by duplicate map key detection
 
 		t := d.nextCBORType()
-		if t == cborTypeTextString {
+		if t == cborTypeTextString || (t == cborTypeByteString && d.dm.fieldNameByteString == FieldNameByteStringAllowed) {
 			var keyBytes []byte
-			keyBytes, lastErr = d.parseTextString()
-			if lastErr != nil {
-				if err == nil {
-					err = lastErr
+			if t == cborTypeTextString {
+				keyBytes, lastErr = d.parseTextString()
+				if lastErr != nil {
+					if err == nil {
+						err = lastErr
+					}
+					d.skip() // skip value
+					continue
 				}
-				d.skip() // skip value
-				continue
+			} else { // cborTypeByteString
+				keyBytes, _ = d.parseByteString()
 			}
 
 			keyLen := len(keyBytes)
@@ -1681,7 +1935,7 @@ func (d *decoder) parseMapToStruct(v reflect.Value, tInfo *typeInfo) error { //n
 				}
 			}
 			// Find field with case-insensitive match
-			if f == nil {
+			if f == nil && d.dm.fieldNameMatching == FieldNameMatchingPreferCaseSensitive {
 				keyString := string(keyBytes)
 				for i := 0; i < len(structType.fields); i++ {
 					fld := structType.fields[i]
@@ -1954,9 +2208,11 @@ var (
 	typeBigInt            = reflect.TypeOf(big.Int{})
 	typeUnmarshaler       = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
 	typeBinaryUnmarshaler = reflect.TypeOf((*encoding.BinaryUnmarshaler)(nil)).Elem()
+	typeString            = reflect.TypeOf("")
+	typeByteSlice         = reflect.TypeOf([]byte(nil))
 )
 
-func fillNil(t cborType, v reflect.Value) error {
+func fillNil(_ cborType, v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Slice, reflect.Map, reflect.Interface, reflect.Ptr:
 		v.Set(reflect.Zero(v.Type()))
@@ -2056,18 +2312,31 @@ func fillFloat(t cborType, val float64, v reflect.Value) error {
 	return &UnmarshalTypeError{CBORType: t.String(), GoType: v.Type().String()}
 }
 
-func fillByteString(t cborType, val []byte, v reflect.Value) error {
+func fillByteString(t cborType, val []byte, shared bool, v reflect.Value, bsts ByteStringToStringMode) error {
 	if reflect.PtrTo(v.Type()).Implements(typeBinaryUnmarshaler) {
 		if v.CanAddr() {
 			v = v.Addr()
 			if u, ok := v.Interface().(encoding.BinaryUnmarshaler); ok {
+				// The contract of BinaryUnmarshaler forbids
+				// retaining the input bytes, so no copying is
+				// required even if val is shared.
 				return u.UnmarshalBinary(val)
 			}
 		}
 		return errors.New("cbor: cannot set new value for " + v.Type().String())
 	}
+	if bsts == ByteStringToStringAllowed && v.Kind() == reflect.String {
+		v.SetString(string(val))
+		return nil
+	}
 	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
-		v.SetBytes(val)
+		src := val
+		if shared {
+			// SetBytes shares the underlying bytes of the source slice.
+			src = make([]byte, len(val))
+			copy(src, val)
+		}
+		v.SetBytes(src)
 		return nil
 	}
 	if v.Kind() == reflect.Array && v.Type().Elem().Kind() == reflect.Uint8 {

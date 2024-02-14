@@ -90,7 +90,7 @@ const (
 )
 
 func (dtm DecTagMode) valid() bool {
-	return dtm < maxDecTagMode
+	return dtm >= 0 && dtm < maxDecTagMode
 }
 
 // EncTagMode specifies how encoder handles tag number.
@@ -107,7 +107,7 @@ const (
 )
 
 func (etm EncTagMode) valid() bool {
-	return etm < maxEncTagMode
+	return etm >= 0 && etm < maxEncTagMode
 }
 
 // TagOptions specifies how encoder and decoder handle tag number.

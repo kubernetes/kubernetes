@@ -224,6 +224,15 @@ func getEncodingStructType(t reflect.Type) (*encodingStructType, error) {
 			copy(flds[i].cborName[n:], flds[i].name)
 			e.Reset()
 
+			// If cborName contains a text string, then cborNameByteString contains a
+			// string that has the byte string major type but is otherwise identical to
+			// cborName.
+			flds[i].cborNameByteString = make([]byte, len(flds[i].cborName))
+			copy(flds[i].cborNameByteString, flds[i].cborName)
+			// Reset encoded CBOR type to byte string, preserving the "additional
+			// information" bits:
+			flds[i].cborNameByteString[0] = byte(cborTypeByteString) | (flds[i].cborNameByteString[0] & 0x1f)
+
 			hasKeyAsStr = true
 		}
 
