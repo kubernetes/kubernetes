@@ -198,7 +198,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge

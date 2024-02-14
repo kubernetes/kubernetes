@@ -80,7 +80,6 @@ seccompDefault: false
 serializeImagePulls: true
 shutdownGracePeriod: 0s
 shutdownGracePeriodCriticalPods: 0s
-streamingConnectionIdleTimeout: 4h0m0s
 syncFrequency: 1m0s
 topologyManagerPolicy: none
 topologyManagerScope: container
