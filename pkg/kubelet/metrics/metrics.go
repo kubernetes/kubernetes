@@ -70,6 +70,7 @@ const (
 	WorkingPodCountKey                 = "working_pods"
 	OrphanedRuntimePodTotalKey         = "orphaned_runtime_pods_total"
 	RestartedPodTotalKey               = "restarted_pods_total"
+	ImagePullDurationKey               = "image_pull_duration_seconds"
 
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
@@ -126,8 +127,30 @@ const (
 	EphemeralContainer = "ephemeral_container"
 )
 
+type imageSizeBucket struct {
+	lowerBoundInBytes uint64
+	label             string
+}
+
 var (
 	podStartupDurationBuckets = []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600}
+	imagePullDurationBuckets  = []float64{1, 5, 10, 20, 30, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600}
+	// imageSizeBuckets has the labels to be associated with image_pull_duration_seconds metric. For example, if the size of
+	// an image pulled is between 1GB and 5GB, the label will be "1GB-5GB".
+	imageSizeBuckets = []imageSizeBucket{
+		{0, "0-10MB"},
+		{10 * 1024 * 1024, "10MB-100MB"},
+		{100 * 1024 * 1024, "100MB-500MB"},
+		{500 * 1024 * 1024, "500MB-1GB"},
+		{1 * 1024 * 1024 * 1024, "1GB-5GB"},
+		{5 * 1024 * 1024 * 1024, "5GB-10GB"},
+		{10 * 1024 * 1024 * 1024, "10GB-20GB"},
+		{20 * 1024 * 1024 * 1024, "20GB-30GB"},
+		{30 * 1024 * 1024 * 1024, "30GB-40GB"},
+		{40 * 1024 * 1024 * 1024, "40GB-60GB"},
+		{60 * 1024 * 1024 * 1024, "60GB-100GB"},
+		{100 * 1024 * 1024 * 1024, "GT100GB"},
+	}
 )
 
 var (
@@ -822,6 +845,20 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
+	// including the time spent in the waiting queue of image puller.
+	// The metric is broken down by bucketed image size.
+	ImagePullDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImagePullDurationKey,
+			Help:           "Duration in seconds to pull an image.",
+			Buckets:        imagePullDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"image_size_in_bytes"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -835,6 +872,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(PodStartSLIDuration)
 		legacyregistry.MustRegister(PodStartTotalDuration)
+		legacyregistry.MustRegister(ImagePullDuration)
 		legacyregistry.MustRegister(NodeStartupPreKubeletDuration)
 		legacyregistry.MustRegister(NodeStartupPreRegistrationDuration)
 		legacyregistry.MustRegister(NodeStartupRegistrationDuration)
@@ -920,4 +958,19 @@ func SinceInSeconds(start time.Time) float64 {
 // SetNodeName sets the NodeName Gauge to 1.
 func SetNodeName(name types.NodeName) {
 	NodeName.WithLabelValues(string(name)).Set(1)
+}
+
+func GetImageSizeBucket(sizeInBytes uint64) string {
+	if sizeInBytes == 0 {
+		return "N/A"
+	}
+
+	for i := len(imageSizeBuckets) - 1; i >= 0; i-- {
+		if sizeInBytes > imageSizeBuckets[i].lowerBoundInBytes {
+			return imageSizeBuckets[i].label
+		}
+	}
+
+	// return empty string when sizeInBytes is 0 (error getting image size)
+	return ""
 }

@@ -32,6 +32,7 @@ import (
 	crierrors "k8s.io/cri-api/pkg/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -166,8 +167,10 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 		return "", msg, err
 	}
 	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
-	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting)",
-		container.Image, imagePullResult.pullDuration.Truncate(time.Millisecond), time.Since(startTime).Truncate(time.Millisecond)), klog.Info)
+	imagePullDuration := time.Since(startTime).Truncate(time.Millisecond)
+	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting). Image size: %v bytes.",
+		container.Image, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
+	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
 }
