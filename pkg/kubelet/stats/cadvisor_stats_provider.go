@@ -104,7 +104,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 		// entries in our summary. For details on .mount units:
 		// http://man7.org/linux/man-pages/man5/systemd.mount.5.html
 		if strings.HasSuffix(key, ".mount") {
-			klog.InfoS("pod is being skipped", "ContainerInfo", cinfo)
+			klog.InfoS("pod is being skipped on mounts", "ContainerInfo", cinfo)
 			continue
 		}
 		// Build the Pod key if this container is managed by a Pod
@@ -388,8 +388,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		}
 		cinfosByPodCgroupKey[podCgroupKey] = cinfo
 		if !isPodManagedContainer(&cinfo) {
-			klog.InfoS("Pod is skipped", "ContainerInfo", cinfo.Spec)
-			klog.InfoS("Pod Labels", "Labels", cinfo.Spec.Labels)
+			klog.InfoS("Pod Skipped Labels", "Labels", cinfo.Spec.Labels)
 			continue
 		}
 		klog.InfoS("Pod Labels Not Skipped", "Labels", cinfo.Spec.Labels)

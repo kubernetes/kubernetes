@@ -750,7 +750,12 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
 			// prioritize evicting the pod for which no stats were found
-			klog.V(4).InfoS("Error getting stats from pods", "P1Found", p1Found, "p2found", p2Found)
+			if !p1Found {
+				klog.V(4).InfoS("Error getting stats from pod 1", "Pod1", p1.ObjectMeta)
+			}
+			if !p2Found {
+				klog.V(4).InfoS("Error getting stats from pod 2", "Pod2", p2.ObjectMeta)
+			}
 			return cmpBool(!p1Found, !p2Found)
 		}
 
@@ -777,6 +782,7 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
 			// prioritize evicting the pod for which no stats were found
+			klog.V(4).InfoS("Error getting stats from pods", "P1Found", p1Found, "P1", p1, "p2found", p2Found, "P2", p2)
 			return cmpBool(!p1Found, !p2Found)
 		}
 		p1Usage, p1Err := podDiskUsage(p1Stats, p1, fsStatsToMeasure)
