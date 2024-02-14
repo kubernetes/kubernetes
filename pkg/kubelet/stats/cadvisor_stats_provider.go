@@ -388,7 +388,6 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		}
 		cinfosByPodCgroupKey[podCgroupKey] = cinfo
 		if !isPodManagedContainer(&cinfo) {
-			klog.InfoS("Pod Skipped Labels", "Labels", cinfo.Spec.Labels)
 			continue
 		}
 		klog.InfoS("Pod Labels Not Skipped", "Labels", cinfo.Spec.Labels)
@@ -408,7 +407,9 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		if len(refs) == 1 {
 			// ContainerInfo with no CPU/memory/network usage for uncleaned cgroups of
 			// already terminated containers, which should not be shown in the results.
-			if !isContainerTerminated(&refs[0].cinfo) {
+			isTerm := isContainerTerminated(&refs[0].cinfo)
+			klog.InfoS("ContainerInfo", "IsTerminated", isTerm, "Labels", &refs[0].cinfo.Spec.Labels, "Spec", &refs[0].cinfo.Spec)
+			if !isTerm {
 				result[refs[0].cgroup] = refs[0].cinfo
 			}
 			continue
@@ -416,6 +417,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		sort.Sort(ByCreationTime(refs))
 		for i := len(refs) - 1; i >= 0; i-- {
 			if hasMemoryAndCPUInstUsage(&refs[i].cinfo) {
+				klog.InfoS("ContainerInfo", "Refs[i].cinfo", refs[i].cinfo.Spec)
 				result[refs[i].cgroup] = refs[i].cinfo
 				break
 			}
@@ -481,6 +483,7 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 	}
 	cstat, found := latestContainerStats(info)
 	if !found {
+		klog.V(4).InfoS("stats not found", "Labels", info.Spec.Labels)
 		return true
 	}
 	if cstat.Network != nil {
@@ -493,6 +496,7 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 			}
 		}
 	}
+	klog.V(4).InfoS("stats", "cstat", cstat)
 	if cstat.CpuInst == nil || cstat.Memory == nil {
 		return true
 	}
