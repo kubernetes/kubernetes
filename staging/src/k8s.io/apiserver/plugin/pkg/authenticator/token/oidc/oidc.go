@@ -204,8 +204,11 @@ func (a *Authenticator) Close() {
 	a.cancel()
 }
 
-// whitelist of signing algorithms to ensure users don't mistakenly pass something
-// goofy.
+func AllValidSigningAlgorithms() []string {
+	return sets.List(sets.KeySet(allowedSigningAlgs))
+}
+
+// allowlist of signing algorithms to ensure users don't mistakenly pass something goofy.
 var allowedSigningAlgs = map[string]bool{
 	oidc.RS256: true,
 	oidc.RS384: true,
