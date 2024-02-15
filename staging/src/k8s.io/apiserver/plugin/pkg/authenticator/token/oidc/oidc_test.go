@@ -1555,6 +1555,39 @@ func TestToken(t *testing.T) {
 			},
 		},
 		{
+			name: "multiple-audiences in authentication config, multiple matches",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"random-client", "my-client", "other-client"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["not-my-client", "my-client", "other-client"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
 			name: "multiple-audiences in authentication config, no match",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
@@ -1584,6 +1617,82 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			wantErr: `oidc: verify token: oidc: expected audience in ["my-client" "random-client"] got ["not-my-client"]`,
+		},
+		{
+			name: "nuanced audience validation using claim validation rules",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"bar", "foo", "baz"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: `sets.equivalent(claims.aud, ["bar", "foo", "baz"])`,
+							Message:    "audience must exactly contain [bar, foo, baz]",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["foo", "bar", "baz"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "audience validation using claim validation rules fails",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"bar", "foo", "baz"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: `sets.equivalent(claims.aud, ["bar", "foo", "baz"])`,
+							Message:    "audience must exactly contain [bar, foo, baz]",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["foo", "baz"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: `oidc: error evaluating claim validation expression: validation expression 'sets.equivalent(claims.aud, ["bar", "foo", "baz"])' failed: audience must exactly contain [bar, foo, baz]`,
 		},
 		{
 			name: "invalid-issuer",

@@ -242,7 +242,7 @@ type Issuer struct {
 	AudienceMatchPolicy AudienceMatchPolicyType `json:"audienceMatchPolicy,omitempty"`
 }
 
-// AudienceMatchPolicyType is a set of valid values for Issuer.AudienceMatchPolicy
+// AudienceMatchPolicyType is a set of valid values for issuer.audienceMatchPolicy
 type AudienceMatchPolicyType string
 
 // Valid types for AudienceMatchPolicyType
