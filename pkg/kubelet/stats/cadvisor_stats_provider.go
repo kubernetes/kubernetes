@@ -384,7 +384,6 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		if !isPodManagedContainer(&cinfo) {
 			continue
 		}
-		klog.InfoS("Pod Labels Not Skipped", "Labels", cinfo.Spec.Labels)
 		cinfoID := containerID{
 			podRef:        buildPodRef(cinfo.Spec.Labels),
 			containerName: kubetypes.GetContainerName(cinfo.Spec.Labels),
@@ -408,8 +407,6 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		}
 		sort.Sort(ByCreationTime(refs))
 		for i := len(refs) - 1; i >= 0; i-- {
-			hasMemoryAndCpu := hasMemoryAndCPUInstUsage(&refs[i].cinfo)
-			klog.InfoS("Memory and Cpu Detected", "HasMemoryAndCpu", hasMemoryAndCpu)
 			if hasMemoryAndCPUInstUsage(&refs[i].cinfo) {
 				result[refs[i].cgroup] = refs[i].cinfo
 				break
@@ -476,7 +473,6 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 	}
 	cstat, found := latestContainerStats(info)
 	if !found {
-		klog.V(4).InfoS("stats not found", "Labels", info.Spec.Labels)
 		return true
 	}
 	if cstat.Network != nil {
@@ -489,14 +485,8 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 			}
 		}
 	}
-	klog.V(4).InfoS("stats", "cstat", cstat)
 
 	if cstat.CpuInst == nil || cstat.Memory == nil {
-		// cadvisor seems to report CPuInst as nill pretty often.
-		if cstat.Memory != nil {
-			klog.V(4).InfoS("stats", "Memory", cstat.Memory)
-			return cstat.Memory.RSS == 0
-		}
 		return true
 	}
 	return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0

@@ -733,12 +733,19 @@ func process(stats statsFunc) cmpFunc {
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
 			// prioritize evicting the pod for which no stats were found
+			if !p1Found {
+				klog.V(4).InfoS("Error getting stats from pod 1", "Pod1", p1.ObjectMeta)
+			}
+			if !p2Found {
+				klog.V(4).InfoS("Error getting stats from pod 2", "Pod2", p2.ObjectMeta)
+			}
 			return cmpBool(!p1Found, !p2Found)
 		}
 
 		p1Process := processUsage(p1Stats.ProcessStats)
 		p2Process := processUsage(p2Stats.ProcessStats)
 		// prioritize evicting the pod which has the larger consumption of process
+		klog.V(4).InfoS("Exceed Request Info", "Pod1", p1.ObjectMeta, "P1Process", p1Process, "P2Process", p2.ObjectMeta, p2Process)
 		return int(p2Process - p1Process)
 	}
 }
@@ -763,6 +770,13 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 		p2Usage, p2Err := podDiskUsage(p2Stats, p2, fsStatsToMeasure)
 		if p1Err != nil || p2Err != nil {
 			// prioritize evicting the pod which had an error getting stats
+			// prioritize evicting the pod for which no stats were found
+			if p1Err != nil {
+				klog.V(4).InfoS("Error getting stats from pod 1", "Pod1", p1.ObjectMeta)
+			}
+			if p2Err != nil {
+				klog.V(4).InfoS("Error getting stats from pod 2", "Pod2", p2.ObjectMeta)
+			}
 			return cmpBool(p1Err != nil, p2Err != nil)
 		}
 
@@ -771,6 +785,7 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 		p1ExceedsRequests := p1Disk.Cmp(v1resource.GetResourceRequestQuantity(p1, diskResource)) == 1
 		p2ExceedsRequests := p2Disk.Cmp(v1resource.GetResourceRequestQuantity(p2, diskResource)) == 1
 		// prioritize evicting the pod which exceeds its requests
+		klog.V(4).InfoS("Exceed Request Info", "Pod1", p1.ObjectMeta, "P1ExceedsRequest", p1ExceedsRequests, "Pod2", p2.ObjectMeta, p2ExceedsRequests)
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
 }
@@ -800,6 +815,7 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceEphemeralStorage)
 		p2Disk.Sub(p2Request)
 		// prioritize evicting the pod which has the larger consumption of disk
+		klog.V(4).InfoS("Disk Info", "P1Disk", p1Disk, "P2Disk", p2Disk)
 		return p2Disk.Cmp(p1Disk)
 	}
 }
