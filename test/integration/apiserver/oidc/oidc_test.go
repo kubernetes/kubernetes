@@ -432,6 +432,8 @@ jwt:
     url: %s
     audiences:
     - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
     certificateAuthority: |
         %s
   claimMappings:
@@ -475,6 +477,8 @@ jwt:
     url: %s
     audiences:
     - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
     certificateAuthority: |
         %s
   claimMappings:
@@ -522,6 +526,8 @@ jwt:
     url: %s
     audiences:
     - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
     certificateAuthority: |
         %s
   claimMappings:
@@ -565,6 +571,8 @@ jwt:
     url: %s
     audiences:
     - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
     certificateAuthority: |
         %s
   claimMappings:
@@ -621,6 +629,8 @@ jwt:
     url: %s
     audiences:
     - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
     certificateAuthority: |
         %s
   claimMappings:
@@ -668,6 +678,8 @@ jwt:
     url: %s
     audiences:
     - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
     certificateAuthority: |
         %s
   claimMappings:

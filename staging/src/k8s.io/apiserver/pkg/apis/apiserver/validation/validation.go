@@ -101,7 +101,7 @@ func validateIssuer(issuer api.Issuer, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validateURL(issuer.URL, fldPath.Child("url"))...)
-	allErrs = append(allErrs, validateAudiences(issuer.Audiences, fldPath.Child("audiences"))...)
+	allErrs = append(allErrs, validateAudiences(issuer.Audiences, issuer.AudienceMatchPolicy, fldPath.Child("audiences"), fldPath.Child("audienceMatchPolicy"))...)
 	allErrs = append(allErrs, validateCertificateAuthority(issuer.CertificateAuthority, fldPath.Child("certificateAuthority"))...)
 
 	return allErrs
@@ -136,25 +136,31 @@ func validateURL(issuerURL string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func validateAudiences(audiences []string, fldPath *field.Path) field.ErrorList {
+func validateAudiences(audiences []string, audienceMatchPolicy api.AudienceMatchPolicyType, fldPath, audienceMatchPolicyFldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(audiences) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, fmt.Sprintf(atLeastOneRequiredErrFmt, fldPath)))
 		return allErrs
 	}
-	// This stricter validation is because the --oidc-client-id flag option is singular.
-	// This will be removed when we support multiple audiences with the StructuredAuthenticationConfiguration feature gate.
-	if len(audiences) > 1 {
-		allErrs = append(allErrs, field.TooMany(fldPath, len(audiences), 1))
-		return allErrs
-	}
 
+	seenAudiences := sets.NewString()
 	for i, audience := range audiences {
 		fldPath := fldPath.Index(i)
 		if len(audience) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath, "audience can't be empty"))
 		}
+		if seenAudiences.Has(audience) {
+			allErrs = append(allErrs, field.Duplicate(fldPath, audience))
+		}
+		seenAudiences.Insert(audience)
+	}
+
+	if len(audiences) > 1 && audienceMatchPolicy != api.AudienceMatchPolicyMatchAny {
+		allErrs = append(allErrs, field.Invalid(audienceMatchPolicyFldPath, audienceMatchPolicy, "audienceMatchPolicy must be MatchAny for multiple audiences"))
+	}
+	if len(audiences) == 1 && (len(audienceMatchPolicy) > 0 && audienceMatchPolicy != api.AudienceMatchPolicyMatchAny) {
+		allErrs = append(allErrs, field.Invalid(audienceMatchPolicyFldPath, audienceMatchPolicy, "audienceMatchPolicy must be empty or MatchAny for single audience"))
 	}
 
 	return allErrs
