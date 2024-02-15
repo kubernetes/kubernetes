@@ -58,6 +58,13 @@ if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
     )
 fi
 
+# Exclude golangci-lint if requested, for example in pull-kubernetes-verify.
+if [[ ${EXCLUDE_GOLANGCI_LINT:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-golangci.sh"              # runs in separate pull-kubernetes-verify-lint
+    )
+fi
+
 # Exclude readonly package check in certain cases, aka, in periodic jobs we don't care and a readonly package won't be touched
 if [[ ${EXCLUDE_READONLY_PACKAGE:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
