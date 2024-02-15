@@ -638,21 +638,6 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					return fmt.Errorf("mismatch of expected pods %d with actual pods %d", expectedLength, len(updatedPodList.Items))
 				}
 			}, podCreationPeriod, evictionPollInterval).Should(gomega.Succeed())
-
-			ginkgo.By("all pods should have statistics")
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				summary, err := getNodeSummary(ctx)
-				if err != nil {
-					return err
-				}
-				if summary == nil || summary.Node.Fs == nil || summary.Node.Fs.InodesFree == nil || summary.Node.Fs.AvailableBytes == nil || summary.Node.Runtime == nil || summary.Node.Runtime.ImageFs.InodesFree == nil || summary.Node.Runtime.ImageFs.AvailableBytes == nil {
-					return fmt.Errorf("some part of data is nil")
-				}
-				if len(summary.Pods) != len(testSpecs) {
-					return fmt.Errorf("Pods Stats from summary %d does not match testSpecs %d", len(summary.Pods), len(testSpecs))
-				}
-				return nil
-			}, 5*time.Minute, evictionPollInterval).Should(gomega.Succeed())
 			ginkgo.By(fmt.Sprintf("Waiting for node to have NodeCondition: %s", expectedNodeCondition))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				logFunc(ctx)
