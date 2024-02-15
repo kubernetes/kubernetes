@@ -761,6 +761,58 @@ jwt:
 			},
 			wantUser: nil,
 		},
+		{
+			name: "multiple audiences check with claim validation rule is ok",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - baz
+    - foo
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+    uid:
+      expression: "claims.uid"
+  claimValidationRules:
+  - expression: 'sets.equivalent(claims.aud, ["bar", "foo", "baz"])'
+    message: 'aud claim must be exactly match list ["bar", "foo", "baz"]'
+`, issuerURL, indentCertificateAuthority(caCert))
+			},
+			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
+			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
+				idTokenLifetime := time.Second * 1200
+				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+					t,
+					signingPrivateKey,
+					map[string]interface{}{
+						"iss": oidcServer.URL(),
+						"sub": defaultOIDCClaimedUsername,
+						"aud": []string{"foo", "bar", "baz"},
+						"exp": time.Now().Add(idTokenLifetime).Unix(),
+						"uid": "1234",
+					},
+					defaultStubAccessToken,
+					defaultStubRefreshToken,
+				))
+			},
+			configureClient: configureClientFetchingOIDCCredentials,
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+				UID:      "1234",
+			},
+		},
 	}
 
 	for _, tt := range tests {

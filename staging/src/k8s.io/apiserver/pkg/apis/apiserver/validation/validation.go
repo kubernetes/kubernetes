@@ -219,6 +219,7 @@ func validateClaimValidationRules(compiler authenticationcel.Compiler, celMapper
 
 			compilationResult, err := compileClaimsCELExpression(compiler, &authenticationcel.ClaimValidationCondition{
 				Expression: rule.Expression,
+				Message:    rule.Message,
 			}, fldPath.Child("expression"))
 
 			if err != nil {

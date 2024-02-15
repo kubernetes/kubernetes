@@ -578,10 +578,8 @@ func (v *idTokenVerifier) verifyAudience(t *oidc.IDToken) error {
 	if v.audiences.Len() == 0 {
 		return fmt.Errorf("oidc: invalid configuration, audiences cannot be empty")
 	}
-	for _, aud := range t.Audience {
-		if v.audiences.Has(aud) {
-			return nil
-		}
+	if v.audiences.HasAny(t.Audience...) {
+		return nil
 	}
 
 	return fmt.Errorf("oidc: expected audience in %q got %q", sets.List(v.audiences), t.Audience)
