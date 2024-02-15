@@ -1587,6 +1587,7 @@ func TestIndexedJob(t *testing.T) {
 }
 
 func TestJobPodReplacementPolicy(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	indexedCompletion := batchv1.IndexedCompletion
 	nonIndexedCompletion := batchv1.NonIndexedCompletion
 	var podReplacementPolicy = func(obj batchv1.PodReplacementPolicy) *batchv1.PodReplacementPolicy {
@@ -1632,7 +1633,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 				new: 4,
 			},
 		},
-		"feature flag true, TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
+		"feature flag true with IndexedJob, TerminatingOrFailed policy, delete & fail pods, recreate terminating pods, and verify job status counters": {
 			podReplacementPolicyEnabled: true,
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          ptr.To[int32](2),
@@ -1665,7 +1666,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 			jobSpec: &batchv1.JobSpec{
 				Parallelism:          ptr.To[int32](2),
 				Completions:          ptr.To[int32](2),
-				CompletionMode:       &indexedCompletion,
+				CompletionMode:       &nonIndexedCompletion,
 				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1846,6 +1847,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 // Disable reverts to previous behavior.
 // Enabling will then match the original failed case.
 func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	const podCount int32 = 2
 	jobSpec := batchv1.JobSpec{
 		Parallelism:          ptr.To(podCount),
