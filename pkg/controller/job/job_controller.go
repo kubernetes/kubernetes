@@ -1921,7 +1921,7 @@ func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
 func recordJobPodsCreationTotal(job *batch.Job, jobCtx *syncJobCtx, succeeded, failed int32) {
 	reason := metrics.PodCreateNew
 	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		if *job.Spec.PodReplacementPolicy == batch.Failed && jobCtx.failed > 0 {
+		if ptr.Deref(job.Spec.PodReplacementPolicy, batch.TerminatingOrFailed) == batch.Failed && jobCtx.failed > 0 {
 			reason = metrics.PodRecreateFailed
 		} else if jobCtx.failed > 0 || ptr.Deref(jobCtx.terminating, 0) > 0 {
 			reason = metrics.PodRecreateTerminatingOrFailed

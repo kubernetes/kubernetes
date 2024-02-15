@@ -115,7 +115,7 @@ func newJobWithName(name string, parallelism, completions, backoffLimit int32, c
 		j.Spec.Parallelism = nil
 	}
 	j.Spec.BackoffLimit = &backoffLimit
-	defaultPodReplacementPolicy(j)
+
 	return j
 }
 
@@ -3880,7 +3880,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			job := &tc.job
-			defaultPodReplacementPolicy(job)
 
 			actual := job
 			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
@@ -5530,13 +5529,5 @@ func setDurationDuringTest(val *time.Duration, newVal time.Duration) func() {
 	*val = newVal
 	return func() {
 		*val = origVal
-	}
-}
-
-// Helper to simulate defaulting of the PodReplacementPolicy field in unit tests
-// as the job controller code assumes it is set by the kube-apiserver.
-func defaultPodReplacementPolicy(job *batch.Job) {
-	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && job.Spec.PodReplacementPolicy == nil {
-		job.Spec.PodReplacementPolicy = ptr.To(batch.TerminatingOrFailed)
 	}
 }
