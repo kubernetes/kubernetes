@@ -92,12 +92,6 @@ var (
 	CustomMetricsAutoscaling = framework.WithFeature(framework.ValidFeatures.Add("CustomMetricsAutoscaling"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	DeviceManager = framework.WithFeature(framework.ValidFeatures.Add("DeviceManager"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	DevicePluginProbe = framework.WithFeature(framework.ValidFeatures.Add("DevicePluginProbe"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Downgrade = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
