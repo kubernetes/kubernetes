@@ -46,6 +46,177 @@ func TestDecode(t *testing.T) {
 		assertOnError func(t *testing.T, e error)
 	}{
 		{
+			name:          "reject duplicate negative int keys into struct",
+			modes:         []cbor.DecMode{modes.DecodeLax},
+			in:            hex("a220012002"), // {-1: 1, -1: 2}
+			into:          struct{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(-1), Index: 1}),
+		},
+		{
+			name:          "reject duplicate negative int keys into map",
+			in:            hex("a220012002"), // {-1: 1, -1: 2}
+			into:          map[int64]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(-1), Index: 1}),
+		},
+		{
+			name:          "reject duplicate positive int keys into struct",
+			modes:         []cbor.DecMode{modes.DecodeLax},
+			in:            hex("a201010102"), // {1: 1, 1: 2}
+			into:          struct{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(1), Index: 1}),
+		},
+		{
+			name:          "reject duplicate positive int keys into map",
+			in:            hex("a201010102"), // {1: 1, 1: 2}
+			into:          map[int64]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(1), Index: 1}),
+		},
+		{
+			name: "reject duplicate text string keys into struct",
+			in:   hex("a2614101614102"), // {"A": 1, "A": 2}
+			into: struct {
+				A int `json:"A"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name:          "reject duplicate text string keys into map",
+			in:            hex("a2614101614102"), // {"A": 1, "A": 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name:          "reject duplicate byte string keys into map",
+			in:            hex("a2414101414102"), // {'A': 1, 'A': 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name: "reject duplicate byte string keys into struct",
+			in:   hex("a2414101414102"), // {'A': 1, 'A': 2}
+			into: struct {
+				A int `json:"A"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name:          "reject duplicate byte string and text string keys into map",
+			in:            hex("a2414101614102"), // {'A': 1, "A": 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name: "reject duplicate byte string and text string keys into struct",
+			in:   hex("a2414101614102"), // {'A': 1, "A": 2}
+			into: struct {
+				A int `json:"A"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name: "reject two identical indefinite-length byte string keys split into chunks differently into struct",
+			in:   hex("a25f426865436c6c6fff015f416844656c6c6fff02"), // {(_ 'he', 'llo'): 1, (_ 'h', 'ello'): 2}
+			into: struct {
+				Hello int `json:"hello"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name:          "reject two identical indefinite-length byte string keys split into chunks differently into map",
+			in:            hex("a25f426865436c6c6fff015f416844656c6c6fff02"), // {(_ 'he', 'llo'): 1, (_ 'h', 'ello'): 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name: "reject two identical indefinite-length text string keys split into chunks differently into struct",
+			in:   hex("a27f626865636c6c6fff017f616864656c6c6fff02"), // {(_ "he", "llo"): 1, (_ "h", "ello"): 2}
+			into: struct {
+				Hello int `json:"hello"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name:          "reject two identical indefinite-length text string keys split into chunks differently into map",
+			modes:         []cbor.DecMode{modes.DecodeLax},
+			in:            hex("a27f626865636c6c6fff017f616864656c6c6fff02"), // {(_ "he", "llo"): 1, (_ "h", "ello"): 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name:  "case-insensitive match treated as unknown field",
+			modes: []cbor.DecMode{modes.Decode},
+			in:    hex("a1614101"), // {"A": 1}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.UnknownFieldError{Index: 0}),
+		},
+		{
+			name:  "case-insensitive match ignored in lax mode",
+			modes: []cbor.DecMode{modes.DecodeLax},
+			in:    hex("a1614101"), // {"A": 1}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 0,
+			},
+			assertOnError: assertNilError,
+		},
+		{
+			name:  "case-insensitive match after exact match treated as unknown field",
+			modes: []cbor.DecMode{modes.Decode},
+			in:    hex("a2616101614102"), // {"a": 1, "A": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 1,
+			},
+			assertOnError: assertIdenticalError(&cbor.UnknownFieldError{Index: 1}),
+		},
+		{
+			name:  "case-insensitive match after exact match ignored in lax mode",
+			modes: []cbor.DecMode{modes.DecodeLax},
+			in:    hex("a2616101614102"), // {"a": 1, "A": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 1,
+			},
+			assertOnError: assertNilError,
+		},
+		{
+			name:  "case-insensitive match before exact match treated as unknown field",
+			modes: []cbor.DecMode{modes.Decode},
+			in:    hex("a2614101616102"), // {"A": 1, "a": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.UnknownFieldError{Index: 0}),
+		},
+		{
+			name:  "case-insensitive match before exact match ignored in lax mode",
+			modes: []cbor.DecMode{modes.DecodeLax},
+			in:    hex("a2614101616102"), // {"A": 1, "a": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 2,
+			},
+			assertOnError: assertNilError,
+		},
+		{
 			name: "reject text string containing invalid utf-8 sequence",
 			in:   hex("6180"), // text string beginning with continuation byte 0x80
 			assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.SemanticError) {

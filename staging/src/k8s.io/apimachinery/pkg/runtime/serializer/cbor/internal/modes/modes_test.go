@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
 )
 
@@ -59,4 +60,12 @@ func assertOnConcreteError[E error](fn func(*testing.T, E)) func(t *testing.T, e
 		}
 		fn(t, ec)
 	}
+}
+
+func assertIdenticalError[E error](expected E) func(*testing.T, error) {
+	return assertOnConcreteError(func(t *testing.T, actual E) {
+		if diff := cmp.Diff(expected, actual); diff != "" {
+			t.Errorf("diff between actual error and expected error:\n%s", diff)
+		}
+	})
 }
