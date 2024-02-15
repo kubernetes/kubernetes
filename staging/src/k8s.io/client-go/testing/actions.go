@@ -297,7 +297,8 @@ func NewRootWatchAction(resource schema.GroupVersionResource, opts interface{}) 
 	action.Verb = "watch"
 	action.Resource = resource
 	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
+	requiresInitialEvents := ExtractWatchOptions(opts)
+	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion, requiresInitialEvents}
 
 	return action
 }
@@ -327,13 +328,35 @@ func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fi
 	return labelSelector, fieldSelector, resourceVersion
 }
 
+func ExtractWatchOptions(opts interface{}) (replayInitialEvents bool) {
+	switch t := opts.(type) {
+	case metav1.ListOptions:
+		if sendInitial := t.SendInitialEvents; sendInitial == nil {
+			// Defaults to true if RV is unset or 0
+			replayInitialEvents = (t.ResourceVersion == "" || t.ResourceVersion == "0")
+		} else if *sendInitial {
+			// Must not be set to true if RV match is not set to NotOlderThan
+			if t.ResourceVersionMatch != metav1.ResourceVersionMatchNotOlderThan {
+				panic(fmt.Errorf("expect a ResourceVersionMatchNotOlderThan %T", opts))
+			}
+
+			replayInitialEvents = true
+		}
+
+	default:
+		panic(fmt.Errorf("expect a ListOptions %T", opts))
+	}
+	return replayInitialEvents
+}
+
 func NewWatchAction(resource schema.GroupVersionResource, namespace string, opts interface{}) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
 	action.Namespace = namespace
 	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
+	requiresInitialEvents := ExtractWatchOptions(opts)
+	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion, requiresInitialEvents}
 
 	return action
 }
@@ -356,9 +379,10 @@ type ListRestrictions struct {
 	Fields fields.Selector
 }
 type WatchRestrictions struct {
-	Labels          labels.Selector
-	Fields          fields.Selector
-	ResourceVersion string
+	Labels                labels.Selector
+	Fields                fields.Selector
+	ResourceVersion       string
+	RequiresInitialEvents bool
 }
 
 type Action interface {
@@ -646,9 +670,10 @@ func (a WatchActionImpl) DeepCopy() Action {
 	return WatchActionImpl{
 		ActionImpl: a.ActionImpl.DeepCopy().(ActionImpl),
 		WatchRestrictions: WatchRestrictions{
-			Labels:          a.WatchRestrictions.Labels.DeepCopySelector(),
-			Fields:          a.WatchRestrictions.Fields.DeepCopySelector(),
-			ResourceVersion: a.WatchRestrictions.ResourceVersion,
+			Labels:                a.WatchRestrictions.Labels.DeepCopySelector(),
+			Fields:                a.WatchRestrictions.Fields.DeepCopySelector(),
+			ResourceVersion:       a.WatchRestrictions.ResourceVersion,
+			RequiresInitialEvents: a.WatchRestrictions.RequiresInitialEvents,
 		},
 	}
 }

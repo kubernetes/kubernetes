@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 )
 
 func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *FakeDynamicClient {
@@ -64,6 +65,10 @@ func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *
 	}
 
 	return NewSimpleDynamicClientWithCustomListKinds(unstructuredScheme, nil, objects...)
+}
+
+type ReplayableWatch interface {
+	WatchWithReplay(gvr schema.GroupVersionResource, ns string) (watch.Interface, error)
 }
 
 // NewSimpleDynamicClientWithCustomListKinds try not to use this.  In general you want to have the scheme have the List types registered
@@ -116,10 +121,23 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
+
+		if replable, ok := o.(ReplayableWatch); ok {
+			if watchAction, ok := action.(testing.WatchAction); ok && watchAction.GetWatchRestrictions().RequiresInitialEvents {
+				klog.Infof("replaying initial events")
+				watch, err := replable.WatchWithReplay(gvr, ns)
+				if err != nil {
+					return false, nil, err
+				}
+				return true, watch, nil
+			}
+		}
+
 		watch, err := o.Watch(gvr, ns)
 		if err != nil {
 			return false, nil, err
 		}
+
 		return true, watch, nil
 	})
 
