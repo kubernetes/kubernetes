@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
@@ -49,6 +50,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	reflectormetrics "k8s.io/component-base/metrics/prometheus/reflector"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
@@ -205,6 +207,10 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start secure server: %v", err)
 		}
+	}
+
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerMetrics) {
+		reflectormetrics.LoadReflectorMetrics()
 	}
 
 	startInformersAndWaitForSync := func(ctx context.Context) {

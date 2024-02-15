@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
@@ -50,6 +51,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	reflectormetrics "k8s.io/component-base/metrics/prometheus/reflector"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
@@ -201,6 +203,10 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
+	}
+
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerMetrics) {
+		reflectormetrics.LoadReflectorMetrics()
 	}
 
 	run := func(ctx context.Context, controllerInitializers map[string]InitFunc) {
