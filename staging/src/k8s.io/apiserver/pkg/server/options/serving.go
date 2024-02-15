@@ -218,7 +218,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 			"for the kernel to release sockets in TIME_WAIT state. [default=false]")
 
 	fs.StringVar(&s.CertificateRevocationList, "certificate-revocation-list", "", ""+
-		"Certificate revocation list. If provided, clients providing a certificate listed in the "+
+		"Path to local certificate revocation list. If provided, clients providing a certificate listed in the "+
 		"file will be rejected")
 }
 
