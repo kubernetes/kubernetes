@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -70,6 +71,17 @@ func TestTLSConfigKey(t *testing.T) {
 	// Make sure config fields that affect the tls config affect the cache key
 	dialer := net.Dialer{}
 	getCert := &GetCertHolder{GetCert: func() (*tls.Certificate, error) { return nil, nil }}
+
+	certFile1, removeCertFile1Fn := writeBytesToFile(t, []byte{1})
+	defer removeCertFile1Fn(t)
+	certFile2, removeCertFile2Fn := writeBytesToFile(t, []byte{2})
+	defer removeCertFile2Fn(t)
+
+	keyFile1, removeKeyFile1Fn := writeBytesToFile(t, []byte{1})
+	defer removeKeyFile1Fn(t)
+	keyFile2, removeKeyFile2Fn := writeBytesToFile(t, []byte{2})
+	defer removeKeyFile2Fn(t)
+
 	uniqueConfigurations := map[string]*Config{
 		"proxy":    {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
 		"no tls":   {},
@@ -121,6 +133,66 @@ func TestTLSConfigKey(t *testing.T) {
 				CAData:   []byte{1},
 				CertData: []byte{1},
 				KeyData:  []byte{1},
+			},
+		},
+		"cadata 2, cert 1, key 1": {
+			TLS: TLSConfig{
+				CAData:   []byte{2},
+				CertData: []byte{1},
+				KeyData:  []byte{1},
+			},
+		},
+		"cert file 1, key file 1": {
+			TLS: TLSConfig{
+				CertFile: certFile1,
+				KeyFile:  keyFile1,
+			},
+		},
+		"cert file 1, key file 1, servername 1": {
+			TLS: TLSConfig{
+				CertFile:   certFile1,
+				KeyFile:    keyFile1,
+				ServerName: "1",
+			},
+		},
+		"cadata 1, cert file 1, key file 1, servername 1": {
+			TLS: TLSConfig{
+				CAData:     []byte{1},
+				CertFile:   certFile1,
+				KeyFile:    keyFile1,
+				ServerName: "1",
+			},
+		},
+		"cert file 1, key file 1, servername 2": {
+			TLS: TLSConfig{
+				CertFile:   certFile1,
+				KeyFile:    keyFile1,
+				ServerName: "2",
+			},
+		},
+		"cert file 1, key file 2": {
+			TLS: TLSConfig{
+				CertFile: certFile1,
+				KeyFile:  keyFile2,
+			},
+		},
+		"cert file 2, key file 1": {
+			TLS: TLSConfig{
+				CertFile: certFile2,
+				KeyFile:  keyFile1,
+			},
+		},
+		"cert file 2, key file 2": {
+			TLS: TLSConfig{
+				CertFile: certFile2,
+				KeyFile:  keyFile2,
+			},
+		},
+		"cadata 1, cert file 1, key file 1": {
+			TLS: TLSConfig{
+				CAData:   []byte{1},
+				CertFile: certFile1,
+				KeyFile:  keyFile1,
 			},
 		},
 		"getCert1": {
@@ -185,6 +257,24 @@ func TestTLSConfigKey(t *testing.T) {
 					continue
 				}
 			}
+		}
+	}
+}
+
+func writeBytesToFile(t *testing.T, bytes []byte) (string, func(*testing.T)) {
+	f, err := os.CreateTemp("", "test-*-data.dat")
+	if err != nil {
+		t.Fatalf("unexpected error while creating a temporary file: %v", err)
+	}
+	if _, err := f.Write(bytes); err != nil {
+		t.Fatalf("unexpected error while writing to the ca file %q: %v", f.Name(), err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("unexpected error while closing the ca file %q: %v", f.Name(), err)
+	}
+	return f.Name(), func(t *testing.T) {
+		if err := os.Remove(f.Name()); err != nil {
+			t.Errorf("unexpected error while removing file: %q - %v", f.Name(), err)
 		}
 	}
 }
