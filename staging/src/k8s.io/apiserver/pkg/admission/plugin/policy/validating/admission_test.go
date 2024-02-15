@@ -1646,13 +1646,13 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 		newClusterScopedParam(matchingParamName+"5", otherNonmatchingLabels),
 	}
 
-	require.NoError(t, testContext.UpdateAndWait(&policy, &binding))
-
 	for _, p := range params {
 		// Don't wait for these sync the informers would not have been
 		// created unless bound to a policy
 		require.NoError(t, testContext.Update(p))
 	}
+
+	require.NoError(t, testContext.UpdateAndWait(&policy, &binding))
 
 	namespacedRequestObject := newParam("some param", nonMatchingNamespace, nil)
 	clusterScopedRequestObject := newClusterScopedParam("other param", nil)
