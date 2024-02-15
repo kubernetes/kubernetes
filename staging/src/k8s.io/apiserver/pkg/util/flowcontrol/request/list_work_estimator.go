@@ -87,7 +87,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 
 	isListFromCache := requestInfo.Verb == "watch" || !shouldListFromStorage(query, &listOptions)
 
-	numStored, err := e.countGetterFn(key(requestInfo))
+	numStored, err := e.countGetterFn(key(requestInfo), requestInfo.Namespace)
 	switch {
 	case err == ObjectCountStaleErr:
 		// object count going stale is indicative of degradation, so we should

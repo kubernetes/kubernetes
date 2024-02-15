@@ -57,13 +57,18 @@ type StorageObjectCountTracker interface {
 	// objects for the given resource
 	Set(string, int64)
 
+	// SetNamespaced is invokved to update current number of total
+	// namespaced objects for a given resource and namespace
+	SetNamespaced(string, string, int64)
+
 	// Get returns the total number of objects for the given resource.
+	// If namespace is non-empty, it will return number of objects only for that namespace.
 	// The following errors are returned:
 	//  - if the count has gone stale for a given resource due to transient
 	//    failures ObjectCountStaleErr is returned.
 	//  - if the given resource is not being tracked then
 	//    ObjectCountNotFoundErr is returned.
-	Get(string) (int64, error)
+	Get(string, string) (int64, error)
 
 	// RunUntil starts all the necessary maintenance.
 	RunUntil(stopCh <-chan struct{})
@@ -74,8 +79,9 @@ type StorageObjectCountTracker interface {
 // keep track of the total number of objects for each resource.
 func NewStorageObjectCountTracker() StorageObjectCountTracker {
 	return &objectCountTracker{
-		clock:  &clock.RealClock{},
-		counts: map[string]*timestampedCount{},
+		clock:            &clock.RealClock{},
+		counts:           map[string]*timestampedCount{},
+		countsNamespaced: map[string]map[string]*timestampedCount{},
 	}
 }
 
@@ -91,8 +97,9 @@ type timestampedCount struct {
 type objectCountTracker struct {
 	clock clock.PassiveClock
 
-	lock   sync.RWMutex
-	counts map[string]*timestampedCount
+	lock             sync.RWMutex
+	counts           map[string]*timestampedCount
+	countsNamespaced map[string]map[string]*timestampedCount
 }
 
 func (t *objectCountTracker) Set(groupResource string, count int64) {
@@ -125,18 +132,68 @@ func (t *objectCountTracker) Set(groupResource string, count int64) {
 	}
 }
 
-func (t *objectCountTracker) Get(groupResource string) (int64, error) {
+func (t *objectCountTracker) SetNamespaced(groupResource, namespace string, count int64) {
+	if count <= -1 {
+		// a value of -1 indicates that the 'Count' call failed to contact
+		// the storage layer, in most cases this error can be transient.
+		// we will continue to work with the count that is in the cache
+		// up to a certain threshold defined by staleTolerationThreshold.
+		// in case this becomes a non transient error then the count for
+		// the given resource will will eventually be removed from
+		// the cache by the pruner.
+		return
+	}
+
+	now := t.clock.Now()
+
+	// lock for writing
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if _, ok := t.countsNamespaced[groupResource]; !ok {
+		t.countsNamespaced[groupResource] = map[string]*timestampedCount{}
+	}
+
+	if item, ok := t.countsNamespaced[groupResource][namespace]; ok {
+		item.count = count
+		item.lastUpdatedAt = now
+		return
+	}
+
+	t.countsNamespaced[groupResource][namespace] = &timestampedCount{
+		count:         count,
+		lastUpdatedAt: now,
+	}
+}
+
+func (t *objectCountTracker) Get(groupResource, namespace string) (int64, error) {
 	staleThreshold := t.clock.Now().Add(-staleTolerationThreshold)
 
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	if item, ok := t.counts[groupResource]; ok {
+	if namespace == "" {
+		if item, ok := t.counts[groupResource]; ok {
+			if item.lastUpdatedAt.Before(staleThreshold) {
+				return item.count, ObjectCountStaleErr
+			}
+			return item.count, nil
+		}
+
+		return 0, ObjectCountNotFoundErr
+	}
+
+	if _, ok := t.countsNamespaced[groupResource]; !ok {
+		return 0, ObjectCountNotFoundErr
+	}
+
+	if item, ok := t.countsNamespaced[groupResource][namespace]; ok {
 		if item.lastUpdatedAt.Before(staleThreshold) {
 			return item.count, ObjectCountStaleErr
 		}
 		return item.count, nil
 	}
+
 	return 0, ObjectCountNotFoundErr
 }
 
@@ -163,6 +220,19 @@ func (t *objectCountTracker) prune(threshold time.Duration) error {
 			continue
 		}
 		delete(t.counts, groupResource)
+	}
+
+	for groupResource, namespacedCount := range t.countsNamespaced {
+		for namespace, count := range namespacedCount {
+			if count.lastUpdatedAt.After(oldestLastUpdatedAtAllowed) {
+				continue
+			}
+
+			delete(t.countsNamespaced[groupResource], namespace)
+			if len(t.countsNamespaced[groupResource]) == 0 {
+				delete(t.countsNamespaced, groupResource)
+			}
+		}
 	}
 
 	return nil

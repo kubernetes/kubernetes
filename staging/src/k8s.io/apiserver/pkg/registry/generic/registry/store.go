@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -1555,7 +1556,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.StorageVersioner = opts.StorageConfig.EncodeVersioner
 
 		if opts.CountMetricPollPeriod > 0 {
-			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod, opts.StorageObjectCountTracker)
+			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod, opts.StorageObjectCountTracker, isNamespaced)
 			previousDestroy := e.DestroyFunc
 			var once sync.Once
 			e.DestroyFunc = func() {
@@ -1573,7 +1574,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 }
 
 // startObservingCount starts monitoring given prefix and periodically updating metrics. It returns a function to stop collection.
-func (e *Store) startObservingCount(period time.Duration, objectCountTracker flowcontrolrequest.StorageObjectCountTracker) func() {
+func (e *Store) startObservingCount(period time.Duration, objectCountTracker flowcontrolrequest.StorageObjectCountTracker, isNamespaced bool) func() {
 	prefix := e.KeyRootFunc(genericapirequest.NewContext())
 	resourceName := e.DefaultQualifiedResource.String()
 	klog.V(2).InfoS("Monitoring resource count at path", "resource", resourceName, "path", "<storage-prefix>/"+prefix)
@@ -1581,14 +1582,41 @@ func (e *Store) startObservingCount(period time.Duration, objectCountTracker flo
 	go wait.JitterUntil(func() {
 		count, err := e.Storage.Count(prefix)
 		if err != nil {
-			klog.V(5).InfoS("Failed to update storage count metric", "err", err)
+			klog.V(5).InfoS("Failed to get storage count for %s: %v", "err", resourceName, err)
 			count = -1
 		}
 
+		klog.Infof("[debug] Object count from storage for resource %q: %d", resourceName, count)
 		metrics.UpdateObjectCount(resourceName, count)
 		if objectCountTracker != nil {
 			objectCountTracker.Set(resourceName, count)
 		}
+
+		if !isNamespaced {
+			return
+		}
+
+		namespaces := &corev1.NamespaceList{}
+		err = e.Storage.GetList(context.TODO(), "/namespaces", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, namespaces)
+		if err != nil {
+			klog.Error("Error getting namespaces while getting object counts: %v", err)
+			return
+		}
+
+		for _, namespace := range namespaces.Items {
+			prefix := e.KeyRootFunc(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace.Name))
+			count, err := e.Storage.Count(prefix)
+			if err != nil {
+				klog.V(5).InfoS("Failed to get storage count for %s: %v", "err", resourceName, err)
+				count = -1
+			}
+
+			klog.Infof("[debug] Namespaced object count for resource %q in namespace %s: %d", resourceName, namespace.Name, count)
+			if objectCountTracker != nil {
+				objectCountTracker.SetNamespaced(resourceName, namespace.Name, count)
+			}
+		}
+
 	}, period, resourceCountPollPeriodJitter, true, stopCh)
 	return func() { close(stopCh) }
 }
