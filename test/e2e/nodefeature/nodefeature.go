@@ -38,7 +38,7 @@ var (
 	DeviceManager = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DeviceManager"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	DevicePluginProbe = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DevicePluginProbe"))
+	DevicePlugin = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DevicePlugin"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	DownwardAPIHugePages = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DownwardAPIHugePages"))
