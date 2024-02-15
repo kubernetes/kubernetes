@@ -29,7 +29,7 @@ kube::golang::setup_env
 # Opt into using go modules
 export GO111MODULE=on
 
-go install golang.org/x/vuln/cmd/govulncheck@v1.0.1
+go install -mod=readonly golang.org/x/vuln/cmd/govulncheck@v1.0.1
 
 # KUBE_VERIFY_GIT_BRANCH is populated in verify CI jobs
 BRANCH="${KUBE_VERIFY_GIT_BRANCH:-master}"
@@ -47,7 +47,7 @@ pushd "${WORKTREE}" >/dev/null
   govulncheck -scan module ./... > "${KUBE_TEMP}/pr-base.txt"
 popd >/dev/null
 
-echo -e "\n HEAD: $(cat "${KUBE_TEMP}"/head.txt)" 
-echo -e "\n PR_BASE: $(cat "${KUBE_TEMP}/pr-base.txt")" 
+echo -e "\n HEAD: $(cat "${KUBE_TEMP}"/head.txt)"
+echo -e "\n PR_BASE: $(cat "${KUBE_TEMP}/pr-base.txt")"
 
 diff -s -u --ignore-all-space "${KUBE_TEMP}"/pr-base.txt "${KUBE_TEMP}"/head.txt || true
