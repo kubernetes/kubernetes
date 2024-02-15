@@ -1200,6 +1200,7 @@ func TestNonParallelJob(t *testing.T) {
 	defer func() {
 		cancel()
 	}()
+	resetMetrics()
 
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{})
 	if err != nil {
