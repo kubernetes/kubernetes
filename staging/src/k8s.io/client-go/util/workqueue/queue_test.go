@@ -167,33 +167,33 @@ func TestLen(t *testing.T) {
 	}
 }
 
-// TestIsQueued ensures that we can check the active queue for specific objects.
-func TestIsQueued(t *testing.T) {
+// TestIsAdded ensures that we can check the active queue for specific objects.
+func TestIsAdded(t *testing.T) {
 	q := workqueue.New()
 
 	q.Add("foo")
 	q.Add("bar")
-	if !q.IsQueued("foo") {
+	if !q.IsAdded("foo") {
 		t.Errorf("Expected foo to be reported as queued")
 	}
-	if !q.IsQueued("bar") {
+	if !q.IsAdded("bar") {
 		t.Errorf("Expected bar to be reported as queued")
 	}
-	if q.IsQueued("baz") {
+	if q.IsAdded("baz") {
 		t.Errorf("baz should not be reported as queued")
 	}
 	_, _ = q.Get()
-	if q.IsQueued("foo") {
+	if q.IsAdded("foo") {
 		t.Errorf("foo should no longer be reported as queued")
 	}
-	if !q.IsQueued("bar") {
+	if !q.IsAdded("bar") {
 		t.Errorf("Expected bar to be reported as queued")
 	}
 	q.Add("foo")
-	if !q.IsQueued("foo") {
+	if !q.IsAdded("foo") {
 		t.Errorf("foo should be queued whilst it is processing but not done")
 	}
-	if !q.IsQueued("bar") {
+	if !q.IsAdded("bar") {
 		t.Errorf("Expected bar to be reported as queued")
 	}
 }

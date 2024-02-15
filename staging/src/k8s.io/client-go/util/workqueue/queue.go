@@ -26,7 +26,7 @@ import (
 // Interface defines the minimal requirements to implement a workqueue.
 type Interface interface {
 	Add(item interface{})
-	IsQueued(item interface{}) bool
+	IsAdded(item interface{}) bool
 	Len() int
 	Get() (item interface{}, shutdown bool)
 	Done(item interface{})
@@ -183,10 +183,10 @@ func (q *Type) Add(item interface{}) {
 	q.cond.Signal()
 }
 
-// IsQueued returns a bool to indicate whether `item` is actively queued.
-// It returns true if the item is in the dirty set which means it is
-// queued or about to be queued once processing completes.
-func (q *Type) IsQueued(item interface{}) bool {
+// IsAdded returns a bool to indicate whether `item` is added to the queue and ready to be processed.
+// The result is only valid for the moment of call, i.e. the item could subsequently be processed and
+// removed from the queue before the client acts on the result.
+func (q *Type) IsAdded(item interface{}) bool {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 	return q.dirty.has(item)
