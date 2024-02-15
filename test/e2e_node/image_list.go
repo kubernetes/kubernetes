@@ -53,7 +53,6 @@ const (
 var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	"gcr.io/cadvisor/cadvisor:v0.47.2",
-	"registry.k8s.io/stress:v1",
 	busyboxImage,
 	"registry.k8s.io/e2e-test-images/busybox@sha256:a9155b13325b2abef48e71de77bb8ac015412a566829f621d06bfae5c699b1b9",
 	imageutils.GetE2EImage(imageutils.Nginx),
