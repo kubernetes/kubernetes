@@ -41,6 +41,12 @@ const (
 	// owner: @nilekhc
 	// alpha: v1.30
 	InformerResourceVersion Feature = "InformerResourceVersion"
+
+	// owner: @chenk008
+	// alpha: v1.31
+	//
+	// Expose informer/reflector basic metrics.
+	InformerMetrics Feature = "InformerMetrics"
 )
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -51,4 +57,5 @@ const (
 var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
 	WatchListClient:         {Default: false, PreRelease: Beta},
 	InformerResourceVersion: {Default: false, PreRelease: Alpha},
+	InformerMetrics:         {Default: false, PreRelease: Alpha},
 }

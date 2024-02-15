@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientgo
+package cache
 
-import (
-	_ "k8s.io/component-base/metrics/prometheus/clientgo/leaderelection" // load leaderelection metrics
-	_ "k8s.io/component-base/metrics/prometheus/reflector"               // load reflector metrics
-	_ "k8s.io/component-base/metrics/prometheus/restclient"              // load restclient metrics
-	_ "k8s.io/component-base/metrics/prometheus/workqueue"               // load the workqueue metrics
-)
+type fakeReflectorMetricsFactory struct {
+	metricsProvider MetricsProvider
+}
+
+func (f *fakeReflectorMetricsFactory) setProvider(metricsProvider MetricsProvider) {
+	f.metricsProvider = metricsProvider
+}
+
+func (f *fakeReflectorMetricsFactory) provider() MetricsProvider {
+	return f.metricsProvider
+}
+
+func NewFakeReflectorMetricsFactory() reflectorMetricsFactoryInterface {
+	return &fakeReflectorMetricsFactory{
+		metricsProvider: noopMetricsProvider{},
+	}
+}

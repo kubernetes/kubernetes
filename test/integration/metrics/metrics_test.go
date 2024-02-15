@@ -18,19 +18,35 @@ package metrics
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/common/model"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/fake"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/util"
 )
 
 func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error) {
@@ -52,6 +68,14 @@ func checkForExpectedMetrics(t *testing.T, metrics testutil.Metrics, expectedMet
 	for _, expected := range expectedMetrics {
 		if _, found := metrics[expected]; !found {
 			t.Errorf("API server metrics did not include expected metric %q", expected)
+		}
+	}
+}
+
+func checkForMetricsNotExist(t *testing.T, metrics testutil.Metrics, unexpectedMetrics []string) {
+	for _, unexpected := range unexpectedMetrics {
+		if _, found := metrics[unexpected]; found {
+			t.Errorf("API server metrics include unexpected metric %q", unexpected)
 		}
 	}
 }
@@ -513,4 +537,161 @@ func sampleExistsInSamples(s *model.Sample, samples model.Samples) bool {
 		}
 	}
 	return false
+}
+
+var reflectorMetrics = []string{
+	"reflector_lists_total",
+	"reflector_list_duration_seconds_sum",
+	"reflector_list_duration_seconds_count",
+	"reflector_list_duration_seconds_bucket",
+	"reflector_items_per_list_bucket",
+	"reflector_watchLists_total",
+	"reflector_watches_total",
+	"reflector_short_watches_total",
+	"reflector_watch_duration_seconds_bucket",
+	"reflector_items_per_watch_bucket",
+	"reflector_last_resource_version",
+}
+
+func TestAPIServerReflectorMetrics(t *testing.T) {
+	currentReflectorMetricsFactory := cache.SwapReflectorMetricsFactory(cache.NewFakeReflectorMetricsFactory())
+	defer cache.SwapReflectorMetricsFactory(currentReflectorMetricsFactory)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(string(clientgofeaturegate.InformerMetrics)), false)()
+	// reset default registry metrics
+	legacyregistry.Reset()
+
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates", "InformerMetrics=true"}, framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	metrics, err := scrapeMetrics(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkForExpectedMetrics(t, metrics, reflectorMetrics)
+}
+
+func TestAPIServerReflectorMetricsNotExist(t *testing.T) {
+	// reset default registry metrics
+	legacyregistry.Reset()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{}, framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	metrics, err := scrapeMetrics(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkForMetricsNotExist(t, metrics, reflectorMetrics)
+}
+
+func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
+	return &fake.Cloud{
+		DisableRoutes: true, // disable routes for server tests, otherwise --cluster-cidr is required
+	}, nil
+}
+
+func TestComponentReflectorMetrics(t *testing.T) {
+	if !cloudprovider.IsCloudProvider("fake") {
+		cloudprovider.RegisterCloudProvider("fake", fakeCloudProviderFactory)
+	}
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiserverConfig.WriteString(fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: controller-manager
+  name: default-context
+current-context: default-context
+users:
+- name: controller-manager
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, server.ClientConfig.BearerToken))
+	apiserverConfig.Close()
+
+	tests := []struct {
+		name       string
+		tester     util.ComponentTester
+		extraFlags []string
+	}{
+		{"kube-controller-manager", util.NewKubeControllerManagerTester("daemonset-controller"), nil},
+		{"cloud-controller-manager", util.NewCloudControllerManagerTester(), []string{"--cloud-provider=fake", "--webhook-secure-port=0"}},
+		{"kube-scheduler", util.NewKubeSchedulerTester(), nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			currentReflectorMetricsFactory := cache.SwapReflectorMetricsFactory(cache.NewFakeReflectorMetricsFactory())
+			defer cache.SwapReflectorMetricsFactory(currentReflectorMetricsFactory)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(string(clientgofeaturegate.InformerMetrics)), false)()
+			// reset default registry metrics
+			legacyregistry.Reset()
+			testComponentReflectorsMetricsWithSecureServing(t, tt.tester, apiserverConfig.Name(), tt.extraFlags)
+		})
+	}
+}
+
+func testComponentReflectorsMetricsWithSecureServing(t *testing.T, tester util.ComponentTester, kubeconfig string, extraFlags []string) {
+	flags := []string{
+		"--authorization-always-allow-paths", "/healthz,/metrics",
+		"--kubeconfig", kubeconfig,
+		"--leader-elect=false",
+		"--feature-gates=InformerMetrics=true",
+	}
+	_, ctx := ktesting.NewTestContext(t)
+	_, secureInfo, tearDownFn, err := tester.StartTestServer(ctx, append(flags, extraFlags...))
+	if tearDownFn != nil {
+		defer tearDownFn()
+	}
+	if err != nil {
+		t.Fatalf("StartTestServer() error = %v", err)
+	}
+	url := fmt.Sprintf("https://%s/metrics", secureInfo.Listener.Addr().String())
+	url = strings.Replace(url, "[::]", "127.0.0.1", -1) // switch to IPv4 because the self-signed cert does not support [::]
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	client := &http.Client{Transport: tr}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed to GET metrics from component: %v", err)
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("failed to GET metrics from component, got: %d %q", r.StatusCode, string(body))
+	}
+	metrics := testutil.NewMetrics()
+	err = testutil.ParseMetrics(string(body), &metrics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkForExpectedMetrics(t, metrics, reflectorMetrics)
 }
