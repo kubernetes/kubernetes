@@ -104,13 +104,10 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 		// entries in our summary. For details on .mount units:
 		// http://man7.org/linux/man-pages/man5/systemd.mount.5.html
 		if strings.HasSuffix(key, ".mount") {
-			klog.InfoS("pod is being skipped on mounts", "ContainerInfo", cinfo)
 			continue
 		}
 		// Build the Pod key if this container is managed by a Pod
 		if !isPodManagedContainer(&cinfo) {
-			klog.InfoS("pod is being skipped", "ContainerInfo", cinfo)
-			klog.InfoS("pod labels", "Labels", cinfo.Spec.Labels)
 			continue
 		}
 		ref := buildPodRef(cinfo.Spec.Labels)
@@ -167,9 +164,6 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			podStats.StartTime = *status.StartTime
 			// only append stats if we were able to get the start time of the pod
 			result = append(result, *podStats)
-		}
-		if !found {
-			klog.InfoS("Missing pod argg", "PodUID", podUID, "Status", status)
 		}
 	}
 
@@ -401,9 +395,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		})
 	}
 	result := make(map[string]cadvisorapiv2.ContainerInfo)
-	klog.InfoS("CinfoMap", "LenOfMap", len(cinfoMap))
-	for idx, refs := range cinfoMap {
-		klog.InfoS("CInfo", "Idx", idx)
+	for _, refs := range cinfoMap {
 		if len(refs) == 1 {
 			// ContainerInfo with no CPU/memory/network usage for uncleaned cgroups of
 			// already terminated containers, which should not be shown in the results.
@@ -416,8 +408,9 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 		}
 		sort.Sort(ByCreationTime(refs))
 		for i := len(refs) - 1; i >= 0; i-- {
+			hasMemoryAndCpu := hasMemoryAndCPUInstUsage(&refs[i].cinfo)
+			klog.InfoS("Memory and Cpu Detected", "HasMemoryAndCpu", hasMemoryAndCpu)
 			if hasMemoryAndCPUInstUsage(&refs[i].cinfo) {
-				klog.InfoS("ContainerInfo", "Refs[i].cinfo", refs[i].cinfo.Spec)
 				result[refs[i].cgroup] = refs[i].cinfo
 				break
 			}
@@ -501,6 +494,7 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 	if cstat.CpuInst == nil || cstat.Memory == nil {
 		// cadvisor seems to report CPuInst as nill pretty often.
 		if cstat.Memory != nil {
+			klog.V(4).InfoS("stats", "Memory", cstat.Memory)
 			return cstat.Memory.RSS == 0
 		}
 		return true
