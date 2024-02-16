@@ -100,10 +100,10 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			switch addrType {
 			case discovery.AddressTypeIPv4:
 				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
+				allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeIPv6:
 				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
+				allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
 			}
