@@ -5450,24 +5450,32 @@ func ValidateService(service *core.Service) field.ErrorList {
 		ports[key] = true
 	}
 
-	// Validate SourceRange field and annotation
-	_, ok := service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]
-	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
-		var fieldPath *field.Path
-		var val string
-		if len(service.Spec.LoadBalancerSourceRanges) > 0 {
-			fieldPath = specPath.Child("LoadBalancerSourceRanges")
-			val = fmt.Sprintf("%v", service.Spec.LoadBalancerSourceRanges)
-		} else {
-			fieldPath = field.NewPath("metadata", "annotations").Key(core.AnnotationLoadBalancerSourceRangesKey)
-			val = service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]
-		}
+	// Validate SourceRanges field or annotation.
+	if len(service.Spec.LoadBalancerSourceRanges) > 0 {
+		fieldPath := specPath.Child("LoadBalancerSourceRanges")
+
 		if service.Spec.Type != core.ServiceTypeLoadBalancer {
 			allErrs = append(allErrs, field.Forbidden(fieldPath, "may only be used when `type` is 'LoadBalancer'"))
 		}
-		_, err := apiservice.GetLoadBalancerSourceRanges(service)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fieldPath, val, "must be a list of IP ranges. For example, 10.240.0.0/24,10.250.0.0/24 "))
+		for idx, value := range service.Spec.LoadBalancerSourceRanges {
+			// Note: due to a historical accident around transition from the
+			// annotation value, these values are allowed to be space-padded.
+			value = strings.TrimSpace(value)
+			allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(idx), value)...)
+		}
+	} else if val, annotationSet := service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]; annotationSet {
+		fieldPath := field.NewPath("metadata", "annotations").Key(core.AnnotationLoadBalancerSourceRangesKey)
+		if service.Spec.Type != core.ServiceTypeLoadBalancer {
+			allErrs = append(allErrs, field.Forbidden(fieldPath, "may only be used when `type` is 'LoadBalancer'"))
+		}
+
+		val = strings.TrimSpace(val)
+		if val != "" {
+			cidrs := strings.Split(val, ",")
+			for _, value := range cidrs {
+				value = strings.TrimSpace(value)
+				allErrs = append(allErrs, validation.IsValidCIDR(fieldPath, value)...)
+			}
 		}
 	}
 
@@ -5870,9 +5878,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 
 		// all PodCIDRs should be valid ones
 		for idx, value := range node.Spec.PodCIDRs {
-			if _, err := ValidateCIDR(value); err != nil {
-				allErrs = append(allErrs, field.Invalid(podCIDRsField.Index(idx), node.Spec.PodCIDRs, "must be valid CIDR"))
-			}
+			allErrs = append(allErrs, validation.IsValidCIDR(podCIDRsField.Index(idx), value)...)
 		}
 
 		// if more than PodCIDR then
@@ -7298,15 +7304,6 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 	}
 
 	return true, allErrs
-}
-
-// ValidateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
-func ValidateCIDR(cidr string) (*net.IPNet, error) {
-	_, net, err := netutils.ParseCIDRSloppy(cidr)
-	if err != nil {
-		return nil, err
-	}
-	return net, nil
 }
 
 func IsDecremented(update, old *int32) bool {

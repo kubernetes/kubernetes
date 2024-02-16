@@ -378,6 +378,16 @@ func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
 	return allErrors
 }
 
+// IsValidCIDR tests that the argument is a valid CIDR value.
+func IsValidCIDR(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	_, _, err := netutils.ParseCIDRSloppy(value)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
+	}
+	return allErrors
+}
+
 const percentFmt string = "[0-9]+%"
 const percentErrMsg string = "a valid percent string must be a numeric string followed by an ending '%'"
 
