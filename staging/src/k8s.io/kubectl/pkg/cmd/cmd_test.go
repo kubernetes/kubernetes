@@ -58,6 +58,37 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 }
 
 func TestKubectlSubcommandShadowPlugin(t *testing.T) {
+	tmpKubeconfig, _ := os.CreateTemp("", "")
+	defer func() {
+		err := os.Remove(tmpKubeconfig.Name())
+		if err != nil {
+			t.Fatalf("temp kubeconfig removal error %v", err)
+		}
+	}()
+
+	configContent := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://localhost:8080
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`)
+	_, err := tmpKubeconfig.Write(configContent)
+	if err != nil {
+		t.Fatalf("temp kubeconfig write error %v", err)
+	}
+
 	tests := []struct {
 		name              string
 		args              []string
@@ -78,7 +109,7 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 		},
 		{
 			name:             "test that normal commands are able to be executed, when builtin subcommand exists",
-			args:             []string{"kubectl", "create", "job", "foo", "--image=busybox", "--dry-run=client", "--namespace", "test-namespace"},
+			args:             []string{"kubectl", "create", "job", "foo", "--image=busybox", "--dry-run=client", "--namespace", "test-namespace", fmt.Sprintf("--kubeconfig=%s", tmpKubeconfig.Name())},
 			expectPlugin:     "",
 			expectPluginArgs: []string{},
 		},
@@ -171,6 +202,37 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 }
 
 func TestKubectlCommandHandlesPlugins(t *testing.T) {
+	tmpKubeconfig, _ := os.CreateTemp("", "")
+	defer func() {
+		err := os.Remove(tmpKubeconfig.Name())
+		if err != nil {
+			t.Fatalf("temp kubeconfig removal error %v", err)
+		}
+	}()
+
+	configContent := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://localhost:8080
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`)
+	_, err := tmpKubeconfig.Write(configContent)
+	if err != nil {
+		t.Fatalf("temp kubeconfig write error %v", err)
+	}
+
 	tests := []struct {
 		name              string
 		args              []string
@@ -186,7 +248,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 		},
 		{
 			name:             "test that normal commands are able to be executed, when no plugin overshadows them and shadowing feature is not enabled",
-			args:             []string{"kubectl", "create", "job", "foo", "--image=busybox", "--dry-run=client"},
+			args:             []string{"kubectl", "create", "job", "foo", "--image=busybox", "--dry-run=client", fmt.Sprintf("--kubeconfig=%s", tmpKubeconfig.Name())},
 			expectPlugin:     "",
 			expectPluginArgs: []string{},
 		},
