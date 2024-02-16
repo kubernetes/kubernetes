@@ -25,6 +25,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -35,6 +36,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/features"
 	authzmetrics "k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -178,6 +180,7 @@ users:
 	}
 
 	// returns a deny response when called
+	denyName := "deny.example.com"
 	serverDenyCalled := atomic.Int32{}
 	serverDeny := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serverDenyCalled.Add(1)
@@ -221,6 +224,7 @@ users:
 	}
 
 	// returns an allow response when called
+	allowName := "allow.example.com"
 	serverAllowCalled := atomic.Int32{}
 	serverAllow := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serverAllowCalled.Add(1)
@@ -242,6 +246,7 @@ users:
 	}
 
 	// returns an allow response when called
+	allowReloadedName := "allowreloaded.example.com"
 	serverAllowReloadedCalled := atomic.Int32{}
 	serverAllowReloaded := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serverAllowReloadedCalled.Add(1)
@@ -269,9 +274,15 @@ users:
 		serverNoOpinionCalled.Store(0)
 		serverAllowCalled.Store(0)
 		serverAllowReloadedCalled.Store(0)
+		authorizationmetrics.ResetMetricsForTest()
 	}
+	var adminClient *clientset.Clientset
 	assertCounts := func(errorCount, timeoutCount, denyCount, noOpinionCount, allowCount, allowReloadedCount int32) {
 		t.Helper()
+		metrics, err := getMetrics(t, adminClient)
+		if err != nil {
+			t.Errorf("error getting metrics: %v", err)
+		}
 		if e, a := errorCount, serverErrorCalled.Load(); e != a {
 			t.Errorf("expected fail webhook calls: %d, got %d", e, a)
 		}
@@ -281,14 +292,23 @@ users:
 		if e, a := denyCount, serverDenyCalled.Load(); e != a {
 			t.Errorf("expected deny webhook calls: %d, got %d", e, a)
 		}
+		if e, a := denyCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: denyName}]["denied"]; e != int32(a) {
+			t.Errorf("expected deny webhook denied metrics calls: %d, got %d", e, a)
+		}
 		if e, a := noOpinionCount, serverNoOpinionCalled.Load(); e != a {
 			t.Errorf("expected noOpinion webhook calls: %d, got %d", e, a)
 		}
 		if e, a := allowCount, serverAllowCalled.Load(); e != a {
 			t.Errorf("expected allow webhook calls: %d, got %d", e, a)
 		}
+		if e, a := allowCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowName}]["allowed"]; e != int32(a) {
+			t.Errorf("expected allow webhook allowed metrics calls: %d, got %d", e, a)
+		}
 		if e, a := allowReloadedCount, serverAllowReloadedCalled.Load(); e != a {
 			t.Errorf("expected allowReloaded webhook calls: %d, got %d", e, a)
+		}
+		if e, a := allowReloadedCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowReloadedName}]["allowed"]; e != int32(a) {
+			t.Errorf("expected allowReloaded webhook allowed metrics calls: %d, got %d", e, a)
 		}
 		resetCounts()
 	}
@@ -333,7 +353,7 @@ authorizers:
     - expression: 'request.resourceAttributes.name == "timeout"'
 
 - type: Webhook
-  name: deny.example.com
+  name: `+denyName+`
   webhook:
     timeout: 5s
     failurePolicy: NoOpinion
@@ -361,7 +381,7 @@ authorizers:
       kubeConfigFile: `+serverNoOpinionKubeconfigName+`
 
 - type: Webhook
-  name: allow.example.com
+  name: `+allowName+`
   webhook:
     timeout: 5s
     failurePolicy: Deny
@@ -383,7 +403,7 @@ authorizers:
 	)
 	t.Cleanup(server.TearDownFn)
 
-	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+	adminClient = clientset.NewForConfigOrDie(server.ClientConfig)
 
 	// malformed webhook short circuits
 	t.Log("checking error")
@@ -470,14 +490,14 @@ authorizers:
 	}
 
 	// check last loaded success/failure metric timestamps, ensure success is present, failure is not
-	initialReloadSuccess, initialReloadFailure, err := getReloadTimes(t, adminClient)
+	initialMetrics, err := getMetrics(t, adminClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if initialReloadSuccess == nil {
+	if initialMetrics.reloadSuccess == nil {
 		t.Fatal("expected success timestamp, got none")
 	}
-	if initialReloadFailure != nil {
+	if initialMetrics.reloadFailure != nil {
 		t.Fatal("expected no failure timestamp, got one")
 	}
 
@@ -487,24 +507,24 @@ authorizers:
 	}
 
 	// wait for failure timestamp > success timestamp
-	var reload1Success, reload1Failure *time.Time
+	var reload1Metrics *metrics
 	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		reload1Success, reload1Failure, err = getReloadTimes(t, adminClient)
+		reload1Metrics, err = getMetrics(t, adminClient)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if reload1Success == nil {
+		if reload1Metrics.reloadSuccess == nil {
 			t.Fatal("expected success timestamp, got none")
 		}
-		if !reload1Success.Equal(*initialReloadSuccess) {
-			t.Fatalf("success timestamp changed from initial success %s to %s unexpectedly", initialReloadSuccess.String(), reload1Success.String())
+		if !reload1Metrics.reloadSuccess.Equal(*initialMetrics.reloadSuccess) {
+			t.Fatalf("success timestamp changed from initial success %s to %s unexpectedly", initialMetrics.reloadSuccess.String(), reload1Metrics.reloadSuccess.String())
 		}
-		if reload1Failure == nil {
+		if reload1Metrics.reloadFailure == nil {
 			t.Log("expected failure timestamp, got nil, retrying")
 			return false, nil
 		}
-		if !reload1Failure.After(*reload1Success) {
-			t.Fatalf("expected failure timestamp to be more recent than success timestamp, got %s <= %s", reload1Failure.String(), reload1Success.String())
+		if !reload1Metrics.reloadFailure.After(*reload1Metrics.reloadSuccess) {
+			t.Fatalf("expected failure timestamp to be more recent than success timestamp, got %s <= %s", reload1Metrics.reloadFailure.String(), reload1Metrics.reloadSuccess.String())
 		}
 		return true, nil
 	})
@@ -539,7 +559,7 @@ apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: AuthorizationConfiguration
 authorizers:
 - type: Webhook
-  name: allowreloaded.example.com
+  name: `+allowReloadedName+`
   webhook:
     timeout: 5s
     failurePolicy: Deny
@@ -553,29 +573,29 @@ authorizers:
 		t.Fatal(err)
 	}
 
-	// wait for success timestamp > reload1Failure timestamp
-	var reload2Success, reload2Failure *time.Time
+	// wait for success timestamp > reload1Metrics.reloadFailure timestamp
+	var reload2Metrics *metrics
 	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		reload2Success, reload2Failure, err = getReloadTimes(t, adminClient)
+		reload2Metrics, err = getMetrics(t, adminClient)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if reload2Failure == nil {
+		if reload2Metrics.reloadFailure == nil {
 			t.Log("expected failure timestamp, got nil, retrying")
 			return false, nil
 		}
-		if !reload2Failure.Equal(*reload1Failure) {
-			t.Fatalf("failure timestamp changed from reload1Failure %s to %s unexpectedly", reload1Failure.String(), reload2Failure.String())
+		if !reload2Metrics.reloadFailure.Equal(*reload1Metrics.reloadFailure) {
+			t.Fatalf("failure timestamp changed from reload1Metrics.reloadFailure %s to %s unexpectedly", reload1Metrics.reloadFailure.String(), reload2Metrics.reloadFailure.String())
 		}
-		if reload2Success == nil {
+		if reload2Metrics.reloadSuccess == nil {
 			t.Fatal("expected success timestamp, got none")
 		}
-		if reload2Success.Equal(*initialReloadSuccess) {
+		if reload2Metrics.reloadSuccess.Equal(*initialMetrics.reloadSuccess) {
 			t.Log("success timestamp hasn't updated from initial success, retrying")
 			return false, nil
 		}
-		if !reload2Success.After(*reload2Failure) {
-			t.Fatalf("expected success timestamp to be more recent than failure, got %s <= %s", reload2Success.String(), reload2Failure.String())
+		if !reload2Metrics.reloadSuccess.After(*reload2Metrics.reloadFailure) {
+			t.Fatalf("expected success timestamp to be more recent than failure, got %s <= %s", reload2Metrics.reloadSuccess.String(), reload2Metrics.reloadFailure.String())
 		}
 		return true, nil
 	})
@@ -610,28 +630,28 @@ authorizers:
 	}
 
 	// wait for failure timestamp > success timestamp
-	var reload3Success, reload3Failure *time.Time
+	var reload3Metrics *metrics
 	err = wait.PollUntilContextTimeout(context.TODO(), time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		reload3Success, reload3Failure, err = getReloadTimes(t, adminClient)
+		reload3Metrics, err = getMetrics(t, adminClient)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if reload3Success == nil {
+		if reload3Metrics.reloadSuccess == nil {
 			t.Fatal("expected success timestamp, got none")
 		}
-		if !reload3Success.Equal(*reload2Success) {
-			t.Fatalf("success timestamp changed from %s to %s unexpectedly", reload2Success.String(), reload3Success.String())
+		if !reload3Metrics.reloadSuccess.Equal(*reload2Metrics.reloadSuccess) {
+			t.Fatalf("success timestamp changed from %s to %s unexpectedly", reload2Metrics.reloadSuccess.String(), reload3Metrics.reloadSuccess.String())
 		}
-		if reload3Failure == nil {
+		if reload3Metrics.reloadFailure == nil {
 			t.Log("expected failure timestamp, got nil, retrying")
 			return false, nil
 		}
-		if reload3Failure.Equal(*reload2Failure) {
+		if reload3Metrics.reloadFailure.Equal(*reload2Metrics.reloadFailure) {
 			t.Log("failure timestamp hasn't updated, retrying")
 			return false, nil
 		}
-		if !reload3Failure.After(*reload3Success) {
-			t.Fatalf("expected failure timestamp to be more recent than success, got %s <= %s", reload3Failure.String(), reload3Success.String())
+		if !reload3Metrics.reloadFailure.After(*reload3Metrics.reloadSuccess) {
+			t.Fatalf("expected failure timestamp to be more recent than success, got %s <= %s", reload3Metrics.reloadFailure.String(), reload3Metrics.reloadSuccess.String())
 		}
 		return true, nil
 	})
@@ -661,36 +681,69 @@ authorizers:
 	}
 }
 
-func getReloadTimes(t *testing.T, client *clientset.Clientset) (*time.Time, *time.Time, error) {
+type metrics struct {
+	reloadSuccess *time.Time
+	reloadFailure *time.Time
+	decisions     map[authorizerKey]map[string]int
+}
+type authorizerKey struct {
+	authorizerType string
+	authorizerName string
+}
+
+var decisionMetric = regexp.MustCompile(`apiserver_authorization_decisions_total\{decision="(.*?)",name="(.*?)",type="(.*?)"\} (\d+)`)
+
+func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 	data, err := client.RESTClient().Get().AbsPath("/metrics").DoRaw(context.TODO())
 
 	//  apiserver_authorization_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:4b86cfa719a83dd63a4dc6a9831edb2b59240d0f59cf215b2d51aacb3f5c395e",status="success"} 1.7002567356895502e+09
 	//  apiserver_authorization_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:4b86cfa719a83dd63a4dc6a9831edb2b59240d0f59cf215b2d51aacb3f5c395e",status="failure"} 1.7002567356895502e+09
+	//  apiserver_authorization_decisions_total{decision="allowed",name="allow.example.com",type="Webhook"} 2
+	//  apiserver_authorization_decisions_total{decision="allowed",name="allowreloaded.example.com",type="Webhook"} 1
+	//  apiserver_authorization_decisions_total{decision="denied",name="deny.example.com",type="Webhook"} 1
+	//  apiserver_authorization_decisions_total{decision="denied",name="error.example.com",type="Webhook"} 1
+	//  apiserver_authorization_decisions_total{decision="denied",name="timeout.example.com",type="Webhook"} 1
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	var success, failure *time.Time
+	var m metrics
 	for _, line := range strings.Split(string(data), "\n") {
+		if matches := decisionMetric.FindStringSubmatch(line); matches != nil {
+			t.Log(line)
+			if m.decisions == nil {
+				m.decisions = map[authorizerKey]map[string]int{}
+			}
+			key := authorizerKey{authorizerType: matches[3], authorizerName: matches[2]}
+			if m.decisions[key] == nil {
+				m.decisions[key] = map[string]int{}
+			}
+			count, err := strconv.Atoi(matches[4])
+			if err != nil {
+				return nil, err
+			}
+			m.decisions[key][matches[1]] = count
+
+		}
 		if strings.HasPrefix(line, "apiserver_authorization_config_controller_automatic_reload_last_timestamp_seconds") {
 			t.Log(line)
 			values := strings.Split(line, " ")
 			value, err := strconv.ParseFloat(values[len(values)-1], 64)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			seconds := int64(value)
 			nanoseconds := int64((value - float64(seconds)) * 1000000000)
 			tm := time.Unix(seconds, nanoseconds)
 			if strings.Contains(line, `"success"`) {
-				success = &tm
-				t.Log("success", success.String())
+				m.reloadSuccess = &tm
+				t.Log("success", m.reloadSuccess.String())
 			}
 			if strings.Contains(line, `"failure"`) {
-				failure = &tm
-				t.Log("failure", failure.String())
+				m.reloadFailure = &tm
+				t.Log("failure", m.reloadFailure.String())
 			}
 		}
 	}
-	return success, failure, nil
+	return &m, nil
 }

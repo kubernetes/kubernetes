@@ -73,7 +73,6 @@ func RegisterMetrics() {
 func ResetMetricsForTest() {
 	authorizationConfigAutomaticReloadsTotal.Reset()
 	authorizationConfigAutomaticReloadLastTimestampSeconds.Reset()
-	legacyregistry.Reset()
 }
 
 func RecordAuthorizationConfigAutomaticReloadFailure(apiServerID string) {
