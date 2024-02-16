@@ -36,6 +36,7 @@ type ContainerStatusApplyConfiguration struct {
 	Started              *bool                                   `json:"started,omitempty"`
 	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
 	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	User                 *ContainerUserApplyConfiguration        `json:"user,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with
@@ -129,5 +130,13 @@ func (b *ContainerStatusApplyConfiguration) WithAllocatedResources(value corev1.
 // If called multiple times, the Resources field is set to the value of the last call.
 func (b *ContainerStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *ContainerStatusApplyConfiguration {
 	b.Resources = value
+	return b
+}
+
+// WithUser sets the User field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the User field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithUser(value *ContainerUserApplyConfiguration) *ContainerStatusApplyConfiguration {
+	b.User = value
 	return b
 }

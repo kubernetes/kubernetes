@@ -609,6 +609,11 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		// If runtime reports cpu & memory resources info, add it to container status
 		cStatusResources = toKubeContainerResources(status.Resources)
 	}
+	var cStatusUser *kubecontainer.ContainerUser
+	if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+		cStatusUser = toKubeContainerUser(status.User)
+	}
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
@@ -624,6 +629,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		State:                toKubeContainerState(status.State),
 		CreatedAt:            time.Unix(0, status.CreatedAt),
 		Resources:            cStatusResources,
+		User:                 cStatusUser,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {

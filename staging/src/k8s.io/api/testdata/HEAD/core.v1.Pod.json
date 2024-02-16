@@ -1341,6 +1341,7 @@
       "supplementalGroups": [
         4
       ],
+      "supplementalGroupsPolicy": "supplementalGroupsPolicyValue",
       "fsGroup": 5,
       "sysctls": [
         {
@@ -1772,6 +1773,15 @@
               "name": "nameValue"
             }
           ]
+        },
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
         }
       }
     ],
@@ -1835,6 +1845,15 @@
               "name": "nameValue"
             }
           ]
+        },
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
         }
       }
     ],
@@ -1899,6 +1918,15 @@
               "name": "nameValue"
             }
           ]
+        },
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
         }
       }
     ],

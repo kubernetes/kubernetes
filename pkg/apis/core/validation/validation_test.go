@@ -7654,35 +7654,59 @@ func TestValidateEphemeralContainers(t *testing.T) {
 
 func TestValidateWindowsPodSecurityContext(t *testing.T) {
 	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}
-	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
+	supplementalGroupsPolicyMerge := core.SupplementalGroupsPolicyMerge
+	invalidWindowsSC := &core.PodSecurityContext{SupplementalGroupsPolicy: &supplementalGroupsPolicyMerge, SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
 	cases := map[string]struct {
-		podSec      *core.PodSpec
-		expectErr   bool
-		errorType   field.ErrorType
-		errorDetail string
+		podSec       *core.PodSpec
+		expectedErrs map[string]struct {
+			errorType   field.ErrorType
+			errorDetail string
+		}
 	}{
 		"valid SC, windows, no error": {
-			podSec:    &core.PodSpec{SecurityContext: validWindowsSC},
-			expectErr: false,
+			podSec: &core.PodSpec{SecurityContext: validWindowsSC},
 		},
 		"invalid SC, windows, error": {
-			podSec:      &core.PodSpec{SecurityContext: invalidWindowsSC},
-			errorType:   "FieldValueForbidden",
-			errorDetail: "cannot be set for a windows pod",
-			expectErr:   true,
+			podSec: &core.PodSpec{SecurityContext: invalidWindowsSC},
+			expectedErrs: map[string]struct {
+				errorType   field.ErrorType
+				errorDetail string
+			}{
+				"field.securityContext.seLinuxOptions": {
+					errorType:   "FieldValueForbidden",
+					errorDetail: "cannot be set for a windows pod",
+				},
+				"field.securityContext.supplementalGroupsPolicy": {
+					errorType:   "FieldValueForbidden",
+					errorDetail: "cannot be set for a windows pod",
+				},
+			},
 		},
 	}
+
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
 			errs := validateWindows(v.podSec, field.NewPath("field"))
-			if v.expectErr && len(errs) > 0 {
-				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
-					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+			if len(v.expectedErrs) > 0 && len(errs) > 0 {
+				if len(v.expectedErrs) != len(errs) {
+					t.Errorf("[%s] Expected number of errors is %d, got %d", k, len(v.expectedErrs), len(errs))
 				}
-			} else if v.expectErr && len(errs) == 0 {
+			L:
+				for field, expectedErr := range v.expectedErrs {
+					for _, err := range errs {
+						if err.Field == field {
+							if err.Type != expectedErr.errorType || !strings.Contains(err.Detail, expectedErr.errorDetail) {
+								t.Errorf("[%s] Expected error on field %q with type %q and detail %q, got %v", k, field, expectedErr.errorType, expectedErr.errorDetail, errs)
+							}
+							continue L
+						}
+					}
+					t.Errorf("[%s] Expected error on field %q with type %q and detail %q, got %v", k, field, expectedErr.errorType, expectedErr.errorDetail, errs)
+				}
+			} else if len(v.expectedErrs) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
-			if !v.expectErr && len(errs) != 0 {
+			if len(v.expectedErrs) == 0 && len(errs) != 0 {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
@@ -21382,6 +21406,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.SeccompProfile",
 		"SecurityContext.ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
+		"SecurityContext.SupplementalGroupsPolicy",
 		"SecurityContext.Sysctls",
 		"SecurityContext.WindowsOptions",
 	)

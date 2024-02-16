@@ -131,6 +131,15 @@
               "name": "nameValue"
             }
           ]
+        },
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
         }
       }
     ],
@@ -194,6 +203,15 @@
               "name": "nameValue"
             }
           ]
+        },
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
         }
       }
     ],
@@ -258,6 +276,15 @@
               "name": "nameValue"
             }
           ]
+        },
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
         }
       }
     ],
