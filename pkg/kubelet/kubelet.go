@@ -1433,9 +1433,11 @@ func (kl *Kubelet) StartGarbageCollection() {
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
-	// when the high threshold is set to 100, stub the image GC manager
-	if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 {
-		klog.V(2).InfoS("ImageGCHighThresholdPercent is set 100, Disable image GC")
+	// when the high threshold is set to 100, and the max age is 0 (or the max age feature is disabled)
+	// stub the image GC manager
+	if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 &&
+		(!utilfeature.DefaultFeatureGate.Enabled(features.ImageMaximumGCAge) || kl.kubeletConfiguration.ImageMaximumGCAge.Duration == 0) {
+		klog.V(2).InfoS("ImageGCHighThresholdPercent is set 100 and ImageMaximumGCAge is 0, Disable image GC")
 		return
 	}
 
