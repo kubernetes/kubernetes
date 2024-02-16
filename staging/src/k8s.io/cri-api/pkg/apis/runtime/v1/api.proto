@@ -235,6 +235,15 @@ message Mount {
     repeated IDMapping uidMappings = 6;
     // GidMappings specifies the runtime GID mappings for the mount.
     repeated IDMapping gidMappings = 7;
+    // If set to true, the mount is made recursive read-only.
+    // In this CRI API, recursive_read_only is a plain true/false boolean, although its equivalent
+    // in the Kubernetes core API is a quaternary that can be nil, "Enabled", "IfPossible", or "Disabled".
+    // kubelet translates that quaternary value in the core API into a boolean in this CRI API.
+    // Remarks:
+    // - nil is just treated as false
+    // - when set to true, readonly must be explicitly set to true, and propagation must be PRIVATE (0).
+    // - (readonly == false && recursive_read_only == false) does not make the mount read-only.
+    bool recursive_read_only = 8;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -1528,6 +1537,22 @@ message StatusRequest {
     bool verbose = 1;
 }
 
+message RuntimeHandlerFeatures {
+    // recursive_read_only_mounts is set to true if the runtime handler supports
+    // recursive read-only mounts.
+    // For runc-compatible runtimes, availability of this feature can be detected by checking whether
+    // the Linux kernel version is >= 5.12, and,  `runc features | jq .mountOptions` contains "rro".
+    bool recursive_read_only_mounts = 1;
+}
+
+message RuntimeHandler {
+    // Name must be unique in StatusResponse.
+    // An empty string denotes the default handler.
+    string name = 1;
+    // Supported features.
+    RuntimeHandlerFeatures features = 2;
+}
+
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
@@ -1536,6 +1561,8 @@ message StatusResponse {
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+    // Runtime handlers.
+    repeated RuntimeHandler runtime_handlers = 3;
 }
 
 message ImageFsInfoRequest {}
