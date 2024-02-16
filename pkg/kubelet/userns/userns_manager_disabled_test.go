@@ -49,6 +49,10 @@ func TestReleaseDisabled(t *testing.T) {
 
 func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+
+	trueVal := true
+	falseVal := false
+
 	tests := []struct {
 		name    string
 		pod     *v1.Pod
@@ -58,6 +62,31 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 			name:    "pod is nil",
 			pod:     nil,
 			success: true,
+		},
+		{
+			name: "hostUsers is nil",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: nil,
+				},
+			},
+			success: true,
+		},
+		{
+			name: "hostUsers is true",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &trueVal,
+				},
+			},
+		},
+		{
+			name: "hostUsers is false",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &falseVal,
+				},
+			},
 		},
 	}
 
