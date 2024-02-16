@@ -35,11 +35,11 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -443,7 +443,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	mounter := mount.New(s.ExperimentalMounterPath)
 	subpather := subpath.New(mounter)
 	hu := hostutil.NewHostUtil()
-	var pluginRunner = exec.New()
+	pluginRunner := exec.New()
 
 	plugins, err := ProbeVolumePlugins(featureGate)
 	if err != nil {

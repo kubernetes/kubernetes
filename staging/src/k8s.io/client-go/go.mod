@@ -5,7 +5,6 @@ module k8s.io/client-go
 go 1.22.0
 
 require (
-	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.4
@@ -24,6 +23,7 @@ require (
 	golang.org/x/term v0.20.0
 	golang.org/x/time v0.3.0
 	google.golang.org/protobuf v1.33.0
+	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.120.1
