@@ -492,9 +492,11 @@ var _ = SIGDescribe("SeparateDiskTest PriorityLocalStorageEvictionOrdering", fra
 				pod: diskConsumingPod("guaranteed-disk", 270 /* Mb */, nil, v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceEphemeralStorage: resource.MustParse("300Mi"),
+						v1.ResourceMemory:           resource.MustParse("300Mi"),
 					},
 					Limits: v1.ResourceList{
 						v1.ResourceEphemeralStorage: resource.MustParse("300Mi"),
+						v1.ResourceMemory:           resource.MustParse("300Mi"),
 					},
 				}),
 			},
@@ -1025,7 +1027,8 @@ func innocentPod() *v1.Pod {
 	// Found that this innocent-pod has some disk usage
 	// Adding a request so we don't eviction due to exceed disk limits
 
-	innocentPodRequest := resource.MustParse("100Mi")
+	innocentPodRequestDisk := resource.MustParse("100Mi")
+	innocentPodMemory := resource.MustParse("100Mi")
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "innocent-pod"},
 		Spec: v1.PodSpec{
@@ -1042,7 +1045,12 @@ func innocentPod() *v1.Pod {
 					},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							v1.ResourceEphemeralStorage: innocentPodRequest,
+							v1.ResourceEphemeralStorage: innocentPodRequestDisk,
+							v1.ResourceMemory:           innocentPodMemory,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: innocentPodRequestDisk,
+							v1.ResourceMemory:           innocentPodMemory,
 						},
 					},
 				},

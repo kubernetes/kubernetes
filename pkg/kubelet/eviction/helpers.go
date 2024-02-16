@@ -684,6 +684,40 @@ func priority(p1, p2 *v1.Pod) int {
 	return -1
 }
 
+// rank pods based on Qos (if stats collection fails)
+func qos(p1, p2 *v1.Pod) int {
+	// Qos Ranking
+	// Guaranteed
+	// Burstable
+	// BestEffort
+	p1Qos := p1.Status.QOSClass
+	p2Qos := p2.Status.QOSClass
+	klog.V(4).InfoS("PodQosFallback", "Pod1", p1.ObjectMeta.Name, "Pod1Qos", p1Qos, "Pod2", p2.ObjectMeta.Name, "Pod2Qos", p2Qos)
+	if p1Qos == v1.PodQOSGuaranteed && p2Qos == v1.PodQOSGuaranteed {
+		return 0
+	}
+	if p1Qos == v1.PodQOSBurstable && p2Qos == v1.PodQOSBurstable {
+		return 0
+	}
+	if p1Qos == v1.PodQOSBestEffort && p2Qos == v1.PodQOSBestEffort {
+		return 0
+	}
+	if p1Qos == v1.PodQOSGuaranteed && p2Qos != v1.PodQOSGuaranteed {
+		return 1
+	}
+	if p1Qos == v1.PodQOSBurstable && p2Qos == v1.PodQOSBestEffort {
+		return 1
+	}
+	if p1Qos == v1.PodQOSBestEffort && p2Qos != v1.PodQOSBestEffort {
+		return -1
+	}
+	if p1Qos != v1.PodQOSGuaranteed && p2Qos == v1.PodQOSGuaranteed {
+		return -1
+	}
+
+	return 0
+}
+
 // exceedMemoryRequests compares whether or not pods' memory usage exceeds their requests
 func exceedMemoryRequests(stats statsFunc) cmpFunc {
 	return func(p1, p2 *v1.Pod) int {
@@ -740,6 +774,10 @@ func process(stats statsFunc) cmpFunc {
 			if !p2Found {
 				klog.V(4).InfoS("Error getting stats from pod 2", "Pod2", p2.ObjectMeta)
 			}
+			qosFallback := qos(p1, p2)
+			if qosFallback != 0 {
+				return qosFallback
+			}
 			return cmpBool(!p1Found, !p2Found)
 		}
 
@@ -764,6 +802,10 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 			if !p2Found {
 				klog.V(4).InfoS("Error getting stats from pod 2", "Pod2", p2.ObjectMeta)
 			}
+			qosFallback := qos(p1, p2)
+			if qosFallback != 0 {
+				return qosFallback
+			}
 			return cmpBool(!p1Found, !p2Found)
 		}
 
@@ -776,6 +818,10 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 			}
 			if p2Err != nil {
 				klog.V(4).InfoS("Error getting stats from pod 2", "Pod2", p2.ObjectMeta)
+			}
+			qosFallback := qos(p1, p2)
+			if qosFallback != 0 {
+				return qosFallback
 			}
 			return cmpBool(p1Err != nil, p2Err != nil)
 		}
@@ -798,12 +844,20 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 		if !p1Found || !p2Found {
 			// prioritize evicting the pod for which no stats were found
 			klog.V(4).InfoS("Error getting stats from pods", "P1Found", p1Found, "P1", p1.ObjectMeta, "p2found", p2Found, "P2", p2.ObjectMeta)
+			qosFallback := qos(p1, p2)
+			if qosFallback != 0 {
+				return qosFallback
+			}
 			return cmpBool(!p1Found, !p2Found)
 		}
 		p1Usage, p1Err := podDiskUsage(p1Stats, p1, fsStatsToMeasure)
 		p2Usage, p2Err := podDiskUsage(p2Stats, p2, fsStatsToMeasure)
 		if p1Err != nil || p2Err != nil {
 			// prioritize evicting the pod which had an error getting stats
+			qosFallback := qos(p1, p2)
+			if qosFallback != 0 {
+				return qosFallback
+			}
 			return cmpBool(p1Err != nil, p2Err != nil)
 		}
 
@@ -816,6 +870,10 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 		p2Disk.Sub(p2Request)
 		// prioritize evicting the pod which has the larger consumption of disk
 		klog.V(4).InfoS("Disk Info", "P1Disk", p1Disk, "P2Disk", p2Disk)
+		qosFallback := qos(p1, p2)
+		if qosFallback != 0 {
+			return qosFallback
+		}
 		return p2Disk.Cmp(p1Disk)
 	}
 }
