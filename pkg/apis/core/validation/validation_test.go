@@ -20849,7 +20849,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
 			},
 		},
 		"Address is link-local": {
@@ -20861,7 +20861,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
 			},
 		},
 		"Address is link-local multicast": {
@@ -20873,7 +20873,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
 			},
 		},
 		"Invalid AppProtocol": {
@@ -23765,7 +23765,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 	}
 }
 
-func TestValidateNonSpecialIP(t *testing.T) {
+func TestValidateEndpointIP(t *testing.T) {
 	fp := field.NewPath("ip")
 
 	// Valid values.
@@ -23776,11 +23776,15 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv4", "10.1.2.3"},
 		{"ipv4 class E", "244.1.2.3"},
 		{"ipv6", "2000::1"},
+
+		// These probably should not have been allowed, but they are
+		{"ipv4 multicast", "239.255.255.253"},
+		{"ipv6 multicast", "ff05::1:3"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := ValidateNonSpecialIP(tc.ip, fp)
+			errs := ValidateEndpointIP(tc.ip, fp)
 			if len(errs) != 0 {
-				t.Errorf("ValidateNonSpecialIP(%q, ...) = %v; want nil", tc.ip, errs)
+				t.Errorf("ValidateEndpointIP(%q, ...) = %v; want nil", tc.ip, errs)
 			}
 		})
 	}
@@ -23794,13 +23798,15 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv4 localhost", "127.0.0.0"},
 		{"ipv4 localhost", "127.255.255.255"},
 		{"ipv6 localhost", "::1"},
+		{"ipv4 link local", "169.254.169.254"},
 		{"ipv6 link local", "fe80::"},
+		{"ipv4 local multicast", "224.0.0.251"},
 		{"ipv6 local multicast", "ff02::"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := ValidateNonSpecialIP(tc.ip, fp)
+			errs := ValidateEndpointIP(tc.ip, fp)
 			if len(errs) == 0 {
-				t.Errorf("ValidateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+				t.Errorf("ValidateEndpointIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
 			}
 		})
 	}
