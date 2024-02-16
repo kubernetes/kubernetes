@@ -90,6 +90,12 @@ const (
 	// Add support for distributed tracing in the API Server
 	APIServerTracing featuregate.Feature = "APIServerTracing"
 
+	// owner: @linxiulei
+	// beta: v1.30
+	//
+	// Enables serving watch requests in separate goroutines.
+	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
+
 	// owner: @cici37 @jpbetz
 	// kep: http://kep.k8s.io/3488
 	// alpha: v1.26
@@ -283,6 +289,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServerIdentity: {Default: true, PreRelease: featuregate.Beta},
 
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
+
+	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
