@@ -21,25 +21,20 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/validating/metrics"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/warning"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
 
@@ -153,8 +148,8 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 				continue
 			}
 
-			params, err := c.collectParams(
-				definition.Spec.ParamKind,
+			params, err := generic.CollectParams(
+				hook.Policy.Spec.ParamKind,
 				hook.ParamInformer,
 				hook.ParamScope,
 				binding.Spec.ParamRef,
@@ -305,125 +300,6 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		return err
 	}
 	return nil
-}
-
-// Returns objects to use to evaluate the policy
-// Copied with minor modification to account for slightly different arguments
-func (c *dispatcher) collectParams(
-	paramKind *v1beta1.ParamKind,
-	paramInformer informers.GenericInformer,
-	paramScope meta.RESTScope,
-	paramRef *v1beta1.ParamRef,
-	namespace string,
-) ([]runtime.Object, error) {
-	// If definition has paramKind, paramRef is required in binding.
-	// If definition has no paramKind, paramRef set in binding will be ignored.
-	var params []runtime.Object
-	var paramStore cache.GenericNamespaceLister
-
-	// Make sure the param kind is ready to use
-	if paramKind != nil && paramRef != nil {
-		if paramInformer == nil {
-			return nil, fmt.Errorf("paramKind kind `%v` not known",
-				paramKind.String())
-		}
-
-		// Set up cluster-scoped, or namespaced access to the params
-		// "default" if not provided, and paramKind is namespaced
-		paramStore = paramInformer.Lister()
-		if paramScope.Name() == meta.RESTScopeNameNamespace {
-			paramsNamespace := namespace
-			if len(paramRef.Namespace) > 0 {
-				paramsNamespace = paramRef.Namespace
-			} else if len(paramsNamespace) == 0 {
-				// You must supply namespace if your matcher can possibly
-				// match a cluster-scoped resource
-				return nil, fmt.Errorf("cannot use namespaced paramRef in policy binding that matches cluster-scoped resources")
-			}
-
-			paramStore = paramInformer.Lister().ByNamespace(paramsNamespace)
-		}
-
-		// If the param informer for this admission policy has not yet
-		// had time to perform an initial listing, don't attempt to use
-		// it.
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-
-		if !cache.WaitForCacheSync(timeoutCtx.Done(), paramInformer.Informer().HasSynced) {
-			return nil, fmt.Errorf("paramKind kind `%v` not yet synced to use for admission",
-				paramKind.String())
-		}
-	}
-
-	// Find params to use with policy
-	switch {
-	case paramKind == nil:
-		// ParamKind is unset. Ignore any globalParamRef or namespaceParamRef
-		// setting.
-		return []runtime.Object{nil}, nil
-	case paramRef == nil:
-		// Policy ParamKind is set, but binding does not use it.
-		// Validate with nil params
-		return []runtime.Object{nil}, nil
-	case len(paramRef.Namespace) > 0 && paramScope.Name() == meta.RESTScopeRoot.Name():
-		// Not allowed to set namespace for cluster-scoped param
-		return nil, fmt.Errorf("paramRef.namespace must not be provided for a cluster-scoped `paramKind`")
-
-	case len(paramRef.Name) > 0:
-		if paramRef.Selector != nil {
-			// This should be validated, but just in case.
-			return nil, fmt.Errorf("paramRef.name and paramRef.selector are mutually exclusive")
-		}
-
-		switch param, err := paramStore.Get(paramRef.Name); {
-		case err == nil:
-			params = []runtime.Object{param}
-		case k8serrors.IsNotFound(err):
-			// Param not yet available. User may need to wait a bit
-			// before being able to use it for validation.
-			//
-			// Set params to nil to prepare for not found action
-			params = nil
-		case k8serrors.IsInvalid(err):
-			// Param mis-configured
-			// require to set namespace for namespaced resource
-			// and unset namespace for cluster scoped resource
-			return nil, err
-		default:
-			// Internal error
-			utilruntime.HandleError(err)
-			return nil, err
-		}
-	case paramRef.Selector != nil:
-		// Select everything by default if empty name and selector
-		selector, err := metav1.LabelSelectorAsSelector(paramRef.Selector)
-		if err != nil {
-			// Cannot parse label selector: configuration error
-			return nil, err
-
-		}
-
-		paramList, err := paramStore.List(selector)
-		if err != nil {
-			// There was a bad internal error
-			utilruntime.HandleError(err)
-			return nil, err
-		}
-
-		// Successfully grabbed params
-		params = paramList
-	default:
-		// Should be unreachable due to validation
-		return nil, fmt.Errorf("one of name or selector must be provided")
-	}
-
-	// Apply fail action for params not found case
-	if len(params) == 0 && paramRef.ParameterNotFoundAction != nil && *paramRef.ParameterNotFoundAction == v1beta1.DenyAction {
-		return nil, errors.New("no params found for policy binding with `Deny` parameterNotFoundAction")
-	}
-
-	return params, nil
 }
 
 func publishValidationFailureAnnotation(binding *v1beta1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
