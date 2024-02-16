@@ -837,13 +837,14 @@ var (
 		},
 	)
 
-	ImageGarbageCollectedTotal = metrics.NewCounter(
+	ImageGarbageCollectedTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           ImageGarbageCollectedTotalKey,
 			Help:           "Total number of images garbage collected by the kubelet, whether through disk usage or image age.",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"reason"},
 	)
 
 	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
