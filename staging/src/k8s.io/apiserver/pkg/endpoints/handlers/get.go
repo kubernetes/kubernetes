@@ -19,7 +19,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -249,17 +248,21 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				scope.err(errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch"), w, req)
 				return
 			}
-			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
-			timeout := time.Duration(0)
-			if opts.TimeoutSeconds != nil {
-				timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-			}
-			if timeout == 0 && minRequestTimeout > 0 {
-				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
-			}
+			timeout := request.GetTimeoutForWatch(opts.TimeoutSeconds, minRequestTimeout)
 			klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "timeout", timeout)
-			ctx, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
+
+			// forceWatch may force some non watch requests to
+			// become watch, these originally non watch requests
+			// won't have any deadline set by the server filter.
+			if _, ok := ctx.Deadline(); !ok {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, timeout)
+				defer cancel()
+
+				// NOTE: this is new since 1.30
+				req = req.WithContext(ctx)
+			}
+
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
 				scope.err(err, w, req)

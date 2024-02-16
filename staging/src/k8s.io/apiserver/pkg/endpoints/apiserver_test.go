@@ -287,7 +287,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	}
 	fakeRuleEvaluator := auditpolicy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := genericapifilters.WithAudit(mux, auditSink, fakeRuleEvaluator, longRunningCheck)
-	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second)
+	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second, 420)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
 	handler = genericapifilters.WithAuditInit(handler)
 

@@ -38,7 +38,7 @@ func WithWatchTerminationDuringShutdown(handler http.Handler, termination apireq
 			responsewriters.InternalError(w, req, errors.New("no RequestInfo found in the context"))
 			return
 		}
-		if !watchVerbs.Has(requestInfo.Verb) {
+		if !requestInfo.IsWatch() {
 			handler.ServeHTTP(w, req)
 			return
 		}

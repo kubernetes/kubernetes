@@ -31,6 +31,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+var (
+	watchVerbs = sets.NewString("watch")
+)
+
 // LongRunningRequestCheck is a predicate which is true for long-running http requests.
 type LongRunningRequestCheck func(r *http.Request, requestInfo *RequestInfo) bool
 
@@ -244,6 +248,10 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 	}
 
 	return &requestInfo, nil
+}
+
+func (ri *RequestInfo) IsWatch() bool {
+	return watchVerbs.Has(ri.Verb)
 }
 
 type requestInfoKeyType int

@@ -39,29 +39,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-// nothing will ever be sent down this channel
-var neverExitWatch <-chan time.Time = make(chan time.Time)
-
-// timeoutFactory abstracts watch timeout logic for testing
-type TimeoutFactory interface {
-	TimeoutCh() (<-chan time.Time, func() bool)
-}
-
-// realTimeoutFactory implements timeoutFactory
-type realTimeoutFactory struct {
-	timeout time.Duration
-}
-
-// TimeoutCh returns a channel which will receive something when the watch times out,
-// and a cleanup function to call when this happens.
-func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
-	if w.timeout == 0 {
-		return neverExitWatch, func() bool { return false }
-	}
-	t := time.NewTimer(w.timeout)
-	return t.C, t.Stop
-}
-
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
 func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
@@ -146,7 +123,6 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		EmbeddedEncoder: embeddedEncoder,
 
 		MemoryAllocator:      memoryAllocator,
-		TimeoutFactory:       &realTimeoutFactory{timeout},
 		ServerShuttingDownCh: serverShuttingDownCh,
 
 		metricsScope: metricsScope,
@@ -176,7 +152,6 @@ type WatchServer struct {
 	EmbeddedEncoder runtime.Encoder
 
 	MemoryAllocator      runtime.MemoryAllocator
-	TimeoutFactory       TimeoutFactory
 	ServerShuttingDownCh <-chan struct{}
 
 	metricsScope string
@@ -208,10 +183,6 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// ensure the connection times out
-	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
-	defer cleanup()
-
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
@@ -235,8 +206,6 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			// available apiserver instance(s).
 			return
 		case <-done:
-			return
-		case <-timeoutCh:
 			return
 		case event, ok := <-ch:
 			if !ok {
@@ -272,9 +241,6 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 
 	defer ws.Close()
 	done := make(chan struct{})
-	// ensure the connection times out
-	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
-	defer cleanup()
 
 	go func() {
 		defer utilruntime.HandleCrash()
@@ -291,11 +257,13 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer)
 	ch := s.Watching.ResultChan()
 
+	// for a server websocket connection, the request object is non nil
+	ctx := ws.Request().Context()
 	for {
 		select {
 		case <-done:
 			return
-		case <-timeoutCh:
+		case <-ctx.Done():
 			return
 		case event, ok := <-ch:
 			if !ok {
