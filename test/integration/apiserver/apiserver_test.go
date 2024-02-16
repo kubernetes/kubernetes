@@ -82,7 +82,7 @@ func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resou
 	client, config, teardown := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			if len(groupVersions) > 0 || len(resources) > 0 {
-				resourceConfig := controlplane.DefaultAPIResourceConfigSource()
+				resourceConfig := controlplane.DefaultAPIResourceConfigSource(nil)
 				resourceConfig.EnableVersions(groupVersions...)
 				resourceConfig.EnableResources(resources...)
 				config.ExtraConfig.APIResourceConfigSource = resourceConfig

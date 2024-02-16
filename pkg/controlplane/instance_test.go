@@ -79,7 +79,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	config := &Config{
 		GenericConfig: genericapiserver.NewConfig(legacyscheme.Codecs),
 		ExtraConfig: ExtraConfig{
-			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
+			APIResourceConfigSource: DefaultAPIResourceConfigSource(nil),
 			APIServerServicePort:    443,
 			MasterCount:             1,
 			EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,
@@ -90,7 +90,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
 	storageConfig.StorageObjectCountTracker = config.GenericConfig.StorageObjectCountTracker
 	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
-	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
+	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(nil), nil)
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
@@ -172,7 +172,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 
-	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfigIgnoreLifecycle(), apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestStorageVersionHashes(t *testing.T) {
 }
 
 func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
-	config := DefaultAPIResourceConfigSource()
+	config := DefaultAPIResourceConfigSource(nil)
 	for gv, enable := range config.GroupVersionConfigs {
 		if enable && strings.Contains(gv.Version, "alpha") {
 			t.Errorf("Alpha API version %s enabled by default", gv.String())
@@ -377,7 +377,7 @@ func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 }
 
 func TestNoBetaVersionsEnabledByDefault(t *testing.T) {
-	config := DefaultAPIResourceConfigSource()
+	config := DefaultAPIResourceConfigSource(nil)
 	for gv, enable := range config.GroupVersionConfigs {
 		if enable && strings.Contains(gv.Version, "beta") {
 			t.Errorf("Beta API version %s enabled by default", gv.String())
@@ -457,7 +457,7 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 		flowcontrolv1bet3.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
 	}
 
-	config := DefaultAPIResourceConfigSource()
+	config := DefaultAPIResourceConfigSource(nil)
 	for gvr, enable := range config.ResourceConfigs {
 		if !strings.Contains(gvr.Version, "beta") {
 			continue // only check beta things

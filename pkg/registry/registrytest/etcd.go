@@ -39,7 +39,7 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 
 	options := options.NewEtcdOptions(config)
 	completedConfig := kubeapiserver.NewStorageFactoryConfig().Complete(options)
-	completedConfig.APIResourceConfig = serverstorage.NewResourceConfig()
+	completedConfig.APIResourceConfig = serverstorage.NewResourceConfigIgnoreLifecycle()
 	factory, err := completedConfig.New()
 	if err != nil {
 		t.Fatalf("Error while making storage factory: %v", err)

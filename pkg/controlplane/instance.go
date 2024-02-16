@@ -785,8 +785,8 @@ var (
 )
 
 // DefaultAPIResourceConfigSource returns default configuration for an APIResource.
-func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
-	ret := serverstorage.NewResourceConfig()
+func DefaultAPIResourceConfigSource(registry serverstorage.GroupVersionRegistry) *serverstorage.ResourceConfig {
+	ret := serverstorage.NewResourceConfig(registry)
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha or beta versions in the list.
 	ret.EnableVersions(stableAPIGroupVersionsEnabledByDefault...)
 

@@ -145,6 +145,24 @@ func MustParseGeneric(str string) *Version {
 	return v
 }
 
+// ParseMajorMinor parses a "generic" version string and returns a version with the major and minor version.
+func ParseMajorMinor(str string) (*Version, error) {
+	v, err := ParseGeneric(str)
+	if err != nil {
+		return nil, err
+	}
+	return MajorMinor(v.Major(), v.Minor()), nil
+}
+
+// MustParseMajorMinor is like ParseMajorMinor except that it panics on error
+func MustParseMajorMinor(str string) *Version {
+	v, err := ParseMajorMinor(str)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // ParseSemantic parses a version string that exactly obeys the syntax and semantics of
 // the "Semantic Versioning" specification (http://semver.org/) (although it ignores
 // leading and trailing whitespace, and allows the version to be preceded by "v"). For
@@ -369,6 +387,11 @@ func (v *Version) AtLeast(min *Version) bool {
 // "is v new enough?".)
 func (v *Version) LessThan(other *Version) bool {
 	return v.compareInternal(other) == -1
+}
+
+// GreaterThan tests if a version is greater than a given version.
+func (v *Version) GreaterThan(other *Version) bool {
+	return v.compareInternal(other) == 1
 }
 
 // Compare compares v against a version string (which will be parsed as either Semantic

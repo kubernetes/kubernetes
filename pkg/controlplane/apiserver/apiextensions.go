@@ -17,7 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	apiextensionsoptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
@@ -62,8 +62,7 @@ func CreateAPIExtensionsConfig(
 	// override MergedResourceConfig with apiextensions defaults and registry
 	if err := commandOptions.APIEnablement.ApplyTo(
 		&genericConfig,
-		apiextensionsapiserver.DefaultAPIResourceConfigSource(),
-		apiextensionsapiserver.Scheme); err != nil {
+		apiextensionsapiserver.DefaultAPIResourceConfigSource(apiextensionsapiserver.Scheme)); err != nil {
 		return nil, err
 	}
 	apiextensionsConfig := &apiextensionsapiserver.Config{
