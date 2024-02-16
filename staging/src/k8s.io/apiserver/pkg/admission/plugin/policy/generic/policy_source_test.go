@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -204,6 +205,10 @@ func (fp *FakePolicy) GetParamKind() *schema.GroupVersionKind {
 	return fp.ParamKind
 }
 
+func (fb *FakePolicy) GetMatchConstraints() *v1beta1.MatchResources {
+	return nil
+}
+
 func (fb *FakeBinding) GetName() string {
 	return fb.Name
 }
@@ -216,6 +221,14 @@ func (fb *FakeBinding) GetPolicyName() types.NamespacedName {
 	return types.NamespacedName{
 		Name: fb.PolicyName,
 	}
+}
+
+func (fb *FakeBinding) GetMatchResources() *v1beta1.MatchResources {
+	return nil
+}
+
+func (fb *FakeBinding) GetParamRef() *v1beta1.ParamRef {
+	return nil
 }
 
 func (fp *FakePolicy) DeepCopyObject() runtime.Object {

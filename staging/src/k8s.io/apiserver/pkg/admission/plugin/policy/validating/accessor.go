@@ -75,6 +75,10 @@ func (v *validatingAdmissionPolicyAccessor) GetParamKind() *schema.GroupVersionK
 	}
 }
 
+func (v *validatingAdmissionPolicyAccessor) GetMatchConstraints() *v1beta1.MatchResources {
+	return v.Spec.MatchConstraints
+}
+
 type validatingAdmissionPolicyBindingAccessor struct {
 	*v1beta1.ValidatingAdmissionPolicyBinding
 }
@@ -92,4 +96,12 @@ func (v *validatingAdmissionPolicyBindingAccessor) GetPolicyName() types.Namespa
 		Namespace: "",
 		Name:      v.Spec.PolicyName,
 	}
+}
+
+func (v *validatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1beta1.MatchResources {
+	return v.Spec.MatchResources
+}
+
+func (v *validatingAdmissionPolicyBindingAccessor) GetParamRef() *v1beta1.ParamRef {
+	return v.Spec.ParamRef
 }
