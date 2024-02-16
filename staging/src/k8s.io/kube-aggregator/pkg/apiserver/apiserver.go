@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/version"
@@ -246,8 +248,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		rejectForwardingRedirects:  c.ExtraConfig.RejectForwardingRedirects,
 	}
 
+	var resourceExpirationEvaluator genericapiserver.ResourceExpirationEvaluator
 	// used later  to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*c.GenericConfig.Version)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.EmulationVersion) {
+		resourceExpirationEvaluator, err = genericapiserver.NewResourceExpirationEvaluator(serverversion.Effective.EmulationVersion())
+	} else {
+		resourceExpirationEvaluator, err = genericapiserver.NewResourceExpirationEvaluator(apimachineryversion.MustParse(c.GenericConfig.Version.String()))
+	}
+
 	if err != nil {
 		return nil, err
 	}
