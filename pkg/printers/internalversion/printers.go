@@ -167,6 +167,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	jobColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Status", Type: "string", Description: "Status of the job."},
 		{Name: "Completions", Type: "string", Description: batchv1.JobStatus{}.SwaggerDoc()["succeeded"]},
 		{Name: "Duration", Type: "string", Description: "Time required to complete the job."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
@@ -1013,6 +1014,15 @@ func hasPodReadyCondition(conditions []api.PodCondition) bool {
 	return false
 }
 
+func hasJobCondition(conditions []batch.JobCondition, conditionType batch.JobConditionType) bool {
+	for _, condition := range conditions {
+		if condition.Type == conditionType {
+			return condition.Status == api.ConditionTrue
+		}
+	}
+	return false
+}
+
 func printPodTemplate(obj *api.PodTemplate, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
@@ -1155,8 +1165,22 @@ func printJob(obj *batch.Job, options printers.GenerateOptions) ([]metav1.TableR
 	default:
 		jobDuration = duration.HumanDuration(obj.Status.CompletionTime.Sub(obj.Status.StartTime.Time))
 	}
+	var status string
+	if hasJobCondition(obj.Status.Conditions, batch.JobComplete) {
+		status = "Complete"
+	} else if hasJobCondition(obj.Status.Conditions, batch.JobFailed) {
+		status = "Failed"
+	} else if obj.ObjectMeta.DeletionTimestamp != nil {
+		status = "Terminating"
+	} else if hasJobCondition(obj.Status.Conditions, batch.JobSuspended) {
+		status = "Suspended"
+	} else if hasJobCondition(obj.Status.Conditions, batch.JobFailureTarget) {
+		status = "FailureTarget"
+	} else {
+		status = "Running"
+	}
 
-	row.Cells = append(row.Cells, obj.Name, completions, jobDuration, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, status, completions, jobDuration, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
