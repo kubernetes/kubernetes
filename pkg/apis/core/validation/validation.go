@@ -5943,7 +5943,9 @@ func ValidateService(service *core.Service) field.ErrorList {
 		if errs := validation.IsValidIP(idxPath, ip); len(errs) != 0 {
 			allErrs = append(allErrs, errs...)
 		} else {
-			allErrs = append(allErrs, ValidateNonSpecialIP(ip, idxPath)...)
+			// For historical reasons, this uses ValidateEndpointIP even
+			// though that is not exactly the appropriate set of checks.
+			allErrs = append(allErrs, ValidateEndpointIP(ip, idxPath)...)
 		}
 	}
 
@@ -7489,19 +7491,21 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path)
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg).WithOrigin("format=dns-label"))
 		}
 	}
-	allErrs = append(allErrs, ValidateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
+	allErrs = append(allErrs, ValidateEndpointIP(address.IP, fldPath.Child("ip"))...)
 	return allErrs
 }
 
-// ValidateNonSpecialIP is used to validate Endpoints, EndpointSlices, and
-// external IPs. Specifically, this disallows unspecified and loopback addresses
-// are nonsensical and link-local addresses tend to be used for node-centric
-// purposes (e.g. metadata service).
+// ValidateEndpointIP is used to validate Endpoints and EndpointSlice addresses, and also
+// (for historical reasons) external IPs. It disallows certain address types that don't
+// make sense in those contexts. Note that this function is _almost_, but not exactly,
+// equivalent to net.IP.IsGlobalUnicast(). (Unlike IsGlobalUnicast, it allows global
+// multicast IPs, which is probably a bug.)
 //
-// IPv6 references
-// - https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
-// - https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml
-func ValidateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList {
+// This function should not be used for new validations; the exact set of IPs that do and
+// don't make sense in a particular field is context-dependent (e.g., localhost makes
+// sense in some places; unspecified IPs make sense in fields that are used as bind
+// addresses rather than destination addresses).
+func ValidateEndpointIP(ipAddress string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	ip := netutils.ParseIPSloppy(ipAddress)
 	if ip == nil {
@@ -7520,7 +7524,7 @@ func ValidateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList
 	if ip.IsLinkLocalMulticast() {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24, ff02::/10)"))
 	}
-	return allErrs.WithOrigin("format=non-special-ip")
+	return allErrs.WithOrigin("format=endpoint-ip")
 }
 
 func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *field.Path) field.ErrorList {
