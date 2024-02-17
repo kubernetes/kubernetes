@@ -332,7 +332,7 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 		// Only remove pod logs directories when all sources are ready.
 		dirs, err := osInterface.ReadDir(podLogsDirectory)
 		if err != nil {
-			return fmt.Errorf("failed to read podLogsDirectory %q: %v", podLogsDirectory, err)
+			return fmt.Errorf("failed to read podLogsDirectory %q: %w", podLogsDirectory, err)
 		}
 		for _, dir := range dirs {
 			name := dir.Name()

@@ -3201,6 +3201,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.readinessManager,
 		kubelet.startupManager,
 		kubelet.rootDirectory,
+		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
 		kubelet.podWorkers,
 		kubelet.os,
