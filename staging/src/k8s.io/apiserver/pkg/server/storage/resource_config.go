@@ -21,6 +21,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/klog/v2"
 )
@@ -57,13 +59,14 @@ type ResourceConfig struct {
 func NewResourceConfig(registry GroupVersionRegistry) *ResourceConfig {
 	emuVer := utilversion.Effective.EmulationVersion()
 	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}, ResourceConfigs: map[schema.GroupVersionResource]bool{},
-		emulationVersion: emuVer, GroupVersionRegistry: registry}
+		emulationVersion: version.MajorMinor(emuVer.Major(), emuVer.Minor()), GroupVersionRegistry: registry}
 }
 
 // NewResourceConfigIgnoreLifecycle creates a ResourceConfig that allows enabling/disabling resources regardless of their APILifecycle.
 // Mainly used in tests.
 func NewResourceConfigIgnoreLifecycle() *ResourceConfig {
-	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}, ResourceConfigs: map[schema.GroupVersionResource]bool{}}
+	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}, ResourceConfigs: map[schema.GroupVersionResource]bool{},
+		emulationVersion: version.MajorMinor(0, 0)}
 }
 
 // DisableMatchingVersions disables all group/versions for which the matcher function returns true.
@@ -150,8 +153,11 @@ func (o *ResourceConfig) versionEnabled(version schema.GroupVersion) bool {
 // An API is unavailable if it introduced after the emulationVersion,
 // or removed before the emulationVersion.
 func (o *ResourceConfig) apiAvailable(lifecycle schema.APILifecycle) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EmulationVersion) {
+		return true, nil
+	}
 	// emulationVersion is not set.
-	if o.emulationVersion == nil {
+	if o.emulationVersion.Major() == 0 && o.emulationVersion.Minor() == 0 {
 		return true, nil
 	}
 	// GroupVersion is introduced after the emulationVersion.

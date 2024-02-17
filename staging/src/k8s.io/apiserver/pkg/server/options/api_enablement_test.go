@@ -21,7 +21,12 @@ import (
 	"testing"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	cliflag "k8s.io/component-base/cli/flag"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 type fakeGroupRegistry struct{}
@@ -31,47 +36,101 @@ func (f fakeGroupRegistry) IsGroupRegistered(group string) bool {
 }
 
 func TestAPIEnablementOptionsValidate(t *testing.T) {
+	t.Cleanup(serverversion.Effective.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.30.0")))
+	binaryVersion := serverversion.Effective.BinaryVersion().String()
 	testCases := []struct {
-		name        string
-		testOptions *APIEnablementOptions
-		expectErr   string
+		name          string
+		testOptions   *APIEnablementOptions
+		runtimeConfig cliflag.ConfigurationMap
+		expectErr     string
 	}{
 		{
 			name: "test when options is nil",
 		},
 		{
-			name: "test when invalid key with only api/all=false",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"api/all": "false"},
-			},
-			expectErr: "invalid key with only api/all=false",
+			name:          "test when invalid key with only api/all=false",
+			runtimeConfig: cliflag.ConfigurationMap{"api/all": "false"},
+			expectErr:     "invalid key with only api/all=false",
 		},
 		{
-			name: "test when ConfigurationMap key is invalid",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"apiall": "false"},
-			},
-			expectErr: "runtime-config invalid key",
+			name:          "test when ConfigurationMap key is invalid",
+			runtimeConfig: cliflag.ConfigurationMap{"apiall": "false"},
+			expectErr:     "runtime-config invalid key",
 		},
 		{
-			name: "test when unknown api groups",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"api/v1": "true"},
-			},
-			expectErr: "unknown api groups",
+			name:          "test when unknown api groups",
+			runtimeConfig: cliflag.ConfigurationMap{"api/v1": "true"},
+			expectErr:     "unknown api groups",
 		},
 		{
-			name: "test when valid api groups",
-			testOptions: &APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
-			},
+			name:          "test when valid api groups",
+			runtimeConfig: cliflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
 		},
 	}
 	testGroupRegistry := fakeGroupRegistry{}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
-			errs := testcase.testOptions.Validate(testGroupRegistry)
+			testOptions := &APIEnablementOptions{
+				RuntimeConfig:    testcase.runtimeConfig,
+				EmulationVersion: binaryVersion,
+			}
+			errs := testOptions.Validate(testGroupRegistry)
+			if len(testcase.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
+				t.Errorf("got err: %v, expected err: %s", errs, testcase.expectErr)
+			}
+
+			if len(testcase.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("got err: %s, expected err nil", errs)
+			}
+		})
+	}
+}
+
+func TestAPIEnablementOptionsValidateEmulationVersion(t *testing.T) {
+	t.Cleanup(serverversion.Effective.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.30.0")))
+	binaryVersion := serverversion.Effective.BinaryVersion().String()
+	testCases := []struct {
+		name             string
+		emulationVersion string
+		expectErr        string
+	}{
+		{
+			name:      "test empty version",
+			expectErr: "could not parse \"\" as version",
+		},
+		{
+			name:             "test misformat version",
+			emulationVersion: "a.b.c",
+			expectErr:        "could not parse \"a.b.c\" as version",
+		},
+		{
+			name:             "test binaryVersion",
+			emulationVersion: binaryVersion,
+		},
+		{
+			name:             "test valid emulation version",
+			emulationVersion: "v1.29.0",
+		},
+		{
+			name:             "test non semantic emulation version",
+			emulationVersion: "1.29",
+		},
+		{
+			name:             "test invalid emulation version",
+			emulationVersion: "1.31.0",
+			expectErr:        "emulation version 1.31.0 is not between [1.29.0, 1.30.0]",
+		},
+	}
+	testGroupRegistry := fakeGroupRegistry{}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.EmulationVersion, true)()
+			testOptions := &APIEnablementOptions{
+				EmulationVersion: testcase.emulationVersion,
+			}
+			errs := testOptions.Validate(testGroupRegistry)
 			if len(testcase.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
 				t.Errorf("got err: %v, expected err: %s", errs, testcase.expectErr)
 			}

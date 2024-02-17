@@ -1194,6 +1194,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
+	genericfeatures.EmulationVersion: {Default: false, PreRelease: featuregate.Alpha},
+
 	genericfeatures.KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
 
 	genericfeatures.KMSv2: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31

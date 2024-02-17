@@ -121,6 +121,7 @@ func TestAddFlags(t *testing.T) {
 		"--storage-backend=etcd3",
 		"--service-cluster-ip-range=192.168.128.0/17",
 		"--lease-reuse-duration-seconds=100",
+		"--emulation-version=v1.29.0",
 	}
 	fs.Parse(args)
 
@@ -276,7 +277,8 @@ func TestAddFlags(t *testing.T) {
 				WebhookRetryBackoff:         apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			},
 			APIEnablement: &apiserveroptions.APIEnablementOptions{
-				RuntimeConfig: cliflag.ConfigurationMap{},
+				RuntimeConfig:    cliflag.ConfigurationMap{},
+				EmulationVersion: "v1.29.0",
 			},
 			EgressSelector: &apiserveroptions.EgressSelectorOptions{
 				ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",

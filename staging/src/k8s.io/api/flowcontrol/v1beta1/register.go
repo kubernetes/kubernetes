@@ -47,6 +47,7 @@ var (
 )
 
 // Adds the list of known types to the given scheme.
+// Do not remove before feature EmulationVersion graduates. Types used in integration tests TestEnableEmulationVersion.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&FlowSchema{},

@@ -14,9 +14,12 @@ limitations under the License.
 package version
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	baseversion "k8s.io/component-base/version"
 )
 
@@ -26,11 +29,14 @@ type EffectiveVersions interface {
 	BinaryVersion() *version.Version
 	EmulationVersion() *version.Version
 	MinCompatibilityVersion() *version.Version
+	Validate() []error
 }
 
 type MutableEffectiveVersions interface {
 	EffectiveVersions
-	Set(binaryVersion, emulationVersion, minCompatibilityVersion *version.Version)
+	// SetBinaryVersionForTests updates the binaryVersion.
+	// Should only be used in tests.
+	SetBinaryVersionForTests(binaryVersion *version.Version) func()
 	SetEmulationVersion(emulationVersion *version.Version)
 	SetMinCompatibilityVersion(minCompatibilityVersion *version.Version)
 }
@@ -60,8 +66,8 @@ type mutableEffectiveVersions struct {
 func newEffectiveVersion() MutableEffectiveVersions {
 	effective := &mutableEffectiveVersions{}
 	binaryVersionInfo := baseversion.Get()
-	binaryVersion := version.MustParseGeneric(binaryVersionInfo.String())
-	compatVersion := version.MajorMinor(binaryVersion.Major(), binaryVersion.Minor()-1)
+	binaryVersion := version.MustParse(binaryVersionInfo.String())
+	compatVersion := version.MajorMinor(binaryVersion.Major(), binaryVersion.SubtractMinor(1).Minor())
 	effective.Set(binaryVersion, binaryVersion, compatVersion)
 	return effective
 }
@@ -74,12 +80,24 @@ func (m *mutableEffectiveVersions) Set(binaryVersion, emulationVersion, minCompa
 	})
 }
 
+// SetBinaryVersionForTests updates the binaryVersion.
+// Should only be used in tests.
+func (m *mutableEffectiveVersions) SetBinaryVersionForTests(binaryVersion *version.Version) func() {
+	effectiveVersions := m.effectiveVersions.Load()
+	m.Set(binaryVersion, binaryVersion, version.MajorMinor(binaryVersion.Major(), binaryVersion.Minor()-1))
+	return func() {
+		m.effectiveVersions.Store(effectiveVersions)
+	}
+}
+
 func (m *mutableEffectiveVersions) SetEmulationVersion(emulationVersion *version.Version) {
-	m.Set(m.BinaryVersion(), emulationVersion, m.MinCompatibilityVersion())
+	effectiveVersions := m.effectiveVersions.Load()
+	m.Set(effectiveVersions.binaryVersion, emulationVersion, effectiveVersions.minCompatibilityVersion)
 }
 
 func (m *mutableEffectiveVersions) SetMinCompatibilityVersion(minCompatibilityVersion *version.Version) {
-	m.Set(m.BinaryVersion(), m.EmulationVersion(), minCompatibilityVersion)
+	effectiveVersions := m.effectiveVersions.Load()
+	m.Set(effectiveVersions.binaryVersion, effectiveVersions.emulationVersion, minCompatibilityVersion)
 }
 
 func (m *mutableEffectiveVersions) BinaryVersion() *version.Version {
@@ -92,4 +110,30 @@ func (m *mutableEffectiveVersions) EmulationVersion() *version.Version {
 
 func (m *mutableEffectiveVersions) MinCompatibilityVersion() *version.Version {
 	return m.effectiveVersions.Load().MinCompatibilityVersion()
+}
+
+func (m *mutableEffectiveVersions) Validate() []error {
+	ev := m.effectiveVersions.Load()
+	// Validate only checks the major and minor versions.
+	binaryVersion := ev.binaryVersion.WithPatch(0)
+	emulationVersion := ev.emulationVersion.WithPatch(0)
+	minCompatibilityVersion := ev.minCompatibilityVersion.WithPatch(0)
+
+	maxEmuVer := binaryVersion
+	minEmuVer := binaryVersion
+	// emulationVersion can only be 1.{binaryMinor-1}...1.{binaryMinor} for alpha if EmulationVersion feature gate is enabled.
+	// otherwise, emulationVersion can only be 1.{binaryMinor}.
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.EmulationVersion) {
+		minEmuVer = binaryVersion.SubtractMinor(1)
+	}
+	if emulationVersion.GreaterThan(maxEmuVer) || emulationVersion.LessThan(minEmuVer) {
+		return []error{fmt.Errorf("emulation version %s is not between [%s, %s]", emulationVersion.String(), minEmuVer.String(), maxEmuVer.String())}
+	}
+	// minCompatibilityVersion can only be 1.{binaryMinor-1} for alpha.
+	maxCompVer := binaryVersion.SubtractMinor(1)
+	minCompVer := binaryVersion.SubtractMinor(1)
+	if minCompatibilityVersion.GreaterThan(maxCompVer) || minCompatibilityVersion.LessThan(minCompVer) {
+		return []error{fmt.Errorf("minCompatibilityVersion version %s is not between [%s, %s]", minCompatibilityVersion.String(), minCompVer.String(), maxCompVer.String())}
+	}
+	return []error{}
 }

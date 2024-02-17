@@ -145,6 +145,25 @@ func MustParseGeneric(str string) *Version {
 	return v
 }
 
+// Parse tries to do ParseSemantic first to keep more information.
+// If ParseSemantic fails, it would just do ParseGeneric.
+func Parse(str string) (*Version, error) {
+	v, err := parse(str, true)
+	if err != nil {
+		return parse(str, false)
+	}
+	return v, err
+}
+
+// MustParse is like Parse except that it panics on error
+func MustParse(str string) *Version {
+	v, err := Parse(str)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // ParseMajorMinor parses a "generic" version string and returns a version with the major and minor version.
 func ParseMajorMinor(str string) (*Version, error) {
 	v, err := ParseGeneric(str)
@@ -229,6 +248,18 @@ func (v *Version) WithMajor(major uint) *Version {
 // WithMinor returns copy of the version object with requested minor number
 func (v *Version) WithMinor(minor uint) *Version {
 	result := *v
+	result.components = []uint{v.Major(), minor, v.Patch()}
+	return &result
+}
+
+// SubtractMinor returns the version diff minor versions back, with the same major and patch.
+// If diff >= current minor, the minor would be 0.
+func (v *Version) SubtractMinor(diff uint) *Version {
+	result := *v
+	var minor uint
+	if diff < v.Minor() {
+		minor = v.Minor() - diff
+	}
 	result.components = []uint{v.Major(), minor, v.Patch()}
 	return &result
 }

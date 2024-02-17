@@ -22,7 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestDisabledVersion(t *testing.T) {
@@ -180,7 +183,8 @@ func TestAnyVersionForGroupEnabled(t *testing.T) {
 	}
 }
 
-func TestEnabledVersionWithEmulationVersion(t *testing.T) {
+func TestEnabledVersionWithEmulationVersionOff(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, false)()
 	g1v1 := schema.GroupVersion{Group: "group1", Version: "version1"}
 	g1v2 := schema.GroupVersion{Group: "group1", Version: "version2"}
 	g2v1 := schema.GroupVersion{Group: "group2", Version: "version1"}
@@ -200,8 +204,52 @@ func TestEnabledVersionWithEmulationVersion(t *testing.T) {
 	scheme.SetGroupVersionLifecycle(g2v3, schema.APILifecycle{
 		RemovedVersion: version.MajorMinor(1, 28),
 	})
-	emuVer := version.MustParseGeneric("1.28.0")
-	utilversion.Effective.Set(emuVer, emuVer, emuVer)
+	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.28.0")))
+	config := NewResourceConfig(scheme)
+
+	config.DisableVersions(g1v1)
+	config.EnableVersions(g1v2, g2v1, g2v2, g2v3)
+
+	if config.versionEnabled(g1v1) {
+		t.Errorf("expected disabled for %v, from %v", g1v1, config)
+	}
+	if !config.versionEnabled(g1v2) {
+		t.Errorf("expected enabled for %v, from %v", g1v2, config)
+	}
+	if !config.versionEnabled(g2v1) {
+		t.Errorf("expected enabled for %v, from %v", g2v1, config)
+	}
+	if !config.versionEnabled(g2v2) {
+		t.Errorf("expected enabled for %v, from %v", g2v2, config)
+	}
+	if !config.versionEnabled(g2v3) {
+		t.Errorf("expected enabled for %v, from %v", g2v3, config)
+	}
+}
+
+func TestEnabledVersionWithEmulationVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
+	g1v1 := schema.GroupVersion{Group: "group1", Version: "version1"}
+	g1v2 := schema.GroupVersion{Group: "group1", Version: "version2"}
+	g2v1 := schema.GroupVersion{Group: "group2", Version: "version1"}
+	g2v2 := schema.GroupVersion{Group: "group2", Version: "version2"}
+	g2v3 := schema.GroupVersion{Group: "group2", Version: "version3"}
+
+	scheme := runtime.NewScheme()
+	scheme.SetGroupVersionLifecycle(g1v2, schema.APILifecycle{
+		IntroducedVersion: version.MajorMinor(1, 29),
+	})
+	scheme.SetGroupVersionLifecycle(g2v1, schema.APILifecycle{
+		RemovedVersion: version.MajorMinor(1, 27),
+	})
+	scheme.SetGroupVersionLifecycle(g2v2, schema.APILifecycle{
+		IntroducedVersion: version.MajorMinor(1, 26),
+	})
+	scheme.SetGroupVersionLifecycle(g2v3, schema.APILifecycle{
+		RemovedVersion: version.MajorMinor(1, 28),
+	})
+	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.29.0")))
+	utilversion.Effective.SetEmulationVersion(version.MustParse("1.28.2"))
 	config := NewResourceConfig(scheme)
 
 	config.DisableVersions(g1v1)
@@ -227,48 +275,49 @@ func TestEnabledVersionWithEmulationVersion(t *testing.T) {
 func TestApiAvailable(t *testing.T) {
 	tests := []struct {
 		name              string
-		compatVersion     *version.Version
+		emulationVersion  *version.Version
 		introducedVersion *version.Version
 		removedVersion    *version.Version
 		expectedResult    bool
 	}{
 		{
 			name:              "unspecified emulation version",
+			emulationVersion:  version.MajorMinor(0, 0),
 			introducedVersion: version.MajorMinor(1, 27),
 			removedVersion:    version.MajorMinor(1, 30),
 			expectedResult:    true,
 		},
 		{
 			name:              "emulation version less than introduced",
-			compatVersion:     version.MajorMinor(1, 26),
+			emulationVersion:  version.MajorMinor(1, 26),
 			introducedVersion: version.MajorMinor(1, 27),
 			removedVersion:    version.MajorMinor(1, 30),
 			expectedResult:    false,
 		},
 		{
 			name:              "emulation version equal to introduced",
-			compatVersion:     version.MajorMinor(1, 27),
+			emulationVersion:  version.MajorMinor(1, 27),
 			introducedVersion: version.MajorMinor(1, 27),
 			removedVersion:    version.MajorMinor(1, 30),
 			expectedResult:    true,
 		},
 		{
 			name:              "emulation version between introduced and removed",
-			compatVersion:     version.MajorMinor(1, 29),
+			emulationVersion:  version.MajorMinor(1, 29),
 			introducedVersion: version.MajorMinor(1, 27),
 			removedVersion:    version.MajorMinor(1, 30),
 			expectedResult:    true,
 		},
 		{
 			name:              "emulation version equal to removed",
-			compatVersion:     version.MajorMinor(1, 30),
+			emulationVersion:  version.MajorMinor(1, 30),
 			introducedVersion: version.MajorMinor(1, 27),
 			removedVersion:    version.MajorMinor(1, 30),
 			expectedResult:    true,
 		},
 		{
 			name:              "emulation version greater than removed",
-			compatVersion:     version.MajorMinor(1, 31),
+			emulationVersion:  version.MajorMinor(1, 31),
 			introducedVersion: version.MajorMinor(1, 27),
 			removedVersion:    version.MajorMinor(1, 30),
 			expectedResult:    false,
@@ -276,7 +325,8 @@ func TestApiAvailable(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			config := ResourceConfig{emulationVersion: tc.compatVersion}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
+			config := ResourceConfig{emulationVersion: tc.emulationVersion}
 			available, _ := config.apiAvailable(schema.APILifecycle{IntroducedVersion: tc.introducedVersion, RemovedVersion: tc.removedVersion})
 			if tc.expectedResult != available {
 				t.Errorf("expected %v, got %v", tc.expectedResult, available)
@@ -356,9 +406,10 @@ func TestEnabledResourceWithEmulationVersion(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
 			scheme := runtime.NewScheme()
-			emuVer := version.MustParseGeneric("1.28.0")
-			utilversion.Effective.Set(emuVer, emuVer, emuVer)
+			t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.29.0")))
+			utilversion.Effective.SetEmulationVersion(version.MustParse("1.28.2"))
 			config := NewResourceConfig(scheme)
 			gv := schema.GroupVersion{Group: "group", Version: "version"}
 			r := gv.WithResource("resource")

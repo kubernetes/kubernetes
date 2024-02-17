@@ -28,12 +28,17 @@ import (
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/features"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
+	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.30.0")))
 	scheme := newFakeScheme(t)
 	apiv1GroupVersion := apiv1.SchemeGroupVersion
 	testCases := []struct {
@@ -553,8 +558,6 @@ func TestParseRuntimeConfig(t *testing.T) {
 }
 
 func newFakeAPIResourceConfigSource(scheme *runtime.Scheme) *serverstore.ResourceConfig {
-	emuVer := version.MustParseGeneric("1.30")
-	utilversion.Effective.Set(emuVer, emuVer, emuVer)
 	ret := serverstore.NewResourceConfig(scheme)
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(

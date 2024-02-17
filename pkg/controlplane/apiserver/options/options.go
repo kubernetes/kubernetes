@@ -24,9 +24,11 @@ import (
 	"strings"
 	"time"
 
+	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -281,6 +283,8 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 			delete(completed.APIEnablement.RuntimeConfig, key)
 		}
 	}
+	// Set emulation version
+	serverversion.Effective.SetEmulationVersion(apimachineryversion.MustParse(completed.APIEnablement.EmulationVersion))
 
 	return CompletedOptions{
 		completedOptions: &completed,
