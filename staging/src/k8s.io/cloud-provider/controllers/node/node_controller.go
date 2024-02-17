@@ -283,11 +283,6 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 		}
 
 		cnc.updateNodeAddress(ctx, node, instanceMetadata)
-
-		err = cnc.reconcileNodeLabels(node.Name)
-		if err != nil {
-			klog.Errorf("Error reconciling node labels for node %q, err: %v", node.Name, err)
-		}
 	}
 
 	workqueue.ParallelizeUntil(ctx, int(cnc.workerCount), len(nodes), updateNodeFunc)
@@ -423,9 +418,8 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 
 	cloudTaint := getCloudTaint(curNode.Spec.Taints)
 	if cloudTaint == nil {
-		// Node object received from event had the cloud taint but was outdated,
-		// the node has actually already been initialized, so this sync event can be ignored.
-		return nil
+		// Node object was already initialized, only need to reconcile the labels
+		return cnc.reconcileNodeLabels(nodeName)
 	}
 
 	klog.Infof("Initializing node %s with cloud provider", nodeName)
