@@ -1543,6 +1543,10 @@ message RuntimeHandlerFeatures {
     // For runc-compatible runtimes, availability of this feature can be detected by checking whether
     // the Linux kernel version is >= 5.12, and,  `runc features | jq .mountOptions` contains "rro".
     bool recursive_read_only_mounts = 1;
+
+    // user_namespaces is set to true if the runtime handler supports user namespaces as implemented
+    // in Kubernetes. This means support for both, user namespaces and idmap mounts.
+    bool user_namespaces = 2;
 }
 
 message RuntimeHandler {
