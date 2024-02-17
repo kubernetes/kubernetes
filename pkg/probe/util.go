@@ -24,8 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	invalidPort  = -1
+	noPortFound  = 0
+	minValidPort = 1
+	maxValidPort = 65535
+)
+
 func ResolveContainerPort(param intstr.IntOrString, container *v1.Container) (int, error) {
-	port := -1
+	port := invalidPort
 	var err error
 	switch param.Type {
 	case intstr.Int:
@@ -40,7 +47,7 @@ func ResolveContainerPort(param intstr.IntOrString, container *v1.Container) (in
 	default:
 		return port, fmt.Errorf("intOrString had no kind: %+v", param)
 	}
-	if port > 0 && port < 65536 {
+	if port >= minValidPort && port <= maxValidPort {
 		return port, nil
 	}
 	return port, fmt.Errorf("invalid port number: %v", port)
@@ -53,5 +60,5 @@ func findPortByName(container *v1.Container, portName string) (int, error) {
 			return int(port.ContainerPort), nil
 		}
 	}
-	return 0, fmt.Errorf("port %s not found", portName)
+	return noPortFound, fmt.Errorf("port %s not found", portName)
 }
