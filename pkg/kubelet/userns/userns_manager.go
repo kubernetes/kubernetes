@@ -96,7 +96,7 @@ func (m *UsernsManager) writeMappingsToFile(pod types.UID, userNs userNamespace)
 
 	fstore, err := utilstore.NewFileStore(dir, &utilfs.DefaultFs{})
 	if err != nil {
-		return err
+		return fmt.Errorf("create user namespace store: %w", err)
 	}
 	if err := fstore.Write(mappingsFile, data); err != nil {
 		return err
@@ -123,7 +123,7 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 	dir := m.kl.GetPodDir(pod)
 	fstore, err := utilstore.NewFileStore(dir, &utilfs.DefaultFs{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create user namespace store: %w", err)
 	}
 	return fstore.Read(mappingsFile)
 }
@@ -151,13 +151,13 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 		if os.IsNotExist(err) {
 			return &m, nil
 		}
-		return nil, fmt.Errorf("user namespace manager can't read pods from disk: %w", err)
+		return nil, fmt.Errorf("read pods from disk: %w", err)
 
 	}
 	for _, podUID := range found {
 		klog.V(5).InfoS("reading pod from disk for user namespace", "podUID", podUID)
 		if err := m.recordPodMappings(podUID); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("record pod mappings: %w", err)
 		}
 	}
 
@@ -308,7 +308,7 @@ func (m *UsernsManager) releaseWithLock(pod types.UID) {
 
 func (m *UsernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) (userNs userNamespace, err error) {
 	if err = json.Unmarshal([]byte(content), &userNs); err != nil {
-		err = fmt.Errorf("can't parse file: %w", err)
+		err = fmt.Errorf("invalid user namespace mappings file: %w", err)
 		return
 	}
 
