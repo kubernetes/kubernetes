@@ -37,7 +37,7 @@ const (
 	testContainerLogMaxFiles        = 3
 	testContainerLogMaxSize         = "40Ki"
 	testContainerLogMaxWorkers      = 2
-	testContainerLogMonitorInterval = 2 * time.Second
+	testContainerLogMonitorInterval = 3 * time.Second
 	rotationPollInterval            = 5 * time.Second
 	rotationEventuallyTimeout       = 3 * time.Minute
 	rotationConsistentlyTimeout     = 2 * time.Minute
