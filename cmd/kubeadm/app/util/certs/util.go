@@ -43,6 +43,19 @@ func SetupCertificateAuthority(t *testing.T) (*x509.Certificate, crypto.Signer) 
 	return caCert, caKey
 }
 
+// SetupIntermediateCertificateAuthority is a utility function for kubeadm testing that creates a
+// Intermediate CertificateAuthority cert/key pair
+func SetupIntermediateCertificateAuthority(t *testing.T, parentCert *x509.Certificate, parentKey crypto.Signer) (*x509.Certificate, crypto.Signer) {
+	caCert, caKey, err := pkiutil.NewIntermediateCertificateAuthority(parentCert, parentKey, &pkiutil.CertConfig{
+		Config: certutil.Config{CommonName: "kubernetes intermediate CA"},
+	})
+	if err != nil {
+		t.Fatalf("failure while generating intermediate CA certificate and key: %v", err)
+	}
+
+	return caCert, caKey
+}
+
 // AssertCertificateIsSignedByCa is a utility function for kubeadm testing that asserts if a given certificate is signed
 // by the expected CA
 func AssertCertificateIsSignedByCa(t *testing.T, cert *x509.Certificate, signingCa *x509.Certificate) {

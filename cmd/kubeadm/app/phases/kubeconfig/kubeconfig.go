@@ -264,10 +264,35 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	}
 	caExpected := bytes.TrimSpace(config.Clusters[expectedCluster].CertificateAuthorityData)
 
-	// If the current CA cert on disk doesn't match the expected CA cert, error out because we have a file, but it's stale
-	if !bytes.Equal(caCurrent, caExpected) {
-		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong CA cert", kubeConfigFilePath)
+	// Parse the current certificate authority data
+	currentCACerts, err := certutil.ParseCertsPEM(caCurrent)
+	if err != nil {
+		return errors.Errorf("the kubeconfig file %q contains an invalid CA cert", kubeConfigFilePath)
 	}
+
+	// Parse the expected certificate authority data
+	expectedCACerts, err := certutil.ParseCertsPEM(caExpected)
+	if err != nil {
+		return errors.Errorf("the expected base64 encoded CA cert %q could not be parsed as a PEM", caExpected)
+	}
+
+	// Only use the first certificate in the expected CA cert list
+	expectedCACert := expectedCACerts[0]
+
+	// find a common trust anchor
+	trustAnchorFound := false
+	for _, currentCACert := range currentCACerts {
+		// Compare the current CA cert to the expected CA cert.
+		// If the certificates match then a common trust anchor was found.
+		if currentCACert.Equal(expectedCACert) {
+			trustAnchorFound = true
+			break
+		}
+	}
+	if !trustAnchorFound {
+		return errors.Errorf("a kubeconfig file %q exists already but could not find trust anchor", kubeConfigFilePath)
+	}
+
 	// If the current API Server location on disk doesn't match the expected API server, show a warning
 	if currentConfig.Clusters[currentCluster].Server != config.Clusters[expectedCluster].Server {
 		klog.Warningf("a kubeconfig file %q exists already but has an unexpected API Server URL: expected: %s, got: %s",

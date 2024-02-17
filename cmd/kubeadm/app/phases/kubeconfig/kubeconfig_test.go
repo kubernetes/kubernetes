@@ -588,7 +588,11 @@ func TestValidateKubeConfig(t *testing.T) {
 
 func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
 	pkiDir := filepath.Join(tmpDir, "pki")
 
 	initConfig := &kubeadmapi.InitConfiguration{
@@ -603,11 +607,9 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 
 	// creates CA, write to pkiDir and remove ca.key to get into external CA condition
 	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
-	if err := pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
-		t.Fatalf("failure while saving CA certificate and key: %v", err)
-	}
-	if err := os.Remove(filepath.Join(pkiDir, kubeadmconstants.CAKeyName)); err != nil {
-		t.Fatalf("failure while deleting ca.key: %v", err)
+
+	if err := pkiutil.WriteCertBundle(pkiDir, kubeadmconstants.CACertAndKeyBaseName, []*x509.Certificate{caCert}); err != nil {
+		t.Fatalf("failure while saving CA certificate: %v", err)
 	}
 
 	// create a valid config
@@ -675,7 +677,138 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			defer func() {
+				if err := os.RemoveAll(tmpdir); err != nil {
+					t.Error(err)
+				}
+			}()
+
+			for name, config := range test.filesToWrite {
+				if err := createKubeConfigFileIfNotExists(tmpdir, name, config); err != nil {
+					t.Errorf("createKubeConfigFileIfNotExists failed: %v", err)
+				}
+			}
+
+			err := ValidateKubeconfigsForExternalCA(tmpdir, test.initConfig)
+			if (err != nil) != test.expectedError {
+				t.Fatalf(dedent.Dedent(
+					"ValidateKubeconfigsForExternalCA failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
+					name,
+					test.expectedError,
+					(err != nil),
+					err,
+				)
+			}
+		})
+	}
+}
+
+func TestValidateKubeconfigsForExternalCAMissingRoot(t *testing.T) {
+	tmpDir := testutil.SetupTempDir(t)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	}()
+	pkiDir := filepath.Join(tmpDir, "pki")
+
+	initConfig := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: pkiDir,
+		},
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+			BindPort:         1234,
+			AdvertiseAddress: "1.2.3.4",
+		},
+	}
+
+	// creates CA, write to pkiDir and remove ca.key to get into external CA condition
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
+
+	// create a config with a CA cert containing multiple certificates
+	intermediateCACert1, intermediateCAKey1 := certstestutil.SetupIntermediateCertificateAuthority(t, caCert, caKey)
+	intermediateCACert2, intermediateCAKey2 := certstestutil.SetupIntermediateCertificateAuthority(t, intermediateCACert1, intermediateCAKey1)
+
+	var caCertBundle []*x509.Certificate
+	caCertBundle = append(caCertBundle, caCert, intermediateCACert1, intermediateCACert2)
+	caCertBytes, _ := pkiutil.EncodeCertBundlePEM(caCertBundle)
+
+	clusterName := "myOrg1"
+
+	// Create a kube config and assign the CA data to the CA bundle, issued from root CA
+	multipleCAConfigRootCAIssuer := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", clusterName)
+	multipleCAConfigRootCAIssuer.Clusters[clusterName].CertificateAuthorityData = caCertBytes
+
+	// Create a kube config and assign the CA data to the CA bundle, issued from intermediate CA 1
+	multipleCAConfigIntermediateCA1Issuer := setupdKubeConfigWithClientAuth(t, intermediateCACert1, intermediateCAKey1, "https://1.2.3.4:1234", "test-cluster", clusterName)
+	multipleCAConfigIntermediateCA1Issuer.Clusters[clusterName].CertificateAuthorityData = caCertBytes
+
+	// Create a kube config and assign the CA data to the CA bundle, issued from intermediate CA 2
+	multipleCAConfigIntermediateCA2Issuer := setupdKubeConfigWithClientAuth(t, intermediateCACert2, intermediateCAKey2, "https://1.2.3.4:1234", "test-cluster", clusterName)
+	multipleCAConfigIntermediateCA2Issuer.Clusters[clusterName].CertificateAuthorityData = caCertBytes
+
+	// create a config with a CA cert containing multiple certificates, omitting the root CA
+	var caCertBundleNoRootCA []*x509.Certificate
+	caCertBundleNoRootCA = append(caCertBundleNoRootCA, intermediateCACert1, intermediateCACert2)
+	caCertBytesNoRootCA, _ := pkiutil.EncodeCertBundlePEM(caCertBundleNoRootCA)
+
+	// Create a kube config and assign the CA data to the CA bundle, issued from intermediate CA 2,
+	// CA is missing root CA certificate.
+	multipleCAConfigNoRootCA := setupdKubeConfigWithClientAuth(t, intermediateCACert2, intermediateCAKey2, "https://1.2.3.4:1234", "test-cluster", clusterName)
+	multipleCAConfigNoRootCA.Clusters[clusterName].CertificateAuthorityData = caCertBytesNoRootCA
+
+	if err := pkiutil.WriteCertBundle(pkiDir, kubeadmconstants.CACertAndKeyBaseName, caCertBundleNoRootCA); err != nil {
+		t.Fatalf("failure while saving CA certificate: %v", err)
+	}
+
+	tests := map[string]struct {
+		filesToWrite  map[string]*clientcmdapi.Config
+		initConfig    *kubeadmapi.InitConfiguration
+		expectedError bool
+	}{
+		"all files are valid for CA with multiple certificates issued from RootCA": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:             multipleCAConfigNoRootCA,
+				kubeadmconstants.SuperAdminKubeConfigFileName:        multipleCAConfigNoRootCA,
+				kubeadmconstants.KubeletKubeConfigFileName:           multipleCAConfigNoRootCA,
+				kubeadmconstants.ControllerManagerKubeConfigFileName: multipleCAConfigNoRootCA,
+				kubeadmconstants.SchedulerKubeConfigFileName:         multipleCAConfigNoRootCA,
+			},
+			initConfig:    initConfig,
+			expectedError: false,
+		},
+		"all files are valid for CA with multiple certificates issued from IntermediateCA1": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:             multipleCAConfigIntermediateCA1Issuer,
+				kubeadmconstants.SuperAdminKubeConfigFileName:        multipleCAConfigIntermediateCA1Issuer,
+				kubeadmconstants.KubeletKubeConfigFileName:           multipleCAConfigIntermediateCA1Issuer,
+				kubeadmconstants.ControllerManagerKubeConfigFileName: multipleCAConfigIntermediateCA1Issuer,
+				kubeadmconstants.SchedulerKubeConfigFileName:         multipleCAConfigIntermediateCA1Issuer,
+			},
+			initConfig:    initConfig,
+			expectedError: false,
+		},
+		"all files are valid for CA with multiple certificates issued from IntermediateCA2": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:             multipleCAConfigIntermediateCA2Issuer,
+				kubeadmconstants.SuperAdminKubeConfigFileName:        multipleCAConfigIntermediateCA2Issuer,
+				kubeadmconstants.KubeletKubeConfigFileName:           multipleCAConfigIntermediateCA2Issuer,
+				kubeadmconstants.ControllerManagerKubeConfigFileName: multipleCAConfigIntermediateCA2Issuer,
+				kubeadmconstants.SchedulerKubeConfigFileName:         multipleCAConfigIntermediateCA2Issuer,
+			},
+			initConfig:    initConfig,
+			expectedError: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer func() {
+				if err := os.RemoveAll(tmpdir); err != nil {
+					t.Error(err)
+				}
+			}()
 
 			for name, config := range test.filesToWrite {
 				if err := createKubeConfigFileIfNotExists(tmpdir, name, config); err != nil {
