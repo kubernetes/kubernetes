@@ -4261,7 +4261,7 @@ func autoConvert_v1_ISCSIPersistentVolumeSource_To_core_ISCSIPersistentVolumeSou
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Portals = *(*[]string)(unsafe.Pointer(&in.Portals))
-	out.DiscoveryCHAPAuth = in.DiscoveryCHAPAuth
+	out.CHAPAuthDiscovery = in.CHAPAuthDiscovery
 	out.SessionCHAPAuth = in.SessionCHAPAuth
 	out.SecretRef = (*core.SecretReference)(unsafe.Pointer(in.SecretRef))
 	out.InitiatorName = (*string)(unsafe.Pointer(in.InitiatorName))
@@ -4281,7 +4281,7 @@ func autoConvert_core_ISCSIPersistentVolumeSource_To_v1_ISCSIPersistentVolumeSou
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Portals = *(*[]string)(unsafe.Pointer(&in.Portals))
-	out.DiscoveryCHAPAuth = in.DiscoveryCHAPAuth
+	out.CHAPAuthDiscovery = in.CHAPAuthDiscovery
 	out.SessionCHAPAuth = in.SessionCHAPAuth
 	out.SecretRef = (*v1.SecretReference)(unsafe.Pointer(in.SecretRef))
 	out.InitiatorName = (*string)(unsafe.Pointer(in.InitiatorName))
@@ -4301,7 +4301,7 @@ func autoConvert_v1_ISCSIVolumeSource_To_core_ISCSIVolumeSource(in *v1.ISCSIVolu
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Portals = *(*[]string)(unsafe.Pointer(&in.Portals))
-	out.DiscoveryCHAPAuth = in.DiscoveryCHAPAuth
+	out.CHAPAuthDiscovery = in.CHAPAuthDiscovery
 	out.SessionCHAPAuth = in.SessionCHAPAuth
 	out.SecretRef = (*core.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.InitiatorName = (*string)(unsafe.Pointer(in.InitiatorName))
@@ -4321,7 +4321,7 @@ func autoConvert_core_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *core.ISCSIVo
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Portals = *(*[]string)(unsafe.Pointer(&in.Portals))
-	out.DiscoveryCHAPAuth = in.DiscoveryCHAPAuth
+	out.CHAPAuthDiscovery = in.CHAPAuthDiscovery
 	out.SessionCHAPAuth = in.SessionCHAPAuth
 	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.InitiatorName = (*string)(unsafe.Pointer(in.InitiatorName))

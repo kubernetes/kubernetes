@@ -899,12 +899,12 @@ type ISCSIVolumeSource struct {
 	Portals []string
 	// Optional: whether support iSCSI Discovery CHAP authentication
 	// +optional
-	DiscoveryCHAPAuth bool
+	CHAPAuthDiscovery bool
 	// Optional: whether support iSCSI Session CHAP authentication
 	// +optional
 	SessionCHAPAuth bool
 	// Optional: CHAP secret for iSCSI target and initiator authentication.
-	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
+	// The secret is used if either CHAPAuthDiscovery or SessionCHAPAuth is true
 	// +optional
 	SecretRef *LocalObjectReference
 	// Optional: Custom initiator name per volume.
@@ -947,12 +947,12 @@ type ISCSIPersistentVolumeSource struct {
 	Portals []string
 	// Optional: whether support iSCSI Discovery CHAP authentication
 	// +optional
-	DiscoveryCHAPAuth bool
+	CHAPAuthDiscovery bool
 	// Optional: whether support iSCSI Session CHAP authentication
 	// +optional
 	SessionCHAPAuth bool
 	// Optional: CHAP secret for iSCSI target and initiator authentication.
-	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
+	// The secret is used if either CHAPAuthDiscovery or SessionCHAPAuth is true
 	// +optional
 	SecretRef *SecretReference
 	// Optional: Custom initiator name per volume.

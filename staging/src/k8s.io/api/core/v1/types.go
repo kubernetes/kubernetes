@@ -1445,7 +1445,7 @@ type ISCSIVolumeSource struct {
 	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 	// chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
 	// +optional
-	DiscoveryCHAPAuth bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
+	CHAPAuthDiscovery bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
 	// chapAuthSession defines whether support iSCSI Session CHAP authentication
 	// +optional
 	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
@@ -1492,7 +1492,7 @@ type ISCSIPersistentVolumeSource struct {
 	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 	// chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
 	// +optional
-	DiscoveryCHAPAuth bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
+	CHAPAuthDiscovery bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
 	// chapAuthSession defines whether support iSCSI Session CHAP authentication
 	// +optional
 	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`

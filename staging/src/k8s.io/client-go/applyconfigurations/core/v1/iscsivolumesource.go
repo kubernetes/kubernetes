@@ -28,7 +28,7 @@ type ISCSIVolumeSourceApplyConfiguration struct {
 	FSType            *string                                 `json:"fsType,omitempty"`
 	ReadOnly          *bool                                   `json:"readOnly,omitempty"`
 	Portals           []string                                `json:"portals,omitempty"`
-	DiscoveryCHAPAuth *bool                                   `json:"chapAuthDiscovery,omitempty"`
+	CHAPAuthDiscovery *bool                                   `json:"chapAuthDiscovery,omitempty"`
 	SessionCHAPAuth   *bool                                   `json:"chapAuthSession,omitempty"`
 	SecretRef         *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
 	InitiatorName     *string                                 `json:"initiatorName,omitempty"`
@@ -98,11 +98,11 @@ func (b *ISCSIVolumeSourceApplyConfiguration) WithPortals(values ...string) *ISC
 	return b
 }
 
-// WithDiscoveryCHAPAuth sets the DiscoveryCHAPAuth field in the declarative configuration to the given value
+// WithCHAPAuthDiscovery sets the CHAPAuthDiscovery field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DiscoveryCHAPAuth field is set to the value of the last call.
-func (b *ISCSIVolumeSourceApplyConfiguration) WithDiscoveryCHAPAuth(value bool) *ISCSIVolumeSourceApplyConfiguration {
-	b.DiscoveryCHAPAuth = &value
+// If called multiple times, the CHAPAuthDiscovery field is set to the value of the last call.
+func (b *ISCSIVolumeSourceApplyConfiguration) WithCHAPAuthDiscovery(value bool) *ISCSIVolumeSourceApplyConfiguration {
+	b.CHAPAuthDiscovery = &value
 	return b
 }
 
