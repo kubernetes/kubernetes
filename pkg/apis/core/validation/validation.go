@@ -784,7 +784,7 @@ func validateISCSIVolumeSource(iscsi *core.ISCSIVolumeSource, fldPath *field.Pat
 	if iscsi.Lun < 0 || iscsi.Lun > 255 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
 	}
-	if (iscsi.CHAPAuthDiscovery || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
+	if (iscsi.CHAPAuthDiscovery || iscsi.CHAPAuthSession) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
 	if iscsi.InitiatorName != nil {
@@ -828,7 +828,7 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 	if iscsi.Lun < 0 || iscsi.Lun > 255 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), iscsi.Lun, validation.InclusiveRangeError(0, 255)))
 	}
-	if (iscsi.CHAPAuthDiscovery || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
+	if (iscsi.CHAPAuthDiscovery || iscsi.CHAPAuthSession) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
 	}
 	if iscsi.SecretRef != nil {

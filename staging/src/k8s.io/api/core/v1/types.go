@@ -1448,7 +1448,7 @@ type ISCSIVolumeSource struct {
 	CHAPAuthDiscovery bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
 	// chapAuthSession defines whether support iSCSI Session CHAP authentication
 	// +optional
-	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
+	CHAPAuthSession bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
 	// secretRef is the CHAP Secret for iSCSI target and initiator authentication
 	// +optional
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`
@@ -1495,7 +1495,7 @@ type ISCSIPersistentVolumeSource struct {
 	CHAPAuthDiscovery bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
 	// chapAuthSession defines whether support iSCSI Session CHAP authentication
 	// +optional
-	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
+	CHAPAuthSession bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
 	// secretRef is the CHAP Secret for iSCSI target and initiator authentication
 	// +optional
 	SecretRef *SecretReference `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`

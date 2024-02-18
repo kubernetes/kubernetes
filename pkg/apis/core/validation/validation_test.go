@@ -4101,7 +4101,7 @@ func TestValidateVolumes(t *testing.T) {
 						Lun:             1,
 						FSType:          "ext4",
 						ReadOnly:        false,
-						SessionCHAPAuth: true,
+						CHAPAuthSession: true,
 					},
 				},
 			},
