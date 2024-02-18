@@ -522,7 +522,7 @@ func validateControllerRef(controllerRef *metav1.OwnerReference) error {
 		return fmt.Errorf("controllerRef.Controller is not set to true")
 	}
 	if controllerRef.BlockOwnerDeletion == nil || !*controllerRef.BlockOwnerDeletion {
-		return fmt.Errorf("controllerRef.BlockOwnerDeletion is not set")
+		return fmt.Errorf("controllerRef.BlockOwnerDeletion is not set to true")
 	}
 	return nil
 }

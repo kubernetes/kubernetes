@@ -506,7 +506,7 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 			tc.cancelWorkWithEvent(logger, podNamespacedName)
 			return
 		}
-		utilruntime.HandleError(fmt.Errorf("could not get pod %s/%s: %v", podUpdate.podName, podUpdate.podNamespace, err))
+		utilruntime.HandleError(fmt.Errorf("could not get pod %s/%s: %w", podUpdate.podNamespace, podUpdate.podName, err))
 		return
 	}
 
@@ -548,7 +548,7 @@ func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdat
 			delete(tc.taintedNodes, nodeUpdate.nodeName)
 			return
 		}
-		utilruntime.HandleError(fmt.Errorf("cannot get node %s: %v", nodeUpdate.nodeName, err))
+		utilruntime.HandleError(fmt.Errorf("cannot get node %s: %w", nodeUpdate.nodeName, err))
 		return
 	}
 
