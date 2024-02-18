@@ -2429,7 +2429,7 @@ func Convert_core_AvoidPods_To_v1_AvoidPods(in *core.AvoidPods, out *v1.AvoidPod
 
 func autoConvert_v1_AzureDiskVolumeSource_To_core_AzureDiskVolumeSource(in *v1.AzureDiskVolumeSource, out *core.AzureDiskVolumeSource, s conversion.Scope) error {
 	out.DiskName = in.DiskName
-	out.DataDiskURI = in.DataDiskURI
+	out.DiskURI = in.DiskURI
 	out.CachingMode = (*core.AzureDataDiskCachingMode)(unsafe.Pointer(in.CachingMode))
 	out.FSType = (*string)(unsafe.Pointer(in.FSType))
 	out.ReadOnly = (*bool)(unsafe.Pointer(in.ReadOnly))
@@ -2444,7 +2444,7 @@ func Convert_v1_AzureDiskVolumeSource_To_core_AzureDiskVolumeSource(in *v1.Azure
 
 func autoConvert_core_AzureDiskVolumeSource_To_v1_AzureDiskVolumeSource(in *core.AzureDiskVolumeSource, out *v1.AzureDiskVolumeSource, s conversion.Scope) error {
 	out.DiskName = in.DiskName
-	out.DataDiskURI = in.DataDiskURI
+	out.DiskURI = in.DiskURI
 	out.CachingMode = (*v1.AzureDataDiskCachingMode)(unsafe.Pointer(in.CachingMode))
 	out.FSType = (*string)(unsafe.Pointer(in.FSType))
 	out.ReadOnly = (*bool)(unsafe.Pointer(in.ReadOnly))

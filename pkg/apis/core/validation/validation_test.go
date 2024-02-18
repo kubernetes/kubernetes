@@ -5197,8 +5197,8 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "azure-disk",
 				VolumeSource: core.VolumeSource{
 					AzureDisk: &core.AzureDiskVolumeSource{
-						DiskName:    "foo",
-						DataDiskURI: "https://blob/vhds/bar.vhd",
+						DiskName: "foo",
+						DiskURI:  "https://blob/vhds/bar.vhd",
 					},
 				},
 			},
@@ -5208,8 +5208,8 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "azure-disk",
 				VolumeSource: core.VolumeSource{
 					AzureDisk: &core.AzureDiskVolumeSource{
-						DiskName:    "",
-						DataDiskURI: "https://blob/vhds/bar.vhd",
+						DiskName: "",
+						DiskURI:  "https://blob/vhds/bar.vhd",
 					},
 				},
 			},
@@ -5223,8 +5223,8 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "azure-disk",
 				VolumeSource: core.VolumeSource{
 					AzureDisk: &core.AzureDiskVolumeSource{
-						DiskName:    "foo",
-						DataDiskURI: "",
+						DiskName: "foo",
+						DiskURI:  "",
 					},
 				},
 			},

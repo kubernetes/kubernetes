@@ -26,7 +26,7 @@ import (
 // with apply.
 type AzureDiskVolumeSourceApplyConfiguration struct {
 	DiskName    *string                      `json:"diskName,omitempty"`
-	DataDiskURI *string                      `json:"diskURI,omitempty"`
+	DiskURI     *string                      `json:"diskURI,omitempty"`
 	CachingMode *v1.AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
 	FSType      *string                      `json:"fsType,omitempty"`
 	ReadOnly    *bool                        `json:"readOnly,omitempty"`
@@ -47,11 +47,11 @@ func (b *AzureDiskVolumeSourceApplyConfiguration) WithDiskName(value string) *Az
 	return b
 }
 
-// WithDataDiskURI sets the DataDiskURI field in the declarative configuration to the given value
+// WithDiskURI sets the DiskURI field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DataDiskURI field is set to the value of the last call.
-func (b *AzureDiskVolumeSourceApplyConfiguration) WithDataDiskURI(value string) *AzureDiskVolumeSourceApplyConfiguration {
-	b.DataDiskURI = &value
+// If called multiple times, the DiskURI field is set to the value of the last call.
+func (b *AzureDiskVolumeSourceApplyConfiguration) WithDiskURI(value string) *AzureDiskVolumeSourceApplyConfiguration {
+	b.DiskURI = &value
 	return b
 }
 

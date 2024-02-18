@@ -1610,7 +1610,7 @@ type AzureDiskVolumeSource struct {
 	// diskName is the Name of the data disk in the blob storage
 	DiskName string `json:"diskName" protobuf:"bytes,1,opt,name=diskName"`
 	// diskURI is the URI of data disk in the blob storage
-	DataDiskURI string `json:"diskURI" protobuf:"bytes,2,opt,name=diskURI"`
+	DiskURI string `json:"diskURI" protobuf:"bytes,2,opt,name=diskURI"`
 	// cachingMode is the Host Caching mode: None, Read Only, Read Write.
 	// +optional
 	CachingMode *AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,3,opt,name=cachingMode,casttype=AzureDataDiskCachingMode"`

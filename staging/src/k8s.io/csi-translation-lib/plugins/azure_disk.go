@@ -109,13 +109,13 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 		ObjectMeta: metav1.ObjectMeta{
 			// Must be unique per disk as it is used as the unique part of the
 			// staging path
-			Name: azureSource.DataDiskURI,
+			Name: azureSource.DiskURI,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:           AzureDiskDriverName,
-					VolumeHandle:     azureSource.DataDiskURI,
+					VolumeHandle:     azureSource.DiskURI,
 					VolumeAttributes: map[string]string{azureDiskKind: managed},
 				},
 			},
@@ -152,7 +152,7 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		csiSource = &v1.CSIPersistentVolumeSource{
 			Driver:           AzureDiskDriverName,
 			VolumeAttributes: map[string]string{azureDiskKind: managed},
-			VolumeHandle:     azureSource.DataDiskURI,
+			VolumeHandle:     azureSource.DiskURI,
 		}
 	)
 
@@ -197,11 +197,11 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 	// refer to https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
 	managed := v1.AzureManagedDisk
 	azureSource := &v1.AzureDiskVolumeSource{
-		DiskName:    diskName,
-		DataDiskURI: diskURI,
-		FSType:      &csiSource.FSType,
-		ReadOnly:    &csiSource.ReadOnly,
-		Kind:        &managed,
+		DiskName: diskName,
+		DiskURI:  diskURI,
+		FSType:   &csiSource.FSType,
+		ReadOnly: &csiSource.ReadOnly,
+		Kind:     &managed,
 	}
 
 	if csiSource.VolumeAttributes != nil {

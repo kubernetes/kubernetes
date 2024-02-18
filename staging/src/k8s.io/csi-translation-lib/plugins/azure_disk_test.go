@@ -120,8 +120,8 @@ func TestTranslateAzureDiskInTreeInlineVolumeToCSI(t *testing.T) {
 			volume: &corev1.Volume{
 				VolumeSource: corev1.VolumeSource{
 					AzureDisk: &corev1.AzureDiskVolumeSource{
-						DiskName:    "diskname",
-						DataDiskURI: "datadiskuri",
+						DiskName: "diskname",
+						DiskURI:  "datadiskuri",
 					},
 				},
 			},
@@ -146,9 +146,9 @@ func TestTranslateAzureDiskInTreeInlineVolumeToCSI(t *testing.T) {
 			volume: &corev1.Volume{
 				VolumeSource: corev1.VolumeSource{
 					AzureDisk: &corev1.AzureDiskVolumeSource{
-						DiskName:    "diskname",
-						DataDiskURI: "datadiskuri",
-						Kind:        &sharedBlobDiskKind,
+						DiskName: "diskname",
+						DiskURI:  "datadiskuri",
+						Kind:     &sharedBlobDiskKind,
 					},
 				},
 			},
@@ -204,7 +204,7 @@ func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
 						AzureDisk: &corev1.AzureDiskVolumeSource{
 							CachingMode: &cachingMode,
-							DataDiskURI: diskURI,
+							DiskURI:     diskURI,
 							FSType:      &fsType,
 							ReadOnly:    &readOnly,
 						},
@@ -236,7 +236,7 @@ func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
 						AzureDisk: &corev1.AzureDiskVolumeSource{
 							CachingMode: &cachingMode,
-							DataDiskURI: diskURI,
+							DiskURI:     diskURI,
 							FSType:      &fsType,
 							ReadOnly:    &readOnly,
 							Kind:        &sharedBlobDiskKind,
@@ -307,7 +307,7 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
 						AzureDisk: &corev1.AzureDiskVolumeSource{
 							CachingMode: &cachingModeReadOnly,
-							DataDiskURI: diskURI,
+							DiskURI:     diskURI,
 							FSType:      &fsType,
 							ReadOnly:    &readOnly,
 							Kind:        &managed,
@@ -343,7 +343,7 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
 						AzureDisk: &corev1.AzureDiskVolumeSource{
 							CachingMode: &cachingModeReadOnly,
-							DataDiskURI: diskURI,
+							DiskURI:     diskURI,
 							FSType:      &fsType,
 							ReadOnly:    &readOnly,
 							Kind:        &managed,
@@ -379,7 +379,7 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
 						AzureDisk: &corev1.AzureDiskVolumeSource{
 							CachingMode: &cachingModeNone,
-							DataDiskURI: diskURI,
+							DiskURI:     diskURI,
 							FSType:      &fsType,
 							ReadOnly:    &readOnly,
 							Kind:        &managed,
@@ -415,7 +415,7 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
 						AzureDisk: &corev1.AzureDiskVolumeSource{
 							CachingMode: &cachingModeReadWrite,
-							DataDiskURI: diskURI,
+							DiskURI:     diskURI,
 							FSType:      &fsType,
 							ReadOnly:    &readOnly,
 							Kind:        &managed,

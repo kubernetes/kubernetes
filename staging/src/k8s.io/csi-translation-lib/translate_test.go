@@ -421,8 +421,8 @@ func generateUniqueVolumeSource(driverName string) (v1.VolumeSource, error) {
 	case plugins.AzureDiskDriverName:
 		return v1.VolumeSource{
 			AzureDisk: &v1.AzureDiskVolumeSource{
-				DiskName:    string(uuid.NewUUID()),
-				DataDiskURI: string(uuid.NewUUID()),
+				DiskName: string(uuid.NewUUID()),
+				DiskURI:  string(uuid.NewUUID()),
 			},
 		}, nil
 	case plugins.AzureFileDriverName:

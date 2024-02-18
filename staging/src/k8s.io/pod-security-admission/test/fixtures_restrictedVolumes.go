@@ -95,7 +95,7 @@ func init() {
 					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{Quobyte: &corev1.QuobyteVolumeSource{Registry: "localhost:1234", Volume: "test"}}}}
 				}),
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{AzureDisk: &corev1.AzureDiskVolumeSource{DiskName: "test", DataDiskURI: "https://test.blob.core.windows.net/test/test.vhd"}}}}
+					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{AzureDisk: &corev1.AzureDiskVolumeSource{DiskName: "test", DiskURI: "https://test.blob.core.windows.net/test/test.vhd"}}}}
 				}),
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{PortworxVolume: &corev1.PortworxVolumeSource{VolumeID: "test", FSType: "ext4"}}}}

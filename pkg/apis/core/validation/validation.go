@@ -1490,7 +1490,7 @@ func validateAzureDisk(azure *core.AzureDiskVolumeSource, fldPath *field.Path) f
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskName"), ""))
 	}
 
-	if azure.DataDiskURI == "" {
+	if azure.DiskURI == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskURI"), ""))
 	}
 
@@ -1503,12 +1503,12 @@ func validateAzureDisk(azure *core.AzureDiskVolumeSource, fldPath *field.Path) f
 	}
 
 	// validate that DiskUri is the correct format
-	if azure.Kind != nil && *azure.Kind == core.AzureManagedDisk && strings.Index(azure.DataDiskURI, "/subscriptions/") != 0 {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskURISupportedManaged))
+	if azure.Kind != nil && *azure.Kind == core.AzureManagedDisk && strings.Index(azure.DiskURI, "/subscriptions/") != 0 {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DiskURI, diskURISupportedManaged))
 	}
 
-	if azure.Kind != nil && *azure.Kind != core.AzureManagedDisk && strings.Index(azure.DataDiskURI, "https://") != 0 {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskURISupportedblob))
+	if azure.Kind != nil && *azure.Kind != core.AzureManagedDisk && strings.Index(azure.DiskURI, "https://") != 0 {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DiskURI, diskURISupportedblob))
 	}
 
 	return allErrs

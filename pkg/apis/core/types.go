@@ -1537,7 +1537,7 @@ type AzureDiskVolumeSource struct {
 	// The Name of the data disk in the blob storage
 	DiskName string
 	// The URI of the data disk in the blob storage
-	DataDiskURI string
+	DiskURI string
 	// Host Caching mode: None, Read Only, Read Write.
 	// +optional
 	CachingMode *AzureDataDiskCachingMode
