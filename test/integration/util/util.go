@@ -128,7 +128,7 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 	return sched, informerFactory
 }
 
-func CreateResourceClaimController(ctx context.Context, tb testing.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
+func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
 	schedulingInformer := informerFactory.Resource().V1alpha2().PodSchedulingContexts()
 	claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
@@ -190,7 +190,7 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 // CreateGCController creates a garbage controller and returns a run function
 // for it. The informer factory needs to be started before invoking that
 // function.
-func CreateGCController(ctx context.Context, tb testing.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
+func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
 	restclient.AddUserAgent(&restConfig, "gc-controller")
 	clientSet := clientset.NewForConfigOrDie(&restConfig)
 	metadataClient, err := metadata.NewForConfig(&restConfig)
@@ -227,7 +227,7 @@ func CreateGCController(ctx context.Context, tb testing.TB, restConfig restclien
 // CreateNamespaceController creates a namespace controller and returns a run
 // function for it. The informer factory needs to be started before invoking
 // that function.
-func CreateNamespaceController(ctx context.Context, tb testing.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
+func CreateNamespaceController(ctx context.Context, tb ktesting.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
 	restclient.AddUserAgent(&restConfig, "namespace-controller")
 	clientSet := clientset.NewForConfigOrDie(&restConfig)
 	metadataClient, err := metadata.NewForConfig(&restConfig)
@@ -503,11 +503,10 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 // It registers cleanup functions to t.Cleanup(), they will be called when the test completes,
 // no need to do this again.
 func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	testCtx := &TestContext{Ctx: ctx}
+	tCtx := ktesting.Init(t)
+	testCtx := &TestContext{Ctx: tCtx}
 
-	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
@@ -535,7 +534,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 
 	oldCloseFn := testCtx.CloseFn
 	testCtx.CloseFn = func() {
-		cancel()
+		tCtx.Cancel("tearing down apiserver")
 		oldCloseFn()
 	}
 

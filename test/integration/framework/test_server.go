@@ -59,6 +59,7 @@ type TestServerSetup struct {
 type TearDownFunc func()
 
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
+// TODO (pohly): convert to ktesting contexts
 func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
 	ctx, cancel := context.WithCancel(ctx)
 
