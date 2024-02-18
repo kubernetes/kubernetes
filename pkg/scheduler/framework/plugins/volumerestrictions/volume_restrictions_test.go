@@ -196,7 +196,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
 				Monitors: []string{"a", "b"},
-				RBDPool:  "foo",
+				Pool:     "foo",
 				Image:    "bar",
 				FSType:   "ext4",
 			},
@@ -206,7 +206,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
 				Monitors: []string{"c", "d"},
-				RBDPool:  "foo",
+				Pool:     "foo",
 				Image:    "bar",
 				FSType:   "ext4",
 			},

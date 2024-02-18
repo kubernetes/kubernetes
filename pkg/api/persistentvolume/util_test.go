@@ -230,7 +230,7 @@ func TestWarnings(t *testing.T) {
 							Monitors:  nil,
 							Image:     "",
 							FSType:    "",
-							RBDPool:   "",
+							Pool:      "",
 							RadosUser: "",
 							Keyring:   "",
 							SecretRef: nil,

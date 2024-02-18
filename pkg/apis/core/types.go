@@ -1241,7 +1241,7 @@ type RBDVolumeSource struct {
 	FSType string
 	// Optional: RadosPool is the rados pool name,default is rbd
 	// +optional
-	RBDPool string
+	Pool string
 	// Optional: RBDUser is the rados user name, default is admin
 	// +optional
 	RadosUser string
@@ -1272,7 +1272,7 @@ type RBDPersistentVolumeSource struct {
 	FSType string
 	// Optional: RadosPool is the rados pool name,default is rbd
 	// +optional
-	RBDPool string
+	Pool string
 	// Optional: RBDUser is the rados user name, default is admin
 	// +optional
 	RadosUser string

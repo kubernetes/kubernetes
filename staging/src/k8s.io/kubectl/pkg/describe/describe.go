@@ -1198,12 +1198,12 @@ func printRBDVolumeSource(rbd *corev1.RBDVolumeSource, w PrefixWriter) {
 		"    Monitors:\t%v\n"+
 		"    Image:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    RBDPool:\t%v\n"+
+		"    Pool:\t%v\n"+
 		"    RadosUser:\t%v\n"+
 		"    Keyring:\t%v\n"+
 		"    SecretRef:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		rbd.Monitors, rbd.Image, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+		rbd.Monitors, rbd.Image, rbd.FSType, rbd.Pool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
 func printRBDPersistentVolumeSource(rbd *corev1.RBDPersistentVolumeSource, w PrefixWriter) {
@@ -1211,12 +1211,12 @@ func printRBDPersistentVolumeSource(rbd *corev1.RBDPersistentVolumeSource, w Pre
 		"    Monitors:\t%v\n"+
 		"    Image:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    RBDPool:\t%v\n"+
+		"    Pool:\t%v\n"+
 		"    RadosUser:\t%v\n"+
 		"    Keyring:\t%v\n"+
 		"    SecretRef:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		rbd.Monitors, rbd.Image, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+		rbd.Monitors, rbd.Image, rbd.FSType, rbd.Pool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
 func printDownwardAPIVolumeSource(d *corev1.DownwardAPIVolumeSource, w PrefixWriter) {

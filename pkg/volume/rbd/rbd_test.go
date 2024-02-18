@@ -43,7 +43,7 @@ import (
 const (
 	testVolName    = "vol-1234"
 	testImage      = "volume-a4b47414-a675-47dc-a9cc-c223f13439b0"
-	testRBDPool    = "volumes"
+	testPool       = "volumes"
 	testGlobalPath = "plugins/kubernetes.io/rbd/volumeDevices/volumes-image-volume-a4b47414-a675-47dc-a9cc-c223f13439b0"
 )
 
@@ -76,8 +76,8 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 		t.Errorf("Invalid spec name for GlobalMapPath spec: %s", spec.PersistentVolume.Name)
 	}
 
-	if spec.PersistentVolume.Spec.RBD.RBDPool != testRBDPool {
-		t.Errorf("Invalid RBDPool from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.RBDPool)
+	if spec.PersistentVolume.Spec.RBD.Pool != testPool {
+		t.Errorf("Invalid Pool from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.Pool)
 	}
 
 	if spec.PersistentVolume.Spec.RBD.Image != testImage {
@@ -383,7 +383,7 @@ func TestPlugin(t *testing.T) {
 			VolumeSource: v1.VolumeSource{
 				RBD: &v1.RBDVolumeSource{
 					Monitors: []string{"a", "b"},
-					RBDPool:  "pool1",
+					Pool:     "pool1",
 					Image:    "image1",
 					FSType:   "ext4",
 				},
@@ -410,7 +410,7 @@ func TestPlugin(t *testing.T) {
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
 						Monitors: []string{"a", "b"},
-						RBDPool:  "pool2",
+						Pool:     "pool2",
 						Image:    "image2",
 						FSType:   "ext4",
 					},
@@ -554,7 +554,7 @@ func TestGetDeviceMountPath(t *testing.T) {
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
 				Monitors: []string{"a", "b"},
-				RBDPool:  pool,
+				Pool:     pool,
 				Image:    image,
 				FSType:   "ext4",
 			},
@@ -636,8 +636,8 @@ func TestConstructVolumeSpec(t *testing.T) {
 		if err != nil {
 			t.Errorf("ConstructVolumeSpec failed: %v", err)
 		} else {
-			if rec.Spec.Volume.RBD.RBDPool != pool {
-				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, rec.Spec.Volume.RBD.RBDPool)
+			if rec.Spec.Volume.RBD.Pool != pool {
+				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, rec.Spec.Volume.RBD.Pool)
 			}
 			if rec.Spec.Volume.RBD.Image != image {
 				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, rec.Spec.Volume.RBD.Image)

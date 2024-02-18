@@ -138,8 +138,8 @@ func (p rbdCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, po
 	volumeAttr := make(map[string]string)
 	volumeAttr[clusterIDKey] = fmt.Sprintf("%x", md5.Sum([]byte(strings.Join(volume.RBD.Monitors, ","))))
 	volumeAttr[poolKey] = defaultPoolVal
-	if volume.RBD.RBDPool != "" {
-		volumeAttr[poolKey] = volume.RBD.RBDPool
+	if volume.RBD.Pool != "" {
+		volumeAttr[poolKey] = volume.RBD.Pool
 	}
 	volumeAttr[staticVolKey] = defaultMigStaticVal
 	volumeAttr[imgFeatureKey] = defaultImgFeatureVal
@@ -178,7 +178,7 @@ func (p rbdCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.P
 		volumeAttributes[clusterIDKey] = pv.Annotations[clusterIDKey]
 	} else {
 		mons := strings.Join(pv.Spec.RBD.Monitors, ",")
-		pool := pv.Spec.RBD.RBDPool
+		pool := pv.Spec.RBD.Pool
 		image := pv.Spec.RBD.Image
 		volumeAttributes[staticVolKey] = defaultMigStaticVal
 		volumeAttributes[clusterIDKey] = fmt.Sprintf("%x", md5.Sum([]byte(mons)))
@@ -233,7 +233,7 @@ func (p rbdCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.P
 		Monitors:  monSlice,
 		Image:     rbdImageName,
 		FSType:    csiSource.FSType,
-		RBDPool:   rbdPool,
+		Pool:      rbdPool,
 		RadosUser: radosUser,
 		ReadOnly:  csiSource.ReadOnly,
 	}
@@ -306,7 +306,7 @@ func fillVolAttrsForRequest(pv *v1.PersistentVolume, volumeAttributes map[string
 		return fmt.Errorf("pv is nil or RBD Volume not defined on pv")
 	}
 	volumeAttributes[imgNameKey] = pv.Spec.RBD.Image
-	volumeAttributes[poolKey] = pv.Spec.RBD.RBDPool
+	volumeAttributes[poolKey] = pv.Spec.RBD.Pool
 	volumeAttributes[imgFeatureKey] = pv.Annotations[imgFeatureKey]
 	volumeAttributes[imgFmtKey] = pv.Annotations[imgFmtKey]
 	volumeAttributes[journalPoolKey] = pv.Annotations[journalPoolKey]
