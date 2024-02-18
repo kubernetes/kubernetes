@@ -3246,17 +3246,17 @@ func TestValidateGlusterfs(t *testing.T) {
 		errfield string
 	}{{
 		name:     "missing endpointname",
-		gfs:      &core.GlusterfsVolumeSource{EndpointsName: "", Path: "/tmp"},
+		gfs:      &core.GlusterfsVolumeSource{Endpoints: "", Path: "/tmp"},
 		errtype:  field.ErrorTypeRequired,
 		errfield: "endpoints",
 	}, {
 		name:     "missing path",
-		gfs:      &core.GlusterfsVolumeSource{EndpointsName: "my-endpoint", Path: ""},
+		gfs:      &core.GlusterfsVolumeSource{Endpoints: "my-endpoint", Path: ""},
 		errtype:  field.ErrorTypeRequired,
 		errfield: "path",
 	}, {
 		name:     "missing endpointname and path",
-		gfs:      &core.GlusterfsVolumeSource{EndpointsName: "", Path: ""},
+		gfs:      &core.GlusterfsVolumeSource{Endpoints: "", Path: ""},
 		errtype:  field.ErrorTypeRequired,
 		errfield: "endpoints",
 	},
@@ -3291,22 +3291,22 @@ func TestValidateGlusterfsPersistentVolumeSource(t *testing.T) {
 		errfield string
 	}{{
 		name:     "missing endpointname",
-		gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "", Path: "/tmp"},
+		gfs:      &core.GlusterfsPersistentVolumeSource{Endpoints: "", Path: "/tmp"},
 		errtype:  field.ErrorTypeRequired,
 		errfield: "endpoints",
 	}, {
 		name:     "missing path",
-		gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "my-endpoint", Path: ""},
+		gfs:      &core.GlusterfsPersistentVolumeSource{Endpoints: "my-endpoint", Path: ""},
 		errtype:  field.ErrorTypeRequired,
 		errfield: "path",
 	}, {
 		name:     "non null endpointnamespace with empty string",
-		gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "my-endpoint", Path: "/tmp", EndpointsNamespace: epNs},
+		gfs:      &core.GlusterfsPersistentVolumeSource{Endpoints: "my-endpoint", Path: "/tmp", EndpointsNamespace: epNs},
 		errtype:  field.ErrorTypeInvalid,
 		errfield: "endpointsNamespace",
 	}, {
 		name:     "missing endpointname and path",
-		gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "", Path: ""},
+		gfs:      &core.GlusterfsPersistentVolumeSource{Endpoints: "", Path: ""},
 		errtype:  field.ErrorTypeRequired,
 		errfield: "endpoints",
 	},
@@ -4377,9 +4377,9 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "glusterfs",
 				VolumeSource: core.VolumeSource{
 					Glusterfs: &core.GlusterfsVolumeSource{
-						EndpointsName: "host1",
-						Path:          "path",
-						ReadOnly:      false,
+						Endpoints: "host1",
+						Path:      "path",
+						ReadOnly:  false,
 					},
 				},
 			},
@@ -4389,9 +4389,9 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "glusterfs",
 				VolumeSource: core.VolumeSource{
 					Glusterfs: &core.GlusterfsVolumeSource{
-						EndpointsName: "",
-						Path:          "path",
-						ReadOnly:      false,
+						Endpoints: "",
+						Path:      "path",
+						ReadOnly:  false,
 					},
 				},
 			},
@@ -4405,9 +4405,9 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "glusterfs",
 				VolumeSource: core.VolumeSource{
 					Glusterfs: &core.GlusterfsVolumeSource{
-						EndpointsName: "host",
-						Path:          "",
-						ReadOnly:      false,
+						Endpoints: "host",
+						Path:      "",
+						ReadOnly:  false,
 					},
 				},
 			},

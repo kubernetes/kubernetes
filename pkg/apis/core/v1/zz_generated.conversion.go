@@ -4090,7 +4090,7 @@ func Convert_core_GitRepoVolumeSource_To_v1_GitRepoVolumeSource(in *core.GitRepo
 }
 
 func autoConvert_v1_GlusterfsPersistentVolumeSource_To_core_GlusterfsPersistentVolumeSource(in *v1.GlusterfsPersistentVolumeSource, out *core.GlusterfsPersistentVolumeSource, s conversion.Scope) error {
-	out.EndpointsName = in.EndpointsName
+	out.Endpoints = in.Endpoints
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
 	out.EndpointsNamespace = (*string)(unsafe.Pointer(in.EndpointsNamespace))
@@ -4103,7 +4103,7 @@ func Convert_v1_GlusterfsPersistentVolumeSource_To_core_GlusterfsPersistentVolum
 }
 
 func autoConvert_core_GlusterfsPersistentVolumeSource_To_v1_GlusterfsPersistentVolumeSource(in *core.GlusterfsPersistentVolumeSource, out *v1.GlusterfsPersistentVolumeSource, s conversion.Scope) error {
-	out.EndpointsName = in.EndpointsName
+	out.Endpoints = in.Endpoints
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
 	out.EndpointsNamespace = (*string)(unsafe.Pointer(in.EndpointsNamespace))
@@ -4116,7 +4116,7 @@ func Convert_core_GlusterfsPersistentVolumeSource_To_v1_GlusterfsPersistentVolum
 }
 
 func autoConvert_v1_GlusterfsVolumeSource_To_core_GlusterfsVolumeSource(in *v1.GlusterfsVolumeSource, out *core.GlusterfsVolumeSource, s conversion.Scope) error {
-	out.EndpointsName = in.EndpointsName
+	out.Endpoints = in.Endpoints
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -4128,7 +4128,7 @@ func Convert_v1_GlusterfsVolumeSource_To_core_GlusterfsVolumeSource(in *v1.Glust
 }
 
 func autoConvert_core_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource(in *core.GlusterfsVolumeSource, out *v1.GlusterfsVolumeSource, s conversion.Scope) error {
-	out.EndpointsName = in.EndpointsName
+	out.Endpoints = in.Endpoints
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
 	return nil

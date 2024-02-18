@@ -21,7 +21,7 @@ package v1
 // GlusterfsPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the GlusterfsPersistentVolumeSource type for use
 // with apply.
 type GlusterfsPersistentVolumeSourceApplyConfiguration struct {
-	EndpointsName      *string `json:"endpoints,omitempty"`
+	Endpoints          *string `json:"endpoints,omitempty"`
 	Path               *string `json:"path,omitempty"`
 	ReadOnly           *bool   `json:"readOnly,omitempty"`
 	EndpointsNamespace *string `json:"endpointsNamespace,omitempty"`
@@ -33,11 +33,11 @@ func GlusterfsPersistentVolumeSource() *GlusterfsPersistentVolumeSourceApplyConf
 	return &GlusterfsPersistentVolumeSourceApplyConfiguration{}
 }
 
-// WithEndpointsName sets the EndpointsName field in the declarative configuration to the given value
+// WithEndpoints sets the Endpoints field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the EndpointsName field is set to the value of the last call.
-func (b *GlusterfsPersistentVolumeSourceApplyConfiguration) WithEndpointsName(value string) *GlusterfsPersistentVolumeSourceApplyConfiguration {
-	b.EndpointsName = &value
+// If called multiple times, the Endpoints field is set to the value of the last call.
+func (b *GlusterfsPersistentVolumeSourceApplyConfiguration) WithEndpoints(value string) *GlusterfsPersistentVolumeSourceApplyConfiguration {
+	b.Endpoints = &value
 	return b
 }
 

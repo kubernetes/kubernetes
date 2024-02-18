@@ -65,7 +65,7 @@ func init() {
 					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{ISCSI: &corev1.ISCSIVolumeSource{TargetPortal: "test", IQN: "iqn.2001-04.com.example:storage.kube.sys1.xyz", Lun: 0}}}}
 				}),
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{Glusterfs: &corev1.GlusterfsVolumeSource{Path: "test", EndpointsName: "test"}}}}
+					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{Glusterfs: &corev1.GlusterfsVolumeSource{Path: "test", Endpoints: "test"}}}}
 				}),
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{RBD: &corev1.RBDVolumeSource{Monitors: []string{"test"}, Image: "test"}}}}

@@ -1159,7 +1159,7 @@ func printGlusterfsVolumeSource(glusterfs *corev1.GlusterfsVolumeSource, w Prefi
 		"    EndpointsName:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
+		glusterfs.Endpoints, glusterfs.Path, glusterfs.ReadOnly)
 }
 
 func printGlusterfsPersistentVolumeSource(glusterfs *corev1.GlusterfsPersistentVolumeSource, w PrefixWriter) {
@@ -1172,7 +1172,7 @@ func printGlusterfsPersistentVolumeSource(glusterfs *corev1.GlusterfsPersistentV
 		"    EndpointsNamespace:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		glusterfs.EndpointsName, endpointsNamespace, glusterfs.Path, glusterfs.ReadOnly)
+		glusterfs.Endpoints, endpointsNamespace, glusterfs.Path, glusterfs.ReadOnly)
 }
 
 func printPersistentVolumeClaimVolumeSource(claim *corev1.PersistentVolumeClaimVolumeSource, w PrefixWriter) {

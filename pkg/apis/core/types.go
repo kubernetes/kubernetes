@@ -1190,8 +1190,8 @@ type QuobyteVolumeSource struct {
 // GlusterfsVolumeSource represents a Glusterfs mount that lasts the lifetime of a pod.
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 type GlusterfsVolumeSource struct {
-	// Required: EndpointsName is the endpoint name that details Glusterfs topology
-	EndpointsName string
+	// Required: Endpoints is the endpoint name that details Glusterfs topology
+	Endpoints string
 
 	// Required: Path is the Glusterfs volume path
 	Path string
@@ -1205,9 +1205,9 @@ type GlusterfsVolumeSource struct {
 // GlusterfsPersistentVolumeSource represents a Glusterfs mount that lasts the lifetime of a pod.
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 type GlusterfsPersistentVolumeSource struct {
-	// EndpointsName is the endpoint name that details Glusterfs topology.
+	// Endpoints is the endpoint name that details Glusterfs topology.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
-	EndpointsName string
+	Endpoints string
 
 	// Path is the Glusterfs volume path.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
