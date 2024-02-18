@@ -461,7 +461,7 @@ func TestGetISCSICHAP(t *testing.T) {
 					Spec: v1.PersistentVolumeSpec{
 						PersistentVolumeSource: v1.PersistentVolumeSource{
 							ISCSI: &v1.ISCSIPersistentVolumeSource{
-								DiscoveryCHAPAuth: true,
+								CHAPAuthDiscovery: true,
 								SessionCHAPAuth:   true,
 							},
 						},
@@ -478,7 +478,7 @@ func TestGetISCSICHAP(t *testing.T) {
 				Volume: &v1.Volume{
 					VolumeSource: v1.VolumeSource{
 						ISCSI: &v1.ISCSIVolumeSource{
-							DiscoveryCHAPAuth: true,
+							CHAPAuthDiscovery: true,
 							SessionCHAPAuth:   true,
 						},
 					},

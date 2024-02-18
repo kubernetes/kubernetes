@@ -4082,7 +4082,7 @@ func TestValidateVolumes(t *testing.T) {
 						Lun:               1,
 						FSType:            "ext4",
 						ReadOnly:          false,
-						DiscoveryCHAPAuth: true,
+						CHAPAuthDiscovery: true,
 					},
 				},
 			},
