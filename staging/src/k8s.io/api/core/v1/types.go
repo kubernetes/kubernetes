@@ -931,7 +931,7 @@ type RBDVolumeSource struct {
 	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// image is the rados image name.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
-	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
+	Image string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -976,7 +976,7 @@ type RBDPersistentVolumeSource struct {
 	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// image is the rados image name.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
-	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
+	Image string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.

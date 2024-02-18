@@ -448,7 +448,7 @@ func generateUniqueVolumeSource(driverName string) (v1.VolumeSource, error) {
 	case plugins.RBDDriverName:
 		return v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
-				RBDImage: string(uuid.NewUUID()),
+				Image: string(uuid.NewUUID()),
 			},
 		}, nil
 	default:

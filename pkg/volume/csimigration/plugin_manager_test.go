@@ -49,7 +49,7 @@ func TestIsMigratable(t *testing.T) {
 					Spec: v1.PersistentVolumeSpec{
 						PersistentVolumeSource: v1.PersistentVolumeSource{
 							RBD: &v1.RBDPersistentVolumeSource{
-								RBDImage: "test-disk",
+								Image: "test-disk",
 							},
 						},
 					},
@@ -67,7 +67,7 @@ func TestIsMigratable(t *testing.T) {
 					Spec: v1.PersistentVolumeSpec{
 						PersistentVolumeSource: v1.PersistentVolumeSource{
 							RBD: &v1.RBDPersistentVolumeSource{
-								RBDImage: "test-disk",
+								Image: "test-disk",
 							},
 						},
 					},

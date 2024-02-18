@@ -324,7 +324,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
-						RBDImage: "fake-device",
+						Image: "fake-device",
 					},
 				},
 				ClaimRef: &v1.ObjectReference{
@@ -486,7 +486,7 @@ func createObjects(pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, 
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				RBD: &v1.RBDPersistentVolumeSource{
-					RBDImage: "fake-device",
+					Image: "fake-device",
 				},
 			},
 			ClaimRef: &v1.ObjectReference{

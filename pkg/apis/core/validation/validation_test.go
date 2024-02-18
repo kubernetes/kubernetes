@@ -4490,7 +4490,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					RBD: &core.RBDVolumeSource{
 						Monitors: []string{"foo"},
-						RBDImage: "bar",
+						Image:    "bar",
 						FSType:   "ext4",
 					},
 				},
@@ -4502,7 +4502,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					RBD: &core.RBDVolumeSource{
 						Monitors: []string{},
-						RBDImage: "bar",
+						Image:    "bar",
 						FSType:   "ext4",
 					},
 				},
@@ -4518,7 +4518,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					RBD: &core.RBDVolumeSource{
 						Monitors: []string{"foo"},
-						RBDImage: "",
+						Image:    "",
 						FSType:   "ext4",
 					},
 				},

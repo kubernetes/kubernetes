@@ -379,7 +379,7 @@ func (plugin *TestPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 		} else if spec.PersistentVolume.Spec.PersistentVolumeSource.NFS != nil {
 			return spec.PersistentVolume.Spec.PersistentVolumeSource.NFS.Server, nil
 		} else if spec.PersistentVolume.Spec.PersistentVolumeSource.RBD != nil {
-			return spec.PersistentVolume.Spec.PersistentVolumeSource.RBD.RBDImage, nil
+			return spec.PersistentVolume.Spec.PersistentVolumeSource.RBD.Image, nil
 		}
 		return "", fmt.Errorf("GetVolumeName called with unexpected PersistentVolume: %v", spec)
 	} else {

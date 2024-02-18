@@ -228,7 +228,7 @@ func TestWarnings(t *testing.T) {
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						RBD: &api.RBDPersistentVolumeSource{
 							Monitors:  nil,
-							RBDImage:  "",
+							Image:     "",
 							FSType:    "",
 							RBDPool:   "",
 							RadosUser: "",

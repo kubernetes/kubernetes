@@ -145,13 +145,13 @@ func (p rbdCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, po
 	volumeAttr[imgFeatureKey] = defaultImgFeatureVal
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-%s", RBDDriverName, volume.RBD.RBDImage),
+			Name: fmt.Sprintf("%s-%s", RBDDriverName, volume.RBD.Image),
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:                    RBDDriverName,
-					VolumeHandle:              volume.RBD.RBDImage,
+					VolumeHandle:              volume.RBD.Image,
 					FSType:                    volume.RBD.FSType,
 					VolumeAttributes:          volumeAttr,
 					NodeStageSecretRef:        secRef,
@@ -179,7 +179,7 @@ func (p rbdCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.P
 	} else {
 		mons := strings.Join(pv.Spec.RBD.Monitors, ",")
 		pool := pv.Spec.RBD.RBDPool
-		image := pv.Spec.RBD.RBDImage
+		image := pv.Spec.RBD.Image
 		volumeAttributes[staticVolKey] = defaultMigStaticVal
 		volumeAttributes[clusterIDKey] = fmt.Sprintf("%x", md5.Sum([]byte(mons)))
 		volID = composeMigVolID(mons, pool, image)
@@ -231,7 +231,7 @@ func (p rbdCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.P
 
 	RBDSource := &v1.RBDPersistentVolumeSource{
 		Monitors:  monSlice,
-		RBDImage:  rbdImageName,
+		Image:     rbdImageName,
 		FSType:    csiSource.FSType,
 		RBDPool:   rbdPool,
 		RadosUser: radosUser,
@@ -305,7 +305,7 @@ func fillVolAttrsForRequest(pv *v1.PersistentVolume, volumeAttributes map[string
 	if pv == nil || pv.Spec.RBD == nil {
 		return fmt.Errorf("pv is nil or RBD Volume not defined on pv")
 	}
-	volumeAttributes[imgNameKey] = pv.Spec.RBD.RBDImage
+	volumeAttributes[imgNameKey] = pv.Spec.RBD.Image
 	volumeAttributes[poolKey] = pv.Spec.RBD.RBDPool
 	volumeAttributes[imgFeatureKey] = pv.Annotations[imgFeatureKey]
 	volumeAttributes[imgFmtKey] = pv.Annotations[imgFmtKey]

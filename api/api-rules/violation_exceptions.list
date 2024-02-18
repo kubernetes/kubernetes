@@ -41,10 +41,8 @@ API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUseExternalID
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/core/v1,PodSpec,DeprecatedServiceAccount
-API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDImage
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDPool
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RadosUser
-API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RBDImage
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RBDPool
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS

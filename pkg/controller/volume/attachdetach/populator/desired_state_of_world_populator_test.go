@@ -57,7 +57,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 					Name: "dswp-test-volume-name",
 					VolumeSource: v1.VolumeSource{
 						RBD: &v1.RBDVolumeSource{
-							RBDImage: "dswp-test-fake-device",
+							Image: "dswp-test-fake-device",
 						},
 					},
 				},
@@ -72,7 +72,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].RBD.RBDImage
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].RBD.Image
 
 	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()

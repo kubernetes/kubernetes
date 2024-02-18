@@ -461,7 +461,7 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume stor
 		RBD: &v1.RBDVolumeSource{
 			Monitors:  []string{rv.serverIP},
 			RBDPool:   "rbd",
-			RBDImage:  "foo",
+			Image:     "foo",
 			RadosUser: "admin",
 			SecretRef: &v1.LocalObjectReference{
 				Name: rv.secret.Name,
@@ -488,7 +488,7 @@ func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 		RBD: &v1.RBDPersistentVolumeSource{
 			Monitors:  []string{rv.serverIP},
 			RBDPool:   "rbd",
-			RBDImage:  "foo",
+			Image:     "foo",
 			RadosUser: "admin",
 			SecretRef: &v1.SecretReference{
 				Name:      rv.secret.Name,

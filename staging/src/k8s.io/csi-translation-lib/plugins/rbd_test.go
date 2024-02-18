@@ -144,7 +144,7 @@ func TestTranslateRBDInTreeInlineVolumeToCSI(t *testing.T) {
 					RBD: &v1.RBDVolumeSource{
 						Monitors:  []string{"10.70.53.126:6789,10.70.53.156:6789"},
 						RBDPool:   "replicapool",
-						RBDImage:  "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
+						Image:     "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
 						RadosUser: "admin",
 						SecretRef: &v1.LocalObjectReference{Name: "ceph-secret"},
 						FSType:    "ext4",
@@ -250,7 +250,7 @@ func TestTranslateRBDInTreePVToCSI(t *testing.T) {
 						RBD: &v1.RBDPersistentVolumeSource{
 							Monitors:  []string{"10.70.53.126:6789"},
 							RBDPool:   "replicapool",
-							RBDImage:  "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
+							Image:     "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
 							RadosUser: "admin",
 							FSType:    "ext4",
 							ReadOnly:  false,
@@ -323,7 +323,7 @@ func TestTranslateRBDInTreePVToCSI(t *testing.T) {
 						RBD: &v1.RBDPersistentVolumeSource{
 							Monitors:  []string{"10.70.53.126:6789"},
 							RBDPool:   "replicapool",
-							RBDImage:  "e4111eb6-4088-11ec-b823-0242ac110003",
+							Image:     "e4111eb6-4088-11ec-b823-0242ac110003",
 							RadosUser: "admin",
 							FSType:    "ext4",
 							ReadOnly:  false,
@@ -490,7 +490,7 @@ func TestTranslateCSIPvToInTree(t *testing.T) {
 						RBD: &v1.RBDPersistentVolumeSource{
 							Monitors:  []string{""},
 							RBDPool:   "replicapool",
-							RBDImage:  "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
+							Image:     "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
 							RadosUser: "admin",
 							FSType:    "ext4",
 							ReadOnly:  false,

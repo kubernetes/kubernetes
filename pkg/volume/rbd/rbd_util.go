@@ -614,7 +614,7 @@ func (util *rbdUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 
 	return &v1.RBDPersistentVolumeSource{
 		Monitors: p.rbdMounter.Mon,
-		RBDImage: p.rbdMounter.Image,
+		Image:    p.rbdMounter.Image,
 		RBDPool:  p.rbdMounter.Pool,
 	}, sz, nil
 }

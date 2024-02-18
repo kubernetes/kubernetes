@@ -22,7 +22,7 @@ package v1
 // with apply.
 type RBDVolumeSourceApplyConfiguration struct {
 	Monitors  []string                                `json:"monitors,omitempty"`
-	RBDImage  *string                                 `json:"image,omitempty"`
+	Image     *string                                 `json:"image,omitempty"`
 	FSType    *string                                 `json:"fsType,omitempty"`
 	RBDPool   *string                                 `json:"pool,omitempty"`
 	RadosUser *string                                 `json:"user,omitempty"`
@@ -47,11 +47,11 @@ func (b *RBDVolumeSourceApplyConfiguration) WithMonitors(values ...string) *RBDV
 	return b
 }
 
-// WithRBDImage sets the RBDImage field in the declarative configuration to the given value
+// WithImage sets the Image field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RBDImage field is set to the value of the last call.
-func (b *RBDVolumeSourceApplyConfiguration) WithRBDImage(value string) *RBDVolumeSourceApplyConfiguration {
-	b.RBDImage = &value
+// If called multiple times, the Image field is set to the value of the last call.
+func (b *RBDVolumeSourceApplyConfiguration) WithImage(value string) *RBDVolumeSourceApplyConfiguration {
+	b.Image = &value
 	return b
 }
 

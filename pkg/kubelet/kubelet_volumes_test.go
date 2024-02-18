@@ -129,7 +129,7 @@ func TestPodVolumesExist(t *testing.T) {
 						Name: "vol1",
 						VolumeSource: v1.VolumeSource{
 							RBD: &v1.RBDVolumeSource{
-								RBDImage: "fake1",
+								Image: "fake1",
 							},
 						},
 					},
@@ -158,7 +158,7 @@ func TestPodVolumesExist(t *testing.T) {
 						Name: "vol2",
 						VolumeSource: v1.VolumeSource{
 							RBD: &v1.RBDVolumeSource{
-								RBDImage: "fake2",
+								Image: "fake2",
 							},
 						},
 					},
@@ -187,7 +187,7 @@ func TestPodVolumesExist(t *testing.T) {
 						Name: "vol3",
 						VolumeSource: v1.VolumeSource{
 							RBD: &v1.RBDVolumeSource{
-								RBDImage: "fake3",
+								Image: "fake3",
 							},
 						},
 					},
@@ -307,7 +307,7 @@ func TestPodVolumeDeadlineUnmount(t *testing.T) {
 						Name: "vol1",
 						VolumeSource: v1.VolumeSource{
 							RBD: &v1.RBDVolumeSource{
-								RBDImage: "fake-device",
+								Image: "fake-device",
 							},
 						},
 					},
@@ -362,7 +362,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					RBD: &v1.RBDVolumeSource{
-						RBDImage: "fake",
+						Image: "fake",
 					},
 				},
 			},
@@ -421,7 +421,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					RBD: &v1.RBDVolumeSource{
-						RBDImage: "fake-device",
+						Image: "fake-device",
 					},
 				},
 			},
@@ -527,7 +527,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					RBD: &v1.RBDVolumeSource{
-						RBDImage: "fake-device",
+						Image: "fake-device",
 					},
 				},
 			},
@@ -611,7 +611,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					RBD: &v1.RBDVolumeSource{
-						RBDImage: "fake-device",
+						Image: "fake-device",
 					},
 				},
 			},

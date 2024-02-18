@@ -186,7 +186,7 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 		rbdMounter: &rbdMounter{
 			rbd: &rbd{
 				volName: spec.Name(),
-				Image:   spec.PersistentVolume.Spec.RBD.RBDImage,
+				Image:   spec.PersistentVolume.Spec.RBD.Image,
 				Pool:    spec.PersistentVolume.Spec.RBD.RBDPool,
 				plugin:  plugin,
 				manager: &rbdUtil{},
@@ -425,8 +425,8 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volu
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
-				RBDPool:  s[0],
-				RBDImage: s[1],
+				RBDPool: s[0],
+				Image:   s[1],
 			},
 		},
 	}
@@ -477,8 +477,8 @@ func getVolumeSpecFromGlobalMapPath(globalMapPath, volumeName string) (*volume.S
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				RBD: &v1.RBDPersistentVolumeSource{
-					RBDImage: image,
-					RBDPool:  pool,
+					Image:   image,
+					RBDPool: pool,
 				},
 			},
 			VolumeMode: &block,
@@ -608,7 +608,7 @@ func (plugin *rbdPlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volu
 func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret string, manager diskManager) (volume.Deleter, error) {
 	return &rbdVolumeDeleter{
 		rbdMounter: &rbdMounter{
-			rbd:         newRBD("", spec.Name(), spec.PersistentVolume.Spec.RBD.RBDImage, spec.PersistentVolume.Spec.RBD.RBDPool, false, plugin, manager),
+			rbd:         newRBD("", spec.Name(), spec.PersistentVolume.Spec.RBD.Image, spec.PersistentVolume.Spec.RBD.RBDPool, false, plugin, manager),
 			Mon:         spec.PersistentVolume.Spec.RBD.Monitors,
 			adminID:     admin,
 			adminSecret: secret,
@@ -1036,10 +1036,10 @@ func getVolumeSourceMonitors(spec *volume.Spec) ([]string, error) {
 
 func getVolumeSourceImage(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.RBDImage, nil
+		return spec.Volume.RBD.Image, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.RBDImage, nil
+		return spec.PersistentVolume.Spec.RBD.Image, nil
 	}
 
 	return "", fmt.Errorf("spec does not reference a RBD volume type")

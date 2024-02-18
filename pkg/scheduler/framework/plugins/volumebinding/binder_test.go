@@ -719,7 +719,7 @@ func makeTestPVForCSIMigration(labels map[string]string, pvc *v1.PersistentVolum
 	} else {
 		pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
 			RBD: &v1.RBDPersistentVolumeSource{
-				RBDImage: "test-disk",
+				Image: "test-disk",
 			},
 		}
 	}
