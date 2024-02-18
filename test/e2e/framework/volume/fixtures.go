@@ -165,7 +165,11 @@ func NewNFSServerWithNodeName(ctx context.Context, cs clientset.Interface, names
 	if nodeName != "" {
 		config.ClientNodeSelection = e2epod.NodeSelection{Name: nodeName}
 	}
-
+	config.ServerCmds = []string{
+		"sh",
+		"-c",
+		"ulimit -n 65536 && /usr/local/bin/run_nfs.sh",
+	}
 	if len(args) > 0 {
 		config.ServerArgs = args
 	}
