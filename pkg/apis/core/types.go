@@ -1229,8 +1229,8 @@ type GlusterfsPersistentVolumeSource struct {
 // RBDVolumeSource represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDVolumeSource struct {
-	// Required: CephMonitors is a collection of Ceph monitors
-	CephMonitors []string
+	// Required: Monitors is a collection of Ceph monitors
+	Monitors []string
 	// Required: RBDImage is the rados image name
 	RBDImage string
 	// Filesystem type to mount.
@@ -1260,8 +1260,8 @@ type RBDVolumeSource struct {
 // RBDPersistentVolumeSource represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDPersistentVolumeSource struct {
-	// Required: CephMonitors is a collection of Ceph monitors
-	CephMonitors []string
+	// Required: Monitors is a collection of Ceph monitors
+	Monitors []string
 	// Required: RBDImage is the rados image name
 	RBDImage string
 	// Filesystem type to mount.

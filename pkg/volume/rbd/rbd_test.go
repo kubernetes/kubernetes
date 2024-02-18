@@ -382,10 +382,10 @@ func TestPlugin(t *testing.T) {
 			Name: "vol1",
 			VolumeSource: v1.VolumeSource{
 				RBD: &v1.RBDVolumeSource{
-					CephMonitors: []string{"a", "b"},
-					RBDPool:      "pool1",
-					RBDImage:     "image1",
-					FSType:       "ext4",
+					Monitors: []string{"a", "b"},
+					RBDPool:  "pool1",
+					RBDImage: "image1",
+					FSType:   "ext4",
 				},
 			},
 		}),
@@ -409,10 +409,10 @@ func TestPlugin(t *testing.T) {
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
-						CephMonitors: []string{"a", "b"},
-						RBDPool:      "pool2",
-						RBDImage:     "image2",
-						FSType:       "ext4",
+						Monitors: []string{"a", "b"},
+						RBDPool:  "pool2",
+						RBDImage: "image2",
+						FSType:   "ext4",
 					},
 				},
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
@@ -450,9 +450,9 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				RBD: &v1.RBDPersistentVolumeSource{
-					CephMonitors: []string{"a", "b"},
-					RBDImage:     "bar",
-					FSType:       "ext4",
+					Monitors: []string{"a", "b"},
+					RBDImage: "bar",
+					FSType:   "ext4",
 				},
 			},
 			ClaimRef: &v1.ObjectReference{
@@ -502,9 +502,9 @@ func TestGetSecretNameAndNamespace(t *testing.T) {
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
-						CephMonitors: []string{"a", "b"},
-						RBDImage:     "bar",
-						FSType:       "ext4",
+						Monitors: []string{"a", "b"},
+						RBDImage: "bar",
+						FSType:   "ext4",
 					},
 				},
 			},
@@ -553,10 +553,10 @@ func TestGetDeviceMountPath(t *testing.T) {
 		Name: "vol",
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
-				CephMonitors: []string{"a", "b"},
-				RBDPool:      pool,
-				RBDImage:     image,
-				FSType:       "ext4",
+				Monitors: []string{"a", "b"},
+				RBDPool:  pool,
+				RBDImage: image,
+				FSType:   "ext4",
 			},
 		},
 	})

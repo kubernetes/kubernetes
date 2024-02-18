@@ -227,14 +227,14 @@ func TestWarnings(t *testing.T) {
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						RBD: &api.RBDPersistentVolumeSource{
-							CephMonitors: nil,
-							RBDImage:     "",
-							FSType:       "",
-							RBDPool:      "",
-							RadosUser:    "",
-							Keyring:      "",
-							SecretRef:    nil,
-							ReadOnly:     false,
+							Monitors:  nil,
+							RBDImage:  "",
+							FSType:    "",
+							RBDPool:   "",
+							RadosUser: "",
+							Keyring:   "",
+							SecretRef: nil,
+							ReadOnly:  false,
 						},
 					},
 				},

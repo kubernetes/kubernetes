@@ -195,20 +195,20 @@ func TestRBDDiskConflicts(t *testing.T) {
 	volState := v1.Volume{
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
-				CephMonitors: []string{"a", "b"},
-				RBDPool:      "foo",
-				RBDImage:     "bar",
-				FSType:       "ext4",
+				Monitors: []string{"a", "b"},
+				RBDPool:  "foo",
+				RBDImage: "bar",
+				FSType:   "ext4",
 			},
 		},
 	}
 	volState2 := v1.Volume{
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
-				CephMonitors: []string{"c", "d"},
-				RBDPool:      "foo",
-				RBDImage:     "bar",
-				FSType:       "ext4",
+				Monitors: []string{"c", "d"},
+				RBDPool:  "foo",
+				RBDImage: "bar",
+				FSType:   "ext4",
 			},
 		},
 	}

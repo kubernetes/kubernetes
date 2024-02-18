@@ -136,7 +136,7 @@ func (p rbdCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, po
 		secRef.Namespace = podNamespace
 	}
 	volumeAttr := make(map[string]string)
-	volumeAttr[clusterIDKey] = fmt.Sprintf("%x", md5.Sum([]byte(strings.Join(volume.RBD.CephMonitors, ","))))
+	volumeAttr[clusterIDKey] = fmt.Sprintf("%x", md5.Sum([]byte(strings.Join(volume.RBD.Monitors, ","))))
 	volumeAttr[poolKey] = defaultPoolVal
 	if volume.RBD.RBDPool != "" {
 		volumeAttr[poolKey] = volume.RBD.RBDPool
@@ -177,7 +177,7 @@ func (p rbdCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.P
 		volID = pv.Annotations[CSIRBDVolHandleAnnKey]
 		volumeAttributes[clusterIDKey] = pv.Annotations[clusterIDKey]
 	} else {
-		mons := strings.Join(pv.Spec.RBD.CephMonitors, ",")
+		mons := strings.Join(pv.Spec.RBD.Monitors, ",")
 		pool := pv.Spec.RBD.RBDPool
 		image := pv.Spec.RBD.RBDImage
 		volumeAttributes[staticVolKey] = defaultMigStaticVal
@@ -230,12 +230,12 @@ func (p rbdCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.P
 	}
 
 	RBDSource := &v1.RBDPersistentVolumeSource{
-		CephMonitors: monSlice,
-		RBDImage:     rbdImageName,
-		FSType:       csiSource.FSType,
-		RBDPool:      rbdPool,
-		RadosUser:    radosUser,
-		ReadOnly:     csiSource.ReadOnly,
+		Monitors:  monSlice,
+		RBDImage:  rbdImageName,
+		FSType:    csiSource.FSType,
+		RBDPool:   rbdPool,
+		RadosUser: radosUser,
+		ReadOnly:  csiSource.ReadOnly,
 	}
 
 	if pv.Annotations == nil {

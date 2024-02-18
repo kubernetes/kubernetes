@@ -193,7 +193,7 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 				mounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(plugin.GetPluginName())},
 				exec:    plugin.host.GetExec(plugin.GetPluginName()),
 			},
-			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
+			Mon:         spec.PersistentVolume.Spec.RBD.Monitors,
 			adminID:     admin,
 			adminSecret: secret,
 		},
@@ -609,7 +609,7 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret str
 	return &rbdVolumeDeleter{
 		rbdMounter: &rbdMounter{
 			rbd:         newRBD("", spec.Name(), spec.PersistentVolume.Spec.RBD.RBDImage, spec.PersistentVolume.Spec.RBD.RBDPool, false, plugin, manager),
-			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
+			Mon:         spec.PersistentVolume.Spec.RBD.Monitors,
 			adminID:     admin,
 			adminSecret: secret,
 		}}, nil
@@ -1025,10 +1025,10 @@ func (rbd *rbdDiskUnmapper) UnmapPodDevice() error {
 
 func getVolumeSourceMonitors(spec *volume.Spec) ([]string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.CephMonitors, nil
+		return spec.Volume.RBD.Monitors, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.CephMonitors, nil
+		return spec.PersistentVolume.Spec.RBD.Monitors, nil
 	}
 
 	return nil, fmt.Errorf("spec does not reference a RBD volume type")

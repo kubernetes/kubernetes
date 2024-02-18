@@ -21,14 +21,14 @@ package v1
 // RBDPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the RBDPersistentVolumeSource type for use
 // with apply.
 type RBDPersistentVolumeSourceApplyConfiguration struct {
-	CephMonitors []string                           `json:"monitors,omitempty"`
-	RBDImage     *string                            `json:"image,omitempty"`
-	FSType       *string                            `json:"fsType,omitempty"`
-	RBDPool      *string                            `json:"pool,omitempty"`
-	RadosUser    *string                            `json:"user,omitempty"`
-	Keyring      *string                            `json:"keyring,omitempty"`
-	SecretRef    *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly     *bool                              `json:"readOnly,omitempty"`
+	Monitors  []string                           `json:"monitors,omitempty"`
+	RBDImage  *string                            `json:"image,omitempty"`
+	FSType    *string                            `json:"fsType,omitempty"`
+	RBDPool   *string                            `json:"pool,omitempty"`
+	RadosUser *string                            `json:"user,omitempty"`
+	Keyring   *string                            `json:"keyring,omitempty"`
+	SecretRef *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
+	ReadOnly  *bool                              `json:"readOnly,omitempty"`
 }
 
 // RBDPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the RBDPersistentVolumeSource type for use with
@@ -37,12 +37,12 @@ func RBDPersistentVolumeSource() *RBDPersistentVolumeSourceApplyConfiguration {
 	return &RBDPersistentVolumeSourceApplyConfiguration{}
 }
 
-// WithCephMonitors adds the given value to the CephMonitors field in the declarative configuration
+// WithMonitors adds the given value to the Monitors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the CephMonitors field.
-func (b *RBDPersistentVolumeSourceApplyConfiguration) WithCephMonitors(values ...string) *RBDPersistentVolumeSourceApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Monitors field.
+func (b *RBDPersistentVolumeSourceApplyConfiguration) WithMonitors(values ...string) *RBDPersistentVolumeSourceApplyConfiguration {
 	for i := range values {
-		b.CephMonitors = append(b.CephMonitors, values[i])
+		b.Monitors = append(b.Monitors, values[i])
 	}
 	return b
 }

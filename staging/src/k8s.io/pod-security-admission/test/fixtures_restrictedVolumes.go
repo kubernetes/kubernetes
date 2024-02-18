@@ -68,7 +68,7 @@ func init() {
 					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{Glusterfs: &corev1.GlusterfsVolumeSource{Path: "test", EndpointsName: "test"}}}}
 				}),
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{RBD: &corev1.RBDVolumeSource{CephMonitors: []string{"test"}, RBDImage: "test"}}}}
+					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{RBD: &corev1.RBDVolumeSource{Monitors: []string{"test"}, RBDImage: "test"}}}}
 				}),
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.Volumes = []corev1.Volume{{Name: "volume1", VolumeSource: corev1.VolumeSource{FlexVolume: &corev1.FlexVolumeSource{Driver: "test"}}}}

@@ -1337,7 +1337,7 @@ func ValidateLocalNonReservedPath(targetPath string, fldPath *field.Path) field.
 
 func validateRBDVolumeSource(rbd *core.RBDVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(rbd.CephMonitors) == 0 {
+	if len(rbd.Monitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
 	}
 	if len(rbd.RBDImage) == 0 {
@@ -1348,7 +1348,7 @@ func validateRBDVolumeSource(rbd *core.RBDVolumeSource, fldPath *field.Path) fie
 
 func validateRBDPersistentVolumeSource(rbd *core.RBDPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(rbd.CephMonitors) == 0 {
+	if len(rbd.Monitors) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
 	}
 	if len(rbd.RBDImage) == 0 {
