@@ -533,10 +533,10 @@ func getISCSIDiscoveryCHAPInfo(spec *volume.Spec) (bool, error) {
 // get iSCSI Session CHAP boolean
 func getISCSISessionCHAPInfo(spec *volume.Spec) (bool, error) {
 	if spec.Volume != nil && spec.Volume.ISCSI != nil {
-		return spec.Volume.ISCSI.SessionCHAPAuth, nil
+		return spec.Volume.ISCSI.CHAPAuthSession, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.ISCSI != nil {
-		return spec.PersistentVolume.Spec.ISCSI.SessionCHAPAuth, nil
+		return spec.PersistentVolume.Spec.ISCSI.CHAPAuthSession, nil
 	}
 
 	return false, fmt.Errorf("Spec does not reference an ISCSI volume type")

@@ -462,7 +462,7 @@ func TestGetISCSICHAP(t *testing.T) {
 						PersistentVolumeSource: v1.PersistentVolumeSource{
 							ISCSI: &v1.ISCSIPersistentVolumeSource{
 								CHAPAuthDiscovery: true,
-								SessionCHAPAuth:   true,
+								CHAPAuthSession:   true,
 							},
 						},
 					},
@@ -479,7 +479,7 @@ func TestGetISCSICHAP(t *testing.T) {
 					VolumeSource: v1.VolumeSource{
 						ISCSI: &v1.ISCSIVolumeSource{
 							CHAPAuthDiscovery: true,
-							SessionCHAPAuth:   true,
+							CHAPAuthSession:   true,
 						},
 					},
 				},
