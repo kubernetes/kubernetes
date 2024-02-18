@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
@@ -101,21 +102,21 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if r.nodeAuthorizer == nil {
 				return nil, nil, fmt.Errorf("authorizer type Node is not allowed if it was not enabled at initial server startup")
 			}
-			authorizers = append(authorizers, r.nodeAuthorizer)
+			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.nodeAuthorizer))
 			ruleResolvers = append(ruleResolvers, r.nodeAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeAlwaysAllow):
 			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
-			authorizers = append(authorizers, alwaysAllowAuthorizer)
+			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, alwaysAllowAuthorizer))
 			ruleResolvers = append(ruleResolvers, alwaysAllowAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeAlwaysDeny):
 			alwaysDenyAuthorizer := authorizerfactory.NewAlwaysDenyAuthorizer()
-			authorizers = append(authorizers, alwaysDenyAuthorizer)
+			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, alwaysDenyAuthorizer))
 			ruleResolvers = append(ruleResolvers, alwaysDenyAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeABAC):
 			if r.abacAuthorizer == nil {
 				return nil, nil, fmt.Errorf("authorizer type ABAC is not allowed if it was not enabled at initial server startup")
 			}
-			authorizers = append(authorizers, r.abacAuthorizer)
+			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.abacAuthorizer))
 			ruleResolvers = append(ruleResolvers, r.abacAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeWebhook):
 			if r.initialConfig.WebhookRetryBackoff == nil {
@@ -145,13 +146,13 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if err != nil {
 				return nil, nil, err
 			}
-			authorizers = append(authorizers, webhookAuthorizer)
+			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, webhookAuthorizer))
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeRBAC):
 			if r.rbacAuthorizer == nil {
 				return nil, nil, fmt.Errorf("authorizer type RBAC is not allowed if it was not enabled at initial server startup")
 			}
-			authorizers = append(authorizers, r.rbacAuthorizer)
+			authorizers = append(authorizers, authorizationmetrics.InstrumentedAuthorizer(string(configuredAuthorizer.Type), configuredAuthorizer.Name, r.rbacAuthorizer))
 			ruleResolvers = append(ruleResolvers, r.rbacAuthorizer)
 		default:
 			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", configuredAuthorizer.Type)
