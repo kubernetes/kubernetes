@@ -975,7 +975,7 @@ func TestDescribeContainers(t *testing.T) {
 						StartedAt: metav1.NewTime(time.Now()),
 					},
 				},
-				LastTerminationState: corev1.ContainerState{
+				LastState: corev1.ContainerState{
 					Terminated: &corev1.ContainerStateTerminated{
 						StartedAt:  metav1.NewTime(time.Now().Add(time.Second * 3)),
 						FinishedAt: metav1.NewTime(time.Now()),

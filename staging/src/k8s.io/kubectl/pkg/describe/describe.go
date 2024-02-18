@@ -1899,8 +1899,8 @@ func describeContainerResource(container corev1.Container, w PrefixWriter) {
 
 func describeContainerState(status corev1.ContainerStatus, w PrefixWriter) {
 	describeStatus("State", status.State, w)
-	if status.LastTerminationState.Terminated != nil {
-		describeStatus("Last State", status.LastTerminationState, w)
+	if status.LastState.Terminated != nil {
+		describeStatus("Last State", status.LastState, w)
 	}
 	w.Write(LEVEL_2, "Ready:\t%v\n", printBool(status.Ready))
 	w.Write(LEVEL_2, "Restart Count:\t%d\n", status.RestartCount)

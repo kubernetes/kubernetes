@@ -1350,7 +1350,7 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodS
 	if !found {
 		return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is not available", containerName, podName)
 	}
-	lastState := cStatus.LastTerminationState
+	lastState := cStatus.LastState
 	waiting, running, terminated := cStatus.State.Waiting, cStatus.State.Running, cStatus.State.Terminated
 
 	switch {
@@ -1487,8 +1487,8 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 				failedInitialization++
 			}
 		case containerStatus.State.Waiting != nil:
-			if containerStatus.LastTerminationState.Terminated != nil {
-				if containerStatus.LastTerminationState.Terminated.ExitCode != 0 {
+			if containerStatus.LastState.Terminated != nil {
+				if containerStatus.LastState.Terminated.ExitCode != 0 {
 					failedInitialization++
 				}
 			} else {
@@ -1528,7 +1528,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 			// Do nothing here, as terminated restartable init containers are not
 			// taken into account for the pod phase.
 		case containerStatus.State.Waiting != nil:
-			if containerStatus.LastTerminationState.Terminated != nil {
+			if containerStatus.LastState.Terminated != nil {
 				// Do nothing here, as terminated restartable init containers are not
 				// taken into account for the pod phase.
 			} else {
@@ -1557,7 +1557,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 				succeeded++
 			}
 		case containerStatus.State.Waiting != nil:
-			if containerStatus.LastTerminationState.Terminated != nil {
+			if containerStatus.LastState.Terminated != nil {
 				stopped++
 			} else {
 				waiting++
@@ -2051,7 +2051,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			} else {
 				// Apply some values from the old statuses as the default values.
 				status.RestartCount = oldStatus.RestartCount
-				status.LastTerminationState = oldStatus.LastTerminationState
+				status.LastState = oldStatus.LastState
 			}
 		}
 		statuses[container.Name] = status
@@ -2101,7 +2101,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			// the status was written, don't override
 			continue
 		}
-		if status.LastTerminationState.Terminated != nil {
+		if status.LastState.Terminated != nil {
 			// if we already have a termination state, nothing to do
 			continue
 		}
@@ -2109,7 +2109,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// setting this value ensures that we show as stopped here, not as waiting:
 		// https://github.com/kubernetes/kubernetes/blob/90c9f7b3e198e82a756a68ffeac978a00d606e55/pkg/kubelet/kubelet_pods.go#L1440-L1445
 		// This prevents the pod from becoming pending
-		status.LastTerminationState.Terminated = &v1.ContainerStateTerminated{
+		status.LastState.Terminated = &v1.ContainerStateTerminated{
 			Reason:   "ContainerStatusUnknown",
 			Message:  "The container could not be located when the pod was deleted.  The container used to be Running",
 			ExitCode: 137,
@@ -2153,7 +2153,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if containerSeen[cName] == 0 {
 			statuses[cName] = status
 		} else {
-			statuses[cName].LastTerminationState = status.State
+			statuses[cName].LastState = status.State
 		}
 		containerSeen[cName] = containerSeen[cName] + 1
 	}
@@ -2184,7 +2184,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			continue
 		}
 		if status.State.Terminated != nil {
-			status.LastTerminationState = status.State
+			status.LastState = status.State
 		}
 		status.State = v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{

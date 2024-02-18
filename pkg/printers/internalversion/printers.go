@@ -866,16 +866,16 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	for i := range pod.Status.InitContainerStatuses {
 		container := pod.Status.InitContainerStatuses[i]
 		restarts += int(container.RestartCount)
-		if container.LastTerminationState.Terminated != nil {
-			terminatedDate := container.LastTerminationState.Terminated.FinishedAt
+		if container.LastState.Terminated != nil {
+			terminatedDate := container.LastState.Terminated.FinishedAt
 			if lastRestartDate.Before(&terminatedDate) {
 				lastRestartDate = terminatedDate
 			}
 		}
 		if isRestartableInitContainer(initContainers[container.Name]) {
 			restartableInitContainerRestarts += int(container.RestartCount)
-			if container.LastTerminationState.Terminated != nil {
-				terminatedDate := container.LastTerminationState.Terminated.FinishedAt
+			if container.LastState.Terminated != nil {
+				terminatedDate := container.LastState.Terminated.FinishedAt
 				if lastRestartableInitContainerRestartDate.Before(&terminatedDate) {
 					lastRestartableInitContainerRestartDate = terminatedDate
 				}
@@ -920,8 +920,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 			container := pod.Status.ContainerStatuses[i]
 
 			restarts += int(container.RestartCount)
-			if container.LastTerminationState.Terminated != nil {
-				terminatedDate := container.LastTerminationState.Terminated.FinishedAt
+			if container.LastState.Terminated != nil {
+				terminatedDate := container.LastState.Terminated.FinishedAt
 				if lastRestartDate.Before(&terminatedDate) {
 					lastRestartDate = terminatedDate
 				}

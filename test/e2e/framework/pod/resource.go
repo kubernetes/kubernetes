@@ -183,13 +183,13 @@ func LogPodStates(pods []v1.Pod) {
 func logPodTerminationMessages(pods []v1.Pod) {
 	for _, pod := range pods {
 		for _, status := range pod.Status.InitContainerStatuses {
-			if status.LastTerminationState.Terminated != nil && len(status.LastTerminationState.Terminated.Message) > 0 {
-				framework.Logf("%s[%s].initContainer[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastTerminationState.Terminated.Message)
+			if status.LastState.Terminated != nil && len(status.LastState.Terminated.Message) > 0 {
+				framework.Logf("%s[%s].initContainer[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastState.Terminated.Message)
 			}
 		}
 		for _, status := range pod.Status.ContainerStatuses {
-			if status.LastTerminationState.Terminated != nil && len(status.LastTerminationState.Terminated.Message) > 0 {
-				framework.Logf("%s[%s].container[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastTerminationState.Terminated.Message)
+			if status.LastState.Terminated != nil && len(status.LastState.Terminated.Message) > 0 {
+				framework.Logf("%s[%s].container[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastState.Terminated.Message)
 			}
 		}
 	}

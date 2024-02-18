@@ -3306,7 +3306,7 @@ func autoConvert_v1_ContainerStatus_To_core_ContainerStatus(in *v1.ContainerStat
 	if err := Convert_v1_ContainerState_To_core_ContainerState(&in.State, &out.State, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_ContainerState_To_core_ContainerState(&in.LastTerminationState, &out.LastTerminationState, s); err != nil {
+	if err := Convert_v1_ContainerState_To_core_ContainerState(&in.LastState, &out.LastState, s); err != nil {
 		return err
 	}
 	out.Ready = in.Ready
@@ -3330,7 +3330,7 @@ func autoConvert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerSt
 	if err := Convert_core_ContainerState_To_v1_ContainerState(&in.State, &out.State, s); err != nil {
 		return err
 	}
-	if err := Convert_core_ContainerState_To_v1_ContainerState(&in.LastTerminationState, &out.LastTerminationState, s); err != nil {
+	if err := Convert_core_ContainerState_To_v1_ContainerState(&in.LastState, &out.LastState, s); err != nil {
 		return err
 	}
 	out.Ready = in.Ready

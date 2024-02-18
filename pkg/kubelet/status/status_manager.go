@@ -500,7 +500,7 @@ func hasPodInitialized(pod *v1.Pod) bool {
 	}
 	// if any container has ever moved out of waiting state, the pod has initialized
 	for _, status := range pod.Status.ContainerStatuses {
-		if status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
+		if status.LastState.Terminated != nil || status.State.Waiting == nil {
 			return true
 		}
 	}
@@ -519,7 +519,7 @@ func hasPodInitialized(pod *v1.Pod) bool {
 				return true
 			}
 		} else { // regular init container
-			if state := containerStatus.LastTerminationState; state.Terminated != nil && state.Terminated.ExitCode == 0 {
+			if state := containerStatus.LastState; state.Terminated != nil && state.Terminated.ExitCode == 0 {
 				return true
 			}
 			if state := containerStatus.State; state.Terminated != nil && state.Terminated.ExitCode == 0 {
@@ -536,7 +536,7 @@ func hasPodInitialized(pod *v1.Pod) bool {
 // are Waiting, the first container is always returned.
 func initializedContainers(containers []v1.ContainerStatus) []v1.ContainerStatus {
 	for i := len(containers) - 1; i >= 0; i-- {
-		if containers[i].State.Waiting == nil || containers[i].LastTerminationState.Terminated != nil {
+		if containers[i].State.Waiting == nil || containers[i].LastState.Terminated != nil {
 			return containers[0 : i+1]
 		}
 	}
@@ -672,12 +672,12 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 				current = "unknown"
 			}
 			switch {
-			case s.LastTerminationState.Running != nil:
+			case s.LastState.Running != nil:
 				previous = "running"
-			case s.LastTerminationState.Waiting != nil:
+			case s.LastState.Waiting != nil:
 				previous = "waiting"
-			case s.LastTerminationState.Terminated != nil:
-				previous = fmt.Sprintf("terminated=%d", s.LastTerminationState.Terminated.ExitCode)
+			case s.LastState.Terminated != nil:
+				previous = fmt.Sprintf("terminated=%d", s.LastState.Terminated.ExitCode)
 			default:
 				previous = "<none>"
 			}
@@ -1027,7 +1027,7 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	for i := range status.ContainerStatuses {
 		cstatus := &status.ContainerStatuses[i]
 		normalizeContainerState(&cstatus.State)
-		normalizeContainerState(&cstatus.LastTerminationState)
+		normalizeContainerState(&cstatus.LastState)
 	}
 	// Sort the container statuses, so that the order won't affect the result of comparison
 	sort.Sort(kubetypes.SortedContainerStatuses(status.ContainerStatuses))
@@ -1036,7 +1036,7 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	for i := range status.InitContainerStatuses {
 		cstatus := &status.InitContainerStatuses[i]
 		normalizeContainerState(&cstatus.State)
-		normalizeContainerState(&cstatus.LastTerminationState)
+		normalizeContainerState(&cstatus.LastState)
 	}
 	// Sort the container statuses, so that the order won't affect the result of comparison
 	kubetypes.SortInitContainerStatuses(pod, status.InitContainerStatuses)

@@ -416,7 +416,7 @@ var _ = SIGDescribe("InitContainer", framework.WithNodeConformance(), func() {
 						return false, fmt.Errorf("first init container should have exitCode != 0: %s", toDebugJSON(status))
 					}
 					// continue until we see an attempt to restart the pod
-					return status.LastTerminationState.Terminated != nil, nil
+					return status.LastState.Terminated != nil, nil
 				default:
 					return false, fmt.Errorf("unexpected object: %#v", t)
 				}

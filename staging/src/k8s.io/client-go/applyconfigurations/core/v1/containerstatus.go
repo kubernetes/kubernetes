@@ -25,17 +25,17 @@ import (
 // ContainerStatusApplyConfiguration represents an declarative configuration of the ContainerStatus type for use
 // with apply.
 type ContainerStatusApplyConfiguration struct {
-	Name                 *string                                 `json:"name,omitempty"`
-	State                *ContainerStateApplyConfiguration       `json:"state,omitempty"`
-	LastTerminationState *ContainerStateApplyConfiguration       `json:"lastState,omitempty"`
-	Ready                *bool                                   `json:"ready,omitempty"`
-	RestartCount         *int32                                  `json:"restartCount,omitempty"`
-	Image                *string                                 `json:"image,omitempty"`
-	ImageID              *string                                 `json:"imageID,omitempty"`
-	ContainerID          *string                                 `json:"containerID,omitempty"`
-	Started              *bool                                   `json:"started,omitempty"`
-	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
-	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	Name               *string                                 `json:"name,omitempty"`
+	State              *ContainerStateApplyConfiguration       `json:"state,omitempty"`
+	LastState          *ContainerStateApplyConfiguration       `json:"lastState,omitempty"`
+	Ready              *bool                                   `json:"ready,omitempty"`
+	RestartCount       *int32                                  `json:"restartCount,omitempty"`
+	Image              *string                                 `json:"image,omitempty"`
+	ImageID            *string                                 `json:"imageID,omitempty"`
+	ContainerID        *string                                 `json:"containerID,omitempty"`
+	Started            *bool                                   `json:"started,omitempty"`
+	AllocatedResources *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
+	Resources          *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with
@@ -60,11 +60,11 @@ func (b *ContainerStatusApplyConfiguration) WithState(value *ContainerStateApply
 	return b
 }
 
-// WithLastTerminationState sets the LastTerminationState field in the declarative configuration to the given value
+// WithLastState sets the LastState field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the LastTerminationState field is set to the value of the last call.
-func (b *ContainerStatusApplyConfiguration) WithLastTerminationState(value *ContainerStateApplyConfiguration) *ContainerStatusApplyConfiguration {
-	b.LastTerminationState = value
+// If called multiple times, the LastState field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithLastState(value *ContainerStateApplyConfiguration) *ContainerStatusApplyConfiguration {
+	b.LastState = value
 	return b
 }
 

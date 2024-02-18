@@ -1023,7 +1023,7 @@ func (in *ContainerStateWaiting) DeepCopy() *ContainerStateWaiting {
 func (in *ContainerStatus) DeepCopyInto(out *ContainerStatus) {
 	*out = *in
 	in.State.DeepCopyInto(&out.State)
-	in.LastTerminationState.DeepCopyInto(&out.LastTerminationState)
+	in.LastState.DeepCopyInto(&out.LastState)
 	if in.Started != nil {
 		in, out := &in.Started, &out.Started
 		*out = new(bool)

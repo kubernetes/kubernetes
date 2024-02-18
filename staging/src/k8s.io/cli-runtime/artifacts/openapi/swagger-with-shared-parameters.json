@@ -5369,7 +5369,7 @@
         },
         "lastState": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ContainerState",
-          "description": "LastTerminationState holds the last termination state of the container to help debug container crashes and restarts. This field is not populated if the container is still running and RestartCount is 0."
+          "description": "LastState holds the last termination state of the container to help debug container crashes and restarts. This field is not populated if the container is still running and RestartCount is 0."
         },
         "name": {
           "description": "Name is a DNS_LABEL representing the unique name of the container. Each container in a pod must have a unique name across all container types. Cannot be updated.",

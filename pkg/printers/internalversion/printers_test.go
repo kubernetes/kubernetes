@@ -1304,10 +1304,10 @@ func TestPrintPod(t *testing.T) {
 					Phase: "podPhase",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
@@ -1330,10 +1330,10 @@ func TestPrintPod(t *testing.T) {
 					Phase: "podPhase",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Ready: false,
@@ -1363,10 +1363,10 @@ func TestPrintPod(t *testing.T) {
 							State: api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
 						},
 						{
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
@@ -1388,16 +1388,16 @@ func TestPrintPod(t *testing.T) {
 					Phase: "podPhase",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                false,
-							RestartCount:         2,
-							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-2 * time.Minute))}},
+							Ready:        false,
+							RestartCount: 2,
+							State:        api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-2 * time.Minute))}},
 						},
 						{
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
@@ -1419,18 +1419,18 @@ func TestPrintPod(t *testing.T) {
 					Phase: "Running",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                false,
-							RestartCount:         2,
-							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-2 * time.Minute))}},
+							Ready:        false,
+							RestartCount: 2,
+							State:        api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-2 * time.Minute))}},
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                false,
-							RestartCount:         4,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
+							Ready:        false,
+							RestartCount: 4,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
 						},
 					},
 				},
@@ -1446,10 +1446,10 @@ func TestPrintPod(t *testing.T) {
 					Phase: "Running",
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                true,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-5 * 24 * time.Hour))}},
+							Ready:        true,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-5 * 24 * time.Hour))}},
 						},
 					},
 				},
@@ -1470,10 +1470,10 @@ func TestPrintPod(t *testing.T) {
 							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
 						},
 						{
-							Ready:                true,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * 24 * time.Hour))}},
+							Ready:        true,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * 24 * time.Hour))}},
 						},
 					},
 				},
@@ -1489,16 +1489,16 @@ func TestPrintPod(t *testing.T) {
 					Phase: "Running",
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                true,
-							RestartCount:         6,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-5 * 24 * time.Hour))}},
+							Ready:        true,
+							RestartCount: 6,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-5 * 24 * time.Hour))}},
 						},
 						{
-							Ready:                true,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * 24 * time.Hour))}},
+							Ready:        true,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * 24 * time.Hour))}},
 						},
 					},
 				},
@@ -1557,12 +1557,12 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					Phase: "Pending",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(false),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Name:         "restartable-init-1",
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started:      utilpointer.Bool(false),
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
@@ -1598,12 +1598,12 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					Phase: "Pending",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(true),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Name:         "restartable-init-1",
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started:      utilpointer.Bool(true),
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
@@ -1639,12 +1639,12 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					Phase: "Running",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(true),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Name:         "restartable-init-1",
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started:      utilpointer.Bool(true),
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
@@ -1655,10 +1655,10 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					},
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                true,
-							RestartCount:         4,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
+							Ready:        true,
+							RestartCount: 4,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
 						},
 					},
 					Conditions: []api.PodCondition{
@@ -1681,12 +1681,12 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					Phase: "Succeeded",
 					InitContainerStatuses: []api.ContainerStatus{
 						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
-							Started:              utilpointer.Bool(false),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+							Name:         "restartable-init-1",
+							Ready:        false,
+							RestartCount: 3,
+							State:        api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
+							Started:      utilpointer.Bool(false),
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
@@ -1697,10 +1697,10 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					},
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							Ready:                false,
-							RestartCount:         4,
-							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
+							Ready:        false,
+							RestartCount: 4,
+							State:        api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}},
+							LastState:    api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
 						},
 					},
 					Conditions: []api.PodCondition{

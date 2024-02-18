@@ -71,8 +71,8 @@ func FailedContainers(pod *v1.Pod) map[string]ContainerFailures {
 	for _, status := range statuses {
 		if status.State.Terminated != nil {
 			states[status.ContainerID] = ContainerFailures{status: status.State.Terminated}
-		} else if status.LastTerminationState.Terminated != nil {
-			states[status.ContainerID] = ContainerFailures{status: status.LastTerminationState.Terminated}
+		} else if status.LastState.Terminated != nil {
+			states[status.ContainerID] = ContainerFailures{status: status.LastState.Terminated}
 		}
 		if status.RestartCount > 0 {
 			var ok bool
