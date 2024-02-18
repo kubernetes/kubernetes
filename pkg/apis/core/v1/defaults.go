@@ -452,8 +452,8 @@ func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
 	if obj.Pool == "" {
 		obj.Pool = "rbd"
 	}
-	if obj.RadosUser == "" {
-		obj.RadosUser = "admin"
+	if obj.User == "" {
+		obj.User = "admin"
 	}
 	if obj.Keyring == "" {
 		obj.Keyring = "/etc/ceph/keyring"
@@ -464,8 +464,8 @@ func SetDefaults_RBDPersistentVolumeSource(obj *v1.RBDPersistentVolumeSource) {
 	if obj.Pool == "" {
 		obj.Pool = "rbd"
 	}
-	if obj.RadosUser == "" {
-		obj.RadosUser = "admin"
+	if obj.User == "" {
+		obj.User = "admin"
 	}
 	if obj.Keyring == "" {
 		obj.Keyring = "/etc/ceph/keyring"

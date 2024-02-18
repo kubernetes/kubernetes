@@ -145,7 +145,7 @@ func TestTranslateRBDInTreeInlineVolumeToCSI(t *testing.T) {
 						Monitors:  []string{"10.70.53.126:6789,10.70.53.156:6789"},
 						Pool:      "replicapool",
 						Image:     "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
-						RadosUser: "admin",
+						User:      "admin",
 						SecretRef: &v1.LocalObjectReference{Name: "ceph-secret"},
 						FSType:    "ext4",
 						ReadOnly:  false,
@@ -248,12 +248,12 @@ func TestTranslateRBDInTreePVToCSI(t *testing.T) {
 					},
 					PersistentVolumeSource: v1.PersistentVolumeSource{
 						RBD: &v1.RBDPersistentVolumeSource{
-							Monitors:  []string{"10.70.53.126:6789"},
-							Pool:      "replicapool",
-							Image:     "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
-							RadosUser: "admin",
-							FSType:    "ext4",
-							ReadOnly:  false,
+							Monitors: []string{"10.70.53.126:6789"},
+							Pool:     "replicapool",
+							Image:    "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
+							User:     "admin",
+							FSType:   "ext4",
+							ReadOnly: false,
 							SecretRef: &v1.SecretReference{
 								Name:      "ceph-secret",
 								Namespace: "default",
@@ -321,12 +321,12 @@ func TestTranslateRBDInTreePVToCSI(t *testing.T) {
 					},
 					PersistentVolumeSource: v1.PersistentVolumeSource{
 						RBD: &v1.RBDPersistentVolumeSource{
-							Monitors:  []string{"10.70.53.126:6789"},
-							Pool:      "replicapool",
-							Image:     "e4111eb6-4088-11ec-b823-0242ac110003",
-							RadosUser: "admin",
-							FSType:    "ext4",
-							ReadOnly:  false,
+							Monitors: []string{"10.70.53.126:6789"},
+							Pool:     "replicapool",
+							Image:    "e4111eb6-4088-11ec-b823-0242ac110003",
+							User:     "admin",
+							FSType:   "ext4",
+							ReadOnly: false,
 							SecretRef: &v1.SecretReference{
 								Name:      "ceph-secret",
 								Namespace: "default",
@@ -488,12 +488,12 @@ func TestTranslateCSIPvToInTree(t *testing.T) {
 					},
 					PersistentVolumeSource: v1.PersistentVolumeSource{
 						RBD: &v1.RBDPersistentVolumeSource{
-							Monitors:  []string{""},
-							Pool:      "replicapool",
-							Image:     "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
-							RadosUser: "admin",
-							FSType:    "ext4",
-							ReadOnly:  false,
+							Monitors: []string{""},
+							Pool:     "replicapool",
+							Image:    "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
+							User:     "admin",
+							FSType:   "ext4",
+							ReadOnly: false,
 							SecretRef: &v1.SecretReference{
 								Name:      "ceph-secret",
 								Namespace: "default",

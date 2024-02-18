@@ -1244,7 +1244,7 @@ type RBDVolumeSource struct {
 	Pool string
 	// Optional: RBDUser is the rados user name, default is admin
 	// +optional
-	RadosUser string
+	User string
 	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
 	// +optional
 	Keyring string
@@ -1275,7 +1275,7 @@ type RBDPersistentVolumeSource struct {
 	Pool string
 	// Optional: RBDUser is the rados user name, default is admin
 	// +optional
-	RadosUser string
+	User string
 	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
 	// +optional
 	Keyring string

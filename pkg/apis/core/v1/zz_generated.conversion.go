@@ -6992,7 +6992,7 @@ func autoConvert_v1_RBDPersistentVolumeSource_To_core_RBDPersistentVolumeSource(
 	out.Image = in.Image
 	out.FSType = in.FSType
 	out.Pool = in.Pool
-	out.RadosUser = in.RadosUser
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*core.SecretReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
@@ -7009,7 +7009,7 @@ func autoConvert_core_RBDPersistentVolumeSource_To_v1_RBDPersistentVolumeSource(
 	out.Image = in.Image
 	out.FSType = in.FSType
 	out.Pool = in.Pool
-	out.RadosUser = in.RadosUser
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*v1.SecretReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
@@ -7026,7 +7026,7 @@ func autoConvert_v1_RBDVolumeSource_To_core_RBDVolumeSource(in *v1.RBDVolumeSour
 	out.Image = in.Image
 	out.FSType = in.FSType
 	out.Pool = in.Pool
-	out.RadosUser = in.RadosUser
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*core.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
@@ -7043,7 +7043,7 @@ func autoConvert_core_RBDVolumeSource_To_v1_RBDVolumeSource(in *core.RBDVolumeSo
 	out.Image = in.Image
 	out.FSType = in.FSType
 	out.Pool = in.Pool
-	out.RadosUser = in.RadosUser
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly

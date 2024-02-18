@@ -231,7 +231,7 @@ func TestWarnings(t *testing.T) {
 							Image:     "",
 							FSType:    "",
 							Pool:      "",
-							RadosUser: "",
+							User:      "",
 							Keyring:   "",
 							SecretRef: nil,
 							ReadOnly:  false,

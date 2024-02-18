@@ -391,9 +391,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if r.Pool == "" {
 				r.Pool = "rbd"
 			}
-			r.RadosUser = c.RandString()
-			if r.RadosUser == "" {
-				r.RadosUser = "admin"
+			r.User = c.RandString()
+			if r.User == "" {
+				r.User = "admin"
 			}
 			r.Keyring = c.RandString()
 			if r.Keyring == "" {
@@ -405,9 +405,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if r.Pool == "" {
 				r.Pool = "rbd"
 			}
-			r.RadosUser = c.RandString()
-			if r.RadosUser == "" {
-				r.RadosUser = "admin"
+			r.User = c.RandString()
+			if r.User == "" {
+				r.User = "admin"
 			}
 			r.Keyring = c.RandString()
 			if r.Keyring == "" {

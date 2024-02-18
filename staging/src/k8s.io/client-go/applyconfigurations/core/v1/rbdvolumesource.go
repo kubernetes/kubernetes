@@ -25,7 +25,7 @@ type RBDVolumeSourceApplyConfiguration struct {
 	Image     *string                                 `json:"image,omitempty"`
 	FSType    *string                                 `json:"fsType,omitempty"`
 	Pool      *string                                 `json:"pool,omitempty"`
-	RadosUser *string                                 `json:"user,omitempty"`
+	User      *string                                 `json:"user,omitempty"`
 	Keyring   *string                                 `json:"keyring,omitempty"`
 	SecretRef *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
 	ReadOnly  *bool                                   `json:"readOnly,omitempty"`
@@ -71,11 +71,11 @@ func (b *RBDVolumeSourceApplyConfiguration) WithPool(value string) *RBDVolumeSou
 	return b
 }
 
-// WithRadosUser sets the RadosUser field in the declarative configuration to the given value
+// WithUser sets the User field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RadosUser field is set to the value of the last call.
-func (b *RBDVolumeSourceApplyConfiguration) WithRadosUser(value string) *RBDVolumeSourceApplyConfiguration {
-	b.RadosUser = &value
+// If called multiple times, the User field is set to the value of the last call.
+func (b *RBDVolumeSourceApplyConfiguration) WithUser(value string) *RBDVolumeSourceApplyConfiguration {
+	b.User = &value
 	return b
 }
 

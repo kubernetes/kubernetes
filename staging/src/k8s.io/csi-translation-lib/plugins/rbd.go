@@ -230,12 +230,12 @@ func (p rbdCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.P
 	}
 
 	RBDSource := &v1.RBDPersistentVolumeSource{
-		Monitors:  monSlice,
-		Image:     rbdImageName,
-		FSType:    csiSource.FSType,
-		Pool:      rbdPool,
-		RadosUser: radosUser,
-		ReadOnly:  csiSource.ReadOnly,
+		Monitors: monSlice,
+		Image:    rbdImageName,
+		FSType:   csiSource.FSType,
+		Pool:     rbdPool,
+		User:     radosUser,
+		ReadOnly: csiSource.ReadOnly,
 	}
 
 	if pv.Annotations == nil {

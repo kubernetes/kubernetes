@@ -948,7 +948,7 @@ type RBDVolumeSource struct {
 	// Default is admin.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
-	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
+	User string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
 	// keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
@@ -993,7 +993,7 @@ type RBDPersistentVolumeSource struct {
 	// Default is admin.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
-	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
+	User string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
 	// keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it

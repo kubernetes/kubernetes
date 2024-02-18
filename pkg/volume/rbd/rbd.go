@@ -750,7 +750,7 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		fstype = ""
 	}
 
-	rbd.RadosUser = r.ID
+	rbd.User = r.ID
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
@@ -1069,10 +1069,10 @@ func getVolumeSourcePool(spec *volume.Spec) (string, error) {
 
 func getVolumeSourceUser(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.RadosUser, nil
+		return spec.Volume.RBD.User, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.RadosUser, nil
+		return spec.PersistentVolume.Spec.RBD.User, nil
 	}
 
 	return "", fmt.Errorf("spec does not reference a RBD volume type")
