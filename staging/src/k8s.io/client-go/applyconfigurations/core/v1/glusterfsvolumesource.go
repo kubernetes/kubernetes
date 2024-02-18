@@ -21,9 +21,9 @@ package v1
 // GlusterfsVolumeSourceApplyConfiguration represents an declarative configuration of the GlusterfsVolumeSource type for use
 // with apply.
 type GlusterfsVolumeSourceApplyConfiguration struct {
-	EndpointsName *string `json:"endpoints,omitempty"`
-	Path          *string `json:"path,omitempty"`
-	ReadOnly      *bool   `json:"readOnly,omitempty"`
+	Endpoints *string `json:"endpoints,omitempty"`
+	Path      *string `json:"path,omitempty"`
+	ReadOnly  *bool   `json:"readOnly,omitempty"`
 }
 
 // GlusterfsVolumeSourceApplyConfiguration constructs an declarative configuration of the GlusterfsVolumeSource type for use with
@@ -32,11 +32,11 @@ func GlusterfsVolumeSource() *GlusterfsVolumeSourceApplyConfiguration {
 	return &GlusterfsVolumeSourceApplyConfiguration{}
 }
 
-// WithEndpointsName sets the EndpointsName field in the declarative configuration to the given value
+// WithEndpoints sets the Endpoints field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the EndpointsName field is set to the value of the last call.
-func (b *GlusterfsVolumeSourceApplyConfiguration) WithEndpointsName(value string) *GlusterfsVolumeSourceApplyConfiguration {
-	b.EndpointsName = &value
+// If called multiple times, the Endpoints field is set to the value of the last call.
+func (b *GlusterfsVolumeSourceApplyConfiguration) WithEndpoints(value string) *GlusterfsVolumeSourceApplyConfiguration {
+	b.Endpoints = &value
 	return b
 }
 

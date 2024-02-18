@@ -885,7 +885,7 @@ type EmptyDirVolumeSource struct {
 type GlusterfsVolumeSource struct {
 	// endpoints is the endpoint name that details Glusterfs topology.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
-	EndpointsName string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
+	Endpoints string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
 
 	// path is the Glusterfs volume path.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
@@ -903,7 +903,7 @@ type GlusterfsVolumeSource struct {
 type GlusterfsPersistentVolumeSource struct {
 	// endpoints is the endpoint name that details Glusterfs topology.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
-	EndpointsName string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
+	Endpoints string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
 
 	// path is the Glusterfs volume path.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod

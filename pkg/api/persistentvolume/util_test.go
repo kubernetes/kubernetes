@@ -291,7 +291,7 @@ func TestWarnings(t *testing.T) {
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						Glusterfs: &api.GlusterfsPersistentVolumeSource{
-							EndpointsName:      "",
+							Endpoints:          "",
 							Path:               "",
 							ReadOnly:           false,
 							EndpointsNamespace: nil,

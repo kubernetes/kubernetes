@@ -994,7 +994,7 @@ func validateQuobyteVolumeSource(quobyte *core.QuobyteVolumeSource, fldPath *fie
 
 func validateGlusterfsVolumeSource(glusterfs *core.GlusterfsVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(glusterfs.EndpointsName) == 0 {
+	if len(glusterfs.Endpoints) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("endpoints"), ""))
 	}
 	if len(glusterfs.Path) == 0 {
@@ -1004,7 +1004,7 @@ func validateGlusterfsVolumeSource(glusterfs *core.GlusterfsVolumeSource, fldPat
 }
 func validateGlusterfsPersistentVolumeSource(glusterfs *core.GlusterfsPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(glusterfs.EndpointsName) == 0 {
+	if len(glusterfs.Endpoints) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("endpoints"), ""))
 	}
 	if len(glusterfs.Path) == 0 {
