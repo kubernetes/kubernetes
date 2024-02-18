@@ -498,7 +498,7 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 	for i := 0; i < 48; i++ {
 		s := v1.ContainerStatus{
 			Name: fmt.Sprintf("container%d", i),
-			LastTerminationState: v1.ContainerState{
+			LastState: v1.ContainerState{
 				Terminated: &v1.ContainerStateTerminated{
 					Message: strings.Repeat("abcdefgh", 24+i%3),
 				},
@@ -513,7 +513,7 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 	result := normalizeStatus(&pod, &podStatus)
 	count := 0
 	for _, s := range result.InitContainerStatuses {
-		l := len(s.LastTerminationState.Terminated.Message)
+		l := len(s.LastState.Terminated.Message)
 		if l < 192 || l > 256 {
 			t.Errorf("container message had length %d", l)
 		}
@@ -825,16 +825,16 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 				pod.Status.Phase = v1.PodRunning
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{
 					{
-						Name:                 "0",
-						LastTerminationState: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Test", ExitCode: 2}},
-						State:                v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
+						Name:      "0",
+						LastState: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Test", ExitCode: 2}},
+						State:     v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
 					},
 				}
 			}),
 			expectFn: func(t *testing.T, status v1.PodStatus) {
 				container := status.ContainerStatuses[0]
-				if container.LastTerminationState.Terminated.ExitCode != 2 {
-					t.Fatalf("unexpected last state: %#v", container.LastTerminationState)
+				if container.LastState.Terminated.ExitCode != 2 {
+					t.Fatalf("unexpected last state: %#v", container.LastState)
 				}
 				expectTerminatedUnknown(t, container.State)
 			},
@@ -962,9 +962,9 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 					{Name: "init-0", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
 					{Name: "init-1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
 					{
-						Name:                 "init-2",
-						LastTerminationState: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
-						State:                v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
+						Name:      "init-2",
+						LastState: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+						State:     v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
 					},
 				}
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{
@@ -1021,7 +1021,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 					{Name: "init-0", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
 				}
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{
-					{Name: "0", LastTerminationState: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}},
+					{Name: "0", LastState: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}},
 				}
 			}),
 			expectFn: func(t *testing.T, status v1.PodStatus) {

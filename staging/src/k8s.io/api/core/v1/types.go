@@ -2935,11 +2935,11 @@ type ContainerStatus struct {
 	// State holds details about the container's current condition.
 	// +optional
 	State ContainerState `json:"state,omitempty" protobuf:"bytes,2,opt,name=state"`
-	// LastTerminationState holds the last termination state of the container to
+	// LastState holds the last termination state of the container to
 	// help debug container crashes and restarts. This field is not
 	// populated if the container is still running and RestartCount is 0.
 	// +optional
-	LastTerminationState ContainerState `json:"lastState,omitempty" protobuf:"bytes,3,opt,name=lastState"`
+	LastState ContainerState `json:"lastState,omitempty" protobuf:"bytes,3,opt,name=lastState"`
 	// Ready specifies whether the container is currently passing its readiness check.
 	// The value will change as readiness probes keep executing. If no readiness
 	// probes are specified, this field defaults to true once the container is

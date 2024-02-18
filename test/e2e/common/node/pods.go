@@ -134,7 +134,7 @@ func getRestartDelay(ctx context.Context, podClient *e2epod.PodClient, podName s
 		}
 
 		// the only case this happens is if this is the first time the Pod is running and there is no "Last State".
-		if status.LastTerminationState.Terminated == nil {
+		if status.LastState.Terminated == nil {
 			framework.Logf("Container's last state is not \"Terminated\".")
 			continue
 		}
@@ -146,13 +146,14 @@ func getRestartDelay(ctx context.Context, podClient *e2epod.PodClient, podName s
 			} else if status.State.Terminated != nil {
 				previousFinishedAt = status.State.Terminated.FinishedAt.Time
 			} else {
-				previousFinishedAt = status.LastTerminationState.Terminated.FinishedAt.Time
+				previousFinishedAt = status.LastState.Terminated.FinishedAt.Time
 			}
 			previousRestartCount = status.RestartCount
 		}
 
 		// when the RestartCount is changed, the Containers will be in one of the following states:
-		//Running, Terminated, Waiting (it already is waiting for the backoff period to expire, and the last state details have been stored into status.LastTerminationState).
+		// Running, Terminated, Waiting (it already is waiting for the backoff period to expire, and the
+		// last state details have been stored into status.LastState).
 		if status.RestartCount > previousRestartCount {
 			var startedAt time.Time
 			if status.State.Running != nil {
@@ -160,7 +161,7 @@ func getRestartDelay(ctx context.Context, podClient *e2epod.PodClient, podName s
 			} else if status.State.Terminated != nil {
 				startedAt = status.State.Terminated.StartedAt.Time
 			} else {
-				startedAt = status.LastTerminationState.Terminated.StartedAt.Time
+				startedAt = status.LastState.Terminated.StartedAt.Time
 			}
 			framework.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
 			return startedAt.Sub(previousFinishedAt), nil

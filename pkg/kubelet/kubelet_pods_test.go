@@ -2114,7 +2114,7 @@ func waitingStateWithLastTermination(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{},
 		},
-		LastTerminationState: v1.ContainerState{
+		LastState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
 				ExitCode: 0,
 			},
@@ -2127,7 +2127,7 @@ func waitingStateWithNonZeroTermination(cName string) v1.ContainerStatus {
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{},
 		},
-		LastTerminationState: v1.ContainerState{
+		LastState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
 				ExitCode: -1,
 			},
@@ -2194,7 +2194,7 @@ func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.Cont
 		State: v1.ContainerState{
 			Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"},
 		},
-		LastTerminationState: v1.ContainerState{
+		LastState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
 				Reason:   "ContainerStatusUnknown",
 				Message:  "The container could not be located when the pod was deleted.  The container used to be Running",
