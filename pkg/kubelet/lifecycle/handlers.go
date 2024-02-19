@@ -133,6 +133,7 @@ func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) err
 	select {
 	case <-ctx.Done():
 		// unexpected termination
+		metrics.LifecycleHandlerSleepTerminated.Inc()
 		return fmt.Errorf("container terminated before sleep hook finished")
 	case <-c:
 		return nil

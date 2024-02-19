@@ -774,3 +774,18 @@ func WaitForContainerRunning(ctx context.Context, c clientset.Interface, namespa
 		return false, nil
 	})
 }
+
+// WaitForContainerTerminated waits for the given Pod container to have a state of terminated
+func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %s terminated", containerName)
+	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
+			for _, cs := range statuses {
+				if cs.Name == containerName {
+					return cs.State.Terminated != nil, nil
+				}
+			}
+		}
+		return false, nil
+	})
+}
