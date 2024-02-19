@@ -533,7 +533,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedDeletedUDPEndpoints    []ServiceEndpoint
 		expectedNewlyActiveUDPServices map[ServicePortName]bool
 		expectedLocalEndpoints         map[types.NamespacedName]int
-		expectedChangedEndpoints       sets.Set[string]
+		expectedChangedEndpoints       sets.Set[types.NamespacedName]
 	}{{
 		name:                           "empty",
 		previousEndpointsMap:           map[ServicePortName][]*BaseEndpointInfo{},
@@ -541,7 +541,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string](),
+		expectedChangedEndpoints:       sets.New[types.NamespacedName](),
 	}, {
 		name: "no change, unnamed port",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -563,7 +563,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string](),
+		expectedChangedEndpoints:       sets.New[types.NamespacedName](),
 	}, {
 		name: "no change, named port, local",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -587,7 +587,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
-		expectedChangedEndpoints: sets.New[string](),
+		expectedChangedEndpoints: sets.New[types.NamespacedName](),
 	}, {
 		name: "no change, multiple slices",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -617,7 +617,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string](),
+		expectedChangedEndpoints:       sets.New[types.NamespacedName](),
 	}, {
 		name: "no change, multiple slices, multiple ports, local",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -655,7 +655,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
-		expectedChangedEndpoints: sets.New[string](),
+		expectedChangedEndpoints: sets.New[types.NamespacedName](),
 	}, {
 		name: "no change, multiple services, slices, IPs, and ports",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -726,7 +726,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeNSN("ns1", "ep1"): 2,
 			makeNSN("ns2", "ep2"): 1,
 		},
-		expectedChangedEndpoints: sets.New[string](),
+		expectedChangedEndpoints: sets.New[types.NamespacedName](),
 	}, {
 		name: "add an EndpointSlice",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -748,7 +748,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
-		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints: sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "remove an EndpointSlice",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -769,7 +769,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints:       sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "add an IP and port",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -800,7 +800,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
-		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints: sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "remove an IP and port",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -836,7 +836,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints:       sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "add a slice to an endpoint",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -867,7 +867,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
 		},
-		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints: sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "remove a slice from an endpoint",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -897,7 +897,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints:       sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "rename a port",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -924,7 +924,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
 		},
 		expectedLocalEndpoints:   map[types.NamespacedName]int{},
-		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints: sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "renumber a port",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -949,7 +949,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints:       sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "complex add and remove",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -1039,7 +1039,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedLocalEndpoints: map[types.NamespacedName]int{
 			makeNSN("ns4", "ep4"): 1,
 		},
-		expectedChangedEndpoints: sets.New[string]("ns1/ep1", "ns2/ep2", "ns3/ep3", "ns4/ep4"),
+		expectedChangedEndpoints: sets.New(makeNSN("ns1", "ep1"), makeNSN("ns2", "ep2"), makeNSN("ns3", "ep3"), makeNSN("ns4", "ep4")),
 	}, {
 		name: "change from 0 endpoint address to 1 unnamed port",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -1059,7 +1059,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
 		},
 		expectedLocalEndpoints:   map[types.NamespacedName]int{},
-		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints: sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "change from ready to terminating pod",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -1081,7 +1081,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints:       sets.New(makeNSN("ns1", "ep1")),
 	}, {
 		name: "change from terminating to empty pod",
 		previousEndpointSlices: []*discovery.EndpointSlice{
@@ -1102,7 +1102,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		}},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
 		expectedLocalEndpoints:         map[types.NamespacedName]int{},
-		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
+		expectedChangedEndpoints:       sets.New(makeNSN("ns1", "ep1")),
 	},
 	}
 
@@ -1141,14 +1141,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				}
 			}
 
-			pendingChanges := fp.endpointsChanges.PendingChanges()
-			if !pendingChanges.Equal(tc.expectedChangedEndpoints) {
-				t.Errorf("[%d] expected changed endpoints %q, got %q", tci, tc.expectedChangedEndpoints.UnsortedList(), pendingChanges.UnsortedList())
-			}
-
 			result := fp.endpointsMap.Update(fp.endpointsChanges)
 			newMap := fp.endpointsMap
 			compareEndpointsMapsStr(t, newMap, tc.expectedResult)
+			if !result.UpdatedServices.Equal(tc.expectedChangedEndpoints) {
+				t.Errorf("[%d] expected changed endpoints %q, got %q", tci, tc.expectedChangedEndpoints.UnsortedList(), result.UpdatedServices.UnsortedList())
+			}
 			if len(result.DeletedUDPEndpoints) != len(tc.expectedDeletedUDPEndpoints) {
 				t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedDeletedUDPEndpoints), len(result.DeletedUDPEndpoints), result.DeletedUDPEndpoints)
 			}
@@ -1335,14 +1333,13 @@ func TestEndpointSliceUpdate(t *testing.T) {
 	fqdnSlice.AddressType = discovery.AddressTypeFQDN
 
 	testCases := map[string]struct {
-		startingSlices           []*discovery.EndpointSlice
-		endpointsChangeTracker   *EndpointsChangeTracker
-		namespacedName           types.NamespacedName
-		paramEndpointSlice       *discovery.EndpointSlice
-		paramRemoveSlice         bool
-		expectedReturnVal        bool
-		expectedCurrentChange    map[ServicePortName][]*BaseEndpointInfo
-		expectedChangedEndpoints sets.Set[string]
+		startingSlices         []*discovery.EndpointSlice
+		endpointsChangeTracker *EndpointsChangeTracker
+		namespacedName         types.NamespacedName
+		paramEndpointSlice     *discovery.EndpointSlice
+		paramRemoveSlice       bool
+		expectedReturnVal      bool
+		expectedCurrentChange  map[ServicePortName][]*BaseEndpointInfo
 	}{
 		// test starting from an empty state
 		"add a simple slice that doesn't already exist": {
@@ -1364,33 +1361,30 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.1.3", port: 443, endpoint: "10.0.1.3:443", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 		// test no modification to state - current change should be nil as nothing changes
 		"add the same slice that already exists": {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker:   NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
-			namespacedName:           types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:       generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
-			paramRemoveSlice:         false,
-			expectedReturnVal:        false,
-			expectedCurrentChange:    nil,
-			expectedChangedEndpoints: sets.New[string](),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+			paramRemoveSlice:       false,
+			expectedReturnVal:      false,
+			expectedCurrentChange:  nil,
 		},
 		// ensure that only valide address types are processed
 		"add an FQDN slice (invalid address type)": {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker:   NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
-			namespacedName:           types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:       fqdnSlice,
-			paramRemoveSlice:         false,
-			expectedReturnVal:        false,
-			expectedCurrentChange:    nil,
-			expectedChangedEndpoints: sets.New[string](),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:     fqdnSlice,
+			paramRemoveSlice:       false,
+			expectedReturnVal:      false,
+			expectedCurrentChange:  nil,
 		},
 		// test additions to existing state
 		"add a slice that overlaps with existing state": {
@@ -1423,7 +1417,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.2.2", port: 443, endpoint: "10.0.2.2:443", isLocal: true, ready: true, serving: true, terminating: false},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 		// test additions to existing state with partially overlapping slices and ports
 		"add a slice that overlaps with existing state and partial ports": {
@@ -1454,7 +1447,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.2.2", port: 443, endpoint: "10.0.2.2:443", isLocal: true, ready: true, serving: true, terminating: false},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 		// test deletions from existing state with partially overlapping slices and ports
 		"remove a slice that overlaps with existing state": {
@@ -1477,7 +1469,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.2.2", port: 443, endpoint: "10.0.2.2:443", isLocal: true, ready: true, serving: true, terminating: false},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 		// ensure a removal that has no effect turns into a no-op
 		"remove a slice that doesn't even exist in current state": {
@@ -1485,13 +1476,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker:   NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
-			namespacedName:           types.NamespacedName{Name: "svc1", Namespace: "ns1"},
-			paramEndpointSlice:       generateEndpointSlice("svc1", "ns1", 3, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
-			paramRemoveSlice:         true,
-			expectedReturnVal:        false,
-			expectedCurrentChange:    nil,
-			expectedChangedEndpoints: sets.New[string](),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 3, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
+			paramRemoveSlice:       true,
+			expectedReturnVal:      false,
+			expectedCurrentChange:  nil,
 		},
 		// start with all endpoints ready, transition to no endpoints ready
 		"transition all endpoints to unready state": {
@@ -1515,7 +1505,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.1.3", port: 443, endpoint: "10.0.1.3:443", isLocal: true, ready: false, serving: false, terminating: false},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 		// start with no endpoints ready, transition to all endpoints ready
 		"transition all endpoints to ready state": {
@@ -1537,7 +1526,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.1.2", port: 443, endpoint: "10.0.1.2:443", isLocal: true, ready: true, serving: true, terminating: false},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 		// start with some endpoints ready, transition to more endpoints ready
 		"transition some endpoints to ready state": {
@@ -1566,7 +1554,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.2.2", port: 443, endpoint: "10.0.2.2:443", isLocal: true, ready: false, serving: false, terminating: false},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 		// start with some endpoints ready, transition to some terminating
 		"transition some endpoints to terminating state": {
@@ -1595,7 +1582,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 					&BaseEndpointInfo{ip: "10.0.2.2", port: 443, endpoint: "10.0.2.2:443", isLocal: true, ready: false, serving: false, terminating: true},
 				},
 			},
-			expectedChangedEndpoints: sets.New[string]("ns1/svc1"),
 		},
 	}
 
@@ -1608,21 +1594,16 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				t.Errorf("EndpointSliceUpdate return value got: %v, want %v", got, tc.expectedReturnVal)
 			}
 
-			pendingChanges := tc.endpointsChangeTracker.PendingChanges()
-			if !pendingChanges.Equal(tc.expectedChangedEndpoints) {
-				t.Errorf("expected changed endpoints %q, got %q", tc.expectedChangedEndpoints.UnsortedList(), pendingChanges.UnsortedList())
-			}
-
 			changes := tc.endpointsChangeTracker.checkoutChanges()
 			if tc.expectedCurrentChange == nil {
 				if len(changes) != 0 {
 					t.Errorf("Expected %s to have no changes", tc.namespacedName)
 				}
 			} else {
-				if len(changes) == 0 || changes[0] == nil {
+				if _, exists := changes[tc.namespacedName]; !exists {
 					t.Fatalf("Expected %s to have changes", tc.namespacedName)
 				}
-				compareEndpointsMapsStr(t, changes[0].current, tc.expectedCurrentChange)
+				compareEndpointsMapsStr(t, changes[tc.namespacedName].current, tc.expectedCurrentChange)
 			}
 		})
 	}
@@ -1709,15 +1690,17 @@ func TestCheckoutChanges(t *testing.T) {
 				t.Fatalf("Expected %d changes, got %d", len(tc.expectedChanges), len(changes))
 			}
 
-			for i, change := range changes {
-				expectedChange := tc.expectedChanges[i]
+			for _, change := range changes {
+				// All of the test cases have 0 or 1 changes, so if we're
+				// here, then expectedChanges[0] is what we expect.
+				expectedChange := tc.expectedChanges[0]
 
 				if !reflect.DeepEqual(change.previous, expectedChange.previous) {
-					t.Errorf("[%d] Expected change.previous: %+v, got: %+v", i, expectedChange.previous, change.previous)
+					t.Errorf("Expected change.previous: %+v, got: %+v", expectedChange.previous, change.previous)
 				}
 
 				if !reflect.DeepEqual(change.current, expectedChange.current) {
-					t.Errorf("[%d] Expected change.current: %+v, got: %+v", i, expectedChange.current, change.current)
+					t.Errorf("Expected change.current: %+v, got: %+v", expectedChange.current, change.current)
 				}
 			}
 		})
