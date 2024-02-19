@@ -86,6 +86,11 @@ func TestEtcdStoragePath(t *testing.T) {
 	}
 
 	etcdStorageData := GetEtcdStorageData()
+	// Remove resources removed before test binary version 1.30
+	delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"))
+	delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "prioritylevelconfigurations"))
+	delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas"))
+	delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "prioritylevelconfigurations"))
 
 	kindSeen := sets.NewString()
 	pathSeen := map[string][]schema.GroupVersionResource{}

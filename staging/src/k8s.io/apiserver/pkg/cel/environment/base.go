@@ -44,12 +44,7 @@ import (
 // desirable because it means that CEL expressions are portable across a wider range
 // of Kubernetes versions.
 func DefaultCompatibilityVersion() *version.Version {
-	v := utilversion.Effective.MinCompatibilityVersion()
-	// the MinCompatibilityVersion is not set for tests.
-	if v.Major() == 0 && v.Minor() == 0 {
-		return version.MajorMinor(1, 29)
-	}
-	return v
+	return utilversion.Effective.MinCompatibilityVersion()
 }
 
 var baseOpts = []VersionedOptions{

@@ -40,7 +40,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -101,7 +100,6 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	opts.Options.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 	opts.Options.Authorization.Modes = []string{"RBAC"}
 	opts.Options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-	opts.Options.APIEnablement.EmulationVersion = utilversion.Effective.BinaryVersion().String()
 	opts.Options.APIEnablement.RuntimeConfig["api/all"] = "true"
 	for _, f := range configFuncs {
 		f(opts)

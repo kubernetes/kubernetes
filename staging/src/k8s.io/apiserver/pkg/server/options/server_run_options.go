@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 
 	"github.com/spf13/pflag"
 )
@@ -196,6 +197,9 @@ func (s *ServerRunOptions) Validate() []error {
 	if err := validateCorsAllowedOriginList(s.CorsAllowedOriginList); err != nil {
 		errors = append(errors, err)
 	}
+	if errs := serverversion.Effective.Validate(); len(errs) != 0 {
+		errors = append(errors, errs...)
+	}
 	return errors
 }
 
@@ -338,4 +342,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
+	serverversion.Effective.AddFlags(fs)
 }

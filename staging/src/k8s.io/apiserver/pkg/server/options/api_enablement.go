@@ -22,25 +22,21 @@ import (
 
 	"github.com/spf13/pflag"
 
-	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	serverversion "k8s.io/apiserver/pkg/util/version"
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // APIEnablementOptions contains the options for which resources to turn on and off.
 // Given small aggregated API servers, this option isn't required for "normal" API servers
 type APIEnablementOptions struct {
-	RuntimeConfig    cliflag.ConfigurationMap
-	EmulationVersion string
+	RuntimeConfig cliflag.ConfigurationMap
 }
 
 func NewAPIEnablementOptions() *APIEnablementOptions {
 	return &APIEnablementOptions{
-		RuntimeConfig:    make(cliflag.ConfigurationMap),
-		EmulationVersion: serverversion.Effective.BinaryVersion().String(),
+		RuntimeConfig: make(cliflag.ConfigurationMap),
 	}
 }
 
@@ -58,11 +54,6 @@ func (s *APIEnablementOptions) AddFlags(fs *pflag.FlagSet) {
 		"api/beta=true|false controls all API versions of the form v[0-9]+beta[0-9]+\n"+
 		"api/alpha=true|false controls all API versions of the form v[0-9]+alpha[0-9]+\n"+
 		"api/legacy is deprecated, and will be removed in a future version")
-	fs.StringVar(&s.EmulationVersion, "emulation-version", serverversion.Effective.BinaryVersion().String(), ""+
-		"The version API server emulates its capabilities (APIs, features, ...) of.\n"+
-		"If set, the server would behave like the set version instead of the underlying binary version.\n"+
-		"Defaults to the binary version. Should be between 1.{binaryMinorVersion-1}..{binaryVersion}.\n"+
-		"Format could be semantic or generic version, like v1.30.0-alpha|v1.30|1.30")
 }
 
 // Validate validates RuntimeConfig with a list of registries.
@@ -92,16 +83,6 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegistry) []error {
 	}
 	if len(groups) != 0 {
 		errors = append(errors, fmt.Errorf("unknown api groups %s", strings.Join(groups, ",")))
-	}
-
-	v, err := apimachineryversion.Parse(s.EmulationVersion)
-	if err != nil {
-		errors = append(errors, err)
-		return errors
-	}
-	serverversion.Effective.SetEmulationVersion(v)
-	if errs := serverversion.Effective.Validate(); len(errs) > 0 {
-		errors = append(errors, errs...)
 	}
 
 	return errors

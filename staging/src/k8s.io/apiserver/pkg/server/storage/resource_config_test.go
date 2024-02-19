@@ -249,7 +249,7 @@ func TestEnabledVersionWithEmulationVersion(t *testing.T) {
 		RemovedVersion: version.MajorMinor(1, 28),
 	})
 	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.29.0")))
-	utilversion.Effective.SetEmulationVersion(version.MustParse("1.28.2"))
+	utilversion.Effective.Set(version.MustParse("v1.29.0"), version.MustParse("v1.28.2"), version.MustParse("v1.28.0"))
 	config := NewResourceConfig(scheme)
 
 	config.DisableVersions(g1v1)
@@ -409,7 +409,7 @@ func TestEnabledResourceWithEmulationVersion(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
 			scheme := runtime.NewScheme()
 			t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.29.0")))
-			utilversion.Effective.SetEmulationVersion(version.MustParse("1.28.2"))
+			utilversion.Effective.Set(version.MustParse("v1.29.0"), version.MustParse("v1.28.2"), version.MustParse("v1.28.0"))
 			config := NewResourceConfig(scheme)
 			gv := schema.GroupVersion{Group: "group", Version: "version"}
 			r := gv.WithResource("resource")

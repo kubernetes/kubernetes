@@ -30,6 +30,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -108,7 +109,7 @@ func TestAddFlags(t *testing.T) {
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
 		"--lease-reuse-duration-seconds=100",
-		"--emulation-version=v1.29.0",
+		"--emulated-version=1.31",
 	}
 	fs.Parse(args)
 
@@ -263,8 +264,7 @@ func TestAddFlags(t *testing.T) {
 			WebhookRetryBackoff:         apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 		},
 		APIEnablement: &apiserveroptions.APIEnablementOptions{
-			RuntimeConfig:    cliflag.ConfigurationMap{},
-			EmulationVersion: "v1.29.0",
+			RuntimeConfig: cliflag.ConfigurationMap{},
 		},
 		EgressSelector: &apiserveroptions.EgressSelectorOptions{
 			ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",
@@ -292,5 +292,9 @@ func TestAddFlags(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
+	}
+
+	if serverversion.Effective.EmulationVersion().String() != "1.31.0" {
+		t.Errorf("Got emulation version %s, wanted %s", serverversion.Effective.EmulationVersion().String(), "1.31.0")
 	}
 }
