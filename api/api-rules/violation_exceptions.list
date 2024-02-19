@@ -28,7 +28,6 @@ API rule violation: names_match,k8s.io/api/authorization/v1beta1,SubjectAccessRe
 API rule violation: names_match,k8s.io/api/core/v1,DaemonEndpoint,Port
 API rule violation: names_match,k8s.io/api/core/v1,Event,ReportingController
 API rule violation: names_match,k8s.io/api/core/v1,FCVolumeSource,WWIDs
-API rule violation: names_match,k8s.io/api/core/v1,NodeResources,Capacity
 API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUseExternalID
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS

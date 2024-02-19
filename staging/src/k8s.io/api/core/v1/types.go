@@ -7292,13 +7292,6 @@ type Sysctl struct {
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
 }
 
-// NodeResources is an object for conveying resource information about a node.
-// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
-type NodeResources struct {
-	// Capacity represents the available resources of a node
-	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
-}
-
 const (
 	// Enable stdin for remote command execution
 	ExecStdinParam = "input"
