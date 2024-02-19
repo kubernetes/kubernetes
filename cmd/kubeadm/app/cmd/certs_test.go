@@ -20,8 +20,10 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -39,6 +41,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -479,6 +482,171 @@ kubernetesVersion: %s`,
 					assertFunc(t, config)
 				}
 			}
+		})
+	}
+}
+
+func TestRunCmdCertsExpiration(t *testing.T) {
+	kdir := testutil.SetupTempDir(t)
+	defer func() {
+		if err := os.RemoveAll(kdir); err != nil {
+			t.Fatalf("Failed to teardown: %s", err)
+		}
+	}()
+
+	cfg := testutil.GetDefaultInternalConfig(t)
+	cfg.CertificatesDir = kdir
+
+	// Generate all the CA
+	caCerts := map[string]*x509.Certificate{}
+	caKeys := map[string]crypto.Signer{}
+	for _, ca := range []*certsphase.KubeadmCert{
+		certsphase.KubeadmCertRootCA(),
+		certsphase.KubeadmCertFrontProxyCA(),
+		certsphase.KubeadmCertEtcdCA(),
+	} {
+		caCert, caKey, err := ca.CreateAsCA(cfg)
+		if err != nil {
+			t.Fatalf("couldn't write out CA %s: %v", ca.Name, err)
+		}
+		caCerts[ca.Name] = caCert
+		caKeys[ca.Name] = caKey
+	}
+
+	// Generate all the signed certificates
+	kubeadmCerts := []*certsphase.KubeadmCert{
+		certsphase.KubeadmCertAPIServer(),
+		certsphase.KubeadmCertKubeletClient(),
+		certsphase.KubeadmCertFrontProxyClient(),
+		certsphase.KubeadmCertEtcdAPIClient(),
+		certsphase.KubeadmCertEtcdServer(),
+		certsphase.KubeadmCertEtcdPeer(),
+		certsphase.KubeadmCertEtcdHealthcheck(),
+	}
+	for _, cert := range kubeadmCerts {
+		caCert := caCerts[cert.CAName]
+		caKey := caKeys[cert.CAName]
+		if err := cert.CreateFromCA(cfg, caCert, caKey); err != nil {
+			t.Fatalf("couldn't write certificate %s: %v", cert.Name, err)
+		}
+	}
+
+	// Generate all the kubeconfig files with embedded certs
+	kubeConfigs := []string{
+		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.SuperAdminKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName,
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+	}
+	for _, kubeConfig := range kubeConfigs {
+		if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, kdir, cfg); err != nil {
+			t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
+		}
+	}
+
+	// A minimal kubeadm config with just enough values to avoid triggering
+	// auto-detection of config values at runtime.
+	var kubeadmConfig = fmt.Sprintf(`
+apiVersion: %[1]s
+kind: ClusterConfiguration
+certificatesDir: %s
+kubernetesVersion: %s`,
+		kubeadmapiv1.SchemeGroupVersion.String(),
+		cfg.CertificatesDir,
+		kubeadmconstants.MinimumControlPlaneVersion.String())
+
+	customConfigPath := kdir + "/kubeadm.conf"
+	f, err := os.Create(customConfigPath)
+	require.NoError(t, err)
+	_, err = f.Write([]byte(kubeadmConfig))
+	require.NoError(t, err)
+
+	brokenCertName := kubeadmconstants.APIServerCertAndKeyBaseName
+	brokenCertPath, _ := pkiutil.PathsForCertAndKey(cfg.CertificatesDir, brokenCertName)
+
+	type testCase struct {
+		name           string
+		output         string
+		brokenCertName string
+	}
+
+	var runTestCase = func(t *testing.T, tc testCase) {
+		var output bytes.Buffer
+		cmd := newCmdCertsExpiration(&output, kdir)
+		args := []string{
+			fmt.Sprintf("--cert-dir=%s", cfg.CertificatesDir),
+			fmt.Sprintf("--config=%s", customConfigPath),
+		}
+		if tc.output != "" {
+			args = append(args, fmt.Sprintf("-o=%s", tc.output))
+
+		}
+		cmd.SetArgs(args)
+		require.NoError(t, cmd.Execute())
+
+		switch tc.output {
+		case "json":
+			var info outputapiv1alpha3.CertificateExpirationInfo
+			require.NoError(t, json.Unmarshal(output.Bytes(), &info))
+			assert.Len(t, info.Certificates, len(kubeadmCerts)+len(kubeConfigs))
+			assert.Len(t, info.CertificateAuthorities, len(caCerts))
+			for _, cert := range info.Certificates {
+				if tc.brokenCertName == cert.Name {
+					assert.True(t, cert.Missing, "expected certificate to be missing")
+				} else {
+					assert.False(t, cert.Missing, "expected certificate to be present")
+				}
+			}
+		default:
+			outputStr := output.String()
+			if tc.brokenCertName != "" {
+				assert.Contains(t, outputStr, "!MISSING!")
+			} else {
+				assert.NotContains(t, outputStr, "!MISSING!")
+			}
+
+			var lines []string
+			for _, line := range strings.SplitAfter(outputStr, "\n") {
+				if strings.TrimSpace(line) != "" {
+					lines = append(lines, line)
+				}
+			}
+			// 2 lines for the column headers.
+			expectedLineCount := len(caCerts) + len(kubeadmCerts) + len(kubeConfigs) + 2
+			assert.Lenf(t, lines, expectedLineCount, "expected %d non-blank lines in output", expectedLineCount)
+		}
+	}
+
+	testCases := []testCase{
+		{
+			name:   "print columns and no missing certs",
+			output: "",
+		},
+		{
+			name:   "print json and no missing certs",
+			output: "json",
+		},
+		// all broken cases must be at the end of the list.
+		{
+			name:           "print columns and missing certs",
+			output:         "",
+			brokenCertName: brokenCertName,
+		},
+		{
+			name:           "print json and missing certs",
+			output:         "json",
+			brokenCertName: brokenCertName,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.brokenCertName != "" {
+				// remove the file to simulate a missing certificate
+				_ = os.Remove(brokenCertPath)
+			}
+			runTestCase(t, tc)
 		})
 	}
 }

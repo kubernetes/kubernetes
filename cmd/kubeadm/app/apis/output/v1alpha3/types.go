@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package output
+package v1alpha3
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +26,7 @@ import (
 
 // BootstrapToken represents information for the bootstrap token output produced by kubeadm
 type BootstrapToken struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	bootstraptokenv1.BootstrapToken
 }
@@ -35,9 +35,9 @@ type BootstrapToken struct {
 
 // Images represents information for the output produced by 'kubeadm config images list'
 type Images struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
-	Images []string
+	Images []string `json:"images"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -46,29 +46,29 @@ type Images struct {
 type ComponentUpgradePlan struct {
 	metav1.TypeMeta
 
-	Name           string
-	CurrentVersion string
-	NewVersion     string
+	Name           string `json:"name"`
+	CurrentVersion string `json:"currentVersion"`
+	NewVersion     string `json:"newVersion"`
 }
 
 // ComponentConfigVersionState describes the current and desired version of a component config
 type ComponentConfigVersionState struct {
 	// Group points to the Kubernetes API group that covers the config
-	Group string
+	Group string `json:"group"`
 
 	// CurrentVersion is the currently active component config version
 	// NOTE: This can be empty in case the config was not found on the cluster or it was unsupported
 	// kubeadm generated version
-	CurrentVersion string
+	CurrentVersion string `json:"currentVersion"`
 
 	// PreferredVersion is the component config version that is currently preferred by kubeadm for use.
 	// NOTE: As of today, this is the only version supported by kubeadm.
-	PreferredVersion string
+	PreferredVersion string `json:"preferredVersion"`
 
 	// ManualUpgradeRequired indicates if users need to manually upgrade their component config versions. This happens if
 	// the CurrentVersion of the config is user supplied (or modified) and no longer supported. Users should upgrade
 	// their component configs to PreferredVersion or any other supported component config version.
-	ManualUpgradeRequired bool
+	ManualUpgradeRequired bool `json:"manualUpgradeRequired"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -78,31 +78,31 @@ type ComponentConfigVersionState struct {
 type UpgradePlan struct {
 	metav1.TypeMeta
 
-	Components []ComponentUpgradePlan
+	Components []ComponentUpgradePlan `json:"components"`
 
-	ConfigVersions []ComponentConfigVersionState
+	ConfigVersions []ComponentConfigVersionState `json:"configVersions"`
 }
 
 // Certificate represents information for a certificate or a certificate authority when using the check-expiration command.
 type Certificate struct {
 	// Name of the certificate.
-	Name string
+	Name string `json:"name"`
 
 	// ExpirationDate defines certificate expiration date.
-	ExpirationDate metav1.Time
+	ExpirationDate metav1.Time `json:"expirationDate"`
 
 	// ResidualTime represents the residual time before expiration.
-	ResidualTime metav1.Duration
+	ResidualTime metav1.Duration `json:"residualTime"`
 
 	// ExternallyManaged defines if the certificate is externally managed.
-	ExternallyManaged bool
+	ExternallyManaged bool `json:"externallyManaged"`
 
 	// CAName represents the name of the CA that signed the certificate.
 	// This field is empty for self-signed, root CA certificates.
-	CAName string
+	CAName string `json:"caName,omitempty"`
 
 	// Missing represents if the certificate is missing.
-	Missing bool
+	Missing bool `json:"missing"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -112,8 +112,8 @@ type CertificateExpirationInfo struct {
 	metav1.TypeMeta
 
 	// Certificates holds a list of certificates to show expiration information for.
-	Certificates []Certificate
+	Certificates []Certificate `json:"certificates"`
 
 	// CertificateAuthorities holds a list of certificate authorities to show expiration information for.
-	CertificateAuthorities []Certificate
+	CertificateAuthorities []Certificate `json:"certificateAuthorities"`
 }
