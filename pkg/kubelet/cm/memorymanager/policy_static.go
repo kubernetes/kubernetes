@@ -31,9 +31,11 @@ import (
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -122,7 +124,8 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	hint := p.affinity.GetAffinity(podUID, container.Name)
 	klog.InfoS("Got topology affinity", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "hint", hint)
 
-	requestedResources, err := getRequestedResources(pod, container)
+	specResources := filterMemoryResources(pod, container)           // used only for reporting
+	requestedResources, err := getRequestedResources(pod, container) // used for internal accounting
 	if err != nil {
 		return err
 	}
@@ -137,11 +140,11 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 		defaultHint, err := p.getDefaultHint(machineState, pod, requestedResources)
 		if err != nil {
-			return err
+			return admission.MakeMultiResourceAllocationError(events.FailedAllocationMemory, specResources, nil, err)
 		}
 
 		if !defaultHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the default preferred hint")
+			return admission.MakeMultiResourceAllocationError(events.FailedAllocationMemory, specResources, nil, fmt.Errorf("[memorymanager] failed to find the default preferred hint"))
 		}
 
 		klog.V(3).InfoS("Topology Hint recomputed", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "previous", bestHint, "recomputed", defaultHint)
@@ -157,11 +160,12 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 		extendedHint, err := p.extendTopologyManagerHint(machineState, pod, requestedResources, bestHint.NUMANodeAffinity)
 		if err != nil {
-			return err
+			return admission.MakeMultiResourceAllocationError(events.FailedAllocationMemory, specResources, bestHint.NUMANodeAffinity, err)
 		}
 
 		if !extendedHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
+			return admission.MakeMultiResourceAllocationError(events.FailedAllocationMemory, specResources, bestHint.NUMANodeAffinity, fmt.Errorf("[memorymanager] failed to find the extended preferred hint"))
+
 		}
 
 		klog.V(3).InfoS("Topology Hint extended", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "previous", bestHint, "extended", extendedHint)
@@ -443,6 +447,27 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 	}
 
 	return p.calculateHints(s.GetMachineState(), pod, requestedResources)
+}
+
+func filterMemoryResources(pod *v1.Pod, container *v1.Container) v1.ResourceList {
+	res := v1.ResourceList{}
+	resources := container.Resources.Requests
+	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
+	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
+	// We should return this value because this is what kubelet agreed to allocate for the container
+	// and the value configured with runtime.
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+			resources = cs.AllocatedResources
+		}
+	}
+	for resourceName, quantity := range resources {
+		if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
+			continue
+		}
+		res[resourceName] = quantity
+	}
+	return res
 }
 
 func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {

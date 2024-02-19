@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -1776,6 +1777,9 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			}
 
 			err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			if err != nil {
+				err = errors.Unwrap(err)
+			}
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 			}

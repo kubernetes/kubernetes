@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
@@ -141,7 +142,7 @@ func TestNewManager(t *testing.T) {
 	for _, tc := range tcases {
 		topology := tc.topology
 
-		mngr, err := NewManager(topology, tc.policyName, "container", tc.policyOptions)
+		mngr, err := NewManager(&record.FakeRecorder{}, topology, tc.policyName, "container", tc.policyOptions)
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
 				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
@@ -186,7 +187,7 @@ func TestManagerScope(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr, err := NewManager(nil, "best-effort", tc.scopeName, nil)
+		mngr, err := NewManager(&record.FakeRecorder{}, nil, "best-effort", tc.scopeName, nil)
 
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
@@ -251,7 +252,7 @@ func TestRegisterProvider(t *testing.T) {
 		},
 	}
 	mngr := manager{}
-	mngr.scope = NewContainerScope(NewNonePolicy())
+	mngr.scope = NewContainerScope(NewNonePolicy(), &record.FakeRecorder{})
 	for _, tc := range tcases {
 		for _, prov := range tc.prov {
 			mngr.RegisterProvider(prov)
@@ -542,11 +543,11 @@ func TestAdmit(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		ctnScopeManager := manager{}
-		ctnScopeManager.scope = NewContainerScope(tc.policy)
+		ctnScopeManager.scope = NewContainerScope(tc.policy, &record.FakeRecorder{})
 		ctnScopeManager.scope.(*containerScope).providers = tc.prov
 
 		podScopeManager := manager{}
-		podScopeManager.scope = NewPodScope(tc.policy)
+		podScopeManager.scope = NewPodScope(tc.policy, &record.FakeRecorder{})
 		podScopeManager.scope.(*podScope).providers = tc.prov
 
 		pod := &v1.Pod{

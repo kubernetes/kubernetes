@@ -22,6 +22,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -165,11 +166,11 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
-func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
+func NewManager(recorder record.EventRecorder, topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
 		klog.InfoS("Creating topology manager with none policy")
-		return &manager{scope: NewNoneScope()}, nil
+		return &manager{scope: NewNoneScope(recorder)}, nil
 	}
 
 	opts, err := NewPolicyOptions(topologyPolicyOptions)
@@ -208,10 +209,10 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	switch topologyScopeName {
 
 	case containerTopologyScope:
-		scope = NewContainerScope(policy)
+		scope = NewContainerScope(policy, recorder)
 
 	case podTopologyScope:
-		scope = NewPodScope(policy)
+		scope = NewPodScope(policy, recorder)
 
 	default:
 		return nil, fmt.Errorf("unknown scope: \"%s\"", topologyScopeName)

@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1056,6 +1057,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		activePods = append(activePods, pod)
 		podsStub.updateActivePods(activePods)
 		err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+		if err != nil {
+			err = errors.Unwrap(err)
+		}
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)

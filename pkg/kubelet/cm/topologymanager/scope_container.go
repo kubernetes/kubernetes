@@ -18,6 +18,7 @@ package topologymanager
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -33,10 +34,11 @@ type containerScope struct {
 var _ Scope = &containerScope{}
 
 // NewContainerScope returns a container scope.
-func NewContainerScope(policy Policy) Scope {
+func NewContainerScope(policy Policy, recorder record.EventRecorder) Scope {
 	return &containerScope{
 		scope{
 			name:             containerTopologyScope,
+			recorder:         recorder,
 			podTopologyHints: podTopologyHints{},
 			policy:           policy,
 			podMap:           containermap.NewContainerMap(),
@@ -45,23 +47,29 @@ func NewContainerScope(policy Policy) Scope {
 }
 
 func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+	allocs := make(allocationMap)
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		bestHint, admit := s.calculateAffinity(pod, &container)
 		klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 
 		if !admit {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-			return admission.GetPodAdmitResult(&TopologyAffinityError{})
+			return admission.GetPodAdmitResult(&TopologyAffinityError{
+				ContainerName: container.Name,
+				Hint:          bestHint.String(),
+			})
 		}
 		klog.InfoS("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
-		err := s.allocateAlignedResources(pod, &container)
+		resources, err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			return admission.GetPodAdmitResult(err)
 		}
+		allocs.Add(container.Name, resources)
 	}
+	s.resourceAllocationSuccessEvent(pod, allocs)
 	return admission.GetPodAdmitResult(nil)
 }
 

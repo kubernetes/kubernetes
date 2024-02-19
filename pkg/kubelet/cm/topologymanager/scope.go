@@ -17,12 +17,17 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
+	"sort"
+	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -55,8 +60,9 @@ type Scope interface {
 }
 
 type scope struct {
-	mutex sync.Mutex
-	name  string
+	recorder record.EventRecorder
+	mutex    sync.Mutex
+	name     string
 	// Mapping of a Pods mapping of Containers and their TopologyHints
 	// Indexed by PodUID to ContainerName
 	podTopologyHints podTopologyHints
@@ -136,24 +142,62 @@ func (s *scope) RemoveContainer(containerID string) error {
 	return nil
 }
 
+type allocationMap map[string][]string
+
+func (am allocationMap) Add(containerName string, resources []string) {
+	for _, resource := range resources {
+		am[resource] = append(am[resource], containerName)
+	}
+}
+
+func (am allocationMap) String() string {
+	if len(am) == 0 {
+		return "none"
+	}
+
+	resources := make([]string, 0, len(am))
+	for resource := range am {
+		resources = append(resources, resource)
+	}
+	sort.Strings(resources)
+
+	items := []string{}
+	for _, resource := range resources {
+		contNames := am[resource]
+		items = append(items, resource+fmt.Sprintf(": containers=%d", len(contNames)))
+	}
+	return strings.Join(items, "; ")
+}
+
+func (s *scope) resourceAllocationSuccessEvent(pod *v1.Pod, allocs allocationMap) {
+	s.recorder.Event(pod, v1.EventTypeNormal, events.AllocatedResources, allocs.String())
+}
+
 func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
+	allocs := make(allocationMap)
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := s.allocateAlignedResources(pod, &container)
+		resources, err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
+			err = admission.ResourceAllocationFailureEvent(s.recorder, pod, container.Name, err)
 			return admission.GetPodAdmitResult(err)
 		}
+		allocs.Add(container.Name, resources)
 	}
+	s.resourceAllocationSuccessEvent(pod, allocs)
 	return admission.GetPodAdmitResult(nil)
 }
 
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track providers anymore
-func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
+func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) ([]string, error) {
+	allocated := []string{}
 	for _, provider := range s.providers {
 		err := provider.Allocate(pod, container)
 		if err != nil {
-			return err
+			return allocated, err
 		}
+		res := provider.GetExclusiveResources(pod, container)
+		allocated = append(allocated, res...)
 	}
-	return nil
+	return allocated, nil
 }
