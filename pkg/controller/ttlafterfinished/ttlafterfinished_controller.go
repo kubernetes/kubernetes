@@ -51,8 +51,10 @@ import (
 // This is implemented outside of Job controller for separation of concerns, and
 // because it will be extended to handle other finishable resource types.
 type Controller struct {
-	client   clientset.Interface
-	recorder record.EventRecorder
+	client clientset.Interface
+
+	recorder         record.EventRecorder
+	eventBroadcaster record.EventBroadcaster
 
 	// jLister can list/get Jobs from the shared informer's store
 	jLister batchlisters.JobLister
@@ -77,9 +79,10 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 	metrics.Register()
 
 	tc := &Controller{
-		client:   client,
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
+		client:           client,
+		eventBroadcaster: eventBroadcaster,
+		recorder:         eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
 	}
 
 	logger := klog.FromContext(ctx)
@@ -104,6 +107,7 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 func (tc *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
+	defer tc.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL after finished controller")

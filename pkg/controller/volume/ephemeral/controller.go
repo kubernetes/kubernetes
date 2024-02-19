@@ -69,7 +69,8 @@ type ephemeralController struct {
 	podIndexer cache.Indexer
 
 	// recorder is used to record events in the API server
-	recorder record.EventRecorder
+	recorder         record.EventRecorder
+	eventBroadcaster record.EventBroadcaster
 
 	queue workqueue.RateLimitingInterface
 }
@@ -93,6 +94,7 @@ func NewController(
 	ephemeralvolumemetrics.RegisterMetrics()
 
 	eventBroadcaster := record.NewBroadcaster()
+	ec.eventBroadcaster = eventBroadcaster
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
@@ -165,6 +167,7 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 func (ec *ephemeralController) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
+	defer ec.eventBroadcaster.Shutdown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ephemeral volume controller")
 	defer logger.Info("Shutting down ephemeral volume controller")

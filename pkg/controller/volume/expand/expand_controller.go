@@ -87,7 +87,8 @@ type expandController struct {
 	volumePluginMgr volume.VolumePluginMgr
 
 	// recorder is used to record events in the API server
-	recorder record.EventRecorder
+	recorder         record.EventRecorder
+	eventBroadcaster record.EventBroadcaster
 
 	operationGenerator operationexecutor.OperationGenerator
 
@@ -122,6 +123,7 @@ func NewExpandController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
+	expc.eventBroadcaster = eventBroadcaster
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	expc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
@@ -324,6 +326,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 func (expc *expandController) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer expc.queue.ShutDown()
+	defer expc.eventBroadcaster.Shutdown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting expand controller")
 	defer logger.Info("Shutting down expand controller")

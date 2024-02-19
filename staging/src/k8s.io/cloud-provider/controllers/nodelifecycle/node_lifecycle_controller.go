@@ -73,9 +73,6 @@ func NewCloudNodeLifecycleController(
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration) (*CloudNodeLifecycleController, error) {
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
-
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
 	}
@@ -89,6 +86,9 @@ func NewCloudNodeLifecycleController(
 	if !instancesSupported && !instancesV2Supported {
 		return nil, errors.New("cloud provider does not support instances")
 	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
 
 	c := &CloudNodeLifecycleController{
 		kubeClient:        kubeClient,
