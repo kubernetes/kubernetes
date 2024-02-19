@@ -406,7 +406,7 @@
         "description": "JobStatus represents the current state of a Job.",
         "properties": {
           "active": {
-            "description": "The number of pending and running pods.",
+            "description": "The number of pending and running pods which are not terminating (without a deletionTimestamp).",
             "format": "int32",
             "type": "integer"
           },
