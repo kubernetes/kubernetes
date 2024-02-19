@@ -43,10 +43,20 @@ const (
 )
 
 // TopologyAffinityError represents an resource alignment error
-type TopologyAffinityError struct{}
+type TopologyAffinityError struct {
+	ContainerName string
+	Hint          string
+}
 
 func (e TopologyAffinityError) Error() string {
-	return "Resources cannot be allocated with Topology locality"
+	msg := "Resources cannot be allocated with Topology locality"
+	if e.ContainerName != "" {
+		msg += " container=" + e.ContainerName
+	}
+	if e.Hint != "" {
+		msg += " hint=" + e.Hint
+	}
+	return msg
 }
 
 func (e TopologyAffinityError) Type() string {
@@ -117,6 +127,14 @@ func (th *TopologyHint) IsEqual(topologyHint TopologyHint) bool {
 		return th.NUMANodeAffinity.IsEqual(topologyHint.NUMANodeAffinity)
 	}
 	return false
+}
+
+func (th TopologyHint) String() string {
+	aff := "N/A"
+	if th.NUMANodeAffinity != nil {
+		aff = th.NUMANodeAffinity.String()
+	}
+	return fmt.Sprintf("[affinity=%s preferred=%v]", aff, th.Preferred)
 }
 
 // LessThan checks if TopologyHint `a` is less than TopologyHint `b`
