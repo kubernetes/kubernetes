@@ -122,7 +122,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.deviceManager)
+	cm.topologyManager.RegisterProvider(cm.deviceManager)
 
 	return cm, nil
 }

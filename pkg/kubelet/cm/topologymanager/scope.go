@@ -19,7 +19,7 @@ package topologymanager
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -42,9 +42,9 @@ type Scope interface {
 	Name() string
 	GetPolicy() Policy
 	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
-	// AddHintProvider adds a hint provider to manager to indicate the hint provider
-	// wants to be consoluted with when making topology hints
-	AddHintProvider(h HintProvider)
+	// RegisterProvider adds a hint provider to manager to indicate the hint provider
+	// wants to be consulted with when making topology hints
+	RegisterProvider(ra ResourceAllocator)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
@@ -60,7 +60,7 @@ type scope struct {
 	// Indexed by PodUID to ContainerName
 	podTopologyHints podTopologyHints
 	// The list of components registered with the Manager
-	hintProviders []HintProvider
+	providers []ResourceAllocator
 	// Topology Manager Policy
 	policy Policy
 	// Mapping of (PodUid, ContainerName) to ContainerID for Adding/Removing Pods from PodTopologyHints mapping
@@ -95,8 +95,8 @@ func (s *scope) GetPolicy() Policy {
 	return s.policy
 }
 
-func (s *scope) AddHintProvider(h HintProvider) {
-	s.hintProviders = append(s.hintProviders, h)
+func (s *scope) RegisterProvider(ra ResourceAllocator) {
+	s.providers = append(s.providers, ra)
 }
 
 // It would be better to implement this function in topologymanager instead of scope
@@ -148,7 +148,7 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track providers anymore
 func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
-	for _, provider := range s.hintProviders {
+	for _, provider := range s.providers {
 		err := provider.Allocate(pod, container)
 		if err != nil {
 			return err

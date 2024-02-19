@@ -67,9 +67,9 @@ func (e TopologyAffinityError) Type() string {
 type Manager interface {
 	// PodAdmitHandler is implemented by Manager
 	lifecycle.PodAdmitHandler
-	// AddHintProvider adds a hint provider to manager to indicate the hint provider
+	// RegisterProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consulted with when making topology hints
-	AddHintProvider(HintProvider)
+	RegisterProvider(ra ResourceAllocator)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
@@ -102,6 +102,12 @@ type HintProvider interface {
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
 	Allocate(pod *v1.Pod, container *v1.Container) error
+}
+
+// ResourceAllocator is an interface for components which manage concrete resources,
+// which can allocate resources, provide allocation hints.
+type ResourceAllocator interface {
+	HintProvider
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
@@ -217,8 +223,8 @@ func (m *manager) GetPolicy() Policy {
 	return m.scope.GetPolicy()
 }
 
-func (m *manager) AddHintProvider(h HintProvider) {
-	m.scope.AddHintProvider(h)
+func (m *manager) RegisterProvider(ra ResourceAllocator) {
+	m.scope.RegisterProvider(ra)
 }
 
 func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {

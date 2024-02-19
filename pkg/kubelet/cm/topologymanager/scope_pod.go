@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -68,7 +68,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 func (s *podScope) accumulateProvidersHints(pod *v1.Pod) []map[string][]TopologyHint {
 	var providersHints []map[string][]TopologyHint
 
-	for _, provider := range s.hintProviders {
+	for _, provider := range s.providers {
 		// Get the TopologyHints for a Pod from a provider.
 		hints := provider.GetPodTopologyHints(pod)
 		providersHints = append(providersHints, hints)
