@@ -577,6 +577,7 @@ function codegen::openapi() {
         echo -e "ERROR:"
         echo -e "\tAPI rule check failed - reported violations differ from known violations"
         echo -e "\tPlease read api/api-rules/README.md to resolve the failure in ${known_filename}"
+        return 1
     fi
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
