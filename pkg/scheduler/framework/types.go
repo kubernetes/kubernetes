@@ -76,13 +76,13 @@ const (
 	Node                  GVK = "Node"
 	PersistentVolume      GVK = "PersistentVolume"
 	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
-	PodSchedulingContext  GVK = "PodSchedulingContext"
-	ResourceClaim         GVK = "ResourceClaim"
-	ResourceClass         GVK = "ResourceClass"
-	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"
 	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
 	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
+	StorageClass          GVK = "storage.k8s.io/StorageClass"
+	PodSchedulingContext  GVK = "PodSchedulingContext"
+	ResourceClaim         GVK = "ResourceClaim"
+	ResourceClass         GVK = "ResourceClass"
 
 	// WildCard is a special GVK to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -167,13 +167,15 @@ func UnrollWildCardResource() []ClusterEventWithHint {
 	return []ClusterEventWithHint{
 		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
 		{Event: ClusterEvent{Resource: Node, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},
 		{Event: ClusterEvent{Resource: CSINode, ActionType: All}},
 		{Event: ClusterEvent{Resource: CSIDriver, ActionType: All}},
 		{Event: ClusterEvent{Resource: CSIStorageCapacity, ActionType: All}},
-		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
-		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},
 		{Event: ClusterEvent{Resource: StorageClass, ActionType: All}},
 		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClaim, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClass, ActionType: All}},
 	}
 }
 
