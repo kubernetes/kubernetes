@@ -24,7 +24,7 @@ import (
 // multiplexed.
 // The format of the multiplexed stream is as follows:
 //
-//    [8]byte{STREAM_TYPE, 0, 0, 0, SIZE1, SIZE2, SIZE3, SIZE4}[]byte{OUTPUT}
+//	[8]byte{STREAM_TYPE, 0, 0, 0, SIZE1, SIZE2, SIZE3, SIZE4}[]byte{OUTPUT}
 //
 // STREAM_TYPE can be 1 for stdout and 2 for stderr
 //
