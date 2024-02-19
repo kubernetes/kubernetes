@@ -233,7 +233,10 @@ func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletCon
 
 	ginkgo.By("Starting the kubelet")
 	startKubelet()
+	waitForKubeletToStart(ctx, f)
+}
 
+func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
