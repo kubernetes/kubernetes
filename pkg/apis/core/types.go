@@ -4978,14 +4978,6 @@ type NodeAddress struct {
 	Address string
 }
 
-// NodeResources is an object for conveying resource information about a node.
-// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
-type NodeResources struct {
-	// Capacity represents the available resources of a node
-	// +optional
-	Capacity ResourceList
-}
-
 // ResourceName is the name identifying various resources in a ResourceList.
 type ResourceName string
 
