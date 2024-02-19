@@ -729,16 +729,16 @@
     driverName: test-driver.cdi.k8s.io
     nodes: scheduler-perf-dra-*
     maxClaimsPerNodeParam: $maxClaimsPerNode
-  - opcode: createResourceClass
+  - opcode: createAny
     templatePath: config/dra/resourceclass.yaml
-  - opcode: createResourceClaimTemplate
+  - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate.yaml
     namespace: init
   - opcode: createPods
     namespace: init
     countParam: $initPods
     podTemplatePath: config/dra/pod-with-claim-template.yaml
-  - opcode: createResourceClaimTemplate
+  - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate.yaml
     namespace: test
   - opcode: createPods
@@ -799,24 +799,24 @@
     driverName: another-test-driver.cdi.k8s.io
     nodes: scheduler-perf-dra-*
     maxClaimsPerNodeParam: $maxClaimsPerNode
-  - opcode: createResourceClass
+  - opcode: createAny
     templatePath: config/dra/resourceclass.yaml
-  - opcode: createResourceClass
+  - opcode: createAny
     templatePath: config/dra/another-resourceclass.yaml
-  - opcode: createResourceClaimTemplate
+  - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate.yaml
     namespace: init
-  - opcode: createResourceClaimTemplate
+  - opcode: createAny
     templatePath: config/dra/another-resourceclaimtemplate.yaml
     namespace: init
   - opcode: createPods
     namespace: init
     countParam: $initPods
     podTemplatePath: config/dra/pod-with-many-claim-templates.yaml
-  - opcode: createResourceClaimTemplate
+  - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate.yaml
     namespace: test
-  - opcode: createResourceClaimTemplate
+  - opcode: createAny
     templatePath: config/dra/another-resourceclaimtemplate.yaml
     namespace: test
   - opcode: createPods

@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
-	"testing"
 
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	draapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -82,18 +81,18 @@ func (op *createResourceClaimsOp) requiredNamespaces() []string {
 	return []string{op.Namespace}
 }
 
-func (op *createResourceClaimsOp) run(ctx context.Context, tb testing.TB, clientset clientset.Interface) {
-	tb.Logf("creating %d claims in namespace %q", op.Count, op.Namespace)
+func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
+	tCtx.Logf("creating %d claims in namespace %q", op.Count, op.Namespace)
 
 	var claimTemplate *resourcev1alpha2.ResourceClaim
 	if err := getSpecFromFile(&op.TemplatePath, &claimTemplate); err != nil {
-		tb.Fatalf("parsing ResourceClaim %q: %v", op.TemplatePath, err)
+		tCtx.Fatalf("parsing ResourceClaim %q: %v", op.TemplatePath, err)
 	}
 	var createErr error
 	var mutex sync.Mutex
 	create := func(i int) {
 		err := func() error {
-			if _, err := clientset.ResourceV1alpha2().ResourceClaims(op.Namespace).Create(ctx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
+			if _, err := tCtx.Client().ResourceV1alpha2().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create claim: %v", err)
 			}
 			return nil
@@ -109,32 +108,10 @@ func (op *createResourceClaimsOp) run(ctx context.Context, tb testing.TB, client
 	if workers > 30 {
 		workers = 30
 	}
-	workqueue.ParallelizeUntil(ctx, workers, op.Count, create)
+	workqueue.ParallelizeUntil(tCtx, workers, op.Count, create)
 	if createErr != nil {
-		tb.Fatal(createErr.Error())
+		tCtx.Fatal(createErr.Error())
 	}
-}
-
-// createResourceClassOpType customizes createOp for creating a ResourceClass.
-type createResourceClassOpType struct{}
-
-func (c createResourceClassOpType) Opcode() operationCode { return createResourceClassOpcode }
-func (c createResourceClassOpType) Name() string          { return "ResourceClass" }
-func (c createResourceClassOpType) Namespaced() bool      { return false }
-func (c createResourceClassOpType) CreateCall(client clientset.Interface, namespace string) func(context.Context, *resourcev1alpha2.ResourceClass, metav1.CreateOptions) (*resourcev1alpha2.ResourceClass, error) {
-	return client.ResourceV1alpha2().ResourceClasses().Create
-}
-
-// createResourceClassOpType customizes createOp for creating a ResourceClaim.
-type createResourceClaimTemplateOpType struct{}
-
-func (c createResourceClaimTemplateOpType) Opcode() operationCode {
-	return createResourceClaimTemplateOpcode
-}
-func (c createResourceClaimTemplateOpType) Name() string     { return "ResourceClaimTemplate" }
-func (c createResourceClaimTemplateOpType) Namespaced() bool { return true }
-func (c createResourceClaimTemplateOpType) CreateCall(client clientset.Interface, namespace string) func(context.Context, *resourcev1alpha2.ResourceClaimTemplate, metav1.CreateOptions) (*resourcev1alpha2.ResourceClaimTemplate, error) {
-	return client.ResourceV1alpha2().ResourceClaimTemplates(namespace).Create
 }
 
 // createResourceDriverOp defines an op where resource claims are created.
@@ -186,8 +163,8 @@ func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
 
 func (op *createResourceDriverOp) requiredNamespaces() []string { return nil }
 
-func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, clientset clientset.Interface) {
-	tb.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
+func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
+	tCtx.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
 
 	// Start the controller side of the DRA test driver such that it simulates
 	// per-node resources.
@@ -197,22 +174,22 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 		MaxAllocations: op.MaxClaimsPerNode,
 	}
 
-	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 	if err != nil {
-		tb.Fatalf("list nodes: %v", err)
+		tCtx.Fatalf("list nodes: %v", err)
 	}
 	for _, node := range nodes.Items {
 		match, err := filepath.Match(op.Nodes, node.Name)
 		if err != nil {
-			tb.Fatalf("matching glob pattern %q against node name %q: %v", op.Nodes, node.Name, err)
+			tCtx.Fatalf("matching glob pattern %q against node name %q: %v", op.Nodes, node.Name, err)
 		}
 		if match {
 			resources.Nodes = append(resources.Nodes, node.Name)
 		}
 	}
 
-	controller := draapp.NewController(clientset, resources)
-	ctx, cancel := context.WithCancel(ctx)
+	controller := draapp.NewController(tCtx.Client(), resources)
+	ctx, cancel := context.WithCancel(tCtx)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -220,11 +197,11 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 		ctx := klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), op.DriverName))
 		controller.Run(ctx, 5 /* workers */)
 	}()
-	tb.Cleanup(func() {
-		tb.Logf("stopping resource driver %q", op.DriverName)
+	tCtx.Cleanup(func() {
+		tCtx.Logf("stopping resource driver %q", op.DriverName)
 		// We must cancel before waiting.
 		cancel()
 		wg.Wait()
-		tb.Logf("stopped resource driver %q", op.DriverName)
+		tCtx.Logf("stopped resource driver %q", op.DriverName)
 	})
 }
