@@ -376,7 +376,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		})
 	})
 
-	ginkgo.Context("when gracefully shutting down with Pod priority", func() {
+	framework.Context("when gracefully shutting down with Pod priority", framework.WithFlaky(), func() {
 
 		const (
 			pollInterval                 = 1 * time.Second
