@@ -1,0 +1,71 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
+
+package v1beta1;
+option go_package = "k8s.io/kms/apis/v1beta1";
+
+// This service defines the public APIs for remote KMS provider.
+service KeyManagementService {
+    // Version returns the runtime name and runtime version of the KMS provider.
+    rpc Version(VersionRequest) returns (VersionResponse) {}
+
+    // Execute decryption operation in KMS provider.
+    rpc Decrypt(DecryptRequest) returns (DecryptResponse) {}
+    // Execute encryption operation in KMS provider.
+    rpc Encrypt(EncryptRequest) returns (EncryptResponse) {}
+}
+
+message VersionRequest {
+    // Version of the KMS plugin API.
+    string version = 1;
+}
+
+message VersionResponse {
+    // Version of the KMS plugin API.
+    string version = 1;
+    // Name of the KMS provider.
+    string runtime_name = 2;
+    // Version of the KMS provider. The string must be semver-compatible.
+    string runtime_version = 3;
+}
+
+message DecryptRequest {
+    // Version of the KMS plugin API.
+    string version = 1;
+    // The data to be decrypted.
+    bytes cipher = 2;
+}
+
+message DecryptResponse {
+    // The decrypted data.
+    bytes plain = 1;
+}
+
+message EncryptRequest {
+    // Version of the KMS plugin API.
+    string version = 1;
+    // The data to be encrypted.
+    bytes plain = 2;
+}
+
+message EncryptResponse {
+    // The encrypted data.
+    bytes cipher = 1;
+}
+

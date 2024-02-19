@@ -1,0 +1,36 @@
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
+
+package v2;
+option go_package = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2";
+
+// EncryptedObject is the representation of data stored in etcd after envelope encryption.
+message EncryptedObject {
+  // EncryptedData is the encrypted data.
+  bytes encryptedData = 1;
+
+  // KeyID is the KMS key ID used for encryption operations.
+  string keyID = 2;
+
+  // EncryptedDEK is the encrypted DEK.
+  bytes encryptedDEK = 3;
+
+  // Annotations is additional metadata that was provided by the KMS plugin.
+  map<string, bytes> annotations = 4;
+}

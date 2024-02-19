@@ -1,0 +1,61 @@
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
+
+package pluginregistration; // This should have been v1.
+option go_package = "k8s.io/kubelet/pkg/apis/pluginregistration/v1";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+// PluginInfo is the message sent from a plugin to the Kubelet pluginwatcher for plugin registration
+message PluginInfo {
+	// Type of the Plugin. CSIPlugin or DevicePlugin
+	string type = 1;
+	// Plugin name that uniquely identifies the plugin for the given plugin type.
+	// For DevicePlugin, this is the resource name that the plugin manages and
+	// should follow the extended resource name convention.
+	// For CSI, this is the CSI driver registrar name.
+	string name = 2;
+	// Optional endpoint location. If found set by Kubelet component,
+	// Kubelet component will use this endpoint for specific requests.
+	// This allows the plugin to register using one endpoint and possibly use
+	// a different socket for control operations. CSI uses this model to delegate
+	// its registration external from the plugin.
+	string endpoint = 3;
+	// Plugin service API versions the plugin supports.
+	// For DevicePlugin, this maps to the deviceplugin API versions the
+	// plugin supports at the given socket.
+	// The Kubelet component communicating with the plugin should be able
+	// to choose any preferred version from this list, or returns an error
+	// if none of the listed versions is supported.
+	repeated string supported_versions = 4;
+}
+
+// RegistrationStatus is the message sent from Kubelet pluginwatcher to the plugin for notification on registration status
+message RegistrationStatus {
+	// True if plugin gets registered successfully at Kubelet
+	bool plugin_registered  = 1;
+	// Error message in case plugin fails to register, empty string otherwise
+	string error  = 2;
+}
+
+// RegistrationStatusResponse is sent by plugin to kubelet in response to RegistrationStatus RPC
+message RegistrationStatusResponse {
+}
+
+// InfoRequest is the empty request message from Kubelet
+message InfoRequest {
+}
+
+// Registration is the service advertised by the Plugins.
+service Registration {
+	rpc GetInfo(InfoRequest) returns (PluginInfo) {}
+	rpc NotifyRegistrationStatus(RegistrationStatus) returns (RegistrationStatusResponse) {}
+}
