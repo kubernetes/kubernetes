@@ -845,7 +845,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
 			}
 			scheme.Default(tc.in)
-			if diff := cmp.Diff(tc.in, tc.want); diff != "" {
+			if diff := cmp.Diff(tc.want, tc.in); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}
 		})
