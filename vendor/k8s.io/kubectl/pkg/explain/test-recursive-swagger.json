@@ -1,0 +1,63 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Kubernetes",
+    "version": "v1.9.0"
+  },
+  "paths": {},
+  "definitions": {
+    "OneKind": {
+      "description": "OneKind has a short description",
+      "required": [
+        "field1"
+      ],
+      "properties": {
+        "field1": {
+          "description": "This is first reference field",
+          "$ref": "#/definitions/ReferenceKind"
+        },
+        "field2": {
+          "description": "This is other kind field with string and reference",
+          "$ref": "#/definitions/OtherKind"
+        }
+      },
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "",
+          "kind": "OneKind",
+          "version": "v2"
+        }
+      ]
+    },
+    "ReferenceKind": {
+      "description": "This is reference Kind",
+      "properties": {
+        "referencefield": {
+          "description": "This is reference to itself.",
+          "$ref": "#/definitions/ReferenceKind"
+        },
+        "referencesarray": {
+          "description": "This is an array of references",
+          "type": "array",
+          "items": {
+            "description": "This is reference object",
+            "$ref": "#/definitions/ReferenceKind"
+          }
+        }
+      }
+    },
+    "OtherKind": {
+      "description": "This is other kind with string and reference fields",
+      "properties": {
+        "string": {
+          "description": "This string must be a string",
+          "type": "string"
+        },
+        "reference": {
+          "description": "This is reference field.",
+          "$ref": "#/definitions/ReferenceKind"
+        }
+      }
+    }
+  }
+}
