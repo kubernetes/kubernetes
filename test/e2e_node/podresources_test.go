@@ -953,7 +953,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 		})
 	})
 
-	ginkgo.Context("without SRIOV devices in the system", func() {
+	framework.Context("without SRIOV devices in the system", framework.WithFlaky(), func() {
 		ginkgo.BeforeEach(func() {
 			requireLackOfSRIOVDevices()
 		})
@@ -1224,7 +1224,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 		})
 	})
 
-	ginkgo.Context("with the builtin rate limit values", func() {
+	framework.Context("with the builtin rate limit values", framework.WithFlaky(), func() {
 		ginkgo.It("should hit throttling when calling podresources List in a tight loop", func(ctx context.Context) {
 			// ensure APIs have been called at least once
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
