@@ -100,8 +100,10 @@ func GetTimestamp(value string, reference time.Time) (string, error) {
 // if the incoming nanosecond portion is longer or shorter than 9 digits it is
 // converted to nanoseconds.  The expectation is that the seconds and
 // seconds will be used to create a time variable.  For example:
-//     seconds, nanoseconds, err := ParseTimestamp("1136073600.000000001",0)
-//     if err == nil since := time.Unix(seconds, nanoseconds)
+//
+//	seconds, nanoseconds, err := ParseTimestamp("1136073600.000000001",0)
+//	if err == nil since := time.Unix(seconds, nanoseconds)
+//
 // returns seconds as def(aultSeconds) if value == ""
 func ParseTimestamps(value string, def int64) (int64, int64, error) {
 	if value == "" {

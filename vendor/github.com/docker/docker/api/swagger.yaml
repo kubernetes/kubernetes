@@ -24,7 +24,7 @@ info:
   title: "Docker Engine API"
   version: "1.41"
   x-logo:
-    url: "https://docs.docker.com/images/logo-docker-main.png"
+    url: "https://docs.docker.com/assets/images/logo-docker-main.png"
   description: |
     The Engine API is an HTTP API served by Docker Engine. It is the API the
     Docker client uses to communicate with the Engine, so everything the Docker
