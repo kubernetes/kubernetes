@@ -75,6 +75,11 @@ func (m *fakeManager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUS
 	return cpuset.CPUSet{}
 }
 
+func (m *fakeManager) GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string {
+	klog.InfoS("GetExclusiveResources", "podUID", pod.UID, "containerName", container.Name)
+	return nil
+}
+
 func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
 	klog.InfoS("Get Allocatable CPUs")
 	return cpuset.CPUSet{}

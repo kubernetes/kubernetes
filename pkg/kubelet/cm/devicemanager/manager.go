@@ -1051,6 +1051,17 @@ func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceIns
 	return m.podDevices.getContainerDevices(podUID, containerName)
 }
 
+// GetExclusiveResources returns a list of resource names whose instances were esclusively
+// allocated to this container.
+func (m *ManagerImpl) GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string {
+	var res []string
+	devs := m.podDevices.getContainerDevices(string(pod.UID), container.Name)
+	for resName := range devs {
+		res = append(res, resName)
+	}
+	return res
+}
+
 // ShouldResetExtendedResourceCapacity returns whether the extended resources should be zeroed or not,
 // depending on whether the node has been recreated. Absence of the checkpoint file strongly indicates the node
 // has been recreated.

@@ -68,7 +68,8 @@ type Manager interface {
 	// PodAdmitHandler is implemented by Manager
 	lifecycle.PodAdmitHandler
 	// RegisterProvider adds a hint provider to manager to indicate the hint provider
-	// wants to be consulted with when making topology hints
+	// wants to be consulted with when making topology hints, and is authoritative
+	// about the current resource allocation.
 	RegisterProvider(ra ResourceAllocator)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
@@ -108,12 +109,20 @@ type HintProvider interface {
 // which can allocate resources, provide allocation hints.
 type ResourceAllocator interface {
 	HintProvider
+	AllocationInfoProvider
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
 type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 	GetPolicy() Policy
+}
+
+type AllocationInfoProvider interface {
+	// GetExclusiveResources returns a list of resource names whose instances were
+	// esclusively allocated to this container. This is used by the orchestrator to
+	// check if a container got exclusive (vs shared) resources or not.
+	GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string
 }
 
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container

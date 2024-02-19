@@ -221,6 +221,11 @@ func (ra *fakeResourceAllocator) Allocate(pod *v1.Pod, container *v1.Container) 
 	return nil
 }
 
+func (ra *fakeResourceAllocator) GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string {
+	//TODO: add a field and use it
+	return nil
+}
+
 type mockPolicy struct {
 	nonePolicy
 	ph []map[string][]TopologyHint
@@ -231,7 +236,7 @@ func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (Topology
 	return TopologyHint{}, true
 }
 
-func TestAddHintProvider(t *testing.T) {
+func TestRegisterProvider(t *testing.T) {
 	tcases := []struct {
 		name string
 		prov []ResourceAllocator

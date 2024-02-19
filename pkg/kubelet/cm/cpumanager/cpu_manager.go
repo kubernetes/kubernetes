@@ -93,6 +93,11 @@ type Manager interface {
 	// GetCPUAffinity returns cpuset which includes cpus from shared pools
 	// as well as exclusively allocated cpus
 	GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
+
+	// GetExclusiveResources returns a list of resource names whose instances were
+	// exclusively allocated to this container. This is used by the orchestrator to
+	// check if a container got exclusive (vs shared) resources or not.
+	GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string
 }
 
 type manager struct {
@@ -531,6 +536,13 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	}
 
 	return cpuset.CPUSet{}
+}
+
+func (m *manager) GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string {
+	if _, ok := m.state.GetCPUSet(string(pod.UID), container.Name); ok {
+		return []string{string(v1.ResourceCPU)}
+	}
+	return nil
 }
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
