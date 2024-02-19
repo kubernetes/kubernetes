@@ -132,6 +132,9 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	// topology manager returned the hint with NUMA affinity nil
 	// we should use the default NUMA affinity calculated the same way as for the topology manager
 	if hint.NUMANodeAffinity == nil {
+
+		klog.V(3).InfoS("Topology Hint has no NUMA Affinity, recomputing", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "resources", requestedResources)
+
 		defaultHint, err := p.getDefaultHint(machineState, pod, requestedResources)
 		if err != nil {
 			return err
@@ -140,12 +143,18 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		if !defaultHint.Preferred && bestHint.Preferred {
 			return fmt.Errorf("[memorymanager] failed to find the default preferred hint")
 		}
+
+		klog.V(3).InfoS("Topology Hint recomputed", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "previous", bestHint, "recomputed", defaultHint)
 		bestHint = defaultHint
 	}
 
 	// topology manager returns the hint that does not satisfy completely the container request
 	// we should extend this hint to the one who will satisfy the request and include the current hint
 	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) {
+		bestHintAff := bestHint.NUMANodeAffinity.String()
+
+		klog.V(3).InfoS("Cannot allocate with best hint affinity, extending", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "affinity", bestHintAff, "resources", requestedResources)
+
 		extendedHint, err := p.extendTopologyManagerHint(machineState, pod, requestedResources, bestHint.NUMANodeAffinity)
 		if err != nil {
 			return err
@@ -154,6 +163,8 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		if !extendedHint.Preferred && bestHint.Preferred {
 			return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
 		}
+
+		klog.V(3).InfoS("Topology Hint extended", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "previous", bestHint, "extended", extendedHint)
 		bestHint = extendedHint
 	}
 
