@@ -21,6 +21,7 @@ import (
 	"os"
 	"testing"
 	"text/template"
+	"time"
 
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +32,8 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 var testConfigTempl = template.Must(template.New("test").Parse(`apiVersion: v1
@@ -103,6 +106,14 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 		if err := file.Close(); err != nil {
 			t.Fatalf("could not close tempfile: %v", err)
 		}
+
+		// Override the default timeouts to be shorter
+		defaultTimeouts := kubeadmapi.GetActiveTimeouts()
+		defaultAPICallTimeout := defaultTimeouts.KubernetesAPICall
+		defaultTimeouts.KubernetesAPICall = &metav1.Duration{Duration: time.Microsecond * 500}
+		defer func() {
+			defaultTimeouts.KubernetesAPICall = defaultAPICallTimeout
+		}()
 
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
