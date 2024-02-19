@@ -445,6 +445,9 @@ function kube::codegen::gen_openapi() {
 #   --informers-name <string = "informers">
 #     An optional override for the leaf name of the generated "informers" directory.
 #
+#   --plural-exceptions <string = "">
+#     An  optional list of comma separated plural exception definitions in Type:PluralizedType form.
+#
 function kube::codegen::gen_client() {
     local in_pkg_root=""
     local one_input_api=""
@@ -458,6 +461,7 @@ function kube::codegen::gen_client() {
     local listers_subdir="listers"
     local informers_subdir="informers"
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
+    local plural_exceptions=""
     local v="${KUBE_VERBOSE:-0}"
 
     while [ "$#" -gt 0 ]; do
@@ -508,6 +512,10 @@ function kube::codegen::gen_client() {
                 ;;
             "--informers-name")
                 informers_subdir="$2"
+                shift 2
+                ;;
+            "--plural-exceptions")
+                plural_exceptions="$2"
                 shift 2
                 ;;
             *)
@@ -622,6 +630,7 @@ function kube::codegen::gen_client() {
         --output-base "${out_base}" \
         --output-package "${out_pkg_root}/${clientset_subdir}" \
         --apply-configuration-package "${applyconfig_pkg}" \
+        --plural-exceptions "${plural_exceptions}" \
         "${inputs[@]}"
 
     if [ "${watchable}" == "true" ]; then
@@ -642,6 +651,7 @@ function kube::codegen::gen_client() {
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
             --output-package "${out_pkg_root}/${listers_subdir}" \
+            --plural-exceptions "${plural_exceptions}" \
             "${inputs[@]}"
 
         echo "Generating informer code for ${#input_pkgs[@]} targets"
@@ -663,6 +673,7 @@ function kube::codegen::gen_client() {
             --output-package "${out_pkg_root}/${informers_subdir}" \
             --versioned-clientset-package "${out_pkg_root}/${clientset_subdir}/${clientset_versioned_name}" \
             --listers-package "${out_pkg_root}/${listers_subdir}" \
+            --plural-exceptions "${plural_exceptions}" \
             "${inputs[@]}"
     fi
 }
