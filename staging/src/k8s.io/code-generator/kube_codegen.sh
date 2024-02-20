@@ -27,11 +27,11 @@ set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-function kube::codegen::internal::git_find() {
-    # Similar to find but faster and easier to understand.  We want to include
-    # modified and untracked files because this might be running against code
-    # which is not tracked by git yet.
-    git ls-files -cmo --exclude-standard "$@"
+function kube::codegen::internal::findz() {
+    # We use `find` rather than `git ls-files` because sometimes external
+    # projects use this across repos.  This is an imperfect wrapper of find,
+    # but good enough for this script.
+    find "$@" -print0
 }
 
 function kube::codegen::internal::grep() {
@@ -142,8 +142,10 @@ function kube::codegen::gen_helpers() {
     if [ "${#input_pkgs[@]}" != 0 ]; then
         echo "Generating deepcopy code for ${#input_pkgs[@]} targets"
 
-        kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.deepcopy.go' \
+        kube::codegen::internal::findz \
+            "${root}" \
+            -type f \
+            -name zz_generated.deepcopy.go \
             | xargs -0 rm -f
 
         local input_args=()
@@ -177,8 +179,10 @@ function kube::codegen::gen_helpers() {
     if [ "${#input_pkgs[@]}" != 0 ]; then
         echo "Generating defaulter code for ${#input_pkgs[@]} targets"
 
-        kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.defaults.go' \
+        kube::codegen::internal::findz \
+            "${root}" \
+            -type f \
+            -name zz_generated.defaults.go \
             | xargs -0 rm -f
 
         local input_args=()
@@ -212,8 +216,10 @@ function kube::codegen::gen_helpers() {
     if [ "${#input_pkgs[@]}" != 0 ]; then
         echo "Generating conversion code for ${#input_pkgs[@]} targets"
 
-        kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.conversion.go' \
+        kube::codegen::internal::findz \
+            "${root}" \
+            -type f \
+            -name zz_generated.conversion.go \
             | xargs -0 rm -f
 
         local input_args=()
@@ -375,8 +381,10 @@ function kube::codegen::gen_openapi() {
     if [ "${#input_pkgs[@]}" != 0 ]; then
         echo "Generating openapi code for ${#input_pkgs[@]} targets"
 
-        kube::codegen::internal::git_find -z \
-            ":(glob)${root}"/'**/zz_generated.openapi.go' \
+        kube::codegen::internal::findz \
+            "${root}" \
+            -type f \
+            -name zz_generated.openapi.go \
             | xargs -0 rm -f
 
         local inputs=()
