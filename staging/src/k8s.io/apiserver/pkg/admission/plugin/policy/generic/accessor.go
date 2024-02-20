@@ -18,14 +18,13 @@ package generic
 
 import (
 	"k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 type PolicyAccessor interface {
 	GetName() string
 	GetNamespace() string
-	GetParamKind() *schema.GroupVersionKind
+	GetParamKind() *v1beta1.ParamKind
 	GetMatchConstraints() *v1beta1.MatchResources
 }
 

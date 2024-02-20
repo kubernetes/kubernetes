@@ -23,7 +23,6 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
@@ -111,10 +110,9 @@ func TestPolicySourceHasSyncedInitialList(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "policy2",
 			},
-			ParamKind: &schema.GroupVersionKind{
-				Group:   "policy.example.com",
-				Version: "v1",
-				Kind:    "FakeParam",
+			ParamKind: &v1beta1.ParamKind{
+				APIVersion: "policy.example.com/v1",
+				Kind:       "FakeParam",
 			},
 		},
 	))
@@ -179,7 +177,7 @@ type FakePolicy struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 
-	ParamKind *schema.GroupVersionKind
+	ParamKind *v1beta1.ParamKind
 }
 
 var _ generic.PolicyAccessor = &FakePolicy{}
@@ -201,7 +199,7 @@ func (fp *FakePolicy) GetNamespace() string {
 	return fp.Namespace
 }
 
-func (fp *FakePolicy) GetParamKind() *schema.GroupVersionKind {
+func (fp *FakePolicy) GetParamKind() *v1beta1.ParamKind {
 	return fp.ParamKind
 }
 
