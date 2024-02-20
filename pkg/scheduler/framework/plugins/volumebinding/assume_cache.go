@@ -283,10 +283,16 @@ func (c *assumeCache) List(indexObj interface{}) []interface{} {
 	defer c.rwMutex.RUnlock()
 
 	allObjs := []interface{}{}
-	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
-	if err != nil {
-		c.logger.Error(err, "List index error")
-		return nil
+	var objs []interface{}
+	if c.indexName != "" {
+		o, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
+		if err != nil {
+			c.logger.Error(err, "List index error")
+			return nil
+		}
+		objs = o
+	} else {
+		objs = c.store.List()
 	}
 
 	for _, obj := range objs {
