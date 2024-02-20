@@ -96,9 +96,11 @@ func NewPathRecorderMux(name string) *PathRecorderMux {
 
 // ListedPaths returns the registered handler exposedPaths.
 func (m *PathRecorderMux) ListedPaths() []string {
+	m.lock.Lock()
 	handledPaths := append([]string{}, m.exposedPaths...)
-	sort.Strings(handledPaths)
+	m.lock.Unlock()
 
+	sort.Strings(handledPaths)
 	return handledPaths
 }
 
