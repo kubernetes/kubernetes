@@ -50,6 +50,13 @@ const instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/images"
 // indexed as imageId-RuntimeHandler
 const imageIndexTupleFormat = "%s,%s"
 
+// ImageGarbageCollectedTotalReason* specify the reason why an image was garbage collected
+// in the `image_garbage_collected_total` metric.
+const (
+	ImageGarbageCollectedTotalReasonAge   = "age"
+	ImageGarbageCollectedTotalReasonSpace = "space"
+)
+
 // StatsProvider is an interface for fetching stats used during image garbage
 // collection.
 type StatsProvider interface {
@@ -372,7 +379,7 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 		klog.V(5).InfoS("Evaluating image ID for possible garbage collection based on image age", "imageID", image.id)
 		// Evaluate whether image is older than MaxAge.
 		if freeTime.Sub(image.lastUsed) > im.policy.MaxAge {
-			if err := im.freeImage(ctx, image); err != nil {
+			if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonAge); err != nil {
 				deletionErrors = append(deletionErrors, err)
 				remainingImages = append(remainingImages, image)
 				continue
@@ -423,7 +430,7 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 			continue
 		}
 
-		if err := im.freeImage(ctx, image); err != nil {
+		if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonSpace); err != nil {
 			deletionErrors = append(deletionErrors, err)
 			continue
 		}
@@ -440,7 +447,7 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 	return spaceFreed, nil
 }
 
-func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo) error {
+func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo, reason string) error {
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
 	// Remove image. Continue despite errors.
 	var err error
@@ -456,7 +463,7 @@ func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo)
 	}
 	delete(im.imageRecords, imageKey)
 
-	metrics.ImageGarbageCollectedTotal.Inc()
+	metrics.ImageGarbageCollectedTotal.WithLabelValues(reason).Inc()
 	return err
 }
 
