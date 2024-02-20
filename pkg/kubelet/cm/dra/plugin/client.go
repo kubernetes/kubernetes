@@ -54,13 +54,14 @@ func (v1alpha2rm v1alpha2NodeResourceManager) Prepare(ctx context.Context, conn 
 	}
 
 	for _, claim := range req.Claims {
-		res, err := nodeClient.NodePrepareResource(ctx,
-			&drapbv1alpha2.NodePrepareResourceRequest{
-				Namespace:      claim.Namespace,
-				ClaimUid:       claim.Uid,
-				ClaimName:      claim.Name,
-				ResourceHandle: claim.ResourceHandle,
-			})
+		req := &drapbv1alpha2.NodePrepareResourceRequest{
+			Namespace:                claim.Namespace,
+			ClaimUid:                 claim.Uid,
+			ClaimName:                claim.Name,
+			ResourceHandle:           claim.ResourceHandle,
+			StructuredResourceHandle: claim.StructuredResourceHandle,
+		}
+		res, err := nodeClient.NodePrepareResource(ctx, req)
 		result := &drapb.NodePrepareResourceResponse{}
 		if err != nil {
 			result.Error = err.Error()

@@ -19,6 +19,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
@@ -71,6 +73,7 @@ type ClaimID struct {
 }
 
 var _ drapbv1alpha2.NodeServer = &ExamplePlugin{}
+var _ drapbv1alpha3.NodeServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
@@ -160,8 +163,28 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 
 	// Determine environment variables.
 	var p parameters
-	if err := json.Unmarshal([]byte(req.ResourceHandle), &p); err != nil {
-		return nil, fmt.Errorf("unmarshal resource handle: %w", err)
+	switch len(req.StructuredResourceHandle) {
+	case 0:
+		// Control plane controller did the allocation.
+		if err := json.Unmarshal([]byte(req.ResourceHandle), &p); err != nil {
+			return nil, fmt.Errorf("unmarshal resource handle: %w", err)
+		}
+	case 1:
+		// Scheduler did the allocation with structured parameters.
+		handle := req.StructuredResourceHandle[0]
+		if handle == nil {
+			return nil, errors.New("unexpected nil StructuredResourceHandle")
+		}
+		p.NodeName = handle.NodeName
+		if err := extractParameters(handle.VendorClassParameters, &p.EnvVars, "admin"); err != nil {
+			return nil, err
+		}
+		if err := extractParameters(handle.VendorClaimParameters, &p.EnvVars, "user"); err != nil {
+			return nil, err
+		}
+	default:
+		// Huh?
+		return nil, fmt.Errorf("invalid length of NodePrepareResourceRequest.StructuredResourceHandle: %d", len(req.StructuredResourceHandle))
 	}
 
 	// Sanity check scheduling.
@@ -212,16 +235,34 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 	return resp, nil
 }
 
+func extractParameters(parameters runtime.RawExtension, env *map[string]string, kind string) error {
+	if len(parameters.Raw) == 0 {
+		return nil
+	}
+	var data map[string]string
+	if err := json.Unmarshal(parameters.Raw, &data); err != nil {
+		return fmt.Errorf("decoding %s parameters: %v", kind, err)
+	}
+	if len(data) > 0 && *env == nil {
+		*env = make(map[string]string)
+	}
+	for key, value := range data {
+		(*env)[kind+"_"+key] = value
+	}
+	return nil
+}
+
 func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
 	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
 		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
 	}
 	for _, claimReq := range req.Claims {
 		claimResp, err := ex.NodePrepareResource(ctx, &drapbv1alpha2.NodePrepareResourceRequest{
-			Namespace:      claimReq.Namespace,
-			ClaimName:      claimReq.Name,
-			ClaimUid:       claimReq.Uid,
-			ResourceHandle: claimReq.ResourceHandle,
+			Namespace:                claimReq.Namespace,
+			ClaimName:                claimReq.Name,
+			ClaimUid:                 claimReq.Uid,
+			ResourceHandle:           claimReq.ResourceHandle,
+			StructuredResourceHandle: claimReq.StructuredResourceHandle,
 		})
 		if err != nil {
 			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
