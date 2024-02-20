@@ -109,6 +109,10 @@ const (
 	CPUManagerPinningRequestsTotalKey = "cpu_manager_pinning_requests_total"
 	CPUManagerPinningErrorsTotalKey   = "cpu_manager_pinning_errors_total"
 
+	// Metrics to track the Memory manager behavior
+	MemoryManagerPinningRequestsTotalKey = "memory_manager_pinning_requests_total"
+	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
+
 	// Metrics to track the Topology manager behavior
 	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
 	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
@@ -742,6 +746,25 @@ var (
 		},
 	)
 
+	// MemoryManagerPinningRequestTotal tracks the number of times the pod spec required the memory manager to pin memory pages
+	MemoryManagerPinningRequestTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerPinningRequestsTotalKey,
+			Help:           "The number of memory pages allocations which required pinning.",
+			StabilityLevel: metrics.ALPHA,
+		})
+
+	// MemoryManagerPinningErrorsTotal tracks the number of times the pod spec required the memory manager to pin memory pages, but the allocation failed
+	MemoryManagerPinningErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerPinningErrorsTotalKey,
+			Help:           "The number of memory pages allocations which required pinning that failed.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// TopologyManagerAdmissionRequestsTotal tracks the number of times the pod spec will cause the topology manager to admit a pod
 	TopologyManagerAdmissionRequestsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -935,6 +958,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 		legacyregistry.MustRegister(CPUManagerPinningRequestsTotal)
 		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
+			legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
+			legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
+		}
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
