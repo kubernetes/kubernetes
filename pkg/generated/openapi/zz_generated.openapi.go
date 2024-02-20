@@ -15913,7 +15913,7 @@ func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.Op
 					},
 					"active": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of pending and running pods.",
+							Description: "The number of pending and running pods which are not terminating (without a deletionTimestamp).",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
