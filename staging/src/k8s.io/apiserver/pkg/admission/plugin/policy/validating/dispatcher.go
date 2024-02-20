@@ -44,7 +44,7 @@ import (
 )
 
 type dispatcher struct {
-	matcher Matcher
+	matcher generic.PolicyMatcher
 	authz   authorizer.Authorizer
 }
 
@@ -52,7 +52,7 @@ var _ generic.Dispatcher[PolicyHook] = &dispatcher{}
 
 func NewDispatcher(
 	authorizer authorizer.Authorizer,
-	matcher Matcher,
+	matcher generic.PolicyMatcher,
 ) generic.Dispatcher[PolicyHook] {
 	return &dispatcher{
 		matcher: matcher,
@@ -124,7 +124,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		var versionedAttr *admission.VersionedAttributes
 
 		definition := hook.Policy
-		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(a, o, definition)
+		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(a, o, NewValidatingAdmissionPolicyAccessor(definition))
 		if err != nil {
 			// Configuration error.
 			addConfigError(err, definition, nil)
@@ -143,7 +143,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		for _, binding := range hook.Bindings {
 			// If the key is inside dependentBindings, there is guaranteed to
 			// be a bindingInfo for it
-			matches, err := c.matcher.BindingMatches(a, o, binding)
+			matches, err := c.matcher.BindingMatches(a, o, NewValidatingAdmissionPolicyBindingAccessor(binding))
 			if err != nil {
 				// Configuration error.
 				addConfigError(err, definition, binding)
