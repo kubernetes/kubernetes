@@ -63,17 +63,23 @@ func expect(tCtx TContext, actual interface{}, extra ...interface{}) gomega.Asse
 }
 
 func expectNoError(tCtx TContext, err error, explain ...interface{}) {
+	if err == nil {
+		return
+	}
+
 	tCtx.Helper()
 
-	description := buildDescription(explain)
+	description := buildDescription(explain...)
 
-	var failure FailureError
-	if errors.As(err, &failure) {
-		if backtrace := failure.Backtrace(); backtrace != "" {
-			if description != "" {
-				tCtx.Log(description)
+	if errors.Is(err, ErrFailure) {
+		var failure FailureError
+		if errors.As(err, &failure) {
+			if backtrace := failure.Backtrace(); backtrace != "" {
+				if description != "" {
+					tCtx.Log(description)
+				}
+				tCtx.Logf("Failed at:\n    %s", strings.ReplaceAll(backtrace, "\n", "\n    "))
 			}
-			tCtx.Logf("Failed at:\n    %s", strings.ReplaceAll(backtrace, "\n", "\n    "))
 		}
 		if description != "" {
 			tCtx.Fatalf("%s: %s", description, err.Error())
@@ -84,7 +90,7 @@ func expectNoError(tCtx TContext, err error, explain ...interface{}) {
 	if description == "" {
 		description = "Unexpected error"
 	}
-	tCtx.Logf("%s: %s\n%s", description, format.Object(err, 1))
+	tCtx.Logf("%s:\n%s", description, format.Object(err, 1))
 	tCtx.Fatalf("%s: %v", description, err.Error())
 }
 
