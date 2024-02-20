@@ -836,7 +836,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		reason = pod.Status.Reason
 	}
 
-	// If the Pod carries {type:PodScheduled, reason:WaitingForGates}, set reason to 'SchedulingGated'.
+	// If the Pod carries {type:PodScheduled, reason:SchedulingGated}, set reason to 'SchedulingGated'.
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == api.PodScheduled && condition.Reason == apiv1.PodReasonSchedulingGated {
 			reason = apiv1.PodReasonSchedulingGated
