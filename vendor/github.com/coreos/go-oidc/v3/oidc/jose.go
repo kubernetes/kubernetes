@@ -1,13 +1,9 @@
-// +build !golint
-
-// Don't lint this file. We don't want to have to add a comment to each constant.
-
 package oidc
 
+// JOSE asymmetric signing algorithm values as defined by RFC 7518
+//
+// see: https://tools.ietf.org/html/rfc7518#section-3.1
 const (
-	// JOSE asymmetric signing algorithm values as defined by RFC 7518
-	//
-	// see: https://tools.ietf.org/html/rfc7518#section-3.1
 	RS256 = "RS256" // RSASSA-PKCS-v1.5 using SHA-256
 	RS384 = "RS384" // RSASSA-PKCS-v1.5 using SHA-384
 	RS512 = "RS512" // RSASSA-PKCS-v1.5 using SHA-512

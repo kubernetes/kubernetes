@@ -171,21 +171,7 @@ func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src
 	return token.claims, nil
 }
 
-func parseClaim(raw []byte, name string, v interface{}) error {
-	var parsed map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return err
-	}
-
-	val, ok := parsed[name]
-	if !ok {
-		return fmt.Errorf("claim doesn't exist: %s", name)
-	}
-
-	return json.Unmarshal([]byte(val), v)
-}
-
-// Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
+// Verify parses a raw ID Token, verifies it's been signed by the provider, performs
 // any additional checks depending on the Config, and returns the payload.
 //
 // Verify does NOT do nonce validation, which is the callers responsibility.
