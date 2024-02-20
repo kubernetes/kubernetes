@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -55,6 +56,38 @@ func dumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	// Note that we don't wait for any Cleanup to propagate, which means
 	// that if you delete a bunch of pods right before ending your test,
 	// you may or may not see the killing/deletion/Cleanup events.
+}
+
+// DumpAllNamespaceContainers runs `kubectl logs` on all containers in namespace
+func DumpAllNamespaceContainers(ctx context.Context, c clientset.Interface, ns string) {
+	podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		framework.Logf("Error getting pods in namespace '%s': %v", ns, err)
+		return
+	}
+	framework.Logf("BEGIN Running kubectl logs ALL containers in %v", ns)
+	for _, pod := range podList.Items {
+		framework.Logf("Logs for container %s", pod.Name)
+		kubectlLogPod(ctx, c, pod, "", framework.Logf)
+	}
+	framework.Logf("END Running kubectl logs ALL containers in %v", ns)
+}
+
+func kubectlLogPod(ctx context.Context, c clientset.Interface, pod v1.Pod, containerNameSubstr string, logFunc func(ftm string, args ...interface{})) {
+	for _, container := range pod.Spec.Containers {
+		if strings.Contains(container.Name, containerNameSubstr) {
+			// Contains() matches all strings if substr is empty
+			logs, err := e2epod.GetPodLogs(ctx, c, pod.Namespace, pod.Name, container.Name)
+			if err != nil {
+				logs, err = e2epod.GetPreviousPodLogs(ctx, c, pod.Namespace, pod.Name, container.Name)
+				if err != nil {
+					logFunc("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+				}
+			}
+			logFunc("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName)
+			logFunc("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
+		}
+	}
 }
 
 // DumpAllNamespaceInfo dumps events, pods and nodes information in the given namespace.

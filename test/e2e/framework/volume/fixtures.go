@@ -43,6 +43,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -475,6 +476,10 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	} else {
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, client, clientPod.Name, clientPod.Namespace, timeouts.PodStart)
 	}
+	framework.Logf(">>>>> trying to log stuff in runVolumeTesterPod")
+	e2edebug.DumpAllNamespaceContainers(ctx, client, config.Namespace)
+	framework.Logf("<<<<< trying to log stuff in runVolumeTesterPod")
+	//time.Sleep(time.Minute * 30)
 	if err != nil {
 		e2epod.DeletePodOrFail(ctx, client, clientPod.Namespace, clientPod.Name)
 		_ = e2epod.WaitForPodNotFoundInNamespace(ctx, client, clientPod.Name, clientPod.Namespace, timeouts.PodDelete)

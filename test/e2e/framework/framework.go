@@ -137,11 +137,17 @@ type Framework struct {
 	// DumpAllNamespaceInfo is invoked by the framework to record
 	// information about a namespace after a test failure.
 	DumpAllNamespaceInfo DumpAllNamespaceInfoAction
+
+	DumpAllNamespaceContainers DumpAllNamespaceContainersAction
 }
 
 // DumpAllNamespaceInfoAction is called after each failed test for namespaces
 // created for the test.
 type DumpAllNamespaceInfoAction func(ctx context.Context, f *Framework, namespace string)
+
+// DumpAllNamespaceInfoAction is called after each failed test for namespaces
+// created for the test.
+type DumpAllNamespaceContainersAction func(ctx context.Context, f *Framework, namespace string)
 
 // TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
@@ -298,6 +304,7 @@ func (f *Framework) dumpNamespaceInfo(ctx context.Context) {
 		if !f.SkipNamespaceCreation {
 			for _, ns := range f.namespacesToDelete {
 				f.DumpAllNamespaceInfo(ctx, f, ns.Name)
+				f.DumpAllNamespaceContainers(ctx, f, ns.Name)
 			}
 		}
 	})

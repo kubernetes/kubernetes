@@ -3300,6 +3300,10 @@ EOF
   systemctl daemon-reload
   echo ">>>>>> END containerd.service <<<<<<"
 
+  echo ">>>>>> BEGIN nfs-client.target rpcbind.socket <<<<<<"
+  systemctl enable --now nfs-client.target rpcbind.socket || true
+  echo ">>>>>> END nfs-client.target rpcbind.socket <<<<<<"
+
   echo "Restart containerd to load the config change"
   systemctl restart containerd
 }

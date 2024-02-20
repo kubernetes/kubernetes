@@ -34,6 +34,9 @@ func init() {
 			f.DumpAllNamespaceInfo = func(ctx context.Context, f *framework.Framework, ns string) {
 				e2edebug.DumpAllNamespaceInfo(ctx, f.ClientSet, ns)
 			}
+			f.DumpAllNamespaceContainers = func(ctx context.Context, f *framework.Framework, ns string) {
+				e2edebug.DumpAllNamespaceContainers(ctx, f.ClientSet, ns)
+			}
 
 			if framework.TestContext.GatherLogsSizes {
 				ginkgo.BeforeEach(func() {
