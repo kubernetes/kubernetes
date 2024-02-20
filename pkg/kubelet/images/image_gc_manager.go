@@ -69,7 +69,7 @@ type StatsProvider interface {
 type ImageGCManager interface {
 	// Applies the garbage collection policy. Errors include being unable to free
 	// enough space as per the garbage collection policy.
-	GarbageCollect(ctx context.Context) error
+	GarbageCollect(ctx context.Context, beganGC time.Time) error
 
 	// Start async garbage collection of images.
 	Start()
@@ -308,7 +308,7 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	return imagesInUse, nil
 }
 
-func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
+func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.Time) error {
 	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
 	defer otelSpan.End()
 
@@ -318,7 +318,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 		return err
 	}
 
-	images, err = im.freeOldImages(ctx, images, freeTime)
+	images, err = im.freeOldImages(ctx, images, freeTime, beganGC)
 	if err != nil {
 		return err
 	}
@@ -369,8 +369,14 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 	return nil
 }
 
-func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evictionInfo, freeTime time.Time) ([]evictionInfo, error) {
+func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evictionInfo, freeTime, beganGC time.Time) ([]evictionInfo, error) {
 	if im.policy.MaxAge == 0 {
+		return images, nil
+	}
+
+	// Wait until the MaxAge has passed since the Kubelet has started,
+	// or else we risk prematurely garbage collecting images.
+	if freeTime.Sub(beganGC) <= im.policy.MaxAge {
 		return images, nil
 	}
 	var deletionErrors []error
