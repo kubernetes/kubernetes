@@ -23,6 +23,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+set -x
+
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v1.4.0'
 DEFAULT_CNI_HASH='993cf3284c6ffe5d803692de033d17941cffad8e58a1d8b8a41bba850eaf51a90c8a590b3e61c428a350aae39bcf77ec3901a64a71f6767e8e82c262671362c0'

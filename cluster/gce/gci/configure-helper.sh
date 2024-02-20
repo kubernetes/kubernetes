@@ -3292,6 +3292,14 @@ EOF
   fi
   chmod 644 "${config_path}"
 
+  # ensure that LimitNOFILE is NOT set to `unlimited` and set to a known value
+  sed -i 's|LimitNOFILE=.*|LimitNOFILE=1048576|' /usr/lib/systemd/system/containerd.service || true
+
+  echo ">>>>>> BEGIN containerd.service <<<<<<"
+  cat /usr/lib/systemd/system/containerd.service || true
+  systemctl daemon-reload
+  echo ">>>>>> END containerd.service <<<<<<"
+
   echo "Restart containerd to load the config change"
   systemctl restart containerd
 }
