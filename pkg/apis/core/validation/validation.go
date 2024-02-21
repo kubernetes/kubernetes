@@ -4234,6 +4234,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	securityContext := spec.SecurityContext
 	// validate Pod SecurityContext
 	if securityContext != nil {
+		if securityContext.AppArmorProfile != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("appArmorProfile"), "cannot be set for a windows pod"))
+		}
 		if securityContext.SELinuxOptions != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seLinuxOptions"), "cannot be set for a windows pod"))
 		}
@@ -4280,6 +4283,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		// TODO: Think if we need to relax this restriction or some of the restrictions
 		if sc != nil {
 			fldPath := cFldPath.Child("securityContext")
+			if sc.AppArmorProfile != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("appArmorProfile"), "cannot be set for a windows pod"))
+			}
 			if sc.SELinuxOptions != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("seLinuxOptions"), "cannot be set for a windows pod"))
 			}
@@ -4657,6 +4663,43 @@ func validateSeccompProfileType(fldPath *field.Path, seccompProfileType core.Sec
 	}
 }
 
+func validateAppArmorProfileField(profile *core.AppArmorProfile, fldPath *field.Path) field.ErrorList {
+	if profile == nil {
+		return nil
+	}
+
+	allErrs := field.ErrorList{}
+
+	switch profile.Type {
+	case core.AppArmorProfileTypeLocalhost:
+		if profile.LocalhostProfile == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when AppArmor type is Localhost"))
+		} else {
+			localhostProfile := strings.TrimSpace(*profile.LocalhostProfile)
+			if localhostProfile != *profile.LocalhostProfile {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), *profile.LocalhostProfile, "must not be padded with whitespace"))
+			} else if localhostProfile == "" {
+				allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when AppArmor type is Localhost"))
+			}
+		}
+
+	case core.AppArmorProfileTypeRuntimeDefault, core.AppArmorProfileTypeUnconfined:
+		if profile.LocalhostProfile != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), profile.LocalhostProfile, "can only be set when AppArmor type is Localhost"))
+		}
+
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "type is required when appArmorProfile is set"))
+
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), profile.Type,
+			[]core.AppArmorProfileType{core.AppArmorProfileTypeLocalhost, core.AppArmorProfileTypeRuntimeDefault, core.AppArmorProfileTypeUnconfined}))
+	}
+
+	return allErrs
+
+}
+
 func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for k, p := range annotations {
@@ -4799,6 +4842,7 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 
 		allErrs = append(allErrs, validateSeccompProfileField(securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
+		allErrs = append(allErrs, validateAppArmorProfileField(securityContext.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 	}
 
 	return allErrs
@@ -7084,6 +7128,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 	}
 
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
+	allErrs = append(allErrs, validateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 
 	return allErrs
 }

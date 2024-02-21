@@ -55,11 +55,8 @@ const (
 	SeccompLocalhostProfileNamePrefix = "localhost/"
 
 	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// Deprecated: use a pod or container security context `appArmorProfile` field instead.
 	AppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
-	// AppArmorBetaDefaultProfileAnnotationKey is the annotation key specifying the default AppArmor profile.
-	AppArmorBetaDefaultProfileAnnotationKey = "apparmor.security.beta.kubernetes.io/defaultProfileName"
-	// AppArmorBetaAllowedProfilesAnnotationKey is the annotation key specifying the allowed AppArmor profiles.
-	AppArmorBetaAllowedProfilesAnnotationKey = "apparmor.security.beta.kubernetes.io/allowedProfileNames"
 
 	// AppArmorBetaProfileRuntimeDefault is the profile specifying the runtime default.
 	AppArmorBetaProfileRuntimeDefault = "runtime/default"

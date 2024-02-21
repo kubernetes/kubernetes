@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -540,12 +539,21 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations, oldPodSpec) {
 		for k := range podAnnotations {
-			if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
+			if strings.HasPrefix(k, api.AppArmorContainerAnnotationKeyPrefix) {
 				delete(podAnnotations, k)
 			}
 		}
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.AppArmorProfile = nil
+		}
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+			if c.SecurityContext != nil {
+				c.SecurityContext.AppArmorProfile = nil
+			}
+			return true
+		})
 	}
 
 	// If the feature is disabled and not in use, drop the hostUsers field.
@@ -940,13 +948,28 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 }
 
 // appArmorInUse returns true if the pod has apparmor related information
-func appArmorInUse(podAnnotations map[string]string) bool {
+func appArmorInUse(podAnnotations map[string]string, podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
 	for k := range podAnnotations {
-		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
+		if strings.HasPrefix(k, api.AppArmorContainerAnnotationKeyPrefix) {
 			return true
 		}
 	}
-	return false
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil {
+		return true
+	}
+	hasAppArmorContainer := false
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil {
+			hasAppArmorContainer = true
+			return false
+		}
+		return true
+	})
+	return hasAppArmorContainer
 }
 
 // restartableInitContainersInUse returns true if the pod spec is non-nil and

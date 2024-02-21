@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -704,83 +706,84 @@ func TestDropProcMount(t *testing.T) {
 }
 
 func TestDropAppArmor(t *testing.T) {
-	podWithAppArmor := func() *api.Pod {
-		return &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.AppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
-			Spec:       api.PodSpec{},
-		}
-	}
-	podWithoutAppArmor := func() *api.Pod {
-		return &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
-			Spec:       api.PodSpec{},
-		}
-	}
-
-	podInfo := []struct {
+	tests := []struct {
 		description string
 		hasAppArmor bool
-		pod         func() *api.Pod
-	}{
-		{
-			description: "has AppArmor",
-			hasAppArmor: true,
-			pod:         podWithAppArmor,
+		pod         api.Pod
+	}{{
+		description: "with AppArmor Annotations",
+		hasAppArmor: true,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.AppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
+			Spec:       api.PodSpec{},
 		},
-		{
-			description: "does not have AppArmor",
-			hasAppArmor: false,
-			pod:         podWithoutAppArmor,
+	}, {
+		description: "with pod AppArmor profile",
+		hasAppArmor: true,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					AppArmorProfile: &api.AppArmorProfile{
+						Type: api.AppArmorProfileTypeRuntimeDefault,
+					},
+				},
+			},
 		},
-		{
-			description: "is nil",
-			hasAppArmor: false,
-			pod:         func() *api.Pod { return nil },
+	}, {
+		description: "with container AppArmor profile",
+		hasAppArmor: true,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec: api.PodSpec{
+				Containers: []api.Container{{
+					SecurityContext: &api.SecurityContext{
+						AppArmorProfile: &api.AppArmorProfile{
+							Type: api.AppArmorProfileTypeRuntimeDefault,
+						},
+					},
+				}},
+			},
 		},
-	}
+	}, {
+		description: "without AppArmor",
+		hasAppArmor: false,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec:       api.PodSpec{},
+		},
+	}}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasAppArmor, oldPod := oldPodInfo.hasAppArmor, oldPodInfo.pod()
-				newPodHasAppArmor, newPod := newPodInfo.hasAppArmor, newPodInfo.pod()
-				if newPod == nil {
-					continue
+	for _, test := range tests {
+		for _, enabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v/enabled=%v", test.description, enabled), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
+
+				newPod := test.pod.DeepCopy()
+
+				if actual := appArmorInUse(newPod.Annotations, &newPod.Spec); actual != test.hasAppArmor {
+					t.Errorf("appArmorInUse does not match expectation: %t != %t", actual, test.hasAppArmor)
 				}
 
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
+				DropDisabledPodFields(newPod, newPod)
+				require.Equal(t, &test.pod, newPod, "unchanged pod should never be mutated")
 
-					DropDisabledPodFields(newPod, oldPod)
+				DropDisabledPodFields(newPod, nil)
 
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+				if enabled {
+					assert.Equal(t, &test.pod, newPod, "pod should not be mutated when AppArmor is enabled")
+				} else {
+					if appArmorInUse(newPod.Annotations, &newPod.Spec) {
+						t.Errorf("newPod should not be using appArmor after dropping disabled fields")
 					}
 
-					switch {
-					case enabled || oldPodHasAppArmor:
-						// new pod should not be changed if the feature is enabled, or if the old pod had AppArmor
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasAppArmor:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have AppArmor
-						if !reflect.DeepEqual(newPod, podWithoutAppArmor()) {
-							t.Errorf("new pod had EmptyDir SizeLimit: %v", cmp.Diff(newPod, podWithoutAppArmor()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
+					if test.hasAppArmor {
+						assert.NotEqual(t, &test.pod, newPod, "pod should be mutated to drop AppArmor")
+					} else {
+						assert.Equal(t, &test.pod, newPod, "pod without AppArmor should not be mutated")
 					}
-				})
-			}
+				}
+			})
 		}
 	}
 }

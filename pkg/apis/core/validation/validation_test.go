@@ -10289,7 +10289,7 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     core.DNSDefault,
 			},
 		},
-		"default AppArmor profile for a container": {
+		"default AppArmor annotation for a container": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -10299,7 +10299,7 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec(nil),
 		},
-		"default AppArmor profile for an init container": {
+		"default AppArmor annotation for an init container": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -10314,7 +10314,7 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:      core.DNSClusterFirst,
 			},
 		},
-		"localhost AppArmor profile for a container": {
+		"localhost AppArmor annotation for a container": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -10323,6 +10323,107 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 			Spec: validPodSpec(nil),
+		},
+		"runtime default AppArmor profile for a pod": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+				SecurityContext: &core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type: core.AppArmorProfileTypeRuntimeDefault,
+					},
+				},
+			},
+		},
+		"runtime default AppArmor profile for a container": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					SecurityContext: &core.SecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type: core.AppArmorProfileTypeRuntimeDefault,
+						},
+					},
+				}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+			},
+		},
+		"unconfined AppArmor profile for a pod": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+				SecurityContext: &core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type: core.AppArmorProfileTypeUnconfined,
+					},
+				},
+			},
+		},
+		"unconfined AppArmor profile for a container": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					SecurityContext: &core.SecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type: core.AppArmorProfileTypeUnconfined,
+						},
+					},
+				}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+			},
+		},
+		"localhost AppArmor profile for a pod": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+				SecurityContext: &core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeLocalhost,
+						LocalhostProfile: ptr.To("example-org/application-foo"),
+					},
+				},
+			},
+		},
+		"localhost AppArmor profile for a container field": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					SecurityContext: &core.SecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type:             core.AppArmorProfileTypeLocalhost,
+							LocalhostProfile: ptr.To("example-org/application-foo"),
+						},
+					},
+				}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+			},
 		},
 		"syntactically valid sysctls": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -11878,6 +11979,143 @@ func TestValidatePod(t *testing.T) {
 					},
 				},
 				Spec: validPodSpec(nil),
+			},
+		},
+		"unsupported pod AppArmor profile type": {
+			expectedError: `Unsupported value: "test"`,
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: core.PodSpec{
+					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSDefault,
+					SecurityContext: &core.PodSecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type: "test",
+						},
+					},
+				},
+			},
+		},
+		"unsupported container AppArmor profile type": {
+			expectedError: `Unsupported value: "test"`,
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: core.PodSpec{
+					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						SecurityContext: &core.SecurityContext{
+							AppArmorProfile: &core.AppArmorProfile{
+								Type: "test",
+							},
+						},
+					}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSDefault,
+				},
+			},
+		},
+		"missing pod AppArmor profile type": {
+			expectedError: "Required value: type is required when appArmorProfile is set",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: core.PodSpec{
+					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSDefault,
+					SecurityContext: &core.PodSecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type: "",
+						},
+					},
+				},
+			},
+		},
+		"missing AppArmor localhost profile": {
+			expectedError: "Required value: must be set when AppArmor type is Localhost",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: core.PodSpec{
+					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSDefault,
+					SecurityContext: &core.PodSecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type: core.AppArmorProfileTypeLocalhost,
+						},
+					},
+				},
+			},
+		},
+		"empty AppArmor localhost profile": {
+			expectedError: "Required value: must be set when AppArmor type is Localhost",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: core.PodSpec{
+					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSDefault,
+					SecurityContext: &core.PodSecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type:             core.AppArmorProfileTypeLocalhost,
+							LocalhostProfile: ptr.To(""),
+						},
+					},
+				},
+			},
+		},
+		"invalid AppArmor localhost profile type": {
+			expectedError: `Invalid value: "foo-bar"`,
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: core.PodSpec{
+					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSDefault,
+					SecurityContext: &core.PodSecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type:             core.AppArmorProfileTypeRuntimeDefault,
+							LocalhostProfile: ptr.To("foo-bar"),
+						},
+					},
+				},
+			},
+		},
+		"invalid AppArmor localhost profile": {
+			expectedError: `Invalid value: "foo-bar "`,
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: core.PodSpec{
+					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSDefault,
+					SecurityContext: &core.PodSecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type:             core.AppArmorProfileTypeLocalhost,
+							LocalhostProfile: ptr.To("foo-bar "),
+						},
+					},
+				},
 			},
 		},
 		"invalid extended resource name in container request": {
@@ -21580,6 +21818,12 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorMsg:    "cannot be set for a windows pod",
 		errorType:   "FieldValueForbidden",
 	}, {
+		name:        "pod with AppArmorProfile",
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{AppArmorProfile: &core.AppArmorProfile{Type: core.AppArmorProfileTypeRuntimeDefault}}}}},
+		expectError: true,
+		errorMsg:    "cannot be set for a windows pod",
+		errorType:   "FieldValueForbidden",
+	}, {
 		name:        "pod with WindowsOptions, no error",
 		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
 		expectError: false,
@@ -21613,6 +21857,7 @@ func TestValidateOSFields(t *testing.T) {
 	// - Add documentation to the os field in the api
 	// - Add validation logic validateLinux, validateWindows functions to make sure the field is only set for eligible OSes
 	osSpecificFields := sets.NewString(
+		"Containers[*].SecurityContext.AppArmorProfile",
 		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
 		"Containers[*].SecurityContext.Capabilities",
 		"Containers[*].SecurityContext.Privileged",
@@ -21623,6 +21868,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.SELinuxOptions",
 		"Containers[*].SecurityContext.SeccompProfile",
 		"Containers[*].SecurityContext.WindowsOptions",
+		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
 		"InitContainers[*].SecurityContext.Capabilities",
 		"InitContainers[*].SecurityContext.Privileged",
@@ -21633,6 +21879,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.SELinuxOptions",
 		"InitContainers[*].SecurityContext.SeccompProfile",
 		"InitContainers[*].SecurityContext.WindowsOptions",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Capabilities",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Privileged",
@@ -21644,6 +21891,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SeccompProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.WindowsOptions",
 		"OS",
+		"SecurityContext.AppArmorProfile",
 		"SecurityContext.FSGroup",
 		"SecurityContext.FSGroupChangePolicy",
 		"SecurityContext.HostIPC",

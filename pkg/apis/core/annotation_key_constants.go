@@ -52,6 +52,19 @@ const (
 	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
 
+	// AppArmorContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// Deprecated: use a pod or container security context `appArmorProfile` field instead.
+	AppArmorContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
+
+	// AppArmorProfileRuntimeDefault is the profile specifying the runtime default.
+	AppArmorProfileRuntimeDefault = "runtime/default"
+
+	// AppArmorProfileLocalhostPrefix is the prefix for specifying profiles loaded on the node.
+	AppArmorProfileLocalhostPrefix = "localhost/"
+
+	// AppArmorProfileNameUnconfined is the Unconfined AppArmor profile
+	AppArmorProfileNameUnconfined = "unconfined"
+
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
