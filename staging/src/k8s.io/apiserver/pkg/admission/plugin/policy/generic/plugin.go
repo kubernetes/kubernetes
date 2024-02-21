@@ -191,8 +191,6 @@ func isPolicyResource(attr admission.Attributes) bool {
 	if gvk.Group == "admissionregistration.k8s.io" {
 		if gvk.Resource == "validatingadmissionpolicies" || gvk.Resource == "validatingadmissionpolicybindings" {
 			return true
-		} else if gvk.Resource == "mutatingadmissionpolicies" || gvk.Resource == "mutatingadmissionpolicybindings" {
-			return true
 		}
 	}
 	return false
