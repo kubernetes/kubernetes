@@ -62,6 +62,10 @@ spec:
       - valuesValue
     matchLabels:
       matchLabelsKey: matchLabelsValue
+  successPolicy:
+    rules:
+    - succeededCount: 2
+      succeededIndexes: succeededIndexesValue
   suspend: true
   template:
     metadata:
