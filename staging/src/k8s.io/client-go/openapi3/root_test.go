@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/openapitest"
@@ -259,7 +260,7 @@ func TestOpenAPIV3Root_GroupVersionToPath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actualPath := gvToAPIPath(test.groupVersion)
+			actualPath := GroupVersionToAPIPath(test.groupVersion)
 			assert.Equal(t, test.expectedPath, actualPath, "expected API path (%s), got (%s)",
 				test.expectedPath, actualPath)
 		})
@@ -305,7 +306,7 @@ func TestOpenAPIV3Root_PathToGroupVersion(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actualGV, err := pathToGroupVersion(test.path)
+			actualGV, err := PathToGroupVersion(test.path)
 			if test.expectedErr {
 				require.Error(t, err, "should have received error for path: %s", test.path)
 			} else {

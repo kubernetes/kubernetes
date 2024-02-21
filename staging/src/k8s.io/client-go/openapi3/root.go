@@ -78,7 +78,7 @@ func (r *root) GroupVersions() ([]schema.GroupVersion, error) {
 	// Example GroupVersion API path: "apis/apps/v1"
 	gvs := make([]schema.GroupVersion, 0, len(paths))
 	for gvAPIPath := range paths {
-		gv, err := pathToGroupVersion(gvAPIPath)
+		gv, err := PathToGroupVersion(gvAPIPath)
 		if err != nil {
 			// Ignore paths which do not parse to GroupVersion
 			continue
@@ -122,7 +122,7 @@ func (r *root) retrieveGVBytes(gv schema.GroupVersion) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	apiPath := gvToAPIPath(gv)
+	apiPath := GroupVersionToAPIPath(gv)
 	gvOpenAPI, found := paths[apiPath]
 	if !found {
 		return nil, &GroupVersionNotFoundError{gv: gv}
@@ -130,11 +130,11 @@ func (r *root) retrieveGVBytes(gv schema.GroupVersion) ([]byte, error) {
 	return gvOpenAPI.Schema(runtime.ContentTypeJSON)
 }
 
-// gvToAPIPath maps the passed GroupVersion to a relative api
+// GroupVersionToAPIPath maps the passed GroupVersion to a relative api
 // server url. Example:
 //
 //	GroupVersion{Group: "apps", Version: "v1"} -> "apis/apps/v1".
-func gvToAPIPath(gv schema.GroupVersion) string {
+func GroupVersionToAPIPath(gv schema.GroupVersion) string {
 	var resourcePath string
 	if len(gv.Group) == 0 {
 		resourcePath = fmt.Sprintf("api/%s", gv.Version)
@@ -144,12 +144,12 @@ func gvToAPIPath(gv schema.GroupVersion) string {
 	return resourcePath
 }
 
-// pathToGroupVersion is a helper function parsing the passed relative
+// PathToGroupVersion is a helper function parsing the passed relative
 // url into a GroupVersion.
 //
 //	Example: apis/apps/v1 -> GroupVersion{Group: "apps", Version: "v1"}
 //	Example: api/v1 -> GroupVersion{Group: "", Version: "v1"}
-func pathToGroupVersion(path string) (schema.GroupVersion, error) {
+func PathToGroupVersion(path string) (schema.GroupVersion, error) {
 	var gv schema.GroupVersion
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
