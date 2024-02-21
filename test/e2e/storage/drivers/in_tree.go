@@ -103,7 +103,7 @@ func InitNFSDriver() storageframework.TestDriver {
 				"", // Default fsType
 			),
 			SupportedMountOption: sets.NewString("relatime"),
-			RequiredMountOption:  sets.NewString("vers=4.1"),
+			RequiredMountOption:  sets.NewString("vers=4.0"),
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence:       true,
 				storageframework.CapExec:              true,
@@ -152,7 +152,7 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 
 func (n *nfsDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := n.externalPluginName
-	parameters := map[string]string{"mountOptions": "vers=4.1"}
+	parameters := map[string]string{"mountOptions": "vers=4.0"}
 	ns := config.Framework.Namespace.Name
 
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
