@@ -157,6 +157,13 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		bestHint = extendedHint
 	}
 
+	// the best hint might violate the NUMA allocation rule on which
+	// NUMA node cannot have both single and cross NUMA node allocations
+	// https://kubernetes.io/blog/2021/08/11/kubernetes-1-22-feature-memory-manager-moves-to-beta/#single-vs-cross-numa-node-allocation
+	if isAffinityViolatingNUMAAllocations(machineState, bestHint.NUMANodeAffinity) {
+		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
+	}
+
 	var containerBlocks []state.Block
 	maskBits := bestHint.NUMANodeAffinity.GetBits()
 	for resourceName, requestedSize := range requestedResources {
@@ -991,4 +998,27 @@ func isNUMAAffinitiesEqual(numaAffinity1, numaAffinity2 []int) bool {
 	}
 
 	return bitMask1.IsEqual(bitMask2)
+}
+
+func isAffinityViolatingNUMAAllocations(machineState state.NUMANodeMap, mask bitmask.BitMask) bool {
+	maskBits := mask.GetBits()
+	singleNUMAHint := len(maskBits) == 1
+	for _, nodeID := range mask.GetBits() {
+		// the node was never used for the memory allocation
+		if machineState[nodeID].NumberOfAssignments == 0 {
+			continue
+		}
+		if singleNUMAHint {
+			continue
+		}
+		// the node used for the single NUMA memory allocation, it cannot be used for the multi NUMA node allocation
+		if len(machineState[nodeID].Cells) == 1 {
+			return true
+		}
+		// the node already used with a different group of nodes, it cannot be used within the current hint
+		if !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
+			return true
+		}
+	}
+	return false
 }
