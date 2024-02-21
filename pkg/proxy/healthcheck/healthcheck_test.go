@@ -26,18 +26,18 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-base/metrics/testutil"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
+	netutils "k8s.io/utils/net"
 )
 
 type fakeListener struct {
@@ -470,8 +470,8 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}, 10256, 10*time.Second)
+	server := hs.httpFactory.New("127.0.0.1:10256", healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,
@@ -505,8 +505,8 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, livezHandler{hs: hs})
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}, 10256, 10*time.Second)
+	server := hs.httpFactory.New("127.0.0.1:10256", livezHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,
