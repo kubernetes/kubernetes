@@ -1399,7 +1399,6 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 		mdata          = make(map[string][]string)
 		contentTypeErr = "malformed header: missing HTTP content-type"
 		grpcMessage    string
-		statusGen      *status.Status
 		recvCompress   string
 		httpStatusCode *int
 		httpStatusErr  string
@@ -1434,12 +1433,6 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 			rawStatusCode = codes.Code(uint32(code))
 		case "grpc-message":
 			grpcMessage = decodeGrpcMessage(hf.Value)
-		case "grpc-status-details-bin":
-			var err error
-			statusGen, err = decodeGRPCStatusDetails(hf.Value)
-			if err != nil {
-				headerError = fmt.Sprintf("transport: malformed grpc-status-details-bin: %v", err)
-			}
 		case ":status":
 			if hf.Value == "200" {
 				httpStatusErr = ""
@@ -1548,14 +1541,12 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 		return
 	}
 
-	if statusGen == nil {
-		statusGen = status.New(rawStatusCode, grpcMessage)
-	}
+	status := istatus.NewWithProto(rawStatusCode, grpcMessage, mdata[grpcStatusDetailsBinHeader])
 
 	// If client received END_STREAM from server while stream was still active,
 	// send RST_STREAM.
 	rstStream := s.getState() == streamActive
-	t.closeStream(s, io.EOF, rstStream, http2.ErrCodeNo, statusGen, mdata, true)
+	t.closeStream(s, io.EOF, rstStream, http2.ErrCodeNo, status, mdata, true)
 }
 
 // readServerPreface reads and handles the initial settings frame from the

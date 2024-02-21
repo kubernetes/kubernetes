@@ -150,7 +150,12 @@ func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundT
 		return -1, err
 	}
 
-	cc := &http.Client{Transport: rt}
+	cc := &http.Client{
+		Transport: rt,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	req, err := http.NewRequest("POST", url, bytes.NewReader(lreq))
 	if err != nil {
 		return -1, err
@@ -210,7 +215,12 @@ func TimeToLiveHTTP(ctx context.Context, id lease.LeaseID, keys bool, url string
 
 	req = req.WithContext(ctx)
 
-	cc := &http.Client{Transport: rt}
+	cc := &http.Client{
+		Transport: rt,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	var b []byte
 	// buffer errc channel so that errc don't block inside the go routinue
 	resp, err := cc.Do(req)

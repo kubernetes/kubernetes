@@ -25,6 +25,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/embedded"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const (
@@ -73,6 +75,8 @@ func (cfg tracerProviderConfig) MarshalLog() interface{} {
 // TracerProvider is an OpenTelemetry TracerProvider. It provides Tracers to
 // instrumentation so it can trace operational flow through a system.
 type TracerProvider struct {
+	embedded.TracerProvider
+
 	mu             sync.Mutex
 	namedTracer    map[instrumentation.Scope]*tracer
 	spanProcessors atomic.Pointer[spanProcessorStates]
@@ -139,7 +143,7 @@ func NewTracerProvider(opts ...TracerProviderOption) *TracerProvider {
 func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
 	// This check happens before the mutex is acquired to avoid deadlocking if Tracer() is called from within Shutdown().
 	if p.isShutdown.Load() {
-		return trace.NewNoopTracerProvider().Tracer(name, opts...)
+		return noop.NewTracerProvider().Tracer(name, opts...)
 	}
 	c := trace.NewTracerConfig(opts...)
 	if name == "" {
@@ -157,7 +161,7 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		// Must check the flag after acquiring the mutex to avoid returning a valid tracer if Shutdown() ran
 		// after the first check above but before we acquired the mutex.
 		if p.isShutdown.Load() {
-			return trace.NewNoopTracerProvider().Tracer(name, opts...), true
+			return noop.NewTracerProvider().Tracer(name, opts...), true
 		}
 		t, ok := p.namedTracer[is]
 		if !ok {

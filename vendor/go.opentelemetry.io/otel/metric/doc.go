@@ -149,7 +149,7 @@ of [go.opentelemetry.io/otel/metric].
 
 Finally, an author can embed another implementation in theirs. The embedded
 implementation will be used for methods not defined by the author. For example,
-an author who want to default to silently dropping the call can use
+an author who wants to default to silently dropping the call can use
 [go.opentelemetry.io/otel/metric/noop]:
 
 	import "go.opentelemetry.io/otel/metric/noop"
