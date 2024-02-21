@@ -7,7 +7,7 @@ go 1.21
 require (
 	github.com/moby/sys/mountinfo v0.6.2
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/sys v0.15.0
+	golang.org/x/sys v0.17.0
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
