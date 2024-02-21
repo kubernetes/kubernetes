@@ -37,7 +37,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -48,7 +48,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 		{
 			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
@@ -63,7 +63,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 		{
 			name: "Assorted HintProviders",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource-1/A": {
 							{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
@@ -75,7 +75,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource-2/A": {
 							{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
@@ -87,7 +87,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource-3": nil,
 					},
@@ -153,7 +153,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -164,7 +164,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 		{
 			name: "HintProvider returns - nil map[string][]TopologyHint from provider",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
@@ -179,12 +179,12 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 		{
 			name: "2 HintProviders with 1 resource returns hints",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {TopologyHint{}},
 					},
@@ -202,12 +202,12 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 		{
 			name: "2 HintProviders 1 with 1 resource 1 with nil hints",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
 				},
-				&mockHintProvider{nil},
+				&fakeResourceAllocator{nil},
 			},
 			expected: []map[string][]TopologyHint{
 				{
@@ -219,12 +219,12 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 		{
 			name: "2 HintProviders 1 with 1 resource 1 empty hints",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -238,7 +238,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 		{
 			name: "HintProvider with 2 resources returns hints",
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 						"resource2": {TopologyHint{}},

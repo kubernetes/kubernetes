@@ -201,22 +201,22 @@ func TestManagerScope(t *testing.T) {
 	}
 }
 
-type mockHintProvider struct {
+type fakeResourceAllocator struct {
 	th map[string][]TopologyHint
 	//TODO: Add this field and add some tests to make sure things error out
 	//appropriately on allocation errors.
 	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
-	return m.th
+func (ra *fakeResourceAllocator) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
+	return ra.th
 }
 
-func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint {
-	return m.th
+func (ra *fakeResourceAllocator) GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint {
+	return ra.th
 }
 
-func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (ra *fakeResourceAllocator) Allocate(pod *v1.Pod, container *v1.Container) error {
 	//return allocateError
 	return nil
 }
@@ -239,9 +239,9 @@ func TestAddHintProvider(t *testing.T) {
 		{
 			name: "RegisterProvider",
 			prov: []ResourceAllocator{
-				&mockHintProvider{},
-				&mockHintProvider{},
-				&mockHintProvider{},
+				&fakeResourceAllocator{},
+				&fakeResourceAllocator{},
+				&fakeResourceAllocator{},
 			},
 		},
 	}
@@ -298,7 +298,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSBestEffort,
 			policy:   singleNumaPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{},
+				&fakeResourceAllocator{},
 			},
 			expected: true,
 		},
@@ -307,7 +307,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSBestEffort,
 			policy:   restrictedPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{},
+				&fakeResourceAllocator{},
 			},
 			expected: true,
 		},
@@ -316,7 +316,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   bePolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -338,7 +338,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   bePolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -364,7 +364,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSBurstable,
 			policy:   bePolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -390,7 +390,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   bePolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -408,7 +408,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   restrictedPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -430,7 +430,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSBurstable,
 			policy:   restrictedPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -451,7 +451,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   restrictedPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -477,7 +477,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSBurstable,
 			policy:   restrictedPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -503,7 +503,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   restrictedPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -521,7 +521,7 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSBurstable,
 			policy:   restrictedPolicy,
 			prov: []ResourceAllocator{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
