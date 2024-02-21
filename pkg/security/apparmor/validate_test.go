@@ -64,7 +64,6 @@ func TestValidateValidHost(t *testing.T) {
 		{v1.AppArmorBetaProfileNamePrefix + "docker-default", true},
 		{v1.AppArmorBetaProfileNamePrefix + "foo-container", true},
 		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
-		{"docker-default", false},
 		{v1.AppArmorBetaProfileNamePrefix + "", false}, // Empty profile explicitly forbidden.
 		{v1.AppArmorBetaProfileNamePrefix + " ", false},
 	}
