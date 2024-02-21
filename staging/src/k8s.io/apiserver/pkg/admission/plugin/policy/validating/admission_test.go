@@ -45,6 +45,7 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -364,7 +365,7 @@ func setupTestCommon(
 		func(p *validating.Policy) validating.Validator {
 			return compiler.CompilePolicy(p)
 		},
-		func(a authorizer.Authorizer, m *matching.Matcher) generic.Dispatcher[validating.PolicyHook] {
+		func(a authorizer.Authorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[validating.PolicyHook] {
 			coolMatcher := matcher
 			if coolMatcher == nil {
 				coolMatcher = generic.NewPolicyMatcher(m)

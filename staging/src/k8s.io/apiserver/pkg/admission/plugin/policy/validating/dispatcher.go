@@ -63,6 +63,10 @@ type policyDecisionWithMetadata struct {
 	Binding    *admissionregistrationv1.ValidatingAdmissionPolicyBinding
 }
 
+func (c *dispatcher) Run(ctx context.Context) error {
+	return nil
+}
+
 // Dispatch implements generic.Dispatcher.
 func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []PolicyHook) error {
 

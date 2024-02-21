@@ -94,3 +94,8 @@ func (f *fileGroupVersion) Schema(contentType string) ([]byte, error) {
 	}
 	return fs.ReadFile(f.f, f.filename)
 }
+
+// ServerRelativeURL returns an empty string.
+func (f *fileGroupVersion) ServerRelativeURL() string {
+	return f.filename
+}

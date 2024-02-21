@@ -114,7 +114,7 @@ func NewPlugin(_ io.Reader) *Plugin {
 					restMapper,
 				)
 			},
-			func(a authorizer.Authorizer, m *matching.Matcher) generic.Dispatcher[PolicyHook] {
+			func(a authorizer.Authorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
 				return NewDispatcher(a, generic.NewPolicyMatcher(m))
 			},
 		),

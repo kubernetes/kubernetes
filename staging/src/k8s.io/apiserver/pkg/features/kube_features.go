@@ -363,6 +363,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
 
+	MutatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
+
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
