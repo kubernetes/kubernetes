@@ -387,6 +387,33 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 			gomega.Expect(warning.FieldRef).To(gomega.Equal("spec.validations[1].expression"))
 			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("undefined field 'maxRetries'"))
 		})
+		ginkgo.By("adding maxRetries as an integer field to the CRD.", func() {
+			crd, err := extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get CRD")
+			crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["maxRetries"] = apiextensionsv1.JSONSchemaProps{
+				Type: "integer",
+			}
+			_, err = extensionsClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "update CRD")
+		})
+		ginkgo.By("waiting for the type check to update", func() {
+			err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, false, func(ctx context.Context) (done bool, err error) {
+				policy, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if policy.Status.TypeChecking != nil && len(policy.Status.TypeChecking.ExpressionWarnings) == 1 {
+					return true, nil
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for type checking to update")
+
+			gomega.Expect(policy.Status.TypeChecking.ExpressionWarnings).To(gomega.HaveLen(1))
+			warning := policy.Status.TypeChecking.ExpressionWarnings[0]
+			gomega.Expect(warning.FieldRef).To(gomega.Equal("spec.validations[0].expression"))
+			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("found no matching overload for '_>_' applied to '(int, string)'"))
+		})
 	})
 
 	/*
