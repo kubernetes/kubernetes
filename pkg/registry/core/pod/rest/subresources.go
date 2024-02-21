@@ -242,7 +242,12 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PortForwardWebsockets) {
+		tunnelingHandler := translator.NewTunnelingHandler(handler)
+		handler = translator.NewTranslatingHandler(handler, tunnelingHandler, wsstream.IsWebSocketRequestWithTunnelingProtocol)
+	}
+	return handler, nil
 }
 
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) http.Handler {
