@@ -550,6 +550,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.ReservedSystemCPUs = in.ReservedSystemCPUs
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.Metrics = in.Metrics
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
@@ -763,6 +764,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.ReservedSystemCPUs = in.ReservedSystemCPUs
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.Metrics = in.Metrics
 	out.Logging = in.Logging
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableSystemLogHandler, &out.EnableSystemLogHandler, s); err != nil {
 		return err

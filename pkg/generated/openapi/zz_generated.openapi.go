@@ -68928,9 +68928,16 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"showHiddenMetricsForVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "showHiddenMetricsForVersion is the previous version for which you want to show hidden metrics. Only the previous minor version is meaningful, other values will not be allowed. The format is `<major>.<minor>`, e.g.: `1.16`. The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, rather than being surprised when they are permanently removed in the release after that. Default: \"\"",
+							Description: "showHiddenMetricsForVersion is the previous version for which you want to show hidden metrics. Only the previous minor version is meaningful, other values will not be allowed. The format is `<major>.<minor>`, e.g.: `1.16`. The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, rather than being surprised when they are permanently removed in the release after that. Deprecated: Use KubeletConfiguration.Metrics.ShowHiddenMetricsForVersion instead, which has a higher precedence. Default: \"\"",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"metrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Metrics specifies the options of metrics. Refer https://github.com/kubernetes/component-base/tree/master/metrics/api/ for more information. Default: nil",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/component-base/metrics/api/v1.MetricsConfiguration"),
 						},
 					},
 					"systemReservedCgroup": {
@@ -69000,7 +69007,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"logging": {
 						SchemaProps: spec.SchemaProps{
-							Description: "logging specifies the options of logging. Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information. Default:\n  Format: text",
+							Description: "logging specifies the options of logging. Refer to https://github.com/kubernetes/component-base/tree/master/logs/api/ for more information. Default:\n  Format: text",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/component-base/logs/api/v1.LoggingConfiguration"),
 						},
@@ -69161,7 +69168,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.Taint", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/component-base/tracing/api/v1.TracingConfiguration", "k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig", "k8s.io/kubelet/config/v1beta1.KubeletAuthentication", "k8s.io/kubelet/config/v1beta1.KubeletAuthorization", "k8s.io/kubelet/config/v1beta1.MemoryReservation", "k8s.io/kubelet/config/v1beta1.MemorySwapConfiguration", "k8s.io/kubelet/config/v1beta1.ShutdownGracePeriodByPodPriority", "k8s.io/kubelet/config/v1beta1.UserNamespaces"},
+			"k8s.io/api/core/v1.Taint", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/component-base/metrics/api/v1.MetricsConfiguration", "k8s.io/component-base/tracing/api/v1.TracingConfiguration", "k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig", "k8s.io/kubelet/config/v1beta1.KubeletAuthentication", "k8s.io/kubelet/config/v1beta1.KubeletAuthorization", "k8s.io/kubelet/config/v1beta1.MemoryReservation", "k8s.io/kubelet/config/v1beta1.MemorySwapConfiguration", "k8s.io/kubelet/config/v1beta1.ShutdownGracePeriodByPodPriority", "k8s.io/kubelet/config/v1beta1.UserNamespaces"},
 	}
 }
 

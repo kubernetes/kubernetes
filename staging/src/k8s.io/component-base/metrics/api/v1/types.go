@@ -22,5 +22,5 @@ import (
 
 // MetricsConfiguration contains metrics options.
 type MetricsConfiguration struct {
-	metrics.Options
+	metrics.Options `json:",inline"`
 }

@@ -430,13 +430,16 @@ type KubeletConfiguration struct {
 	// The format is <major>.<minor>, e.g.: '1.16'.
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
-	// Deprecated: Use KubeletConfiguration.Metrics.ShowHiddenMetricsForVersion instead.
+	// Deprecated: Use KubeletConfiguration.Metrics.ShowHiddenMetricsForVersion instead, which has a higher precedence.
+	// +optional
 	ShowHiddenMetricsForVersion string
-	// Metrics specifies the options of metrics.
-	// Refer k8s.io/component-base/metrics/api/ for more information.
+	// MetricsConfiguration contains metrics options.
+	// Refer https://github.com/kubernetes/component-base/tree/master/metrics/api/ for more information.
+	// +optional
 	Metrics metricsapi.MetricsConfiguration
 	// Logging specifies the options of logging.
-	// Refer k8s.io/component-base/logs/api/ for more information.
+	// Refer https://github.com/kubernetes/component-base/tree/master/logs/api/ for more information.
+	// +optional
 	Logging logsapi.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool

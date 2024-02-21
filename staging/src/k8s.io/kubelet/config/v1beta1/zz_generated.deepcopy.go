@@ -444,6 +444,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	in.Metrics.DeepCopyInto(&out.Metrics)
 	if in.EnforceNodeAllocatable != nil {
 		in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
 		*out = make([]string, len(*in))
