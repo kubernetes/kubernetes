@@ -443,7 +443,9 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}, discoverySyncedCh chan<-
 	}
 	wg.Wait()
 
-	close(discoverySyncedCh)
+	if discoverySyncedCh != nil {
+		close(discoverySyncedCh)
+	}
 
 	// Spawn workers
 	// These workers wait for APIServices to be marked dirty.

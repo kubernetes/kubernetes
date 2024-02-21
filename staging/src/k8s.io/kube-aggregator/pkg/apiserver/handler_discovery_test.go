@@ -61,10 +61,6 @@ func waitForQueueComplete(stopCh <-chan struct{}, dm *discoveryManager) bool {
 	})
 }
 
-func fakeCh() chan struct{} {
-	return make(chan struct{})
-}
-
 // Test that the discovery manager starts and aggregates from two local API services
 func TestBasic(t *testing.T) {
 	service1 := discoveryendpoint.NewResourceManager("apis")
@@ -208,7 +204,7 @@ func TestBasic(t *testing.T) {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
@@ -272,7 +268,7 @@ func TestInitialRunHasAllAPIServices(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	initialSyncedCh := fakeCh()
+	initialSyncedCh := make(chan struct{})
 	go aggregatedManager.Run(testCtx.Done(), initialSyncedCh)
 	select {
 	case <-initialSyncedCh:
@@ -327,7 +323,7 @@ func TestDirty(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// immediately check for ping, since Run() should block for local services
@@ -364,7 +360,7 @@ func TestWaitForSync(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// immediately check for ping, since Run() should block for local services
@@ -411,7 +407,7 @@ func TestRemoveAPIService(t *testing.T) {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 
 	for _, s := range apiServices {
 		aggregatedManager.RemoveAPIService(s.Name)
@@ -587,7 +583,7 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// At this point external services have synced. Check if discovery document
@@ -725,7 +721,7 @@ func testLegacyFallbackWithCustomRootHandler(t *testing.T, rootHandlerFn func(ht
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// At this point external services have synced. Check if discovery document
@@ -805,7 +801,7 @@ func TestAPIServiceStale(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// At this point external services have synced. Check if discovery document
@@ -867,7 +863,7 @@ func TestNotModified(t *testing.T) {
 	testCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done(), fakeCh())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 
 	// Important to wait here to ensure we prime the cache with the initial list
 	// of documents in order to exercise 304 Not Modified
