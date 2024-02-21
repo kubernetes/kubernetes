@@ -4163,7 +4163,7 @@ type PodSecurityContext struct {
 	// appArmorProfile is the AppArmor options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
-	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty"`
+	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,11,opt,name=appArmorProfile"`
 }
 
 // SeccompProfile defines a pod/container's seccomp profile settings.
@@ -4209,14 +4209,14 @@ type AppArmorProfile struct {
 	//   RuntimeDefault - the container runtime's default profile.
 	//   Unconfined - no AppArmor enforcement.
 	// +unionDiscriminator
-	Type AppArmorProfileType `json:"type"`
+	Type AppArmorProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=AppArmorProfileType"`
 
 	// localhostProfile indicates a profile loaded on the node that should be used.
 	// The profile must be preconfigured on the node to work.
 	// Must match the loaded name of the profile.
 	// Must be set if and only if type is "Localhost".
 	// +optional
-	LocalhostProfile *string `json:"localhostProfile,omitempty"`
+	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
 }
 
 // +enum
@@ -7255,7 +7255,7 @@ type SecurityContext struct {
 	// overrides the pod's appArmorProfile.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
-	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty"`
+	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,12,opt,name=appArmorProfile"`
 }
 
 // +enum
