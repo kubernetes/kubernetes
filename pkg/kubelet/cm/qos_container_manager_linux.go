@@ -82,8 +82,9 @@ func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
 	cm := m.cgroupManager
 	rootContainer := m.cgroupRoot
-	if !cm.Exists(rootContainer) {
-		return fmt.Errorf("root container %v doesn't exist", rootContainer)
+	exists, err := cm.Exists(rootContainer)
+	if err != nil || !exists {
+		return fmt.Errorf("root container %v doesn't exist due to : %v", rootContainer, err)
 	}
 
 	// Top level for Qos containers are created only for Burstable
@@ -112,7 +113,11 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		m.setHugePagesUnbounded(containerConfig)
 
 		// check if it exists
-		if !cm.Exists(containerName) {
+		exists, err := cm.Exists(containerName)
+		if err != nil {
+			return fmt.Errorf("failed to check existence of top level %v QOS cgroup : %v", qosClass, err)
+		}
+		if !exists {
 			if err := cm.Create(containerConfig); err != nil {
 				return fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
 			}

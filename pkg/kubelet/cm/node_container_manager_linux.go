@@ -54,7 +54,11 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
 		ResourceParameters: getCgroupConfig(nodeAllocatable),
 	}
-	if cm.cgroupManager.Exists(cgroupConfig.Name) {
+	exists, err := cm.cgroupManager.Exists(cgroupConfig.Name)
+	if err != nil {
+		return err
+	}
+	if exists {
 		return nil
 	}
 	if err := cm.cgroupManager.Create(cgroupConfig); err != nil {

@@ -61,9 +61,13 @@ type podContainerManagerImpl struct {
 var _ PodContainerManager = &podContainerManagerImpl{}
 
 // Exists checks if the pod's cgroup already exists
-func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
+func (m *podContainerManagerImpl) Exists(pod *v1.Pod) (bool, error) {
 	podContainerName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.Exists(podContainerName)
+	exists, err := m.cgroupManager.Exists(podContainerName)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 // EnsureExists takes a pod as argument and makes sure that
@@ -71,7 +75,10 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 // If the pod level container doesn't already exist it is created.
 func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	// check if container already exist
-	alreadyExists := m.Exists(pod)
+	alreadyExists, err := m.Exists(pod)
+	if err != nil {
+		return err
+	}
 	if !alreadyExists {
 		enforceMemoryQoS := false
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
@@ -309,8 +316,8 @@ type podContainerManagerNoop struct {
 // Make sure that podContainerManagerStub implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerNoop{}
 
-func (m *podContainerManagerNoop) Exists(_ *v1.Pod) bool {
-	return true
+func (m *podContainerManagerNoop) Exists(_ *v1.Pod) (bool, error) {
+	return true, nil
 }
 
 func (m *podContainerManagerNoop) EnsureExists(_ *v1.Pod) error {

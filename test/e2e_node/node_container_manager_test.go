@@ -121,7 +121,11 @@ const (
 )
 
 func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {
-	if !cm.Exists(cgroupConfig.Name) {
+	exists, err := cm.Exists(cgroupConfig.Name)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		if err := cm.Create(cgroupConfig); err != nil {
 			return err
 		}
@@ -241,7 +245,8 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 	expectedNAPodCgroup := cm.ParseCgroupfsToCgroupName(currentConfig.CgroupRoot)
 	expectedNAPodCgroup = cm.NewCgroupName(expectedNAPodCgroup, "kubepods")
-	if !cgroupManager.Exists(expectedNAPodCgroup) {
+	exists, err := cgroupManager.Exists(expectedNAPodCgroup)
+	if err != nil || !exists {
 		return fmt.Errorf("Expected Node Allocatable Cgroup %q does not exist", expectedNAPodCgroup)
 	}
 

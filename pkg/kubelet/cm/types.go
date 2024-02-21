@@ -69,7 +69,7 @@ type CgroupManager interface {
 	// Validate checks if the cgroup is valid
 	Validate(name CgroupName) error
 	// Exists checks if the cgroup already exists
-	Exists(name CgroupName) bool
+	Exists(name CgroupName) (bool, error)
 	// Name returns the literal cgroupfs name on the host after any driver specific conversions.
 	// We would expect systemd implementation to make appropriate name conversion.
 	// For example, if we pass {"foo", "bar"}
@@ -110,7 +110,7 @@ type PodContainerManager interface {
 	EnsureExists(*v1.Pod) error
 
 	// Exists returns true if the pod cgroup exists.
-	Exists(*v1.Pod) bool
+	Exists(*v1.Pod) (bool, error)
 
 	// Destroy takes a pod Cgroup name as argument and destroys the pod's container.
 	Destroy(name CgroupName) error

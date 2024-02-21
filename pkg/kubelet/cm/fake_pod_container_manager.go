@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -45,11 +45,11 @@ func (m *FakePodContainerManager) AddPodFromCgroups(pod *kubecontainer.Pod) {
 	m.Cgroups[pod.ID] = []string{pod.Name}
 }
 
-func (m *FakePodContainerManager) Exists(_ *v1.Pod) bool {
+func (m *FakePodContainerManager) Exists(_ *v1.Pod) (bool, error) {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "Exists")
-	return true
+	return true, nil
 }
 
 func (m *FakePodContainerManager) EnsureExists(_ *v1.Pod) error {

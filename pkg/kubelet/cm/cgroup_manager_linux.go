@@ -285,8 +285,11 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 }
 
 // Exists checks if all subsystem cgroups already exist
-func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
-	return m.Validate(name) == nil
+func (m *cgroupManagerImpl) Exists(name CgroupName) (bool, error) {
+	if err := m.Validate(name); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // Destroy destroys the specified cgroup

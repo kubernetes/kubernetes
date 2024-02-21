@@ -49,8 +49,8 @@ func (m *unsupportedCgroupManager) Validate(_ CgroupName) error {
 	return errNotSupported
 }
 
-func (m *unsupportedCgroupManager) Exists(_ CgroupName) bool {
-	return false
+func (m *unsupportedCgroupManager) Exists(_ CgroupName) (bool, error) {
+	return false, errNotSupported
 }
 
 func (m *unsupportedCgroupManager) Destroy(_ *CgroupConfig) error {

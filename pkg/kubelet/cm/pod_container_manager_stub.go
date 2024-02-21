@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -26,8 +26,8 @@ type podContainerManagerStub struct {
 
 var _ PodContainerManager = &podContainerManagerStub{}
 
-func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
-	return true
+func (m *podContainerManagerStub) Exists(_ *v1.Pod) (bool, error) {
+	return true, nil
 }
 
 func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
