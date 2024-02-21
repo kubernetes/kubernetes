@@ -4729,6 +4729,66 @@ func ValidateAppArmorProfileFormat(profile string) error {
 	return nil
 }
 
+// validateAppArmorAnnotationsAndFields validates that AppArmor fields and annotations are consistent.
+func validateAppArmorAnnotationsAndFields(objectMeta metav1.ObjectMeta, podSpec *core.PodSpec, specPath *field.Path) field.ErrorList {
+	if podSpec.OS != nil && podSpec.OS.Name == core.Windows {
+		// Skip consistency check for windows pods.
+		return nil
+	}
+
+	allErrs := field.ErrorList{}
+
+	podshelper.VisitContainersWithPath(podSpec, specPath, func(c *core.Container, cFldPath *field.Path) bool {
+		var field *core.AppArmorProfile
+		if c.SecurityContext != nil {
+			field = c.SecurityContext.AppArmorProfile
+		}
+
+		if field == nil {
+			return true
+		}
+
+		key := core.AppArmorContainerAnnotationKeyPrefix + c.Name
+		if annotation, found := objectMeta.Annotations[key]; found {
+			apparmorPath := cFldPath.Child("securityContext").Child("appArmorProfile")
+			err := validateAppArmorAnnotationsAndFieldsMatch(annotation, field, apparmorPath)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+		return true
+	})
+
+	return allErrs
+}
+
+func validateAppArmorAnnotationsAndFieldsMatch(annotationValue string, apparmorField *core.AppArmorProfile, fldPath *field.Path) *field.Error {
+	if apparmorField == nil {
+		return nil
+	}
+
+	switch apparmorField.Type {
+	case core.AppArmorProfileTypeUnconfined:
+		if annotationValue != core.AppArmorProfileNameUnconfined {
+			return field.Forbidden(fldPath.Child("type"), "apparmor type in annotation and field must match")
+		}
+
+	case core.AppArmorProfileTypeRuntimeDefault:
+		if annotationValue != core.AppArmorProfileRuntimeDefault {
+			return field.Forbidden(fldPath.Child("type"), "apparmor type in annotation and field must match")
+		}
+
+	case core.AppArmorProfileTypeLocalhost:
+		if !strings.HasPrefix(annotationValue, core.AppArmorProfileLocalhostPrefix) {
+			return field.Forbidden(fldPath.Child("type"), "apparmor type in annotation and field must match")
+		} else if apparmorField.LocalhostProfile == nil || strings.TrimPrefix(annotationValue, core.AppArmorProfileLocalhostPrefix) != *apparmorField.LocalhostProfile {
+			return field.Forbidden(fldPath.Child("localhostProfile"), "apparmor profile in annotation and field must match")
+		}
+	}
+
+	return nil
+}
+
 func podSpecHasContainer(spec *core.PodSpec, containerName string) bool {
 	var hasContainer bool
 	podshelper.VisitContainersWithPath(spec, field.NewPath("spec"), func(c *core.Container, _ *field.Path) bool {
@@ -4883,6 +4943,7 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "cannot be set until all schedulingGates have been cleared"))
 	}
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(pod.ObjectMeta, &pod.Spec, fldPath)...)
+	allErrs = append(allErrs, validateAppArmorAnnotationsAndFields(pod.ObjectMeta, &pod.Spec, fldPath)...)
 
 	return allErrs
 }

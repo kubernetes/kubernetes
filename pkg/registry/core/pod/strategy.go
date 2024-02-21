@@ -91,6 +91,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
+	applyAppArmorVersionSkew(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -757,4 +758,110 @@ func applySchedulingGatedCondition(pod *api.Pod) {
 		Reason:  apiv1.PodReasonSchedulingGated,
 		Message: "Scheduling is blocked due to non-empty scheduling gates",
 	})
+}
+
+// applyAppArmorVersionSkew implements the version skew behavior described in:
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/24-apparmor#version-skew-strategy
+func applyAppArmorVersionSkew(pod *api.Pod) {
+	if pod.Spec.OS != nil && pod.Spec.OS.Name == api.Windows {
+		return
+	}
+
+	var podProfile *api.AppArmorProfile
+	if pod.Spec.SecurityContext != nil {
+		podProfile = pod.Spec.SecurityContext.AppArmorProfile
+	}
+
+	// Handle the containers of the pod
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(),
+		func(ctr *api.Container, _ podutil.ContainerType) bool {
+			// get possible annotation and field
+			key := api.AppArmorContainerAnnotationKeyPrefix + ctr.Name
+			annotation, hasAnnotation := pod.Annotations[key]
+
+			field, hasField := (*api.AppArmorProfile)(nil), false
+			if ctr.SecurityContext != nil && ctr.SecurityContext.AppArmorProfile != nil {
+				field = ctr.SecurityContext.AppArmorProfile
+				hasField = true
+			}
+
+			// sync field and annotation
+			if !hasAnnotation {
+				newAnnotation := ""
+				if hasField {
+					newAnnotation = appArmorAnnotationForField(field)
+				} else if podProfile != nil {
+					newAnnotation = appArmorAnnotationForField(podProfile)
+				}
+
+				if newAnnotation != "" {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[key] = newAnnotation
+				}
+			} else if !hasField {
+				newField := apparmorFieldForAnnotation(annotation)
+
+				if newField != nil {
+					if ctr.SecurityContext == nil {
+						ctr.SecurityContext = &api.SecurityContext{}
+					}
+					ctr.SecurityContext.AppArmorProfile = newField
+				}
+			}
+
+			return true
+		})
+}
+
+// appArmorFieldForAnnotation takes a pod apparmor profile field and returns the
+// converted annotation value
+func appArmorAnnotationForField(field *api.AppArmorProfile) string {
+	// If only apparmor fields are specified, add the corresponding annotations.
+	// This ensures that the fields are enforced even if the node version
+	// trails the API version
+	switch field.Type {
+	case api.AppArmorProfileTypeUnconfined:
+		return api.AppArmorProfileNameUnconfined
+
+	case api.AppArmorProfileTypeRuntimeDefault:
+		return api.AppArmorProfileRuntimeDefault
+
+	case api.AppArmorProfileTypeLocalhost:
+		if field.LocalhostProfile != nil {
+			return api.AppArmorProfileLocalhostPrefix + *field.LocalhostProfile
+		}
+	}
+
+	// we can only reach this code path if the LocalhostProfile is nil but the
+	// provided field type is AppArmorProfileTypeLocalhost or if an unrecognized
+	// type is specified
+	return ""
+}
+
+// apparmorFieldForAnnotation takes a pod annotation and returns the converted
+// apparmor profile field.
+func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
+	if annotation == api.AppArmorProfileNameUnconfined {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
+	}
+
+	if annotation == api.AppArmorProfileRuntimeDefault {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
+	}
+
+	if strings.HasPrefix(annotation, api.AppArmorProfileLocalhostPrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, api.AppArmorProfileLocalhostPrefix)
+		if localhostProfile != "" {
+			return &api.AppArmorProfile{
+				Type:             api.AppArmorProfileTypeLocalhost,
+				LocalhostProfile: &localhostProfile,
+			}
+		}
+	}
+
+	// we can only reach this code path if the localhostProfile name has a zero
+	// length or if the annotation has an unrecognized value
+	return nil
 }
