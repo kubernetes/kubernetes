@@ -601,13 +601,18 @@ func WaitForRootPaths(t *testing.T, ctx context.Context, client testClient, requ
 func WaitForGroups(ctx context.Context, client testClient, groups ...apidiscoveryv2beta1.APIGroupDiscovery) error {
 	return WaitForResultWithCondition(ctx, client, func(groupList apidiscoveryv2beta1.APIGroupDiscoveryList) bool {
 		for _, searchGroup := range groups {
+			found := false
 			for _, docGroup := range groupList.Items {
 				if reflect.DeepEqual(searchGroup, docGroup) {
-					return true
+					found = true
+					break
 				}
 			}
+			if !found {
+				return false
+			}
 		}
-		return false
+		return true
 	})
 }
 
