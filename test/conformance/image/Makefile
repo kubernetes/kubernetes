@@ -33,7 +33,7 @@ CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
 # This is defined in root Makefile, but some build contexts do not refer to them
 KUBE_BASE_IMAGE_REGISTRY?=registry.k8s.io
-BASE_IMAGE_VERSION?=bookworm-v1.0.0
+BASE_IMAGE_VERSION?=bookworm-v1.0.1
 RUNNERIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:${BASE_IMAGE_VERSION}
 
 TEMP_DIR:=$(shell mktemp -d -t conformance-XXXXXX)
