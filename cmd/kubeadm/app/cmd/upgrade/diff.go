@@ -115,7 +115,7 @@ func runDiff(flags *diffFlags, args []string) error {
 			SkipCRIDetect: true,
 		})
 	} else {
-		var client *client.Clientset
+		var client client.Interface
 		client, err = kubeconfigutil.ClientSetFromFile(flags.kubeConfigPath)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
