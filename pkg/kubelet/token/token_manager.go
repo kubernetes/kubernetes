@@ -167,7 +167,7 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 }
 
 // requiresRefresh returns true if the token is older than 80% of its total
-// ttl, or if the token is older than 24 hours.
+// ttl, or if the token is older than 24 hours, or if it is later than the system time.
 func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
 		cpy := tr.DeepCopy()
@@ -185,6 +185,10 @@ func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	}
 	// Require a refresh if within 20% of the TTL plus a jitter from the expiration time.
 	if now.After(exp.Add(-1*time.Duration((*tr.Spec.ExpirationSeconds*20)/100)*time.Second - jitter)) {
+		return true
+	}
+	// Require a refresh if the issued time is later than the system time.
+	if now.Before(iat) {
 		return true
 	}
 	return false
