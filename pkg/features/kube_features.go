@@ -887,6 +887,7 @@ const (
 	// owner: @haircommander
 	// kep: http://kep.k8s.io/4210
 	// alpha: v1.29
+	// beta: v1.30
 	// ImageMaximumGCAge enables the Kubelet configuration field of the same name, allowing an admin
 	// to specify the age after which an image will be garbage collected.
 	ImageMaximumGCAge featuregate.Feature = "ImageMaximumGCAge"
@@ -1006,6 +1007,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics: {Default: true, PreRelease: featuregate.Beta},
 
 	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
+
+	ImageMaximumGCAge: {Default: true, PreRelease: featuregate.Beta},
 
 	InTreePluginAWSUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1162,8 +1165,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
 
 	LoadBalancerIPMode: {Default: true, PreRelease: featuregate.Beta},
-
-	ImageMaximumGCAge: {Default: false, PreRelease: featuregate.Alpha},
 
 	UserNamespacesPodSecurityStandards: {Default: false, PreRelease: featuregate.Alpha},
 

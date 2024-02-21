@@ -526,10 +526,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "imageMaximumGCAge should not be specified without feature gate",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"ImageMaximumGCAge": false}
 			conf.ImageMaximumGCAge = metav1.Duration{Duration: 1}
 			return conf
 		},
-		errMsg: "invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option ImageMaximumGCAge",
+		errMsg: "invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge",
 	}, {
 		name: "imageMaximumGCAge should not be negative",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
