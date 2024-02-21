@@ -58,17 +58,97 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 		{
 			name: "jwt authenticator is empty",
 			in:   &api.AuthenticationConfiguration{},
-			want: "jwt: Required value: at least one jwt is required",
+			want: "",
 		},
 		{
-			name: ">1 jwt authenticator",
+			name: "duplicate issuer across jwt authenticators",
 			in: &api.AuthenticationConfiguration{
 				JWT: []api.JWTAuthenticator{
-					{Issuer: api.Issuer{URL: "https://issuer-url", Audiences: []string{"audience"}}},
-					{Issuer: api.Issuer{URL: "https://issuer-url", Audiences: []string{"audience"}}},
+					{
+						Issuer: api.Issuer{
+							URL:       "https://issuer-url",
+							Audiences: []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String("prefix"),
+							},
+						},
+					},
+					{
+						Issuer: api.Issuer{
+							URL:       "https://issuer-url",
+							Audiences: []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String("prefix"),
+							},
+						},
+					},
 				},
 			},
-			want: "jwt: Too many: 2: must have at most 1 items",
+			want: `jwt[1].issuer.url: Duplicate value: "https://issuer-url"`,
+		},
+		{
+			name: "duplicate discoveryURL across jwt authenticators",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:          "https://issuer-url",
+							DiscoveryURL: "https://discovery-url/.well-known/openid-configuration",
+							Audiences:    []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String("prefix"),
+							},
+						},
+					},
+					{
+						Issuer: api.Issuer{
+							URL:          "https://different-issuer-url",
+							DiscoveryURL: "https://discovery-url/.well-known/openid-configuration",
+							Audiences:    []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String("prefix"),
+							},
+						},
+					},
+				},
+			},
+			want: `jwt[1].issuer.discoveryURL: Duplicate value: "https://discovery-url/.well-known/openid-configuration"`,
 		},
 		{
 			name: "failed issuer validation",
