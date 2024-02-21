@@ -30,12 +30,19 @@ import (
 	admissionregistrationv1apply "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	informerv1 "k8s.io/client-go/informers/admissionregistration/v1"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
+	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus/schemawatcher"
+	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus/typetracker"
 )
 
 // ControllerName has "Status" in it to differentiate this controller with the other that runs in API server.
 const ControllerName = "validatingadmissionpolicy-status"
+
+// schemaWatchPollInterval is the interval in which the schema watcher refreshes.
+// 10s result in 6 queries per minute.
+const schemaWatchPollInterval = time.Second * 10
 
 // Controller is the ValidatingAdmissionPolicy Status controller that reconciles the Status field of each policy object.
 // This controller runs type checks against referred types for each policy definition.
@@ -49,6 +56,13 @@ type Controller struct {
 	// Type of params is defined in policy.Spec.ParamsKind
 	// Types of object are calculated from policy.Spec.MatchingConstraints
 	typeChecker *validatingadmissionpolicy.TypeChecker
+
+	// schemaWatcher pulls the public OpenAPI v3 schema and detects any types
+	// that have a mutated schema.
+	schemaWatcher *schemawatcher.Instance
+
+	// typeTracker maintains the bidirectional mapping of policy and its referred GVKs
+	typeTracker *typetracker.Instance
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
@@ -63,15 +77,21 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
+	go wait.UntilWithContext(ctx, c.refreshSchema, schemaWatchPollInterval)
 	<-ctx.Done()
 }
 
-func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
+func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer,
+	policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface,
+	openAPIClient openapi.Client,
+	typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
 	c := &Controller{
 		policyInformer: policyInformer,
 		policyQueue:    workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: ControllerName}),
 		policyClient:   policyClient,
 		typeChecker:    typeChecker,
+		schemaWatcher:  schemawatcher.New(openAPIClient),
+		typeTracker:    typetracker.New(),
 	}
 	reg, err := policyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -80,12 +100,25 @@ func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, 
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			c.enqueuePolicy(newObj)
 		},
+		DeleteFunc: c.handleDeletion,
 	})
 	if err != nil {
 		return nil, err
 	}
 	c.policySynced = reg.HasSynced
 	return c, nil
+}
+
+func (c *Controller) refreshSchema(_ context.Context) {
+	changedGVKs, err := c.schemaWatcher.ChangedGVKs()
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	affectedPolicyNames := c.typeTracker.AffectedPolicies(changedGVKs)
+	for _, name := range affectedPolicyNames {
+		c.policyQueue.Add(name)
+	}
 }
 
 func (c *Controller) enqueuePolicy(policy any) {
@@ -96,6 +129,14 @@ func (c *Controller) enqueuePolicy(policy any) {
 			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v", policy))
 		}
 		c.policyQueue.Add(key)
+	}
+}
+
+func (c *Controller) handleDeletion(obj any) {
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err == nil {
+		policyName := key // no conversion needed.
+		c.typeTracker.ObservedDeletion(policyName)
 	}
 }
 
@@ -142,10 +183,22 @@ func (c *Controller) reconcile(ctx context.Context, policy *v1.ValidatingAdmissi
 	if policy == nil {
 		return nil
 	}
-	if policy.Generation <= policy.Status.ObservedGeneration {
+	// policy.Status.ObservedGeneration can be equal to policy.Generation
+	// if the policy is enqueued due to a mutation of its referred schemas.
+	// In this case, a recheck should still happen.
+	if policy.Generation < policy.Status.ObservedGeneration {
 		return nil
 	}
-	warnings := c.typeChecker.Check(policy)
+
+	// collect and observed referred types (as GVKs) of the policy.
+	typeCheckingCtx := c.typeChecker.CreateContext(policy)
+	gvks := typeCheckingCtx.GVKs()
+	if paramGVK := typeCheckingCtx.ParamGVK(); !paramGVK.Empty() {
+		gvks = append(gvks, paramGVK)
+	}
+	c.typeTracker.ObserveChange(policy.Name, gvks)
+
+	warnings := c.typeChecker.CheckContext(typeCheckingCtx, policy)
 	warningsConfig := make([]*admissionregistrationv1apply.ExpressionWarningApplyConfiguration, 0, len(warnings))
 	for _, warning := range warnings {
 		warningsConfig = append(warningsConfig, admissionregistrationv1apply.ExpressionWarning().

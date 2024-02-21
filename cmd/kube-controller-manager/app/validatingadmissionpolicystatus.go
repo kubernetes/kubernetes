@@ -42,18 +42,19 @@ func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescrip
 }
 
 func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	// KCM won't start the controller without the feature gate set.
-
+	discoveryClient := controllerContext.ClientBuilder.DiscoveryClientOrDie(names.ValidatingAdmissionPolicyStatusController)
 	schemaResolver := resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme).
-		Combine(&resolver.ClientDiscoveryResolver{Discovery: controllerContext.ClientBuilder.DiscoveryClientOrDie(names.ValidatingAdmissionPolicyStatusController)})
+		Combine(&resolver.ClientDiscoveryResolver{Discovery: discoveryClient})
 
 	typeChecker := &pluginvalidatingadmissionpolicy.TypeChecker{
 		SchemaResolver: schemaResolver,
 		RestMapper:     controllerContext.RESTMapper,
 	}
+
 	c, err := validatingadmissionpolicystatus.NewController(
 		controllerContext.InformerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 		controllerContext.ClientBuilder.ClientOrDie(names.ValidatingAdmissionPolicyStatusController).AdmissionregistrationV1().ValidatingAdmissionPolicies(),
+		discoveryClient.OpenAPIV3(),
 		typeChecker,
 	)
 

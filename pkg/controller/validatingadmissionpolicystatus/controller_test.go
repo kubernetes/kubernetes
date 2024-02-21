@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/openapi/openapitest"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
@@ -108,6 +109,7 @@ func TestTypeChecking(t *testing.T) {
 			controller, err := NewController(
 				informerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 				client.AdmissionregistrationV1().ValidatingAdmissionPolicies(),
+				openapitest.NewFakeClient(),
 				typeChecker,
 			)
 			if err != nil {
