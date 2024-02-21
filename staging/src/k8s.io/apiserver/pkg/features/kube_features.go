@@ -103,6 +103,13 @@ const (
 	// Enables expression validation in Admission Control
 	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
 
+	// owner: @alexzielenski, @cici37, @jiahuif
+	// kep: https://kep.k8s.io/3962
+	// alpha: v1.30
+	//
+	// Enables the MutatingAdmissionPolicy in Admission Chain
+	MutatingAdmissionPolicy featuregate.Feature = "MutatingAdmissionPolicy"
+
 	// owner: @cici37
 	// kep: https://kep.k8s.io/2876
 	// alpha: v1.23

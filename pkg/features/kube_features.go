@@ -1208,6 +1208,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
+	genericfeatures.MutatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
+
 	genericfeatures.WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	genericfeatures.WatchList: {Default: false, PreRelease: featuregate.Alpha},
