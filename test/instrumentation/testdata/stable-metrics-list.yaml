@@ -309,6 +309,12 @@
   stabilityLevel: STABLE
   labels:
   - resource
+- name: apiserver_storage_size_bytes
+  help: Size of the storage database file physically allocated in bytes.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - cluster
 - name: container_cpu_usage_seconds_total
   help: Cumulative cpu time consumed by the container in core-seconds
   type: Custom

@@ -197,7 +197,7 @@ func TestStorageSizeCollector(t *testing.T) {
 				return []Monitor{fakeEtcdMonitor{storageSize: 1e9}}, nil
 			},
 			err: nil,
-			want: `# HELP apiserver_storage_size_bytes [ALPHA] Size of the storage database file physically allocated in bytes.
+			want: `# HELP apiserver_storage_size_bytes [STABLE] Size of the storage database file physically allocated in bytes.
 			# TYPE apiserver_storage_size_bytes gauge
 			apiserver_storage_size_bytes{cluster="etcd-0"} 1e+09
 			`,
