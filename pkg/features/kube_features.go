@@ -526,6 +526,7 @@ const (
 	// kep: http://kep.k8s.io/3018
 	// alpha: v1.26
 	// beta: v1.27
+	// GA: v1.31
 	//
 	// Enables PDBUnhealthyPodEvictionPolicy for PodDisruptionBudgets
 	PDBUnhealthyPodEvictionPolicy featuregate.Feature = "PDBUnhealthyPodEvictionPolicy"
@@ -1095,7 +1096,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NodeSwap: {Default: true, PreRelease: featuregate.Beta},
 
-	PDBUnhealthyPodEvictionPolicy: {Default: true, PreRelease: featuregate.Beta},
+	PDBUnhealthyPodEvictionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	PersistentVolumeLastPhaseTransitionTime: {Default: true, PreRelease: featuregate.Beta},
 
