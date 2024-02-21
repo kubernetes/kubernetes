@@ -87,19 +87,13 @@ func (*regex) ProgramOptions() []cel.ProgramOption {
 }
 
 func find(strVal ref.Val, regexVal ref.Val) ref.Val {
-	str, ok := strVal.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(strVal)
-	}
-	regex, ok := regexVal.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(regexVal)
-	}
-	re, err := regexp.Compile(regex)
+	str := strVal.(types.String)
+	regex := regexVal.(types.String)
+	re, err := regexp.Compile(string(regex))
 	if err != nil {
 		return types.NewErr("Illegal regex: %v", err.Error())
 	}
-	result := re.FindString(str)
+	result := re.FindString(string(str))
 	return types.String(result)
 }
 
@@ -108,28 +102,19 @@ func findAll(args ...ref.Val) ref.Val {
 	if argn < 2 || argn > 3 {
 		return types.NoSuchOverloadErr()
 	}
-	str, ok := args[0].Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(args[0])
-	}
-	regex, ok := args[1].Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(args[1])
-	}
+	str := args[0].(types.String)
+	regex := args[1].(types.String)
 	n := int64(-1)
 	if argn == 3 {
-		n, ok = args[2].Value().(int64)
-		if !ok {
-			return types.MaybeNoSuchOverloadErr(args[2])
-		}
+		n = int64(args[2].(types.Int))
 	}
 
-	re, err := regexp.Compile(regex)
+	re, err := regexp.Compile(string(regex))
 	if err != nil {
 		return types.NewErr("Illegal regex: %v", err.Error())
 	}
 
-	result := re.FindAllString(str, int(n))
+	result := re.FindAllString(string(str), int(n))
 
 	return types.NewStringList(types.DefaultTypeAdapter, result)
 }

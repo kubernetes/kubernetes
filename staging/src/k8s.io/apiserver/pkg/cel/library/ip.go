@@ -193,12 +193,8 @@ func (*ip) ProgramOptions() []cel.ProgramOption {
 }
 
 func stringToIP(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	addr, err := parseIPAddr(s)
+	s := arg.(types.String)
+	addr, err := parseIPAddr(string(s))
 	if err != nil {
 		// Don't add context, we control the error message already.
 		return types.NewErr("%v", err)
@@ -210,19 +206,12 @@ func stringToIP(arg ref.Val) ref.Val {
 }
 
 func ipToString(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.String(ip.Addr.String())
 }
 
 func family(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	ip := arg.(apiservercel.IP)
 
 	switch {
 	case ip.Addr.Is4():
@@ -235,12 +224,9 @@ func family(arg ref.Val) ref.Val {
 }
 
 func ipIsCanonical(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.(types.String)
 
-	addr, err := parseIPAddr(s)
+	addr, err := parseIPAddr(string(s))
 	if err != nil {
 		// Don't add context, we control the error message already.
 		return types.NewErr("%v", err)
@@ -249,61 +235,38 @@ func ipIsCanonical(arg ref.Val) ref.Val {
 	// Addr.String() always returns the canonical form of the IP address.
 	// Therefore comparing this with the original string representation
 	// will tell us if the IP address is in its canonical form.
-	return types.Bool(addr.String() == s)
+	return types.Bool(addr.String() == string(s))
 }
 
 func isIP(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.(types.String)
 
-	_, err := parseIPAddr(s)
+	_, err := parseIPAddr(string(s))
 	return types.Bool(err == nil)
 }
 
 func isUnspecified(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsUnspecified())
 }
 
 func isLoopback(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsLoopback())
 }
 
 func isLinkLocalMulticast(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsLinkLocalMulticast())
 }
 
 func isLinkLocalUnicast(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsLinkLocalUnicast())
 }
 
 func isGlobalUnicast(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsGlobalUnicast())
 }
 
