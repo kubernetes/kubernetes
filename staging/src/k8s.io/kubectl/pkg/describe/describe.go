@@ -829,7 +829,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 				w.Write(LEVEL_0, "LocalhostProfile:\t%s\n", *pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
 			}
 		}
-		// remove when .IP field is depreciated
+		// remove when .IP field is deprecated
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
 		describePodIPs(pod, w, "")
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
@@ -3745,7 +3745,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		w.Write(LEVEL_0, "  Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
 		w.Write(LEVEL_0, "  Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
-		// remove when .PodCIDR is depreciated
+		// remove when .PodCIDR is deprecated
 		if len(node.Spec.PodCIDR) > 0 {
 			w.Write(LEVEL_0, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
 		}
