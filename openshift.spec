@@ -69,15 +69,47 @@ Kubernetes allowing you to safely host many different applications and workloads
 on a unified cluster.
 
 %package hyperkube
-Summary:        OpenShift Kubernetes server commands
-Requires:       util-linux
-Requires:       socat
-Requires:       iptables
+Summary:        OpenShift Kubernetes server commands, via deps
+Requires:       kube-scheduler = %{version}
+Requires:       kube-kubelet = %{version}
+Requires:       kube-controller-manager = %{version}
+Requires:       kube-apiserver = %{version}
 Provides:       hyperkube = %{version}
 Obsoletes:      atomic-openshift-hyperkube <= %{version}
 Obsoletes:      atomic-openshift-node <= %{version}
 
+%package kube-scheduler
+Summary:        OpenShift Kubernetes Scheduler
+Provides:       kube-scheduler = %{version}
+
+%package kubelet
+Summary:        OpenShift Kubernetes Kubelet
+Requires:       util-linux
+Requires:       socat
+Requires:       iptables
+Provides:       kube-kubelet = %{version}
+
+%package kube-controller-manager
+Summary:        OpenShift Kubernetes Controller Manager
+Provides:       kube-controller-manager = %{version}
+
+%package kube-apiserver
+Summary:        OpenShift Kubernetes API Server
+Provides:       kube-apiserver = %{version}
+
 %description hyperkube
+%{summary}
+
+%description kube-scheduler
+%{summary}
+
+%description kubelet
+%{summary}
+
+%description kube-controller-manager
+%{summary}
+
+%description kube-apiserver
 %{summary}
 
 %prep
@@ -120,18 +152,29 @@ install -p -m 755 openshift-hack/images/hyperkube/hyperkube %{buildroot}%{_bindi
 install -p -m 755 openshift-hack/images/hyperkube/kubensenter %{buildroot}%{_bindir}/kubensenter
 install -p -m 755 openshift-hack/sysctls/50-kubelet.conf %{buildroot}%{_sysctldir}/50-kubelet.conf
 
-%post
+%post kubelet
 %sysctl_apply 50-kubelet.conf
 
 %files hyperkube
 %license LICENSE
 %{_bindir}/hyperkube
-%{_bindir}/kube-apiserver
-%{_bindir}/kube-controller-manager
-%{_bindir}/kube-scheduler
+%defattr(-,root,root,0700)
+
+%files kubelet
 %{_bindir}/kubelet
 %{_bindir}/kubensenter
 %{_sysctldir}/50-kubelet.conf
 %defattr(-,root,root,0700)
+
+%files kube-scheduler
+%{_bindir}/kube-scheduler
+
+%files kube-controller-manager
+%{_bindir}/kube-controller-manager
+
+%files kube-apiserver
+%{_bindir}/kube-apiserver
+
+
 
 %changelog
