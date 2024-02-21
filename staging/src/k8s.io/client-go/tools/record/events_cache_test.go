@@ -283,18 +283,16 @@ func TestEventCorrelator(t *testing.T) {
 }
 
 func TestEventSpamFilter(t *testing.T) {
-	spamKeyFuncBasedOnObjectsAndReason := func(e *v1.Event) string {
-		return strings.Join([]string{
-			e.Source.Component,
-			e.Source.Host,
-			e.InvolvedObject.Kind,
-			e.InvolvedObject.Namespace,
-			e.InvolvedObject.Name,
-			string(e.InvolvedObject.UID),
-			e.InvolvedObject.APIVersion,
+	spamKeyFuncBasedOnObjectsAndReason := func(e *v1.Event) any {
+		return struct {
+			Source         v1.EventSource
+			InvolvedObject v1.ObjectReference
+			Reason         string
+		}{
+			e.Source,
+			e.InvolvedObject,
 			e.Reason,
-		},
-			"")
+		}
 	}
 	burstSize := 1
 	eventInterval := time.Duration(1) * time.Second
