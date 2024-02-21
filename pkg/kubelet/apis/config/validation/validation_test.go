@@ -570,6 +570,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		errMsg: "invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s",
 	}, {
+		name: "pod logs path must be not empty",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = ""
+			return config
+		},
+		errMsg: "invalid configuration: podLogsDir was not specified",
+	}, {
 		name: "pod logs path must be absolute",
 		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			config.PodLogsDir = "./test"
