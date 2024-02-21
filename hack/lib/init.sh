@@ -135,6 +135,7 @@ KUBE_NONSERVER_GROUP_VERSIONS="
  abac.authorization.kubernetes.io/v0 \
  abac.authorization.kubernetes.io/v1beta1 \
  apidiscovery.k8s.io/v2beta1 \
+ apidiscovery.k8s.io/v2 \
  componentconfig/v1alpha1 \
  imagepolicy.k8s.io/v1alpha1\
  admission.k8s.io/v1\
