@@ -362,6 +362,14 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1a1",
 			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicyBinding"),
 		},
+		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"): {
+			Stub:             `{"metadata":{"name":"map1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"mutations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas", "patchType":"ApplyConfiguration"}]}}`,
+			ExpectedEtcdPath: "/registry/mutatingadmissionpolicies/map1",
+		},
+		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"): {
+			Stub:             `{"metadata":{"name":"mpb1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"}}}`,
+			ExpectedEtcdPath: "/registry/mutatingadmissionpolicybindings/mpb1",
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/scheduling/v1

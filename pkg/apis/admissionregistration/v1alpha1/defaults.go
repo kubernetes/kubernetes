@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,5 +56,21 @@ func SetDefaults_ParamRef(obj *admissionregistrationv1alpha1.ParamRef) {
 	if obj.ParameterNotFoundAction == nil {
 		v := admissionregistrationv1alpha1.DenyAction
 		obj.ParameterNotFoundAction = &v
+	}
+}
+
+// SetDefaults_MutatingAdmissionPolicySpec sets defaults for MutatingAdmissionPolicySpec
+func SetDefaults_MutatingAdmissionPolicySpec(obj *admissionregistrationv1alpha1.MutatingAdmissionPolicySpec) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1alpha1.Fail
+		obj.FailurePolicy = &policy
+	}
+}
+
+// SetDefaults_Mutation sets defaults for Mutation
+func SetDefaults_Mutation(obj *admissionregistrationv1alpha1.Mutation) {
+	if obj.ReinvocationPolicy == nil {
+		never := admissionregistrationv1.NeverReinvocationPolicy
+		obj.ReinvocationPolicy = &never
 	}
 }

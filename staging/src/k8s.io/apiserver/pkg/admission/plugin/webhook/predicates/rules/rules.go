@@ -121,7 +121,7 @@ func (r *Matcher) resource() bool {
 func IsExemptAdmissionConfigurationResource(attr admission.Attributes) bool {
 	gvk := attr.GetKind()
 	if gvk.Group == "admissionregistration.k8s.io" {
-		if gvk.Kind == "ValidatingWebhookConfiguration" || gvk.Kind == "MutatingWebhookConfiguration" || gvk.Kind == "ValidatingAdmissionPolicy" || gvk.Kind == "ValidatingAdmissionPolicyBinding" {
+		if gvk.Kind == "ValidatingWebhookConfiguration" || gvk.Kind == "MutatingWebhookConfiguration" || gvk.Kind == "ValidatingAdmissionPolicy" || gvk.Kind == "ValidatingAdmissionPolicyBinding" || gvk.Kind == "MutatingAdmissionPolicy" || gvk.Kind == "MutatingAdmissionPolicyBinding" {
 			return true
 		}
 	}
