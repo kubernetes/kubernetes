@@ -230,12 +230,10 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		// IsPodReady is the current implementation of IsHealthy
 		// If the pod is healthy, it should be guarded by the PDB.
 		if !podutil.IsPodReady(pod) {
-			if feature.DefaultFeatureGate.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
-				if pdb.Spec.UnhealthyPodEvictionPolicy != nil && *pdb.Spec.UnhealthyPodEvictionPolicy == policyv1.AlwaysAllow {
-					// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
-					updateDeletionOptions = true
-					return nil
-				}
+			if pdb.Spec.UnhealthyPodEvictionPolicy != nil && *pdb.Spec.UnhealthyPodEvictionPolicy == policyv1.AlwaysAllow {
+				// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+				updateDeletionOptions = true
+				return nil
 			}
 			// default nil and IfHealthyBudget policy
 			if pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
