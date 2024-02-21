@@ -416,7 +416,7 @@ type KubeletConfiguration struct {
 	// rather than being surprised when they are permanently removed in the release after that.
 	// Deprecated: Use KubeletConfiguration.Metrics.ShowHiddenMetricsForVersion instead.
 	ShowHiddenMetricsForVersion string
-	// Metrics specifies the options of metrics.
+	// MetricsConfiguration contains metrics options.
 	// Refer k8s.io/component-base/metrics/api/ for more information.
 	Metrics metricsapi.MetricsConfiguration
 	// Logging specifies the options of logging.
