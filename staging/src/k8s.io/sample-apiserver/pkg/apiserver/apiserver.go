@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
@@ -101,7 +102,7 @@ func (cfg *Config) Complete() CompletedConfig {
 
 // New returns a new instance of WardleServer from the given config.
 func (c completedConfig) New() (*WardleServer, error) {
-	genericServer, err := c.GenericConfig.New("sample-apiserver", genericapiserver.NewEmptyDelegate())
+	genericServer, err := c.GenericConfig.New(server.KubeAggregatedAPIServer, genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return nil, err
 	}

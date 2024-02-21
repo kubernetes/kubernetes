@@ -22,12 +22,14 @@ import (
 	"net"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -52,6 +54,11 @@ type WardleServerOptions struct {
 	StdErr                io.Writer
 
 	AlternateDNS []string
+}
+
+// AddFlags adds the apiextensions-apiserver flags to the flagset.
+func (o WardleServerOptions) AddFlags(fs *pflag.FlagSet) {
+	o.RecommendedOptions.AddFlags(fs)
 }
 
 // NewWardleServerOptions returns a new WardleServerOptions
@@ -132,8 +139,7 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 		return []admission.PluginInitializer{wardleinitializer.New(informerFactory)}, nil
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs, server.KubeAggregatedAPIServer)
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(sampleopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "Wardle"
 	serverConfig.OpenAPIConfig.Info.Version = "0.1"

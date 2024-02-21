@@ -92,7 +92,7 @@ type ServerRunOptions struct {
 }
 
 func NewServerRunOptions() *ServerRunOptions {
-	defaults := server.NewConfig(serializer.CodecFactory{})
+	defaults := server.NewConfig(serializer.CodecFactory{}, server.KubeAPIServer)
 	return &ServerRunOptions{
 		MaxRequestsInFlight:                 defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight:         defaults.MaxMutatingRequestsInFlight,

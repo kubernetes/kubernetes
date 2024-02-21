@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/server"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -125,7 +126,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(aggregatorscheme.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(aggregatorscheme.Codecs, server.KubeAggregator)
 
 	if err := o.ServerRunOptions.ApplyTo(&serverConfig.Config); err != nil {
 		return err
@@ -136,6 +137,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), aggregatorscheme.Scheme); err != nil {
 		return err
 	}
+
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
