@@ -24,10 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
@@ -149,12 +147,7 @@ type reconciler struct {
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
-		rc.runNew(stopCh)
-		return
-	}
-
-	rc.runOld(stopCh)
+	rc.runNew(stopCh)
 }
 
 func (rc *reconciler) unmountVolumes() {
