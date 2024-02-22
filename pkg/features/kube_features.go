@@ -510,6 +510,7 @@ const (
 	// kep: https://kep.k8s.io/3756
 	// alpha: v1.25 (as part of SELinuxMountReadWriteOncePod)
 	// beta: v1.27
+	// GA: v1.30
 	// Robust VolumeManager reconstruction after kubelet restart.
 	NewVolumeManagerReconstruction featuregate.Feature = "NewVolumeManagerReconstruction"
 
@@ -1055,7 +1056,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
-	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
+	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	NFTablesProxyMode: {Default: false, PreRelease: featuregate.Alpha},
 
