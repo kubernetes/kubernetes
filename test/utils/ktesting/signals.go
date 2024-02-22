@@ -30,6 +30,7 @@ var (
 	interruptCtx context.Context
 
 	defaultProgressReporter = new(progressReporter)
+	defaultSignalChannel    chan os.Signal
 )
 
 const ginkgoSpecContextKey = "GINKGO_SPEC_CONTEXT"
@@ -57,24 +58,34 @@ func init() {
 	// probably cannot be in either Ginkgo or Gomega).
 	interruptCtx = context.WithValue(cancelCtx, ginkgoSpecContextKey, defaultProgressReporter)
 
-	signalChannel := make(chan os.Signal, 1)
+	defaultSignalChannel = make(chan os.Signal, 1)
 	// progressSignals will be empty on Windows.
 	if len(progressSignals) > 0 {
-		signal.Notify(signalChannel, progressSignals...)
+		signal.Notify(defaultSignalChannel, progressSignals...)
 	}
 
 	// os.Stderr gets redirected by "go test". "go test -v" has to be
 	// used to see the output while a test runs.
-	go defaultProgressReporter.run(interruptCtx, os.Stderr, signalChannel)
+	defaultProgressReporter.setOutput(os.Stderr)
+	go defaultProgressReporter.run(interruptCtx, defaultSignalChannel)
 }
 
 type progressReporter struct {
 	mutex           sync.Mutex
 	reporterCounter int64
 	reporters       map[int64]func() string
+	out             io.Writer
 }
 
 var _ ginkgoReporter = &progressReporter{}
+
+func (p *progressReporter) setOutput(out io.Writer) io.Writer {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	oldOut := p.out
+	p.out = out
+	return oldOut
+}
 
 // AttachProgressReporter implements Gomega's contextWithAttachProgressReporter.
 func (p *progressReporter) AttachProgressReporter(reporter func() string) func() {
@@ -100,13 +111,13 @@ func (p *progressReporter) detachProgressReporter(id int64) {
 	delete(p.reporters, id)
 }
 
-func (p *progressReporter) run(ctx context.Context, out io.Writer, progressSignalChannel chan os.Signal) {
+func (p *progressReporter) run(ctx context.Context, progressSignalChannel chan os.Signal) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-progressSignalChannel:
-			p.dumpProgress(out)
+			p.dumpProgress()
 		}
 	}
 }
@@ -117,7 +128,7 @@ func (p *progressReporter) run(ctx context.Context, out io.Writer, progressSigna
 //
 // But perhaps dumping goroutines and their callstacks is useful anyway?  TODO:
 // look at how Ginkgo does it and replicate some of it.
-func (p *progressReporter) dumpProgress(out io.Writer) {
+func (p *progressReporter) dumpProgress() {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -135,5 +146,5 @@ func (p *progressReporter) dumpProgress(out io.Writer) {
 		}
 	}
 
-	_, _ = out.Write([]byte(buffer.String()))
+	_, _ = p.out.Write([]byte(buffer.String()))
 }

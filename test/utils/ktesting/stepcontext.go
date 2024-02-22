@@ -76,7 +76,7 @@ func (sCtx *stepContext) Fatalf(format string, args ...any) {
 	sCtx.TContext.Fatal(sCtx.what + ": " + strings.TrimSpace(fmt.Sprintf(format, args...)))
 }
 
-// Value intercepts a search for the special
+// Value intercepts a search for the special "GINKGO_SPEC_CONTEXT".
 func (sCtx *stepContext) Value(key any) any {
 	if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
 		if reporter, ok := sCtx.TContext.Value(key).(ginkgoReporter); ok {
