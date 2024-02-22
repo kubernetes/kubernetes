@@ -143,6 +143,13 @@ const (
 	// Enables the use of derived encryption keys with KMS v2.
 	KMSv2KDF featuregate.Feature = "KMSv2KDF"
 
+	// owner: @alexzielenski, @cici37, @jiahuif
+	// kep: https://kep.k8s.io/3962
+	// alpha: v1.30
+	//
+	// Enables the MutatingAdmissionPolicy in Admission Chain
+	MutatingAdmissionPolicy featuregate.Feature = "MutatingAdmissionPolicy"
+
 	// owner: @jiahuif
 	// kep: https://kep.k8s.io/2887
 	// alpha: v1.23
