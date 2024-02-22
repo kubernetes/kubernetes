@@ -55,7 +55,6 @@ func (in *BootstrapToken) DeepCopyObject() runtime.Object {
 func (in *Certificate) DeepCopyInto(out *Certificate) {
 	*out = *in
 	in.ExpirationDate.DeepCopyInto(&out.ExpirationDate)
-	out.ResidualTime = in.ResidualTime
 	return
 }
 

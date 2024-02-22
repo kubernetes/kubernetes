@@ -132,7 +132,7 @@ func Convert_output_BootstrapToken_To_v1alpha3_BootstrapToken(in *output.Bootstr
 func autoConvert_v1alpha3_Certificate_To_output_Certificate(in *Certificate, out *output.Certificate, s conversion.Scope) error {
 	out.Name = in.Name
 	out.ExpirationDate = in.ExpirationDate
-	out.ResidualTime = in.ResidualTime
+	out.ResidualTimeSeconds = in.ResidualTimeSeconds
 	out.ExternallyManaged = in.ExternallyManaged
 	out.CAName = in.CAName
 	out.Missing = in.Missing
@@ -147,7 +147,7 @@ func Convert_v1alpha3_Certificate_To_output_Certificate(in *Certificate, out *ou
 func autoConvert_output_Certificate_To_v1alpha3_Certificate(in *output.Certificate, out *Certificate, s conversion.Scope) error {
 	out.Name = in.Name
 	out.ExpirationDate = in.ExpirationDate
-	out.ResidualTime = in.ResidualTime
+	out.ResidualTimeSeconds = in.ResidualTimeSeconds
 	out.ExternallyManaged = in.ExternallyManaged
 	out.CAName = in.CAName
 	out.Missing = in.Missing

@@ -88,11 +88,11 @@ type Certificate struct {
 	// Name of the certificate.
 	Name string `json:"name"`
 
-	// ExpirationDate defines certificate expiration date.
+	// ExpirationDate defines certificate expiration date in UTC following the RFC3339 format.
 	ExpirationDate metav1.Time `json:"expirationDate"`
 
-	// ResidualTime represents the residual time before expiration.
-	ResidualTime metav1.Duration `json:"residualTime"`
+	// ResidualTimeSeconds represents the duration in seconds relative to the residual time before expiration.
+	ResidualTimeSeconds int64 `json:"residualTime"`
 
 	// ExternallyManaged defines if the certificate is externally managed.
 	ExternallyManaged bool `json:"externallyManaged"`

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"text/tabwriter"
+	"time"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
@@ -379,11 +380,11 @@ func fetchCertificateExpirationInfo(rm *renewal.Manager) (*outputapiv1alpha3.Cer
 				return nil, err
 			}
 			info.Certificates = append(info.Certificates, outputapiv1alpha3.Certificate{
-				Name:              e.Name,
-				ExpirationDate:    metav1.Time{Time: e.ExpirationDate},
-				ResidualTime:      metav1.Duration{Duration: e.ResidualTime()},
-				CAName:            handler.CAName,
-				ExternallyManaged: e.ExternallyManaged,
+				Name:                e.Name,
+				ExpirationDate:      metav1.Time{Time: e.ExpirationDate},
+				ResidualTimeSeconds: int64(e.ResidualTime() / time.Second),
+				CAName:              handler.CAName,
+				ExternallyManaged:   e.ExternallyManaged,
 			})
 		} else {
 			// the certificate does not exist (for any reason)
@@ -401,10 +402,10 @@ func fetchCertificateExpirationInfo(rm *renewal.Manager) (*outputapiv1alpha3.Cer
 				return nil, err
 			}
 			info.CertificateAuthorities = append(info.CertificateAuthorities, outputapiv1alpha3.Certificate{
-				Name:              e.Name,
-				ExpirationDate:    metav1.Time{Time: e.ExpirationDate},
-				ResidualTime:      metav1.Duration{Duration: e.ResidualTime()},
-				ExternallyManaged: e.ExternallyManaged,
+				Name:                e.Name,
+				ExpirationDate:      metav1.Time{Time: e.ExpirationDate},
+				ResidualTimeSeconds: int64(e.ResidualTime() / time.Second),
+				ExternallyManaged:   e.ExternallyManaged,
 			})
 		} else {
 			// the CA does not exist (for any reason)
@@ -515,7 +516,7 @@ func (p *certTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 		s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
 			cert.Name,
 			cert.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-			duration.ShortHumanDuration(cert.ResidualTime.Duration),
+			duration.ShortHumanDuration(time.Duration(cert.ResidualTimeSeconds)*time.Second),
 			cert.CAName,
 			yesNo(cert.ExternallyManaged),
 		)
@@ -534,7 +535,7 @@ func (p *certTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 		s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
 			ca.Name,
 			ca.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-			duration.ShortHumanDuration(ca.ResidualTime.Duration),
+			duration.ShortHumanDuration(time.Duration(ca.ResidualTimeSeconds)*time.Second),
 			yesNo(ca.ExternallyManaged),
 		)
 		fmt.Fprintln(tabw, s)
