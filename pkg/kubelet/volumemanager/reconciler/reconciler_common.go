@@ -146,10 +146,6 @@ type reconciler struct {
 	volumesNeedReportedInUse        []v1.UniqueVolumeName
 }
 
-func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	rc.runNew(stopCh)
-}
-
 func (rc *reconciler) unmountVolumes() {
 	// Ensure volumes that should be unmounted are unmounted.
 	for _, mountedVolume := range rc.actualStateOfWorld.GetAllMountedVolumes() {

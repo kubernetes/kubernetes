@@ -21,10 +21,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// TODO: move to reconciler.go and remove old code there when NewVolumeManagerReconstruction is GA
-
-// TODO: Replace Run() when NewVolumeManagerReconstruction is GA
-func (rc *reconciler) runNew(stopCh <-chan struct{}) {
+func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	rc.reconstructVolumes()
 	klog.InfoS("Reconciler: start to sync state")
 	wait.Until(rc.reconcileNew, rc.loopSleepDuration, stopCh)
