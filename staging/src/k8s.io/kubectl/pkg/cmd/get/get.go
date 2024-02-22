@@ -92,7 +92,7 @@ var (
 		Prints a table of the most important information about the specified resources.
 		You can filter the list using a label selector and the --selector flag. If the
 		desired resource type is namespaced you will only see results in your current
-		namespace unless you pass --all-namespaces.
+		namespace unless you pass --all-namespaces or --namespace(for specific namespace)
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`))
@@ -132,7 +132,13 @@ var (
 		kubectl get rc/web service/frontend pods/web-pod-13je7
 
 		# List the 'status' subresource for a single pod
-		kubectl get pod web-pod-13je7 --subresource status`))
+		kubectl get pod web-pod-13je7 --subresource status
+
+		# List all deployments in namespace - backend
+		kubectl get deployments.apps --namespace backend
+
+		# List all pods existing in all namespaces
+		kubectl get pods --all-namspaces`))
 )
 
 const (
