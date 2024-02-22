@@ -1,5 +1,8 @@
+//go:build !linux
+// +build !linux
+
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +17,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package config implements the pod configuration readers.
-package config // import "k8s.io/kubernetes/pkg/kubelet/config"
+package podsource
+
+import (
+	"fmt"
+
+	"k8s.io/klog/v2"
+)
+
+func (s *sourceFile) startWatch() {
+	klog.ErrorS(nil, "Watching source file is unsupported in this build")
+}
+
+func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
+	return fmt.Errorf("consuming watch event is unsupported in this build")
+}

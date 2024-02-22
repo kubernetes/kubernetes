@@ -34,10 +34,10 @@ import (
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigapi "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -63,7 +63,7 @@ type KubeletFlags struct {
 	NodeIP string
 
 	// Container-runtime-specific options.
-	config.ContainerRuntimeOptions
+	kubeletconfig.ContainerRuntimeOptions
 
 	// certDirectory is the directory where the TLS certs are located.
 	// If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.
@@ -200,14 +200,14 @@ func getLabelNamespace(key string) string {
 }
 
 // NewKubeletConfiguration will create a new KubeletConfiguration with default values
-func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
+func NewKubeletConfiguration() (*kubeletconfigapi.KubeletConfiguration, error) {
 	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	if err != nil {
 		return nil, err
 	}
 	versioned := &v1beta1.KubeletConfiguration{}
 	scheme.Default(versioned)
-	config := &kubeletconfig.KubeletConfiguration{}
+	config := &kubeletconfigapi.KubeletConfiguration{}
 	if err := scheme.Convert(versioned, config, nil); err != nil {
 		return nil, err
 	}
@@ -218,13 +218,13 @@ func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 // applyLegacyDefaults applies legacy default values to the KubeletConfiguration in order to
 // preserve the command line API. This is used to construct the baseline default KubeletConfiguration
 // before the first round of flag parsing.
-func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
+func applyLegacyDefaults(kc *kubeletconfigapi.KubeletConfiguration) {
 	// --anonymous-auth
 	kc.Authentication.Anonymous.Enabled = true
 	// --authentication-token-webhook
 	kc.Authentication.Webhook.Enabled = false
 	// --authorization-mode
-	kc.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeAlwaysAllow
+	kc.Authorization.Mode = kubeletconfigapi.KubeletAuthorizationModeAlwaysAllow
 	// --read-only-port
 	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 }
@@ -233,7 +233,7 @@ func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
 	KubeletFlags
-	kubeletconfig.KubeletConfiguration
+	kubeletconfigapi.KubeletConfiguration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -281,7 +281,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		mainfs.AddFlagSet(fs)
 	}()
 
-	f.ContainerRuntimeOptions.AddFlags(fs)
+	addContainerRuntimeFlags(fs, &f.ContainerRuntimeOptions)
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
@@ -314,25 +314,43 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	// DEPRECATED FLAGS
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
-	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+	mustMarkDeprecated(fs, "minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
-	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+	mustMarkDeprecated(fs, "maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxContainerCount, "maximum-dead-containers", f.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")
-	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+	mustMarkDeprecated(fs, "maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.BoolVar(&f.RegisterSchedulable, "register-schedulable", f.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false.")
-	fs.MarkDeprecated("register-schedulable", "will be removed in a future version")
+	mustMarkDeprecated(fs, "register-schedulable", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
-	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
+	mustMarkDeprecated(fs, "keep-terminated-pod-volumes", "will be removed in a future version")
 	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
-	fs.MarkDeprecated("experimental-mounter-path", "will be removed in 1.25 or later. in favor of using CSI.")
+	mustMarkDeprecated(fs, "experimental-mounter-path", "will be removed in 1.25 or later. in favor of using CSI.")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file. Empty string for no configuration file.")
-	fs.MarkDeprecated("cloud-config", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
+	mustMarkDeprecated(fs, "cloud-config", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
 	fs.BoolVar(&f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "experimental-allocatable-ignore-eviction", f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "When set to 'true', Hard Eviction Thresholds will be ignored while calculating Node Allocatable. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details. [default=false]")
-	fs.MarkDeprecated("experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
+	mustMarkDeprecated(fs, "experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
+}
+
+func mustMarkDeprecated(fs *pflag.FlagSet, name, userMessage string) {
+	if err := fs.MarkDeprecated(name, userMessage); err != nil {
+		panic(err)
+	}
+}
+
+// addContainerRuntimeFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
+func addContainerRuntimeFlags(fs *pflag.FlagSet, o *kubeletconfig.ContainerRuntimeOptions) {
+	// General settings.
+	fs.StringVar(&o.RuntimeCgroups, "runtime-cgroups", o.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
+	fs.StringVar(&o.PodSandboxImage, "pod-infra-container-image", o.PodSandboxImage, "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
+	mustMarkDeprecated(fs, "pod-infra-container-image", "will be removed in a future release. Image garbage collector will get sandbox image information from CRI.")
+
+	// Image credential provider settings.
+	fs.StringVar(&o.ImageCredentialProviderConfigFile, "image-credential-provider-config", o.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")
+	fs.StringVar(&o.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", o.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
 }
 
 // AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
-func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfiguration) {
+func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfigapi.KubeletConfiguration) {
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
 	defer func() {
 		// All KubeletConfiguration flags are now deprecated, and any new flags that point to

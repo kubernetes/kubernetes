@@ -37,8 +37,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
@@ -90,7 +90,7 @@ const (
 // this node and makes it so.
 type VolumeManager interface {
 	// Starts the volume manager and all the asynchronous loops that it controls
-	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+	Run(sourcesReady podsource.SourcesReady, stopCh <-chan struct{})
 
 	// WaitForAttachAndMount processes the volumes referenced in the specified
 	// pod and blocks until they are all attached and mounted (reflected in
@@ -277,7 +277,7 @@ type volumeManager struct {
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
-func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (vm *volumeManager) Run(sourcesReady podsource.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
 	if vm.kubeClient != nil {

@@ -38,8 +38,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -52,7 +52,7 @@ import (
 // if it has volumes. It also verifies that the pods in the desired state of the
 // world cache still exist, if not, it removes them.
 type DesiredStateOfWorldPopulator interface {
-	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+	Run(sourcesReady podsource.SourcesReady, stopCh <-chan struct{})
 
 	// ReprocessPod sets value for the specified pod in processedPods
 	// to false, forcing it to be reprocessed. This is required to enable
@@ -146,7 +146,7 @@ type processedPods struct {
 	sync.RWMutex
 }
 
-func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady podsource.SourcesReady, stopCh <-chan struct{}) {
 	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
 	klog.InfoS("Desired state populator starts to run")
 	wait.PollUntil(dswp.loopSleepDuration, func() (bool, error) {

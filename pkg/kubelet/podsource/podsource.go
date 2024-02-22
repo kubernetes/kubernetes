@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package podsource
 
 import (
 	"context"
@@ -34,31 +34,31 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-// PodConfigNotificationMode describes how changes are sent to the update channel.
-type PodConfigNotificationMode int
+// PodSourceNotificationMode describes how changes are sent to the update channel.
+type PodSourceNotificationMode int
 
 const (
-	// PodConfigNotificationUnknown is the default value for
-	// PodConfigNotificationMode when uninitialized.
-	PodConfigNotificationUnknown PodConfigNotificationMode = iota
-	// PodConfigNotificationSnapshot delivers the full configuration as a SET whenever
+	// PodSourceNotificationUnknown is the default value for
+	// PodSourceNotificationMode when uninitialized.
+	PodSourceNotificationUnknown PodSourceNotificationMode = iota
+	// PodSourceNotificationSnapshot delivers the full configuration as a SET whenever
 	// any change occurs.
-	PodConfigNotificationSnapshot
-	// PodConfigNotificationSnapshotAndUpdates delivers an UPDATE and DELETE message whenever pods are
+	PodSourceNotificationSnapshot
+	// PodSourceNotificationSnapshotAndUpdates delivers an UPDATE and DELETE message whenever pods are
 	// changed, and a SET message if there are any additions or removals.
-	PodConfigNotificationSnapshotAndUpdates
-	// PodConfigNotificationIncremental delivers ADD, UPDATE, DELETE, REMOVE, RECONCILE to the update channel.
-	PodConfigNotificationIncremental
+	PodSourceNotificationSnapshotAndUpdates
+	// PodSourceNotificationIncremental delivers ADD, UPDATE, DELETE, REMOVE, RECONCILE to the update channel.
+	PodSourceNotificationIncremental
 )
 
 type podStartupSLIObserver interface {
 	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
 }
 
-// PodConfig is a configuration mux that merges many sources of pod configuration into a single
+// PodSource is a configuration mux that merges many sources of pod configuration into a single
 // consistent structure, and then delivers incremental change notifications to listeners
 // in order.
-type PodConfig struct {
+type PodSource struct {
 	pods *podStorage
 	mux  *mux
 
@@ -67,26 +67,26 @@ type PodConfig struct {
 
 	// contains the list of all configured sources
 	sourcesLock sync.Mutex
-	sources     sets.String
+	sources     sets.Set[string]
 }
 
-// NewPodConfig creates an object that can merge many configuration sources into a stream
+// NewPodSource creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
-func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *PodConfig {
+func NewPodSource(mode PodSourceNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *PodSource {
 	updates := make(chan kubetypes.PodUpdate, 50)
 	storage := newPodStorage(updates, mode, recorder, startupSLIObserver)
-	podConfig := &PodConfig{
+	podSource := &PodSource{
 		pods:    storage,
 		mux:     newMux(storage),
 		updates: updates,
-		sources: sets.String{},
+		sources: sets.New[string](),
 	}
-	return podConfig
+	return podSource
 }
 
 // Channel creates or returns a config source channel.  The channel
 // only accepts PodUpdates
-func (c *PodConfig) Channel(ctx context.Context, source string) chan<- interface{} {
+func (c *PodSource) Channel(ctx context.Context, source string) chan<- interface{} {
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
 	c.sources.Insert(source)
@@ -95,23 +95,23 @@ func (c *PodConfig) Channel(ctx context.Context, source string) chan<- interface
 
 // SeenAllSources returns true if seenSources contains all sources in the
 // config, and also this config has received a SET message from each source.
-func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
+func (c *PodSource) SeenAllSources(seenSources sets.Set[string]) bool {
 	if c.pods == nil {
 		return false
 	}
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
-	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.List(), "seenSources", seenSources)
-	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
+	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.UnsortedList(), "seenSources", seenSources)
+	return seenSources.IsSuperset(c.sources) && c.pods.seenSources(c.sources)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
-func (c *PodConfig) Updates() <-chan kubetypes.PodUpdate {
+func (c *PodSource) Updates() <-chan kubetypes.PodUpdate {
 	return c.updates
 }
 
 // Sync requests the full configuration be delivered to the update channel.
-func (c *PodConfig) Sync() {
+func (c *PodSource) Sync() {
 	c.pods.sync()
 }
 
@@ -123,7 +123,7 @@ type podStorage struct {
 	podLock sync.RWMutex
 	// map of source name to pod uid to pod reference
 	pods map[string]map[types.UID]*v1.Pod
-	mode PodConfigNotificationMode
+	mode PodSourceNotificationMode
 
 	// ensures that updates are delivered in strict order
 	// on the updates channel
@@ -132,7 +132,7 @@ type podStorage struct {
 
 	// contains the set of all sources that have sent at least one SET
 	sourcesSeenLock sync.RWMutex
-	sourcesSeen     sets.String
+	sourcesSeen     sets.Set[string]
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
@@ -140,15 +140,15 @@ type podStorage struct {
 	startupSLIObserver podStartupSLIObserver
 }
 
-// TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
+// TODO: PodSourceNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *podStorage {
+func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodSourceNotificationMode, recorder record.EventRecorder, startupSLIObserver podStartupSLIObserver) *podStorage {
 	return &podStorage{
 		pods:               make(map[string]map[types.UID]*v1.Pod),
 		mode:               mode,
 		updates:            updates,
-		sourcesSeen:        sets.String{},
+		sourcesSeen:        sets.New[string](),
 		recorder:           recorder,
 		startupSLIObserver: startupSLIObserver,
 	}
@@ -167,7 +167,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 
 	// deliver update notifications
 	switch s.mode {
-	case PodConfigNotificationIncremental:
+	case PodSourceNotificationIncremental:
 		if len(removes.Pods) > 0 {
 			s.updates <- *removes
 		}
@@ -191,7 +191,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- *reconciles
 		}
 
-	case PodConfigNotificationSnapshotAndUpdates:
+	case PodSourceNotificationSnapshotAndUpdates:
 		if len(removes.Pods) > 0 || len(adds.Pods) > 0 || firstSet {
 			s.updates <- kubetypes.PodUpdate{Pods: s.mergedState().([]*v1.Pod), Op: kubetypes.SET, Source: source}
 		}
@@ -202,15 +202,15 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- *deletes
 		}
 
-	case PodConfigNotificationSnapshot:
+	case PodSourceNotificationSnapshot:
 		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 || len(removes.Pods) > 0 || firstSet {
 			s.updates <- kubetypes.PodUpdate{Pods: s.mergedState().([]*v1.Pod), Op: kubetypes.SET, Source: source}
 		}
 
-	case PodConfigNotificationUnknown:
+	case PodSourceNotificationUnknown:
 		fallthrough
 	default:
-		panic(fmt.Sprintf("unsupported PodConfigNotificationMode: %#v", s.mode))
+		panic(fmt.Sprintf("unsupported PodSourceNotificationMode: %#v", s.mode))
 	}
 
 	return nil
@@ -324,14 +324,14 @@ func (s *podStorage) markSourceSet(source string) {
 	s.sourcesSeen.Insert(source)
 }
 
-func (s *podStorage) seenSources(sources ...string) bool {
+func (s *podStorage) seenSources(sources sets.Set[string]) bool {
 	s.sourcesSeenLock.RLock()
 	defer s.sourcesSeenLock.RUnlock()
-	return s.sourcesSeen.HasAll(sources...)
+	return s.sourcesSeen.IsSuperset(sources)
 }
 
 func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {
-	names := sets.String{}
+	names := sets.New[string]()
 	for i, pod := range pods {
 		// Pods from each source are assumed to have passed validation individually.
 		// This function only checks if there is any naming conflict.

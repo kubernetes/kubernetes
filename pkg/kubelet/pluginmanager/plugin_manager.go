@@ -22,19 +22,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/reconciler"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 )
 
 // PluginManager runs a set of asynchronous loops that figure out which plugins
 // need to be registered/deregistered and makes it so.
 type PluginManager interface {
 	// Starts the plugin manager and all the asynchronous loops that it controls
-	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+	Run(sourcesReady podsource.SourcesReady, stopCh <-chan struct{})
 
 	// AddHandler adds the given plugin handler for a specific plugin type, which
 	// will be added to the actual state of world cache so that it can be passed to
@@ -105,7 +105,7 @@ type pluginManager struct {
 
 var _ PluginManager = &pluginManager{}
 
-func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (pm *pluginManager) Run(sourcesReady podsource.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
 	if err := pm.desiredStateOfWorldPopulator.Start(stopCh); err != nil {

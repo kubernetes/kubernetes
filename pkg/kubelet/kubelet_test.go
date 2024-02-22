@@ -63,7 +63,6 @@ import (
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -71,6 +70,7 @@ import (
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
@@ -80,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/podsource"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -214,7 +215,7 @@ func newTestKubeletWithImageList(
 	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
-	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
+	kubelet.sourcesReady = podsource.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
 	kubelet.nodeHasSynced = func() bool { return true }
@@ -734,7 +735,7 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 		{Pod: fakePod},
 	}
 	kubelet := testKubelet.kubelet
-	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
+	kubelet.sourcesReady = podsource.NewSourcesReady(func(_ sets.Set[string]) bool { return ready })
 
 	kubelet.HandlePodRemoves(pods)
 	time.Sleep(2 * time.Second)
@@ -3098,7 +3099,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		DynamicPluginProber:  prober,
 		TLSOptions:           tlsOptions,
 	}
-	crOptions := &config.ContainerRuntimeOptions{}
+	crOptions := &kubeletconfig.ContainerRuntimeOptions{}
 
 	testMainKubelet, err := NewMainKubelet(
 		kubeCfg,

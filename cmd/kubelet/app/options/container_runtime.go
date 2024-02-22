@@ -16,9 +16,7 @@ limitations under the License.
 
 package options
 
-import (
-	"k8s.io/kubernetes/pkg/kubelet/config"
-)
+import "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 
 const (
 	// When these values are updated, also update test/utils/image/manifest.go
@@ -33,8 +31,8 @@ var (
 
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
 // default values.
-func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
-	return &config.ContainerRuntimeOptions{
+func NewContainerRuntimeOptions() *kubeletconfig.ContainerRuntimeOptions {
+	return &kubeletconfig.ContainerRuntimeOptions{
 		PodSandboxImage: defaultPodSandboxImage,
 	}
 }
