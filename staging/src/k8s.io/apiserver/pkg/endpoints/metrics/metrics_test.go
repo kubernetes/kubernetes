@@ -89,36 +89,6 @@ func TestCleanVerb(t *testing.T) {
 			expectedVerb: "WATCH",
 		},
 		{
-			desc:          "LIST is transformed to WATCH for the old pattern watch",
-			initialVerb:   "LIST",
-			suggestedVerb: "WATCH",
-			request: &http.Request{
-				Method: "GET",
-				URL: &url.URL{
-					RawQuery: "/api/v1/watch/pods",
-				},
-			},
-			expectedVerb: "WATCH",
-		},
-		{
-			desc:          "LIST is transformed to WATCH for the old pattern watchlist",
-			initialVerb:   "LIST",
-			suggestedVerb: "WATCHLIST",
-			request: &http.Request{
-				Method: "GET",
-				URL: &url.URL{
-					RawQuery: "/api/v1/watch/pods",
-				},
-			},
-			expectedVerb: "WATCH",
-		},
-		{
-			desc:         "WATCHLIST should be transformed to WATCH",
-			initialVerb:  "WATCHLIST",
-			request:      nil,
-			expectedVerb: "WATCH",
-		},
-		{
 			desc:        "PATCH should be transformed to APPLY with the right content type",
 			initialVerb: "PATCH",
 			request: &http.Request{
@@ -133,12 +103,6 @@ func TestCleanVerb(t *testing.T) {
 			initialVerb:  "PATCH",
 			request:      nil,
 			expectedVerb: "PATCH",
-		},
-		{
-			desc:         "WATCHLIST should be transformed to WATCH",
-			initialVerb:  "WATCHLIST",
-			request:      nil,
-			expectedVerb: "WATCH",
 		},
 		{
 			desc:         "unexpected verbs should be designated as unknown",

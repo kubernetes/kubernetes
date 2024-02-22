@@ -333,9 +333,7 @@ var (
 		"POST",
 		"PROXY",
 		"PUT",
-		"UPDATE",
-		"WATCH",
-		"WATCHLIST")
+		"UPDATE")
 
 	// These are the valid connect requests which we report in our metrics.
 	validConnectRequests = utilsets.NewString(
@@ -691,10 +689,6 @@ func CleanVerb(verb string, request *http.Request, requestInfo *request.RequestI
 	if suggestedVerb := getVerbIfWatch(request); suggestedVerb == "WATCH" {
 		reportedVerb = "WATCH"
 	}
-	// normalize the legacy WATCHLIST to WATCH to ensure users aren't surprised by metrics
-	if verb == "WATCHLIST" {
-		reportedVerb = "WATCH"
-	}
 	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) {
 		reportedVerb = "APPLY"
 	}
@@ -730,13 +724,6 @@ func determineRequestNamespaceAndName(ctx context.Context, opts *metainternalver
 
 // cleanVerb additionally ensures that unknown verbs don't clog up the metrics.
 func cleanVerb(verb, suggestedVerb string, request *http.Request, requestInfo *request.RequestInfo) string {
-	// CanonicalVerb (being an input for this function) doesn't handle correctly the
-	// deprecated path pattern for watch of:
-	//   GET /api/{version}/watch/{resource}
-	// We correct it manually based on the pass verb from the installer.
-	if suggestedVerb == "WATCH" || suggestedVerb == "WATCHLIST" {
-		return "WATCH"
-	}
 	reportedVerb := CleanVerb(verb, request, requestInfo)
 	if validRequestMethods.Has(reportedVerb) {
 		return reportedVerb

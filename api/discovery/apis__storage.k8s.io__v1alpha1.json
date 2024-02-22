@@ -19,8 +19,7 @@
         "get",
         "list",
         "patch",
-        "update",
-        "watch"
+        "update"
       ]
     }
   ]

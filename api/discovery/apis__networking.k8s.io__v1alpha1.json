@@ -19,8 +19,7 @@
         "get",
         "list",
         "patch",
-        "update",
-        "watch"
+        "update"
       ]
     },
     {
@@ -36,8 +35,7 @@
         "get",
         "list",
         "patch",
-        "update",
-        "watch"
+        "update"
       ]
     },
     {
