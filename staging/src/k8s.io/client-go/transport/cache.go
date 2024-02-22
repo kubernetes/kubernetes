@@ -41,6 +41,10 @@ type tlsTransportCache struct {
 // ControllerStopCtx is a stop context object that is passed down to
 // the dynamic cert dialer. It's exposed as a variable for testing
 // purposes to avoid goroutine leakages.
+// NOTE: the initial value of the 'ControllerStopCtx' is set to
+// 'wait.NeverStopCtx', and the integration testing framework relies
+// on this initial value to determine if a test has modified the variable,
+// so changing the initial value here will break the integration tests.
 var ControllerStopCtx = wait.NeverStopCtx
 
 const idleConnsPerHost = 25
