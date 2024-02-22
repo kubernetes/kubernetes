@@ -107,8 +107,8 @@ type Server struct {
 	auth                 AuthInterface
 	host                 HostInterface
 	restfulCont          containerInterface
-	metricsBuckets       sets.String
-	metricsMethodBuckets sets.String
+	metricsBuckets       sets.Set[string]
+	metricsMethodBuckets sets.Set[string]
 	resourceAnalyzer     stats.ResourceAnalyzer
 }
 
@@ -271,8 +271,8 @@ func NewServer(
 		resourceAnalyzer:     resourceAnalyzer,
 		auth:                 auth,
 		restfulCont:          &filteringContainer{Container: restful.NewContainer()},
-		metricsBuckets:       sets.NewString(),
-		metricsMethodBuckets: sets.NewString("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
+		metricsBuckets:       sets.New[string](),
+		metricsMethodBuckets: sets.New[string]("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
