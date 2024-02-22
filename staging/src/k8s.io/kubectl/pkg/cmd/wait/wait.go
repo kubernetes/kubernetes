@@ -82,7 +82,10 @@ var (
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
+		kubectl wait --for=delete pod/busybox1 --timeout=60s
+
+		# Wait for the creation of the service "loadbalancer" in addition to wait to have ingress
+		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer --wait-for-creation`))
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
@@ -163,10 +166,6 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		return nil, err
 	}
 	builder := flags.ResourceBuilderFlags.ToBuilder(flags.RESTClientGetter, args)
-	var creationCheckerBuilder genericclioptions.ResourceFinder
-	if flags.WaitForCreation {
-		creationCheckerBuilder = flags.ResourceBuilderFlags.ToBuilder(flags.RESTClientGetter, args)
-	}
 	clientConfig, err := flags.RESTClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -186,12 +185,11 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	}
 
 	o := &WaitOptions{
-		ResourceFinder:        builder,
-		DynamicClient:         dynamicClient,
-		Timeout:               effectiveTimeout,
-		ForCondition:          flags.ForCondition,
-		WaitForCreation:       flags.WaitForCreation,
-		CreationCheckerFinder: creationCheckerBuilder,
+		ResourceFinder:  builder,
+		DynamicClient:   dynamicClient,
+		Timeout:         effectiveTimeout,
+		ForCondition:    flags.ForCondition,
+		WaitForCreation: flags.WaitForCreation,
 
 		Printer:     printer,
 		ConditionFn: conditionFn,
@@ -307,8 +305,7 @@ type UIDMap map[ResourceLocation]types.UID
 // WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
 // command, making the logic itself easy to unit test with our existing mocks.
 type WaitOptions struct {
-	ResourceFinder        genericclioptions.ResourceFinder
-	CreationCheckerFinder genericclioptions.ResourceFinder
+	ResourceFinder genericclioptions.ResourceFinder
 	// UIDMap maps a resource location to a UID.  It is optional, but ConditionFuncs may choose to use it to make the result
 	// more reliable.  For instance, delete can look for UID consistency during delegated calls.
 	UIDMap          UIDMap
@@ -345,7 +342,7 @@ func (o *WaitOptions) RunWait() error {
 				case <-ctx.Done():
 					return fmt.Errorf("context deadline is exceeded while waiting for the creation of the resources")
 				default:
-					err := o.CreationCheckerFinder.Do().Visit(func(info *resource.Info, err error) error {
+					err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
 						// We don't need to do anything after we assure that the resources exist. Because
 						// actual logic will be incorporated after we wait all the resources' existence.
 						return nil
