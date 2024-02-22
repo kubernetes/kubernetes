@@ -83,8 +83,11 @@ type compiledPolicyEntry[E Evaluator] struct {
 }
 
 type PolicyHook[P runtime.Object, B runtime.Object, E Evaluator] struct {
-	Policy        P
-	Bindings      []B
+	Policy   P
+	Bindings []B
+
+	// ParamInformer is the informer for the param CRD for this policy, or nil if
+	// there is no param or if there was a configuration error
 	ParamInformer informers.GenericInformer
 	ParamScope    meta.RESTScope
 
@@ -157,7 +160,7 @@ func (s *policySource[P, B, E]) Run(ctx context.Context) error {
 	}
 	defer func() {
 		if err := s.policyInformer.RemoveEventHandler(handle); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to remove policy event handler: %v", err))
+			utilruntime.HandleError(fmt.Errorf("failed to remove policy event handler: %w", err))
 		}
 	}()
 
@@ -167,7 +170,7 @@ func (s *policySource[P, B, E]) Run(ctx context.Context) error {
 	}
 	defer func() {
 		if err := s.bindingInformer.RemoveEventHandler(bindingHandle); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to remove binding event handler: %v", err))
+			utilruntime.HandleError(fmt.Errorf("failed to remove binding event handler: %w", err))
 		}
 	}()
 
@@ -231,7 +234,7 @@ func (s *policySource[P, B, E]) refreshPolicies() {
 	if err != nil {
 		// An error was generated while syncing policies. Mark it as dirty again
 		// so we can retry later
-		utilruntime.HandleError(fmt.Errorf("encountered error syncing policies: %v. Rescheduling policy sync", err))
+		utilruntime.HandleError(fmt.Errorf("encountered error syncing policies: %w. Rescheduling policy sync", err))
 		s.notify()
 	}
 }
@@ -299,8 +302,26 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 			continue
 		}
 
+		var parsedParamKind *schema.GroupVersionKind
 		policyAccessor := s.newPolicyAccessor(policySpec)
-		paramInformer, paramScope, configurationError := s.ensureParamsForPolicyLocked(policyAccessor.GetParamKind())
+
+		if paramKind := policyAccessor.GetParamKind(); paramKind != nil {
+			groupVersion, err := schema.ParseGroupVersion(paramKind.APIVersion)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to parse paramKind APIVersion: %w", err))
+				continue
+			}
+			parsedParamKind = &schema.GroupVersionKind{
+				Group:   groupVersion.Group,
+				Version: groupVersion.Version,
+				Kind:    paramKind.Kind,
+			}
+
+			// TEMPORARY UNTIL WE HAVE SHARED PARAM INFORMERS
+			usedParams[*parsedParamKind] = struct{}{}
+		}
+
+		paramInformer, paramScope, configurationError := s.ensureParamsForPolicyLocked(parsedParamKind)
 		result = append(result, PolicyHook[P, B, E]{
 			Policy:             policySpec,
 			Bindings:           bindingSpecs,
@@ -309,11 +330,6 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 			ParamScope:         paramScope,
 			ConfigurationError: configurationError,
 		})
-
-		// TEMPORARY UNTIL WE HAVE SHARED PARAM INFORMERS
-		if paramKind := policyAccessor.GetParamKind(); paramKind != nil {
-			usedParams[*paramKind] = struct{}{}
-		}
 
 		// Should queue a re-sync for policy sync error. If our shared param
 		// informer can notify us when CRD discovery changes we can remove this

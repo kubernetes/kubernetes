@@ -261,7 +261,7 @@ func (f validateFunc) Validate(
 	)
 }
 
-var _ validating.Matcher = &fakeMatcher{}
+var _ generic.PolicyMatcher = &fakeMatcher{}
 
 func (f *fakeMatcher) ValidateInitialization() error {
 	return nil
@@ -273,11 +273,11 @@ func (f *fakeMatcher) GetNamespace(name string) (*v1.Namespace, error) {
 
 type fakeMatcher struct {
 	DefaultMatch         bool
-	DefinitionMatchFuncs map[types.NamespacedName]func(*v1beta1.ValidatingAdmissionPolicy, admission.Attributes) bool
-	BindingMatchFuncs    map[types.NamespacedName]func(*v1beta1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
+	DefinitionMatchFuncs map[types.NamespacedName]func(generic.PolicyAccessor, admission.Attributes) bool
+	BindingMatchFuncs    map[types.NamespacedName]func(generic.BindingAccessor, admission.Attributes) bool
 }
 
-func (f *fakeMatcher) RegisterDefinition(definition *v1beta1.ValidatingAdmissionPolicy, matchFunc func(*v1beta1.ValidatingAdmissionPolicy, admission.Attributes) bool) {
+func (f *fakeMatcher) RegisterDefinition(definition *v1beta1.ValidatingAdmissionPolicy, matchFunc func(generic.PolicyAccessor, admission.Attributes) bool) {
 	namespace, name := definition.Namespace, definition.Name
 	key := types.NamespacedName{
 		Name:      name,
@@ -286,13 +286,13 @@ func (f *fakeMatcher) RegisterDefinition(definition *v1beta1.ValidatingAdmission
 
 	if matchFunc != nil {
 		if f.DefinitionMatchFuncs == nil {
-			f.DefinitionMatchFuncs = make(map[types.NamespacedName]func(*v1beta1.ValidatingAdmissionPolicy, admission.Attributes) bool)
+			f.DefinitionMatchFuncs = make(map[types.NamespacedName]func(generic.PolicyAccessor, admission.Attributes) bool)
 		}
 		f.DefinitionMatchFuncs[key] = matchFunc
 	}
 }
 
-func (f *fakeMatcher) RegisterBinding(binding *v1beta1.ValidatingAdmissionPolicyBinding, matchFunc func(*v1beta1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool) {
+func (f *fakeMatcher) RegisterBinding(binding *v1beta1.ValidatingAdmissionPolicyBinding, matchFunc func(generic.BindingAccessor, admission.Attributes) bool) {
 	namespace, name := binding.Namespace, binding.Name
 	key := types.NamespacedName{
 		Name:      name,
@@ -301,7 +301,7 @@ func (f *fakeMatcher) RegisterBinding(binding *v1beta1.ValidatingAdmissionPolicy
 
 	if matchFunc != nil {
 		if f.BindingMatchFuncs == nil {
-			f.BindingMatchFuncs = make(map[types.NamespacedName]func(*v1beta1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool)
+			f.BindingMatchFuncs = make(map[types.NamespacedName]func(generic.BindingAccessor, admission.Attributes) bool)
 		}
 		f.BindingMatchFuncs[key] = matchFunc
 	}
@@ -309,8 +309,8 @@ func (f *fakeMatcher) RegisterBinding(binding *v1beta1.ValidatingAdmissionPolicy
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeMatcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
-	namespace, name := definition.Namespace, definition.Name
+func (f *fakeMatcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition generic.PolicyAccessor) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
+	namespace, name := definition.GetNamespace(), definition.GetName()
 	key := types.NamespacedName{
 		Name:      name,
 		Namespace: namespace,
@@ -325,8 +325,8 @@ func (f *fakeMatcher) DefinitionMatches(a admission.Attributes, o admission.Obje
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeMatcher) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1beta1.ValidatingAdmissionPolicyBinding) (bool, error) {
-	namespace, name := binding.Namespace, binding.Name
+func (f *fakeMatcher) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding generic.BindingAccessor) (bool, error) {
+	namespace, name := binding.GetNamespace(), binding.GetName()
 	key := types.NamespacedName{
 		Name:      name,
 		Namespace: namespace,
@@ -355,7 +355,7 @@ func setupFakeTest(t *testing.T, comp *fakeCompiler, match *fakeMatcher) *generi
 func setupTestCommon(
 	t *testing.T,
 	compiler *fakeCompiler,
-	matcher validating.Matcher,
+	matcher generic.PolicyMatcher,
 	shouldStartInformers bool,
 ) *generic.PolicyTestContext[*validating.Policy, *validating.PolicyBinding, validating.Validator] {
 	testContext, testContextCancel, err := generic.NewPolicyTestContext(
@@ -367,7 +367,7 @@ func setupTestCommon(
 		func(a authorizer.Authorizer, m *matching.Matcher) generic.Dispatcher[validating.PolicyHook] {
 			coolMatcher := matcher
 			if coolMatcher == nil {
-				coolMatcher = validating.NewMatcher(m)
+				coolMatcher = generic.NewPolicyMatcher(m)
 			}
 			return validating.NewDispatcher(a, coolMatcher)
 		},
@@ -549,7 +549,7 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 		}
 	})
 
-	matcher.RegisterDefinition(denyPolicy, func(vap *v1beta1.ValidatingAdmissionPolicy, a admission.Attributes) bool {
+	matcher.RegisterDefinition(denyPolicy, func(vap generic.PolicyAccessor, a admission.Attributes) bool {
 		// Match names with even-numbered length
 		obj := a.GetObject()
 

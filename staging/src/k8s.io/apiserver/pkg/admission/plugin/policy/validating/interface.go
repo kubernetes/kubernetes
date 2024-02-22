@@ -21,7 +21,6 @@ import (
 
 	celgo "github.com/google/cel-go/cel"
 
-	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -78,23 +77,6 @@ func (v *Variable) ReturnTypes() []*celgo.Type {
 
 func (v *Variable) GetName() string {
 	return v.Name
-}
-
-// Matcher is used for matching ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding to attributes
-type Matcher interface {
-	admission.InitializationValidator
-
-	// DefinitionMatches says whether this policy definition matches the provided admission
-	// resource request
-	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error)
-
-	// BindingMatches says whether this policy definition matches the provided admission
-	// resource request
-	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicyBinding) (bool, error)
-
-	// GetNamespace retrieves the Namespace resource by the given name. The name may be empty, in which case
-	// GetNamespace must return nil, nil
-	GetNamespace(name string) (*corev1.Namespace, error)
 }
 
 // ValidateResult defines the result of a Validator.Validate operation.

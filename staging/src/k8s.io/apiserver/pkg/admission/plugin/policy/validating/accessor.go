@@ -18,7 +18,6 @@ package validating
 
 import (
 	"k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 )
@@ -47,32 +46,12 @@ func (v *validatingAdmissionPolicyAccessor) GetName() string {
 	return v.Name
 }
 
-func (v *validatingAdmissionPolicyAccessor) GetParamKind() *schema.GroupVersionKind {
-	paramKind := v.Spec.ParamKind
-	if paramKind == nil {
-		return nil
-	}
+func (v *validatingAdmissionPolicyAccessor) GetParamKind() *v1beta1.ParamKind {
+	return v.Spec.ParamKind
+}
 
-	groupVersion, err := schema.ParseGroupVersion(paramKind.APIVersion)
-	if err != nil {
-		// A validatingadmissionpolicy which passes validation should have
-		// a parseable APIVersion for its ParamKind, so this should never happen
-		// if the policy is valid.
-		//
-		// Return a bogus but non-nil GVK that will throw an error about the
-		// invalid APIVersion when the param is looked up.
-		return &schema.GroupVersionKind{
-			Group:   paramKind.APIVersion,
-			Version: "",
-			Kind:    paramKind.Kind,
-		}
-	}
-
-	return &schema.GroupVersionKind{
-		Group:   groupVersion.Group,
-		Version: groupVersion.Version,
-		Kind:    paramKind.Kind,
-	}
+func (v *validatingAdmissionPolicyAccessor) GetMatchConstraints() *v1beta1.MatchResources {
+	return v.Spec.MatchConstraints
 }
 
 type validatingAdmissionPolicyBindingAccessor struct {
@@ -92,4 +71,12 @@ func (v *validatingAdmissionPolicyBindingAccessor) GetPolicyName() types.Namespa
 		Namespace: "",
 		Name:      v.Spec.PolicyName,
 	}
+}
+
+func (v *validatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1beta1.MatchResources {
+	return v.Spec.MatchResources
+}
+
+func (v *validatingAdmissionPolicyBindingAccessor) GetParamRef() *v1beta1.ParamRef {
+	return v.Spec.ParamRef
 }

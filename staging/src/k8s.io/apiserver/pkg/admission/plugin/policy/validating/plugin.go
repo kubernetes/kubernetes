@@ -94,7 +94,7 @@ func NewPlugin(_ io.Reader) *Plugin {
 				)
 			},
 			func(a authorizer.Authorizer, m *matching.Matcher) generic.Dispatcher[PolicyHook] {
-				return NewDispatcher(a, NewMatcher(m))
+				return NewDispatcher(a, generic.NewPolicyMatcher(m))
 			},
 		),
 	}
