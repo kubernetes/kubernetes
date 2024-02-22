@@ -35,6 +35,10 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting/internal"
 )
 
+// Underlier is the additional interface implemented by the per-test LogSink
+// behind [TContext.Logger].
+type Underlier = ktesting.Underlier
+
 // CleanupGracePeriod is the time that a [TContext] gets canceled before the
 // deadline of its underlying test suite (usually determined via "go test
 // -timeout"). This gives the running test(s) time to fail with an informative
