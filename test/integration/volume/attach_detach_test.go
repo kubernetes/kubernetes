@@ -441,6 +441,7 @@ func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, sync
 		nil, /* prober */
 		false,
 		5*time.Second,
+		false,
 		timers,
 	)
 

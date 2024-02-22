@@ -389,6 +389,7 @@ func startPersistentVolumeAttachDetachController(ctx context.Context, controller
 			GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
+			controllerContext.ComponentConfig.AttachDetachController.DisableForceDetachOnTimeout,
 			attachdetach.DefaultTimerConfig,
 		)
 	if attachDetachControllerErr != nil {

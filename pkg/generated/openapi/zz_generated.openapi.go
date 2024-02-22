@@ -55020,8 +55020,16 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachController
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
+					"disableForceDetachOnTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisableForceDetachOnTimeout disables force detach when the maximum unmount time is exceeded. Is false by default, and thus force detach on unmount is enabled.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"DisableAttachDetachReconcilerSync", "ReconcilerSyncLoopPeriod"},
+				Required: []string{"DisableAttachDetachReconcilerSync", "ReconcilerSyncLoopPeriod", "disableForceDetachOnTimeout"},
 			},
 		},
 		Dependencies: []string{
