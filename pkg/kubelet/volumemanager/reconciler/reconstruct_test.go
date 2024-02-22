@@ -26,18 +26,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestReconstructVolumes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, true)()
-
 	tests := []struct {
 		name                                string
 		volumePaths                         []string
@@ -148,8 +143,6 @@ func TestReconstructVolumes(t *testing.T) {
 }
 
 func TestCleanOrphanVolumes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, true)()
-
 	type podInfo struct {
 		podName         string
 		podUID          string
@@ -263,7 +256,6 @@ func TestReconstructVolumesMount(t *testing.T) {
 	// Since the volume is reconstructed, it must be marked as uncertain
 	// even after a final SetUp error, see https://github.com/kubernetes/kubernetes/issues/96635
 	// and https://github.com/kubernetes/kubernetes/pull/110670.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, true)()
 
 	tests := []struct {
 		name            string
