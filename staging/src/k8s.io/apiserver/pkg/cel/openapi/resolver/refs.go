@@ -60,6 +60,36 @@ func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), visited sets.S
 			return nil, fmt.Errorf("internal error: cannot resolve Ref %q: %w", ref, ErrSchemaNotFound)
 		}
 		result = *resolved
+
+		// Overwrite structural information like description/default into
+		// result
+		// Place validations into an extra allOf on the result schema
+		if schema.Default != nil {
+			result.Default = schema.Default
+		}
+
+		if schema.Enum != nil {
+			result.Enum = schema.Enum
+		}
+
+		if schema.Description != "" {
+			result.Description = schema.Description
+		}
+
+		validationSchema := *schema
+		validationSchema.Default = nil
+		validationSchema.Description = ""
+		validationSchema.Enum = nil
+		validationSchema.Ref = spec.Ref{}
+
+		filteredAllOf := make([]spec.Schema, 0, len(result.AllOf))
+		for _, allOf := range result.AllOf {
+			if allOf.Ref.GetURL() == nil {
+				filteredAllOf = append(filteredAllOf, allOf)
+			}
+		}
+
+		result.AllOf = append([]spec.Schema{validationSchema}, filteredAllOf...)
 		changed = true
 	}
 	// schema is an object, populate its properties and additionalProperties
