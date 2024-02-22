@@ -104,7 +104,10 @@ func NewPolicyDispatcher[P runtime.Object, B runtime.Object, E Evaluator](
 // request. It then resolves all params and creates an Invocation for each
 // matching policy-binding-param tuple. The delegate is then called with the
 // list of tuples.
-//
+func (d *policyDispatcher[P, B, E]) Run(ctx context.Context) error {
+	return nil
+}
+
 // Note: MatchConditions expressions are not evaluated here. The dispatcher delegate
 // is expected to ignore the result of any policies whose match conditions dont pass.
 // This may be possible to refactor so matchconditions are checked here instead.

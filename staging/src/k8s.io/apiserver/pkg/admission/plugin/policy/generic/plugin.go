@@ -165,6 +165,13 @@ func (c *Plugin[H]) ValidateInitialization() error {
 		}
 	}()
 
+	go func() {
+		err := c.dispatcher.Run(pluginContext)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			utilruntime.HandleError(fmt.Errorf("policy dispatcher context unexpectedly closed: %v", err))
+		}
+	}()
+
 	c.SetReadyFunc(func() bool {
 		return namespaceInformer.Informer().HasSynced() && c.source.HasSynced()
 	})
