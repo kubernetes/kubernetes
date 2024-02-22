@@ -1421,7 +1421,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.podFailurePolicy",
 			},
 		},
-		"remove pod failure policy": {
+		"update pod failure policy": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
@@ -1452,7 +1452,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.podFailurePolicy",
 			},
 		},
-		"update pod failure policy": {
+		"remove pod failure policy": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
