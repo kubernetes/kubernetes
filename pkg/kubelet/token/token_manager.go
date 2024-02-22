@@ -166,8 +166,10 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 	return m.clock.Now().After(t.Status.ExpirationTimestamp.Time)
 }
 
-// requiresRefresh returns true if the token is older than 80% of its total
-// ttl, or if the token is older than 24 hours, or if it is later than the system time.
+// requiresRefresh returns true if:
+// 1. token is older than 80% of its total.
+// 2. token is older than 24 hours.
+// 3. If system time leaps, the token time may be later than the system time.
 func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
 		cpy := tr.DeepCopy()
