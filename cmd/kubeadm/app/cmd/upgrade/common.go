@@ -176,7 +176,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
+	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet, printer); err != nil {
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 

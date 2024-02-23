@@ -158,7 +158,8 @@ func (pf *upgradePlanJSONYamlPrintFlags) AllowedFormats() []string {
 // upgradePlanJSONYAMLPrinter prints upgrade plan in a JSON or YAML format
 type upgradePlanJSONYAMLPrinter struct {
 	output.ResourcePrinterWrapper
-	Buffer []outputapiv1alpha2.ComponentUpgradePlan
+	Components     []outputapiv1alpha2.ComponentUpgradePlan
+	ConfigVersions []outputapiv1alpha2.ComponentConfigVersionState
 }
 
 // newUpgradePlanJSONYAMLPrinter creates a new upgradePlanJSONYAMLPrinter object
@@ -175,7 +176,7 @@ func (p *upgradePlanJSONYAMLPrinter) PrintObj(obj runtime.Object, writer io.Writ
 	if !ok {
 		return errors.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
 	}
-	p.Buffer = append(p.Buffer, *item)
+	p.Components = append(p.Components, *item)
 	return nil
 }
 
@@ -184,19 +185,18 @@ func (p *upgradePlanJSONYAMLPrinter) Flush(writer io.Writer, last bool) {
 	if !last {
 		return
 	}
-	if len(p.Buffer) == 0 {
+	if len(p.Components) == 0 && len(p.ConfigVersions) == 0 {
 		return
 	}
-	plan := &outputapiv1alpha2.UpgradePlan{Components: p.Buffer}
+	plan := &outputapiv1alpha2.UpgradePlan{Components: p.Components, ConfigVersions: p.ConfigVersions}
 	if err := p.Printer.PrintObj(plan, writer); err != nil {
 		fmt.Fprintf(os.Stderr, "could not flush output buffer: %v\n", err)
 	}
+	p.Components = p.Components[:0]
 }
 
-// Close empties the list of buffered components
-func (p *upgradePlanJSONYAMLPrinter) Close(writer io.Writer) {
-	p.Buffer = p.Buffer[:0]
-}
+// Close does nothing.
+func (p *upgradePlanJSONYAMLPrinter) Close(writer io.Writer) {}
 
 // upgradePlanTextPrinter prints upgrade plan in a text form
 type upgradePlanTextPrinter struct {
@@ -282,6 +282,11 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 	if len(availUpgrades) == 0 {
 		klog.V(1).Infoln("[upgrade/plan] Awesome, you're up-to-date! Enjoy!")
 		return nil
+	}
+
+	// A workaround to set the configVersionStates in the printer
+	if p, ok := printer.(*upgradePlanJSONYAMLPrinter); ok {
+		p.ConfigVersions = configVersionStates
 	}
 
 	// Generate and print upgrade plans
@@ -387,6 +392,7 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapiv1alpha2.UpgradePlan, 
 			printer.PrintObj(&plan, writer)
 		}
 	}
+
 	printer.Flush(writer, true)
 
 	printer.Fprintln(writer, "You can now apply the upgrade by executing the following command:")
