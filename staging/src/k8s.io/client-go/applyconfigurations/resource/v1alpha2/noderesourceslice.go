@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	v1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -30,11 +30,11 @@ import (
 // NodeResourceSliceApplyConfiguration represents an declarative configuration of the NodeResourceSlice type for use
 // with apply.
 type NodeResourceSliceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	NodeName                         *string `json:"nodeName,omitempty"`
-	DriverName                       *string `json:"driverName,omitempty"`
-	v1alpha2.NodeResourceModel       `json:",inline"`
+	v1.TypeMetaApplyConfiguration       `json:",inline"`
+	*v1.ObjectMetaApplyConfiguration    `json:"metadata,omitempty"`
+	NodeName                            *string `json:"nodeName,omitempty"`
+	DriverName                          *string `json:"driverName,omitempty"`
+	NodeResourceModelApplyConfiguration `json:",inline"`
 }
 
 // NodeResourceSlice constructs an declarative configuration of the NodeResourceSlice type for use with
@@ -58,18 +58,18 @@ func NodeResourceSlice(name string) *NodeResourceSliceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNodeResourceSlice(nodeResourceSlice *v1alpha2.NodeResourceSlice, fieldManager string) (*NodeResourceSliceApplyConfiguration, error) {
+func ExtractNodeResourceSlice(nodeResourceSlice *resourcev1alpha2.NodeResourceSlice, fieldManager string) (*NodeResourceSliceApplyConfiguration, error) {
 	return extractNodeResourceSlice(nodeResourceSlice, fieldManager, "")
 }
 
 // ExtractNodeResourceSliceStatus is the same as ExtractNodeResourceSlice except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractNodeResourceSliceStatus(nodeResourceSlice *v1alpha2.NodeResourceSlice, fieldManager string) (*NodeResourceSliceApplyConfiguration, error) {
+func ExtractNodeResourceSliceStatus(nodeResourceSlice *resourcev1alpha2.NodeResourceSlice, fieldManager string) (*NodeResourceSliceApplyConfiguration, error) {
 	return extractNodeResourceSlice(nodeResourceSlice, fieldManager, "status")
 }
 
-func extractNodeResourceSlice(nodeResourceSlice *v1alpha2.NodeResourceSlice, fieldManager string, subresource string) (*NodeResourceSliceApplyConfiguration, error) {
+func extractNodeResourceSlice(nodeResourceSlice *resourcev1alpha2.NodeResourceSlice, fieldManager string, subresource string) (*NodeResourceSliceApplyConfiguration, error) {
 	b := &NodeResourceSliceApplyConfiguration{}
 	err := managedfields.ExtractInto(nodeResourceSlice, internal.Parser().Type("io.k8s.api.resource.v1alpha2.NodeResourceSlice"), fieldManager, b, subresource)
 	if err != nil {
@@ -253,5 +253,13 @@ func (b *NodeResourceSliceApplyConfiguration) WithNodeName(value string) *NodeRe
 // If called multiple times, the DriverName field is set to the value of the last call.
 func (b *NodeResourceSliceApplyConfiguration) WithDriverName(value string) *NodeResourceSliceApplyConfiguration {
 	b.DriverName = &value
+	return b
+}
+
+// WithNamedResources sets the NamedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NamedResources field is set to the value of the last call.
+func (b *NodeResourceSliceApplyConfiguration) WithNamedResources(value *NamedResourcesResourcesApplyConfiguration) *NodeResourceSliceApplyConfiguration {
+	b.NamedResources = value
 	return b
 }

@@ -14823,6 +14823,10 @@
     "io.k8s.api.resource.v1alpha2.DriverAllocationResult": {
       "description": "DriverAllocationResult contains vendor parameters and the allocation result for one request.",
       "properties": {
+        "namedResources": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult",
+          "description": "NamedResources describes the allocation result when using the named resources model."
+        },
         "vendorRequestParameters": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
           "description": "VendorRequestParameters are the per-request configuration parameters from the time that the claim was allocated."
@@ -14852,6 +14856,156 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult": {
+      "description": "NamedResourcesAllocationResult is used in AllocationResultModel.",
+      "properties": {
+        "name": {
+          "description": "Name is the name of the selected resource instance.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesAttribute": {
+      "description": "NamedResourcesAttribute is a combination of an attribute name and its value.",
+      "properties": {
+        "bool": {
+          "description": "BoolValue is a true/false value.",
+          "type": "boolean"
+        },
+        "int": {
+          "description": "IntValue is a 64-bit integer.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "intSlice": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice",
+          "description": "IntSliceValue is an array of 64-bit integers."
+        },
+        "name": {
+          "description": "Name is unique identifier among all resource instances managed by the driver on the node. It must be a DNS subdomain.",
+          "type": "string"
+        },
+        "quantity": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
+          "description": "QuantityValue is a quantity."
+        },
+        "string": {
+          "description": "StringValue is a string.",
+          "type": "string"
+        },
+        "stringSlice": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice",
+          "description": "StringSliceValue is an array of strings."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesFilter": {
+      "description": "NamedResourcesFilter is used in ResourceFilterModel.",
+      "properties": {
+        "selector": {
+          "description": "Selector is a CEL expression which must evaluate to true if a resource instance is suitable. The language is as defined in https://kubernetes.io/docs/reference/using-api/cel/\n\nIn addition, for each type NamedResourcesin AttributeValue there is a map that resolves to the corresponding value of the instance under evaluation. For example:\n\n   attributes.quantity[\"a\"].isGreaterThan(quantity(\"0\")) &&\n   attributes.stringslice[\"b\"].isSorted()",
+          "type": "string"
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesInstance": {
+      "description": "NamedResourcesInstance represents one individual hardware instance that can be selected based on its attributes.",
+      "properties": {
+        "attributes": {
+          "description": "Attributes defines the attributes of this resource instance. The name of each attribute must be unique.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesAttribute"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "name": {
+          "description": "Name is unique identifier among all resource instances managed by the driver on the node. It must be a DNS subdomain.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice": {
+      "description": "NamedResourcesIntSlice contains a slice of 64-bit integers.",
+      "properties": {
+        "ints": {
+          "description": "Ints is the slice of 64-bit integers.",
+          "items": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "ints"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesRequest": {
+      "description": "NamedResourcesRequest is used in ResourceRequestModel.",
+      "properties": {
+        "selector": {
+          "description": "Selector is a CEL expression which must evaluate to true if a resource instance is suitable. The language is as defined in https://kubernetes.io/docs/reference/using-api/cel/\n\nIn addition, for each type NamedResourcesin AttributeValue there is a map that resolves to the corresponding value of the instance under evaluation. For example:\n\n   attributes.quantity[\"a\"].isGreaterThan(quantity(\"0\")) &&\n   attributes.stringslice[\"b\"].isSorted()",
+          "type": "string"
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesResources": {
+      "description": "NamedResourcesResources is used in NodeResourceModel.",
+      "properties": {
+        "instances": {
+          "description": "The list of all individual resources instances currently available.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesInstance"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "instances"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice": {
+      "description": "NamedResourcesStringSlice contains a slice of strings.",
+      "properties": {
+        "strings": {
+          "description": "Strings is the slice of strings.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "strings"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.resource.v1alpha2.NodeResourceSlice": {
       "description": "NodeResourceSlice provides information about available resources on individual nodes.",
       "properties": {
@@ -14870,6 +15024,10 @@
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
           "description": "Standard object metadata"
+        },
+        "namedResources": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesResources",
+          "description": "NamedResources describes available resources using the named resources model."
         },
         "nodeName": {
           "description": "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceSlice objects with a certain node name.",
@@ -15571,6 +15729,10 @@
         "driverName": {
           "description": "DriverName is the name used by the DRA driver kubelet plugin.",
           "type": "string"
+        },
+        "namedResources": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesFilter",
+          "description": "NamedResources describes a resource filter using the named resources model."
         }
       },
       "type": "object"
@@ -15596,6 +15758,10 @@
     "io.k8s.api.resource.v1alpha2.ResourceRequest": {
       "description": "ResourceRequest is a request for resources from one particular driver.",
       "properties": {
+        "namedResources": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesRequest",
+          "description": "NamedResources describes a request for resources with the named resources model."
+        },
         "vendorParameters": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
           "description": "VendorParameters are arbitrary setup parameters for the requested resource. They are ignored while allocating a claim."

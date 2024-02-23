@@ -73,6 +73,9 @@
             "status": {
               "available": 1
             }
+          },
+          "namedResources": {
+            "selector": "selectorValue"
           }
         }
       ]

@@ -53,6 +53,9 @@ func validNewNodeResourceSlice(name string) *resource.NodeResourceSlice {
 		},
 		NodeName:   name,
 		DriverName: "cdi.example.com",
+		NodeResourceModel: resource.NodeResourceModel{
+			NamedResources: &resource.NamedResourcesResources{},
+		},
 	}
 }
 

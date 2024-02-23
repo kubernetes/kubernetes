@@ -455,7 +455,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/resourceclaimparameters/" + namespace + "/claim1parameters",
 		},
 		gvr("resource.k8s.io", "v1alpha2", "noderesourceslices"): {
-			Stub:             `{"metadata": {"name": "node1slice"}, "nodeName": "worker1", "driverName": "dra.example.com"}`, // TODO: add one structured parameter model
+			Stub:             `{"metadata": {"name": "node1slice"}, "nodeName": "worker1", "driverName": "dra.example.com", "namedResources": {}}`,
 			ExpectedEtcdPath: "/registry/noderesourceslices/node1slice",
 		},
 		// --

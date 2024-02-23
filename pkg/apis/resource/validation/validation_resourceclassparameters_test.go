@@ -186,15 +186,14 @@ func TestValidateResourceClassParameters(t *testing.T) {
 			}(),
 		},
 
-		// TODO: implement one structured parameter model
-		// "empty-model": {
-		// 	wantFailures: field.ErrorList{field.Required(field.NewPath("filters").Index(0), "exactly one structured model field must be set")},
-		// 	parameters: func() *resource.ResourceClassParameters {
-		// 		parameters := testResourceClassParameters(goodName, goodName, goodFilters)
-		// 		parameters.Filters = []resource.ResourceFilter{{DriverName: goodName}}
-		// 		return parameters
-		// 	}(),
-		// },
+		"empty-model": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("filters").Index(0), "exactly one structured model field must be set")},
+			parameters: func() *resource.ResourceClassParameters {
+				parameters := testResourceClassParameters(goodName, goodName, goodFilters)
+				parameters.Filters = []resource.ResourceFilter{{DriverName: goodName}}
+				return parameters
+			}(),
+		},
 
 		"filters-invalid-driver": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("filters").Index(1).Child("driverName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
@@ -202,15 +201,15 @@ func TestValidateResourceClassParameters(t *testing.T) {
 				parameters := testResourceClassParameters(goodName, goodName, goodFilters)
 				parameters.Filters = []resource.ResourceFilter{
 					{
-						DriverName:          goodName,
+						DriverName: goodName,
 						ResourceFilterModel: resource.ResourceFilterModel{
-							// TODO: implement one structured parameter model
+							NamedResources: &resource.NamedResourcesFilter{Selector: "true"},
 						},
 					},
 					{
-						DriverName:          badName,
+						DriverName: badName,
 						ResourceFilterModel: resource.ResourceFilterModel{
-							// TODO: implement one structured parameter model
+							NamedResources: &resource.NamedResourcesFilter{Selector: "true"},
 						},
 					},
 				}
@@ -224,14 +223,16 @@ func TestValidateResourceClassParameters(t *testing.T) {
 				parameters := testResourceClassParameters(goodName, goodName, goodFilters)
 				parameters.Filters = []resource.ResourceFilter{
 					{
-						DriverName:          goodName,
+						DriverName: goodName,
 						ResourceFilterModel: resource.ResourceFilterModel{
-							// TODO: implement one structured parameter model
+							NamedResources: &resource.NamedResourcesFilter{Selector: "true"},
 						},
 					},
 					{
-						DriverName:          goodName,
-						ResourceFilterModel: resource.ResourceFilterModel{},
+						DriverName: goodName,
+						ResourceFilterModel: resource.ResourceFilterModel{
+							NamedResources: &resource.NamedResourcesFilter{Selector: "true"},
+						},
 					},
 				}
 				return parameters

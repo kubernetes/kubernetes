@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	namedresourcesvalidation "k8s.io/kubernetes/pkg/apis/resource/structured/namedresources/validation"
 )
 
 // validateResourceDriverName reuses the validation of a CSI driver because
@@ -236,10 +237,13 @@ func validateDriverAllocationResults(results []resource.DriverAllocationResult, 
 func validateAllocationResultModel(model *resource.AllocationResultModel, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	entries := sets.New[string]()
-	// TODO: implement one structured parameter model
+	if model.NamedResources != nil {
+		entries.Insert("namedResources")
+		allErrs = append(allErrs, namedresourcesvalidation.ValidateAllocationResult(model.NamedResources, fldPath.Child("namedResources"))...)
+	}
 	switch len(entries) {
 	case 0:
-		// allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
 	case 1:
 		// Okay.
 	default:
@@ -396,10 +400,13 @@ func ValidateNodeResourceSlice(nodeResourceSlice *resource.NodeResourceSlice) fi
 func validateNodeResourceModel(model *resource.NodeResourceModel, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	entries := sets.New[string]()
-	// TODO: implement one structured parameter model
+	if model.NamedResources != nil {
+		entries.Insert("namedResources")
+		allErrs = append(allErrs, namedresourcesvalidation.ValidateResources(model.NamedResources, fldPath.Child("namedResources"))...)
+	}
 	switch len(entries) {
 	case 0:
-		// allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
 	case 1:
 		// Okay.
 	default:
@@ -463,10 +470,13 @@ func validateResourceRequests(requests []resource.ResourceRequest, fldPath *fiel
 func validateResourceRequestModel(model *resource.ResourceRequestModel, fldPath *field.Path, requestStored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	entries := sets.New[string]()
-	// TODO: implement one structured parameter model
+	if model.NamedResources != nil {
+		entries.Insert("namedResources")
+		allErrs = append(allErrs, namedresourcesvalidation.ValidateRequest(namedresourcesvalidation.Options{StoredExpressions: requestStored}, model.NamedResources, fldPath.Child("namedResources"))...)
+	}
 	switch len(entries) {
 	case 0:
-		// allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
 	case 1:
 		// Okay.
 	default:
@@ -516,10 +526,13 @@ func validateResourceFilters(filters []resource.ResourceFilter, fldPath *field.P
 func validateResourceFilterModel(model *resource.ResourceFilterModel, fldPath *field.Path, filtersStored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	entries := sets.New[string]()
-	// TODO: implement one structured parameter model
+	if model.NamedResources != nil {
+		entries.Insert("namedResources")
+		allErrs = append(allErrs, namedresourcesvalidation.ValidateFilter(namedresourcesvalidation.Options{StoredExpressions: filtersStored}, model.NamedResources, fldPath.Child("namedResources"))...)
+	}
 	switch len(entries) {
 	case 0:
-		// allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one structured model field must be set"))
 	case 1:
 		// Okay.
 	default:

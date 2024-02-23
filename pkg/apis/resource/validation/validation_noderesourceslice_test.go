@@ -32,10 +32,10 @@ func testNodeResourceSlice(name, nodeName, driverName string) *resource.NodeReso
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		NodeName:          nodeName,
-		DriverName:        driverName,
+		NodeName:   nodeName,
+		DriverName: driverName,
 		NodeResourceModel: resource.NodeResourceModel{
-			// TODO: implement one structured parameter model
+			NamedResources: &resource.NamedResourcesResources{},
 		},
 	}
 }
@@ -188,15 +188,14 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 			slice:        testNodeResourceSlice(goodName, goodName, badName),
 		},
 
-		// TODO: implement one structured parameter model
-		// "empty-model": {
-		// 	wantFailures: field.ErrorList{field.Required(nil, "exactly one structured model field must be set")},
-		// 	slice: func() *resource.NodeResourceSlice {
-		// 		slice := testNodeResourceSlice(goodName, goodName, driverName)
-		// 		slice.NodeResourceModel = resource.NodeResourceModel{}
-		// 		return slice
-		// 	}(),
-		// },
+		"empty-model": {
+			wantFailures: field.ErrorList{field.Required(nil, "exactly one structured model field must be set")},
+			slice: func() *resource.NodeResourceSlice {
+				slice := testNodeResourceSlice(goodName, goodName, driverName)
+				slice.NodeResourceModel = resource.NodeResourceModel{}
+				return slice
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {

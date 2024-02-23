@@ -92,6 +92,9 @@
                   "status": {
                     "available": 1
                   }
+                },
+                "namedResources": {
+                  "name": "nameValue"
                 }
               }
             ]

@@ -33,4 +33,19 @@ metadata:
   resourceVersion: resourceVersionValue
   selfLink: selfLinkValue
   uid: uidValue
+namedResources:
+  instances:
+  - attributes:
+    - bool: true
+      int: 7
+      intSlice:
+        ints:
+        - 1
+      name: nameValue
+      quantity: "0"
+      string: stringValue
+      stringSlice:
+        strings:
+        - stringsValue
+    name: nameValue
 nodeName: nodeNameValue

@@ -1523,10 +1523,32 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=resource.k8s.io, Version=v1alpha2
 	case v1alpha2.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha2.AllocationResultApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("AllocationResultModel"):
+		return &resourcev1alpha2.AllocationResultModelApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("DriverAllocationResult"):
 		return &resourcev1alpha2.DriverAllocationResultApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("DriverRequests"):
 		return &resourcev1alpha2.DriverRequestsApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesAllocationResult"):
+		return &resourcev1alpha2.NamedResourcesAllocationResultApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesAttribute"):
+		return &resourcev1alpha2.NamedResourcesAttributeApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesAttributeValue"):
+		return &resourcev1alpha2.NamedResourcesAttributeValueApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesFilter"):
+		return &resourcev1alpha2.NamedResourcesFilterApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesInstance"):
+		return &resourcev1alpha2.NamedResourcesInstanceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesIntSlice"):
+		return &resourcev1alpha2.NamedResourcesIntSliceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesRequest"):
+		return &resourcev1alpha2.NamedResourcesRequestApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesResources"):
+		return &resourcev1alpha2.NamedResourcesResourcesApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesStringSlice"):
+		return &resourcev1alpha2.NamedResourcesStringSliceApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceModel"):
+		return &resourcev1alpha2.NodeResourceModelApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceSlice"):
 		return &resourcev1alpha2.NodeResourceSliceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContext"):
@@ -1561,10 +1583,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.ResourceClassParametersReferenceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceFilter"):
 		return &resourcev1alpha2.ResourceFilterApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceFilterModel"):
+		return &resourcev1alpha2.ResourceFilterModelApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceHandle"):
 		return &resourcev1alpha2.ResourceHandleApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceRequest"):
 		return &resourcev1alpha2.ResourceRequestApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceRequestModel"):
+		return &resourcev1alpha2.ResourceRequestModelApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("StructuredResourceHandle"):
 		return &resourcev1alpha2.StructuredResourceHandleApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("VendorParameters"):

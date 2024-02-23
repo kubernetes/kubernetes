@@ -30,6 +30,9 @@ var slice = &resource.NodeResourceSlice{
 	},
 	NodeName:   "valid-node-name",
 	DriverName: "testdriver.example.com",
+	NodeResourceModel: resource.NodeResourceModel{
+		NamedResources: &resource.NamedResourcesResources{},
+	},
 }
 
 func TestClassStrategy(t *testing.T) {

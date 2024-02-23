@@ -19,15 +19,14 @@ limitations under the License.
 package v1alpha2
 
 import (
-	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // ResourceRequestApplyConfiguration represents an declarative configuration of the ResourceRequest type for use
 // with apply.
 type ResourceRequestApplyConfiguration struct {
-	VendorParameters              *runtime.RawExtension `json:"vendorParameters,omitempty"`
-	v1alpha2.ResourceRequestModel `json:",inline"`
+	VendorParameters                       *runtime.RawExtension `json:"vendorParameters,omitempty"`
+	ResourceRequestModelApplyConfiguration `json:",inline"`
 }
 
 // ResourceRequestApplyConfiguration constructs an declarative configuration of the ResourceRequest type for use with
@@ -41,5 +40,13 @@ func ResourceRequest() *ResourceRequestApplyConfiguration {
 // If called multiple times, the VendorParameters field is set to the value of the last call.
 func (b *ResourceRequestApplyConfiguration) WithVendorParameters(value runtime.RawExtension) *ResourceRequestApplyConfiguration {
 	b.VendorParameters = &value
+	return b
+}
+
+// WithNamedResources sets the NamedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NamedResources field is set to the value of the last call.
+func (b *ResourceRequestApplyConfiguration) WithNamedResources(value *NamedResourcesRequestApplyConfiguration) *ResourceRequestApplyConfiguration {
+	b.NamedResources = value
 	return b
 }

@@ -39,7 +39,8 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 }
 
 var map_AllocationResultModel = map[string]string{
-	"": "AllocationResultModel must have one and only one field set.",
+	"":               "AllocationResultModel must have one and only one field set.",
+	"namedResources": "NamedResources describes the allocation result when using the named resources model.",
 }
 
 func (AllocationResultModel) SwaggerDoc() map[string]string {
@@ -67,7 +68,8 @@ func (DriverRequests) SwaggerDoc() map[string]string {
 }
 
 var map_NodeResourceModel = map[string]string{
-	"": "NodeResourceModel must have one and only one field set.",
+	"":               "NodeResourceModel must have one and only one field set.",
+	"namedResources": "NamedResources describes available resources using the named resources model.",
 }
 
 func (NodeResourceModel) SwaggerDoc() map[string]string {
@@ -331,7 +333,8 @@ func (ResourceFilter) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceFilterModel = map[string]string{
-	"": "ResourceFilterModel must have one and only one field set.",
+	"":               "ResourceFilterModel must have one and only one field set.",
+	"namedResources": "NamedResources describes a resource filter using the named resources model.",
 }
 
 func (ResourceFilterModel) SwaggerDoc() map[string]string {
@@ -359,7 +362,8 @@ func (ResourceRequest) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceRequestModel = map[string]string{
-	"": "ResourceRequestModel must have one and only one field set.",
+	"":               "ResourceRequestModel must have one and only one field set.",
+	"namedResources": "NamedResources describes a request for resources with the named resources model.",
 }
 
 func (ResourceRequestModel) SwaggerDoc() map[string]string {

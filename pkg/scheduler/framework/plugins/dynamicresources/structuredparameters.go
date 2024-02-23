@@ -23,8 +23,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
 	"k8s.io/klog/v2"
+	namedresourcesmodel "k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/structured/namedresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 )
 
@@ -35,7 +37,7 @@ type resources map[string]map[string]resourceModels
 // resourceModels may have more than one entry because it is valid for a driver to
 // use more than one structured parameter model.
 type resourceModels struct {
-	// TODO: add some structured parameter model
+	namedresources namedresourcesmodel.Model
 }
 
 // newResourceModel parses the available information about resources. Objects
@@ -54,7 +56,7 @@ func newResourceModel(logger klog.Logger, nodeResourceSliceLister resourcev1alph
 			model[slice.NodeName] = make(map[string]resourceModels)
 		}
 		resource := model[slice.NodeName][slice.DriverName]
-		// TODO: add some structured parameter model
+		namedresourcesmodel.AddResources(&resource.namedresources, slice.NamedResources)
 		model[slice.NodeName][slice.DriverName] = resource
 	}
 
@@ -75,11 +77,11 @@ func newResourceModel(logger klog.Logger, nodeResourceSliceLister resourcev1alph
 			if model[structured.NodeName] == nil {
 				model[structured.NodeName] = make(map[string]resourceModels)
 			}
-			// resource := model[structured.NodeName][handle.DriverName]
-			// TODO: add some structured parameter model
-			// for _, result := range structured.Results {
-			//     // Call AddAllocation for each known model. Each call itself needs to check for nil.
-			// }
+			resource := model[structured.NodeName][handle.DriverName]
+			for _, result := range structured.Results {
+				// Call AddAllocation for each known model. Each call itself needs to check for nil.
+				namedresourcesmodel.AddAllocation(&resource.namedresources, result.NamedResources)
+			}
 		}
 	}
 
@@ -90,12 +92,52 @@ func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClas
 	// Each node driver is separate from the others. Each driver may have
 	// multiple requests which need to be allocated together, so here
 	// we have to collect them per model.
-	// TODO: implement some structured parameters model
+	type perDriverRequests struct {
+		parameters []runtime.RawExtension
+		requests   []*resourcev1alpha2.NamedResourcesRequest
+	}
+	namedresourcesRequests := make(map[string]perDriverRequests)
+	for i, request := range claimParameters.DriverRequests {
+		driverName := request.DriverName
+		p := namedresourcesRequests[driverName]
+		for e, request := range request.Requests {
+			switch {
+			case request.ResourceRequestModel.NamedResources != nil:
+				p.parameters = append(p.parameters, request.VendorParameters)
+				p.requests = append(p.requests, request.ResourceRequestModel.NamedResources)
+			default:
+				return nil, fmt.Errorf("claim parameters %s: driverRequersts[%d].requests[%d]: no supported structured parameters found", klog.KObj(claimParameters), i, e)
+			}
+		}
+		if len(p.requests) > 0 {
+			namedresourcesRequests[driverName] = p
+		}
+	}
 
 	c := &claimController{
 		class:           class,
 		classParameters: classParameters,
 		claimParameters: claimParameters,
+		namedresources:  make(map[string]perDriverController, len(namedresourcesRequests)),
+	}
+	for driverName, perDriver := range namedresourcesRequests {
+		var filter *resourcev1alpha2.NamedResourcesFilter
+		if classParameters != nil {
+			for _, f := range classParameters.Filters {
+				if f.DriverName == driverName && f.ResourceFilterModel.NamedResources != nil {
+					filter = f.ResourceFilterModel.NamedResources
+					break
+				}
+			}
+		}
+		controller, err := namedresourcesmodel.NewClaimController(filter, perDriver.requests)
+		if err != nil {
+			return nil, fmt.Errorf("creating claim controller for named resources structured model: %w", err)
+		}
+		c.namedresources[driverName] = perDriverController{
+			parameters: perDriver.parameters,
+			controller: controller,
+		}
 	}
 	return c, nil
 }
@@ -106,11 +148,28 @@ type claimController struct {
 	class           *resourcev1alpha2.ResourceClass
 	classParameters *resourcev1alpha2.ResourceClassParameters
 	claimParameters *resourcev1alpha2.ResourceClaimParameters
-	// TODO: implement some structured parameters model
+	namedresources  map[string]perDriverController
+}
+
+type perDriverController struct {
+	parameters []runtime.RawExtension
+	controller *namedresourcesmodel.Controller
 }
 
 func (c claimController) nodeIsSuitable(ctx context.Context, nodeName string, resources resources) (bool, error) {
-	// TODO: implement some structured parameters model
+	nodeResources := resources[nodeName]
+	for driverName, perDriver := range c.namedresources {
+		okay, err := perDriver.controller.NodeIsSuitable(ctx, nodeResources[driverName].namedresources)
+		if err != nil {
+			// This is an error in the CEL expression which needs
+			// to be fixed. Better fail very visibly instead of
+			// ignoring the node.
+			return false, fmt.Errorf("checking node %q and resources of driver %q: %w", nodeName, driverName, err)
+		}
+		if !okay {
+			return false, nil
+		}
+	}
 	return true, nil
 }
 
@@ -128,7 +187,49 @@ func (c claimController) allocate(ctx context.Context, nodeName string, resource
 		},
 	}
 
-	// TODO: implement some structured parameters model
+	nodeResources := resources[nodeName]
+	for driverName, perDriver := range c.namedresources {
+		// Must return one entry for each request. The entry may be nil. This way,
+		// the result can be correlated with the per-request parameters.
+		results, err := perDriver.controller.Allocate(ctx, nodeResources[driverName].namedresources)
+		if err != nil {
+			return "", nil, fmt.Errorf("allocating via named resources structured model: %w", err)
+		}
+		handle := resourcev1alpha2.ResourceHandle{
+			DriverName: driverName,
+			StructuredData: &resourcev1alpha2.StructuredResourceHandle{
+				NodeName: nodeName,
+			},
+		}
+		for i, result := range results {
+			if result == nil {
+				continue
+			}
+			handle.StructuredData.Results = append(handle.StructuredData.Results,
+				resourcev1alpha2.DriverAllocationResult{
+					VendorRequestParameters: perDriver.parameters[i],
+					AllocationResultModel: resourcev1alpha2.AllocationResultModel{
+						NamedResources: result,
+					},
+				},
+			)
+		}
+		if c.classParameters != nil {
+			for _, p := range c.classParameters.VendorParameters {
+				if p.DriverName == driverName {
+					handle.StructuredData.VendorClassParameters = p.Parameters
+					break
+				}
+			}
+		}
+		for _, request := range c.claimParameters.DriverRequests {
+			if request.DriverName == driverName {
+				handle.StructuredData.VendorClaimParameters = request.VendorParameters
+				break
+			}
+		}
+		allocation.ResourceHandles = append(allocation.ResourceHandles, handle)
+	}
 
 	return c.class.DriverName, allocation, nil
 }

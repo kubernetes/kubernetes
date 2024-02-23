@@ -2,7 +2,9 @@ apiVersion: resource.k8s.io/v1alpha2
 driverRequests:
 - driverName: driverNameValue
   requests:
-  - vendorParameters:
+  - namedResources:
+      selector: selectorValue
+    vendorParameters:
       apiVersion: example.com/v1
       kind: CustomType
       spec:

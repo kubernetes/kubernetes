@@ -44,5 +44,31 @@
     ]
   },
   "nodeName": "nodeNameValue",
-  "driverName": "driverNameValue"
+  "driverName": "driverNameValue",
+  "namedResources": {
+    "instances": [
+      {
+        "name": "nameValue",
+        "attributes": [
+          {
+            "name": "nameValue",
+            "quantity": "0",
+            "bool": true,
+            "int": 7,
+            "intSlice": {
+              "ints": [
+                1
+              ]
+            },
+            "string": "stringValue",
+            "stringSlice": {
+              "strings": [
+                "stringsValue"
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
 }

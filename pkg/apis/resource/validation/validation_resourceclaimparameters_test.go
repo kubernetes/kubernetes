@@ -186,15 +186,14 @@ func TestValidateResourceClaimParameters(t *testing.T) {
 			}(),
 		},
 
-		// TODO: implement one structured parameter model
-		// "empty-model": {
-		// 	wantFailures: field.ErrorList{field.Required(field.NewPath("driverRequests").Index(0).Child("requests").Index(0), "exactly one structured model field must be set")},
-		// 	parameters: func() *resource.ResourceClaimParameters {
-		// 		parameters := testResourceClaimParameters(goodName, goodName, goodRequests)
-		// 		parameters.DriverRequests = []resource.DriverRequests{{DriverName: goodName, Requests: []resource.ResourceRequest{{}}}}
-		// 		return parameters
-		// 	}(),
-		// },
+		"empty-model": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("driverRequests").Index(0).Child("requests").Index(0), "exactly one structured model field must be set")},
+			parameters: func() *resource.ResourceClaimParameters {
+				parameters := testResourceClaimParameters(goodName, goodName, goodRequests)
+				parameters.DriverRequests = []resource.DriverRequests{{DriverName: goodName, Requests: []resource.ResourceRequest{{}}}}
+				return parameters
+			}(),
+		},
 
 		"empty-requests": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("driverRequests").Index(0).Child("requests"), "empty entries with no requests are not allowed")},
@@ -215,7 +214,7 @@ func TestValidateResourceClaimParameters(t *testing.T) {
 						Requests: []resource.ResourceRequest{
 							{
 								ResourceRequestModel: resource.ResourceRequestModel{
-									// TODO: implement one structured parameter model
+									NamedResources: &resource.NamedResourcesRequest{Selector: "true"},
 								},
 							},
 						},
@@ -225,7 +224,7 @@ func TestValidateResourceClaimParameters(t *testing.T) {
 						Requests: []resource.ResourceRequest{
 							{
 								ResourceRequestModel: resource.ResourceRequestModel{
-									// TODO: implement one structured parameter model
+									NamedResources: &resource.NamedResourcesRequest{Selector: "true"},
 								},
 							},
 						},
@@ -245,8 +244,7 @@ func TestValidateResourceClaimParameters(t *testing.T) {
 						Requests: []resource.ResourceRequest{
 							{
 								ResourceRequestModel: resource.ResourceRequestModel{
-									// TODO: implement one structured parameter model
-
+									NamedResources: &resource.NamedResourcesRequest{Selector: "true"},
 								},
 							},
 						},
@@ -256,7 +254,7 @@ func TestValidateResourceClaimParameters(t *testing.T) {
 						Requests: []resource.ResourceRequest{
 							{
 								ResourceRequestModel: resource.ResourceRequestModel{
-									// TODO: implement one structured parameter model
+									NamedResources: &resource.NamedResourcesRequest{Selector: "true"},
 								},
 							},
 						},

@@ -18,15 +18,11 @@ limitations under the License.
 
 package v1alpha2
 
-import (
-	v1alpha2 "k8s.io/api/resource/v1alpha2"
-)
-
 // ResourceFilterApplyConfiguration represents an declarative configuration of the ResourceFilter type for use
 // with apply.
 type ResourceFilterApplyConfiguration struct {
-	DriverName                   *string `json:"driverName,omitempty"`
-	v1alpha2.ResourceFilterModel `json:",inline"`
+	DriverName                            *string `json:"driverName,omitempty"`
+	ResourceFilterModelApplyConfiguration `json:",inline"`
 }
 
 // ResourceFilterApplyConfiguration constructs an declarative configuration of the ResourceFilter type for use with
@@ -40,5 +36,13 @@ func ResourceFilter() *ResourceFilterApplyConfiguration {
 // If called multiple times, the DriverName field is set to the value of the last call.
 func (b *ResourceFilterApplyConfiguration) WithDriverName(value string) *ResourceFilterApplyConfiguration {
 	b.DriverName = &value
+	return b
+}
+
+// WithNamedResources sets the NamedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NamedResources field is set to the value of the last call.
+func (b *ResourceFilterApplyConfiguration) WithNamedResources(value *NamedResourcesFilterApplyConfiguration) *ResourceFilterApplyConfiguration {
+	b.NamedResources = value
 	return b
 }

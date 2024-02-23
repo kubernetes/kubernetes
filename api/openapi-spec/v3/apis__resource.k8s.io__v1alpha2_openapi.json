@@ -120,6 +120,14 @@
       "io.k8s.api.resource.v1alpha2.DriverAllocationResult": {
         "description": "DriverAllocationResult contains vendor parameters and the allocation result for one request.",
         "properties": {
+          "namedResources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult"
+              }
+            ],
+            "description": "NamedResources describes the allocation result when using the named resources model."
+          },
           "vendorRequestParameters": {
             "allOf": [
               {
@@ -162,6 +170,185 @@
         },
         "type": "object"
       },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult": {
+        "description": "NamedResourcesAllocationResult is used in AllocationResultModel.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of the selected resource instance.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesAttribute": {
+        "description": "NamedResourcesAttribute is a combination of an attribute name and its value.",
+        "properties": {
+          "bool": {
+            "description": "BoolValue is a true/false value.",
+            "type": "boolean"
+          },
+          "int": {
+            "description": "IntValue is a 64-bit integer.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "intSlice": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice"
+              }
+            ],
+            "description": "IntSliceValue is an array of 64-bit integers."
+          },
+          "name": {
+            "default": "",
+            "description": "Name is unique identifier among all resource instances managed by the driver on the node. It must be a DNS subdomain.",
+            "type": "string"
+          },
+          "quantity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "QuantityValue is a quantity."
+          },
+          "string": {
+            "description": "StringValue is a string.",
+            "type": "string"
+          },
+          "stringSlice": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice"
+              }
+            ],
+            "description": "StringSliceValue is an array of strings."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesFilter": {
+        "description": "NamedResourcesFilter is used in ResourceFilterModel.",
+        "properties": {
+          "selector": {
+            "default": "",
+            "description": "Selector is a CEL expression which must evaluate to true if a resource instance is suitable. The language is as defined in https://kubernetes.io/docs/reference/using-api/cel/\n\nIn addition, for each type NamedResourcesin AttributeValue there is a map that resolves to the corresponding value of the instance under evaluation. For example:\n\n   attributes.quantity[\"a\"].isGreaterThan(quantity(\"0\")) &&\n   attributes.stringslice[\"b\"].isSorted()",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesInstance": {
+        "description": "NamedResourcesInstance represents one individual hardware instance that can be selected based on its attributes.",
+        "properties": {
+          "attributes": {
+            "description": "Attributes defines the attributes of this resource instance. The name of each attribute must be unique.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesAttribute"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "name": {
+            "default": "",
+            "description": "Name is unique identifier among all resource instances managed by the driver on the node. It must be a DNS subdomain.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice": {
+        "description": "NamedResourcesIntSlice contains a slice of 64-bit integers.",
+        "properties": {
+          "ints": {
+            "description": "Ints is the slice of 64-bit integers.",
+            "items": {
+              "default": 0,
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "required": [
+          "ints"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesRequest": {
+        "description": "NamedResourcesRequest is used in ResourceRequestModel.",
+        "properties": {
+          "selector": {
+            "default": "",
+            "description": "Selector is a CEL expression which must evaluate to true if a resource instance is suitable. The language is as defined in https://kubernetes.io/docs/reference/using-api/cel/\n\nIn addition, for each type NamedResourcesin AttributeValue there is a map that resolves to the corresponding value of the instance under evaluation. For example:\n\n   attributes.quantity[\"a\"].isGreaterThan(quantity(\"0\")) &&\n   attributes.stringslice[\"b\"].isSorted()",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesResources": {
+        "description": "NamedResourcesResources is used in NodeResourceModel.",
+        "properties": {
+          "instances": {
+            "description": "The list of all individual resources instances currently available.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesInstance"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "required": [
+          "instances"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice": {
+        "description": "NamedResourcesStringSlice contains a slice of strings.",
+        "properties": {
+          "strings": {
+            "description": "Strings is the slice of strings.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "required": [
+          "strings"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.resource.v1alpha2.NodeResourceSlice": {
         "description": "NodeResourceSlice provides information about available resources on individual nodes.",
         "properties": {
@@ -186,6 +373,14 @@
             ],
             "default": {},
             "description": "Standard object metadata"
+          },
+          "namedResources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesResources"
+              }
+            ],
+            "description": "NamedResources describes available resources using the named resources model."
           },
           "nodeName": {
             "default": "",
@@ -1083,6 +1278,14 @@
           "driverName": {
             "description": "DriverName is the name used by the DRA driver kubelet plugin.",
             "type": "string"
+          },
+          "namedResources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesFilter"
+              }
+            ],
+            "description": "NamedResources describes a resource filter using the named resources model."
           }
         },
         "type": "object"
@@ -1112,6 +1315,14 @@
       "io.k8s.api.resource.v1alpha2.ResourceRequest": {
         "description": "ResourceRequest is a request for resources from one particular driver.",
         "properties": {
+          "namedResources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NamedResourcesRequest"
+              }
+            ],
+            "description": "NamedResources describes a request for resources with the named resources model."
+          },
           "vendorParameters": {
             "allOf": [
               {
@@ -1184,6 +1395,17 @@
           }
         },
         "type": "object"
+      },
+      "io.k8s.apimachinery.pkg.api.resource.Quantity": {
+        "description": "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          }
+        ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
         "description": "APIResource specifies the name of a resource and whether it is namespaced.",

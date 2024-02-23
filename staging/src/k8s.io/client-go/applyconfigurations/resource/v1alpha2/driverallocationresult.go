@@ -19,15 +19,14 @@ limitations under the License.
 package v1alpha2
 
 import (
-	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // DriverAllocationResultApplyConfiguration represents an declarative configuration of the DriverAllocationResult type for use
 // with apply.
 type DriverAllocationResultApplyConfiguration struct {
-	VendorRequestParameters        *runtime.RawExtension `json:"vendorRequestParameters,omitempty"`
-	v1alpha2.AllocationResultModel `json:",inline"`
+	VendorRequestParameters                 *runtime.RawExtension `json:"vendorRequestParameters,omitempty"`
+	AllocationResultModelApplyConfiguration `json:",inline"`
 }
 
 // DriverAllocationResultApplyConfiguration constructs an declarative configuration of the DriverAllocationResult type for use with
@@ -41,5 +40,13 @@ func DriverAllocationResult() *DriverAllocationResultApplyConfiguration {
 // If called multiple times, the VendorRequestParameters field is set to the value of the last call.
 func (b *DriverAllocationResultApplyConfiguration) WithVendorRequestParameters(value runtime.RawExtension) *DriverAllocationResultApplyConfiguration {
 	b.VendorRequestParameters = &value
+	return b
+}
+
+// WithNamedResources sets the NamedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NamedResources field is set to the value of the last call.
+func (b *DriverAllocationResultApplyConfiguration) WithNamedResources(value *NamedResourcesAllocationResultApplyConfiguration) *DriverAllocationResultApplyConfiguration {
+	b.NamedResources = value
 	return b
 }

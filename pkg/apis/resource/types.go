@@ -224,7 +224,8 @@ type DriverAllocationResult struct {
 
 // AllocationResultModel must have one and only one field set.
 type AllocationResultModel struct {
-	// TODO: implement one structured parameter model
+	// NamedResources describes the allocation result when using the named resources model.
+	NamedResources *NamedResourcesAllocationResult
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -500,7 +501,8 @@ type NodeResourceSlice struct {
 
 // NodeResourceModel must have one and only one field set.
 type NodeResourceModel struct {
-	// TODO: implement one structured parameter model
+	// NamedResources describes available resources using the named resources model.
+	NamedResources *NamedResourcesResources
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -567,7 +569,8 @@ type ResourceRequest struct {
 
 // ResourceRequestModel must have one and only one field set.
 type ResourceRequestModel struct {
-	// TODO: implement one structured parameter model
+	// NamedResources describes a request for resources with the named resources model.
+	NamedResources *NamedResourcesRequest
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -616,7 +619,8 @@ type ResourceFilter struct {
 
 // ResourceFilterModel must have one and only one field set.
 type ResourceFilterModel struct {
-	// TODO: implement one structured parameter model
+	// NamedResources describes a resource filter using the named resources model.
+	NamedResources *NamedResourcesFilter
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
