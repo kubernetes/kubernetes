@@ -17,6 +17,7 @@ limitations under the License.
 package openapitest
 
 import (
+	"crypto/sha512"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,4 +77,8 @@ func (f FakeGroupVersion) Schema(contentType string) ([]byte, error) {
 		return nil, f.ForcedErr
 	}
 	return f.GVSpec, nil
+}
+
+func (f FakeGroupVersion) Hash() (string, error) {
+	return fmt.Sprintf("%x", sha512.Sum512(f.GVSpec)), nil
 }

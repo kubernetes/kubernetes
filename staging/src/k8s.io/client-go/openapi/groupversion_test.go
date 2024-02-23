@@ -102,16 +102,12 @@ func TestGroupVersion(t *testing.T) {
 			if string(schema) != expectedResult {
 				t.Fatalf("unexpected result actual: %s expected: %s", string(schema), expectedResult)
 			}
-			if hasher, ok := gv.(Hasher); ok {
-				if h, err := hasher.Hash(); err == nil {
-					if h != "014fbff9a07c" {
-						t.Fatalf("unexpected hash, expected %q but got %q", "014fbff9a07c", h)
-					}
-				} else {
-					t.Fatalf("unexpected error when parsing the hash: %v", err)
+			if h, err := gv.Hash(); err == nil {
+				if h != "014fbff9a07c" {
+					t.Fatalf("unexpected hash, expected %q but got %q", "014fbff9a07c", h)
 				}
 			} else {
-				t.Fatalf("unexpected not a Hasher")
+				t.Fatalf("unexpected error when parsing the hash: %v", err)
 			}
 		})
 	}

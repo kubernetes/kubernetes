@@ -138,7 +138,6 @@ type mockGroupVersion struct {
 
 var _ openapi.Client = (*mockOpenAPIClient)(nil)
 var _ openapi.GroupVersion = (*mockGroupVersion)(nil)
-var _ openapi.Hasher = (*mockGroupVersion)(nil)
 
 func (c *mockOpenAPIClient) Paths() (map[string]openapi.GroupVersion, error) {
 	return c.paths, nil

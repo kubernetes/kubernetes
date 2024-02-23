@@ -31,9 +31,7 @@ const HashParamName = "hash"
 
 type GroupVersion interface {
 	Schema(contentType string) ([]byte, error)
-}
 
-type Hasher interface {
 	// Hash returns the hash that uniquely identifies the version of the requested schema.
 	// It returns an empty string if the hash does not present in the URL to the schema,
 	// or an error if the URL fails to parse.

@@ -17,8 +17,10 @@ limitations under the License.
 package openapitest
 
 import (
+	"crypto/sha512"
 	"embed"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"strings"
@@ -93,4 +95,8 @@ func (f *fileGroupVersion) Schema(contentType string) ([]byte, error) {
 		return nil, errors.New("openapitest only supports 'application/json' contentType")
 	}
 	return fs.ReadFile(f.f, f.filename)
+}
+
+func (f *fileGroupVersion) Hash() (string, error) {
+	return fmt.Sprintf("%x", sha512.Sum512([]byte(f.filename))), nil
 }

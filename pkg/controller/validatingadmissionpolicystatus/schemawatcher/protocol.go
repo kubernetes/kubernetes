@@ -69,11 +69,7 @@ func parseOpenAPIPathItem(path string, gv openapi.GroupVersion) (groupVersion sc
 	if err != nil {
 		return
 	}
-	h, ok := gv.(openapi.Hasher)
-	if !ok {
-		return schema.GroupVersion{}, "", fmt.Errorf("%w: not a hasher", ErrNoHash)
-	}
-	hash, err = h.Hash()
+	hash, err = gv.Hash()
 	if err != nil {
 		return schema.GroupVersion{}, "", fmt.Errorf("%w: %w", ErrNoHash, err)
 	}
