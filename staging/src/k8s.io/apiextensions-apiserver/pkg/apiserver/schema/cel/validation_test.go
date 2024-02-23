@@ -2676,11 +2676,10 @@ func TestReasonAndFldPath(t *testing.T) {
 		return &r
 	}()
 	tests := []struct {
-		name      string
-		schema    *schema.Structural
-		obj       interface{}
-		errors    []string
-		errorType field.ErrorType
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		errors field.ErrorList
 	}{
 		{name: "Return error based on input reason",
 			obj: map[string]interface{}{
@@ -2691,8 +2690,12 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", forbiddenReason),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeForbidden,
-			errors:    []string{"root.f: Forbidden"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.f",
+				},
+			},
 		},
 		{name: "Return error default is invalid",
 			obj: map[string]interface{}{
@@ -2703,8 +2706,12 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", nil),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeInvalid,
-			errors:    []string{"root.f: Invalid"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "root.f",
+				},
+			},
 		},
 		{name: "Return error based on input fieldPath",
 			obj: map[string]interface{}{
@@ -2715,8 +2722,63 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ".m", forbiddenReason),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeForbidden,
-			errors:    []string{"root.f.m: Forbidden"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.f.m",
+				},
+			},
+		},
+		{
+			name: "multiple rules with custom reason and field path",
+			obj: map[string]interface{}{
+				"field1": "value1",
+				"field2": "value2",
+				"field3": "value3",
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"field1": stringType,
+					"field2": stringType,
+					"field3": stringType,
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:      `self.field2 != "value2"`,
+							Reason:    ptr.To(apiextensions.FieldValueDuplicate),
+							FieldPath: ".field2",
+						},
+						{
+							Rule:      `self.field3 != "value3"`,
+							Reason:    ptr.To(apiextensions.FieldValueRequired),
+							FieldPath: ".field3",
+						},
+						{
+							Rule:      `self.field1 != "value1"`,
+							Reason:    ptr.To(apiextensions.FieldValueForbidden),
+							FieldPath: ".field1",
+						},
+					},
+				},
+			},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "root.field2",
+				},
+				{
+					Type:  field.ErrorTypeRequired,
+					Field: "root.field3",
+				},
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.field1",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -2727,30 +2789,14 @@ func TestReasonAndFldPath(t *testing.T) {
 				t.Fatal("expected non nil validator")
 			}
 			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, nil, celconfig.RuntimeCELCostBudget)
-			unmatched := map[string]struct{}{}
-			for _, e := range tt.errors {
-				unmatched[e] = struct{}{}
+
+			for i := range errs {
+				// Ignore unchecked fields for this test
+				errs[i].Detail = ""
+				errs[i].BadValue = nil
 			}
-			for _, err := range errs {
-				if err.Type != tt.errorType {
-					t.Errorf("expected error type %v, but got: %v", tt.errorType, err.Type)
-					continue
-				}
-				matched := false
-				for expected := range unmatched {
-					if strings.Contains(err.Error(), expected) {
-						delete(unmatched, expected)
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
-				}
-			}
-			if len(unmatched) > 0 {
-				t.Errorf("expected errors %v", unmatched)
-			}
+
+			require.ElementsMatch(t, tt.errors, errs)
 		})
 	}
 }

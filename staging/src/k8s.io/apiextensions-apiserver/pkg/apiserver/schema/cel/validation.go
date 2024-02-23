@@ -369,8 +369,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
+			currentFldPath := fldPath
 			if len(compiled.NormalizedRuleFieldPath) > 0 {
-				fldPath = fldPath.Child(compiled.NormalizedRuleFieldPath)
+				currentFldPath = currentFldPath.Child(compiled.NormalizedRuleFieldPath)
 			}
 
 			addErr := func(e *field.Error) {
@@ -385,22 +386,22 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
 				if msgErr != nil {
 					if msgErr.Type == cel.ErrorTypeInternal {
-						addErr(field.InternalError(fldPath, msgErr))
+						addErr(field.InternalError(currentFldPath, msgErr))
 						return errs, -1
 					} else if msgErr.Type == cel.ErrorTypeInvalid {
-						addErr(field.Invalid(fldPath, sts.Type, msgErr.Error()))
+						addErr(field.Invalid(currentFldPath, sts.Type, msgErr.Error()))
 						return errs, -1
 					} else {
 						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
-						addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+						addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 						remainingBudget = newRemainingBudget
 					}
 				} else {
-					addErr(fieldErrorForReason(fldPath, sts.Type, messageExpression, rule.Reason))
+					addErr(fieldErrorForReason(currentFldPath, sts.Type, messageExpression, rule.Reason))
 					remainingBudget = newRemainingBudget
 				}
 			} else {
-				addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+				addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 			}
 		}
 	}
