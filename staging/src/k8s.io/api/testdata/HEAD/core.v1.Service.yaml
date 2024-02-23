@@ -64,6 +64,7 @@ spec:
   sessionAffinityConfig:
     clientIP:
       timeoutSeconds: 1
+  trafficDistribution: trafficDistributionValue
   type: typeValue
 status:
   conditions:
