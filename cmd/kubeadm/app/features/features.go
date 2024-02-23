@@ -38,6 +38,8 @@ const (
 	EtcdLearnerMode = "EtcdLearnerMode"
 	// WaitForAllControlPlaneComponents is expected to be alpha in v1.30
 	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
+	// ControlPlaneKubeletLocalMode is expected to be in alpha in v1.31, beta in v1.32
+	ControlPlaneKubeletLocalMode = "ControlPlaneKubeletLocalMode"
 )
 
 // InitFeatureGates are the default feature gates for the init command
@@ -53,6 +55,7 @@ var InitFeatureGates = FeatureList{
 	},
 	EtcdLearnerMode:                  {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 	WaitForAllControlPlaneComponents: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	ControlPlaneKubeletLocalMode:     {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 
 // Feature represents a feature being gated
