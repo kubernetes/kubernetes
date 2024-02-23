@@ -450,47 +450,49 @@ func TestListOptions(t *testing.T) {
 				metav1.ResourceVersionMatchExact,
 				invalidResourceVersionMatch,
 			}
+			skipCaches := []bool{false, true}
 
 			for _, limit := range limits {
 				for _, continueToken := range continueTokens {
+					continueName := ""
+					switch continueToken {
+					case "":
+						continueName = "empty"
+					case validContinueToken:
+						continueName = "valid"
+					case invalidContinueToken:
+						continueName = "invalid"
+					default:
+						continueName = "unknown"
+					}
 					for _, rv := range rvs {
+						rvName := ""
+						switch rv {
+						case "":
+							rvName = "empty"
+						case "0":
+							rvName = "0"
+						case compactedRv:
+							rvName = "compacted"
+						case invalidResourceVersion:
+							rvName = "invalid"
+						default:
+							rvName = "unknown"
+						}
 						for _, rvMatch := range rvMatches {
-							rvName := ""
-							switch rv {
-							case "":
-								rvName = "empty"
-							case "0":
-								rvName = "0"
-							case compactedRv:
-								rvName = "compacted"
-							case invalidResourceVersion:
-								rvName = "invalid"
-							default:
-								rvName = "unknown"
+							for _, skipCache := range skipCaches {
+								name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s skipCache=%v", limit, continueName, rvName, rvMatch, skipCache)
+								t.Run(name, func(t *testing.T) {
+									opts := metav1.ListOptions{
+										ResourceVersion:      rv,
+										ResourceVersionMatch: rvMatch,
+										Continue:             continueToken,
+										Limit:                limit,
+										SkipCache:            skipCache,
+									}
+									testListOptionsCase(t, rsClient, watchCacheEnabled, opts, compactedRv)
+								})
 							}
-
-							continueName := ""
-							switch continueToken {
-							case "":
-								continueName = "empty"
-							case validContinueToken:
-								continueName = "valid"
-							case invalidContinueToken:
-								continueName = "invalid"
-							default:
-								continueName = "unknown"
-							}
-
-							name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s", limit, continueName, rvName, rvMatch)
-							t.Run(name, func(t *testing.T) {
-								opts := metav1.ListOptions{
-									ResourceVersion:      rv,
-									ResourceVersionMatch: rvMatch,
-									Continue:             continueToken,
-									Limit:                limit,
-								}
-								testListOptionsCase(t, rsClient, watchCacheEnabled, opts, compactedRv)
-							})
 						}
 					}
 				}
@@ -574,7 +576,7 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	// the limit is respected when testing here.
 	hasContinuation := len(opts.Continue) > 0
 	hasLimit := opts.Limit > 0 && opts.ResourceVersion != "0"
-	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
+	skipWatchCache := opts.SkipCache || opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
 	usingWatchCache := watchCacheEnabled && !skipWatchCache
 
 	if usingWatchCache { // watch cache does not respect limit and is not used for continue

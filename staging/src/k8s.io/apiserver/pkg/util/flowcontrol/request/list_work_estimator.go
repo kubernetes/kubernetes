@@ -175,5 +175,5 @@ func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
 	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 
-	return consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
+	return opts.SkipCache || consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
 }

@@ -91,6 +91,12 @@ type ListOptions struct {
 	// Defaults to true if `resourceVersion=""` or `resourceVersion="0"` (for backward
 	// compatibility reasons) and to false otherwise.
 	SendInitialEvents *bool
+
+	// SkipCache bypasses the server cache, forcing the request to be served directly from etcd.
+	//
+	// Caution: This dramatically increases the request resource cost.
+	// Use only for debugging cache staleness or corruption. Not intended for regular client usage.
+	SkipCache bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

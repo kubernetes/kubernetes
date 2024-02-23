@@ -43,6 +43,11 @@ func TestValidateListOptions(t *testing.T) {
 			ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 		},
 	}, {
+		name: "valid-skip-cache",
+		opts: internalversion.ListOptions{
+			SkipCache: true,
+		},
+	}, {
 		name: "invalid-resourceversionmatch-exact",
 		opts: internalversion.ListOptions{
 			ResourceVersion:      "0",
@@ -73,6 +78,13 @@ func TestValidateListOptions(t *testing.T) {
 		opts: internalversion.ListOptions{
 			Watch: true,
 		},
+	}, {
+		name: "invalid-watch-skip-cache",
+		opts: internalversion.ListOptions{
+			Watch:     true,
+			SkipCache: true,
+		},
+		expectErrors: []string{"skipCache: Unsupported value: true: supported values: \"false\""},
 	}, {
 		name: "valid-watch-sendInitialEvents-on",
 		opts: internalversion.ListOptions{

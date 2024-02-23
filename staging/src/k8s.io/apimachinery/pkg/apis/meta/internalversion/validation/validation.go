@@ -72,5 +72,8 @@ func validateWatchOptions(options *internalversion.ListOptions, isWatchListFeatu
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("resourceVersionMatch"), "resourceVersionMatch is forbidden when continue is provided"))
 		}
 	}
+	if options.SkipCache {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("skipCache"), options.SkipCache, []string{"false"}))
+	}
 	return allErrs
 }

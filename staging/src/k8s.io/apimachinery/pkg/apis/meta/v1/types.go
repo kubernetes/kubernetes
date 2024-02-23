@@ -430,6 +430,12 @@ type ListOptions struct {
 	// compatibility reasons) and to false otherwise.
 	// +optional
 	SendInitialEvents *bool `json:"sendInitialEvents,omitempty" protobuf:"varint,11,opt,name=sendInitialEvents"`
+
+	// SkipCache bypasses the server cache, forcing the request to be served directly from etcd.
+	//
+	// Caution: This dramatically increases the request resource cost.
+	// Use only for debugging cache staleness or corruption. Not intended for regular client usage.
+	SkipCache bool `json:"skipCache,omitempty" protobuf:"varint,12,opt,name=skipCache"`
 }
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch

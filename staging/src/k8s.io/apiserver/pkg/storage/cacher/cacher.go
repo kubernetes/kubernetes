@@ -732,7 +732,7 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
 	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 
-	return consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
+	return opts.SkipCache || consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
 }
 
 func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {

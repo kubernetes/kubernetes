@@ -163,6 +163,10 @@ func TestGetListCacheBypass(t *testing.T) {
 		{opts: storage.ListOptions{ResourceVersion: "0"}, expectBypass: false},
 		{opts: storage.ListOptions{ResourceVersion: "1"}, expectBypass: false},
 
+		{opts: storage.ListOptions{ResourceVersion: "", SkipCache: true}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", SkipCache: true}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "1", SkipCache: true}, expectBypass: true},
+
 		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
 		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
 		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
