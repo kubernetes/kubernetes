@@ -107,6 +107,15 @@ var (
 // authenticationConfigFunc is a function that returns a string representation of an authentication config.
 type authenticationConfigFunc func(t *testing.T, issuerURL, caCert string) string
 
+type apiServerOIDCConfig struct {
+	oidcURL                  string
+	oidcClientID             string
+	oidcCAFilePath           string
+	oidcUsernamePrefix       string
+	oidcUsernameClaim        string
+	authenticationConfigYAML string
+}
+
 func TestOIDC(t *testing.T) {
 	t.Log("Testing OIDC authenticator with --oidc-* flags")
 	runTests(t, false)
@@ -122,18 +131,57 @@ func TestStructuredAuthenticationConfig(t *testing.T) {
 func runTests(t *testing.T, useAuthenticationConfig bool) {
 	var tests = []singleTest[*rsa.PrivateKey, *rsa.PublicKey]{
 		{
-			name:                    "ID token is ok",
-			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
-			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
+			name: "ID token is ok",
+			configureInfrastructure: func(t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey)) (
+				oidcServer *utilsoidc.TestServer,
+				apiServer *kubeapiserverapptesting.TestServer,
+				signingPrivateKey *rsa.PrivateKey,
+				caCertContent []byte,
+				caFilePath string,
+			) {
+				caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
+				signingPrivateKey, publicKey := keyFunc(t)
+				oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath)
+
+				if useAuthenticationConfig {
+					authenticationConfig := fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      claim: user
+      prefix: %s
+`, oidcServer.URL(), defaultOIDCClientID, indentCertificateAuthority(string(caCertContent)), defaultOIDCUsernamePrefix)
+					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, &signingPrivateKey.PublicKey)
+				} else {
+					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID,
+						oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix, oidcUsernameClaim: "user"}, &signingPrivateKey.PublicKey)
+				}
+				oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey))
+
+				adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
+				configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
+
+				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
+			}, configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
 				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
+					// This asserts the minimum valid claims for an ID token required by the authenticator.
+					// "iss", "aud", "exp" and a claim for the username.
 					map[string]interface{}{
-						"iss": oidcServer.URL(),
-						"sub": defaultOIDCClaimedUsername,
-						"aud": defaultOIDCClientID,
-						"exp": time.Now().Add(idTokenLifetime).Unix(),
+						"iss":  oidcServer.URL(),
+						"user": defaultOIDCClaimedUsername,
+						"aud":  defaultOIDCClientID,
+						"exp":  time.Now().Add(idTokenLifetime).Unix(),
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
@@ -244,9 +292,9 @@ jwt:
       claim: sub
       prefix: %s
 `, oidcServer.URL(), defaultOIDCClientID, indentCertificateAuthority(string(caCertContent)), defaultOIDCUsernamePrefix)
-					apiServer = startTestAPIServerForOIDC(t, "", "", "", authenticationConfig, &signingPrivateKey.PublicKey)
+					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, &signingPrivateKey.PublicKey)
 				} else {
-					apiServer = startTestAPIServerForOIDC(t, oidcServer.URL(), defaultOIDCClientID, caFilePath, "", &signingPrivateKey.PublicKey)
+					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, &signingPrivateKey.PublicKey)
 				}
 
 				adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
@@ -875,9 +923,9 @@ func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePub
 
 	authenticationConfig := fn(t, oidcServer.URL(), string(caCertContent))
 	if len(authenticationConfig) > 0 {
-		apiServer = startTestAPIServerForOIDC(t, "", "", "", authenticationConfig, publicKey)
+		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey)
 	} else {
-		apiServer = startTestAPIServerForOIDC(t, oidcServer.URL(), defaultOIDCClientID, caFilePath, "", publicKey)
+		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, publicKey)
 	}
 
 	oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey))
@@ -929,18 +977,21 @@ func configureClientConfigForOIDC(t *testing.T, config *rest.Config, clientID, c
 	return cfg
 }
 
-func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, oidcURL, oidcClientID, oidcCAFilePath, authenticationConfigYAML string, publicKey L) *kubeapiserverapptesting.TestServer {
+func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiServerOIDCConfig, publicKey L) *kubeapiserverapptesting.TestServer {
 	t.Helper()
 
 	var customFlags []string
-	if authenticationConfigYAML != "" {
-		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, authenticationConfigYAML))}
+	if len(c.authenticationConfigYAML) > 0 {
+		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
 	} else {
 		customFlags = []string{
-			fmt.Sprintf("--oidc-issuer-url=%s", oidcURL),
-			fmt.Sprintf("--oidc-client-id=%s", oidcClientID),
-			fmt.Sprintf("--oidc-ca-file=%s", oidcCAFilePath),
-			fmt.Sprintf("--oidc-username-prefix=%s", defaultOIDCUsernamePrefix),
+			fmt.Sprintf("--oidc-issuer-url=%s", c.oidcURL),
+			fmt.Sprintf("--oidc-client-id=%s", c.oidcClientID),
+			fmt.Sprintf("--oidc-ca-file=%s", c.oidcCAFilePath),
+			fmt.Sprintf("--oidc-username-prefix=%s", c.oidcUsernamePrefix),
+		}
+		if len(c.oidcUsernameClaim) > 0 {
+			customFlags = append(customFlags, fmt.Sprintf("--oidc-username-claim=%s", c.oidcUsernameClaim))
 		}
 		customFlags = append(customFlags, maybeSetSigningAlgs(publicKey)...)
 	}

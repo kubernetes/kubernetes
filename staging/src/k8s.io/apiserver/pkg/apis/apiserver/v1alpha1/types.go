@@ -176,6 +176,14 @@ type AuthenticationConfiguration struct {
 	// authenticators is neither defined nor stable across releases.  Since
 	// each JWT authenticator must have a unique issuer URL, at most one
 	// JWT authenticator will attempt to cryptographically validate the token.
+	//
+	// The minimum valid JWT payload must contain the following claims:
+	// {
+	//		"iss": "https://issuer.example.com",
+	//		"aud": ["audience"],
+	//		"exp": 1234567890,
+	//		"<username claim>": "username"
+	// }
 	JWT []JWTAuthenticator `json:"jwt"`
 }
 
