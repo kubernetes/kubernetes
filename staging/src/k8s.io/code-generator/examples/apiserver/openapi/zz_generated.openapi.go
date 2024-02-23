@@ -1294,6 +1294,13 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"skipCache": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

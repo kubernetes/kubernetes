@@ -8,5 +8,6 @@ limit: 7
 resourceVersion: resourceVersionValue
 resourceVersionMatch: resourceVersionMatchValue
 sendInitialEvents: true
+skipCache: true
 timeoutSeconds: 5
 watch: true

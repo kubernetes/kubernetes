@@ -1859,6 +1859,15 @@
             }
           },
           {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -1983,6 +1992,15 @@
             "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
             "in": "query",
             "name": "sendInitialEvents",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
             "schema": {
               "type": "boolean",
               "uniqueItems": true
@@ -2670,6 +2688,15 @@
             }
           },
           {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -2794,6 +2821,15 @@
             "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
             "in": "query",
             "name": "sendInitialEvents",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
             "schema": {
               "type": "boolean",
               "uniqueItems": true
@@ -3481,6 +3517,15 @@
             }
           },
           {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -3605,6 +3650,15 @@
             "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
             "in": "query",
             "name": "sendInitialEvents",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
             "schema": {
               "type": "boolean",
               "uniqueItems": true
@@ -4312,6 +4366,15 @@
             }
           },
           {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -4436,6 +4499,15 @@
             "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
             "in": "query",
             "name": "sendInitialEvents",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+            "in": "query",
+            "name": "skipCache",
             "schema": {
               "type": "boolean",
               "uniqueItems": true
@@ -5170,6 +5242,15 @@
           }
         },
         {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -5321,6 +5402,15 @@
           }
         },
         {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -5466,6 +5556,15 @@
           "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
           "in": "query",
           "name": "sendInitialEvents",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -5633,6 +5732,15 @@
           }
         },
         {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -5778,6 +5886,15 @@
           "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
           "in": "query",
           "name": "sendInitialEvents",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -5945,6 +6062,15 @@
           }
         },
         {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -6100,6 +6226,15 @@
           "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
           "in": "query",
           "name": "sendInitialEvents",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -6277,6 +6412,15 @@
           }
         },
         {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -6432,6 +6576,15 @@
           "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
           "in": "query",
           "name": "sendInitialEvents",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
@@ -6609,6 +6762,15 @@
           }
         },
         {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -6760,6 +6922,15 @@
           }
         },
         {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -6905,6 +7076,15 @@
           "description": "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
           "in": "query",
           "name": "sendInitialEvents",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "SkipCache bypasses the server cache, forcing the request to be served directly from etcd.\n\nCaution: This dramatically increases the request resource cost. Use only for debugging cache staleness or corruption. Not intended for regular client usage.",
+          "in": "query",
+          "name": "skipCache",
           "schema": {
             "type": "boolean",
             "uniqueItems": true
