@@ -109,12 +109,3 @@ func (a *Plugin) Admit(ctx context.Context, attr admission.Attributes, o admissi
 func (a *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	a.Plugin.SetEnabled(featureGates.Enabled(features.MutatingAdmissionPolicy))
 }
-
-func compilePolicy(policy *Policy) PolicyEvaluator {
-	//!TODO: Implement this
-	// Should compile the policy into a funciton that takes a param, namespace,
-	// request info, etc, and returns:
-	// 	1. Unstructured Patch of Fields to Set
-	// 	2. Slice of field paths to delete? Or unstructured map of deleted fields?
-	return nil
-}
