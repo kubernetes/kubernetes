@@ -22,11 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -67,16 +65,7 @@ func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
-
-	// create cannot set status
-	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) {
-		dropContainerMetricSources(newHPA.Spec.Metrics)
-	}
-}
+func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
 
 // Validate validates a new autoscaler.
 func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -99,32 +88,7 @@ func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
-	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) && !hasContainerMetricSources(oldHPA) {
-		dropContainerMetricSources(newHPA.Spec.Metrics)
-	}
-	// Update is not allowed to set status
-	newHPA.Status = oldHPA.Status
-}
-
-// dropContainerMetricSources ensures all container resource metric sources are nil
-func dropContainerMetricSources(metrics []autoscaling.MetricSpec) {
-	for i := range metrics {
-		metrics[i].ContainerResource = nil
-	}
-}
-
-// hasContainerMetricSources returns true if the hpa has any container resource metric sources
-func hasContainerMetricSources(hpa *autoscaling.HorizontalPodAutoscaler) bool {
-	for i := range hpa.Spec.Metrics {
-		if hpa.Spec.Metrics[i].ContainerResource != nil {
-			return true
-		}
-	}
-	return false
-}
+func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
 
 // ValidateUpdate is the default update validation for an end user.
 func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
