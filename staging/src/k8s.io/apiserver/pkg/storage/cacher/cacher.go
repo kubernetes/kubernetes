@@ -22,10 +22,12 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 
+	"google.golang.org/grpc/metadata"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -237,6 +239,8 @@ type indexedTriggerFunc struct {
 	indexName   string
 	indexerFunc storage.IndexerFunc
 }
+
+var watchIndex atomic.Int64
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
@@ -514,6 +518,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		opts.SendInitialEvents = nil
 	}
 	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
+		val := watchIndex.Add(1)
+		ctx = metadata.AppendToOutgoingContext(ctx, "index", fmt.Sprintf("%d", val))
 		return c.storage.Watch(ctx, key, opts)
 	}
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
