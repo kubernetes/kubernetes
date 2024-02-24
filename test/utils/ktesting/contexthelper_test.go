@@ -19,6 +19,8 @@ package ktesting
 import (
 	"context"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,13 +49,13 @@ func TestCause(t *testing.T) {
 	}{
 		"nothing": {
 			parentCtx: context.Background(),
-			timeout:   10 * time.Millisecond,
+			timeout:   5 * time.Millisecond,
 			sleep:     time.Millisecond,
 		},
 		"timeout": {
 			parentCtx:   context.Background(),
 			timeout:     time.Millisecond,
-			sleep:       10 * time.Millisecond,
+			sleep:       5 * time.Millisecond,
 			expectErr:   context.Canceled,
 			expectCause: canceledError(timeoutCause),
 		},
@@ -64,7 +66,7 @@ func TestCause(t *testing.T) {
 				return ctx
 			}(),
 			timeout:     time.Millisecond,
-			sleep:       10 * time.Millisecond,
+			sleep:       5 * time.Millisecond,
 			expectErr:   context.Canceled,
 			expectCause: context.Canceled,
 		},
@@ -112,7 +114,17 @@ func TestCause(t *testing.T) {
 			if tt.expectDeadline != 0 {
 				actualDeadline, ok := ctx.Deadline()
 				if assert.True(t, ok, "should have had a deadline") {
-					assert.InDelta(t, time.Until(actualDeadline), tt.expectDeadline, float64(5*time.Second), "remaining time till Deadline()")
+					// Testing timing behavior is unreliable in Prow because
+					// the test runs in parallel with several others.
+					// Therefore this check is skipped if a CI environment is
+					// detected.
+					ci, _ := os.LookupEnv("CI")
+					switch strings.ToLower(ci) {
+					case "yes", "true", "1":
+						// Skip.
+					default:
+						assert.InDelta(t, time.Until(actualDeadline), tt.expectDeadline, float64(time.Second), "remaining time till Deadline()")
+					}
 				}
 			}
 			time.Sleep(tt.sleep)
