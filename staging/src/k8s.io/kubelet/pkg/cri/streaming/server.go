@@ -80,6 +80,8 @@ type Config struct {
 	StreamIdleTimeout time.Duration
 	// How long to wait for clients to create streams. Only used for SPDY streaming.
 	StreamCreationTimeout time.Duration
+	// How long to wait before dropping an event
+	StreamDropEventTime time.Duration
 
 	// The streaming protocols the server supports (understands and permits).  See
 	// k8s.io/kubernetes/pkg/kubelet/server/remotecommand/constants.go for available protocols.
@@ -98,6 +100,7 @@ type Config struct {
 // DefaultConfig provides default values for server Config. The DefaultConfig is partial, so
 // some fields like Addr must still be provided.
 var DefaultConfig = Config{
+	StreamDropEventTime:             5 * time.Minute,
 	StreamIdleTimeout:               4 * time.Hour,
 	StreamCreationTimeout:           remotecommandconsts.DefaultStreamCreationTimeout,
 	SupportedRemoteCommandProtocols: remotecommandconsts.SupportedStreamingProtocols,
