@@ -876,9 +876,10 @@ const (
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
 
-	// owner: @Sh4d1,@RyanAoh
+	// owner: @Sh4d1,@RyanAoh,@rikatz
 	// kep: http://kep.k8s.io/1860
 	// alpha: v1.29
+	// beta: v1.30
 	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
 	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
 
@@ -1152,7 +1153,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
 
-	LoadBalancerIPMode: {Default: false, PreRelease: featuregate.Alpha},
+	LoadBalancerIPMode: {Default: true, PreRelease: featuregate.Beta},
 
 	ImageMaximumGCAge: {Default: false, PreRelease: featuregate.Alpha},
 
