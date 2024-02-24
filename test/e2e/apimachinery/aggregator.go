@@ -413,7 +413,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 	framework.ExpectNoError(err, "gave up waiting for apiservice wardle to come up successfully")
 }
 
-// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.27 and compiled against 1.27
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.29 and compiled against 1.29
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image, apiServiceGroupName, apiServiceVersion string) {
 	n := generateSampleAPIServerObjectNames(f.Namespace.Name)
