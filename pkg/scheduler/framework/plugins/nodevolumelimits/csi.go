@@ -84,6 +84,10 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
+		// There is a possibility that a PVC is deleted when isSchedulableAfterPodDeleted is called.
+		// In this case, it's impossible if PVCs are relevant to the scheduling pod.
+		// To catch this case, we register PVC/Delete event.
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete}},
 	}
 }
 
