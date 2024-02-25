@@ -420,6 +420,9 @@ func (tc *CustomMetricTestCase) Run(ctx context.Context) {
 	// Set up a cluster: create a custom metric and set up k8s-sd adapter
 	err = monitoring.CreateDescriptors(gcmService, projectID)
 	if err != nil {
+		if strings.Contains(err.Error(), "Request throttled") {
+			e2eskipper.Skipf("Skipping...hitting rate limits on creating and updating metrics/labels")
+		}
 		framework.Failf("Failed to create metric descriptor: %v", err)
 	}
 	defer monitoring.CleanupDescriptors(gcmService, projectID)
