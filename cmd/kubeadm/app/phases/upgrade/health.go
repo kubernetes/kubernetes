@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
@@ -66,8 +67,8 @@ func (c *healthCheck) Name() string {
 // - the API /healthz endpoint is healthy
 // - all control-plane Nodes are Ready
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string]) error {
-	fmt.Println("[upgrade] Running cluster health checks")
+func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string], printer output.Printer) error {
+	_, _ = printer.Println("[upgrade] Running cluster health checks")
 
 	healthChecks := []preflight.Checker{
 		&healthCheck{
