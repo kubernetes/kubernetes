@@ -118,17 +118,18 @@ func buildDescription(explain ...interface{}) string {
 // is passed in. For example, errors can be checked with ExpectNoError:
 //
 //	cb := func(func(tCtx ktesting.TContext) int {
-//	   value, err := doSomething(...)
-//	   ktesting.ExpectNoError(tCtx, err, "something failed")
-//	   return value
+//	    value, err := doSomething(...)
+//	    tCtx.ExpectNoError(err, "something failed")
+//	    assert(tCtx, 42, value, "the answer")
+//	    return value
 //	}
 //	tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
 //
 // If there is no value, then an error can be returned:
 //
 //	cb := func(func(tCtx ktesting.TContext) error {
-//	   err := doSomething(...)
-//	   return err
+//	    err := doSomething(...)
+//	    return err
 //	}
 //	tCtx.Eventually(cb).Should(gomega.Succeed(), "foobar should succeed")
 //
@@ -143,12 +144,21 @@ func buildDescription(explain ...interface{}) string {
 // anymore, use [gomega.StopTrying]:
 //
 //	cb := func(func(tCtx ktesting.TContext) int {
-//	   value, err := doSomething(...)
-//	   if errors.Is(err, SomeFinalErr) {
-//	    gomega.StopTrying("permanent failure).Wrap(err).Now()
-//	   }
-//	   ktesting.ExpectNoError(tCtx, err, "something failed")
-//	   return value
+//	    value, err := doSomething(...)
+//	    if errors.Is(err, SomeFinalErr) {
+//	        // This message completely replaces the normal
+//	        // failure message and thus should include all
+//	        // relevant information.
+//	        //
+//	        // github.com/onsi/gomega/format is a good way
+//	        // to format arbitrary data. It uses indention
+//	        // and falls back to YAML for Kubernetes API
+//	        // structs for readability.
+//	        gomega.StopTrying("permanent failure, last value:\n%s", format.Object(value, 1 /* indent one level */)).
+//	            Wrap(err).Now()
+//	    }
+//	    ktesting.ExpectNoError(tCtx, err, "something failed")
+//	    return value
 //	}
 //	tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
 //
@@ -156,15 +166,15 @@ func buildDescription(explain ...interface{}) string {
 // particularly useful in [Consistently] to ignore some intermittent error.
 //
 //	cb := func(func(tCtx ktesting.TContext) int {
-//	   value, err := doSomething(...)
-//	   var intermittentErr SomeIntermittentError
-//	   if errors.As(err, &intermittentErr) {
-//	       gomega.TryAgainAfter(intermittentErr.RetryPeriod).Wrap(err).Now()
-//	   }
-//	   ktesting.ExpectNoError(tCtx, err, "something failed")
-//	   return value
-//	}
-//	tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
+//	    value, err := doSomething(...)
+//	    var intermittentErr SomeIntermittentError
+//	    if errors.As(err, &intermittentErr) {
+//	        gomega.TryAgainAfter(intermittentErr.RetryPeriod).Wrap(err).Now()
+//	    }
+//	    ktesting.ExpectNoError(tCtx, err, "something failed")
+//	    return value
+//	 }
+//	 tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
 func Eventually[T any](tCtx TContext, cb func(TContext) T) gomega.AsyncAssertion {
 	tCtx.Helper()
 	return gomega.NewWithT(tCtx).Eventually(tCtx, func(ctx context.Context) (val T, err error) {

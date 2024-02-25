@@ -83,7 +83,7 @@ type TContext interface {
 	Cancel(cause string)
 
 	// Cleanup registers a callback that will get invoked when the test
-	// has finished. Callbacks get invoked in first-in-first-out order.
+	// has finished. Callbacks get invoked in last-in-first-out order (LIFO).
 	//
 	// Beware of context cancellation. The following cleanup code
 	// will use a canceled context, which is not desirable:
