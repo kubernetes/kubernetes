@@ -642,7 +642,7 @@ func TestCSILimits(t *testing.T) {
 }
 
 func TestCSILimitsQHint(t *testing.T) {
-	podEbs := st.MakePod().PVC("csi-ebs.csi.aws.com-3").Obj()
+	podEbs := st.MakePod().PVC("csi-ebs.csi.aws.com-2")
 
 	tests := []struct {
 		newPod                 *v1.Pod
@@ -656,8 +656,8 @@ func TestCSILimitsQHint(t *testing.T) {
 		wantQHint              framework.QueueingHint
 	}{
 		{
-			newPod:      podEbs,
-			deletedPod:  st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj(),
+			newPod:      podEbs.Obj(),
+			deletedPod:  st.MakePod().PVC("csi-ebs.csi.aws.com-2").Obj(),
 			filterName:  "csi",
 			driverNames: []string{ebsCSIDriverName},
 			test:        "return a Queue when a deleted pod has a PVC from the same driver",
@@ -665,7 +665,7 @@ func TestCSILimitsQHint(t *testing.T) {
 			wantQHint:   framework.Queue,
 		},
 		{
-			newPod:      podEbs,
+			newPod:      podEbs.Obj(),
 			deletedPod:  st.MakePod().Obj(),
 			filterName:  "csi",
 			driverNames: []string{ebsCSIDriverName},
@@ -674,7 +674,7 @@ func TestCSILimitsQHint(t *testing.T) {
 			wantQHint:   framework.QueueSkip,
 		},
 		{
-			newPod:      podEbs,
+			newPod:      podEbs.Obj(),
 			deletedPod:  st.MakePod().PVC("csi-pd.csi.storage.gke.io-1").Obj(),
 			filterName:  "csi",
 			driverNames: []string{ebsCSIDriverName, gceCSIDriverName},
@@ -683,7 +683,7 @@ func TestCSILimitsQHint(t *testing.T) {
 			wantQHint:   framework.QueueSkip,
 		},
 		{
-			newPod:      podEbs,
+			newPod:      podEbs.Obj(),
 			deletedPod:  st.MakePod().PVC("not.available").Obj(),
 			filterName:  "csi",
 			driverNames: []string{ebsCSIDriverName, gceCSIDriverName},
@@ -692,7 +692,7 @@ func TestCSILimitsQHint(t *testing.T) {
 			wantQHint:   framework.QueueSkip,
 		},
 		{
-			newPod:                 podEbs,
+			newPod:                 podEbs.Obj(),
 			deletedPod:             st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj(),
 			deletedPodNotScheduled: true,
 			filterName:             "csi",
@@ -700,6 +700,15 @@ func TestCSILimitsQHint(t *testing.T) {
 			test:                   "return a QueueSkip when a deleted pod is not scheduled.",
 			limitSource:            "csinode",
 			wantQHint:              framework.QueueSkip,
+		},
+		{
+			newPod:      st.MakePod().PVC("not-found").Obj(),
+			deletedPod:  st.MakePod().PVC("not-found").Obj(),
+			filterName:  "csi",
+			driverNames: []string{ebsCSIDriverName},
+			test:        "return a QueueSkip when a PVC newPod has is not found.",
+			limitSource: "csinode",
+			wantQHint:   framework.QueueSkip,
 		},
 	}
 
