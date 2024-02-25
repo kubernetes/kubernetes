@@ -296,16 +296,16 @@ func TestWarnings(t *testing.T) {
 				}}},
 			}},
 			expected: []string{
-				`spec.initContainers[0].env[1]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[2]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[3]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[4]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[5]: hides previous definition of "a"`,
-				`spec.containers[0].env[1]: hides previous definition of "b"`,
-				`spec.containers[0].env[2]: hides previous definition of "b"`,
-				`spec.containers[0].env[3]: hides previous definition of "b"`,
-				`spec.containers[0].env[4]: hides previous definition of "b"`,
-				`spec.containers[0].env[5]: hides previous definition of "b"`,
+				`spec.initContainers[0].env[1]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[2]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[3]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[4]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[5]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.containers[0].env[1]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[2]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[3]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[4]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[5]: hides previous definition of "b", which may be dropped when using apply`,
 			},
 		},
 		{
@@ -1066,12 +1066,12 @@ func TestWarnings(t *testing.T) {
 			if tc.oldTemplate != nil {
 				oldTemplate = tc.oldTemplate
 			}
-			actual := sets.NewString(GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})
@@ -1084,12 +1084,12 @@ func TestWarnings(t *testing.T) {
 					Spec:       tc.template.Spec,
 				}
 			}
-			actual := sets.NewString(GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})

@@ -75,8 +75,6 @@ const (
 
 type fakeKubelet struct {
 	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	containerInfoFunc   func(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	rawInfoFunc         func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
 	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
 	podsFunc            func() []*v1.Pod
 	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
@@ -108,14 +106,6 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 
 func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
-}
-
-func (fk *fakeKubelet) GetContainerInfo(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-	return fk.containerInfoFunc(ctx, podFullName, uid, containerName, req)
-}
-
-func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
-	return fk.rawInfoFunc(req)
 }
 
 func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {

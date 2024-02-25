@@ -434,11 +434,16 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return errors.New(log("Unmounter.TearDownAt failed: %v", err))
 	}
 
-	// Deprecation: Removal of target_path provided in the NodePublish RPC call
+	// Removal of target_path provided in the NodePublish RPC call
 	// (in this case location `dir`) MUST be done by the CSI plugin according
-	// to the spec. This will no longer be done directly as part of TearDown
-	// by the kubelet in the future. Kubelet will only be responsible for
-	// removal of json data files it creates and parent directories.
+	// to the spec.
+	//
+	// Kubelet should only be responsible for removal of json data files it
+	// creates and parent directories.
+	//
+	// However, some CSI plugins maybe buggy and don't adhere to the standard,
+	// so we still need to remove the target_path here if it's unmounted and
+	// empty.
 	if err := removeMountDir(c.plugin, dir); err != nil {
 		return errors.New(log("Unmounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 	}

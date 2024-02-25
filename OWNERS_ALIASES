@@ -135,6 +135,7 @@ aliases:
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
+    - carlory
     - chrishenzie
     - gnufied
     - humblec
@@ -249,6 +250,7 @@ aliases:
     - haircommander
     - tzneal
     - rphillips
+    - kannon92
   sig-network-approvers:
     - andrewsykim
     - aojea
@@ -302,6 +304,7 @@ aliases:
     - RainbowMango
     - serathius
     - dgrisonnet
+    - rexagod
   sig-instrumentation-reviewers:
     - dashpole
     - ehashman
@@ -313,6 +316,7 @@ aliases:
     - dgrisonnet
     - pohly
     - mengjiao-liu
+    - rexagod
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
@@ -487,6 +491,7 @@ aliases:
   feature-approvers:
     - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
+    - aojea # Network, Testing
     - danwinship # Network
     - dchen1107 # Node
     - deads2k # API Machinery
@@ -510,6 +515,7 @@ aliases:
     - msau42 # Storage
     - mwielgus # Autoscaling
     - pwittrock # CLI
+    - rexagod # Instrumentation
     - saad-ali # Storage
     - seans3 # CLI
     - sergeykanzhelev # Node

@@ -38,7 +38,6 @@ import (
 	"time"
 
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -123,19 +122,6 @@ const (
 type TestLogger interface {
 	Infof(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
-}
-
-// GLogger is test logger.
-type GLogger struct{}
-
-// Infof outputs log with info level.
-func (l *GLogger) Infof(format string, args ...interface{}) {
-	klog.Infof(format, args...)
-}
-
-// Errorf outputs log with error level.
-func (l *GLogger) Errorf(format string, args ...interface{}) {
-	klog.Errorf(format, args...)
 }
 
 // E2ELogger is test logger.

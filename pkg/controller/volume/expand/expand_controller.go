@@ -352,7 +352,7 @@ func (expc *expandController) getPersistentVolume(ctx context.Context, pvc *v1.P
 		return nil, fmt.Errorf("failed to get PV %q: %v", volumeName, err)
 	}
 
-	return pv.DeepCopy(), nil
+	return pv, nil
 }
 
 // isNodeExpandComplete returns true if  pvc.Status.Capacity >= pv.Spec.Capacity

@@ -433,13 +433,15 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 	})
 
-	// Regression test for #74839, where:
-	// Packets considered INVALID by conntrack are now dropped. In particular, this fixes
-	// a problem where spurious retransmits in a long-running TCP connection to a service
-	// IP could result in the connection being closed with the error "Connection reset by
-	// peer"
+	// Regression test for #74839
+	// Packets considered INVALID by conntrack are not NATed, this can result
+	// in a problem where spurious retransmits in a long-running TCP connection
+	// to a service IP ends up with "Connection reset by peer" error.
+	// Proxy implementations (which leverage conntrack) can either drop packets
+	// marked INVALID by conntrack or enforce `nf_conntrack_tcp_be_liberal` to
+	// overcome this.
 	// xref: https://kubernetes.io/blog/2019/03/29/kube-proxy-subtleties-debugging-an-intermittent-connection-reset/
-	ginkgo.It("should drop INVALID conntrack entries [Privileged]", func(ctx context.Context) {
+	ginkgo.It("proxy implementation should not be vulnerable to the invalid conntrack state bug [Privileged]", func(ctx context.Context) {
 		serverLabel := map[string]string{
 			"app": "boom-server",
 		}
@@ -535,22 +537,21 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.NewPodClient(fr).CreateSync(ctx, pod)
 		ginkgo.By("Client pod created")
 
-		// The client will open connections against the server
-		// The server will inject invalid packets
-		// if conntrack does not drop the invalid packets it will go through without NAT
-		// so the client will receive an unexpected TCP connection and RST the connection
-		// the server will log ERROR if that happens
-		ginkgo.By("checking client pod does not RST the TCP connection because it receives an INVALID packet")
+		// The client will open connections against the server.
+		// The server will inject packets with out-of-window sequence numbers and
+		// if these packets go without NAT client will receive an unexpected TCP
+		// packet and RST the connection, the server will log ERROR if that happens.
+		ginkgo.By("checking client pod does not RST the TCP connection because it receives an out-of-window packet")
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn("ERROR", "boom-server")); err == nil {
 			logs, err := e2epod.GetPodLogs(ctx, cs, ns, "boom-server", "boom-server")
 			framework.ExpectNoError(err)
 			framework.Logf("boom-server pod logs: %s", logs)
-			framework.Failf("boom-server pod received a RST from the client")
+			framework.Failf("boom-server pod received a RST from the client, enabling nf_conntrack_tcp_be_liberal or dropping packets marked invalid by conntrack might help here.")
 		}
 
 		logs, err := e2epod.GetPodLogs(ctx, cs, ns, "boom-server", "boom-server")
 		framework.ExpectNoError(err)
-		if !strings.Contains(string(logs), "connection established") {
+		if !strings.Contains(logs, "connection established") {
 			framework.Logf("boom-server pod logs: %s", logs)
 			framework.Failf("boom-server pod did not send any bad packet to the client")
 		}

@@ -338,10 +338,18 @@ func TestMapIPsByIPFamily(t *testing.T) {
 
 			ipMap := MapIPsByIPFamily(testcase.ipString)
 
-			if !reflect.DeepEqual(testcase.expectCorrect, ipMap[ipFamily]) {
+			var ipStr []string
+			for _, ip := range ipMap[ipFamily] {
+				ipStr = append(ipStr, ip.String())
+			}
+			if !reflect.DeepEqual(testcase.expectCorrect, ipStr) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, ipMap[ipFamily])
 			}
-			if !reflect.DeepEqual(testcase.expectIncorrect, ipMap[otherIPFamily]) {
+			ipStr = nil
+			for _, ip := range ipMap[otherIPFamily] {
+				ipStr = append(ipStr, ip.String())
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, ipStr) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, ipMap[otherIPFamily])
 			}
 		})
@@ -372,58 +380,58 @@ func TestMapCIDRsByIPFamily(t *testing.T) {
 		},
 		{
 			desc:            "want IPv4 and receive IPv6",
-			ipString:        []string{"fd00:20::1/64"},
+			ipString:        []string{"fd00:20::/64"},
 			wantIPv6:        false,
 			expectCorrect:   nil,
-			expectIncorrect: []string{"fd00:20::1/64"},
+			expectIncorrect: []string{"fd00:20::/64"},
 		},
 		{
 			desc:            "want IPv6 and receive IPv4",
-			ipString:        []string{"192.168.200.2/24"},
+			ipString:        []string{"192.168.200.0/24"},
 			wantIPv6:        true,
 			expectCorrect:   nil,
-			expectIncorrect: []string{"192.168.200.2/24"},
+			expectIncorrect: []string{"192.168.200.0/24"},
 		},
 		{
 			desc:            "want IPv6 and receive IPv4 and IPv6",
-			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24", "fd00:20::1/64", "2001:db9::3/64"},
+			ipString:        []string{"192.168.200.0/24", "192.1.34.0/24", "fd00:20::/64", "2001:db9::/64"},
 			wantIPv6:        true,
-			expectCorrect:   []string{"fd00:20::1/64", "2001:db9::3/64"},
-			expectIncorrect: []string{"192.168.200.2/24", "192.1.34.23/24"},
+			expectCorrect:   []string{"fd00:20::/64", "2001:db9::/64"},
+			expectIncorrect: []string{"192.168.200.0/24", "192.1.34.0/24"},
 		},
 		{
 			desc:            "want IPv4 and receive IPv4 and IPv6",
-			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24", "fd00:20::1/64", "2001:db9::3/64"},
+			ipString:        []string{"192.168.200.0/24", "192.1.34.0/24", "fd00:20::/64", "2001:db9::/64"},
 			wantIPv6:        false,
-			expectCorrect:   []string{"192.168.200.2/24", "192.1.34.23/24"},
-			expectIncorrect: []string{"fd00:20::1/64", "2001:db9::3/64"},
+			expectCorrect:   []string{"192.168.200.0/24", "192.1.34.0/24"},
+			expectIncorrect: []string{"fd00:20::/64", "2001:db9::/64"},
 		},
 		{
 			desc:            "want IPv4 and receive IPv4 only",
-			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24"},
+			ipString:        []string{"192.168.200.0/24", "192.1.34.0/24"},
 			wantIPv6:        false,
-			expectCorrect:   []string{"192.168.200.2/24", "192.1.34.23/24"},
+			expectCorrect:   []string{"192.168.200.0/24", "192.1.34.0/24"},
 			expectIncorrect: nil,
 		},
 		{
 			desc:            "want IPv6 and receive IPv4 only",
-			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24"},
+			ipString:        []string{"192.168.200.0/24", "192.1.34.0/24"},
 			wantIPv6:        true,
 			expectCorrect:   nil,
-			expectIncorrect: []string{"192.168.200.2/24", "192.1.34.23/24"},
+			expectIncorrect: []string{"192.168.200.0/24", "192.1.34.0/24"},
 		},
 		{
 			desc:            "want IPv4 and receive IPv6 only",
-			ipString:        []string{"fd00:20::1/64", "2001:db9::3/64"},
+			ipString:        []string{"fd00:20::/64", "2001:db9::/64"},
 			wantIPv6:        false,
 			expectCorrect:   nil,
-			expectIncorrect: []string{"fd00:20::1/64", "2001:db9::3/64"},
+			expectIncorrect: []string{"fd00:20::/64", "2001:db9::/64"},
 		},
 		{
 			desc:            "want IPv6 and receive IPv6 only",
-			ipString:        []string{"fd00:20::1/64", "2001:db9::3/64"},
+			ipString:        []string{"fd00:20::/64", "2001:db9::/64"},
 			wantIPv6:        true,
-			expectCorrect:   []string{"fd00:20::1/64", "2001:db9::3/64"},
+			expectCorrect:   []string{"fd00:20::/64", "2001:db9::/64"},
 			expectIncorrect: nil,
 		},
 	}
@@ -440,11 +448,20 @@ func TestMapCIDRsByIPFamily(t *testing.T) {
 
 			cidrMap := MapCIDRsByIPFamily(testcase.ipString)
 
-			if !reflect.DeepEqual(testcase.expectCorrect, cidrMap[ipFamily]) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, cidrMap[ipFamily])
+			var cidrStr []string
+			for _, cidr := range cidrMap[ipFamily] {
+				cidrStr = append(cidrStr, cidr.String())
 			}
-			if !reflect.DeepEqual(testcase.expectIncorrect, cidrMap[otherIPFamily]) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, cidrMap[otherIPFamily])
+			var cidrStrOther []string
+			for _, cidr := range cidrMap[otherIPFamily] {
+				cidrStrOther = append(cidrStrOther, cidr.String())
+			}
+
+			if !reflect.DeepEqual(testcase.expectCorrect, cidrStr) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, cidrStr)
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, cidrStrOther) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, cidrStrOther)
 			}
 		})
 	}

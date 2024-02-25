@@ -156,7 +156,7 @@ func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[st
 
 	zone, ok := nodeLabels[v1.LabelTopologyZone]
 	if !ok || zone == "" {
-		klog.InfoS("Skipping topology aware endpoint filtering since node is missing label", "label", v1.LabelTopologyZone)
+		klog.V(2).InfoS("Skipping topology aware endpoint filtering since node is missing label", "label", v1.LabelTopologyZone)
 		return false
 	}
 
@@ -166,7 +166,7 @@ func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[st
 			continue
 		}
 		if endpoint.ZoneHints().Len() == 0 {
-			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint", "endpoint", endpoint)
+			klog.V(2).InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint", "endpoint", endpoint)
 			return false
 		}
 
@@ -176,7 +176,7 @@ func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[st
 	}
 
 	if !hasEndpointForZone {
-		klog.InfoS("Skipping topology aware endpoint filtering since no hints were provided for zone", "zone", zone)
+		klog.V(2).InfoS("Skipping topology aware endpoint filtering since no hints were provided for zone", "zone", zone)
 		return false
 	}
 

@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -761,10 +762,17 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			default:
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), opts.Predicate, s.codec, s.versioner, newItemFunc); err != nil {
+			obj, err := decodeListItem(ctx, data, uint64(kv.ModRevision), s.codec, s.versioner, newItemFunc)
+			if err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
 				return err
 			}
+
+			// being unable to set the version does not prevent the object from being extracted
+			if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
+				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+			}
+
 			numEvald++
 
 			// free kv early. Long lists can take O(seconds) to decode.
@@ -1038,20 +1046,23 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	return nil
 }
 
-// appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
+// decodeListItem decodes bytes value in array into object.
+func decodeListItem(ctx context.Context, data []byte, rev uint64, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) (runtime.Object, error) {
+	startedAt := time.Now()
+	defer func() {
+		endpointsrequest.TrackDecodeLatency(ctx, time.Since(startedAt))
+	}()
+
 	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	// being unable to set the version does not prevent the object from being extracted
+
 	if err := versioner.UpdateObject(obj, rev); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
 	}
-	if matched, err := pred.Matches(obj); err == nil && matched {
-		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-	}
-	return nil
+
+	return obj, nil
 }
 
 // recordDecodeError record decode error split by object type.

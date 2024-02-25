@@ -269,7 +269,7 @@ runTests() {
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
      | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
     produceJUnitXMLReport "${junit_filename_prefix}"
-    return ${rc}
+    return "${rc}"
   fi
 
   kube::log::status "Running tests with code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
@@ -340,7 +340,7 @@ runTests() {
   go tool cover -html="${COMBINED_COVER_PROFILE}" -o="${coverage_html_file}"
   kube::log::status "Combined coverage report: ${coverage_html_file}"
 
-  return ${test_result}
+  return "${test_result}"
 }
 
 reportCoverageToCoveralls() {

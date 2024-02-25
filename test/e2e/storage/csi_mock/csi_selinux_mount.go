@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -252,19 +253,6 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 
 	// [Serial]: the tests read global kube-controller-manager metrics, so no other test changes them in parallel.
 	f.Context("SELinuxMount metrics [LinuxOnly]", feature.SELinux, feature.SELinuxMountReadWriteOncePod, f.WithSerial(), func() {
-
-		// All SELinux metrics. Unless explicitly mentioned in test.expectIncreases, these metrics must not grow during
-		// a test.
-		allMetrics := sets.NewString(
-			"volume_manager_selinux_container_errors_total",
-			"volume_manager_selinux_container_warnings_total",
-			"volume_manager_selinux_pod_context_mismatch_errors_total",
-			"volume_manager_selinux_pod_context_mismatch_warnings_total",
-			"volume_manager_selinux_volume_context_mismatch_errors_total",
-			"volume_manager_selinux_volume_context_mismatch_warnings_total",
-			"volume_manager_selinux_volumes_admitted_total",
-		)
-
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
@@ -321,6 +309,21 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 		for _, t := range tests {
 			t := t
 			ginkgo.It(t.name, func(ctx context.Context) {
+				// Some metrics use CSI driver name as a label, which is "csi-mock-" + the namespace name.
+				volumePluginLabel := "{volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\"}"
+
+				// All SELinux metrics. Unless explicitly mentioned in test.expectIncreases, these metrics must not grow during
+				// a test.
+				allMetrics := sets.NewString(
+					"volume_manager_selinux_container_errors_total",
+					"volume_manager_selinux_container_warnings_total",
+					"volume_manager_selinux_pod_context_mismatch_errors_total",
+					"volume_manager_selinux_pod_context_mismatch_warnings_total",
+					"volume_manager_selinux_volume_context_mismatch_errors_total"+volumePluginLabel,
+					"volume_manager_selinux_volume_context_mismatch_warnings_total"+volumePluginLabel,
+					"volume_manager_selinux_volumes_admitted_total"+volumePluginLabel,
+				)
+
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
 				}
@@ -387,20 +390,17 @@ func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName stri
 	framework.ExpectNoError(err)
 
 	metrics := map[string]float64{}
-	for method, samples := range response {
-		if metricNames.Has(method) {
-			if len(samples) == 0 {
-				return nil, fmt.Errorf("metric %s has no samples", method)
-			}
-			lastSample := samples[len(samples)-1]
-			metrics[method] = float64(lastSample.Value)
+	for _, samples := range response {
+		if len(samples) == 0 {
+			continue
 		}
-	}
-
-	// Ensure all metrics were provided
-	for name := range metricNames {
-		if _, found := metrics[name]; !found {
-			return nil, fmt.Errorf("metric %s not found", name)
+		// Find the *last* sample that has the label we are interested in.
+		for i := len(samples) - 1; i >= 0; i-- {
+			metricNameWithLabels := samples[i].Metric.String()
+			if metricNames.Has(metricNameWithLabels) {
+				metrics[metricNameWithLabels] = float64(samples[i].Value)
+				break
+			}
 		}
 	}
 
@@ -421,11 +421,23 @@ func waitForMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber, nod
 		noIncreaseMetrics = sets.NewString()
 		// Always evaluate all SELinux metrics to check that the other metrics are not unexpectedly increased.
 		for name := range allMetricNames {
-			if expectedIncreaseNames.Has(name) {
+			expectIncrease := false
+
+			// allMetricNames can include "{volume_plugin="XXX"}", while expectedIncreaseNames does not.
+			// Compare them properly. Value of volume_plugin="XXX" was already checked in grabMetrics(),
+			// we can ignore it here.
+			for expectedIncreaseMetricName := range expectedIncreaseNames {
+				if strings.HasPrefix(name, expectedIncreaseMetricName) {
+					expectIncrease = true
+					break
+				}
+			}
+			if expectIncrease {
 				if metrics[name] <= initialValues[name] {
 					noIncreaseMetrics.Insert(name)
 				}
 			} else {
+				// Expect the metric to be stable
 				if initialValues[name] != metrics[name] {
 					return false, fmt.Errorf("metric %s unexpectedly increased to %v", name, metrics[name])
 				}

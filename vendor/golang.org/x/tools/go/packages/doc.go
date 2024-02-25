@@ -5,12 +5,32 @@
 /*
 Package packages loads Go packages for inspection and analysis.
 
-The Load function takes as input a list of patterns and return a list of Package
-structs describing individual packages matched by those patterns.
-The LoadMode controls the amount of detail in the loaded packages.
+The [Load] function takes as input a list of patterns and returns a
+list of [Package] values describing individual packages matched by those
+patterns.
+A [Config] specifies configuration options, the most important of which is
+the [LoadMode], which controls the amount of detail in the loaded packages.
 
-Load passes most patterns directly to the underlying build tool,
-but all patterns with the prefix "query=", where query is a
+Load passes most patterns directly to the underlying build tool.
+The default build tool is the go command.
+Its supported patterns are described at
+https://pkg.go.dev/cmd/go#hdr-Package_lists_and_patterns.
+
+Load may be used in Go projects that use alternative build systems, by
+installing an appropriate "driver" program for the build system and
+specifying its location in the GOPACKAGESDRIVER environment variable.
+For example,
+https://github.com/bazelbuild/rules_go/wiki/Editor-and-tool-integration
+explains how to use the driver for Bazel.
+The driver program is responsible for interpreting patterns in its
+preferred notation and reporting information about the packages that
+they identify.
+(See driverRequest and driverResponse types for the JSON
+schema used by the protocol.
+Though the protocol is supported, these types are currently unexported;
+see #64608 for a proposal to publish them.)
+
+Regardless of driver, all patterns with the prefix "query=", where query is a
 non-empty string of letters from [a-z], are reserved and may be
 interpreted as query operators.
 
@@ -35,7 +55,7 @@ The Package struct provides basic information about the package, including
   - Imports, a map from source import strings to the Packages they name;
   - Types, the type information for the package's exported symbols;
   - Syntax, the parsed syntax trees for the package's source code; and
-  - TypeInfo, the result of a complete type-check of the package syntax trees.
+  - TypesInfo, the result of a complete type-check of the package syntax trees.
 
 (See the documentation for type Package for the complete list of fields
 and more detailed descriptions.)
@@ -64,7 +84,7 @@ reported about the loaded packages. See the documentation for type LoadMode
 for details.
 
 Most tools should pass their command-line arguments (after any flags)
-uninterpreted to the loader, so that the loader can interpret them
+uninterpreted to [Load], so that it can interpret them
 according to the conventions of the underlying build system.
 See the Example function for typical usage.
 */

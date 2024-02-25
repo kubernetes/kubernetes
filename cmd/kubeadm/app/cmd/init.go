@@ -118,7 +118,11 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 				return err
 			}
 
-			data := c.(*initData)
+			data, ok := c.(*initData)
+			if !ok {
+				return errors.New("invalid data struct")
+			}
+
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
 			return initRunner.Run(args)
@@ -518,7 +522,10 @@ func (d *initData) Client() (clientset.Interface, error) {
 				return nil, err
 			}
 		} else { // Use a real client
-			if !d.adminKubeConfigBootstrapped {
+			isDefaultKubeConfigPath := d.KubeConfigPath() == kubeadmconstants.GetAdminKubeConfigPath()
+			// Only bootstrap the admin.conf if it's used by the user (i.e. --kubeconfig has its default value)
+			// and if the bootstrapping was not already done
+			if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
 				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
 				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil)
 				if err != nil {
@@ -526,8 +533,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 				}
 				d.adminKubeConfigBootstrapped = true
 			} else {
-				// In case adminKubeConfigBootstrapped is already set just return a client from the default
-				// kubeconfig location.
+				// Alternatively, just load the config pointed at the --kubeconfig path
 				d.client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
 				if err != nil {
 					return nil, err

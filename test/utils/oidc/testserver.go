@@ -18,6 +18,7 @@ package oidc
 
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/tls"
 	"encoding/hex"
@@ -170,17 +171,21 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath string) *TestServer {
 	return oidcServer
 }
 
+type JosePrivateKey interface {
+	*rsa.PrivateKey | *ecdsa.PrivateKey
+}
+
 // TokenHandlerBehaviorReturningPredefinedJWT describes the scenario when signed JWT token is being created.
 // This behavior should being applied to the MockTokenHandler.
-func TokenHandlerBehaviorReturningPredefinedJWT(
+func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
 	t *testing.T,
-	rsaPrivateKey *rsa.PrivateKey,
+	privateKey K,
 	claims map[string]interface{}, accessToken, refreshToken string,
 ) func() (Token, error) {
 	t.Helper()
 
 	return func() (Token, error) {
-		signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: rsaPrivateKey}, nil)
+		signer, err := jose.NewSigner(jose.SigningKey{Algorithm: GetSignatureAlgorithm(privateKey), Key: privateKey}, nil)
 		require.NoError(t, err)
 
 		payloadJSON, err := json.Marshal(claims)
@@ -199,13 +204,17 @@ func TokenHandlerBehaviorReturningPredefinedJWT(
 	}
 }
 
+type JosePublicKey interface {
+	*rsa.PublicKey | *ecdsa.PublicKey
+}
+
 // DefaultJwksHandlerBehavior describes the scenario when JSON Web Key Set token is being returned.
 // This behavior should being applied to the MockJWKsHandler.
-func DefaultJwksHandlerBehavior(t *testing.T, verificationPublicKey *rsa.PublicKey) func() jose.JSONWebKeySet {
+func DefaultJwksHandlerBehavior[K JosePublicKey](t *testing.T, verificationPublicKey K) func() jose.JSONWebKeySet {
 	t.Helper()
 
 	return func() jose.JSONWebKeySet {
-		key := jose.JSONWebKey{Key: verificationPublicKey, Use: "sig", Algorithm: string(jose.RS256)}
+		key := jose.JSONWebKey{Key: verificationPublicKey, Use: "sig", Algorithm: string(GetSignatureAlgorithm(verificationPublicKey))}
 
 		thumbprint, err := key.Thumbprint(crypto.SHA256)
 		require.NoError(t, err)
@@ -214,5 +223,18 @@ func DefaultJwksHandlerBehavior(t *testing.T, verificationPublicKey *rsa.PublicK
 		return jose.JSONWebKeySet{
 			Keys: []jose.JSONWebKey{key},
 		}
+	}
+}
+
+type JoseKey interface{ JosePrivateKey | JosePublicKey }
+
+func GetSignatureAlgorithm[K JoseKey](key K) jose.SignatureAlgorithm {
+	switch any(key).(type) {
+	case *rsa.PrivateKey, *rsa.PublicKey:
+		return jose.RS256
+	case *ecdsa.PrivateKey, *ecdsa.PublicKey:
+		return jose.ES256
+	default:
+		panic("unknown key type") // should be impossible
 	}
 }

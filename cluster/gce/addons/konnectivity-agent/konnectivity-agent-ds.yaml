@@ -27,7 +27,7 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       containers:
-        - image: registry.k8s.io/kas-network-proxy/proxy-agent:v0.28.0
+        - image: registry.k8s.io/kas-network-proxy/proxy-agent:v0.29.0
           name: konnectivity-agent
           command: ["/proxy-agent"]
           args: [

@@ -180,6 +180,7 @@ func AddHandlers(h printers.PrintHandler) {
 	cronJobColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Schedule", Type: "string", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["schedule"]},
+		{Name: "Timezone", Type: "string", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["timeZone"]},
 		{Name: "Suspend", Type: "boolean", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["suspend"]},
 		{Name: "Active", Type: "integer", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["active"]},
 		{Name: "Last Schedule", Type: "string", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["lastScheduleTime"]},
@@ -835,7 +836,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		reason = pod.Status.Reason
 	}
 
-	// If the Pod carries {type:PodScheduled, reason:WaitingForGates}, set reason to 'SchedulingGated'.
+	// If the Pod carries {type:PodScheduled, reason:SchedulingGated}, set reason to 'SchedulingGated'.
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == api.PodScheduled && condition.Reason == apiv1.PodReasonSchedulingGated {
 			reason = apiv1.PodReasonSchedulingGated
@@ -1185,7 +1186,12 @@ func printCronJob(obj *batch.CronJob, options printers.GenerateOptions) ([]metav
 		lastScheduleTime = translateTimestampSince(*obj.Status.LastScheduleTime)
 	}
 
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestampSince(obj.CreationTimestamp))
+	timeZone := "<none>"
+	if obj.Spec.TimeZone != nil {
+		timeZone = *obj.Spec.TimeZone
+	}
+
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, timeZone, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector))
@@ -2301,7 +2307,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				if len(statuses) > i && statuses[i].Resource != nil {
 					current = statuses[i].Resource.Current.AverageValue.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, spec.Resource.Target.AverageValue.String()))
+				list = append(list, fmt.Sprintf("%s: %s/%s", spec.Resource.Name.String(), current, spec.Resource.Target.AverageValue.String()))
 			} else {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].Resource != nil && statuses[i].Resource.Current.AverageUtilization != nil {
@@ -2312,7 +2318,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				if spec.Resource.Target.AverageUtilization != nil {
 					target = fmt.Sprintf("%d%%", *spec.Resource.Target.AverageUtilization)
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, target))
+				list = append(list, fmt.Sprintf("%s: %s/%s", spec.Resource.Name.String(), current, target))
 			}
 		case autoscaling.ContainerResourceMetricSourceType:
 			if spec.ContainerResource.Target.AverageValue != nil {
@@ -2320,7 +2326,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				if len(statuses) > i && statuses[i].ContainerResource != nil {
 					current = statuses[i].ContainerResource.Current.AverageValue.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, spec.ContainerResource.Target.AverageValue.String()))
+				list = append(list, fmt.Sprintf("%s: %s/%s", spec.ContainerResource.Name.String(), current, spec.ContainerResource.Target.AverageValue.String()))
 			} else {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].ContainerResource != nil && statuses[i].ContainerResource.Current.AverageUtilization != nil {
@@ -2331,7 +2337,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				if spec.ContainerResource.Target.AverageUtilization != nil {
 					target = fmt.Sprintf("%d%%", *spec.ContainerResource.Target.AverageUtilization)
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, target))
+				list = append(list, fmt.Sprintf("%s: %s/%s", spec.ContainerResource.Name.String(), current, target))
 			}
 		default:
 			list = append(list, "<unknown type>")

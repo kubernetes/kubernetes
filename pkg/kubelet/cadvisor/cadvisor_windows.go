@@ -20,7 +20,6 @@ limitations under the License.
 package cadvisor
 
 import (
-	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
@@ -46,24 +45,12 @@ func (cu *cadvisorClient) Start() error {
 	return nil
 }
 
-func (cu *cadvisorClient) DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error) {
-	return cadvisorapi.ContainerInfo{}, nil
-}
-
-func (cu *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-	return &cadvisorapi.ContainerInfo{}, nil
-}
-
 // ContainerInfoV2 is only expected to be used for the root container. Returns info for all containers in the node.
 func (cu *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return cu.winStatsClient.WinContainerInfos()
 }
 
 func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
-	return nil, nil
-}
-
-func (cu *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return nil, nil
 }
 
@@ -85,10 +72,6 @@ func (cu *cadvisorClient) ContainerFsInfo() (cadvisorapiv2.FsInfo, error) {
 
 func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cu.GetDirFsInfo(cu.rootPath)
-}
-
-func (cu *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
-	return &events.EventChannel{}, nil
 }
 
 func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {

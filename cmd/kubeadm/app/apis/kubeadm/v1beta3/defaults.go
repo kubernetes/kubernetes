@@ -107,7 +107,7 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 func SetDefaults_APIServer(obj *APIServer) {
 	if obj.TimeoutForControlPlane == nil {
 		obj.TimeoutForControlPlane = &metav1.Duration{
-			Duration: constants.DefaultControlPlaneTimeout,
+			Duration: constants.ControlPlaneComponentHealthCheckTimeout,
 		}
 	}
 }

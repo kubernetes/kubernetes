@@ -53,6 +53,7 @@ func (*FakeProxier) OnEndpointSliceAdd(slice *discoveryv1.EndpointSlice)        
 func (*FakeProxier) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointSlice) {}
 func (*FakeProxier) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice)           {}
 func (*FakeProxier) OnEndpointSlicesSynced()                                          {}
+func (*FakeProxier) OnServiceCIDRsChanged(_ []string)                                 {}
 
 func NewHollowProxy(
 	nodeName string,

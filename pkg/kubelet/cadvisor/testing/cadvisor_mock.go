@@ -24,7 +24,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	events "github.com/google/cadvisor/events"
 	v1 "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
 )
@@ -67,21 +66,6 @@ func (mr *MockInterfaceMockRecorder) ContainerFsInfo() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerFsInfo", reflect.TypeOf((*MockInterface)(nil).ContainerFsInfo))
 }
 
-// ContainerInfo mocks base method.
-func (m *MockInterface) ContainerInfo(name string, req *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ContainerInfo", name, req)
-	ret0, _ := ret[0].(*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ContainerInfo indicates an expected call of ContainerInfo.
-func (mr *MockInterfaceMockRecorder) ContainerInfo(name, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerInfo", reflect.TypeOf((*MockInterface)(nil).ContainerInfo), name, req)
-}
-
 // ContainerInfoV2 mocks base method.
 func (m *MockInterface) ContainerInfoV2(name string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
 	m.ctrl.T.Helper()
@@ -95,21 +79,6 @@ func (m *MockInterface) ContainerInfoV2(name string, options v2.RequestOptions) 
 func (mr *MockInterfaceMockRecorder) ContainerInfoV2(name, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerInfoV2", reflect.TypeOf((*MockInterface)(nil).ContainerInfoV2), name, options)
-}
-
-// DockerContainer mocks base method.
-func (m *MockInterface) DockerContainer(name string, req *v1.ContainerInfoRequest) (v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DockerContainer", name, req)
-	ret0, _ := ret[0].(v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DockerContainer indicates an expected call of DockerContainer.
-func (mr *MockInterfaceMockRecorder) DockerContainer(name, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DockerContainer", reflect.TypeOf((*MockInterface)(nil).DockerContainer), name, req)
 }
 
 // GetDirFsInfo mocks base method.
@@ -201,21 +170,6 @@ func (mr *MockInterfaceMockRecorder) Start() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockInterface)(nil).Start))
 }
 
-// SubcontainerInfo mocks base method.
-func (m *MockInterface) SubcontainerInfo(name string, req *v1.ContainerInfoRequest) (map[string]*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubcontainerInfo", name, req)
-	ret0, _ := ret[0].(map[string]*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SubcontainerInfo indicates an expected call of SubcontainerInfo.
-func (mr *MockInterfaceMockRecorder) SubcontainerInfo(name, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubcontainerInfo", reflect.TypeOf((*MockInterface)(nil).SubcontainerInfo), name, req)
-}
-
 // VersionInfo mocks base method.
 func (m *MockInterface) VersionInfo() (*v1.VersionInfo, error) {
 	m.ctrl.T.Helper()
@@ -229,21 +183,6 @@ func (m *MockInterface) VersionInfo() (*v1.VersionInfo, error) {
 func (mr *MockInterfaceMockRecorder) VersionInfo() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VersionInfo", reflect.TypeOf((*MockInterface)(nil).VersionInfo))
-}
-
-// WatchEvents mocks base method.
-func (m *MockInterface) WatchEvents(request *events.Request) (*events.EventChannel, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WatchEvents", request)
-	ret0, _ := ret[0].(*events.EventChannel)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// WatchEvents indicates an expected call of WatchEvents.
-func (mr *MockInterfaceMockRecorder) WatchEvents(request interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchEvents", reflect.TypeOf((*MockInterface)(nil).WatchEvents), request)
 }
 
 // MockImageFsInfoProvider is a mock of ImageFsInfoProvider interface.

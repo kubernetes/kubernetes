@@ -290,19 +290,19 @@ func TestPodSecrets(t *testing.T) {
 									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef"}}}}}}}},
 		},
 	}
-	extractedNames := sets.NewString()
+	extractedNames := sets.New[string]()
 	VisitPodSecretNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
 	}, AllContainers)
 
 	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
-	excludedSecretPaths := sets.NewString(
+	excludedSecretPaths := sets.New[string](
 		"Spec.Volumes[*].VolumeSource.CephFS.SecretFile",
 	)
 	// expectedSecretPaths holds struct paths to fields with "secret" in the name that are references to secret API objects.
 	// every path here should be represented as an example in the Pod stub above, with the secret name set to the path.
-	expectedSecretPaths := sets.NewString(
+	expectedSecretPaths := sets.New[string](
 		"Spec.Containers[*].EnvFrom[*].SecretRef",
 		"Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef",
 		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef",
@@ -326,20 +326,20 @@ func TestPodSecrets(t *testing.T) {
 	secretPaths := collectResourcePaths(t, "secret", nil, "", reflect.TypeOf(&api.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
 	if missingPaths := expectedSecretPaths.Difference(secretPaths); len(missingPaths) > 0 {
-		t.Logf("Missing expected secret paths:\n%s", strings.Join(missingPaths.List(), "\n"))
+		t.Logf("Missing expected secret paths:\n%s", strings.Join(sets.List[string](missingPaths), "\n"))
 		t.Error("Missing expected secret paths. Verify VisitPodSecretNames() is correctly finding the missing paths, then correct expectedSecretPaths")
 	}
 	if extraPaths := secretPaths.Difference(expectedSecretPaths); len(extraPaths) > 0 {
-		t.Logf("Extra secret paths:\n%s", strings.Join(extraPaths.List(), "\n"))
+		t.Logf("Extra secret paths:\n%s", strings.Join(sets.List[string](extraPaths), "\n"))
 		t.Error("Extra fields with 'secret' in the name found. Verify VisitPodSecretNames() is including these fields if appropriate, then correct expectedSecretPaths")
 	}
 
 	if missingNames := expectedSecretPaths.Difference(extractedNames); len(missingNames) > 0 {
-		t.Logf("Missing expected secret names:\n%s", strings.Join(missingNames.List(), "\n"))
+		t.Logf("Missing expected secret names:\n%s", strings.Join(sets.List[string](missingNames), "\n"))
 		t.Error("Missing expected secret names. Verify the pod stub above includes these references, then verify VisitPodSecretNames() is correctly finding the missing names")
 	}
 	if extraNames := extractedNames.Difference(expectedSecretPaths); len(extraNames) > 0 {
-		t.Logf("Extra secret names:\n%s", strings.Join(extraNames.List(), "\n"))
+		t.Logf("Extra secret names:\n%s", strings.Join(sets.List[string](extraNames), "\n"))
 		t.Error("Extra secret names extracted. Verify VisitPodSecretNames() is correctly extracting secret names")
 	}
 
@@ -360,12 +360,12 @@ func TestPodSecrets(t *testing.T) {
 }
 
 // collectResourcePaths traverses the object, computing all the struct paths that lead to fields with resourcename in the name.
-func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, name string, tp reflect.Type) sets.String {
+func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, name string, tp reflect.Type) sets.Set[string] {
 	resourcename = strings.ToLower(resourcename)
-	resourcePaths := sets.NewString()
+	resourcePaths := sets.New[string]()
 
 	if tp.Kind() == reflect.Pointer {
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
+		resourcePaths.Insert(sets.List[string](collectResourcePaths(t, resourcename, path, name, tp.Elem()))...)
 		return resourcePaths
 	}
 
@@ -375,7 +375,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 
 	switch tp.Kind() {
 	case reflect.Pointer:
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
+		resourcePaths.Insert(sets.List[string](collectResourcePaths(t, resourcename, path, name, tp.Elem()))...)
 	case reflect.Struct:
 		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;
 		// it contains cycles so it's easiest to just skip it.
@@ -384,14 +384,14 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
-			resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type).List()...)
+			resourcePaths.Insert(sets.List[string](collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type))...)
 		}
 	case reflect.Interface:
 		t.Errorf("cannot find %s fields in interface{} field %s", resourcename, path.String())
 	case reflect.Map:
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).List()...)
+		resourcePaths.Insert(sets.List[string](collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()))...)
 	case reflect.Slice:
-		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).List()...)
+		resourcePaths.Insert(sets.List[string](collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()))...)
 	default:
 		// all primitive types
 	}
@@ -448,7 +448,7 @@ func TestPodConfigmaps(t *testing.T) {
 							Name: "Spec.Volumes[*].VolumeSource.ConfigMap"}}}}},
 		},
 	}
-	extractedNames := sets.NewString()
+	extractedNames := sets.New[string]()
 	VisitPodConfigmapNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
@@ -456,7 +456,7 @@ func TestPodConfigmaps(t *testing.T) {
 
 	// expectedPaths holds struct paths to fields with "ConfigMap" in the name that are references to ConfigMap API objects.
 	// every path here should be represented as an example in the Pod stub above, with the ConfigMap name set to the path.
-	expectedPaths := sets.NewString(
+	expectedPaths := sets.New[string](
 		"Spec.Containers[*].EnvFrom[*].ConfigMapRef",
 		"Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef",
 		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef",
@@ -468,20 +468,20 @@ func TestPodConfigmaps(t *testing.T) {
 	)
 	collectPaths := collectResourcePaths(t, "ConfigMap", nil, "", reflect.TypeOf(&api.Pod{}))
 	if missingPaths := expectedPaths.Difference(collectPaths); len(missingPaths) > 0 {
-		t.Logf("Missing expected paths:\n%s", strings.Join(missingPaths.List(), "\n"))
+		t.Logf("Missing expected paths:\n%s", strings.Join(sets.List[string](missingPaths), "\n"))
 		t.Error("Missing expected paths. Verify VisitPodConfigmapNames() is correctly finding the missing paths, then correct expectedPaths")
 	}
 	if extraPaths := collectPaths.Difference(expectedPaths); len(extraPaths) > 0 {
-		t.Logf("Extra paths:\n%s", strings.Join(extraPaths.List(), "\n"))
+		t.Logf("Extra paths:\n%s", strings.Join(sets.List[string](extraPaths), "\n"))
 		t.Error("Extra fields with resource in the name found. Verify VisitPodConfigmapNames() is including these fields if appropriate, then correct expectedPaths")
 	}
 
 	if missingNames := expectedPaths.Difference(extractedNames); len(missingNames) > 0 {
-		t.Logf("Missing expected names:\n%s", strings.Join(missingNames.List(), "\n"))
+		t.Logf("Missing expected names:\n%s", strings.Join(sets.List[string](missingNames), "\n"))
 		t.Error("Missing expected names. Verify the pod stub above includes these references, then verify VisitPodConfigmapNames() is correctly finding the missing names")
 	}
 	if extraNames := extractedNames.Difference(expectedPaths); len(extraNames) > 0 {
-		t.Logf("Extra names:\n%s", strings.Join(extraNames.List(), "\n"))
+		t.Logf("Extra names:\n%s", strings.Join(sets.List[string](extraNames), "\n"))
 		t.Error("Extra names extracted. Verify VisitPodConfigmapNames() is correctly extracting resource names")
 	}
 
@@ -2744,6 +2744,88 @@ func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	}
 }
 
+func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "Create",
+			wantOption: false,
+		},
+		{
+			name: "UpdateInvalidProjectedTokenPath",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "../foo",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "UpdateValidProjectedTokenPath",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "foo",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+		{
+			name: "UpdateEmptyProjectedTokenPath",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: nil,
+							HostPath:  &api.HostPathVolumeSource{Path: "foo"},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Pod meta doesn't impact the outcome.
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowNonLocalProjectedTokenPath {
+				t.Errorf("Got AllowNonLocalProjectedTokenPath=%t, want %t", gotOptions.AllowNonLocalProjectedTokenPath, tc.wantOption)
+			}
+		})
+	}
+}
+
 func TestDropInPlacePodVerticalScaling(t *testing.T) {
 	podWithInPlaceVerticalScaling := func() *api.Pod {
 		return &api.Pod{
@@ -3386,6 +3468,239 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 			dropDisabledClusterTrustBundleProjection(tc.newPod, tc.oldPod)
 			if diff := cmp.Diff(tc.newPod, tc.wantPod); diff != "" {
 				t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDropPodLifecycleSleepAction(t *testing.T) {
+	makeSleepHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			Sleep: &api.SleepAction{Seconds: 1},
+		}
+	}
+
+	makeExecHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			Exec: &api.ExecAction{Command: []string{"foo"}},
+		}
+	}
+
+	makeHTTPGetHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			HTTPGet: &api.HTTPGetAction{Host: "foo"},
+		}
+	}
+
+	makeContainer := func(preStop, postStart *api.LifecycleHandler) api.Container {
+		container := api.Container{Name: "foo"}
+		if preStop != nil || postStart != nil {
+			container.Lifecycle = &api.Lifecycle{
+				PostStart: postStart,
+				PreStop:   preStop,
+			}
+		}
+		return container
+	}
+
+	makeEphemeralContainer := func(preStop, postStart *api.LifecycleHandler) api.EphemeralContainer {
+		container := api.EphemeralContainer{
+			EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "foo"},
+		}
+		if preStop != nil || postStart != nil {
+			container.Lifecycle = &api.Lifecycle{
+				PostStart: postStart,
+				PreStop:   preStop,
+			}
+		}
+		return container
+	}
+
+	makePod := func(containers []api.Container, initContainers []api.Container, ephemeralContainers []api.EphemeralContainer) *api.PodSpec {
+		return &api.PodSpec{
+			Containers:          containers,
+			InitContainers:      initContainers,
+			EphemeralContainers: ephemeralContainers,
+		}
+	}
+
+	testCases := []struct {
+		gateEnabled            bool
+		oldLifecycleHandler    *api.LifecycleHandler
+		newLifecycleHandler    *api.LifecycleHandler
+		expectLifecycleHandler *api.LifecycleHandler
+	}{
+		// nil -> nil
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    nil,
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    nil,
+			expectLifecycleHandler: nil,
+		},
+		// nil -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// nil -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		// exec -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// exec -> http
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeHTTPGetHandler(),
+			expectLifecycleHandler: makeHTTPGetHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeHTTPGetHandler(),
+			expectLifecycleHandler: makeHTTPGetHandler(),
+		},
+		// exec -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		// sleep -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// sleep -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)()
+
+			// preStop
+			// container
+			{
+				oldPod := makePod([]api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				newPod := makePod([]api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				expectPod := makePod([]api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// InitContainer
+			{
+				oldPod := makePod(nil, []api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil)
+				newPod := makePod(nil, []api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil)
+				expectPod := makePod(nil, []api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// EphemeralContainer
+			{
+				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.oldLifecycleHandler.DeepCopy(), nil)})
+				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.newLifecycleHandler.DeepCopy(), nil)})
+				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.expectLifecycleHandler.DeepCopy(), nil)})
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// postStart
+			// container
+			{
+				oldPod := makePod([]api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil, nil)
+				newPod := makePod([]api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil, nil)
+				expectPod := makePod([]api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// InitContainer
+			{
+				oldPod := makePod(nil, []api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil)
+				newPod := makePod(nil, []api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil)
+				expectPod := makePod(nil, []api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// EphemeralContainer
+			{
+				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.oldLifecycleHandler.DeepCopy())})
+				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.newLifecycleHandler.DeepCopy())})
+				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.expectLifecycleHandler.DeepCopy())})
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
 			}
 		})
 	}

@@ -2549,7 +2549,6 @@ type responseWriterState struct {
 	wroteHeader   bool        // WriteHeader called (explicitly or implicitly). Not necessarily sent to user yet.
 	sentHeader    bool        // have we sent the header frame?
 	handlerDone   bool        // handler has finished
-	dirty         bool        // a Write failed; don't reuse this responseWriterState
 
 	sentContentLen int64 // non-zero if handler set a Content-Length header
 	wroteBytes     int64
@@ -2669,7 +2668,6 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 			date:          date,
 		})
 		if err != nil {
-			rws.dirty = true
 			return 0, err
 		}
 		if endStream {
@@ -2690,7 +2688,6 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 	if len(p) > 0 || endStream {
 		// only send a 0 byte DATA frame if we're ending the stream.
 		if err := rws.conn.writeDataFromHandler(rws.stream, p, endStream); err != nil {
-			rws.dirty = true
 			return 0, err
 		}
 	}
@@ -2702,9 +2699,6 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 			trailers:  rws.trailers,
 			endStream: true,
 		})
-		if err != nil {
-			rws.dirty = true
-		}
 		return len(p), err
 	}
 	return len(p), nil
@@ -2920,14 +2914,12 @@ func (rws *responseWriterState) writeHeader(code int) {
 			h.Del("Transfer-Encoding")
 		}
 
-		if rws.conn.writeHeaders(rws.stream, &writeResHeaders{
+		rws.conn.writeHeaders(rws.stream, &writeResHeaders{
 			streamID:    rws.stream.id,
 			httpResCode: code,
 			h:           h,
 			endStream:   rws.handlerDone && !rws.hasTrailers(),
-		}) != nil {
-			rws.dirty = true
-		}
+		})
 
 		return
 	}
@@ -2992,19 +2984,10 @@ func (w *responseWriter) write(lenData int, dataB []byte, dataS string) (n int, 
 
 func (w *responseWriter) handlerDone() {
 	rws := w.rws
-	dirty := rws.dirty
 	rws.handlerDone = true
 	w.Flush()
 	w.rws = nil
-	if !dirty {
-		// Only recycle the pool if all prior Write calls to
-		// the serverConn goroutine completed successfully. If
-		// they returned earlier due to resets from the peer
-		// there might still be write goroutines outstanding
-		// from the serverConn referencing the rws memory. See
-		// issue 20704.
-		responseWriterStatePool.Put(rws)
-	}
+	responseWriterStatePool.Put(rws)
 }
 
 // Push errors.
@@ -3187,6 +3170,7 @@ func (sc *serverConn) startPush(msg *startPushRequest) {
 			panic(fmt.Sprintf("newWriterAndRequestNoBody(%+v): %v", msg.url, err))
 		}
 
+		sc.curHandlers++
 		go sc.runHandler(rw, req, sc.handler.ServeHTTP)
 		return promisedID, nil
 	}

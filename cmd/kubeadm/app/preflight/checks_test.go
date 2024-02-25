@@ -866,9 +866,11 @@ func TestImagePullCheck(t *testing.T) {
 		},
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// Test case1: pull only img3
+			func() ([]byte, []byte, error) { return []byte("pause"), nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			// Test case 2: fail to pull image2 and image3
 			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
+			func() ([]byte, []byte, error) { return []byte("pause"), nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
@@ -903,6 +905,8 @@ func TestImagePullCheck(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
@@ -914,8 +918,10 @@ func TestImagePullCheck(t *testing.T) {
 
 	check := ImagePullCheck{
 		runtime:         containerRuntime,
+		sandboxImage:    "pause",
 		imageList:       []string{"img1", "img2", "img3"},
 		imagePullPolicy: corev1.PullIfNotPresent,
+		imagePullSerial: true,
 	}
 	warnings, errors := check.Check()
 	if len(warnings) != 0 {
@@ -936,8 +942,10 @@ func TestImagePullCheck(t *testing.T) {
 	// Test with unknown policy
 	check = ImagePullCheck{
 		runtime:         containerRuntime,
+		sandboxImage:    "pause",
 		imageList:       []string{"img1", "img2", "img3"},
 		imagePullPolicy: "",
+		imagePullSerial: true,
 	}
 	_, errors = check.Check()
 	if len(errors) != 1 {

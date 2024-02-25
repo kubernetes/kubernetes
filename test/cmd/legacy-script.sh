@@ -328,6 +328,17 @@ setup() {
   kube::log::status "Setup complete"
 }
 
+# Generate a random namespace name, based on the current time (to make
+# debugging slightly easier) and a random number. Don't use `date +%N`
+# because that doesn't work on OSX.
+create_and_use_new_namespace() {
+  local ns_name
+  ns_name="namespace-$(date +%s)-${RANDOM}"
+  kube::log::status "Creating namespace ${ns_name}"
+  kubectl create namespace "${ns_name}"
+  kubectl config set-context "${CONTEXT}" --namespace="${ns_name}"
+}
+
 # Runs all kubectl tests.
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
@@ -340,17 +351,6 @@ runTests() {
   fi
   kube::log::status "Checking kubectl version"
   kubectl version
-
-  # Generate a random namespace name, based on the current time (to make
-  # debugging slightly easier) and a random number. Don't use `date +%N`
-  # because that doesn't work on OSX.
-  create_and_use_new_namespace() {
-    local ns_name
-    ns_name="namespace-$(date +%s)-${RANDOM}"
-    kube::log::status "Creating namespace ${ns_name}"
-    kubectl create namespace "${ns_name}"
-    kubectl config set-context "${CONTEXT}" --namespace="${ns_name}"
-  }
 
   kube_flags=( '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--insecure-skip-tls-verify' )
 

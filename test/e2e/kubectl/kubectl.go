@@ -2218,13 +2218,21 @@ func startProxyServer(ns string) (int, *exec.Cmd, error) {
 	if err != nil {
 		return -1, nil, err
 	}
-	defer stdout.Close()
-	defer stderr.Close()
 	buf := make([]byte, 128)
 	var n int
 	if n, err = stdout.Read(buf); err != nil {
 		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %w", err)
 	}
+	go func() {
+		out, _ := io.ReadAll(stdout)
+		framework.Logf("kubectl proxy stdout: %s", string(buf[:n])+string(out))
+		stdout.Close()
+	}()
+	go func() {
+		err, _ := io.ReadAll(stderr)
+		framework.Logf("kubectl proxy stderr: %s", string(err))
+		stderr.Close()
+	}()
 	output := string(buf[:n])
 	match := proxyRegexp.FindStringSubmatch(output)
 	if len(match) == 2 {

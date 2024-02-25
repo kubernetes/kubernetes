@@ -461,3 +461,78 @@ func TestDetectCRISocketImpl(t *testing.T) {
 		})
 	}
 }
+
+func TestPullImagesInParallelImpl(t *testing.T) {
+	testError := errors.New("error")
+
+	tests := []struct {
+		name            string
+		images          []string
+		ifNotPresent    bool
+		imageExistsFunc func(string) (bool, error)
+		pullImageFunc   func(string) error
+		expectedErrors  int
+	}{
+		{
+			name:         "all images exist, no errors",
+			images:       []string{"foo", "bar", "baz"},
+			ifNotPresent: true,
+			imageExistsFunc: func(string) (bool, error) {
+				return true, nil
+			},
+			pullImageFunc:  nil,
+			expectedErrors: 0,
+		},
+		{
+			name:         "cannot check if one image exists due to error",
+			images:       []string{"foo", "bar", "baz"},
+			ifNotPresent: true,
+			imageExistsFunc: func(image string) (bool, error) {
+				if image == "baz" {
+					return false, testError
+				}
+				return true, nil
+			},
+			pullImageFunc:  nil,
+			expectedErrors: 1,
+		},
+		{
+			name:         "cannot pull two images",
+			images:       []string{"foo", "bar", "baz"},
+			ifNotPresent: true,
+			imageExistsFunc: func(string) (bool, error) {
+				return false, nil
+			},
+			pullImageFunc: func(image string) error {
+				if image == "foo" {
+					return nil
+				}
+				return testError
+			},
+			expectedErrors: 2,
+		},
+		{
+			name:         "pull all images",
+			images:       []string{"foo", "bar", "baz"},
+			ifNotPresent: true,
+			imageExistsFunc: func(string) (bool, error) {
+				return false, nil
+			},
+			pullImageFunc: func(string) error {
+				return nil
+			},
+			expectedErrors: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := pullImagesInParallelImpl(tc.images, tc.ifNotPresent,
+				tc.imageExistsFunc, tc.pullImageFunc)
+			if len(actual) != tc.expectedErrors {
+				t.Fatalf("expected non-nil errors: %v, got: %v, full list of errors: %v",
+					tc.expectedErrors, len(actual), actual)
+			}
+		})
+	}
+}

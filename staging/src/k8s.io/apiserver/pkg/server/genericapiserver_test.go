@@ -48,6 +48,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
@@ -681,4 +682,94 @@ func TestGracefulShutdown(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Errorf("Timed out waiting for response.")
 	}
+}
+
+func TestWarningWithRequestTimeout(t *testing.T) {
+	type result struct {
+		err        interface{}
+		stackTrace string
+	}
+	clientDoneCh, resultCh := make(chan struct{}), make(chan result, 1)
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// this will catch recoverable panic like 'Header called after Handler finished'.
+		// go runtime crashes the program if it detects a program-ending
+		// panic like 'concurrent map iteration and map write', so this
+		// panic can not be caught.
+		defer func() {
+			result := result{}
+			result.err = recover()
+			if result.err != nil {
+				// Same as stdlib http server code. Manually allocate stack
+				// trace buffer size to prevent excessively large logs
+				const size = 64 << 10
+				buf := make([]byte, size)
+				buf = buf[:goruntime.Stack(buf, false)]
+				result.stackTrace = string(buf)
+			}
+			resultCh <- result
+		}()
+
+		// add warnings while we're waiting for the request to timeout to catch read/write races
+	loop:
+		for {
+			select {
+			case <-r.Context().Done():
+				break loop
+			default:
+				warning.AddWarning(r.Context(), "a", "1")
+			}
+		}
+		// the request has just timed out, write to catch read/write races
+		warning.AddWarning(r.Context(), "agent", "text")
+
+		// give time for the timeout response to be written, then try to
+		// write a response header to catch the "Header after Handler finished" panic
+		<-clientDoneCh
+
+		warning.AddWarning(r.Context(), "agent", "text")
+	})
+	handler := newGenericAPIServerHandlerChain(t, "/test", testHandler)
+
+	server := httptest.NewUnstartedServer(handler)
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+
+	request, err := http.NewRequest("GET", server.URL+"/test?timeout=100ms", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	client := server.Client()
+	response, err := client.Do(request)
+	close(clientDoneCh)
+	if err != nil {
+		t.Errorf("expected server to return an HTTP response: %v", err)
+	}
+	if want := http.StatusGatewayTimeout; response == nil || response.StatusCode != want {
+		t.Errorf("expected server to return %d, but got: %v", want, response)
+	}
+
+	var resultGot result
+	select {
+	case resultGot = <-resultCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("the handler never returned a result")
+	}
+	if resultGot.err != nil {
+		t.Errorf("Expected no panic, but got: %v", resultGot.err)
+		t.Errorf("Stack Trace: %s", resultGot.stackTrace)
+	}
+}
+
+// builds a handler chain with the given user handler as used by GenericAPIServer.
+func newGenericAPIServerHandlerChain(t *testing.T, path string, handler http.Handler) http.Handler {
+	config, _ := setUp(t)
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	s.Handler.NonGoRestfulMux.Handle(path, handler)
+	return s.Handler
 }

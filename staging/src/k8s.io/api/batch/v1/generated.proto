@@ -361,7 +361,8 @@ message JobStatus {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time completionTime = 3;
 
-  // The number of pending and running pods.
+  // The number of pending and running pods which are not terminating (without
+  // a deletionTimestamp).
   // +optional
   optional int32 active = 4;
 

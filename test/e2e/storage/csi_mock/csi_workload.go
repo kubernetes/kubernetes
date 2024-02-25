@@ -34,41 +34,30 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 	ginkgo.Context("CSI workload information using mock driver", func() {
-		var (
-			podInfoTrue  = true
-			podInfoFalse = false
-		)
 		tests := []struct {
 			name                   string
-			podInfoOnMount         *bool
+			podInfoOnMount         bool
 			deployClusterRegistrar bool
 			expectPodInfo          bool
 			expectEphemeral        bool
 		}{
 			{
-				name:                   "should not be passed when podInfoOnMount=nil",
-				podInfoOnMount:         nil,
-				deployClusterRegistrar: true,
-				expectPodInfo:          false,
-				expectEphemeral:        false,
-			},
-			{
 				name:                   "should be passed when podInfoOnMount=true",
-				podInfoOnMount:         &podInfoTrue,
+				podInfoOnMount:         true,
 				deployClusterRegistrar: true,
 				expectPodInfo:          true,
 				expectEphemeral:        false,
 			},
 			{
 				name:                   "contain ephemeral=true when using inline volume",
-				podInfoOnMount:         &podInfoTrue,
+				podInfoOnMount:         true,
 				deployClusterRegistrar: true,
 				expectPodInfo:          true,
 				expectEphemeral:        true,
 			},
 			{
 				name:                   "should not be passed when podInfoOnMount=false",
-				podInfoOnMount:         &podInfoFalse,
+				podInfoOnMount:         false,
 				deployClusterRegistrar: true,
 				expectPodInfo:          false,
 				expectEphemeral:        false,
@@ -85,45 +74,31 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 			ginkgo.It(t.name, func(ctx context.Context) {
 				m.init(ctx, testParameters{
 					registerDriver: test.deployClusterRegistrar,
-					podInfo:        test.podInfoOnMount})
+					podInfo:        &test.podInfoOnMount})
 
 				ginkgo.DeferCleanup(m.cleanup)
 
-				waitUntilPodInfoInLog(ctx, m, test.expectPodInfo, test.expectEphemeral, 1)
+				waitUntilPodInfoInLog(ctx, m, test.expectPodInfo, test.expectEphemeral)
 
 			})
 		}
 	})
 
 	ginkgo.Context("CSI PodInfoOnMount Update", func() {
-		var (
-			podInfoTrue  = true
-			podInfoFalse = false
-		)
 		tests := []struct {
 			name              string
-			oldPodInfoOnMount *bool
-			newPodInfoOnMount *bool
+			oldPodInfoOnMount bool
+			newPodInfoOnMount bool
 		}{
 			{
 				name:              "should not be passed when update from true to false",
-				oldPodInfoOnMount: &podInfoTrue,
-				newPodInfoOnMount: &podInfoFalse,
-			},
-			{
-				name:              "should not be passed when update from true to nil",
-				oldPodInfoOnMount: &podInfoTrue,
-				newPodInfoOnMount: nil,
+				oldPodInfoOnMount: true,
+				newPodInfoOnMount: false,
 			},
 			{
 				name:              "should be passed when update from false to true",
-				oldPodInfoOnMount: &podInfoFalse,
-				newPodInfoOnMount: &podInfoTrue,
-			},
-			{
-				name:              "should be passed when update from nil to true",
-				oldPodInfoOnMount: nil,
-				newPodInfoOnMount: &podInfoTrue,
+				oldPodInfoOnMount: false,
+				newPodInfoOnMount: true,
 			},
 		}
 		for _, t := range tests {
@@ -131,21 +106,20 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 			ginkgo.It(t.name, func(ctx context.Context) {
 				m.init(ctx, testParameters{
 					registerDriver: true,
-					podInfo:        test.oldPodInfoOnMount})
+					podInfo:        &test.oldPodInfoOnMount})
 
 				ginkgo.DeferCleanup(m.cleanup)
 
-				waitUntilPodInfoInLog(ctx, m, test.oldPodInfoOnMount != nil && *test.oldPodInfoOnMount, false, 1)
-				m.update(utils.PatchCSIOptions{PodInfo: test.newPodInfoOnMount})
-				waitUntilPodInfoInLog(ctx, m, test.newPodInfoOnMount != nil && *test.newPodInfoOnMount, false, 2)
-
+				waitUntilPodInfoInLog(ctx, m, test.oldPodInfoOnMount, false)
+				m.update(utils.PatchCSIOptions{PodInfo: &test.newPodInfoOnMount})
+				waitUntilPodInfoInLog(ctx, m, test.newPodInfoOnMount, false)
 			})
 		}
 	})
 
 })
 
-func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInfo, expectEphemeral bool, expectedNumNodePublish int) {
+func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInfo, expectEphemeral bool) {
 	var err error
 
 	utils.WaitUntil(framework.Poll, framework.PodStartTimeout, func() bool {
@@ -176,7 +150,7 @@ func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInf
 			framework.ExpectNoError(err, "while deleting")
 
 			ginkgo.By("Checking CSI driver logs")
-			err = checkPodLogs(ctx, m.driver.GetCalls, pod, expectPodInfo, expectEphemeral, csiInlineVolumesEnabled, false, expectedNumNodePublish)
+			err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, expectPodInfo, expectEphemeral, csiInlineVolumesEnabled, false)
 			framework.ExpectNoError(err)
 		})
 

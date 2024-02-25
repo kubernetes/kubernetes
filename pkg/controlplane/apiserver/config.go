@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -148,7 +150,13 @@ func BuildGenericConfig(
 	}
 
 	var enablesRBAC bool
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, enablesRBAC, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, enablesRBAC, err = BuildAuthorizer(
+		wait.ContextForChannel(genericConfig.ShutdownInitiatedNotify()),
+		s,
+		genericConfig.EgressSelector,
+		genericConfig.APIServerID,
+		versionedInformers,
+	)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
@@ -170,7 +178,7 @@ func BuildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
-func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, egressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
+func BuildAuthorizer(ctx context.Context, s controlplaneapiserver.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
 	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	if err != nil {
 		return nil, nil, false, err
@@ -195,7 +203,7 @@ func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, egressSelector *e
 		}
 	}
 
-	authorizer, ruleResolver, err := authorizationConfig.New()
+	authorizer, ruleResolver, err := authorizationConfig.New(ctx, apiserverID)
 
 	return authorizer, ruleResolver, enablesRBAC, err
 }

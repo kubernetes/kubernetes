@@ -26,7 +26,7 @@ import (
 
 func TestLibraryCompatibility(t *testing.T) {
 	var libs []map[string][]cel.FunctionOpt
-	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls)
+	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls, ipLibraryDecls, cidrLibraryDecls)
 	functionNames := sets.New[string]()
 	for _, lib := range libs {
 		for name := range lib {
@@ -47,6 +47,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		"errored", "error",
 		// Kubernetes <1.29>:
 		"add", "asApproximateFloat", "asInteger", "compareTo", "isGreaterThan", "isInteger", "isLessThan", "isQuantity", "quantity", "sign", "sub",
+		// Kubernetes <1.30>:
+		"ip", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast", "ip.isCanonical", "isIP", "cidr", "containsIP", "containsCIDR", "masked", "prefixLength", "isCIDR", "string",
 		// Kubernetes <1.??>:
 	)
 

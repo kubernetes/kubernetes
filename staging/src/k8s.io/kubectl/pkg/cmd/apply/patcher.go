@@ -156,7 +156,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 		}
 	}
 
-	if patch == nil {
+	if patch == nil && p.OpenAPIGetter != nil {
 		if openAPISchema, err := p.OpenAPIGetter.OpenAPISchema(); err == nil && openAPISchema != nil {
 			// if openapischema is used, we'll try to get required patch type for this GVK from Open API.
 			// if it fails or could not find any patch type, fall back to baked-in patch type determination.

@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -55,7 +58,6 @@ const (
 	nodeStatusTimeout   = 10 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	podEvictTimeout     = 2 * time.Minute
-	minNodes            = 2
 )
 
 var _ = utils.SIGDescribe("Pod Disks", feature.StorageProvider, func() {

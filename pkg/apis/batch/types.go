@@ -437,7 +437,8 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time
 
-	// The number of pending and running pods.
+	// The number of pending and running pods which are not terminating (without
+	// a deletionTimestamp).
 	// +optional
 	Active int32
 

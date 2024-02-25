@@ -32,24 +32,41 @@ const (
 )
 
 var (
-	encryptionConfigAutomaticReloadFailureTotal = metrics.NewCounterVec(
+	encryptionConfigAutomaticReloadsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "automatic_reload_failures_total",
-			Help:           "Total number of failed automatic reloads of encryption configuration split by apiserver identity.",
+			Name:           "automatic_reloads_total",
+			Help:           "Total number of reload successes and failures of encryption configuration split by apiserver identity.",
 			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"status", "apiserver_id_hash"},
+	)
+
+	// deprecatedEncryptionConfigAutomaticReloadFailureTotal has been deprecated in 1.30.0
+	// use encryptionConfigAutomaticReloadsTotal instead
+	deprecatedEncryptionConfigAutomaticReloadFailureTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "automatic_reload_failures_total",
+			Help:              "Total number of failed automatic reloads of encryption configuration split by apiserver identity.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.30.0",
 		},
 		[]string{"apiserver_id_hash"},
 	)
 
-	encryptionConfigAutomaticReloadSuccessTotal = metrics.NewCounterVec(
+	// deprecatedEncryptionConfigAutomaticReloadSuccessTotal has been deprecated in 1.30.0
+	// use encryptionConfigAutomaticReloadsTotal instead
+	deprecatedEncryptionConfigAutomaticReloadSuccessTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "automatic_reload_success_total",
-			Help:           "Total number of successful automatic reloads of encryption configuration split by apiserver identity.",
-			StabilityLevel: metrics.ALPHA,
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "automatic_reload_success_total",
+			Help:              "Total number of successful automatic reloads of encryption configuration split by apiserver identity.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.30.0",
 		},
 		[]string{"apiserver_id_hash"},
 	)
@@ -76,21 +93,24 @@ func RegisterMetrics() {
 				return sha256.New()
 			},
 		}
-		legacyregistry.MustRegister(encryptionConfigAutomaticReloadFailureTotal)
-		legacyregistry.MustRegister(encryptionConfigAutomaticReloadSuccessTotal)
+		legacyregistry.MustRegister(encryptionConfigAutomaticReloadsTotal)
+		legacyregistry.MustRegister(deprecatedEncryptionConfigAutomaticReloadFailureTotal)
+		legacyregistry.MustRegister(deprecatedEncryptionConfigAutomaticReloadSuccessTotal)
 		legacyregistry.MustRegister(encryptionConfigAutomaticReloadLastTimestampSeconds)
 	})
 }
 
 func RecordEncryptionConfigAutomaticReloadFailure(apiServerID string) {
 	apiServerIDHash := getHash(apiServerID)
-	encryptionConfigAutomaticReloadFailureTotal.WithLabelValues(apiServerIDHash).Inc()
+	encryptionConfigAutomaticReloadsTotal.WithLabelValues("failure", apiServerIDHash).Inc()
+	deprecatedEncryptionConfigAutomaticReloadFailureTotal.WithLabelValues(apiServerIDHash).Inc()
 	recordEncryptionConfigAutomaticReloadTimestamp("failure", apiServerIDHash)
 }
 
 func RecordEncryptionConfigAutomaticReloadSuccess(apiServerID string) {
 	apiServerIDHash := getHash(apiServerID)
-	encryptionConfigAutomaticReloadSuccessTotal.WithLabelValues(apiServerIDHash).Inc()
+	encryptionConfigAutomaticReloadsTotal.WithLabelValues("success", apiServerIDHash).Inc()
+	deprecatedEncryptionConfigAutomaticReloadSuccessTotal.WithLabelValues(apiServerIDHash).Inc()
 	recordEncryptionConfigAutomaticReloadTimestamp("success", apiServerIDHash)
 }
 

@@ -384,6 +384,16 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.ContainerLogMaxWorkers != nil {
+		in, out := &in.ContainerLogMaxWorkers, &out.ContainerLogMaxWorkers
+		*out = new(int32)
+		**out = **in
+	}
+	if in.ContainerLogMonitorInterval != nil {
+		in, out := &in.ContainerLogMonitorInterval, &out.ContainerLogMonitorInterval
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved
 		*out = make(map[string]string, len(*in))

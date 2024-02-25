@@ -33,6 +33,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -42,7 +43,7 @@ import (
 
 // This test checks if node-problem-detector (NPD) runs fine without error on
 // the up to 10 nodes in the cluster. NPD's functionality is tested in e2e_node tests.
-var _ = SIGDescribe("NodeProblemDetector", func() {
+var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, func() {
 	const (
 		pollInterval      = 1 * time.Second
 		pollTimeout       = 1 * time.Minute

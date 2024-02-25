@@ -124,7 +124,7 @@ var (
 			// Start with 10ms with the last bucket being [~88m, Inf).
 			Buckets:           metrics.ExponentialBuckets(0.01, 2, 20),
 			StabilityLevel:    metrics.STABLE,
-			DeprecatedVersion: "1.28.0",
+			DeprecatedVersion: "1.29.0",
 		},
 		[]string{"attempts"})
 
@@ -209,7 +209,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "plugin_evaluation_total",
-			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter and Filter.).",
+			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"plugin", "extension_point", "profile"})
 

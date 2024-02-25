@@ -353,6 +353,24 @@ func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 	return false
 }
 
+// hasNonLocalProjectedTokenPath return true if spec.Volumes have any entry with non-local projected token path
+func hasNonLocalProjectedTokenPath(spec *api.PodSpec) bool {
+	for _, volume := range spec.Volumes {
+		if volume.Projected != nil {
+			for _, source := range volume.Projected.Sources {
+				if source.ServiceAccountToken == nil {
+					continue
+				}
+				errs := apivalidation.ValidateLocalNonReservedPath(source.ServiceAccountToken.Path, nil)
+				if len(errs) != 0 {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
@@ -366,6 +384,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
+		AllowNonLocalProjectedTokenPath:                   false,
 	}
 
 	if oldPodSpec != nil {
@@ -378,6 +397,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
 		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
+		// if old spec has an invalid projected token volume path, we must allow it
+		opts.AllowNonLocalProjectedTokenPath = hasNonLocalProjectedTokenPath(oldPodSpec)
 
 		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
 		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
@@ -573,39 +594,56 @@ func dropDisabledFields(
 		// For other types of containers, validateContainers will handle them.
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) && !podLifecycleSleepActionInUse(oldPodSpec) {
-		for i := range podSpec.Containers {
-			if podSpec.Containers[i].Lifecycle == nil {
-				continue
-			}
-			if podSpec.Containers[i].Lifecycle.PreStop != nil {
-				podSpec.Containers[i].Lifecycle.PreStop.Sleep = nil
-			}
-			if podSpec.Containers[i].Lifecycle.PostStart != nil {
-				podSpec.Containers[i].Lifecycle.PostStart.Sleep = nil
-			}
-		}
-		for i := range podSpec.InitContainers {
-			if podSpec.InitContainers[i].Lifecycle == nil {
-				continue
-			}
-			if podSpec.InitContainers[i].Lifecycle.PreStop != nil {
-				podSpec.InitContainers[i].Lifecycle.PreStop.Sleep = nil
-			}
-			if podSpec.InitContainers[i].Lifecycle.PostStart != nil {
-				podSpec.InitContainers[i].Lifecycle.PostStart.Sleep = nil
+	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
+}
+
+func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) || podLifecycleSleepActionInUse(oldPodSpec) {
+		return
+	}
+
+	adjustLifecycle := func(lifecycle *api.Lifecycle) {
+		if lifecycle.PreStop != nil && lifecycle.PreStop.Sleep != nil {
+			lifecycle.PreStop.Sleep = nil
+			if lifecycle.PreStop.Exec == nil && lifecycle.PreStop.HTTPGet == nil && lifecycle.PreStop.TCPSocket == nil {
+				lifecycle.PreStop = nil
 			}
 		}
-		for i := range podSpec.EphemeralContainers {
-			if podSpec.EphemeralContainers[i].Lifecycle == nil {
-				continue
+		if lifecycle.PostStart != nil && lifecycle.PostStart.Sleep != nil {
+			lifecycle.PostStart.Sleep = nil
+			if lifecycle.PostStart.Exec == nil && lifecycle.PostStart.HTTPGet == nil && lifecycle.PostStart.TCPSocket == nil {
+				lifecycle.PostStart = nil
 			}
-			if podSpec.EphemeralContainers[i].Lifecycle.PreStop != nil {
-				podSpec.EphemeralContainers[i].Lifecycle.PreStop.Sleep = nil
-			}
-			if podSpec.EphemeralContainers[i].Lifecycle.PostStart != nil {
-				podSpec.EphemeralContainers[i].Lifecycle.PostStart.Sleep = nil
-			}
+		}
+	}
+
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.Containers[i].Lifecycle)
+		if podSpec.Containers[i].Lifecycle.PreStop == nil && podSpec.Containers[i].Lifecycle.PostStart == nil {
+			podSpec.Containers[i].Lifecycle = nil
+		}
+	}
+
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.InitContainers[i].Lifecycle)
+		if podSpec.InitContainers[i].Lifecycle.PreStop == nil && podSpec.InitContainers[i].Lifecycle.PostStart == nil {
+			podSpec.InitContainers[i].Lifecycle = nil
+		}
+	}
+
+	for i := range podSpec.EphemeralContainers {
+		if podSpec.EphemeralContainers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.EphemeralContainers[i].Lifecycle)
+		if podSpec.EphemeralContainers[i].Lifecycle.PreStop == nil && podSpec.EphemeralContainers[i].Lifecycle.PostStart == nil {
+			podSpec.EphemeralContainers[i].Lifecycle = nil
 		}
 	}
 }

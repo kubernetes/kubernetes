@@ -50,19 +50,17 @@ func addOSValidator(validators []system.Validator, reporter *system.StreamReport
 	return validators
 }
 
-// addIPv6Checks adds IPv6 related bridgenf and forwarding checks
+// addIPv6Checks adds IPv6 related checks
 func addIPv6Checks(checks []Checker) []Checker {
 	checks = append(checks,
-		FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 		FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
 	)
 	return checks
 }
 
-// addIPv4Checks adds IPv4 related bridgenf and forwarding checks
+// addIPv4Checks adds IPv4 related checks
 func addIPv4Checks(checks []Checker) []Checker {
 	checks = append(checks,
-		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}})
 	return checks
 }

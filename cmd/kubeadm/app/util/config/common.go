@@ -250,8 +250,12 @@ func validateKnownGVKs(gvks []schema.GroupVersionKind) error {
 
 // MigrateOldConfig migrates an old configuration from a byte slice into a new one (returned again as a byte slice).
 // Only kubeadm kinds are migrated.
-func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) {
+func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrateMutators) ([]byte, error) {
 	newConfig := [][]byte{}
+
+	if mutators == nil {
+		mutators = defaultMigrateMutators()
+	}
 
 	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
 	if err != nil {
@@ -277,6 +281,9 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 		if err != nil {
 			return []byte{}, err
 		}
+		if err := mutators.mutate([]any{o}); err != nil {
+			return []byte{}, err
+		}
 		b, err := MarshalKubeadmConfigObject(o, gv)
 		if err != nil {
 			return []byte{}, err
@@ -290,6 +297,9 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 		if err != nil {
 			return []byte{}, err
 		}
+		if err := mutators.mutate([]any{o}); err != nil {
+			return []byte{}, err
+		}
 		b, err := MarshalKubeadmConfigObject(o, gv)
 		if err != nil {
 			return []byte{}, err
@@ -301,6 +311,9 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
 		o, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, false)
 		if err != nil {
+			return []byte{}, err
+		}
+		if err := mutators.mutate([]any{o}); err != nil {
 			return []byte{}, err
 		}
 		b, err := MarshalKubeadmConfigObject(o, gv)
@@ -369,4 +382,111 @@ func isKubeadmPrereleaseVersion(versionInfo *apimachineryversion.Info, k8sVersio
 		}
 	}
 	return false
+}
+
+// prepareStaticVariables takes a given config and stores values from it in variables
+// that can be used from multiple packages.
+func prepareStaticVariables(config any) {
+	switch c := config.(type) {
+	case *kubeadmapi.InitConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+	case *kubeadmapi.JoinConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+	case *kubeadmapi.ResetConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+	}
+}
+
+// migrateMutator can be used to mutate a slice of configuration objects.
+// The mutation is applied in-place and no copies are made.
+type migrateMutator struct {
+	in         []any
+	mutateFunc func(in []any) error
+}
+
+// migrateMutators holds a list of registered mutators.
+type migrateMutators []migrateMutator
+
+// mutate can be called on a list of registered mutators to find a suitable one to perform
+// a configuration object mutation.
+func (mutators migrateMutators) mutate(in []any) error {
+	var mutator *migrateMutator
+	for idx, m := range mutators {
+		if len(m.in) != len(in) {
+			continue
+		}
+		inputMatch := true
+		for idx := range m.in {
+			if reflect.TypeOf(m.in[idx]) != reflect.TypeOf(in[idx]) {
+				inputMatch = false
+				break
+			}
+		}
+		if inputMatch {
+			mutator = &mutators[idx]
+			break
+		}
+	}
+	if mutator == nil {
+		return errors.Errorf("could not find a mutator for input: %#v", in)
+	}
+	return mutator.mutateFunc(in)
+}
+
+// addEmpty adds an empty migrate mutator for a given input.
+func (mutators *migrateMutators) addEmpty(in []any) {
+	mutator := migrateMutator{
+		in:         in,
+		mutateFunc: func(in []any) error { return nil },
+	}
+	*mutators = append(*mutators, mutator)
+}
+
+// defaultMutators returns the default list of mutators for known configuration objects.
+// TODO: make this function return defaultEmptyMutators() when v1beta3 is removed.
+func defaultMigrateMutators() migrateMutators {
+	var (
+		mutators migrateMutators
+		mutator  migrateMutator
+	)
+
+	// mutator for InitConfiguration, ClusterConfiguration.
+	mutator = migrateMutator{
+		in: []any{(*kubeadmapi.InitConfiguration)(nil)},
+		mutateFunc: func(in []any) error {
+			a := in[0].(*kubeadmapi.InitConfiguration)
+			a.Timeouts.ControlPlaneComponentHealthCheck.Duration = a.APIServer.TimeoutForControlPlane.Duration
+			a.APIServer.TimeoutForControlPlane = nil
+			return nil
+		},
+	}
+	mutators = append(mutators, mutator)
+
+	// mutator for JoinConfiguration.
+	mutator = migrateMutator{
+		in: []any{(*kubeadmapi.JoinConfiguration)(nil)},
+		mutateFunc: func(in []any) error {
+			a := in[0].(*kubeadmapi.JoinConfiguration)
+			a.Timeouts.Discovery.Duration = a.Discovery.Timeout.Duration
+			a.Discovery.Timeout = nil
+			return nil
+		},
+	}
+	mutators = append(mutators, mutator)
+
+	// empty mutator for ResetConfiguration.
+	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
+
+	return mutators
+}
+
+// defaultEmptyMigrateMutators returns a list of empty mutators for known types.
+func defaultEmptyMigrateMutators() migrateMutators {
+	mutators := &migrateMutators{}
+
+	mutators.addEmpty([]any{(*kubeadmapi.InitConfiguration)(nil)})
+	mutators.addEmpty([]any{(*kubeadmapi.JoinConfiguration)(nil)})
+	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
+
+	return *mutators
 }

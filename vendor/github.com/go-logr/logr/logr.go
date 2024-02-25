@@ -207,10 +207,6 @@ limitations under the License.
 // those.
 package logr
 
-import (
-	"context"
-)
-
 // New returns a new Logger instance.  This is primarily used by libraries
 // implementing LogSink, rather than end users.  Passing a nil sink will create
 // a Logger which discards all log lines.
@@ -408,45 +404,6 @@ func (l Logger) WithCallStackHelper() (func(), Logger) {
 // IsZero returns true if this logger is an uninitialized zero value
 func (l Logger) IsZero() bool {
 	return l.sink == nil
-}
-
-// contextKey is how we find Loggers in a context.Context.
-type contextKey struct{}
-
-// FromContext returns a Logger from ctx or an error if no Logger is found.
-func FromContext(ctx context.Context) (Logger, error) {
-	if v, ok := ctx.Value(contextKey{}).(Logger); ok {
-		return v, nil
-	}
-
-	return Logger{}, notFoundError{}
-}
-
-// notFoundError exists to carry an IsNotFound method.
-type notFoundError struct{}
-
-func (notFoundError) Error() string {
-	return "no logr.Logger was present"
-}
-
-func (notFoundError) IsNotFound() bool {
-	return true
-}
-
-// FromContextOrDiscard returns a Logger from ctx.  If no Logger is found, this
-// returns a Logger that discards all log messages.
-func FromContextOrDiscard(ctx context.Context) Logger {
-	if v, ok := ctx.Value(contextKey{}).(Logger); ok {
-		return v
-	}
-
-	return Discard()
-}
-
-// NewContext returns a new Context, derived from ctx, which carries the
-// provided Logger.
-func NewContext(ctx context.Context, logger Logger) context.Context {
-	return context.WithValue(ctx, contextKey{}, logger)
 }
 
 // RuntimeInfo holds information that the logr "core" library knows which

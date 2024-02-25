@@ -44,128 +44,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEnsureNodeExistsByProviderID(t *testing.T) {
-
-	testCases := []struct {
-		testName           string
-		node               *v1.Node
-		expectedCalls      []string
-		expectedNodeExists bool
-		hasInstanceID      bool
-		existsByProviderID bool
-		nodeNameErr        error
-		providerIDErr      error
-	}{
-		{
-			testName:           "node exists by provider id",
-			existsByProviderID: true,
-			providerIDErr:      nil,
-			hasInstanceID:      true,
-			nodeNameErr:        errors.New("unimplemented"),
-			expectedCalls:      []string{"instance-exists-by-provider-id"},
-			expectedNodeExists: true,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node0",
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-				},
-			},
-		},
-		{
-			testName:           "does not exist by provider id",
-			existsByProviderID: false,
-			providerIDErr:      nil,
-			hasInstanceID:      true,
-			nodeNameErr:        errors.New("unimplemented"),
-			expectedCalls:      []string{"instance-exists-by-provider-id"},
-			expectedNodeExists: false,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node0",
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-				},
-			},
-		},
-		{
-			testName:           "exists by instance id",
-			existsByProviderID: true,
-			providerIDErr:      nil,
-			hasInstanceID:      true,
-			nodeNameErr:        nil,
-			expectedCalls:      []string{"instance-id", "instance-exists-by-provider-id"},
-			expectedNodeExists: true,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node0",
-				},
-			},
-		},
-		{
-			testName:           "does not exist by no instance id",
-			existsByProviderID: true,
-			providerIDErr:      nil,
-			hasInstanceID:      false,
-			nodeNameErr:        cloudprovider.InstanceNotFound,
-			expectedCalls:      []string{"instance-id"},
-			expectedNodeExists: false,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node0",
-				},
-			},
-		},
-		{
-			testName:           "provider id returns error",
-			existsByProviderID: false,
-			providerIDErr:      errors.New("unimplemented"),
-			hasInstanceID:      true,
-			nodeNameErr:        cloudprovider.InstanceNotFound,
-			expectedCalls:      []string{"instance-exists-by-provider-id"},
-			expectedNodeExists: false,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node0",
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-				},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.testName, func(t *testing.T) {
-			fc := &fakecloud.Cloud{
-				ExistsByProviderID: tc.existsByProviderID,
-				Err:                tc.nodeNameErr,
-				ErrByProviderID:    tc.providerIDErr,
-			}
-
-			if tc.hasInstanceID {
-				fc.ExtID = map[types.NodeName]string{
-					types.NodeName(tc.node.Name): "provider-id://a",
-				}
-			}
-
-			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderID(context.TODO(), instances, tc.node)
-			assert.Equal(t, err, tc.providerIDErr)
-
-			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
-				"expected cloud provider methods `%v` to be called but `%v` was called ",
-				tc.expectedCalls, fc.Calls)
-
-			assert.Equal(t, tc.expectedNodeExists, exists,
-				"expected exists to be `%t` but got `%t`",
-				tc.existsByProviderID, exists)
-		})
-	}
-}
-
 func Test_syncNode(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -1397,6 +1275,249 @@ func Test_syncNode(t *testing.T) {
 						},
 					},
 					ProviderID: "node0.aws.12345",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "[instanceV2] provided additional labels",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ExistsByProviderID: true,
+				Err:                nil,
+				Zone: cloudprovider.Zone{
+					FailureDomain: "us-west-1a",
+					Region:        "us-west",
+				},
+				AdditionalLabels: map[string]string{
+					"topology.k8s.cp/zone-id": "az1",
+					"my.custom.label/foo":     "bar",
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Annotations: map[string]string{
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "node0.cp.12345",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Annotations: map[string]string{
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
+					},
+					Labels: map[string]string{
+						"failure-domain.beta.kubernetes.io/region": "us-west",
+						"failure-domain.beta.kubernetes.io/zone":   "us-west-1a",
+						"topology.kubernetes.io/region":            "us-west",
+						"topology.kubernetes.io/zone":              "us-west-1a",
+						"topology.k8s.cp/zone-id":                  "az1",
+						"my.custom.label/foo":                      "bar",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "node0.cp.12345",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "[instanceV2] provided additional labels with labels to discard",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ExistsByProviderID: true,
+				Err:                nil,
+				Zone: cloudprovider.Zone{
+					FailureDomain: "us-west-1a",
+					Region:        "us-west",
+				},
+				AdditionalLabels: map[string]string{
+					// Kubernetes reserves k8s.io and kubernetes.io namespaces
+					// and should be discarded
+					"topology.kubernetes.io/region": "us-other-west",
+					"topology.k8s.io/region":        "us-other-west",
+					// Should discard labels that already exist
+					"my.custom.label/foo": "bar",
+					"my.custom.label/bar": "foo",
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Annotations: map[string]string{
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
+					},
+					Labels: map[string]string{
+						"my.custom.label/foo": "fizz",
+						"my.custom.label/bar": "foo",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "node0.cp.12345",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Annotations: map[string]string{
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
+					},
+					Labels: map[string]string{
+						"failure-domain.beta.kubernetes.io/region": "us-west",
+						"failure-domain.beta.kubernetes.io/zone":   "us-west-1a",
+						"topology.kubernetes.io/region":            "us-west",
+						"topology.kubernetes.io/zone":              "us-west-1a",
+						"my.custom.label/foo":                      "fizz",
+						"my.custom.label/bar":                      "foo",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "node0.cp.12345",
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{

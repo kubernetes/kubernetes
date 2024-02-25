@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta4
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -34,5 +35,35 @@ func Convert_v1beta4_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 		return err
 	}
 	err = Convert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(&ClusterConfiguration{}, &out.ClusterConfiguration, s)
+	out.ClusterConfiguration.APIServer.TimeoutForControlPlane = nil
+	return err
+}
+
+// Convert_kubeadm_APIServer_To_v1beta4_APIServer is required due to missing APIServer.TimeoutForControlPlane in v1beta4.
+func Convert_kubeadm_APIServer_To_v1beta4_APIServer(in *kubeadm.APIServer, out *APIServer, s conversion.Scope) error {
+	return autoConvert_kubeadm_APIServer_To_v1beta4_APIServer(in, out, s)
+}
+
+// Convert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration is required due to missing TimeoutForControlPlane in v1beta4
+func Convert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	out.APIServer.TimeoutForControlPlane = &metav1.Duration{}
+	return autoConvert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
+}
+
+// Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration converts a public JoinConfiguration to a private JoinConfiguration.
+func Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	err := autoConvert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
+	return err
+}
+
+// Convert_kubeadm_Discovery_To_v1beta4_Discovery is required because there is no Discovery.Timeout in v1beta4
+func Convert_kubeadm_Discovery_To_v1beta4_Discovery(in *kubeadm.Discovery, out *Discovery, s conversion.Scope) error {
+	return autoConvert_kubeadm_Discovery_To_v1beta4_Discovery(in, out, s)
+}
+
+// Convert_v1beta4_Discovery_To_kubeadm_Discovery is required because there is no Discovery.Timeout in v1beta4
+func Convert_v1beta4_Discovery_To_kubeadm_Discovery(in *Discovery, out *kubeadm.Discovery, s conversion.Scope) error {
+	err := autoConvert_v1beta4_Discovery_To_kubeadm_Discovery(in, out, s)
+	out.Timeout = &metav1.Duration{}
 	return err
 }

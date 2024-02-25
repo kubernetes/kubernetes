@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -51,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -93,47 +95,42 @@ const (
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal"
 
-// internal struct for string service information
-type servicePortInfo struct {
-	*proxy.BaseServicePortInfo
-	// The following fields are computed and stored for performance reasons.
-	nameString             string
-	clusterPolicyChainName utiliptables.Chain
-	localPolicyChainName   utiliptables.Chain
-	firewallChainName      utiliptables.Chain
-	externalChainName      utiliptables.Chain
-}
-
-// returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
-	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
-
-	// Store the following for performance reasons.
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
-	protocol := strings.ToLower(string(svcPort.Protocol()))
-	svcPort.nameString = svcPortName.String()
-	svcPort.clusterPolicyChainName = servicePortPolicyClusterChain(svcPort.nameString, protocol)
-	svcPort.localPolicyChainName = servicePortPolicyLocalChainName(svcPort.nameString, protocol)
-	svcPort.firewallChainName = serviceFirewallChainName(svcPort.nameString, protocol)
-	svcPort.externalChainName = serviceExternalChainName(svcPort.nameString, protocol)
-
-	return svcPort
-}
-
-// internal struct for endpoints information
-type endpointInfo struct {
-	*proxy.BaseEndpointInfo
-
-	ChainName utiliptables.Chain
-}
-
-// returns a new proxy.Endpoint which abstracts a endpointInfo
-func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
-	return &endpointInfo{
-		BaseEndpointInfo: baseInfo,
-		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.String()),
+// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
+func NewDualStackProxier(
+	ipt [2]utiliptables.Interface,
+	sysctl utilsysctl.Interface,
+	exec utilexec.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	localhostNodePorts bool,
+	masqueradeBit int,
+	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
+	hostname string,
+	nodeIPs map[v1.IPFamily]net.IP,
+	recorder events.EventRecorder,
+	healthzServer *healthcheck.ProxierHealthServer,
+	nodePortAddresses []string,
+	initOnly bool,
+) (proxy.Provider, error) {
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
+		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
+
+	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
+		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
+	}
+	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
@@ -168,7 +165,7 @@ type Proxier struct {
 	iptables       utiliptables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
-	exec           utilexec.Interface
+	conntrack      conntrack.Interface
 	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
@@ -235,7 +232,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings, nil)
 
 	if !nodePortAddresses.ContainsIPv4Loopback() {
 		localhostNodePorts = false
@@ -281,7 +278,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
-		exec:                     exec,
+		conntrack:                conntrack.NewExec(exec),
 		localDetector:            localDetector,
 		hostname:                 hostname,
 		nodeIP:                   nodeIP,
@@ -320,42 +317,47 @@ func NewProxier(ipFamily v1.IPFamily,
 	return proxier, nil
 }
 
-// NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
-func NewDualStackProxier(
-	ipt [2]utiliptables.Interface,
-	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	localhostNodePorts bool,
-	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
-	hostname string,
-	nodeIPs map[v1.IPFamily]net.IP,
-	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
-	nodePortAddresses []string,
-	initOnly bool,
-) (proxy.Provider, error) {
-	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
-	}
+// internal struct for string service information
+type servicePortInfo struct {
+	*proxy.BaseServicePortInfo
+	// The following fields are computed and stored for performance reasons.
+	nameString             string
+	clusterPolicyChainName utiliptables.Chain
+	localPolicyChainName   utiliptables.Chain
+	firewallChainName      utiliptables.Chain
+	externalChainName      utiliptables.Chain
+}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+// returns a new proxy.ServicePort which abstracts a serviceInfo
+func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
+	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
+
+	// Store the following for performance reasons.
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
+	protocol := strings.ToLower(string(svcPort.Protocol()))
+	svcPort.nameString = svcPortName.String()
+	svcPort.clusterPolicyChainName = servicePortPolicyClusterChain(svcPort.nameString, protocol)
+	svcPort.localPolicyChainName = servicePortPolicyLocalChainName(svcPort.nameString, protocol)
+	svcPort.firewallChainName = serviceFirewallChainName(svcPort.nameString, protocol)
+	svcPort.externalChainName = serviceExternalChainName(svcPort.nameString, protocol)
+
+	return svcPort
+}
+
+// internal struct for endpoints information
+type endpointInfo struct {
+	*proxy.BaseEndpointInfo
+
+	ChainName utiliptables.Chain
+}
+
+// returns a new proxy.Endpoint which abstracts a endpointInfo
+func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+	return &endpointInfo{
+		BaseEndpointInfo: baseInfo,
+		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.String()),
 	}
-	if initOnly {
-		return nil, nil
-	}
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 type iptablesJumpChain struct {
@@ -671,6 +673,10 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 func (proxier *Proxier) OnNodeSynced() {
 }
 
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
+
 // portProtoHash takes the ServicePortName and protocol for a service
 // returns the associated 16 character hash. This is computed by hashing (sha256)
 // then encoding to base32 and truncating to 16 chars. We do this because IPTables
@@ -793,11 +799,6 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(2).InfoS("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()
 
-	var serviceChanged, endpointsChanged sets.Set[string]
-	if tryPartialSync {
-		serviceChanged = proxier.serviceChanges.PendingChanges()
-		endpointsChanged = proxier.endpointsChanges.PendingChanges()
-	}
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
@@ -1016,7 +1017,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// create a firewall chain.
 		loadBalancerTrafficChain := externalTrafficChain
 		fwChain := svcInfo.firewallChainName
-		usesFWChain := hasEndpoints && len(svcInfo.LoadBalancerVIPStrings()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
+		usesFWChain := hasEndpoints && len(svcInfo.LoadBalancerVIPs()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
 		if usesFWChain {
 			loadBalancerTrafficChain = fwChain
 		}
@@ -1079,7 +1080,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture externalIPs.
-		for _, externalIP := range svcInfo.ExternalIPStrings() {
+		for _, externalIP := range svcInfo.ExternalIPs() {
 			if hasEndpoints {
 				// Send traffic bound for external IPs to the "external
 				// destinations" chain.
@@ -1087,7 +1088,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcPortNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", externalIP,
+					"-d", externalIP.String(),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", string(externalTrafficChain))
 			}
@@ -1099,7 +1100,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", externalTrafficFilterComment,
 					"-m", protocol, "-p", protocol,
-					"-d", externalIP,
+					"-d", externalIP.String(),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", externalTrafficFilterTarget,
 				)
@@ -1107,13 +1108,13 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
+		for _, lbip := range svcInfo.LoadBalancerVIPs() {
 			if hasEndpoints {
 				natRules.Write(
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", lbip,
+					"-d", lbip.String(),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", string(loadBalancerTrafficChain))
 
@@ -1123,7 +1124,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeProxyFirewallChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s traffic not accepted by %s"`, svcPortNameString, svcInfo.firewallChainName),
 					"-m", protocol, "-p", protocol,
-					"-d", lbip,
+					"-d", lbip.String(),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", "DROP")
 			}
@@ -1132,12 +1133,12 @@ func (proxier *Proxier) syncProxyRules() {
 			// Either no endpoints at all (REJECT) or no endpoints for
 			// external traffic (DROP anything that didn't get short-circuited
 			// by the EXT chain.)
-			for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
+			for _, lbip := range svcInfo.LoadBalancerVIPs() {
 				filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", externalTrafficFilterComment,
 					"-m", protocol, "-p", protocol,
-					"-d", lbip,
+					"-d", lbip.String(),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", externalTrafficFilterTarget,
 				)
@@ -1189,7 +1190,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// then we can omit them from the restore input. However, we have to still
 		// figure out how many chains we _would_ have written, to make the metrics
 		// come out right, so we just compute them and throw them away.
-		if tryPartialSync && !serviceChanged.Has(svcName.NamespacedName.String()) && !endpointsChanged.Has(svcName.NamespacedName.String()) {
+		if tryPartialSync && !serviceUpdateResult.UpdatedServices.Has(svcName.NamespacedName) && !endpointUpdateResult.UpdatedServices.Has(svcName.NamespacedName) {
 			natChains = skippedNatChains
 			natRules = skippedNatRules
 		}
@@ -1296,12 +1297,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// firewall filter based on each source range
 			allowFromNode := false
-			for _, src := range svcInfo.LoadBalancerSourceRanges() {
-				natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
-				_, cidr, err := netutils.ParseCIDRSloppy(src)
-				if err != nil {
-					klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
-				} else if cidr.Contains(proxier.nodeIP) {
+			for _, cidr := range svcInfo.LoadBalancerSourceRanges() {
+				natRules.Write(args, "-s", cidr.String(), "-j", string(externalTrafficChain))
+				if cidr.Contains(proxier.nodeIP) {
 					allowFromNode = true
 				}
 			}
@@ -1311,10 +1309,10 @@ func (proxier *Proxier) syncProxyRules() {
 			// will loop back with the source IP set to the VIP.  We
 			// need the following rules to allow requests from this node.
 			if allowFromNode {
-				for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
+				for _, lbip := range svcInfo.LoadBalancerVIPs() {
 					natRules.Write(
 						args,
-						"-s", lbip,
+						"-s", lbip.String(),
 						"-j", string(externalTrafficChain))
 				}
 			}
@@ -1544,7 +1542,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Finish housekeeping, clear stale conntrack entries for UDP Services
-	conntrack.CleanStaleEntries(proxier.iptables.IsIPv6(), proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
+	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
 func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffer, svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {

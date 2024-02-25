@@ -233,7 +233,7 @@ func TestNewResetData(t *testing.T) {
 			}
 
 			if tc.data != nil {
-				if diff := cmp.Diff(tc.data, data, cmp.AllowUnexported(resetData{}), cmpopts.IgnoreFields(resetData{}, "client", "cfg")); diff != "" {
+				if diff := cmp.Diff(tc.data, data, cmp.AllowUnexported(resetData{}), cmpopts.IgnoreFields(resetData{}, "client", "resetCfg.Timeouts")); diff != "" {
 					t.Fatalf("newResetData returned data (-want,+got):\n%s", diff)
 				}
 			}

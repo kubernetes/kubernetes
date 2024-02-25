@@ -185,6 +185,8 @@ var (
 		"ConfigMapAndSecretChangeDetectionStrategy",
 		"ContainerLogMaxFiles",
 		"ContainerLogMaxSize",
+		"ContainerLogMaxWorkers",
+		"ContainerLogMonitorInterval",
 		"ContentType",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",

@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -159,7 +162,7 @@ func main() {
 
 	// Setting up a localized scale test framework.
 	f := scale.NewIngressScaleFramework(cs, ns.Name, cloudConfig)
-	f.Logger = &e2eingress.GLogger{}
+	f.Logger = &e2eingress.E2ELogger{}
 	// Customizing scale test.
 	f.EnableTLS = enableTLS
 	f.OutputFile = outputFile

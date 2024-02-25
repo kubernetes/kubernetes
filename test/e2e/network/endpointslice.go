@@ -307,7 +307,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		})
 
-		err := wait.Poll(5*time.Second, 3*time.Minute, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			var err error
 			pod1, err = podClient.Get(ctx, pod1.Name, metav1.GetOptions{})
 			if err != nil {
@@ -583,6 +583,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		// create custom endpoint slices
 		tcpProtocol := v1.ProtocolTCP
+		readyCondTrue := true
 		epsTemplate := &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
 				Labels: map[string]string{
@@ -591,7 +592,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				}},
 			AddressType: addressType,
 			Endpoints: []discoveryv1.Endpoint{
-				{Addresses: []string{pod.Status.PodIP}},
+				{
+					Addresses:  []string{pod.Status.PodIP},
+					Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+				},
 			},
 		}
 
@@ -684,6 +688,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		// create custom endpoint slices
 		tcpProtocol := v1.ProtocolTCP
+		readyCondTrue := true
 		epsTemplate := &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
 				Labels: map[string]string{
@@ -696,7 +701,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("creating")
 		eps1 := epsTemplate.DeepCopy()
 		eps1.Endpoints = []discoveryv1.Endpoint{
-			{Addresses: []string{pod1.Status.PodIP}},
+			{
+				Addresses:  []string{pod1.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+			},
 		}
 		eps1.Ports = []discoveryv1.EndpointPort{{
 			Name:     pointer.String("port80"),
@@ -708,7 +716,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Endpoints = []discoveryv1.Endpoint{
-			{Addresses: []string{pod2.Status.PodIP}},
+			{
+				Addresses:  []string{pod2.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: &readyCondTrue},
+			},
 		}
 		eps2.Ports = []discoveryv1.EndpointPort{{
 			Name:     pointer.String("port81"),
@@ -740,7 +751,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 // the only caller of this function.
 func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
 	endpointSlices := []discoveryv1.EndpointSlice{}
-	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(ctx, cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
 			return false, nil
@@ -752,7 +763,7 @@ func expectEndpointsAndSlices(ctx context.Context, cs clientset.Interface, ns st
 	}
 
 	endpoints := &v1.Endpoints{}
-	if err := wait.PollWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		endpointsFound, hasMatchingEndpoints := hasMatchingEndpoints(ctx, cs, ns, svc.Name, len(pods), numSubsets)
 		if !hasMatchingEndpoints {
 			framework.Logf("Matching Endpoints not found")

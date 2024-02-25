@@ -353,6 +353,15 @@ func (c *linuxContainer) start(process *Process) (retErr error) {
 		}()
 	}
 
+	// Before starting "runc init", mark all non-stdio open files as O_CLOEXEC
+	// to make sure we don't leak any files into "runc init". Any files to be
+	// passed to "runc init" through ExtraFiles will get dup2'd by the Go
+	// runtime and thus their O_CLOEXEC flag will be cleared. This is some
+	// additional protection against attacks like CVE-2024-21626, by making
+	// sure we never leak files to "runc init" we didn't intend to.
+	if err := utils.CloseExecFrom(3); err != nil {
+		return fmt.Errorf("unable to mark non-stdio fds as cloexec: %w", err)
+	}
 	if err := parent.start(); err != nil {
 		return fmt.Errorf("unable to start container process: %w", err)
 	}
@@ -2268,7 +2277,7 @@ func ignoreTerminateErrors(err error) error {
 
 func requiresRootOrMappingTool(c *configs.Config) bool {
 	gidMap := []configs.IDMap{
-		{ContainerID: 0, HostID: os.Getegid(), Size: 1},
+		{ContainerID: 0, HostID: int64(os.Getegid()), Size: 1},
 	}
 	return !reflect.DeepEqual(c.GidMappings, gidMap)
 }

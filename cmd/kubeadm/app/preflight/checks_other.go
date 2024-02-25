@@ -30,13 +30,13 @@ func addOSValidator(validators []system.Validator, _ *system.StreamReporter) []s
 	return validators
 }
 
-// addIPv6Checks adds IPv6 related bridgenf and forwarding checks
+// addIPv6Checks adds IPv6 related checks
 // No-op for Darwin (MacOS), Windows.
 func addIPv6Checks(checks []Checker) []Checker {
 	return checks
 }
 
-// addIPv4Checks adds IPv4 related bridgenf and forwarding checks
+// addIPv4Checks adds IPv4 related checks
 // No-op for Darwin (MacOS), Windows.
 func addIPv4Checks(checks []Checker) []Checker {
 	return checks

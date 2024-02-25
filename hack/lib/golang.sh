@@ -497,7 +497,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.21
+  minimum_go_version=go1.22
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -773,7 +773,7 @@ kube::golang::build_binaries_for_platform() {
   done
 
   V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} ASMFLAGS=${goasmflags} LDFLAGS=${goldflags}"
+  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
@@ -781,7 +781,6 @@ kube::golang::build_binaries_for_platform() {
       -installsuffix=static
       ${goflags:+"${goflags[@]}"}
       -gcflags="${gogcflags}"
-      -asmflags="${goasmflags}"
       -ldflags="${goldflags}"
       -tags="${gotags:-}"
     )
@@ -792,7 +791,6 @@ kube::golang::build_binaries_for_platform() {
     build_args=(
       ${goflags:+"${goflags[@]}"}
       -gcflags="${gogcflags}"
-      -asmflags="${goasmflags}"
       -ldflags="${goldflags}"
       -tags="${gotags:-}"
     )
@@ -808,7 +806,6 @@ kube::golang::build_binaries_for_platform() {
     go test -c \
       ${goflags:+"${goflags[@]}"} \
       -gcflags="${gogcflags}" \
-      -asmflags="${goasmflags}" \
       -ldflags="${goldflags}" \
       -tags="${gotags:-}" \
       -o "${outfile}" \
@@ -865,26 +862,19 @@ kube::golang::build_binaries() {
     # These are "local" but are visible to and relied on by functions this
     # function calls.  They are effectively part of the calling API to
     # build_binaries_for_platform.
-    local goflags goldflags goasmflags gogcflags gotags
+    local goflags goldflags gogcflags gotags
 
-    # This is $(pwd) because we use run-in-gopath to build.  Once that is
-    # excised, this can become ${KUBE_ROOT}.
-    local trimroot # two lines to appease shellcheck SC2155
-    trimroot=$(pwd)
+    goflags=()
+    gogcflags="${GOGCFLAGS:-}"
+    goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
 
-    goasmflags="all=-trimpath=${trimroot}"
-
-    gogcflags="all=-trimpath=${trimroot} ${GOGCFLAGS:-}"
     if [[ "${DBG:-}" == 1 ]]; then
         # Debugging - disable optimizations and inlining and trimPath
-        gogcflags="${GOGCFLAGS:-} all=-N -l"
-        goasmflags=""
-    fi
-
-    goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
-    if [[ "${DBG:-}" != 1 ]]; then
-        # Not debugging - disable symbols and DWARF.
+        gogcflags="${gogcflags} all=-N -l"
+    else
+        # Not debugging - disable symbols and DWARF, trim embedded paths
         goldflags="${goldflags} -s -w"
+        goflags+=("-trimpath")
     fi
 
     # Extract tags if any specified in GOFLAGS

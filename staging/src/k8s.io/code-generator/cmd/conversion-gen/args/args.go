@@ -68,13 +68,13 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 
 // AddFlags add the generator flags to the flag set.
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	pflag.CommandLine.StringSliceVar(&ca.BasePeerDirs, "base-peer-dirs", ca.BasePeerDirs,
+	fs.StringSliceVar(&ca.BasePeerDirs, "base-peer-dirs", ca.BasePeerDirs,
 		"Comma-separated list of apimachinery import paths which are considered, after tag-specified peers, for conversions. Only change these if you have very good reasons.")
-	pflag.CommandLine.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
+	fs.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
 		"Application specific comma-separated list of import paths which are considered, after tag-specified peers and base-peer-dirs, for conversions.")
-	pflag.CommandLine.StringSliceVar(&ca.ExtraDirs, "extra-dirs", ca.ExtraDirs,
+	fs.StringSliceVar(&ca.ExtraDirs, "extra-dirs", ca.ExtraDirs,
 		"Application specific comma-separated list of import paths which are loaded and considered for callable conversions, but are not considered peers for conversion.")
-	pflag.CommandLine.BoolVar(&ca.SkipUnsafe, "skip-unsafe", ca.SkipUnsafe,
+	fs.BoolVar(&ca.SkipUnsafe, "skip-unsafe", ca.SkipUnsafe,
 		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
 }
 

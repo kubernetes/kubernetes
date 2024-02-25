@@ -54,6 +54,8 @@ const (
 	ProfileRestricted = "restricted"
 	// ProfileNetadmin offers elevated privileges for network debugging.
 	ProfileNetadmin = "netadmin"
+	// ProfileSysadmin offers elevated privileges for debugging.
+	ProfileSysadmin = "sysadmin"
 )
 
 type ProfileApplier interface {
@@ -74,6 +76,8 @@ func NewProfileApplier(profile string) (ProfileApplier, error) {
 		return &restrictedProfile{}, nil
 	case ProfileNetadmin:
 		return &netadminProfile{}, nil
+	case ProfileSysadmin:
+		return &sysadminProfile{}, nil
 	}
 
 	return nil, fmt.Errorf("unknown profile: %s", profile)
@@ -92,6 +96,9 @@ type restrictedProfile struct {
 }
 
 type netadminProfile struct {
+}
+
+type sysadminProfile struct {
 }
 
 func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
@@ -212,6 +219,29 @@ func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	return nil
 }
 
+func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("sysadmin profile: %s", err)
+	}
+
+	setPrivileged(pod, containerName)
+
+	switch style {
+	case node:
+		useHostNamespaces(pod)
+		mountRootPartition(pod, containerName)
+
+	case podCopy:
+		// to mimic general, default and baseline
+		shareProcessNamespace(pod)
+	case ephemeral:
+		// no additional modifications needed
+	}
+
+	return nil
+}
+
 // removeLabelsAndProbes removes labels from the pod and remove probes
 // from all containers of the pod.
 func removeLabelsAndProbes(p *corev1.Pod) {
@@ -267,6 +297,20 @@ func clearSecurityContext(p *corev1.Pod, containerName string) {
 			return true
 		}
 		c.SecurityContext = nil
+		return false
+	})
+}
+
+// setPrivileged configures the containers as privileged.
+func setPrivileged(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		c.SecurityContext.Privileged = pointer.Bool(true)
 		return false
 	})
 }

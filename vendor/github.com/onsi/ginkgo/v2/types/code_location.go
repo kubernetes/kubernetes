@@ -149,7 +149,7 @@ func PruneStack(fullStackTrace string, skip int) string {
 		re := regexp.MustCompile(`\/ginkgo\/|\/pkg\/testing\/|\/pkg\/runtime\/`)
 		for i := 0; i < len(stack)/2; i++ {
 			// We filter out based on the source code file name.
-			if !re.Match([]byte(stack[i*2+1])) {
+			if !re.MatchString(stack[i*2+1]) {
 				prunedStack = append(prunedStack, stack[i*2])
 				prunedStack = append(prunedStack, stack[i*2+1])
 			}

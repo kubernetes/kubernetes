@@ -72,7 +72,7 @@ func (h *handler) FromDocumentMap(docmap kubeadmapi.DocumentMap) (kubeadmapi.Com
 // fromConfigMap is an utility function, which will load the value of a key of a config map and use h.FromDocumentMap() to perform the parsing
 // This is an utility func. Used by the component config support implementations. Don't use it outside of that context.
 func (h *handler) fromConfigMap(client clientset.Interface, cmName, cmKey string, mustExist bool) (kubeadmapi.ComponentConfig, error) {
-	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, cmName)
+	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, cmName)
 	if err != nil {
 		if !mustExist && (apierrors.IsNotFound(err) || apierrors.IsForbidden(err)) {
 			klog.Warningf("Warning: No %s config is loaded. Continuing without it: %v", h.GroupVersion, err)

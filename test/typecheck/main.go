@@ -241,10 +241,10 @@ func dedup(errors []packages.Error) []string {
 
 var outMu sync.Mutex
 
-func serialFprintf(w io.Writer, format string, a ...interface{}) (n int, err error) {
+func serialFprintf(w io.Writer, format string, a ...interface{}) {
 	outMu.Lock()
 	defer outMu.Unlock()
-	return fmt.Fprintf(w, format, a...)
+	_, _ = fmt.Fprintf(w, format, a...)
 }
 
 func main() {
@@ -294,11 +294,7 @@ func main() {
 			}()
 
 			f := false
-			if len(args) != 0 {
-				serialFprintf(os.Stdout, "type-checking %s against %s\n", plat, args)
-			} else {
-				serialFprintf(os.Stdout, "type-checking %s\n", plat)
-			}
+			serialFprintf(os.Stdout, "type-checking %s\n", plat)
 			errors, err := c.verify(plat)
 			if err != nil {
 				serialFprintf(os.Stderr, "ERROR(%s): failed to verify: %v\n", plat, err)

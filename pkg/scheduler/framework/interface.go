@@ -95,12 +95,13 @@ const (
 	Unschedulable
 	// UnschedulableAndUnresolvable is used when a plugin finds a pod unschedulable and
 	// other postFilter plugins like preemption would not change anything.
+	// See the comment on PostFilter interface for more details about how PostFilter should handle this status.
 	// Plugins should return Unschedulable if it is possible that the pod can get scheduled
 	// after running other postFilter plugins.
 	// The accompanying status message should explain why the pod is unschedulable.
 	//
 	// We regard the backoff as a penalty of wasting the scheduling cycle.
-	// When the scheduling queue requeues Pods, which was rejected with Unschedulable in the last scheduling,
+	// When the scheduling queue requeues Pods, which was rejected with UnschedulableAndUnresolvable in the last scheduling,
 	// the Pod goes through backoff.
 	UnschedulableAndUnresolvable
 	// Wait is used when a Permit plugin finds a pod scheduling should wait.
@@ -399,6 +400,9 @@ type PreFilterPlugin interface {
 	// plugins must return success or the pod will be rejected. PreFilter could optionally
 	// return a PreFilterResult to influence which nodes to evaluate downstream. This is useful
 	// for cases where it is possible to determine the subset of nodes to process in O(1) time.
+	// When PreFilterResult filters out some Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
+	// i.e., those Nodes will be out of the candidates of the preemption.
+	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
@@ -438,7 +442,17 @@ type FilterPlugin interface {
 // after a pod cannot be scheduled.
 type PostFilterPlugin interface {
 	Plugin
-	// PostFilter is called by the scheduling framework.
+	// PostFilter is called by the scheduling framework
+	// when the scheduling cycle failed at PreFilter or Filter by Unschedulable or UnschedulableAndUnresolvable.
+	// NodeToStatusMap has statuses that each Node got in the Filter phase.
+	// If this scheduling cycle failed at PreFilter, all Nodes have the status from the rejector PreFilter plugin in NodeToStatusMap.
+	// Note that the scheduling framework runs PostFilter plugins even when PreFilter returned UnschedulableAndUnresolvable.
+	// In that case, NodeToStatusMap contains all Nodes with UnschedulableAndUnresolvable.
+	//
+	// Also, ignoring Nodes with UnschedulableAndUnresolvable is the responsibility of each PostFilter plugin,
+	// meaning NodeToStatusMap obviously could have Nodes with UnschedulableAndUnresolvable
+	// and the scheduling framework does call PostFilter even when all Nodes in NodeToStatusMap are UnschedulableAndUnresolvable.
+	//
 	// A PostFilter plugin should return one of the following statuses:
 	// - Unschedulable: the plugin gets executed successfully but the pod cannot be made schedulable.
 	// - Success: the plugin gets executed successfully and the pod can be made schedulable.
@@ -638,6 +652,9 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator PodNominator)
+
+	// Close calls Close method of each plugin.
+	Close() error
 }
 
 // Handle provides data and some tools that plugins can use. It is

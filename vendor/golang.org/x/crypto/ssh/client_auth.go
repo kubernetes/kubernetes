@@ -307,7 +307,10 @@ func (cb publicKeyCallback) auth(session []byte, user string, c packetConn, rand
 	}
 	var methods []string
 	var errSigAlgo error
-	for _, signer := range signers {
+
+	origSignersLen := len(signers)
+	for idx := 0; idx < len(signers); idx++ {
+		signer := signers[idx]
 		pub := signer.PublicKey()
 		as, algo, err := pickSignatureAlgorithm(signer, extensions)
 		if err != nil && errSigAlgo == nil {
@@ -320,6 +323,21 @@ func (cb publicKeyCallback) auth(session []byte, user string, c packetConn, rand
 		ok, err := validateKey(pub, algo, user, c)
 		if err != nil {
 			return authFailure, nil, err
+		}
+		// OpenSSH 7.2-7.7 advertises support for rsa-sha2-256 and rsa-sha2-512
+		// in the "server-sig-algs" extension but doesn't support these
+		// algorithms for certificate authentication, so if the server rejects
+		// the key try to use the obtained algorithm as if "server-sig-algs" had
+		// not been implemented if supported from the algorithm signer.
+		if !ok && idx < origSignersLen && isRSACert(algo) && algo != CertAlgoRSAv01 {
+			if contains(as.Algorithms(), KeyAlgoRSA) {
+				// We retry using the compat algorithm after all signers have
+				// been tried normally.
+				signers = append(signers, &multiAlgorithmSigner{
+					AlgorithmSigner:     as,
+					supportedAlgorithms: []string{KeyAlgoRSA},
+				})
+			}
 		}
 		if !ok {
 			continue

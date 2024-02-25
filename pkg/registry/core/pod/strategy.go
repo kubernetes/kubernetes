@@ -89,7 +89,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	podutil.DropDisabledPodFields(pod, nil)
 
-	applyWaitingForSchedulingGatesCondition(pod)
+	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
 }
 
@@ -737,9 +737,9 @@ func mutatePodAffinity(pod *api.Pod) {
 	}
 }
 
-// applyWaitingForSchedulingGatesCondition adds a {type:PodScheduled, reason:WaitingForGates} condition
+// applySchedulingGatedCondition adds a {type:PodScheduled, reason:SchedulingGated} condition
 // to a new-created Pod if necessary.
-func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
+func applySchedulingGatedCondition(pod *api.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) ||
 		len(pod.Spec.SchedulingGates) == 0 {
 		return

@@ -1077,13 +1077,13 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 			Containers: []v1.Container{
 				{
 					Name:            ctnName,
-					Image:           "registry.k8s.io/stress:v1",
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: "Always",
 					Env:             env,
 					// 60 min timeout * 60s / tick per 10s = 360 ticks before timeout => ~11.11Mi/tick
 					// to fill ~4Gi of memory, so initial ballpark 12Mi/tick.
 					// We might see flakes due to timeout if the total memory on the nodes increases.
-					Args:      []string{"-mem-alloc-size", "12Mi", "-mem-alloc-sleep", "10s", "-mem-total", memLimit},
+					Args:      []string{"stress", "--mem-alloc-size", "12Mi", "--mem-alloc-sleep", "10s", "--mem-total", memLimit},
 					Resources: res,
 				},
 			},

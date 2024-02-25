@@ -18,4 +18,4 @@ limitations under the License.
 // from a Kubernetes server and then indexing the type definitions.
 // The openapi spec contains the object model definitions and extensions metadata
 // such as the patchStrategy and patchMergeKey for creating patches.
-package openapi // k8s.io/kubectl/pkg/util/openapi
+package openapi // import "k8s.io/kubectl/pkg/util/openapi"

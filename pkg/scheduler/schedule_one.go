@@ -342,7 +342,7 @@ func (sched *Scheduler) handleBindingCycleError(
 		//
 		// Avoid moving the assumed Pod itself as it's always Unschedulable.
 		// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
-		// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
+		// add this event to in-flight events and thus move the assumed pod to backoffQ anyways if the plugins don't have appropriate QueueingHint.
 		if status.IsRejected() {
 			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, internalqueue.AssignedPodDelete, assumedPod, nil, func(pod *v1.Pod) bool {
 				return assumedPod.UID != pod.UID
@@ -485,12 +485,14 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 	nodes := allNodes
 	if !preRes.AllNodes() {
 		nodes = make([]*framework.NodeInfo, 0, len(preRes.NodeNames))
-		for n := range preRes.NodeNames {
-			nInfo, err := sched.nodeInfoSnapshot.NodeInfos().Get(n)
-			if err != nil {
-				return nil, diagnosis, err
+		for _, n := range allNodes {
+			if !preRes.NodeNames.Has(n.Node().Name) {
+				// We consider Nodes that are filtered out by PreFilterResult as rejected via UnschedulableAndUnresolvable.
+				// We have to record them in NodeToStatusMap so that they won't be considered as candidates in the preemption.
+				diagnosis.NodeToStatusMap[n.Node().Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result")
+				continue
 			}
-			nodes = append(nodes, nInfo)
+			nodes = append(nodes, n)
 		}
 	}
 	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, &diagnosis, nodes)
@@ -924,7 +926,7 @@ func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assum
 		sched.finishBinding(logger, fwk, assumed, targetNode, status)
 	}()
 
-	bound, err := sched.extendersBinding(assumed, targetNode)
+	bound, err := sched.extendersBinding(logger, assumed, targetNode)
 	if bound {
 		return framework.AsStatus(err)
 	}
@@ -932,15 +934,20 @@ func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assum
 }
 
 // TODO(#87159): Move this to a Plugin.
-func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error) {
+func (sched *Scheduler) extendersBinding(logger klog.Logger, pod *v1.Pod, node string) (bool, error) {
 	for _, extender := range sched.Extenders {
 		if !extender.IsBinder() || !extender.IsInterested(pod) {
 			continue
 		}
-		return true, extender.Bind(&v1.Binding{
+		err := extender.Bind(&v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
 			Target:     v1.ObjectReference{Kind: "Node", Name: node},
 		})
+		if err != nil && extender.IsIgnorable() {
+			logger.Info("Skipping extender in bind as it returned error and has ignorable flag set", "extender", extender, "err", err)
+			continue
+		}
+		return true, err
 	}
 	return false, nil
 }

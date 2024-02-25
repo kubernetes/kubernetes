@@ -131,13 +131,8 @@ func (w *fakeWaiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return w.errsToReturn[waitForHashChange]
 }
 
-// WaitForHealthyKubelet returns a dummy nil just to implement the interface
-func (w *fakeWaiter) WaitForHealthyKubelet(_ time.Duration, _ string) error {
-	return nil
-}
-
-// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
-func (w *fakeWaiter) WaitForKubeletAndFunc(f func() error) error {
+// WaitForHKubelet returns a dummy nil just to implement the interface
+func (w *fakeWaiter) WaitForKubelet() error {
 	return nil
 }
 

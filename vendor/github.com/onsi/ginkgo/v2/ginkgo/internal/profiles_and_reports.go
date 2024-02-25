@@ -144,7 +144,7 @@ func FinalizeProfilesAndReportsForSuites(suites TestSuites, cliConfig types.CLIC
 	return messages, nil
 }
 
-//loads each profile, combines them, deletes them, stores them in destination
+// loads each profile, combines them, deletes them, stores them in destination
 func MergeAndCleanupCoverProfiles(profiles []string, destination string) error {
 	combined := &bytes.Buffer{}
 	modeRegex := regexp.MustCompile(`^mode: .*\n`)
@@ -184,7 +184,7 @@ func GetCoverageFromCoverProfile(profile string) (float64, error) {
 	cmd := exec.Command("go", "tool", "cover", "-func", profile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("Could not process Coverprofile %s: %s", profile, err.Error())
+		return 0, fmt.Errorf("Could not process Coverprofile %s: %s - %s", profile, err.Error(), string(output))
 	}
 	re := regexp.MustCompile(`total:\s*\(statements\)\s*(\d*\.\d*)\%`)
 	matches := re.FindStringSubmatch(string(output))

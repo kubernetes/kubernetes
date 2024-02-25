@@ -210,8 +210,16 @@ func (r ratchetingOptions) shouldRatchetError() bool {
 func (r ratchetingOptions) key(field string) ratchetingOptions {
 	if r.currentCorrelation == nil {
 		return r
+	} else if r.nearestParentCorrelation == nil && (field == "apiVersion" || field == "kind") {
+		// We cannot ratchet changes to the APIVersion and kind fields field since
+		// they aren't visible. (both old and new are converted to the same type)
+		//
+		return ratchetingOptions{}
 	}
 
+	// nearestParentCorrelation is always non-nil except for the root node.
+	// The below line ensures that the next nearestParentCorrelation is set
+	// to a non-nil r.currentCorrelation
 	return ratchetingOptions{currentCorrelation: r.currentCorrelation.Key(field), nearestParentCorrelation: r.currentCorrelation}
 }
 

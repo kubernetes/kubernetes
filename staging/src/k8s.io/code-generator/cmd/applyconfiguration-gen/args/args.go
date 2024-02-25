@@ -49,10 +49,15 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
 	customArgs := &CustomArgs{
 		ExternalApplyConfigurations: map[types.Name]string{
-			// Always include TypeMeta and ObjectMeta. They are sufficient for the vast majority of use cases.
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:       "k8s.io/client-go/applyconfigurations/meta/v1",
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}:     "k8s.io/client-go/applyconfigurations/meta/v1",
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "OwnerReference"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+			// Always include the applyconfigurations we've generated in client-go. They are sufficient for the vast majority of use cases.
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "Condition"}:                "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}:            "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "LabelSelector"}:            "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "LabelSelectorRequirement"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ManagedFieldsEntry"}:       "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}:               "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "OwnerReference"}:           "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:                 "k8s.io/client-go/applyconfigurations/meta/v1",
 		},
 	}
 	genericArgs.CustomArgs = customArgs
@@ -65,10 +70,10 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 }
 
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
-	pflag.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
+	fs.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
-	pflag.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
+	fs.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
 		"path to the openapi schema containing all the types that apply configurations will be generated for")
 }
 

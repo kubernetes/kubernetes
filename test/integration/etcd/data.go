@@ -228,7 +228,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"): {
 			Stub:             `{"metadata": {"name": "va2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
 			ExpectedEtcdPath: "/registry/flowschemas/va2",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "FlowSchema"),
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
 		},
 		// --
 
@@ -236,7 +236,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "prioritylevelconfigurations"): {
 			Stub:             `{"metadata": {"name": "conf2"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
 			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf2",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "PriorityLevelConfiguration"),
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
 		},
 		// --
 
@@ -244,7 +244,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas"): {
 			Stub:             `{"metadata": {"name": "fs-1"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
 			ExpectedEtcdPath: "/registry/flowschemas/fs-1",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "FlowSchema"),
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
 		},
 		// --
 
@@ -252,7 +252,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "prioritylevelconfigurations"): {
 			Stub:             `{"metadata": {"name": "conf3"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
 			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf3",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "PriorityLevelConfiguration"),
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
 		},
 		// --
 
@@ -260,6 +260,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"): {
 			Stub:             `{"metadata": {"name": "fs-2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
 			ExpectedEtcdPath: "/registry/flowschemas/fs-2",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
 		},
 		// --
 
@@ -267,6 +268,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"): {
 			Stub:             `{"metadata": {"name": "conf4"}, "spec": {"type": "Limited", "limited": {"nominalConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
 			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf4",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
 		},
 		// --
 
@@ -274,7 +276,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1", "flowschemas"): {
 			Stub:             `{"metadata": {"name": "fs-3"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
 			ExpectedEtcdPath: "/registry/flowschemas/fs-3",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "FlowSchema"),
 		},
 		// --
 
@@ -282,7 +283,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("flowcontrol.apiserver.k8s.io", "v1", "prioritylevelconfigurations"): {
 			Stub:             `{"metadata": {"name": "conf5"}, "spec": {"type": "Limited", "limited": {"nominalConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
 			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf5",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "PriorityLevelConfiguration"),
 		},
 		// --
 

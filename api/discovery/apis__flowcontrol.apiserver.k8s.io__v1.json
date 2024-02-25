@@ -8,7 +8,7 @@
       "name": "flowschemas",
       "namespaced": false,
       "singularName": "flowschema",
-      "storageVersionHash": "9NnFrw7ZEmA=",
+      "storageVersionHash": "GJVAJZSZBIw=",
       "verbs": [
         "create",
         "delete",
@@ -36,7 +36,7 @@
       "name": "prioritylevelconfigurations",
       "namespaced": false,
       "singularName": "prioritylevelconfiguration",
-      "storageVersionHash": "+CwSrEWTDhc=",
+      "storageVersionHash": "Kir5PVfvNeI=",
       "verbs": [
         "create",
         "delete",

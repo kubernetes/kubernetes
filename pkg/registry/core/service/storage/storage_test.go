@@ -11933,8 +11933,10 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 			defer storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 
 			// prepare status
-			if loadbalancerIPModeInUse(tc.statusBeforeUpdate) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+			// Test here is negative, because starting with v1.30 the feature gate is enabled by default, so we should
+			// now disable it to do the proper test
+			if !loadbalancerIPModeInUse(tc.statusBeforeUpdate) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, false)()
 			}
 			oldSvc := obj.(*api.Service).DeepCopy()
 			oldSvc.Status = tc.statusBeforeUpdate

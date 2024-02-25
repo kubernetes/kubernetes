@@ -189,7 +189,7 @@ func TestCreateCertificateChain(t *testing.T) {
 		t.Fatalf("unexpected error getting tree: %v", err)
 	}
 
-	if certTree.CreateTree(ic); err != nil {
+	if err := certTree.CreateTree(ic); err != nil {
 		t.Fatal(err)
 	}
 

@@ -54,6 +54,7 @@ const (
 	testPlugin                        = "test-plugin"
 	permitPlugin                      = "permit-plugin"
 	bindPlugin                        = "bind-plugin"
+	testCloseErrorPlugin              = "test-close-error-plugin"
 
 	testProfileName              = "test-profile"
 	testPercentageOfNodesToScore = 35
@@ -197,7 +198,7 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 }
 
 func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	return nil, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
+	return pl.inj.PreFilterResult, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
 func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -236,6 +237,25 @@ func (pl *TestPlugin) Permit(ctx context.Context, state *framework.CycleState, p
 
 func (pl *TestPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.BindStatus), injectReason)
+}
+
+func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	return &TestCloseErrorPlugin{name: testCloseErrorPlugin}, nil
+}
+
+// TestCloseErrorPlugin implements for Close test.
+type TestCloseErrorPlugin struct {
+	name string
+}
+
+func (pl *TestCloseErrorPlugin) Name() string {
+	return pl.name
+}
+
+var errClose = errors.New("close err")
+
+func (pl *TestCloseErrorPlugin) Close() error {
+	return errClose
 }
 
 // TestPreFilterPlugin only implements PreFilterPlugin interface.
@@ -379,6 +399,7 @@ var registry = func() Registry {
 	r.Register(testPlugin, newTestPlugin)
 	r.Register(queueSortPlugin, newQueueSortPlugin)
 	r.Register(bindPlugin, newBindPlugin)
+	r.Register(testCloseErrorPlugin, newTestCloseErrorPlugin)
 	return r
 }()
 
@@ -1622,6 +1643,56 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			wantSkippedPlugins:  sets.New("skip1", "skip2"),
 			wantStatusCode:      framework.Success,
 		},
+		{
+			name: "one PreFilter plugin returned Unschedulable, but another PreFilter plugin should be executed",
+			plugins: []*TestPlugin{
+				{
+					name: "unschedulable",
+					inj:  injectedResult{PreFilterStatus: int(framework.Unschedulable)},
+				},
+				{
+					// to make sure this plugin is executed, this plugin return Skip and we confirm it via wantSkippedPlugins.
+					name: "skip",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+			},
+			wantPreFilterResult: nil,
+			wantSkippedPlugins:  sets.New("skip"),
+			wantStatusCode:      framework.Unschedulable,
+		},
+		{
+			name: "one PreFilter plugin returned UnschedulableAndUnresolvable, and all other plugins aren't executed",
+			plugins: []*TestPlugin{
+				{
+					name: "unresolvable",
+					inj:  injectedResult{PreFilterStatus: int(framework.UnschedulableAndUnresolvable)},
+				},
+				{
+					// to make sure this plugin is not executed, this plugin return Skip and we confirm it via wantSkippedPlugins.
+					name: "skip",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+			},
+			wantPreFilterResult: nil,
+			wantStatusCode:      framework.UnschedulableAndUnresolvable,
+		},
+		{
+			name: "all nodes are filtered out by prefilter result, but other plugins aren't executed because we consider all nodes are filtered out by UnschedulableAndUnresolvable",
+			plugins: []*TestPlugin{
+				{
+					name: "reject-all-nodes",
+					inj:  injectedResult{PreFilterResult: &framework.PreFilterResult{NodeNames: sets.New[string]()}},
+				},
+				{
+					// to make sure this plugin is not executed, this plugin return Skip and we confirm it via wantSkippedPlugins.
+					name: "skip",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+			},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New[string]()},
+			wantSkippedPlugins:  sets.New[string](), // "skip" plugin isn't executed.
+			wantStatusCode:      framework.UnschedulableAndUnresolvable,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2737,7 +2808,9 @@ func TestPermitPlugins(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile,
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -2919,7 +2992,10 @@ func TestRecordingMetrics(t *testing.T) {
 				SchedulerName:            testProfileName,
 				Plugins:                  plugins,
 			}
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile, withMetricsRecorder(recorder))
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				withMetricsRecorder(recorder),
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				cancel()
 				t.Fatalf("Failed to create framework for testing: %v", err)
@@ -3089,7 +3165,9 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: plugins}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile)
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -3145,7 +3223,9 @@ func TestWaitOnPermit(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: plugins}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile)
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -3211,6 +3291,53 @@ func TestListPlugins(t *testing.T) {
 	}
 }
 
+func TestClose(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins *config.Plugins
+		wantErr error
+	}{
+		{
+			name: "close doesn't return error",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin, Weight: 5},
+					},
+				},
+			},
+		},
+		{
+			name: "close returns error",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin, Weight: 5},
+						{Name: testCloseErrorPlugin},
+					},
+				},
+			},
+			wantErr: errClose,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fw, err := NewFramework(ctx, registry, &config.KubeSchedulerProfile{Plugins: tc.plugins})
+			if err != nil {
+				t.Fatalf("Unexpected error during calling NewFramework, got %v", err)
+			}
+			err = fw.Close()
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("Unexpected error from Close(), got: %v, want: %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func buildScoreConfigDefaultWeights(ps ...string) *config.Plugins {
 	return buildScoreConfigWithWeights(defaultWeights, ps...)
 }
@@ -3224,20 +3351,21 @@ func buildScoreConfigWithWeights(weights map[string]int32, ps ...string) *config
 }
 
 type injectedResult struct {
-	ScoreRes                 int64 `json:"scoreRes,omitempty"`
-	NormalizeRes             int64 `json:"normalizeRes,omitempty"`
-	ScoreStatus              int   `json:"scoreStatus,omitempty"`
-	NormalizeStatus          int   `json:"normalizeStatus,omitempty"`
-	PreFilterStatus          int   `json:"preFilterStatus,omitempty"`
-	PreFilterAddPodStatus    int   `json:"preFilterAddPodStatus,omitempty"`
-	PreFilterRemovePodStatus int   `json:"preFilterRemovePodStatus,omitempty"`
-	FilterStatus             int   `json:"filterStatus,omitempty"`
-	PostFilterStatus         int   `json:"postFilterStatus,omitempty"`
-	PreScoreStatus           int   `json:"preScoreStatus,omitempty"`
-	ReserveStatus            int   `json:"reserveStatus,omitempty"`
-	PreBindStatus            int   `json:"preBindStatus,omitempty"`
-	BindStatus               int   `json:"bindStatus,omitempty"`
-	PermitStatus             int   `json:"permitStatus,omitempty"`
+	ScoreRes                 int64                      `json:"scoreRes,omitempty"`
+	NormalizeRes             int64                      `json:"normalizeRes,omitempty"`
+	ScoreStatus              int                        `json:"scoreStatus,omitempty"`
+	NormalizeStatus          int                        `json:"normalizeStatus,omitempty"`
+	PreFilterResult          *framework.PreFilterResult `json:"preFilterResult,omitempty"`
+	PreFilterStatus          int                        `json:"preFilterStatus,omitempty"`
+	PreFilterAddPodStatus    int                        `json:"preFilterAddPodStatus,omitempty"`
+	PreFilterRemovePodStatus int                        `json:"preFilterRemovePodStatus,omitempty"`
+	FilterStatus             int                        `json:"filterStatus,omitempty"`
+	PostFilterStatus         int                        `json:"postFilterStatus,omitempty"`
+	PreScoreStatus           int                        `json:"preScoreStatus,omitempty"`
+	ReserveStatus            int                        `json:"reserveStatus,omitempty"`
+	PreBindStatus            int                        `json:"preBindStatus,omitempty"`
+	BindStatus               int                        `json:"bindStatus,omitempty"`
+	PermitStatus             int                        `json:"permitStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *framework.Status) {

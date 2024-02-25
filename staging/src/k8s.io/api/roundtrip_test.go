@@ -25,6 +25,7 @@ import (
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
 	admissionregv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -91,6 +92,7 @@ var groups = []runtime.SchemeBuilder{
 	admissionregv1.SchemeBuilder,
 	apiserverinternalv1alpha1.SchemeBuilder,
 	apidiscoveryv2beta1.SchemeBuilder,
+	apidiscoveryv2.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
 	appsv1beta2.SchemeBuilder,
 	appsv1.SchemeBuilder,

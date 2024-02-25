@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -614,7 +615,7 @@ func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace
 	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
+			return true, err
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
 		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
@@ -627,7 +628,7 @@ func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace
 		}
 	})
 	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
-	if wait.Interrupted(err) {
+	if wait.Interrupted(err) || strings.Contains(err.Error(), "would exceed context deadline") {
 		framework.Logf("Number of replicas was stable over %v", timeout)
 		return
 	}

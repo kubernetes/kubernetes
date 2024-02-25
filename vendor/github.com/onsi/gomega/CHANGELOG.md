@@ -1,3 +1,26 @@
+## 1.31.0
+
+### Features
+- Async assertions include context cancellation cause if present [121c37f]
+
+### Maintenance
+- Bump minimum go version [dee1e3c]
+- docs: fix typo in example usage "occured" -> "occurred" [49005fe]
+- Bump actions/setup-go from 4 to 5 (#714) [f1c8757]
+- Bump github/codeql-action from 2 to 3 (#715) [9836e76]
+- Bump github.com/onsi/ginkgo/v2 from 2.13.0 to 2.13.2 (#713) [54726f0]
+- Bump golang.org/x/net from 0.17.0 to 0.19.0 (#711) [df97ecc]
+- docs: fix `HaveExactElement` typo (#712) [a672c86]
+
+## 1.30.0
+
+### Features
+- BeTrueBecause and BeFalseBecause allow for better failure messages [4da4c7f]
+
+### Maintenance
+- Bump actions/checkout from 3 to 4 (#694) [6ca6e97]
+- doc: fix type on gleak go doc [f1b8343]
+
 ## 1.29.0
 
 ### Features

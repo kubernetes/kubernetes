@@ -64,8 +64,6 @@ type Controller struct {
 	secondaryServiceCIDR *net.IPNet
 	kubeClient           clientset.Interface
 	eventBroadcaster     record.EventBroadcaster
-	// Method for easy mocking in unittest.
-	lookupIP func(host string) ([]net.IP, error)
 
 	nodeLister         corelisters.NodeLister
 	nodeInformerSynced cache.InformerSynced
@@ -113,7 +111,6 @@ func NewNodeIpamController(
 		cloud:                cloud,
 		kubeClient:           kubeClient,
 		eventBroadcaster:     record.NewBroadcaster(),
-		lookupIP:             net.LookupIP,
 		clusterCIDRs:         clusterCIDRs,
 		serviceCIDR:          serviceCIDR,
 		secondaryServiceCIDR: secondaryServiceCIDR,

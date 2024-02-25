@@ -552,7 +552,7 @@ func TestGetNodeAddressesFromNodeIP(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetNodeAddressesFromNodeIP(tt.nodeIP, tt.nodeAddresses, true)
+			got, err := GetNodeAddressesFromNodeIP(tt.nodeIP, tt.nodeAddresses)
 			if (err != nil) != tt.shouldError {
 				t.Errorf("GetNodeAddressesFromNodeIP() error = %v, wantErr %v", err, tt.shouldError)
 				return

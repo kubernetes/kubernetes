@@ -23,8 +23,12 @@ import (
 )
 
 var (
+	// Please keep the list in alphabetical order.
+
 	// The test does not work in UserNS (for example, `open /proc/sys/kernel/shm_rmid_forced: permission denied`).
 	NotInUserNS = framework.WithEnvironment(framework.ValidEnvironments.Add("NotInUserNS"))
+
+	// Please keep the list in alphabetical order.
 )
 
 func init() {

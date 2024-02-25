@@ -948,7 +948,8 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(ctx context.C
 func (ctrl *PersistentVolumeController) assignDefaultStorageClass(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
 	logger := klog.FromContext(ctx)
 
-	if storagehelpers.GetPersistentVolumeClaimClass(claim) != "" {
+	if storagehelpers.PersistentVolumeClaimHasClass(claim) {
+		// The user asked for a class.
 		return false, nil
 	}
 
@@ -1954,6 +1955,18 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 				return nil, err
 			}
 			return plugin, nil
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		if metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnMigratedTo) {
+			// CSI migration scenario - do not depend on in-tree plugin
+			return nil, nil
+		}
+
+		if volume.Spec.CSI != nil {
+			// CSI volume source scenario - external provisioner is requested
+			return nil, nil
 		}
 	}
 

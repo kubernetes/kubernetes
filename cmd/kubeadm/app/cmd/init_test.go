@@ -17,7 +17,10 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -53,6 +57,20 @@ apiVersion: %[1]s
 kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
 `, kubeadmapiv1.SchemeGroupVersion.String(), expectedCRISocket)
+
+const testKubeconfigDataFormat = `---
+apiVersion: v1
+clusters:
+- name: foo-cluster
+  cluster:
+    server: %s
+contexts:
+- name: foo-context
+  context:
+    cluster: foo-cluster
+current-context: foo-context
+kind: Config
+`
 
 func TestNewInitData(t *testing.T) {
 	// create temp directory
@@ -117,6 +135,7 @@ func TestNewInitData(t *testing.T) {
 							CRISocket:             expectedCRISocket,
 							IgnorePreflightErrors: []string{"c", "d"},
 							ImagePullPolicy:       "IfNotPresent",
+							ImagePullSerial:       ptr.To(true),
 						},
 						LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 							AdvertiseAddress: "1.2.3.4",
@@ -134,7 +153,7 @@ func TestNewInitData(t *testing.T) {
 						},
 					},
 				}
-				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(initData{}), cmpopts.IgnoreFields(initData{}, "client", "cfg.ClusterConfiguration", "cfg.NodeRegistration.Taints")); diff != "" {
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(initData{}), cmpopts.IgnoreFields(initData{}, "client", "cfg.ClusterConfiguration", "cfg.NodeRegistration.Taints", "cfg.Timeouts")); diff != "" {
 					t.Fatalf("newInitData returned data (-want,+got):\n%s", diff)
 				}
 			},
@@ -347,5 +366,40 @@ func expectedInitIgnorePreflightErrors(expectedItems ...string) func(t *testing.
 		if !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
 			t.Errorf("Invalid ignore preflight errors in InitConfiguration. Expected: %v. Actual: %v", sets.List(expected), data.cfg.NodeRegistration.IgnorePreflightErrors)
 		}
+	}
+}
+
+func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer ts.Close()
+
+	kubeconfigPath := filepath.Join(t.TempDir(), "custom.conf")
+	if err := os.WriteFile(kubeconfigPath, []byte(fmt.Sprintf(testKubeconfigDataFormat, ts.URL)), 0o600); err != nil {
+		t.Fatalf("os.WriteFile returned unexpected error: %v", err)
+	}
+
+	// initialize an external init option and inject it to the init cmd
+	initOptions := newInitOptions()
+	initOptions.skipCRIDetect = true // avoid CRI detection in unit tests
+	initOptions.kubeconfigPath = kubeconfigPath
+	cmd := newCmdInit(nil, initOptions)
+
+	data, err := newInitData(cmd, nil, initOptions, nil)
+	if err != nil {
+		t.Fatalf("newInitData returned unexpected error: %v", err)
+	}
+
+	client, err := data.Client()
+	if err != nil {
+		t.Fatalf("data.Client returned unexpected error: %v", err)
+	}
+
+	result := client.Discovery().RESTClient().Verb("HEAD").Do(context.Background())
+	if err := result.Error(); err != nil {
+		t.Fatalf("REST client request returned unexpected error: %v", err)
 	}
 }

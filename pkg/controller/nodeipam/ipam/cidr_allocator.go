@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -159,4 +161,15 @@ func ipnetToStringList(inCIDRs []*net.IPNet) []string {
 		outCIDRs[idx] = inCIDR.String()
 	}
 	return outCIDRs
+}
+
+// occupyServiceCIDR removes the service CIDR range from the cluster CIDR if it
+// intersects.
+func occupyServiceCIDR(set *cidrset.CidrSet, clusterCIDR, serviceCIDR *net.IPNet) error {
+	if clusterCIDR.Contains(serviceCIDR.IP) || serviceCIDR.Contains(clusterCIDR.IP) {
+		if err := set.Occupy(serviceCIDR); err != nil {
+			return err
+		}
+	}
+	return nil
 }

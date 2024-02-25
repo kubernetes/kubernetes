@@ -64,19 +64,18 @@ func parseNodeIP(nodeIP string, allowDual, sloppy bool) ([]net.IP, error) {
 
 // ParseNodeIPArgument parses kubelet's --node-ip argument. If nodeIP contains invalid
 // values, they will be logged and ignored. Dual-stack node IPs are allowed if
-// cloudProvider is unset, or if it is `"external"` and allowCloudDualStack is true.
-func ParseNodeIPArgument(nodeIP, cloudProvider string, allowCloudDualStack bool) ([]net.IP, error) {
+// cloudProvider is unset or `"external"`.
+func ParseNodeIPArgument(nodeIP, cloudProvider string) ([]net.IP, error) {
 	var allowDualStack bool
-	if (cloudProvider == cloudProviderNone) || (cloudProvider == cloudProviderExternal && allowCloudDualStack) {
+	if cloudProvider == cloudProviderNone || cloudProvider == cloudProviderExternal {
 		allowDualStack = true
 	}
 	return parseNodeIP(nodeIP, allowDualStack, true)
 }
 
 // ParseNodeIPAnnotation parses the `alpha.kubernetes.io/provided-node-ip` annotation,
-// which can be either a single IP address or (if allowDualStack is true) a
-// comma-separated pair of IP addresses. Unlike with ParseNodeIPArgument, invalid values
-// are considered an error.
-func ParseNodeIPAnnotation(nodeIP string, allowDualStack bool) ([]net.IP, error) {
-	return parseNodeIP(nodeIP, allowDualStack, false)
+// which can be either a single IP address or a comma-separated pair of IP addresses.
+// Unlike with ParseNodeIPArgument, invalid values are considered an error.
+func ParseNodeIPAnnotation(nodeIP string) ([]net.IP, error) {
+	return parseNodeIP(nodeIP, true, false)
 }

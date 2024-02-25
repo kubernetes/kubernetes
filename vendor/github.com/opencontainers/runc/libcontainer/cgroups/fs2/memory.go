@@ -100,7 +100,7 @@ func statMemory(dirPath string, stats *cgroups.Stats) error {
 	memoryUsage, err := getMemoryDataV2(dirPath, "")
 	if err != nil {
 		if errors.Is(err, unix.ENOENT) && dirPath == UnifiedMountpoint {
-			// The root cgroup does not have memory.{current,max}
+			// The root cgroup does not have memory.{current,max,peak}
 			// so emulate those using data from /proc/meminfo and
 			// /sys/fs/cgroup/memory.stat
 			return rootStatsFromMeminfo(stats)
@@ -108,10 +108,12 @@ func statMemory(dirPath string, stats *cgroups.Stats) error {
 		return err
 	}
 	stats.MemoryStats.Usage = memoryUsage
-	swapUsage, err := getMemoryDataV2(dirPath, "swap")
+	swapOnlyUsage, err := getMemoryDataV2(dirPath, "swap")
 	if err != nil {
 		return err
 	}
+	stats.MemoryStats.SwapOnlyUsage = swapOnlyUsage
+	swapUsage := swapOnlyUsage
 	// As cgroup v1 reports SwapUsage values as mem+swap combined,
 	// while in cgroup v2 swap values do not include memory,
 	// report combined mem+swap for v1 compatibility.
@@ -119,6 +121,9 @@ func statMemory(dirPath string, stats *cgroups.Stats) error {
 	if swapUsage.Limit != math.MaxUint64 {
 		swapUsage.Limit += memoryUsage.Limit
 	}
+	// The `MaxUsage` of mem+swap cannot simply combine mem with
+	// swap. So set it to 0 for v1 compatibility.
+	swapUsage.MaxUsage = 0
 	stats.MemoryStats.SwapUsage = swapUsage
 
 	return nil
@@ -133,6 +138,7 @@ func getMemoryDataV2(path, name string) (cgroups.MemoryData, error) {
 	}
 	usage := moduleName + ".current"
 	limit := moduleName + ".max"
+	maxUsage := moduleName + ".peak"
 
 	value, err := fscommon.GetCgroupParamUint(path, usage)
 	if err != nil {
@@ -151,6 +157,14 @@ func getMemoryDataV2(path, name string) (cgroups.MemoryData, error) {
 		return cgroups.MemoryData{}, err
 	}
 	memoryData.Limit = value
+
+	// `memory.peak` since kernel 5.19
+	// `memory.swap.peak` since kernel 6.5
+	value, err = fscommon.GetCgroupParamUint(path, maxUsage)
+	if err != nil && !os.IsNotExist(err) {
+		return cgroups.MemoryData{}, err
+	}
+	memoryData.MaxUsage = value
 
 	return memoryData, nil
 }

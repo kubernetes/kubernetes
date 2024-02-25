@@ -28,8 +28,6 @@ const (
 	Error   HealthcheckStatus = "error"
 )
 
-type HealthcheckType string
-
 var (
 	// healthcheck is a Prometheus Gauge metrics used for recording the results of a k8s healthcheck.
 	healthcheck = k8smetrics.NewGaugeVec(
@@ -57,6 +55,7 @@ var (
 func Register(registry k8smetrics.KubeRegistry) {
 	registry.Register(healthcheck)
 	registry.Register(healthchecksTotal)
+	_ = k8smetrics.RegisterProcessStartTime(registry.Register)
 }
 
 func ResetHealthMetrics() {

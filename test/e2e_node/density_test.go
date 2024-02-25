@@ -76,7 +76,7 @@ var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), fun
 		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
-	ginkgo.Context("create a batch of pods", func() {
+	f.Context("create a batch of pods", framework.WithFlaky(), func() {
 		// TODO(coufon): the values are generous, set more precise limits with benchmark data
 		// and add more tests
 		dTests := []densityTest{
@@ -225,7 +225,7 @@ var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), fun
 		}
 	})
 
-	ginkgo.Context("create a sequence of pods", func() {
+	f.Context("create a sequence of pods", framework.WithFlaky(), func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,

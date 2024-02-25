@@ -192,7 +192,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.ShareProcesses, "share-processes", o.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Debugging profile. Options are "legacy", "general", "baseline", "netadmin", or "restricted".`))
+	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -213,14 +213,15 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
-		// Downstream tools may want to use their own customized
-		// attach function to do extra work or use attach command
-		// with different flags instead of the static one defined in
-		// handleAttachPod. But if this function is not set explicitly,
-		// we fall back to default.
-		if o.AttachFunc == nil {
-			o.AttachFunc = o.handleAttachPod
-		}
+	}
+
+	// Downstream tools may want to use their own customized
+	// attach function to do extra work or use attach command
+	// with different flags instead of the static one defined in
+	// handleAttachPod. But if this function is not set explicitly,
+	// we fall back to default.
+	if o.AttachFunc == nil {
+		o.AttachFunc = o.handleAttachPod
 	}
 
 	// Environment

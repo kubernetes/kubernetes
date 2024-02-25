@@ -180,7 +180,16 @@ type Issuer struct {
 	URL                  string
 	CertificateAuthority string
 	Audiences            []string
+	AudienceMatchPolicy  AudienceMatchPolicyType
 }
+
+// AudienceMatchPolicyType is a set of valid values for Issuer.AudienceMatchPolicy
+type AudienceMatchPolicyType string
+
+// Valid types for AudienceMatchPolicyType
+const (
+	AudienceMatchPolicyMatchAny AudienceMatchPolicyType = "MatchAny"
+)
 
 // ClaimValidationRule provides the configuration for a single claim validation rule.
 type ClaimValidationRule struct {

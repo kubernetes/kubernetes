@@ -155,8 +155,9 @@ func CreateTestClient() *fake.Clientset {
 			// We want also the "mynode" node since all the testing pods live there
 			nodeName = nodeNamePrefix
 		}
-		attachVolumeToNode(nodes, "lostVolumeName", nodeName)
+		attachVolumeToNode(nodes, "lostVolumeName", nodeName, false)
 	}
+	attachVolumeToNode(nodes, "inUseVolume", nodeNamePrefix, true)
 	fakeClient.AddReactor("update", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		updateAction := action.(core.UpdateAction)
 		node := updateAction.GetObject().(*v1.Node)
@@ -312,21 +313,18 @@ func NewNFSPV(pvName, volumeName string) *v1.PersistentVolume {
 	}
 }
 
-func attachVolumeToNode(nodes *v1.NodeList, volumeName, nodeName string) {
+func attachVolumeToNode(nodes *v1.NodeList, volumeName, nodeName string, inUse bool) {
 	// if nodeName exists, get the object.. if not create node object
 	var node *v1.Node
-	found := false
-	nodes.Size()
 	for i := range nodes.Items {
-		curNode := nodes.Items[i]
+		curNode := &nodes.Items[i]
 		if curNode.ObjectMeta.Name == nodeName {
-			node = &curNode
-			found = true
+			node = curNode
 			break
 		}
 	}
-	if !found {
-		node = &v1.Node{
+	if node == nil {
+		nodes.Items = append(nodes.Items, v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: nodeName,
 				Labels: map[string]string{
@@ -336,24 +334,19 @@ func attachVolumeToNode(nodes *v1.NodeList, volumeName, nodeName string) {
 					util.ControllerManagedAttachAnnotation: "true",
 				},
 			},
-			Status: v1.NodeStatus{
-				VolumesAttached: []v1.AttachedVolume{
-					{
-						Name:       v1.UniqueVolumeName(TestPluginName + "/" + volumeName),
-						DevicePath: "fake/path",
-					},
-				},
-			},
-		}
-	} else {
-		volumeAttached := v1.AttachedVolume{
-			Name:       v1.UniqueVolumeName(TestPluginName + "/" + volumeName),
-			DevicePath: "fake/path",
-		}
-		node.Status.VolumesAttached = append(node.Status.VolumesAttached, volumeAttached)
+		})
+		node = &nodes.Items[len(nodes.Items)-1]
 	}
+	uniqueVolumeName := v1.UniqueVolumeName(TestPluginName + "/" + volumeName)
+	volumeAttached := v1.AttachedVolume{
+		Name:       uniqueVolumeName,
+		DevicePath: "fake/path",
+	}
+	node.Status.VolumesAttached = append(node.Status.VolumesAttached, volumeAttached)
 
-	nodes.Items = append(nodes.Items, *node)
+	if inUse {
+		node.Status.VolumesInUse = append(node.Status.VolumesInUse, uniqueVolumeName)
+	}
 }
 
 type TestPlugin struct {

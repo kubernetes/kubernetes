@@ -60,7 +60,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
-	"k8s.io/utils/integer"
 )
 
 const (
@@ -768,7 +767,7 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 func slowStartBatch(count int, initialBatchSize int, fn func() error) (int, error) {
 	remaining := count
 	successes := 0
-	for batchSize := integer.IntMin(remaining, initialBatchSize); batchSize > 0; batchSize = integer.IntMin(2*batchSize, remaining) {
+	for batchSize := min(remaining, initialBatchSize); batchSize > 0; batchSize = min(2*batchSize, remaining) {
 		errCh := make(chan error, batchSize)
 		var wg sync.WaitGroup
 		wg.Add(batchSize)

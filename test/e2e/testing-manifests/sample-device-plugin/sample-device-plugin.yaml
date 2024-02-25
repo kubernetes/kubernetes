@@ -35,7 +35,7 @@ spec:
         hostPath:
           path: /var/run/cdi
       containers:
-      - image: registry.k8s.io/e2e-test-images/sample-device-plugin:1.3
+      - image: registry.k8s.io/e2e-test-images/sample-device-plugin:1.7
         name: sample-device-plugin
         env:
         - name: PLUGIN_SOCK_DIR

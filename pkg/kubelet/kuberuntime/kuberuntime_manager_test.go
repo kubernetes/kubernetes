@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	goruntime "runtime"
 	"sort"
 	"testing"
 	"time"
@@ -2466,10 +2465,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 }
 
 func TestUpdatePodContainerResources(t *testing.T) {
-	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
-	if goruntime.GOOS == "windows" {
-		t.Skip("Updating Pod Container Resources is not supported on Windows.")
-	}
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB

@@ -158,3 +158,10 @@ func (proxier *metaProxier) OnNodeSynced() {
 	proxier.ipv4Proxier.OnNodeSynced()
 	proxier.ipv6Proxier.OnNodeSynced()
 }
+
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *metaProxier) OnServiceCIDRsChanged(cidrs []string) {
+	proxier.ipv4Proxier.OnServiceCIDRsChanged(cidrs)
+	proxier.ipv6Proxier.OnServiceCIDRsChanged(cidrs)
+}

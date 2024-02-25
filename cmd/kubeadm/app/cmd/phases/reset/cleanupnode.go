@@ -81,13 +81,20 @@ func runCleanupNode(c workflow.RunData) error {
 	}
 
 	if !r.DryRun() {
-		// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
-		fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
-		// In case KubeletRunDirectory holds a symbolic link, evaluate it
-		kubeletRunDir, err := absoluteKubeletRunDirectory()
-		if err == nil {
-			// Only clean absoluteKubeletRunDirectory if umountDirsCmd passed without error
-			dirsToClean = append(dirsToClean, kubeletRunDir)
+		// In case KubeletRunDirectory holds a symbolic link, evaluate it.
+		// This would also throw an error if the directory does not exist.
+		kubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
+		if err != nil {
+			klog.Warningf("[reset] Skipping unmount of directories in %q: %v\n",
+				kubeadmconstants.KubeletRunDirectory, err)
+		} else {
+			// Unmount all mount paths under kubeletRunDirectory.
+			fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+			if err := unmountKubeletDirectory(kubeletRunDirectory, r.ResetCfg().UnmountFlags); err != nil {
+				return err
+			}
+			// Clean the kubeletRunDirectory.
+			dirsToClean = append(dirsToClean, kubeletRunDirectory)
 		}
 	} else {
 		fmt.Printf("[reset] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
@@ -126,20 +133,6 @@ func runCleanupNode(c workflow.RunData) error {
 	}
 
 	return nil
-}
-
-func absoluteKubeletRunDirectory() (string, error) {
-	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
-	if err != nil {
-		klog.Warningf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v\n", kubeadmconstants.KubeletRunDirectory, err)
-		return "", err
-	}
-	err = unmountKubeletDirectory(absoluteKubeletRunDirectory)
-	if err != nil {
-		klog.Warningf("[reset] Failed to unmount mounted directories in %s \n", kubeadmconstants.KubeletRunDirectory)
-		return "", err
-	}
-	return absoluteKubeletRunDirectory, nil
 }
 
 func removeContainers(execer utilsexec.Interface, criSocketPath string) error {

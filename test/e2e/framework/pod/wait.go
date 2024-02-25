@@ -75,7 +75,7 @@ func BeRunningNoRetries() types.GomegaMatcher {
 		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed, v1.PodSucceeded:
-				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead.", v1.PodRunning, pod.Status.Phase))
+				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
 			default:
 				return true, nil
 			}
@@ -518,11 +518,6 @@ func WaitForPodSuccessInNamespace(ctx context.Context, c clientset.Interface, po
 	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, podStartTimeout)
 }
 
-// WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
-func WaitForPodSuccessInNamespaceSlow(ctx context.Context, c clientset.Interface, podName string, namespace string) error {
-	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, slowPodStartTimeout)
-}
-
 // WaitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.
 // Unlike `waitForPodTerminatedInNamespace`, the pod's Phase and Reason are ignored. If the pod Get
 // api returns IsNotFound then the wait stops and nil is returned. If the Get api returns an error other
@@ -773,6 +768,21 @@ func WaitForContainerRunning(ctx context.Context, c clientset.Interface, namespa
 			for _, cs := range statuses {
 				if cs.Name == containerName {
 					return cs.State.Running != nil, nil
+				}
+			}
+		}
+		return false, nil
+	})
+}
+
+// WaitForContainerTerminated waits for the given Pod container to have a state of terminated
+func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %s terminated", containerName)
+	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
+			for _, cs := range statuses {
+				if cs.Name == containerName {
+					return cs.State.Terminated != nil, nil
 				}
 			}
 		}

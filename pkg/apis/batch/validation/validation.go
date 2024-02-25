@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -64,23 +65,23 @@ const (
 
 var (
 	supportedPodFailurePolicyActions = sets.New(
-		string(batch.PodFailurePolicyActionCount),
-		string(batch.PodFailurePolicyActionFailIndex),
-		string(batch.PodFailurePolicyActionFailJob),
-		string(batch.PodFailurePolicyActionIgnore))
+		batch.PodFailurePolicyActionCount,
+		batch.PodFailurePolicyActionFailIndex,
+		batch.PodFailurePolicyActionFailJob,
+		batch.PodFailurePolicyActionIgnore)
 
 	supportedPodFailurePolicyOnExitCodesOperator = sets.New(
-		string(batch.PodFailurePolicyOnExitCodesOpIn),
-		string(batch.PodFailurePolicyOnExitCodesOpNotIn))
+		batch.PodFailurePolicyOnExitCodesOpIn,
+		batch.PodFailurePolicyOnExitCodesOpNotIn)
 
 	supportedPodFailurePolicyOnPodConditionsStatus = sets.New(
-		string(api.ConditionFalse),
-		string(api.ConditionTrue),
-		string(api.ConditionUnknown))
+		api.ConditionFalse,
+		api.ConditionTrue,
+		api.ConditionUnknown)
 
 	supportedPodReplacementPolicy = sets.New(
-		string(batch.Failed),
-		string(batch.TerminatingOrFailed))
+		batch.Failed,
+		batch.TerminatingOrFailed)
 )
 
 // validateGeneratedSelector validates that the generated selector on a controller object match the controller object
@@ -207,7 +208,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	}
 	if spec.CompletionMode != nil {
 		if *spec.CompletionMode != batch.NonIndexedCompletion && *spec.CompletionMode != batch.IndexedCompletion {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("completionMode"), spec.CompletionMode, []string{string(batch.NonIndexedCompletion), string(batch.IndexedCompletion)}))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("completionMode"), spec.CompletionMode, []batch.CompletionMode{batch.NonIndexedCompletion, batch.IndexedCompletion}))
 		}
 		if *spec.CompletionMode == batch.IndexedCompletion {
 			if spec.Completions == nil {
@@ -260,7 +261,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 			fmt.Sprintf("valid values: %q, %q", api.RestartPolicyOnFailure, api.RestartPolicyNever)))
 	} else if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure && spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"),
-			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
+			spec.Template.Spec.RestartPolicy, []api.RestartPolicy{api.RestartPolicyOnFailure, api.RestartPolicyNever}))
 	} else if spec.PodFailurePolicy != nil && spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "spec", "restartPolicy"),
 			spec.Template.Spec.RestartPolicy, fmt.Sprintf("only %q is supported when podFailurePolicy is specified", api.RestartPolicyNever)))
@@ -293,10 +294,10 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 		// If PodFailurePolicy is specified then we only allow Failed.
 		if spec.PodFailurePolicy != nil {
 			if *spec.PodReplacementPolicy != batch.Failed {
-				allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, []string{string(batch.Failed)}))
+				allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, []batch.PodReplacementPolicy{batch.Failed}))
 			}
 			// If PodFailurePolicy not specified we allow values in supportedPodReplacementPolicy.
-		} else if !supportedPodReplacementPolicy.Has(string(*spec.PodReplacementPolicy)) {
+		} else if !supportedPodReplacementPolicy.Has(*spec.PodReplacementPolicy) {
 			allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, sets.List(supportedPodReplacementPolicy)))
 		}
 	}
@@ -312,7 +313,7 @@ func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePol
 		if spec.BackoffLimitPerIndex == nil {
 			allErrs = append(allErrs, field.Invalid(actionPath, rule.Action, "requires the backoffLimitPerIndex to be set"))
 		}
-	} else if !supportedPodFailurePolicyActions.Has(string(rule.Action)) {
+	} else if !supportedPodFailurePolicyActions.Has(rule.Action) {
 		allErrs = append(allErrs, field.NotSupported(actionPath, rule.Action, sets.List(supportedPodFailurePolicyActions)))
 	}
 	if rule.OnExitCodes != nil {
@@ -341,7 +342,7 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(pattern.Type), patternPath.Child("type"))...)
 		if pattern.Status == "" {
 			allErrs = append(allErrs, field.Required(statusPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnPodConditionsStatus))))
-		} else if !supportedPodFailurePolicyOnPodConditionsStatus.Has(string(pattern.Status)) {
+		} else if !supportedPodFailurePolicyOnPodConditionsStatus.Has(pattern.Status) {
 			allErrs = append(allErrs, field.NotSupported(statusPath, pattern.Status, sets.List(supportedPodFailurePolicyOnPodConditionsStatus)))
 		}
 	}
@@ -353,7 +354,7 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {
 		allErrs = append(allErrs, field.Required(operatorPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnExitCodesOperator))))
-	} else if !supportedPodFailurePolicyOnExitCodesOperator.Has(string(onExitCode.Operator)) {
+	} else if !supportedPodFailurePolicyOnExitCodesOperator.Has(onExitCode.Operator) {
 		allErrs = append(allErrs, field.NotSupported(operatorPath, onExitCode.Operator, sets.List(supportedPodFailurePolicyOnExitCodesOperator)))
 	}
 	if onExitCode.ContainerName != nil && !containerNames.Has(*onExitCode.ContainerName) {
@@ -402,25 +403,25 @@ func validateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 	}
 	if status.UncountedTerminatedPods != nil {
 		path := fldPath.Child("uncountedTerminatedPods")
-		seen := sets.NewString()
+		seen := sets.New[types.UID]()
 		for i, k := range status.UncountedTerminatedPods.Succeeded {
 			p := path.Child("succeeded").Index(i)
 			if k == "" {
 				allErrs = append(allErrs, field.Invalid(p, k, "must not be empty"))
-			} else if seen.Has(string(k)) {
+			} else if seen.Has(k) {
 				allErrs = append(allErrs, field.Duplicate(p, k))
 			} else {
-				seen.Insert(string(k))
+				seen.Insert(k)
 			}
 		}
 		for i, k := range status.UncountedTerminatedPods.Failed {
 			p := path.Child("failed").Index(i)
 			if k == "" {
 				allErrs = append(allErrs, field.Invalid(p, k, "must not be empty"))
-			} else if seen.Has(string(k)) {
+			} else if seen.Has(k) {
 				allErrs = append(allErrs, field.Duplicate(p, k))
 			} else {
-				seen.Insert(string(k))
+				seen.Insert(k)
 			}
 		}
 	}
@@ -561,7 +562,7 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	default:
-		validValues := []string{string(batch.AllowConcurrent), string(batch.ForbidConcurrent), string(batch.ReplaceConcurrent)}
+		validValues := []batch.ConcurrencyPolicy{batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent}
 		allErrs = append(allErrs, field.NotSupported(fldPath, *concurrencyPolicy, validValues))
 	}
 

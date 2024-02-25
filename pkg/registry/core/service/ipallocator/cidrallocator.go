@@ -178,7 +178,7 @@ func (c *MetaAllocator) processNextItem() bool {
 func (c *MetaAllocator) syncTree() error {
 	now := time.Now()
 	defer func() {
-		klog.Infof("Finished sync for CIDRs took %v", time.Since(now))
+		klog.V(2).Infof("Finished sync for CIDRs took %v", time.Since(now))
 	}()
 
 	serviceCIDRs, err := c.serviceCIDRLister.List(labels.Everything())

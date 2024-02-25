@@ -30,8 +30,8 @@ DOCKER="${DOCKER:-docker}"
 
 # required version for this script, if not installed on the host we will
 # use the official docker image instead. keep this in sync with SHELLCHECK_IMAGE
-SHELLCHECK_VERSION="0.8.0"
-SHELLCHECK_IMAGE="docker.io/koalaman/shellcheck-alpine:v0.8.0@sha256:f42fde76d2d14a645a848826e54a4d650150e151d9c81057c898da89a82c8a56"
+SHELLCHECK_VERSION="0.9.0"
+SHELLCHECK_IMAGE="docker.io/koalaman/shellcheck-alpine:v0.9.0@sha256:e19ed93c22423970d56568e171b4512c9244fc75dd9114045016b4a0073ac4b7"
 
 # disabled lints
 disabled=(

@@ -83,7 +83,8 @@ const (
 	SuccessAndFailOnMountDeviceName = "success-and-failed-mount-device-name"
 
 	// FailWithInUseVolumeName will cause NodeExpandVolume to result in FailedPrecondition error
-	FailWithInUseVolumeName = "fail-expansion-in-use"
+	FailWithInUseVolumeName       = "fail-expansion-in-use"
+	FailWithUnSupportedVolumeName = "fail-expansion-unsupported"
 
 	FailVolumeExpansion = "fail-expansion-test"
 
@@ -500,8 +501,12 @@ func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOption
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}
+	if resizeOptions.VolumeSpec.Name() == FailWithUnSupportedVolumeName {
+		return false, volumetypes.NewOperationNotSupportedError("volume-unsupported")
+	}
+
 	if resizeOptions.VolumeSpec.Name() == AlwaysFailNodeExpansion {
-		return false, fmt.Errorf("Test failure: NodeExpand")
+		return false, fmt.Errorf("test failure: NodeExpand")
 	}
 
 	if resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {

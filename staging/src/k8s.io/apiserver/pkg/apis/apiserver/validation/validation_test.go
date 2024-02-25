@@ -269,11 +269,13 @@ func TestValidateURL(t *testing.T) {
 
 func TestValidateAudiences(t *testing.T) {
 	fldPath := field.NewPath("issuer", "audiences")
+	audienceMatchPolicyFldPath := field.NewPath("issuer", "audienceMatchPolicy")
 
 	testCases := []struct {
-		name string
-		in   []string
-		want string
+		name        string
+		in          []string
+		matchPolicy string
+		want        string
 	}{
 		{
 			name: "audiences is empty",
@@ -281,25 +283,49 @@ func TestValidateAudiences(t *testing.T) {
 			want: "issuer.audiences: Required value: at least one issuer.audiences is required",
 		},
 		{
-			name: "at most one audiences is allowed",
-			in:   []string{"audience1", "audience2"},
-			want: "issuer.audiences: Too many: 2: must have at most 1 items",
-		},
-		{
 			name: "audience is empty",
 			in:   []string{""},
 			want: "issuer.audiences[0]: Required value: audience can't be empty",
+		},
+		{
+			name:        "invalid match policy with single audience",
+			in:          []string{"audience"},
+			matchPolicy: "MatchExact",
+			want:        `issuer.audienceMatchPolicy: Invalid value: "MatchExact": audienceMatchPolicy must be empty or MatchAny for single audience`,
 		},
 		{
 			name: "valid audience",
 			in:   []string{"audience"},
 			want: "",
 		},
+		{
+			name:        "valid audience with MatchAny policy",
+			in:          []string{"audience"},
+			matchPolicy: "MatchAny",
+			want:        "",
+		},
+		{
+			name:        "duplicate audience",
+			in:          []string{"audience", "audience"},
+			matchPolicy: "MatchAny",
+			want:        `issuer.audiences[1]: Duplicate value: "audience"`,
+		},
+		{
+			name: "match policy not set with multiple audiences",
+			in:   []string{"audience1", "audience2"},
+			want: `issuer.audienceMatchPolicy: Invalid value: "": audienceMatchPolicy must be MatchAny for multiple audiences`,
+		},
+		{
+			name:        "valid multiple audiences",
+			in:          []string{"audience1", "audience2"},
+			matchPolicy: "MatchAny",
+			want:        "",
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateAudiences(tt.in, fldPath).ToAggregate()
+			got := validateAudiences(tt.in, api.AudienceMatchPolicyType(tt.matchPolicy), fldPath, audienceMatchPolicyFldPath).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("Audiences validation mismatch (-want +got):\n%s", d)
 			}

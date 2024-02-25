@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -51,8 +50,6 @@ import (
 	"k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/controller-manager/pkg/features"
 	_ "k8s.io/controller-manager/pkg/features/register"
 
 	utilpointer "k8s.io/utils/pointer"
@@ -460,177 +457,6 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
 			compareUpdateCalls(t, item.expectedUpdateCalls, cloud.UpdateCalls)
-		})
-	}
-}
-
-func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StableLoadBalancerNodeSet, false)()
-	node1 := makeNode(tweakName("node1"), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
-	node2 := makeNode(tweakName("node2"), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
-	node3 := makeNode(tweakName("node3"), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
-	node2NotReady := makeNode(tweakName("node2"), tweakSetCondition(v1.NodeReady, v1.ConditionFalse))
-	node2Tainted := makeNode(tweakName("node2"), tweakAddTaint(ToBeDeletedTaint), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
-	node2SpuriousChange := makeNode(tweakName("node2"), tweakAddTaint("Other"), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
-	node2Exclude := makeNode(tweakName("node2"), tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakSetCondition(v1.NodeReady, v1.ConditionTrue))
-
-	type stateChanges struct {
-		nodes       []*v1.Node
-		syncCallErr bool
-	}
-
-	etpLocalservice1 := newService("s0", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
-	etpLocalservice2 := newService("s1", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
-	service3 := defaultExternalService()
-
-	services := []*v1.Service{etpLocalservice1, etpLocalservice2, service3}
-
-	for _, tc := range []struct {
-		desc                string
-		expectedUpdateCalls []fakecloud.UpdateBalancerCall
-		stateChanges        []stateChanges
-		initialState        []*v1.Node
-	}{{
-		desc:         "No node changes",
-		initialState: []*v1.Node{node1, node2, node3},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
-	}, {
-		desc:         "1 new node gets added",
-		initialState: []*v1.Node{node1, node2},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
-			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
-			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
-		},
-	}, {
-		desc:         "1 new node gets added - with retries",
-		initialState: []*v1.Node{node1, node2},
-		stateChanges: []stateChanges{
-			{
-				nodes:       []*v1.Node{node1, node2, node3},
-				syncCallErr: true,
-			},
-			{
-				nodes: []*v1.Node{node1, node2, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
-			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
-			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
-		},
-	}, {
-		desc:         "1 node goes NotReady",
-		initialState: []*v1.Node{node1, node2, node3},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2NotReady, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-			{Service: service3, Hosts: []*v1.Node{node1, node3}},
-		},
-	}, {
-		desc:         "1 node gets Tainted",
-		initialState: []*v1.Node{node1, node2, node3},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2Tainted, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-			{Service: service3, Hosts: []*v1.Node{node1, node3}},
-		},
-	}, {
-		desc:         "1 node goes Ready",
-		initialState: []*v1.Node{node1, node2NotReady, node3},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
-			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
-			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
-		},
-	}, {
-		desc:         "1 node get excluded",
-		initialState: []*v1.Node{node1, node2, node3},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2Exclude, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-			{Service: service3, Hosts: []*v1.Node{node1, node3}},
-		},
-	}, {
-		desc:         "1 old node gets deleted",
-		initialState: []*v1.Node{node1, node2, node3},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2}},
-			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2}},
-			{Service: service3, Hosts: []*v1.Node{node1, node2}},
-		},
-	}, {
-		desc:         "1 spurious node update",
-		initialState: []*v1.Node{node1, node2, node3},
-		stateChanges: []stateChanges{
-			{
-				nodes: []*v1.Node{node1, node2SpuriousChange, node3},
-			},
-		},
-		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
-	}} {
-		t.Run(tc.desc, func(t *testing.T) {
-			controller, cloud, _ := newController(nil)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			for _, svc := range services {
-				key, _ := cache.MetaNamespaceKeyFunc(svc)
-				controller.lastSyncedNodes[key] = tc.initialState
-			}
-
-			for _, state := range tc.stateChanges {
-				setupState := func() {
-					controller.nodeLister = newFakeNodeLister(nil, state.nodes...)
-					if state.syncCallErr {
-						cloud.Err = fmt.Errorf("error please")
-					}
-				}
-				cleanupState := func() {
-					cloud.Err = nil
-				}
-				setupState()
-				controller.updateLoadBalancerHosts(ctx, services, 3)
-				cleanupState()
-			}
-
-			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
 		})
 	}
 }
@@ -2150,45 +1976,13 @@ func tweakProviderID(id string) nodeTweak {
 
 func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 	testcases := []struct {
-		name                 string
-		oldNode              *v1.Node
-		newNode              *v1.Node
-		shouldSync           bool
-		stableNodeSetEnabled bool
+		name       string
+		oldNode    *v1.Node
+		newNode    *v1.Node
+		shouldSync bool
 	}{{
 		name:       "nothing changed",
 		oldNode:    makeNode(),
-		newNode:    makeNode(),
-		shouldSync: false,
-	}, {
-		name:                 "nothing changed",
-		oldNode:              makeNode(),
-		newNode:              makeNode(),
-		shouldSync:           false,
-		stableNodeSetEnabled: true,
-	}, {
-		name:       "taint F->T",
-		oldNode:    makeNode(),
-		newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-		shouldSync: true,
-	}, {
-		name:       "taint T->F",
-		oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-		newNode:    makeNode(),
-		shouldSync: true,
-	}, {
-		name:       "taint T->T",
-		oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-		newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-		shouldSync: false,
-	}, {
-		name:       "other taint F->T",
-		oldNode:    makeNode(),
-		newNode:    makeNode(tweakAddTaint("other")),
-		shouldSync: false,
-	}, {
-		name:       "other taint T->F",
-		oldNode:    makeNode(tweakAddTaint("other")),
 		newNode:    makeNode(),
 		shouldSync: false,
 	}, {
@@ -2207,23 +2001,15 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
 		shouldSync: false,
 	}, {
-		name:                 "excluded F->T",
-		oldNode:              makeNode(),
-		newNode:              makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-		shouldSync:           true,
-		stableNodeSetEnabled: true,
+		name:       "other taint F->T",
+		oldNode:    makeNode(),
+		newNode:    makeNode(tweakAddTaint("other")),
+		shouldSync: false,
 	}, {
-		name:                 "excluded changed T->F",
-		oldNode:              makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-		newNode:              makeNode(),
-		shouldSync:           true,
-		stableNodeSetEnabled: true,
-	}, {
-		name:                 "excluded changed T->T",
-		oldNode:              makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-		newNode:              makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-		shouldSync:           false,
-		stableNodeSetEnabled: true,
+		name:       "other taint T->F",
+		oldNode:    makeNode(tweakAddTaint("other")),
+		newNode:    makeNode(),
+		shouldSync: false,
 	}, {
 		name:       "other label changed F->T",
 		oldNode:    makeNode(),
@@ -2235,16 +2021,6 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		newNode:    makeNode(),
 		shouldSync: false,
 	}, {
-		name:       "readiness changed F->T",
-		oldNode:    makeNode(tweakSetReady(false)),
-		newNode:    makeNode(),
-		shouldSync: true,
-	}, {
-		name:       "readiness changed T->F",
-		oldNode:    makeNode(),
-		newNode:    makeNode(tweakSetReady(false)),
-		shouldSync: true,
-	}, {
 		name:       "readiness changed F->F",
 		oldNode:    makeNode(tweakSetReady(false)),
 		newNode:    makeNode(tweakSetReady(false)),
@@ -2255,20 +2031,10 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		newNode:    makeNode(tweakUnsetCondition(v1.NodeReady)),
 		shouldSync: false,
 	}, {
-		name:       "readiness changed T->unset",
-		oldNode:    makeNode(),
-		newNode:    makeNode(tweakUnsetCondition(v1.NodeReady)),
-		shouldSync: true,
-	}, {
 		name:       "readiness changed unset->F",
 		oldNode:    makeNode(tweakUnsetCondition(v1.NodeReady)),
 		newNode:    makeNode(tweakSetReady(false)),
 		shouldSync: false,
-	}, {
-		name:       "readiness changed unset->T",
-		oldNode:    makeNode(tweakUnsetCondition(v1.NodeReady)),
-		newNode:    makeNode(),
-		shouldSync: true,
 	}, {
 		name:       "readiness changed unset->unset",
 		oldNode:    makeNode(tweakUnsetCondition(v1.NodeReady)),
@@ -2300,48 +2066,28 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		newNode:    makeNode(tweakDeleted()),
 		shouldSync: false,
 	}, {
-		name:                 "deletionTimestamp F -> T",
-		oldNode:              makeNode(),
-		newNode:              makeNode(tweakDeleted()),
-		shouldSync:           false,
-		stableNodeSetEnabled: true,
+		name:       "providerID set F -> T",
+		oldNode:    makeNode(tweakProviderID("")),
+		newNode:    makeNode(),
+		shouldSync: true,
 	}, {
 		name:       "providerID set F -> T",
 		oldNode:    makeNode(tweakProviderID("")),
 		newNode:    makeNode(),
 		shouldSync: true,
 	}, {
-		name:                 "providerID set F -> T",
-		oldNode:              makeNode(tweakProviderID("")),
-		newNode:              makeNode(),
-		shouldSync:           true,
-		stableNodeSetEnabled: true,
-	}, {
 		name:       "providerID set T-> F",
 		oldNode:    makeNode(),
 		newNode:    makeNode(tweakProviderID("")),
 		shouldSync: true,
 	}, {
-		name:                 "providerID set T-> F",
-		oldNode:              makeNode(),
-		newNode:              makeNode(tweakProviderID("")),
-		shouldSync:           true,
-		stableNodeSetEnabled: true,
-	}, {
 		name:       "providerID change",
 		oldNode:    makeNode(),
 		newNode:    makeNode(tweakProviderID(providerID + "-2")),
 		shouldSync: true,
-	}, {
-		name:                 "providerID change",
-		oldNode:              makeNode(),
-		newNode:              makeNode(tweakProviderID(providerID + "-2")),
-		shouldSync:           true,
-		stableNodeSetEnabled: true,
 	}}
 	for _, testcase := range testcases {
-		t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, testcase.stableNodeSetEnabled), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StableLoadBalancerNodeSet, testcase.stableNodeSetEnabled)()
+		t.Run(testcase.name, func(t *testing.T) {
 			shouldSync := shouldSyncUpdatedNode(testcase.oldNode, testcase.newNode)
 			if shouldSync != testcase.shouldSync {
 				t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
@@ -2356,209 +2102,154 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 		oldNode    *v1.Node
 		newNode    *v1.Node
 		shouldSync bool
-		fgEnabled  bool
 	}
-	testcases := []testCase{}
-	for _, fgEnabled := range []bool{true, false} {
-		testcases = append(testcases, []testCase{
-			{
-				name:       "tainted T, excluded F->T",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "tainted T, excluded T->F",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "tainted T, providerID set F->T",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID("")),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "tainted T, providerID set T->F",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID("")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "tainted T, providerID change",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID(providerID+"-2")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "tainted T, ready F->T",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetReady(false)),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "tainted T, ready T->F",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetReady(false)),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "excluded T, tainted F->T",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakAddTaint(ToBeDeletedTaint)),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "excluded T, tainted T->F",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakAddTaint(ToBeDeletedTaint)),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "excluded T, ready F->T",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakSetReady(false)),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "excluded T, ready T->F",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakSetReady(false)),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "excluded T, providerID set F->T",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID("")),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "excluded T, providerID set T->F",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID("")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "excluded T, providerID change",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID(providerID+"-2")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "ready F, tainted F->T",
-				oldNode:    makeNode(tweakSetReady(false)),
-				newNode:    makeNode(tweakSetReady(false), tweakAddTaint(ToBeDeletedTaint)),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "ready F, tainted T->F",
-				oldNode:    makeNode(tweakSetReady(false), tweakAddTaint(ToBeDeletedTaint)),
-				newNode:    makeNode(tweakSetReady(false)),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "ready F, excluded F->T",
-				oldNode:    makeNode(tweakSetReady(false)),
-				newNode:    makeNode(tweakSetReady(false), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "ready F, excluded T->F",
-				oldNode:    makeNode(tweakSetReady(false), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakSetReady(false)),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "ready F, providerID set F->T",
-				oldNode:    makeNode(tweakSetReady(false), tweakProviderID("")),
-				newNode:    makeNode(tweakSetReady(false)),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "ready F, providerID set T->F",
-				oldNode:    makeNode(tweakSetReady(false)),
-				newNode:    makeNode(tweakSetReady(false), tweakProviderID("")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "ready F, providerID change",
-				oldNode:    makeNode(tweakSetReady(false)),
-				newNode:    makeNode(tweakSetReady(false), tweakProviderID(providerID+"-2")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "providerID unset, excluded F->T",
-				oldNode:    makeNode(tweakProviderID("")),
-				newNode:    makeNode(tweakProviderID(""), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "providerID unset, excluded T->F",
-				oldNode:    makeNode(tweakProviderID(""), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakProviderID("")),
-				shouldSync: true,
-				fgEnabled:  fgEnabled,
-			}, {
-				name:       "providerID unset, ready T->F",
-				oldNode:    makeNode(tweakProviderID("")),
-				newNode:    makeNode(tweakProviderID(""), tweakSetReady(true)),
-				shouldSync: false,
-				fgEnabled:  fgEnabled,
-			},
-		}...)
-	}
-	testcases = append(testcases, []testCase{
+	testcases := []testCase{
 		{
+			name:       "tainted T, excluded F->T",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: true,
+		}, {
+			name:       "tainted T, excluded T->F",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: true,
+		}, {
+			name:       "tainted T, providerID set F->T",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID("")),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: true,
+		}, {
+			name:       "tainted T, providerID set T->F",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID("")),
+			shouldSync: true,
+		}, {
+			name:       "tainted T, providerID change",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID(providerID+"-2")),
+			shouldSync: true,
+		}, {
+			name:       "tainted T, ready F->T",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetReady(false)),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: false,
+		}, {
+			name:       "tainted T, ready T->F",
+			oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakSetReady(false)),
+			shouldSync: false,
+		}, {
+			name:       "excluded T, tainted F->T",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: false,
+		}, {
+			name:       "excluded T, tainted T->F",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: false,
+		}, {
+			name:       "excluded T, ready F->T",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakSetReady(false)),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: false,
+		}, {
+			name:       "excluded T, ready T->F",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakSetReady(false)),
+			shouldSync: false,
+		}, {
+			name:       "excluded T, providerID set F->T",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID("")),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: true,
+		}, {
+			name:       "excluded T, providerID set T->F",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID("")),
+			shouldSync: true,
+		}, {
+			name:       "excluded T, providerID change",
+			oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID(providerID+"-2")),
+			shouldSync: true,
+		}, {
+			name:       "ready F, tainted F->T",
+			oldNode:    makeNode(tweakSetReady(false)),
+			newNode:    makeNode(tweakSetReady(false), tweakAddTaint(ToBeDeletedTaint)),
+			shouldSync: false,
+		}, {
+			name:       "ready F, tainted T->F",
+			oldNode:    makeNode(tweakSetReady(false), tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakSetReady(false)),
+			shouldSync: false,
+		}, {
+			name:       "ready F, excluded F->T",
+			oldNode:    makeNode(tweakSetReady(false)),
+			newNode:    makeNode(tweakSetReady(false), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: true,
+		}, {
+			name:       "ready F, excluded T->F",
+			oldNode:    makeNode(tweakSetReady(false), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakSetReady(false)),
+			shouldSync: true,
+		}, {
+			name:       "ready F, providerID set F->T",
+			oldNode:    makeNode(tweakSetReady(false), tweakProviderID("")),
+			newNode:    makeNode(tweakSetReady(false)),
+			shouldSync: true,
+		}, {
+			name:       "ready F, providerID set T->F",
+			oldNode:    makeNode(tweakSetReady(false)),
+			newNode:    makeNode(tweakSetReady(false), tweakProviderID("")),
+			shouldSync: true,
+		}, {
+			name:       "ready F, providerID change",
+			oldNode:    makeNode(tweakSetReady(false)),
+			newNode:    makeNode(tweakSetReady(false), tweakProviderID(providerID+"-2")),
+			shouldSync: true,
+		}, {
+			name:       "providerID unset, excluded F->T",
+			oldNode:    makeNode(tweakProviderID("")),
+			newNode:    makeNode(tweakProviderID(""), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			shouldSync: true,
+		}, {
+			name:       "providerID unset, excluded T->F",
+			oldNode:    makeNode(tweakProviderID(""), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+			newNode:    makeNode(tweakProviderID("")),
+			shouldSync: true,
+		}, {
+			name:       "providerID unset, ready T->F",
+			oldNode:    makeNode(tweakProviderID("")),
+			newNode:    makeNode(tweakProviderID(""), tweakSetReady(true)),
+			shouldSync: false,
+		}, {
 			name:       "providerID unset, ready F->T",
 			oldNode:    makeNode(tweakProviderID("")),
 			newNode:    makeNode(tweakProviderID(""), tweakSetReady(false)),
 			shouldSync: false,
-			fgEnabled:  true,
-		},
-		{
-			name:       "providerID unset, ready F->T",
-			oldNode:    makeNode(tweakProviderID("")),
-			newNode:    makeNode(tweakProviderID(""), tweakSetReady(false)),
-			shouldSync: true,
-			fgEnabled:  false,
 		}, {
 			name:       "providerID unset, tainted T->F",
 			oldNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
 			newNode:    makeNode(tweakProviderID("")),
 			shouldSync: false,
-			fgEnabled:  true,
-		},
-		{
-			name:       "providerID unset, tainted T->F",
-			oldNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
-			newNode:    makeNode(tweakProviderID("")),
-			shouldSync: true,
-			fgEnabled:  false,
 		}, {
 			name:       "providerID unset, tainted F->T",
 			oldNode:    makeNode(tweakProviderID("")),
 			newNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
 			shouldSync: false,
-			fgEnabled:  true,
-		}, {
-			name:       "providerID unset, tainted F->T",
-			oldNode:    makeNode(tweakProviderID("")),
-			newNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
-			shouldSync: true,
-			fgEnabled:  false,
 		},
-	}...)
+	}
+
 	for _, testcase := range testcases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StableLoadBalancerNodeSet, testcase.fgEnabled)()
-		t.Run(fmt.Sprintf("%s - StableLoadBalancerNodeSet: %v", testcase.name, testcase.fgEnabled), func(t *testing.T) {
+		t.Run(testcase.name, func(t *testing.T) {
 			shouldSync := shouldSyncUpdatedNode(testcase.oldNode, testcase.newNode)
 			if shouldSync != testcase.shouldSync {
 				t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
 			}
 		})
 	}
-
 }
 
 func TestServiceQueueDelay(t *testing.T) {

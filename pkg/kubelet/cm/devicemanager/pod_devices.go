@@ -163,7 +163,7 @@ func (pdev *podDevices) removeContainerAllocatedResources(podUID, contName strin
 	}
 }
 
-// Returns all of devices allocated to the pods being tracked, keyed by resourceName.
+// Returns all devices allocated to the pods being tracked, keyed by resourceName.
 func (pdev *podDevices) devices() map[string]sets.Set[string] {
 	ret := make(map[string]sets.Set[string])
 	pdev.RLock()

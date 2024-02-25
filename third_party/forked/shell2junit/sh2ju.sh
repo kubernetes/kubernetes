@@ -122,13 +122,13 @@ function juLog() {
   echo "+++ exit code: ${evErr}"        | tee -a ${outf}
 
   # set the appropriate error, based in the exit code and the regex
-  [[ ${evErr} != 0 ]] && err=1 || err=0
+  [[ ${evErr} -ne 0 ]] && err=1 || err=0
   out="$(${SED} -e 's/^\([^+]\)/| \1/g' "$outf")"
-  if [ ${err} = 0 ] && [ -n "${ereg:-}" ]; then
+  if [ "${err}" -eq 0 ] && [ -n "${ereg:-}" ]; then
       H=$(echo "${out}" | grep -E ${icase} "${ereg}")
       [[ -n "${H}" ]] && err=1
   fi
-  [[ ${err} != 0 ]] && echo "+++ error: ${err}"         | tee -a ${outf}
+  [[ ${err} -ne 0 ]] && echo "+++ error: ${err}"         | tee -a ${outf}
   rm -f ${outf}
 
   errMsg=$(cat ${errf})
@@ -142,7 +142,7 @@ function juLog() {
   # write the junit xml report
   ## failure tag
   local failure=""
-  if [[ ${err} != 0 ]]; then
+  if [[ ${err} -ne 0 ]]; then
       local failureMsg
       if [ -n "${failureRe}" ]; then
           failureMsg="$(echo "${errMsg}" | grep -e "${failureRe}" | ${SED} -e "s;${failureRe};;")"
@@ -195,5 +195,5 @@ EOF
 EOF
   fi
 
-  return ${err}
+  return "${err}"
 }

@@ -164,7 +164,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 // return (output, error)
 func newSMBMapping(username, password, remotepath string) (string, error) {
 	if username == "" || password == "" || remotepath == "" {
-		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remoteapth: %s)", username, sensitiveOptionsRemoved, remotepath)
+		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remotepath: %s)", username, sensitiveOptionsRemoved, remotepath)
 	}
 
 	// use PowerShell Environment Variables to store user input string to prevent command line injection
@@ -193,8 +193,8 @@ func isSMBMappingExist(remotepath string) bool {
 // check whether remotepath is valid
 // return (true, nil) if remotepath is valid
 func isValidPath(remotepath string) (bool, error) {
-	cmd := exec.Command("powershell", "/c", `Test-Path $Env:remoteapth`)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("remoteapth=%s", remotepath))
+	cmd := exec.Command("powershell", "/c", `Test-Path $Env:remotepath`)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("remotepath=%s", remotepath))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("returned output: %s, error: %v", string(output), err)

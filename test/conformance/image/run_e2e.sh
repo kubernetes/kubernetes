@@ -18,6 +18,7 @@ set -o nounset
 set -o pipefail
 
 # Shutdown the tests gracefully then save the results
+# shellcheck disable=SC2317 # false positive
 shutdown () {
     E2E_SUITE_PID=$(pgrep e2e.test)
     echo "sending TERM to ${E2E_SUITE_PID}"
@@ -41,7 +42,7 @@ saveResults() {
 if [[ -n ${E2E_USE_GO_RUNNER:-} ]]; then
     set -x
     /gorunner && ret=0 || ret=$?
-    exit ${ret}
+    exit "${ret}"
 fi
 
 # We get the TERM from kubernetes and handle it gracefully
@@ -49,7 +50,7 @@ trap shutdown TERM
 
 ginkgo_args=()
 if [[ -n ${E2E_DRYRUN:-} ]]; then
-    ginkgo_args+=("--dryRun=true")
+    ginkgo_args+=("--dry-run=true")
 fi
 
 # NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
@@ -74,4 +75,4 @@ set -x
 /usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" -v="${E2E_VERBOSITY}" > >(tee "${RESULTS_DIR}"/e2e.log) && ret=0 || ret=$?
 set +x
 saveResults
-exit ${ret}
+exit "${ret}"
