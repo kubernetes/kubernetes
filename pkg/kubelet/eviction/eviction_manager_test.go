@@ -397,8 +397,8 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 				podMaker := makePodWithPIDStats
 				summaryStatsMaker := makePIDStats
 				podsToMake := []podToMake{
-					{},
-					{},
+					{name: "pod1", priority: lowPriority, pidUsage: 500},
+					{name: "pod2", priority: defaultPriority, pidUsage: 500},
 				}
 				pods := []*v1.Pod{}
 				podStats := map[*v1.Pod]statsapi.PodStats{}
