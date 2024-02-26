@@ -45,7 +45,7 @@ type ManagerImpl struct {
 }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string) (*ManagerImpl, error) {
+func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
 	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)

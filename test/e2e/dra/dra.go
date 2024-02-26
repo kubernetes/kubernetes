@@ -28,6 +28,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/gstruct"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -82,116 +83,167 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	ginkgo.Context("kubelet", func() {
 		nodes := NewNodes(f, 1, 1)
-		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
-		b := newBuilder(f, driver)
 
-		ginkgo.It("registers plugin", func() {
-			ginkgo.By("the driver is running")
-		})
+		ginkgo.Context("with ConfigMap parameters", func() {
+			driver := NewDriver(f, nodes, networkResources)
+			b := newBuilder(f, driver)
 
-		ginkgo.It("must retry NodePrepareResources", func(ctx context.Context) {
-			// We have exactly one host.
-			m := MethodInstance{driver.Nodenames()[0], NodePrepareResourcesMethod}
-
-			driver.Fail(m, true)
-
-			ginkgo.By("waiting for container startup to fail")
-			parameters := b.parameters()
-			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
-
-			b.create(ctx, parameters, pod, template)
-
-			ginkgo.By("wait for NodePrepareResources call")
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				if driver.CallCount(m) == 0 {
-					return errors.New("NodePrepareResources not called yet")
-				}
-				return nil
-			}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
-
-			ginkgo.By("allowing container startup to succeed")
-			callCount := driver.CallCount(m)
-			driver.Fail(m, false)
-			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
-			framework.ExpectNoError(err, "start pod with inline resource claim")
-			if driver.CallCount(m) == callCount {
-				framework.Fail("NodePrepareResources should have been called again")
-			}
-		})
-
-		ginkgo.It("must not run a pod if a claim is not reserved for it", func(ctx context.Context) {
-			// Pretend that the resource is allocated and reserved for some other entity.
-			// Until the resourceclaim controller learns to remove reservations for
-			// arbitrary types we can simply fake somthing here.
-			claim := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
-			b.create(ctx, claim)
-			claim, err := f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "get claim")
-			claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
-			claim.Status.DriverName = driver.Name
-			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{
-				APIGroup: "example.com",
-				Resource: "some",
-				Name:     "thing",
-				UID:      "12345",
+			ginkgo.It("registers plugin", func() {
+				ginkgo.By("the driver is running")
 			})
-			_, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "update claim")
 
-			pod := b.podExternal()
+			ginkgo.It("must retry NodePrepareResources", func(ctx context.Context) {
+				// We have exactly one host.
+				m := MethodInstance{driver.Nodenames()[0], NodePrepareResourcesMethod}
 
-			// This bypasses scheduling and therefore the pod gets
-			// to run on the node although it never gets added to
-			// the `ReservedFor` field of the claim.
-			pod.Spec.NodeName = nodes.NodeNames[0]
-			b.create(ctx, pod)
+				driver.Fail(m, true)
 
-			gomega.Consistently(ctx, func(ctx context.Context) error {
-				testPod, err := b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-				if err != nil {
-					return fmt.Errorf("expected the test pod %s to exist: %w", pod.Name, err)
+				ginkgo.By("waiting for container startup to fail")
+				parameters := b.parameters()
+				pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+
+				b.create(ctx, parameters, pod, template)
+
+				ginkgo.By("wait for NodePrepareResources call")
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					if driver.CallCount(m) == 0 {
+						return errors.New("NodePrepareResources not called yet")
+					}
+					return nil
+				}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
+
+				ginkgo.By("allowing container startup to succeed")
+				callCount := driver.CallCount(m)
+				driver.Fail(m, false)
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "start pod with inline resource claim")
+				if driver.CallCount(m) == callCount {
+					framework.Fail("NodePrepareResources should have been called again")
 				}
-				if testPod.Status.Phase != v1.PodPending {
-					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod.Name, testPod.Status.Phase, v1.PodPending)
+			})
+
+			ginkgo.It("must not run a pod if a claim is not reserved for it", func(ctx context.Context) {
+				// Pretend that the resource is allocated and reserved for some other entity.
+				// Until the resourceclaim controller learns to remove reservations for
+				// arbitrary types we can simply fake somthing here.
+				claim := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				b.create(ctx, claim)
+				claim, err := f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get claim")
+				claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
+				claim.Status.DriverName = driver.Name
+				claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{
+					APIGroup: "example.com",
+					Resource: "some",
+					Name:     "thing",
+					UID:      "12345",
+				})
+				_, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+				framework.ExpectNoError(err, "update claim")
+
+				pod := b.podExternal()
+
+				// This bypasses scheduling and therefore the pod gets
+				// to run on the node although it never gets added to
+				// the `ReservedFor` field of the claim.
+				pod.Spec.NodeName = nodes.NodeNames[0]
+				b.create(ctx, pod)
+
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					testPod, err := b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return fmt.Errorf("expected the test pod %s to exist: %w", pod.Name, err)
+					}
+					if testPod.Status.Phase != v1.PodPending {
+						return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod.Name, testPod.Status.Phase, v1.PodPending)
+					}
+					return nil
+				}, 20*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
+			})
+
+			ginkgo.It("must unprepare resources for force-deleted pod", func(ctx context.Context) {
+				parameters := b.parameters()
+				claim := b.externalClaim(resourcev1alpha2.AllocationModeImmediate)
+				pod := b.podExternal()
+				zero := int64(0)
+				pod.Spec.TerminationGracePeriodSeconds = &zero
+
+				b.create(ctx, parameters, claim, pod)
+
+				b.testPod(ctx, f.ClientSet, pod)
+
+				ginkgo.By(fmt.Sprintf("force delete test pod %s", pod.Name))
+				err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero})
+				if !apierrors.IsNotFound(err) {
+					framework.ExpectNoError(err, "force delete test pod")
 				}
-				return nil
-			}, 20*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
+
+				for host, plugin := range b.driver.Nodes {
+					ginkgo.By(fmt.Sprintf("waiting for resources on %s to be unprepared", host))
+					gomega.Eventually(plugin.GetPreparedResources).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
+				}
+			})
+
+			ginkgo.It("must skip NodePrepareResource if not used by any container", func(ctx context.Context) {
+				parameters := b.parameters()
+				pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				for i := range pod.Spec.Containers {
+					pod.Spec.Containers[i].Resources.Claims = nil
+				}
+				b.create(ctx, parameters, pod, template)
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
+				for host, plugin := range b.driver.Nodes {
+					gomega.Expect(plugin.GetPreparedResources()).Should(gomega.BeEmpty(), "not claims should be prepared on host %s while pod is running", host)
+				}
+			})
+
 		})
 
-		ginkgo.It("must unprepare resources for force-deleted pod", func(ctx context.Context) {
-			parameters := b.parameters()
-			claim := b.externalClaim(resourcev1alpha2.AllocationModeImmediate)
-			pod := b.podExternal()
-			zero := int64(0)
-			pod.Spec.TerminationGracePeriodSeconds = &zero
+		ginkgo.Context("with structured parameters", func() {
+			driver := NewDriver(f, nodes, perNode(1, nodes))
+			driver.parameterMode = parameterModeStructured
 
-			b.create(ctx, parameters, claim, pod)
+			f.It("must manage NodeResourceSlice", f.WithSlow(), func(ctx context.Context) {
+				nodeName := nodes.NodeNames[0]
+				driverName := driver.Name
+				m := MethodInstance{nodeName, NodeListAndWatchResourcesMethod}
+				ginkgo.By("wait for NodeListAndWatchResources call")
+				gomega.Eventually(ctx, func() int64 {
+					return driver.CallCount(m)
+				}).WithTimeout(podStartTimeout).Should(gomega.BeNumerically(">", int64(0)), "NodeListAndWatchResources call count")
 
-			b.testPod(ctx, f.ClientSet, pod)
+				ginkgo.By("check if NodeResourceSlice object exists on the API server")
+				resourceClient := f.ClientSet.ResourceV1alpha2().NodeResourceSlices()
+				matchSlices := gomega.And(
+					gomega.HaveLen(1),
+					gomega.ContainElement(gstruct.MatchAllFields(gstruct.Fields{
+						"TypeMeta":   gstruct.Ignore(),
+						"ObjectMeta": gstruct.Ignore(), // TODO: validate ownerref
+						"NodeName":   gomega.Equal(nodes.NodeNames[0]),
+						"DriverName": gomega.Equal(driver.Name),
+						"NodeResourceModel": gomega.Equal(resourcev1alpha2.NodeResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{
+							Instances: []resourcev1alpha2.NamedResourcesInstance{{Name: "instance-0"}},
+						}}),
+					})),
+				)
+				getSlices := func(ctx context.Context) ([]resourcev1alpha2.NodeResourceSlice, error) {
+					slices, err := resourceClient.List(ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("nodeName=%s,driverName=%s", nodeName, driverName)})
+					if err != nil {
+						return nil, err
+					}
+					return slices.Items, nil
+				}
+				gomega.Eventually(ctx, getSlices).WithTimeout(20 * time.Second).Should(matchSlices)
+				gomega.Consistently(ctx, getSlices).WithTimeout(20 * time.Second).Should(matchSlices)
 
-			ginkgo.By(fmt.Sprintf("force delete test pod %s", pod.Name))
-			err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero})
-			if !apierrors.IsNotFound(err) {
-				framework.ExpectNoError(err, "force delete test pod")
-			}
+				// Removal of node resource slice is tested by the general driver removal code.
+			})
 
-			for host, plugin := range b.driver.Nodes {
-				ginkgo.By(fmt.Sprintf("waiting for resources on %s to be unprepared", host))
-				gomega.Eventually(plugin.GetPreparedResources).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
-			}
-		})
-
-		ginkgo.It("must skip NodePrepareResource if not used by any container", func(ctx context.Context) {
-			parameters := b.parameters()
-			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
-			for i := range pod.Spec.Containers {
-				pod.Spec.Containers[i].Resources.Claims = nil
-			}
-			b.create(ctx, parameters, pod, template)
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
-			for host, plugin := range b.driver.Nodes {
-				gomega.Expect(plugin.GetPreparedResources()).Should(gomega.BeEmpty(), "not claims should be prepared on host %s while pod is running", host)
-			}
+			// TODO: more test scenarios:
+			// - driver returns "unimplemented" as method response
+			// - driver returns "Unimplemented" as part of stream
+			// - driver returns EOF
+			// - driver changes resources
 		})
 	})
 
@@ -241,11 +293,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("supports claim and class parameters", func(ctx context.Context) {
 			objects := genParameters()
 
-			// TODO: replace with publishing NodeResourceSlice through kubelet
-			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
-				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
-			}
-
 			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
 			objects = append(objects, pod, template)
 
@@ -261,11 +308,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
 				pods[i] = pod
 				objects = append(objects, pod, template)
-			}
-
-			// TODO: replace with publishing NodeResourceSlice through kubelet
-			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
-				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
 			}
 
 			b.create(ctx, objects...)
@@ -296,11 +338,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				pod := b.podExternal()
 				pods[i] = pod
 				objects = append(objects, pod)
-			}
-
-			// TODO: replace with publishing NodeResourceSlice through kubelet
-			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
-				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
 			}
 
 			b.create(ctx, objects...)
@@ -338,11 +375,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				pod := b.podExternal()
 				pods[i] = pod
 				objects = append(objects, pod)
-			}
-
-			// TODO: replace with publishing NodeResourceSlice through kubelet
-			if parameterMode == parameterModeTranslated || parameterMode == parameterModeStructured {
-				objects = append(objects, b.nodeResourceSlice(nodes.NodeNames[0], maxAllocations))
 			}
 
 			b.create(ctx, objects...)
@@ -1276,31 +1308,6 @@ func (b *builder) rawParameterData(kv ...string) []byte {
 	raw, err := json.Marshal(data)
 	framework.ExpectNoError(err, "JSON encoding of parameter data")
 	return raw
-}
-
-func (b *builder) nodeResourceSlice(nodeName string, capacity int) *resourcev1alpha2.NodeResourceSlice {
-	slice := &resourcev1alpha2.NodeResourceSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: b.driver.Name + "-" + nodeName,
-		},
-
-		NodeName:   nodeName,
-		DriverName: b.driver.Name,
-
-		NodeResourceModel: resourcev1alpha2.NodeResourceModel{
-			NamedResources: &resourcev1alpha2.NamedResourcesResources{},
-		},
-	}
-
-	for i := 0; i < capacity; i++ {
-		slice.NodeResourceModel.NamedResources.Instances = append(slice.NodeResourceModel.NamedResources.Instances,
-			resourcev1alpha2.NamedResourcesInstance{
-				Name: fmt.Sprintf("instance-%d", i),
-			},
-		)
-	}
-
-	return slice
 }
 
 // makePod returns a simple pod with no resource claims.

@@ -34,6 +34,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,10 +51,11 @@ import (
 )
 
 const (
-	NodePrepareResourceMethod    = "/v1alpha2.Node/NodePrepareResource"
-	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
-	NodeUnprepareResourceMethod  = "/v1alpha2.Node/NodeUnprepareResource"
-	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
+	NodePrepareResourceMethod       = "/v1alpha2.Node/NodePrepareResource"
+	NodePrepareResourcesMethod      = "/v1alpha3.Node/NodePrepareResources"
+	NodeUnprepareResourceMethod     = "/v1alpha2.Node/NodeUnprepareResource"
+	NodeUnprepareResourcesMethod    = "/v1alpha3.Node/NodeUnprepareResources"
+	NodeListAndWatchResourcesMethod = "/v1alpha3.Node/NodeListAndWatchResources"
 )
 
 type Nodes struct {
@@ -105,6 +107,7 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() a
 			// not run on all nodes.
 			resources.Nodes = nodes.NodeNames
 		}
+		ginkgo.DeferCleanup(d.IsGone) // Register first so it gets called last.
 		d.SetUp(nodes, resources)
 		ginkgo.DeferCleanup(d.TearDown)
 	})
@@ -181,6 +184,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	}
 	if d.parameterMode == "" {
 		d.parameterMode = parameterModeConfigMap
+	}
+	var numResourceInstances = -1 // disabled
+	if d.parameterMode != parameterModeConfigMap {
+		numResourceInstances = resources.MaxAllocations
 	}
 	switch d.parameterMode {
 	case parameterModeConfigMap, parameterModeTranslated:
@@ -259,7 +266,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		pod := pod
 		nodename := pod.Spec.NodeName
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
-		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
+		loggerCtx := klog.NewContext(ctx, logger)
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
 					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
@@ -269,10 +277,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 					klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
 					return d.removeFile(&pod, name)
 				},
+				NumResourceInstances: numResourceInstances,
 			},
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 				return d.interceptor(nodename, ctx, req, info, handler)
+			}),
+			kubeletplugin.GRPCStreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+				return d.streamInterceptor(nodename, srv, ss, info, handler)
 			}),
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
@@ -349,6 +361,16 @@ func (d *Driver) TearDown() {
 	d.wg.Wait()
 }
 
+func (d *Driver) IsGone(ctx context.Context) {
+	gomega.Eventually(ctx, func(ctx context.Context) ([]resourcev1alpha2.NodeResourceSlice, error) {
+		slices, err := d.f.ClientSet.ResourceV1alpha2().NodeResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: "driverName=" + d.Name})
+		if err != nil {
+			return nil, err
+		}
+		return slices.Items, err
+	}).Should(gomega.BeEmpty())
+}
+
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
@@ -360,6 +382,22 @@ func (d *Driver) interceptor(nodename string, ctx context.Context, req interface
 	}
 
 	return handler(ctx, req)
+}
+
+func (d *Driver) streamInterceptor(nodename string, srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	// Stream calls block for a long time. We must not hold the lock while
+	// they are running.
+	d.mutex.Lock()
+	m := MethodInstance{nodename, info.FullMethod}
+	d.callCounts[m]++
+	fail := d.fail[m]
+	d.mutex.Unlock()
+
+	if fail {
+		return errors.New("injected error")
+	}
+
+	return handler(srv, stream)
 }
 
 func (d *Driver) Fail(m MethodInstance, injectError bool) {

@@ -198,3 +198,20 @@ func (p *plugin) NodeUnprepareResources(
 	logger.V(4).Info(log("done calling NodeUnprepareResources rpc"), "response", response, "err", err)
 	return response, err
 }
+
+func (p *plugin) NodeListAndWatchResources(
+	ctx context.Context,
+	req *drapb.NodeListAndWatchResourcesRequest,
+	opts ...grpc.CallOption,
+) (drapb.Node_NodeListAndWatchResourcesClient, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(log("calling NodeListAndWatchResources rpc"), "request", req)
+
+	conn, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		return nil, err
+	}
+
+	nodeClient := drapb.NewNodeClient(conn)
+	return nodeClient.NodeListAndWatchResources(ctx, req, opts...)
+}

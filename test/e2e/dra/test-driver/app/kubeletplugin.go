@@ -26,7 +26,10 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	resourceapi "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
@@ -35,6 +38,7 @@ import (
 )
 
 type ExamplePlugin struct {
+	stopCh  <-chan struct{}
 	logger  klog.Logger
 	d       kubeletplugin.DRAPlugin
 	fileOps FileOperations
@@ -80,7 +84,8 @@ func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
 	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
 }
 
-// FileOperations defines optional callbacks for handling CDI files.
+// FileOperations defines optional callbacks for handling CDI files
+// and some other configuration.
 type FileOperations struct {
 	// Create must overwrite the file.
 	Create func(name string, content []byte) error
@@ -88,10 +93,16 @@ type FileOperations struct {
 	// Remove must remove the file. It must not return an error when the
 	// file does not exist.
 	Remove func(name string) error
+
+	// NumResourceInstances determines whether the plugin reports resources
+	// instances and how many. A negative value causes it to report "not implemented"
+	// in the NodeListAndWatchResources gRPC call.
+	NumResourceInstances int
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+	logger := klog.FromContext(ctx)
 	if fileOps.Create == nil {
 		fileOps.Create = func(name string, content []byte) error {
 			return os.WriteFile(name, content, os.FileMode(0644))
@@ -106,6 +117,7 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string,
 		}
 	}
 	ex := &ExamplePlugin{
+		stopCh:     ctx.Done(),
 		logger:     logger,
 		fileOps:    fileOps,
 		cdiDir:     cdiDir,
@@ -118,6 +130,7 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string,
 		kubeletplugin.Logger(logger),
 		kubeletplugin.DriverName(driverName),
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
+		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
 	d, err := kubeletplugin.Start(ex, opts...)
 	if err != nil {
@@ -330,6 +343,39 @@ func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv
 	return resp, nil
 }
 
+func (ex *ExamplePlugin) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAndWatchResourcesRequest, stream drapbv1alpha3.Node_NodeListAndWatchResourcesServer) error {
+	if ex.fileOps.NumResourceInstances < 0 {
+		ex.logger.Info("Sending no NodeResourcesResponse")
+		return status.New(codes.Unimplemented, "node resource support disabled").Err()
+	}
+
+	instances := make([]resourceapi.NamedResourcesInstance, ex.fileOps.NumResourceInstances)
+	for i := 0; i < ex.fileOps.NumResourceInstances; i++ {
+		instances[i].Name = fmt.Sprintf("instance-%d", i)
+	}
+	resp := &drapbv1alpha3.NodeListAndWatchResourcesResponse{
+		Resources: []*resourceapi.NodeResourceModel{
+			{
+				NamedResources: &resourceapi.NamedResourcesResources{
+					Instances: instances,
+				},
+			},
+		},
+	}
+
+	ex.logger.Info("Sending NodeListAndWatchResourcesResponse", "response", resp)
+	if err := stream.Send(resp); err != nil {
+		return err
+	}
+
+	// Keep the stream open until the test is done.
+	// TODO: test sending more updates later
+	<-ex.stopCh
+	ex.logger.Info("Done sending NodeListAndWatchResourcesResponse, closing stream")
+
+	return nil
+}
+
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
@@ -358,6 +404,25 @@ func (ex *ExamplePlugin) recordGRPCCall(ctx context.Context, req interface{}, in
 	ex.mutex.Unlock()
 
 	return call.Response, call.Err
+}
+
+func (ex *ExamplePlugin) recordGRPCStream(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	call := GRPCCall{
+		FullMethod: info.FullMethod,
+	}
+	ex.mutex.Lock()
+	ex.gRPCCalls = append(ex.gRPCCalls, call)
+	index := len(ex.gRPCCalls) - 1
+	ex.mutex.Unlock()
+
+	// We don't hold the mutex here to allow concurrent calls.
+	call.Err = handler(srv, stream)
+
+	ex.mutex.Lock()
+	ex.gRPCCalls[index] = call
+	ex.mutex.Unlock()
+
+	return call.Err
 }
 
 func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {

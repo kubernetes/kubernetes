@@ -154,7 +154,7 @@ func TestNewManagerImpl(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, test.stateFileDirectory)
+			manager, err := NewManagerImpl(kubeClient, test.stateFileDirectory, "worker")
 			if test.wantErr {
 				assert.Error(t, err)
 				return
@@ -287,7 +287,7 @@ func TestGetResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, t.TempDir())
+			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
 			assert.NoError(t, err)
 
 			if test.claimInfo != nil {
@@ -760,7 +760,7 @@ func TestPrepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler()
+			plg := plugin.NewRegistrationHandler(nil, "worker")
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
@@ -1060,7 +1060,7 @@ func TestUnprepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler()
+			plg := plugin.NewRegistrationHandler(nil, "worker")
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}

@@ -44,6 +44,12 @@ service Node {
   // The same error handling rules apply,
   rpc NodeUnprepareResources (NodeUnprepareResourcesRequest)
     returns (NodeUnprepareResourcesResponse) {}
+
+  // NodeListAndWatchResources returns a stream of NodeResourcesResponse objects.
+  // At the start and whenever resource availability changes, the
+  // plugin must send one such object with all information to the Kubelet.
+  rpc NodeListAndWatchResources(NodeListAndWatchResourcesRequest)
+    returns (stream NodeListAndWatchResourcesResponse) {}
 }
 
 message NodePrepareResourcesRequest {
@@ -86,6 +92,13 @@ message NodeUnprepareResourcesResponse {
 message NodeUnprepareResourceResponse {
     // If non-empty, unpreparing the ResourceClaim failed.
     string error = 1;
+}
+
+message NodeListAndWatchResourcesRequest {
+}
+
+message NodeListAndWatchResourcesResponse {
+    repeated k8s.io.api.resource.v1alpha2.NodeResourceModel resources = 1;
 }
 
 message Claim {
