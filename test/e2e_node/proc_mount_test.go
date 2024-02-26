@@ -32,6 +32,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
+var falseVar = false
+
 var _ = SIGDescribe("ProcMount", framework.WithNodeConformance(), "[LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("proc-mount-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
@@ -71,6 +73,7 @@ var _ = SIGDescribe("ProcMount", framework.WithNodeFeature("ProcMountType"), "[L
 						},
 					},
 				},
+				HostUsers: &falseVar,
 			},
 		}, metav1.CreateOptions{})
 		gomega.Expect(err).To(gomega.HaveOccurred())
@@ -94,6 +97,7 @@ func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMount
 					},
 				},
 			},
+			HostUsers: &falseVar,
 		},
 	})
 
