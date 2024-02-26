@@ -296,6 +296,58 @@ func TestInitialRunHasAllAPIServices(t *testing.T) {
 	checkAPIGroups(t, apiGroup, parsed)
 }
 
+func TestServiceGC(t *testing.T) {
+	service := discoveryendpoint.NewResourceManager("apis")
+
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done(), nil)
+
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, service)
+
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+
+	// Lookup size of cache
+	getCacheLen := func() int {
+		aggregatedManager.resultsLock.Lock()
+		defer aggregatedManager.resultsLock.Unlock()
+		return len(aggregatedManager.cachedResults)
+	}
+
+	require.Equal(t, 1, getCacheLen())
+
+	// Change the service of the same APIService a bit to create duplicate entry
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service-changed",
+			},
+		},
+	}, service)
+
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+	require.Equal(t, 1, getCacheLen())
+}
+
 // Test that a handler associated with an APIService gets pinged after the
 // APIService has been marked as dirty
 func TestDirty(t *testing.T) {
