@@ -75,12 +75,16 @@ runTests() {
   kube::etcd::start_scraping
   kube::log::status "Running integration test cases"
 
-  make -C "${KUBE_ROOT}" test \
+  # shellcheck disable=SC2034
+  # KUBE_RACE and MAKEFLAGS are used in the downstream make, and we set them to
+  # empty here to ensure that we aren't unintentionally consuming them from the
+  # previous make invocation.
+  KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS:-}" \
-      KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
-      KUBE_RACE=""
+      KUBE_RACE="" \
+      MAKEFLAGS="" \
+      make -C "${KUBE_ROOT}" test
 
   cleanup
 }

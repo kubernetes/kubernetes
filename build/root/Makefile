@@ -197,10 +197,12 @@ define TEST_IT_HELP_INFO
 # Args:
 #   WHAT: Directory names to test.  All *_test.go files under these
 #     directories will be run.  If not specified, "everything" will be tested.
+#   KUBE_TEST_ARGS: Arguments to pass to the resulting go test invocation.
 #
 # Example:
 #   make test-integration
 #   make test-integration WHAT=./test/integration/kubelet GOFLAGS="-v -coverpkg=./pkg/kubelet/..." KUBE_COVER="y"
+#   make test-integration WHAT=./test/integration/pods GOFLAGS="-v" KUBE_TEST_ARGS='-run ^TestPodUpdateActiveDeadlineSeconds$$'
 endef
 .PHONY: test-integration
 ifeq ($(PRINT_HELP),y)
@@ -208,7 +210,8 @@ test-integration:
 	echo "$$TEST_IT_HELP_INFO"
 else
 test-integration:
-	hack/make-rules/test-integration.sh $(WHAT)
+	# KUBE_TEST_ARGS is explicitly passed here in order to ensure that we are preserving any dollar signs in the value.
+	KUBE_TEST_ARGS='$(value KUBE_TEST_ARGS)' hack/make-rules/test-integration.sh $(WHAT)
 endif
 
 define TEST_E2E_NODE_HELP_INFO
