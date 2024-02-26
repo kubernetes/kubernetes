@@ -77,8 +77,8 @@ type testWatchCache struct {
 	stopCh           chan struct{}
 }
 
-func (w *testWatchCache) getAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
-	cacheInterval, err := w.getCacheIntervalForEvents(resourceVersion)
+func (w *testWatchCache) getAllEventsSince(resourceVersion uint64, opts storage.ListOptions) ([]*watchCacheEvent, error) {
+	cacheInterval, err := w.getCacheIntervalForEvents(resourceVersion, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +98,11 @@ func (w *testWatchCache) getAllEventsSince(resourceVersion uint64) ([]*watchCach
 	return result, nil
 }
 
-func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64) (*watchCacheInterval, error) {
+func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts storage.ListOptions) (*watchCacheInterval, error) {
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(resourceVersion)
+	return w.getAllEventsSinceLocked(resourceVersion, opts)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -269,7 +269,7 @@ func TestEvents(t *testing.T) {
 
 	// Test for Added event.
 	{
-		_, err := store.getAllEventsSince(1)
+		_, err := store.getAllEventsSince(1, storage.ListOptions{})
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
@@ -278,7 +278,7 @@ func TestEvents(t *testing.T) {
 		}
 	}
 	{
-		result, err := store.getAllEventsSince(2)
+		result, err := store.getAllEventsSince(2, storage.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -302,13 +302,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with not full cache.
 	{
-		_, err := store.getAllEventsSince(1)
+		_, err := store.getAllEventsSince(1, storage.ListOptions{})
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.getAllEventsSince(3)
+		result, err := store.getAllEventsSince(3, storage.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -336,13 +336,13 @@ func TestEvents(t *testing.T) {
 
 	// Test with full cache - there should be elements from 5 to 9.
 	{
-		_, err := store.getAllEventsSince(3)
+		_, err := store.getAllEventsSince(3, storage.ListOptions{})
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
 	}
 	{
-		result, err := store.getAllEventsSince(4)
+		result, err := store.getAllEventsSince(4, storage.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -361,7 +361,7 @@ func TestEvents(t *testing.T) {
 	store.Delete(makeTestPod("pod", uint64(10)))
 
 	{
-		result, err := store.getAllEventsSince(9)
+		result, err := store.getAllEventsSince(9, storage.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -392,13 +392,13 @@ func TestMarker(t *testing.T) {
 		makeTestPod("pod2", 9),
 	}, "9")
 
-	_, err := store.getAllEventsSince(8)
+	_, err := store.getAllEventsSince(8, storage.ListOptions{})
 	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Getting events from 8 should return no events,
 	// even though there is a marker there.
-	result, err := store.getAllEventsSince(9)
+	result, err := store.getAllEventsSince(9, storage.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -409,7 +409,7 @@ func TestMarker(t *testing.T) {
 	pod := makeTestPod("pods", 12)
 	store.Add(pod)
 	// Getting events from 8 should still work and return one event.
-	result, err = store.getAllEventsSince(9)
+	result, err = store.getAllEventsSince(9, storage.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -975,7 +975,7 @@ func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 	// Force cache resize.
 	addEvent("key4", 50, later.Add(time.Second))
 
-	_, err := store.getAllEventsSince(15)
+	_, err := store.getAllEventsSince(15, storage.ListOptions{})
 	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
 		t.Errorf("unexpected error: %v", err)
 	}
