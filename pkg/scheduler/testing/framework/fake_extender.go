@@ -149,6 +149,7 @@ type FakeExtender struct {
 	FilteredNodes    []*framework.NodeInfo
 	UnInterested     bool
 	Ignorable        bool
+	Binder           func() error
 
 	// Cached node information for fake extender
 	CachedNodeNameToInfo map[string]*framework.NodeInfo
@@ -361,6 +362,9 @@ func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*framework.NodeInfo) (*ex
 
 // Bind implements the extender Bind function.
 func (f *FakeExtender) Bind(binding *v1.Binding) error {
+	if f.Binder != nil {
+		return f.Binder()
+	}
 	if len(f.FilteredNodes) != 0 {
 		for _, node := range f.FilteredNodes {
 			if node.Node().Name == binding.Target.Name {
