@@ -933,3 +933,20 @@ func (o ReplicaSetsByRevision) Less(i, j int) bool {
 	}
 	return revision1 < revision2
 }
+
+const (
+	maxNameLength = 253
+	// maxNameHashLength is the pod template spec hash length(10) add '-'(1).
+	podTemplateSpecHashLength = 10 + 1
+	// maxReplicaSetBaseNameLength is the max length of replicaset basename
+	maxReplicaSetBaseNameLength = maxNameLength - podTemplateSpecHashLength
+)
+
+// GetReplicaSetName truncate deployment name, if it's length longer than 242.
+// Returns truncated deployment name add '-' and pod template spec hash.
+func GetReplicaSetName(deploymentName string, podTemplateSpecHash string) string {
+	if len(deploymentName) > maxReplicaSetBaseNameLength {
+		deploymentName = deploymentName[:maxReplicaSetBaseNameLength]
+	}
+	return fmt.Sprintf("%s-%s", deploymentName, podTemplateSpecHash)
+}
