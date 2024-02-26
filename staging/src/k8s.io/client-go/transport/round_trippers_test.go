@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"k8s.io/klog/v2"
@@ -516,7 +517,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 
 	for _, tc := range tcs {
 		// hijack the klog output
-		tmpWriteBuffer := bytes.NewBuffer(nil)
+		tmpWriteBuffer := &lockedBuffer{Buffer: bytes.NewBuffer(nil)}
 		klog.SetOutput(tmpWriteBuffer)
 		klog.LogToStderr(false)
 
@@ -544,4 +545,23 @@ func TestDebuggingRoundTripper(t *testing.T) {
 			}
 		}
 	}
+}
+
+type lockedBuffer struct {
+	lock sync.Mutex
+	*bytes.Buffer
+}
+
+func (sb *lockedBuffer) Write(p []byte) (n int, err error) {
+	sb.lock.Lock()
+	defer sb.lock.Unlock()
+
+	return sb.Buffer.Write(p)
+}
+
+func (sb *lockedBuffer) String() string {
+	sb.lock.Lock()
+	defer sb.lock.Unlock()
+
+	return sb.Buffer.String()
 }
