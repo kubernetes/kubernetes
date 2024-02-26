@@ -305,6 +305,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			types := []core.ServiceInternalTrafficPolicy{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
+		func(p *core.LoadBalancerIPMode, c fuzz.Continue) {
+			types := []core.LoadBalancerIPMode{core.LoadBalancerIPModeProxy, core.LoadBalancerIPModeVIP}
+			*p = types[c.Rand.Intn(len(types))]
+		},
 		func(ct *core.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
