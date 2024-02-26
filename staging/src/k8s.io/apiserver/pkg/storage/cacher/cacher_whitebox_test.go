@@ -285,6 +285,7 @@ func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectByp
 }
 
 func TestGetListNonRecursiveCacheBypass(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
