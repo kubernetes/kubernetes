@@ -353,7 +353,7 @@ fi
 # IP_ALIAS_SIZE is the size of the podCIDR allocated to a node.
 # IP_ALIAS_SUBNETWORK is the subnetwork to allocate from. If empty, a
 #   new subnetwork will be created for the cluster.
-ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
+ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-true}
 export NODE_IPAM_MODE=${KUBE_GCE_NODE_IPAM_MODE:-RangeAllocator}
 if [ "${ENABLE_IP_ALIASES}" = true ]; then
   # Number of Pods that can run on this node.
