@@ -82,6 +82,7 @@ runTests() {
   KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
+      KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE="" \
       MAKEFLAGS="" \
       make -C "${KUBE_ROOT}" test
