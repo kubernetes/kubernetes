@@ -1178,7 +1178,8 @@ type Kubelet struct {
 	updatePodCIDRMux sync.Mutex
 
 	// updateRuntimeMux is a lock on updating runtime, because this path is not thread-safe.
-	// This lock is used by Kubelet.updateRuntimeUp and Kubelet.fastNodeStatusUpdate functions and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.updateRuntimeUp, Kubelet.fastNodeStatusUpdate and
+	// Kubelet.HandlerSupportsUserNamespaces functions and shouldn't be used anywhere else.
 	updateRuntimeMux sync.Mutex
 
 	// nodeLeaseController claims and renews the node lease for this Kubelet
@@ -2898,7 +2899,9 @@ func (kl *Kubelet) updateRuntimeUp() {
 		kl.runtimeState.setRuntimeState(fmt.Errorf("container runtime not ready: %v", runtimeReady))
 		return
 	}
+
 	kl.runtimeState.setRuntimeState(nil)
+	kl.runtimeState.setRuntimeHandlers(s.Handlers)
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }

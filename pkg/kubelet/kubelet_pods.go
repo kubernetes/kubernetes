@@ -425,8 +425,8 @@ func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
 }
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
-	return kl.usernsManager.GetOrCreateUserNamespaceMappings(pod)
+func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+	return kl.usernsManager.GetOrCreateUserNamespaceMappings(pod, runtimeHandler)
 }
 
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,

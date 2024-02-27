@@ -526,6 +526,8 @@ const (
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
 	Conditions []RuntimeCondition
+	// Handlers is a map of current available handlers
+	Handlers map[string]RuntimeHandler
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
@@ -542,10 +544,28 @@ func (r *RuntimeStatus) GetRuntimeCondition(t RuntimeConditionType) *RuntimeCond
 // String formats the runtime status into human readable string.
 func (r *RuntimeStatus) String() string {
 	var ss []string
+	var sh []string
 	for _, c := range r.Conditions {
 		ss = append(ss, c.String())
 	}
-	return fmt.Sprintf("Runtime Conditions: %s", strings.Join(ss, ", "))
+	for _, h := range r.Handlers {
+		sh = append(sh, h.String())
+	}
+	return fmt.Sprintf("Runtime Conditions: %s; Handlers: %s", strings.Join(ss, ", "), strings.Join(sh, ", "))
+}
+
+// RuntimeHandler contains condition information for the runtime handler.
+type RuntimeHandler struct {
+	// Name is the handler name.
+	Name string
+	// SupportsUserNamespaces is true if the handler has support for
+	// user namespaces.
+	SupportsUserNamespaces bool
+}
+
+// String formats the runtime handler into human readable string.
+func (h *RuntimeHandler) String() string {
+	return fmt.Sprintf("Name=%s SupportsUserNamespaces: %v", h.Name, h.SupportsUserNamespaces)
 }
 
 // RuntimeCondition contains condition information for the runtime.
