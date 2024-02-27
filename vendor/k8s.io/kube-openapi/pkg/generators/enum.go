@@ -22,8 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/types"
 )
 
 const tagEnumType = "enum"
@@ -121,7 +122,7 @@ func parseEnums(c *generator.Context) enumMap {
 					Value:   *c.ConstValue,
 					Comment: strings.Join(c.CommentLines, " "),
 				}
-				enumTypes[enumType.Name].appendValue(value)
+				enumTypes[enumType.Name].addIfNotPresent(value)
 			}
 		}
 	}
@@ -129,7 +130,21 @@ func parseEnums(c *generator.Context) enumMap {
 	return enumTypes
 }
 
-func (et *enumType) appendValue(value *enumValue) {
+func (et *enumType) addIfNotPresent(value *enumValue) {
+	// If we already have an enum case with the same value, then ignore this new
+	// one. This can happen if an enum aliases one from another package and
+	// re-exports the cases.
+	for i, existing := range et.Values {
+		if existing.Value == value.Value {
+
+			// Take the value of the longer comment (or some other deterministic tie breaker)
+			if len(existing.Comment) < len(value.Comment) || (len(existing.Comment) == len(value.Comment) && existing.Comment > value.Comment) {
+				et.Values[i] = value
+			}
+
+			return
+		}
+	}
 	et.Values = append(et.Values, value)
 }
 
@@ -155,7 +170,7 @@ func isEnumType(stringType *types.Type, t *types.Type) bool {
 }
 
 func hasEnumTag(t *types.Type) bool {
-	return types.ExtractCommentTags("+", t.CommentLines)[tagEnumType] != nil
+	return gengo.ExtractCommentTags("+", t.CommentLines)[tagEnumType] != nil
 }
 
 // whitespaceRegex is the regex for consecutive whitespaces.
