@@ -2570,6 +2570,7 @@ var validEnvDownwardAPIFieldPathExpressions = sets.New(
 	"metadata.name",
 	"metadata.namespace",
 	"metadata.uid",
+	"metadata.creationTimestamp",
 	"spec.nodeName",
 	"spec.serviceAccountName",
 	"status.hostIP",

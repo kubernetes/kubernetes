@@ -19,8 +19,9 @@ package fieldpath
 import (
 	"strings"
 	"testing"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -47,6 +48,8 @@ func BenchmarkFormatMap(b *testing.B) {
 	// Avoid compiler optimizations
 	_ = s
 }
+
+var refTime = metav1.Date(1970, time.January, 1, 1, 1, 1, 0, time.UTC)
 
 func TestExtractFieldPathAsString(t *testing.T) {
 	cases := []struct {
@@ -154,6 +157,17 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			},
 			expectedValue: "label value",
 		},
+		{
+			name:      "ok - creationTimestamp",
+			fieldPath: "metadata.creationTimeStamp",
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: refTime,
+				},
+			},
+			expectedValue: refTime.String(),
+		},
+
 		{
 			name:      "invalid expression",
 			fieldPath: "metadata.whoops",

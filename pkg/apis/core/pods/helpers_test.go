@@ -19,7 +19,9 @@ package pods
 import (
 	"reflect"
 	"testing"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -140,6 +142,8 @@ func TestVisitContainersWithPath(t *testing.T) {
 	}
 }
 
+var refTime = metav1.Date(1970, time.January, 1, 1, 1, 1, 0, time.UTC)
+
 func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 	testCases := []struct {
 		version       string
@@ -167,6 +171,13 @@ func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 			value:         "test-pod",
 			expectedLabel: "metadata.name",
 			expectedValue: "test-pod",
+		},
+		{
+			version:       "v1",
+			label:         "metadata.creationTimestamp",
+			value:         refTime.String(),
+			expectedLabel: "metadata.creationTimestamp",
+			expectedValue: refTime.String(),
 		},
 		{
 			version:       "v1",

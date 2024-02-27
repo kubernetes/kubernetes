@@ -87,6 +87,8 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 		return accessor.GetNamespace(), nil
 	case "metadata.uid":
 		return string(accessor.GetUID()), nil
+	case "metadata.creationTimeStamp":
+		return accessor.GetCreationTimestamp().String(), nil
 	}
 
 	return "", fmt.Errorf("unsupported fieldPath: %v", fieldPath)
