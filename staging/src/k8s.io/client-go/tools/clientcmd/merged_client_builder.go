@@ -131,8 +131,10 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 					klog.V(4).Infof("Error merging in-cluster with merged configuration: %v", err)
 					return mergedConfig, nil
 				}
-				klog.V(4).Infof("Using in-cluster configuration")
-				return icConfig, nil
+				// TODO: remove, testing if returning icConfig is the issue
+				return mergedConfig, nil
+				//klog.V(4).Infof("Using in-cluster configuration")
+				//return icConfig, nil
 			}
 			return mergedConfig, nil
 		}
