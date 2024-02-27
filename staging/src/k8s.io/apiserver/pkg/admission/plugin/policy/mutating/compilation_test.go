@@ -21,10 +21,11 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TestCompilation is an open-box test of mutatingEvaluator.compile
@@ -42,9 +43,9 @@ func TestCompilation(t *testing.T) {
 		{
 			name: "refer to object",
 			policy: &Policy{
-				Spec: MutatingAdmissionPolicySpec{Mutations: []Mutation{
+				Spec: v1alpha1.MutatingAdmissionPolicySpec{Mutations: []v1alpha1.Mutation{
 					{
-						PatchType: "Apply",
+						PatchType: ptr.To(v1alpha1.ApplyConfigurationPatchType),
 						Expression: `Object{
 							spec: Object.spec{
 								replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
@@ -53,7 +54,7 @@ func TestCompilation(t *testing.T) {
 					},
 				}},
 			},
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: pointer.Int32(2)}},
+			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](2)}},
 			expectedResult: map[string]any{
 				"spec": map[string]any{
 					"replicas": int64(3),
@@ -63,9 +64,9 @@ func TestCompilation(t *testing.T) {
 		{
 			name: "refer to oldObject",
 			policy: &Policy{
-				Spec: MutatingAdmissionPolicySpec{Mutations: []Mutation{
+				Spec: v1alpha1.MutatingAdmissionPolicySpec{Mutations: []v1alpha1.Mutation{
 					{
-						PatchType: "Apply",
+						PatchType: ptr.To(v1alpha1.ApplyConfigurationPatchType),
 						Expression: `Object{
 							spec: Object.spec{
 								replicas: oldObject.spec.replicas % 2 == 0?oldObject.spec.replicas + 1:oldObject.spec.replicas
@@ -74,8 +75,8 @@ func TestCompilation(t *testing.T) {
 					},
 				}},
 			},
-			object:    &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: pointer.Int32(1)}},
-			oldObject: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: pointer.Int32(2)}},
+			object:    &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			oldObject: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](2)}},
 			expectedResult: map[string]any{
 				"spec": map[string]any{
 					"replicas": int64(3),
@@ -84,8 +85,7 @@ func TestCompilation(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			e := &evaluator{policy: tc.policy}
-			c, err := e.compile(plugincel.OptionalVariableDeclarations{HasParams: e.hasParams()})
+			program, err := compileMutation(tc.policy.Spec.Mutations[0], plugincel.OptionalVariableDeclarations{HasParams: tc.policy.Spec.ParamKind != nil})
 			if err != nil {
 				if tc.expectedErr == "" {
 					t.Fatalf("unexpected error: %v", err)
@@ -94,8 +94,10 @@ func TestCompilation(t *testing.T) {
 			a := &activation{}
 			_ = a.SetObject(tc.object)
 			_ = a.SetOldObject(tc.oldObject)
-			p := c.programs[0]
-			v, _, err := p.ContextEval(context.Background(), a)
+			v, _, err := program.ContextEval(context.Background(), a)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !reflect.DeepEqual(tc.expectedResult, v.Value()) {
 				t.Errorf("unexpected result, expected %v but got %v", tc.expectedResult, v.Value())
 			}

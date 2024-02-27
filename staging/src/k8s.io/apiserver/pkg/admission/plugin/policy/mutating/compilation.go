@@ -23,6 +23,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/interpreter"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,30 +40,33 @@ import (
 
 // compilePolicy compiles the policy into a PolicyEvaluator
 // any error is stored and delayed until invocation.
+//
+// Each individual mutation is compiled into MutationEvaluationFunc and
+// returned as a slice in the same order as the mutations appeared in the policy.
 func compilePolicy(policy *Policy) PolicyEvaluator {
-	// removal not yet supported
-	e := &evaluator{policy: policy}
-	e.compiledEvaluator, e.err = e.compile(plugincel.OptionalVariableDeclarations{HasParams: e.hasParams()})
-	return e.Invoke
+	hasParams := policy.Spec.ParamKind != nil
+	var res []MutationEvaluationFunc
+	for _, m := range policy.Spec.Mutations {
+		e := &evaluator{}
+		e.program, e.err = compileMutation(m, plugincel.OptionalVariableDeclarations{HasParams: hasParams})
+		res = append(res, e.Invoke)
+	}
+	return res
 }
 
 type evaluator struct {
-	policy *Policy
-
-	compiledEvaluator *compiledEvaluator
+	program cel.Program
 	// err holds the error during the creation of compiledEvaluator
 	err error
 }
 
-type compiledEvaluator struct {
-	programs []cel.Program
-}
+func compileMutation(mutation v1alpha1.Mutation, vars plugincel.OptionalVariableDeclarations) (cel.Program, error) {
+	if mutation.PatchType == nil {
+		return nil, fmt.Errorf("patch type is not set")
+	} else if *mutation.PatchType != v1alpha1.ApplyConfigurationPatchType {
+		return nil, fmt.Errorf("unsupported mutation type %q", *mutation.PatchType)
+	}
 
-func (e *evaluator) hasParams() bool {
-	return e.policy.Spec.ParamKind != nil
-}
-
-func (e *evaluator) compile(vars plugincel.OptionalVariableDeclarations) (*compiledEvaluator, error) {
 	envSet, err := createEnvSet(vars)
 	if err != nil {
 		return nil, err
@@ -71,67 +75,42 @@ func (e *evaluator) compile(vars plugincel.OptionalVariableDeclarations) (*compi
 	if err != nil {
 		return nil, err
 	}
-	var programs []cel.Program
-	for _, m := range e.policy.Spec.Mutations {
-		if m.PatchType != "Apply" {
-			return nil, fmt.Errorf("unsupported mutation type %q", m.PatchType)
-		}
-		ast, issues := env.Compile(m.Expression)
-		if issues != nil {
-			return nil, fmt.Errorf("cannot compile CEL expression: %v", issues)
-		}
-		program, err := env.Program(ast)
-		if err != nil {
-			return nil, fmt.Errorf("cannot initiate program: %w", err)
-		}
-		programs = append(programs, program)
+	ast, issues := env.Compile(mutation.Expression)
+	if issues != nil {
+		return nil, fmt.Errorf("cannot compile CEL expression: %v", issues)
 	}
-	return &compiledEvaluator{
-		programs: programs,
-	}, nil
+	program, err := env.Program(ast)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initiate program: %w", err)
+	}
+	return program, nil
 }
 
-func (e *evaluator) Invoke(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, o admission.ObjectInterfaces, versionedParams runtime.Object, namespace *v1.Namespace, typeConverter managedfields.TypeConverter, runtimeCELCostBudget int64) (patch.Application, error) {
-	err := e.err
-	if err != nil {
+func (e *evaluator) Invoke(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, o admission.ObjectInterfaces, versionedParams runtime.Object, namespace *v1.Namespace, typeConverter managedfields.TypeConverter, runtimeCELCostBudget int64) (runtime.Object, error) {
+	if err := e.err; err != nil {
 		return nil, err
 	}
 	a := new(activation)
-	objectGVK := versionedAttr.GetKind()
-	err = a.SetObject(versionedAttr.GetObject())
+	if err := a.SetObject(versionedAttr.GetObject()); err != nil {
+		return nil, err
+	} else if err := a.SetOldObject(versionedAttr.GetOldObject()); err != nil {
+		return nil, err
+	} else if err := a.SetParams(versionedParams); err != nil {
+		return nil, err
+	}
+	v, _, err := e.program.ContextEval(ctx, a)
 	if err != nil {
 		return nil, err
 	}
-	err = a.SetOldObject(versionedAttr.GetOldObject())
-	if err != nil {
-		return nil, err
+	value, ok := v.Value().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected evaluation result type: %t", v.Value())
 	}
-	err = a.SetParams(versionedParams)
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range e.compiledEvaluator.programs {
-		v, _, err := p.ContextEval(ctx, a)
-		if err != nil {
-			return nil, err
-		}
-		value, ok := v.Value().(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("unexpected evaluation result type: %t", v.Value())
-		}
-		o := unstructured.Unstructured{Object: a.object}
-		p := unstructured.Unstructured{Object: value}
-		p.SetGroupVersionKind(objectGVK)
-		patched, err := patch.NewSMD(typeConverter, &o, &p)
-		if err != nil {
-			return nil, err
-		}
-		err = a.SetObject(patched.GetPatchedObject())
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &patchedObject{patchedObject: &unstructured.Unstructured{Object: a.object}}, nil
+
+	liveObject := unstructured.Unstructured{Object: a.object}
+	patchObject := unstructured.Unstructured{Object: value}
+	patchObject.SetGroupVersionKind(versionedAttr.GetKind())
+	return patch.ApplySMD(typeConverter, &liveObject, &patchObject)
 }
 
 func createEnvSet(vars plugincel.OptionalVariableDeclarations) (*environment.EnvSet, error) {
@@ -203,12 +182,4 @@ func (a *activation) SetParams(params runtime.Object) error {
 	}
 	a.params, err = runtime.DefaultUnstructuredConverter.ToUnstructured(params)
 	return err
-}
-
-type patchedObject struct {
-	patchedObject runtime.Object
-}
-
-func (p *patchedObject) GetPatchedObject() runtime.Object {
-	return p.patchedObject
 }
