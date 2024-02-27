@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	api "k8s.io/api/core/v1"
@@ -242,8 +243,16 @@ Loop:
 // function for the given stream pair.
 func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	ctx := context.Background()
-	defer p.dataStream.Close()
-	defer p.errorStream.Close()
+	resetStreams := false
+	defer func() {
+		if resetStreams {
+			p.dataStream.Reset()  //nolint: errcheck
+			p.errorStream.Reset() //nolint: errcheck
+			return
+		}
+		p.dataStream.Close()  //nolint: errcheck
+		p.errorStream.Close() //nolint: errcheck
+	}()
 
 	portString := p.dataStream.Headers().Get(api.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
@@ -252,11 +261,34 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
 	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
 
-	if err != nil {
-		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
-		utilruntime.HandleError(msg)
-		fmt.Fprint(p.errorStream, msg.Error())
+	// happy path, we have successfully completed forwarding task
+	if err == nil {
+		return
 	}
+
+	if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+		// In the process of forwarding, we encountered error types that can be handled:
+		//
+		// These two errors can occur in the following scenarios:
+		// ECONNRESET: the target process reset connection between CRI and itself.
+		// see: https://github.com/kubernetes/kubernetes/issues/111825 for detail
+		//
+		// EPIPE: the target process did not read the received data, causing the
+		// buffer in the kernel to be full, resulting in the occurrence of Zero Window,
+		// then closing the connection (FIN, RESET)
+		// see: https://github.com/kubernetes/kubernetes/issues/74551 for detail
+		//
+		// In both cases, we should RESET the httpStream.
+		klog.ErrorS(err, "forwarding port", "conn", h.conn, "request", p.requestID, "port", portString)
+		resetStreams = true
+		return
+	}
+
+	// We don't know how to deal with other types of errors,
+	// try to forward them to errStream, let our user know what happened
+	msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %w", port, h.pod, h.uid, err)
+	utilruntime.HandleError(msg)
+	fmt.Fprint(p.errorStream, msg.Error())
 }
 
 // httpStreamPair represents the error and data streams for a port
