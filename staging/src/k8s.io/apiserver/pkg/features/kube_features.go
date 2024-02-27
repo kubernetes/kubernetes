@@ -163,6 +163,13 @@ const (
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
 
+	// owner: @serathius
+	// beta: v1.30
+	//
+	// Allow watch cache to create a watch on a dedicated RPC.
+	// This prevents watch cache from being starved by other watches.
+	SeparateCacheWatchRPC featuregate.Feature = "SeparateCacheWatchRPC"
+
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.14
 	// beta: v1.16
@@ -302,6 +309,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
 
 	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
