@@ -55,7 +55,11 @@ func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	}
 	result = make(map[string]any, len(v.fields))
 	for k, v := range v.fields {
-		result[k] = convertField(v)
+		converted, err := convertField(v)
+		if err != nil {
+			return nil, fmt.Errorf("fail to convert field %q: %w", k, err)
+		}
+		result[k] = converted
 	}
 	return result, nil
 }
@@ -104,8 +108,12 @@ func (v *ObjectVal) IsZeroValue() bool {
 // convertField converts a referred ref.Val to its expected type.
 // For objects, the expected type is map[string]any
 // For lists, the expected type is []any
+// For maps, the expected type is map[string]any
 // For anything else, it is converted via value.Value()
-func convertField(value ref.Val) any {
+//
+// It will return an error if the request type is a map but the key
+// is not a string.
+func convertField(value ref.Val) (any, error) {
 	// special handling for lists, where the elements are converted with Value() instead of ConvertToNative
 	// to allow them to become native value of any type.
 	if listOfVal, ok := value.Value().([]ref.Val); ok {
@@ -113,7 +121,20 @@ func convertField(value ref.Val) any {
 		for _, v := range listOfVal {
 			result = append(result, v.Value())
 		}
-		return result
+		return result, nil
 	}
-	return value.Value()
+	// unstructured maps, as seen in annotations
+	// map keys must be strings
+	if mapOfVal, ok := value.Value().(map[ref.Val]ref.Val); ok {
+		result := make(map[string]any)
+		for k, v := range mapOfVal {
+			stringKey, ok := k.Value().(string)
+			if !ok {
+				return nil, fmt.Errorf("map key %q is of type %t, not string", k, k)
+			}
+			result[stringKey] = v.Value()
+		}
+		return result, nil
+	}
+	return value.Value(), nil
 }
