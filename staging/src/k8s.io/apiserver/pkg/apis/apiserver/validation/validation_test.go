@@ -50,9 +50,10 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
 
 	testCases := []struct {
-		name string
-		in   *api.AuthenticationConfiguration
-		want string
+		name              string
+		in                *api.AuthenticationConfiguration
+		disallowedIssuers []string
+		want              string
 	}{
 		{
 			name: "jwt authenticator is empty",
@@ -175,6 +176,33 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 			want: `jwt[0].userValidationRules[1].expression: Duplicate value: "user.username == 'foo'"`,
 		},
 		{
+			name: "valid authentication configuration with disallowed issuer",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:       "https://issuer-url",
+							Audiences: []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String("prefix"),
+							},
+						},
+					},
+				},
+			},
+			disallowedIssuers: []string{"a", "b", "https://issuer-url", "c"},
+			want:              `jwt[0].issuer.url: Invalid value: "https://issuer-url": URL must not overlap with disallowed issuers: [a b c https://issuer-url]`,
+		},
+		{
 			name: "valid authentication configuration",
 			in: &api.AuthenticationConfiguration{
 				JWT: []api.JWTAuthenticator{
@@ -204,7 +232,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateAuthenticationConfiguration(tt.in).ToAggregate()
+			got := ValidateAuthenticationConfiguration(tt.in, tt.disallowedIssuers).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("AuthenticationConfiguration validation mismatch (-want +got):\n%s", d)
 			}
@@ -216,9 +244,10 @@ func TestValidateIssuerURL(t *testing.T) {
 	fldPath := field.NewPath("issuer", "url")
 
 	testCases := []struct {
-		name string
-		in   string
-		want string
+		name              string
+		in                string
+		disallowedIssuers sets.Set[string]
+		want              string
 	}{
 		{
 			name: "url is empty",
@@ -251,6 +280,12 @@ func TestValidateIssuerURL(t *testing.T) {
 			want: `issuer.url: Invalid value: "https://issuer-url#fragment": URL must not contain a fragment`,
 		},
 		{
+			name:              "valid url that is disallowed",
+			in:                "https://issuer-url",
+			disallowedIssuers: sets.New("https://issuer-url"),
+			want:              `issuer.url: Invalid value: "https://issuer-url": URL must not overlap with disallowed issuers: [https://issuer-url]`,
+		},
+		{
 			name: "valid url",
 			in:   "https://issuer-url",
 			want: "",
@@ -259,7 +294,7 @@ func TestValidateIssuerURL(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateIssuerURL(tt.in, fldPath).ToAggregate()
+			got := validateIssuerURL(tt.in, tt.disallowedIssuers, fldPath).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("URL validation mismatch (-want +got):\n%s", d)
 			}
