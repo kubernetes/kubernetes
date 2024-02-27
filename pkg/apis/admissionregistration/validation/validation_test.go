@@ -3530,7 +3530,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.matchPolicy: Unsupported value: "other": supported values: "Equivalent", "Exact"`,
+		expectedError: `spec.matchResources.matchPolicy: Unsupported value: "other": supported values: "Equivalent", "Exact"`,
 	}, {
 		name: "Operations must not be empty or nil",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3585,7 +3585,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].operations: Required value, spec.matchResouces.resourceRules[1].operations: Required value, spec.matchResouces.excludeResourceRules[0].operations: Required value, spec.matchResouces.excludeResourceRules[1].operations: Required value`,
+		expectedError: `spec.matchResources.resourceRules[0].operations: Required value, spec.matchResources.resourceRules[1].operations: Required value, spec.matchResources.excludeResourceRules[0].operations: Required value, spec.matchResources.excludeResourceRules[1].operations: Required value`,
 	}, {
 		name: "\"\" is NOT a valid operation",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3758,7 +3758,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+		expectedError: `spec.matchResources.resourceRules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
 	}, {
 		name: "resource a/* can mix with a",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3823,7 +3823,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+		expectedError: `spec.matchResources.resourceRules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
 	}, {
 		name: "resource */* cannot mix with other resources",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -3851,7 +3851,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResouces.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "validationActions must be unique",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
