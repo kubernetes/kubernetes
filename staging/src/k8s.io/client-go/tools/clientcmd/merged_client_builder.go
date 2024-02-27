@@ -20,6 +20,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/imdario/mergo"
 	"k8s.io/klog/v2"
 
 	restclient "k8s.io/client-go/rest"
@@ -119,20 +120,20 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 			//isDefaultConfig := config.loader.IsDefaultConfig(mergedConfig)
 			//if !isDefaultConfig {
 			//	// merge with in-cluster config if in cluster config possible
-			//	if config.icc.Possible() {
-			//		icConfig, err := config.icc.ClientConfig()
-			//		if err != nil {
-			//			klog.V(4).Infof("Error getting in cluster config: %v", err)
-			//			return nil, err
-			//		}
-			//		err = mergo.Merge(icConfig, mergedConfig)
-			//		if err != nil {
-			//			klog.V(4).Infof("Error merging in-cluster with merged configuration: %v", err)
-			//			return nil, err
-			//		}
-			//		klog.V(4).Infof("Using in-cluster configuration")
-			//		return icConfig, nil
-			//	}
+			if config.icc.Possible() {
+				icConfig, err := config.icc.ClientConfig()
+				if err != nil {
+					klog.V(4).Infof("Error getting in cluster config: %v", err)
+					return mergedConfig, err
+				}
+				err = mergo.Merge(icConfig, mergedConfig)
+				if err != nil {
+					klog.V(4).Infof("Error merging in-cluster with merged configuration: %v", err)
+					return mergedConfig, err
+				}
+				klog.V(4).Infof("Using in-cluster configuration")
+				return icConfig, nil
+			}
 			return mergedConfig, nil
 		}
 	}
