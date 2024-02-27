@@ -19,6 +19,7 @@ package features
 import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
@@ -919,6 +920,7 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableVersionedFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
 
 	// Register all client-go features with kube's feature gate instance and make all client-go
 	// feature checks use kube's instance. The effect is that for kube binaries, client-go
@@ -928,6 +930,18 @@ func init() {
 	ca := &clientAdapter{utilfeature.DefaultMutableFeatureGate}
 	runtime.Must(clientfeatures.AddFeaturesToExistingFeatureGates(ca))
 	clientfeatures.ReplaceFeatureGates(ca)
+}
+
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
+// To add a new feature, define a key for it above and add it here. The features will be
+// available throughout Kubernetes binaries.
+//
+// Entries are separated from each other with blank lines to avoid sweeping gofmt changes
+// when adding or removing one entry.
+var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	genericfeatures.EmulationVersion: featuregate.VersionedSpecs{
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -1193,8 +1207,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	genericfeatures.EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	genericfeatures.EmulationVersion: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
 

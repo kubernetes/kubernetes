@@ -184,6 +184,7 @@ func TestAnyVersionForGroupEnabled(t *testing.T) {
 }
 
 func TestEnabledVersionWithEmulationVersionOff(t *testing.T) {
+	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.30.0")))
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, false)()
 	g1v1 := schema.GroupVersion{Group: "group1", Version: "version1"}
 	g1v2 := schema.GroupVersion{Group: "group1", Version: "version2"}
@@ -193,18 +194,17 @@ func TestEnabledVersionWithEmulationVersionOff(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	scheme.SetGroupVersionLifecycle(g1v2, schema.APILifecycle{
-		IntroducedVersion: version.MajorMinor(1, 29),
+		IntroducedVersion: version.MajorMinor(1, 31),
 	})
 	scheme.SetGroupVersionLifecycle(g2v1, schema.APILifecycle{
-		RemovedVersion: version.MajorMinor(1, 27),
+		RemovedVersion: version.MajorMinor(1, 29),
 	})
 	scheme.SetGroupVersionLifecycle(g2v2, schema.APILifecycle{
-		IntroducedVersion: version.MajorMinor(1, 26),
+		IntroducedVersion: version.MajorMinor(1, 28),
 	})
 	scheme.SetGroupVersionLifecycle(g2v3, schema.APILifecycle{
-		RemovedVersion: version.MajorMinor(1, 28),
+		RemovedVersion: version.MajorMinor(1, 30),
 	})
-	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.28.0")))
 	config := NewResourceConfig(scheme)
 
 	config.DisableVersions(g1v1)
@@ -228,6 +228,7 @@ func TestEnabledVersionWithEmulationVersionOff(t *testing.T) {
 }
 
 func TestEnabledVersionWithEmulationVersion(t *testing.T) {
+	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.31.0")))
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
 	g1v1 := schema.GroupVersion{Group: "group1", Version: "version1"}
 	g1v2 := schema.GroupVersion{Group: "group1", Version: "version2"}
@@ -237,19 +238,19 @@ func TestEnabledVersionWithEmulationVersion(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	scheme.SetGroupVersionLifecycle(g1v2, schema.APILifecycle{
-		IntroducedVersion: version.MajorMinor(1, 29),
+		IntroducedVersion: version.MajorMinor(1, 31),
 	})
 	scheme.SetGroupVersionLifecycle(g2v1, schema.APILifecycle{
-		RemovedVersion: version.MajorMinor(1, 27),
+		RemovedVersion: version.MajorMinor(1, 29),
 	})
 	scheme.SetGroupVersionLifecycle(g2v2, schema.APILifecycle{
-		IntroducedVersion: version.MajorMinor(1, 26),
+		IntroducedVersion: version.MajorMinor(1, 28),
 	})
 	scheme.SetGroupVersionLifecycle(g2v3, schema.APILifecycle{
-		RemovedVersion: version.MajorMinor(1, 28),
+		RemovedVersion: version.MajorMinor(1, 30),
 	})
-	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.29.0")))
-	utilversion.Effective.Set(version.MustParse("v1.29.0"), version.MustParse("v1.28.2"), version.MustParse("v1.28.0"))
+
+	utilversion.Effective.Set(version.MustParse("v1.31.0"), version.MustParse("v1.30.2"), version.MustParse("v1.30.0"))
 	config := NewResourceConfig(scheme)
 
 	config.DisableVersions(g1v1)
@@ -325,6 +326,7 @@ func TestApiAvailable(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.30.0")))
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
 			config := ResourceConfig{emulationVersion: tc.emulationVersion}
 			available, _ := config.apiAvailable(schema.APILifecycle{IntroducedVersion: tc.introducedVersion, RemovedVersion: tc.removedVersion})
@@ -360,45 +362,45 @@ func TestEnabledResourceWithEmulationVersion(t *testing.T) {
 	}{
 		{
 			name:                   "enable gv introduced before emulation version",
-			groupVersionIntroduced: version.MajorMinor(1, 27),
+			groupVersionIntroduced: version.MajorMinor(1, 29),
 			enableGroupVersion:     true,
 			enableResource:         true,
 			expectedResult:         true,
 		},
 		{
 			name:                   "enable gv introduced after emulation version",
-			groupVersionIntroduced: version.MajorMinor(1, 29),
+			groupVersionIntroduced: version.MajorMinor(1, 31),
 			enableGroupVersion:     true,
 			enableResource:         true,
 			expectedResult:         false,
 		},
 		{
 			name:                   "enable resource for disabled gv introduced before emulation version",
-			groupVersionIntroduced: version.MajorMinor(1, 27),
+			groupVersionIntroduced: version.MajorMinor(1, 29),
 			enableGroupVersion:     false,
 			enableResource:         true,
 			expectedResult:         true,
 		},
 		{
 			name:                   "enable resource introduced before and gv introduced before emulation version",
-			groupVersionIntroduced: version.MajorMinor(1, 27),
-			resourceIntroduced:     version.MajorMinor(1, 26),
+			groupVersionIntroduced: version.MajorMinor(1, 29),
+			resourceIntroduced:     version.MajorMinor(1, 28),
 			enableGroupVersion:     true,
 			enableResource:         true,
 			expectedResult:         true,
 		},
 		{
 			name:                   "enable resource introduced after and gv introduced before emulation version",
-			groupVersionIntroduced: version.MajorMinor(1, 27),
-			resourceIntroduced:     version.MajorMinor(1, 29),
+			groupVersionIntroduced: version.MajorMinor(1, 29),
+			resourceIntroduced:     version.MajorMinor(1, 31),
 			enableGroupVersion:     true,
 			enableResource:         true,
 			expectedResult:         false,
 		},
 		{
 			name:                   "enable resource introduced before and gv introduced after emulation version",
-			groupVersionIntroduced: version.MajorMinor(1, 29),
-			resourceIntroduced:     version.MajorMinor(1, 27),
+			groupVersionIntroduced: version.MajorMinor(1, 31),
+			resourceIntroduced:     version.MajorMinor(1, 29),
 			enableGroupVersion:     true,
 			enableResource:         true,
 			expectedResult:         false,
@@ -406,10 +408,10 @@ func TestEnabledResourceWithEmulationVersion(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.31.0")))
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
 			scheme := runtime.NewScheme()
-			t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(version.MustParse("v1.29.0")))
-			utilversion.Effective.Set(version.MustParse("v1.29.0"), version.MustParse("v1.28.2"), version.MustParse("v1.28.0"))
+			utilversion.Effective.Set(version.MustParse("v1.31.0"), version.MustParse("v1.30.2"), version.MustParse("v1.30.0"))
 			config := NewResourceConfig(scheme)
 			gv := schema.GroupVersion{Group: "group", Version: "version"}
 			r := gv.WithResource("resource")

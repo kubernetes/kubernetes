@@ -37,8 +37,8 @@ import (
 )
 
 func TestParseRuntimeConfig(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
 	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.30.0")))
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmulationVersion, true)()
 	scheme := newFakeScheme(t)
 	apiv1GroupVersion := apiv1.SchemeGroupVersion
 	testCases := []struct {

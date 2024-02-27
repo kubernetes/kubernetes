@@ -32,13 +32,16 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/webhook"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/listers/core/v1"
@@ -92,6 +95,10 @@ func (o CustomResourceDefinitionsServerOptions) Validate() error {
 
 // Complete fills in missing options.
 func (o *CustomResourceDefinitionsServerOptions) Complete() error {
+	// set feature gate emulation version before Validate().
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.EmulationVersion) {
+		return utilfeature.DefaultMutableVersionedFeatureGate.SetEmulationVersion(serverversion.Effective.EmulationVersion())
+	}
 	return nil
 }
 

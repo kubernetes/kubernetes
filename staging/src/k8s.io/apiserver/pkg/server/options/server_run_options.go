@@ -197,6 +197,9 @@ func (s *ServerRunOptions) Validate() []error {
 	if err := validateCorsAllowedOriginList(s.CorsAllowedOriginList); err != nil {
 		errors = append(errors, err)
 	}
+	if errs := utilfeature.DefaultMutableVersionedFeatureGate.Validate(); len(errs) != 0 {
+		errors = append(errors, errs...)
+	}
 	if errs := serverversion.Effective.Validate(); len(errs) != 0 {
 		errors = append(errors, errs...)
 	}
@@ -341,6 +344,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
+	utilfeature.DefaultMutableVersionedFeatureGate.DeferErrorsToValidation(true)
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 	serverversion.Effective.AddFlags(fs)
 }

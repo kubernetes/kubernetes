@@ -62,6 +62,9 @@ func TestAllRegisteredFeaturesExpected(t *testing.T) {
 	if err := knownFeatureGates.Add(defaultKubernetesFeatureGates); err != nil {
 		t.Fatal(err)
 	}
+	if err := knownFeatureGates.AddVersioned(defaultVersionedKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
 	knownFeatures := knownFeatureGates.GetAll()
 
 	for registeredFeature := range registeredFeatures {

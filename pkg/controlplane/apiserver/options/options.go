@@ -24,9 +24,12 @@ import (
 	"strings"
 	"time"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -197,6 +200,12 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 
 	completed := completedOptions{
 		Options: *o,
+	}
+	// set feature gate emulation version first.
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.EmulationVersion) {
+		if err := utilfeature.DefaultMutableVersionedFeatureGate.SetEmulationVersion(serverversion.Effective.EmulationVersion()); err != nil {
+			return CompletedOptions{}, err
+		}
 	}
 
 	// set defaults

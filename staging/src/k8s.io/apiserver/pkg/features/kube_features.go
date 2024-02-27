@@ -18,6 +18,7 @@ package features
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -284,6 +285,16 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableVersionedFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+}
+
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
+// To add a new feature, define a key for it above and add it here. The features will be
+// available throughout Kubernetes binaries.
+var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	EmulationVersion: featuregate.VersionedSpecs{
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -308,8 +319,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
-
-	EmulationVersion: {Default: false, PreRelease: featuregate.Alpha},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 

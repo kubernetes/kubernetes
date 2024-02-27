@@ -27,9 +27,12 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	serverversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -115,6 +118,10 @@ func (o AggregatorOptions) Validate(args []string) error {
 
 // Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
+	// set feature gate emulation version before Validate().
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.EmulationVersion) {
+		return utilfeature.DefaultMutableVersionedFeatureGate.SetEmulationVersion(serverversion.Effective.EmulationVersion())
+	}
 	return nil
 }
 
