@@ -124,7 +124,8 @@
         "required": [
           "type",
           "status",
-          "reason"
+          "reason",
+          "message"
         ],
         "type": "object"
       },
