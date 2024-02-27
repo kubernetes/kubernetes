@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/onsi/gomega"
 	"k8s.io/klog/v2"
 )
 
@@ -136,6 +137,16 @@ func (eCtx *errorContext) Fatalf(format string, args ...any) {
 func (eCtx *errorContext) CleanupCtx(cb func(TContext)) {
 	eCtx.Helper()
 	cleanupCtx(eCtx, cb)
+}
+
+func (eCtx *errorContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
+	eCtx.Helper()
+	return expect(eCtx, actual, extra...)
+}
+
+func (eCtx *errorContext) ExpectNoError(err error, explain ...interface{}) {
+	eCtx.Helper()
+	expectNoError(eCtx, err, explain...)
 }
 
 func (eCtx *errorContext) Logger() klog.Logger {
