@@ -85,6 +85,32 @@ var _ = SIGDescribe("Downward API", func() {
 	})
 
 	/*
+	   Release: v1.30
+	   Testname: DownwardAPI, environment for creationTimestamp
+	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify creationTimestamp as environment variable in the Pod Spec are visible at runtime in the container.
+	*/
+	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars", f.WithNodeConformance(), func(ctx context.Context) {
+		podName := "downward-api-" + string(uuid.NewUUID())
+		env := []v1.EnvVar{
+			{
+				Name: "POD_CREATION_TIMESTAMP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.creationTimestamp",
+					},
+				},
+			},
+		}
+
+		expectations := []string{
+			fmt.Sprintf("POD_CREATION_TIMESTAMP=%v", podName),
+		}
+
+		testDownwardAPI(ctx, f, podName, env, expectations)
+	})
+
+	/*
 	   Release: v1.9
 	   Testname: DownwardAPI, environment for host ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.

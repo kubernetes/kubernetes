@@ -22,8 +22,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -41,6 +42,8 @@ const (
 	testNamespace  = "test_metadata_namespace"
 	testName       = "test_metadata_name"
 )
+
+var refTime = metav1.Date(1970, time.January, 1, 1, 1, 1, 0, time.UTC)
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := utiltesting.MkTmpdir("downwardApi_volume_test.")
@@ -132,6 +135,14 @@ func TestDownwardAPI(t *testing.T) {
 			},
 		},
 		{
+			name:  "test_creationtimestamp",
+			files: map[string]string{"creation_time_stamp": "metadata.creationTimestamp"},
+			steps: []testStep{
+				verifyLinesInFile{stepName{"creation_time_stamp"}, refTime.String()},
+			},
+		},
+
+		{
 			name:      "test_write_twice_no_update",
 			files:     map[string]string{"labels": "metadata.labels"},
 			podLabels: labels1,
@@ -222,10 +233,11 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 		files = append(files, file)
 	}
 	podMeta := metav1.ObjectMeta{
-		Name:        testName,
-		Namespace:   testNamespace,
-		Labels:      podLabels,
-		Annotations: podAnnotations,
+		Name:              testName,
+		Namespace:         testNamespace,
+		Labels:            podLabels,
+		Annotations:       podAnnotations,
+		CreationTimestamp: refTime,
 	}
 	clientset := fake.NewSimpleClientset(&v1.Pod{ObjectMeta: podMeta})
 
