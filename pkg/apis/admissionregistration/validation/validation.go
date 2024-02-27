@@ -1338,8 +1338,7 @@ func validateMutatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admission
 	var compiler plugincel.Compiler // composition compiler is stateful, create one lazily per policy
 	getCompiler := func() plugincel.Compiler {
 		if compiler == nil {
-			needsComposition := len(spec.Variables) > 0
-			compiler = createCompiler(needsComposition)
+			compiler = createCompiler(false)
 		}
 		return compiler
 	}
@@ -1364,16 +1363,11 @@ func validateMutatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admission
 	if !opts.ignoreMatchConditions {
 		allErrors = append(allErrors, validateMatchConditions(spec.MatchConditions, opts, fldPath.Child("matchConditions"))...)
 	}
-	if len(spec.Variables) > 0 {
-		for i, variable := range spec.Variables {
-			allErrors = append(allErrors, validateVariable(getCompiler(), &variable, spec.ParamKind, opts, fldPath.Child("variables").Index(i))...)
-		}
-	}
 	if len(spec.Mutations) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("mutations"), "mutations must contain at least one item"))
 	} else {
 		for i, mutation := range spec.Mutations {
-			allErrors = append(allErrors, validateMutation(getCompiler(), &mutation, spec.ParamKind, opts, fldPath.Child("validations").Index(i))...)
+			allErrors = append(allErrors, validateMutation(getCompiler(), &mutation, spec.ParamKind, opts, fldPath.Child("mutations").Index(i))...)
 		}
 	}
 	return allErrors
@@ -1408,6 +1402,9 @@ func validateMutation(compiler plugincel.Compiler, m *admissionregistration.Muta
 	}
 	if m.ReinvocationPolicy != nil && !supportedReinvocationPolicies.Has(string(*m.ReinvocationPolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *m.ReinvocationPolicy, supportedReinvocationPolicies.List()))
+	}
+	if m.PatchType == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("patchType"), "patchType must be specified"))
 	}
 	return allErrors
 }

@@ -749,20 +749,6 @@ type MutatingAdmissionPolicySpec struct {
 	// +listMapKey=name
 	// +optional
 	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,5,rep,name=matchConditions"`
-
-	// Variables contain definitions of variables that can be used in composition of other expressions.
-	// Each variable is defined as a named CEL expression.
-	// The variables defined here will be available under `variables` in other expressions of the policy
-	// except MatchConditions because MatchConditions are evaluated before the rest of the policy.
-	//
-	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
-	// Thus, Variables must be sorted by the order of first appearance and acyclic.
-	// +patchMergeKey=name
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	Variables []Variable `json:"variables,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=variables"`
 }
 
 // Mutation specifies the CEL expression which is used to apply the Mutation.
@@ -831,7 +817,22 @@ type Mutation struct {
 	// Defaults to "Never".
 	// +optional
 	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,5,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
+	// patchType indicates the patch strategy used.
+	// Allowed values are "ApplyConfiguration" and "JSONPatch".
+	// +required
+	PatchType *PatchType `json:"patchType,omitempty" protobuf:"bytes,6,opt,name=patchType,casttype=patchType"`
 }
+
+// PatchType specifies what type of strategy the admission mutation uses.
+// +enum
+type PatchType string
+
+const (
+	// ApplyConfigurationPatchType indicates that the mutation is using apply configuration to mutate the object.
+	ApplyConfigurationPatchType PatchType = "ApplyConfiguration"
+	// JSONPatchPatchType indicates that the object is mutated through JSONPatch.
+	JSONPatchPatchType PatchType = "JSONPatchPatchType"
+)
 
 // ReinvocationPolicyType specifies what type of policy the admission mutation uses.
 // +enum

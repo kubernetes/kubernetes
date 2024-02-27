@@ -1255,20 +1255,6 @@ type MutatingAdmissionPolicySpec struct {
 	// +listMapKey=name
 	// +optional
 	MatchConditions []MatchCondition
-
-	// Variables contain definitions of variables that can be used in composition of other expressions.
-	// Each variable is defined as a named CEL expression.
-	// The variables defined here will be available under `variables` in other expressions of the policy
-	// except MatchConditions because MatchConditions are evaluated before the rest of the policy.
-	//
-	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
-	// Thus, Variables must be sorted by the order of first appearance and acyclic.
-	// +patchMergeKey=name
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	Variables []Variable
 }
 
 // Mutation specifies the CEL expression which is used to apply the Mutation.
@@ -1337,7 +1323,22 @@ type Mutation struct {
 	// Defaults to "Never".
 	// +optional
 	ReinvocationPolicy *ReinvocationPolicyType
+	// patchType indicates the patch strategy used.
+	// Allowed values are "ApplyConfiguration" and "JSONPatch".
+	// +required
+	PatchType *PatchType
 }
+
+// PatchType specifies what type of strategy the admission mutation uses.
+// +enum
+type PatchType string
+
+const (
+	// ApplyConfigurationPatchType indicates that the mutation is using apply configuration to mutate the object.
+	ApplyConfigurationPatchType PatchType = "ApplyConfiguration"
+	// JSONPatchPatchType indicates that the object is mutated through JSONPatch.
+	JSONPatchPatchType PatchType = "JSONPatchPatchType"
+)
 
 // +genclient
 // +genclient:nonNamespaced
