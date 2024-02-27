@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -64,6 +65,10 @@ var (
 	// synchronizeTokenIDVerifierForTest should be set to true to force a
 	// wait until the token ID verifiers are ready.
 	synchronizeTokenIDVerifierForTest = false
+)
+
+const (
+	wellKnownEndpointPath = "/.well-known/openid-configuration"
 )
 
 type Options struct {
@@ -268,6 +273,28 @@ func New(opts Options) (authenticator.Token, error) {
 		client = &http.Client{Transport: tr, Timeout: 30 * time.Second}
 	}
 
+	// If the discovery URL is set in authentication configuration, we set up a
+	// roundTripper to rewrite the {url}/.well-known/openid-configuration to
+	// the discovery URL. This is useful for self-hosted providers, for example,
+	// providers that run on top of Kubernetes itself.
+	if len(opts.JWTAuthenticator.Issuer.DiscoveryURL) > 0 {
+		discoveryURL, err := url.Parse(opts.JWTAuthenticator.Issuer.DiscoveryURL)
+		if err != nil {
+			return nil, fmt.Errorf("oidc: invalid discovery URL: %w", err)
+		}
+
+		clientWithDiscoveryURL := *client
+		baseTransport := clientWithDiscoveryURL.Transport
+		if baseTransport == nil {
+			baseTransport = http.DefaultTransport
+		}
+		// This matches the url construction in oidc.NewProvider as of go-oidc v2.2.1.
+		// xref: https://github.com/coreos/go-oidc/blob/40cd342c4a2076195294612a834d11df23c1b25a/oidc.go#L114
+		urlToRewrite := strings.TrimSuffix(opts.JWTAuthenticator.Issuer.URL, "/") + wellKnownEndpointPath
+		clientWithDiscoveryURL.Transport = &discoveryURLRoundTripper{baseTransport, discoveryURL, urlToRewrite}
+		client = &clientWithDiscoveryURL
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = oidc.ClientContext(ctx, client)
 
@@ -337,6 +364,26 @@ func New(opts Options) (authenticator.Token, error) {
 	}
 
 	return newInstrumentedAuthenticator(issuerURL, authenticator), nil
+}
+
+// discoveryURLRoundTripper is a http.RoundTripper that rewrites the
+// {url}/.well-known/openid-configuration to the discovery URL.
+type discoveryURLRoundTripper struct {
+	base http.RoundTripper
+	// discoveryURL is the URL to use to fetch the openid configuration
+	discoveryURL *url.URL
+	// urlToRewrite is the URL to rewrite to the discovery URL
+	urlToRewrite string
+}
+
+func (t *discoveryURLRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method == http.MethodGet && req.URL.String() == t.urlToRewrite {
+		clone := req.Clone(req.Context())
+		clone.Host = ""
+		clone.URL = t.discoveryURL
+		return t.base.RoundTrip(clone)
+	}
+	return t.base.RoundTrip(req)
 }
 
 // untrustedIssuer extracts an untrusted "iss" claim from the given JWT token,
