@@ -47,6 +47,7 @@ const (
 	// owner: @jefftree @alexzielenski
 	// alpha: v1.26
 	// beta: v1.27
+	// stable: v1.30
 	//
 	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
 	// caching with ETags containing all APIResources known to the apiserver.
@@ -284,7 +285,7 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 
-	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
+	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
