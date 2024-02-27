@@ -124,12 +124,12 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 				icConfig, err := config.icc.ClientConfig()
 				if err != nil {
 					klog.V(4).Infof("Error getting in cluster config: %v", err)
-					return mergedConfig, err
+					return mergedConfig, nil
 				}
 				err = mergo.Merge(icConfig, mergedConfig)
 				if err != nil {
 					klog.V(4).Infof("Error merging in-cluster with merged configuration: %v", err)
-					return mergedConfig, err
+					return mergedConfig, nil
 				}
 				klog.V(4).Infof("Using in-cluster configuration")
 				return icConfig, nil
