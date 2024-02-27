@@ -20,10 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 )
 
 const eof = -1
@@ -494,8 +496,7 @@ func UnquoteExtend(s string) (string, error) {
 		return "", ErrSyntax
 	}
 
-	// Is it trivial?  Avoid allocation.
-	if !contains(s, '\\') && !contains(s, quote) {
+	if !slices.Contains(toBytes(s), '\\') && !slices.Contains(toBytes(s), quote) {
 		return s, nil
 	}
 
@@ -517,11 +518,13 @@ func UnquoteExtend(s string) (string, error) {
 	return string(buf), nil
 }
 
-func contains(s string, c byte) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] == c {
-			return true
-		}
+// toBytes performs unholy acts to avoid allocations
+func toBytes(s string) []byte {
+	// unsafe.StringData is unspecified for the empty string, so we provide a strict interpretation
+	if len(s) == 0 {
+		return nil
 	}
-	return false
+	// Copied from go 1.20.1 os.File.WriteString
+	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/os/file.go#L246
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
