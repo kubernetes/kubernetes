@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/metadata"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -34,10 +36,11 @@ const (
 	progressRequestPeriod = 100 * time.Millisecond
 )
 
-func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock TickerFactory) *conditionalProgressRequester {
+func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock TickerFactory, contextMetadata metadata.MD) *conditionalProgressRequester {
 	pr := &conditionalProgressRequester{
 		clock:                clock,
 		requestWatchProgress: requestWatchProgress,
+		contextMetadata:      contextMetadata,
 	}
 	pr.cond = sync.NewCond(pr.mux.RLocker())
 	return pr
@@ -54,6 +57,7 @@ type TickerFactory interface {
 type conditionalProgressRequester struct {
 	clock                TickerFactory
 	requestWatchProgress WatchProgressRequester
+	contextMetadata      metadata.MD
 
 	mux     sync.RWMutex
 	cond    *sync.Cond
@@ -63,6 +67,9 @@ type conditionalProgressRequester struct {
 
 func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 	ctx := wait.ContextForChannel(stopCh)
+	if pr.contextMetadata != nil {
+		ctx = metadata.NewOutgoingContext(ctx, pr.contextMetadata)
+	}
 	go func() {
 		defer utilruntime.HandleCrash()
 		<-stopCh

@@ -44,7 +44,7 @@ func TestCacherListerWatcher(t *testing.T) {
 		}
 	}
 
-	lw := NewListerWatcher(store, prefix, fn)
+	lw := NewListerWatcher(store, prefix, fn, nil)
 
 	obj, err := lw.List(metav1.ListOptions{})
 	if err != nil {
@@ -80,7 +80,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 		}
 	}
 
-	lw := NewListerWatcher(store, prefix, fn)
+	lw := NewListerWatcher(store, prefix, fn, nil)
 
 	obj1, err := lw.List(metav1.ListOptions{Limit: 2})
 	if err != nil {
