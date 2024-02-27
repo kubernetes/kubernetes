@@ -112,11 +112,11 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 	case mergedConfig != nil:
 		// the configuration is valid, but if this is equal to the defaults we should try
 		// in-cluster configuration
-		isDefaultConfig, err := config.loader.IsDefaultConfig(mergedConfig)
-		if err != nil {
-			klog.V(4).Infof("Default config invalid: %v", err)
-			return mergedConfig, nil
-		}
+		//if err != nil {
+		//	klog.V(4).Infof("Default config invalid: %v", err)
+		//	return mergedConfig, nil
+		//}
+		isDefaultConfig := config.loader.IsDefaultConfig(mergedConfig)
 		if !isDefaultConfig {
 			// merge with in-cluster config if in cluster config possible
 			if config.icc.Possible() {

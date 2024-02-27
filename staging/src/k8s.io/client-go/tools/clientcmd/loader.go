@@ -68,7 +68,7 @@ func currentMigrationRules() map[string]string {
 type ClientConfigLoader interface {
 	ConfigAccess
 	// IsDefaultConfig returns true if the returned config matches the defaults.
-	IsDefaultConfig(*restclient.Config) (bool, error)
+	IsDefaultConfig(*restclient.Config) bool
 	// Load returns the latest config
 	Load() (*clientcmdapi.Config, error)
 }
@@ -101,8 +101,8 @@ func (g *ClientConfigGetter) IsExplicitFile() bool {
 func (g *ClientConfigGetter) GetExplicitFile() string {
 	return ""
 }
-func (g *ClientConfigGetter) IsDefaultConfig(config *restclient.Config) (bool, error) {
-	return false, nil
+func (g *ClientConfigGetter) IsDefaultConfig(config *restclient.Config) bool {
+	return false
 }
 
 // ClientConfigLoadingRules is an ExplicitPath and string slice of specific locations that are used for merging together a Config
@@ -371,15 +371,15 @@ func (rules *ClientConfigLoadingRules) GetExplicitFile() string {
 }
 
 // IsDefaultConfig returns true if the provided configuration matches the default
-func (rules *ClientConfigLoadingRules) IsDefaultConfig(config *restclient.Config) (bool, error) {
+func (rules *ClientConfigLoadingRules) IsDefaultConfig(config *restclient.Config) bool {
 	if rules.DefaultClientConfig == nil {
-		return false, nil
+		return false
 	}
 	defaultConfig, err := rules.DefaultClientConfig.ClientConfig()
 	if err != nil {
-		return false, err
+		return false
 	}
-	return reflect.DeepEqual(config, defaultConfig), nil
+	return reflect.DeepEqual(config, defaultConfig)
 }
 
 // LoadFromFile takes a filename and deserializes the contents into Config object

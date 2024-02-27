@@ -126,12 +126,12 @@ func TestInClusterConfig(t *testing.T) {
 			err:        nil,
 		},
 
-		"in-cluster not checked when default config is invalid": {
+		"in-cluster is checked when default config is invalid": {
 			defaultConfig: defaultInvalid,
 			clientConfig:  &testClientConfig{config: config1},
 			icc:           &testICC{},
 
-			checkedICC: false,
+			checkedICC: true,
 			result:     config1,
 			err:        nil,
 		},
