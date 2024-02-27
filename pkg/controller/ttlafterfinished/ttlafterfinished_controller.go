@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
-	jobutil "k8s.io/kubernetes/pkg/controller/job"
+	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished/metrics"
 	"k8s.io/utils/clock"
 )
