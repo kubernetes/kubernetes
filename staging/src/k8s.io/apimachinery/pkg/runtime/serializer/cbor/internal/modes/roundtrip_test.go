@@ -260,24 +260,24 @@ func TestRoundtrip(t *testing.T) {
 			}{},
 		},
 	} {
-		mps := tc.modePairs
-		if len(mps) == 0 {
+		modePairs := tc.modePairs
+		if len(modePairs) == 0 {
 			// Default is all modes to all modes.
-			mps = []modePair{}
-			for _, em := range allEncModes {
-				for _, dm := range allDecModes {
-					mps = append(mps, modePair{enc: em, dec: dm})
+			modePairs = []modePair{}
+			for _, encMode := range allEncModes {
+				for _, decMode := range allDecModes {
+					modePairs = append(modePairs, modePair{enc: encMode, dec: decMode})
 				}
 			}
 		}
 
-		for _, mp := range mps {
-			encModeName, ok := encModeNames[mp.enc]
+		for _, modePair := range modePairs {
+			encModeName, ok := encModeNames[modePair.enc]
 			if !ok {
 				t.Fatal("test case configured to run against unrecognized encode mode")
 			}
 
-			decModeName, ok := decModeNames[mp.dec]
+			decModeName, ok := decModeNames[modePair.dec]
 			if !ok {
 				t.Fatal("test case configured to run against unrecognized decode mode")
 			}
@@ -285,13 +285,13 @@ func TestRoundtrip(t *testing.T) {
 			t.Run(fmt.Sprintf("enc=%s/dec=%s/%s", encModeName, decModeName, tc.name), func(t *testing.T) {
 				original := tc.obj
 
-				b, err := mp.enc.Marshal(original)
+				b, err := modePair.enc.Marshal(original)
 				if err != nil {
 					t.Fatalf("unexpected error from Marshal: %v", err)
 				}
 
 				final := reflect.New(reflect.TypeOf(original))
-				err = mp.dec.Unmarshal(b, final.Interface())
+				err = modePair.dec.Unmarshal(b, final.Interface())
 				if err != nil {
 					t.Fatalf("unexpected error from Unmarshal: %v", err)
 				}
