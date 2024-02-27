@@ -444,7 +444,7 @@ func (jm *ControllerV2) syncCronJob(
 			jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, status: %v", j.Name, status)
 			updateStatus = true
 		} else if IsJobSucceeded(j) {
-			// a job does not have to be in active list, as long as it is finished, we will process the timestamp
+			// a job does not have to be in active list, as long as it has completed successfully, we will process the timestamp
 			if cronJob.Status.LastSuccessfulTime == nil {
 				cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime
 				updateStatus = true

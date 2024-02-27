@@ -736,6 +736,10 @@ func TestIsJobSucceeded(t *testing.T) {
 				Status: batchv1.JobStatus{
 					Conditions: []batchv1.JobCondition{
 						{
+							Type:   batchv1.JobFailed,
+							Status: v1.ConditionTrue,
+						},
+						{
 							Type:   batchv1.JobComplete,
 							Status: v1.ConditionFalse,
 						},
