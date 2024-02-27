@@ -21,6 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 )
 
 type ResourceEncodingConfig interface {
@@ -35,8 +39,10 @@ type ResourceEncodingConfig interface {
 
 type DefaultResourceEncodingConfig struct {
 	// resources records the overriding encoding configs for individual resources.
-	resources map[schema.GroupResource]*OverridingResourceEncoding
-	scheme    *runtime.Scheme
+	resources               map[schema.GroupResource]*OverridingResourceEncoding
+	scheme                  *runtime.Scheme
+	emulationVersion        *version.Version
+	minCompatibilityVersion *version.Version
 }
 
 type OverridingResourceEncoding struct {
@@ -47,7 +53,10 @@ type OverridingResourceEncoding struct {
 var _ ResourceEncodingConfig = &DefaultResourceEncodingConfig{}
 
 func NewDefaultResourceEncodingConfig(scheme *runtime.Scheme) *DefaultResourceEncodingConfig {
-	return &DefaultResourceEncodingConfig{resources: map[schema.GroupResource]*OverridingResourceEncoding{}, scheme: scheme}
+	emuVer := utilversion.Effective.EmulationVersion()
+	compatVer := utilversion.Effective.MinCompatibilityVersion()
+	return &DefaultResourceEncodingConfig{resources: map[schema.GroupResource]*OverridingResourceEncoding{}, scheme: scheme,
+		emulationVersion: version.MajorMinor(emuVer.Major(), emuVer.Minor()), minCompatibilityVersion: version.MajorMinor(compatVer.Major(), compatVer.Minor())}
 }
 
 func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored schema.GroupResource, externalEncodingVersion, internalVersion schema.GroupVersion) {
@@ -67,6 +76,26 @@ func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.Group
 		return resourceOverride.ExternalResourceEncoding, nil
 	}
 
+	if feature.DefaultFeatureGate.Enabled(features.EmulationVersion) && o.emulationVersion != nil && o.minCompatibilityVersion != nil {
+		// List all versions for this group.
+		knownVersionsToBinary := o.scheme.PrioritizedVersionsForGroup(resource.Group)
+		emulationVersions := enabledVersions(resource.Resource, o.scheme, o.emulationVersion, knownVersionsToBinary)
+		minCompatibilityVersions := enabledVersions(resource.Resource, o.scheme, o.minCompatibilityVersion, knownVersionsToBinary)
+
+		// Return the first GV that is common to both the emulation and the
+		// minimum compatibility versions. The lists are sorted by priority
+		// so returning the first match will give the highest priority version
+		for _, emulationGV := range emulationVersions {
+			for _, minWindowGV := range minCompatibilityVersions {
+				if emulationGV == minWindowGV {
+					return emulationGV, nil
+				}
+			}
+		}
+
+		return schema.GroupVersion{}, fmt.Errorf("resource not codable by both emulation version and min compatibility version: %v", resource)
+	}
+
 	// return the most preferred external version for the group
 	return o.scheme.PrioritizedVersionsForGroup(resource.Group)[0], nil
 }
@@ -81,4 +110,29 @@ func (o *DefaultResourceEncodingConfig) InMemoryEncodingFor(resource schema.Grou
 		return resourceOverride.InternalResourceEncoding, nil
 	}
 	return schema.GroupVersion{Group: resource.Group, Version: runtime.APIVersionInternal}, nil
+}
+
+func enabledVersions(
+	resource string,
+	registry GroupVersionRegistry,
+	emulationVersion *version.Version,
+	prioritizedVersions []schema.GroupVersion,
+) []schema.GroupVersion {
+	var enabledVersions []schema.GroupVersion
+	for _, gv := range prioritizedVersions {
+		gvr := schema.GroupVersionResource{
+			Group:    gv.Group,
+			Version:  gv.Version,
+			Resource: resource,
+		}
+
+		if enabled, _ := isAPIAvailable(registry.GroupVersionLifecycle(gv), emulationVersion); !enabled {
+			continue
+		} else if enabled, _ := isAPIAvailable(registry.ResourceLifecycle(gvr), emulationVersion); !enabled {
+			continue
+		}
+
+		enabledVersions = append(enabledVersions, gv)
+	}
+	return enabledVersions
 }

@@ -156,17 +156,21 @@ func (o *ResourceConfig) apiAvailable(lifecycle schema.APILifecycle) (bool, erro
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EmulationVersion) {
 		return true, nil
 	}
+	return isAPIAvailable(lifecycle, o.emulationVersion)
+}
+
+func isAPIAvailable(lifecycle schema.APILifecycle, emulationVersion *version.Version) (bool, error) {
 	// emulationVersion is not set.
-	if o.emulationVersion.Major() == 0 && o.emulationVersion.Minor() == 0 {
+	if emulationVersion.Major() == 0 && emulationVersion.Minor() == 0 {
 		return true, nil
 	}
 	// GroupVersion is introduced after the emulationVersion.
-	if lifecycle.IntroducedVersion != nil && o.emulationVersion.LessThan(lifecycle.IntroducedVersion) {
-		return false, fmt.Errorf("api introduced at %s, after the emulationVersion %s", lifecycle.IntroducedVersion.String(), o.emulationVersion.String())
+	if lifecycle.IntroducedVersion != nil && emulationVersion.LessThan(lifecycle.IntroducedVersion) {
+		return false, fmt.Errorf("api introduced at %s, after the emulationVersion %s", lifecycle.IntroducedVersion.String(), emulationVersion.String())
 	}
 	// GroupVersion is removed before the emulationVersion.
-	if lifecycle.RemovedVersion != nil && o.emulationVersion.GreaterThan(lifecycle.RemovedVersion) {
-		return false, fmt.Errorf("api removed at %s, before the emulationVersion %s", lifecycle.RemovedVersion.String(), o.emulationVersion.String())
+	if lifecycle.RemovedVersion != nil && emulationVersion.GreaterThan(lifecycle.RemovedVersion) {
+		return false, fmt.Errorf("api removed at %s, before the emulationVersion %s", lifecycle.RemovedVersion.String(), emulationVersion.String())
 	}
 	// TODO: handle remove when RemovedVersion equals emulationVersion like resourceExpirationEvaluator.ShouldServeForVersion.
 	return true, nil
