@@ -446,6 +446,8 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 }
 
 func TestToAuthenticationConfig_OIDC(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+
 	testCases := []struct {
 		name         string
 		args         []string
@@ -638,6 +640,43 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 					},
 				},
 				OIDCSigningAlgs: []string{"RS256"},
+			},
+		},
+		{
+			name: "basic authentication configuration",
+			args: []string{
+				"--authentication-config=" + writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+    audiences: [ "🐼" ]
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`),
+			},
+			expectConfig: kubeauthenticator.Config{
+				TokenSuccessCacheTTL: 10 * time.Second,
+				AuthenticationConfig: &apiserver.AuthenticationConfiguration{
+					JWT: []apiserver.JWTAuthenticator{
+						{
+							Issuer: apiserver.Issuer{
+								URL:       "https://test-issuer",
+								Audiences: []string{"🐼"},
+							},
+							ClaimMappings: apiserver.ClaimMappings{
+								Username: apiserver.PrefixedClaimOrExpression{
+									Claim:  "sub",
+									Prefix: pointer.String(""),
+								},
+							},
+						},
+					},
+				},
+				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
 	}

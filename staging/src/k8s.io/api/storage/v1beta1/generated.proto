@@ -127,6 +127,7 @@ message CSIDriverSpec {
   // This field is immutable.
   //
   // +optional
+  // +listType=atomic
   repeated string volumeLifecycleModes = 3;
 
   // storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
@@ -263,6 +264,7 @@ message CSINodeDriver {
   // It is possible for different nodes to use different topology keys.
   // This can be empty if driver does not support topology.
   // +optional
+  // +listType=atomic
   repeated string topologyKeys = 3;
 
   // allocatable represents the volume resources of a node that are available for scheduling.
@@ -287,6 +289,8 @@ message CSINodeSpec {
   // If all drivers in the list are uninstalled, this can become empty.
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated CSINodeDriver drivers = 1;
 }
 
@@ -379,8 +383,6 @@ message CSIStorageCapacityList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CSIStorageCapacity objects.
-  // +listType=map
-  // +listMapKey=name
   repeated CSIStorageCapacity items = 2;
 }
 
@@ -412,6 +414,7 @@ message StorageClass {
   // e.g. ["ro", "soft"]. Not validated -
   // mount of the PVs will simply fail if one is invalid.
   // +optional
+  // +listType=atomic
   repeated string mountOptions = 5;
 
   // allowVolumeExpansion shows whether the storage class allow volume expand

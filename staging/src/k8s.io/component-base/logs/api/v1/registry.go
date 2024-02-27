@@ -79,7 +79,7 @@ func newLogFormatRegistry() *logFormatRegistry {
 		registry: make(map[string]logFormat),
 		frozen:   false,
 	}
-	registry.register("text", logFormat{feature: LoggingStableOptions})
+	_ = registry.register(DefaultLogFormat, logFormat{factory: textFactory{}, feature: LoggingStableOptions})
 	return registry
 }
 

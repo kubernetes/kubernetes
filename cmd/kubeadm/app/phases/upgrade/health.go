@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
@@ -66,8 +67,8 @@ func (c *healthCheck) Name() string {
 // - the API /healthz endpoint is healthy
 // - all control-plane Nodes are Ready
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string]) error {
-	fmt.Println("[upgrade] Running cluster health checks")
+func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string], printer output.Printer) error {
+	_, _ = printer.Println("[upgrade] Running cluster health checks")
 
 	healthChecks := []preflight.Checker{
 		&healthCheck{
@@ -93,7 +94,7 @@ func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfi
 // createJob is a check that verifies that a Job can be created in the cluster
 func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) (lastError error) {
 	const (
-		jobName = "upgrade-health-check"
+		prefix  = "upgrade-health-check"
 		ns      = metav1.NamespaceSystem
 		timeout = 15 * time.Second
 	)
@@ -101,18 +102,19 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 	// If client.Discovery().RESTClient() is nil, the fake client is used.
 	// Return early because the kubeadm dryrun dynamic client only handles the core/v1 GroupVersion.
 	if client.Discovery().RESTClient() == nil {
-		fmt.Printf("[upgrade/health] Would create the Job %q in namespace %q and wait until it completes\n", jobName, ns)
+		fmt.Printf("[upgrade/health] Would create the Job with the prefix %q in namespace %q and wait until it completes\n", prefix, ns)
 		return nil
 	}
 
 	// Prepare Job
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: ns,
+			GenerateName: prefix + "-",
+			Namespace:    ns,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: ptr.To[int32](0),
+			BackoffLimit:            ptr.To[int32](0),
+			TTLSecondsAfterFinished: ptr.To[int32](2),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
@@ -129,7 +131,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 					},
 					Containers: []v1.Container{
 						{
-							Name:  jobName,
+							Name:  prefix,
 							Image: images.GetPauseImage(cfg),
 							Args:  []string{"-v"},
 						},
@@ -139,38 +141,29 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 		},
 	}
 
-	// Check if the Job already exists and delete it
-	if _, err := client.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{}); err == nil {
-		if err = deleteHealthCheckJob(client, ns, jobName); err != nil {
-			return err
-		}
-	}
+	ctx := context.Background()
 
-	// Cleanup the Job on exit
-	defer func() {
-		lastError = deleteHealthCheckJob(client, ns, jobName)
-	}()
-
-	// Create the Job, but retry in case it is being currently deleted
-	klog.V(2).Infof("Creating Job %q in the namespace %q", jobName, ns)
-	err := wait.PollImmediate(time.Second*1, timeout, func() (bool, error) {
-		if _, err := client.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
-			klog.V(2).Infof("Could not create Job %q in the namespace %q, retrying: %v", jobName, ns, err)
+	// Create the Job, but retry if it fails
+	klog.V(2).Infof("Creating a Job with the prefix %q in the namespace %q", prefix, ns)
+	var jobName string
+	err := wait.PollUntilContextTimeout(ctx, time.Second*1, timeout, true, func(ctx context.Context) (bool, error) {
+		createdJob, err := client.BatchV1().Jobs(ns).Create(ctx, job, metav1.CreateOptions{})
+		if err != nil {
+			klog.V(2).Infof("Could not create a Job with the prefix %q in the namespace %q, retrying: %v", prefix, ns, err)
 			lastError = err
 			return false, nil
 		}
+
+		jobName = createdJob.Name
 		return true, nil
 	})
 	if err != nil {
-		return errors.Wrapf(lastError, "could not create Job %q in the namespace %q", jobName, ns)
+		return errors.Wrapf(lastError, "could not create a Job with the prefix %q in the namespace %q", prefix, ns)
 	}
 
-	// Waiting and manually deleting the Job is a workaround to not enabling the TTL controller.
-	// TODO: refactor this if the TTL controller is enabled in kubeadm once it goes Beta.
-
 	// Wait for the Job to complete
-	err = wait.PollImmediate(time.Second*1, timeout, func() (bool, error) {
-		job, err := client.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(ctx, time.Second*1, timeout, true, func(ctx context.Context) (bool, error) {
+		job, err := client.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			lastError = err
 			klog.V(2).Infof("could not get Job %q in the namespace %q, retrying: %v", jobName, ns, err)
@@ -191,15 +184,6 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 
 	klog.V(2).Infof("Job %q in the namespace %q completed", jobName, ns)
 
-	return nil
-}
-
-func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error {
-	klog.V(2).Infof("Deleting Job %q in the namespace %q", jobName, ns)
-	propagation := metav1.DeletePropagationForeground
-	if err := client.BatchV1().Jobs(ns).Delete(context.TODO(), jobName, metav1.DeleteOptions{PropagationPolicy: &propagation}); err != nil {
-		return errors.Wrapf(err, "could not delete Job %q in the namespace %q", jobName, ns)
-	}
 	return nil
 }
 

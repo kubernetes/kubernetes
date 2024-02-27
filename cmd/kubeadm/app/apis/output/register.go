@@ -39,6 +39,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&BootstrapToken{},
 		&Images{},
 		&UpgradePlan{},
+		&CertificateExpirationInfo{},
 	)
 	return nil
 }

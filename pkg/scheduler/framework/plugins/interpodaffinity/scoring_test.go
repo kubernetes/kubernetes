@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 var nsLabelT1 = map[string]string{"team": "team1"}
@@ -783,7 +784,7 @@ func TestPreferredAffinity(t *testing.T) {
 			defer cancel()
 			state := framework.NewCycleState()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1, IgnorePreferredTermsOfExistingPods: test.ignorePreferredTermsOfExistingPods}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 
 			if !status.IsSuccess() {
 				if status.Code() != test.wantStatus.Code() {
@@ -951,7 +952,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 			defer cancel()
 			state := framework.NewCycleState()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if !test.wantStatus.Equal(status) {
 				t.Errorf("InterPodAffinity#PreScore() returned unexpected status.Code got: %v, want: %v", status.Code(), test.wantStatus.Code())
 			}

@@ -62,21 +62,21 @@ type Controller interface {
 
 // Driver provides the actual allocation and deallocation operations.
 type Driver interface {
-	// GetClassParameters gets called to retrieve the parameter object
+	// GetClassParameters is called to retrieve the parameter object
 	// referenced by a class. The content should be validated now if
 	// possible. class.Parameters may be nil.
 	//
-	// The caller will wrap the error to include the parameter reference.
+	// The caller wraps the error to include the parameter reference.
 	GetClassParameters(ctx context.Context, class *resourcev1alpha2.ResourceClass) (interface{}, error)
 
-	// GetClaimParameters gets called to retrieve the parameter object
+	// GetClaimParameters is called to retrieve the parameter object
 	// referenced by a claim. The content should be validated now if
 	// possible. claim.Spec.Parameters may be nil.
 	//
-	// The caller will wrap the error to include the parameter reference.
+	// The caller wraps the error to include the parameter reference.
 	GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error)
 
-	// Allocate gets called when all same-driver ResourceClaims for Pod are ready
+	// Allocate is called when all same-driver ResourceClaims for Pod are ready
 	// to be allocated. The selectedNode is empty for ResourceClaims with immediate
 	// allocation, in which case the resource driver decides itself where
 	// to allocate. If there is already an on-going allocation, the driver
@@ -86,15 +86,15 @@ type Driver interface {
 	// Parameters have been retrieved earlier.
 	//
 	// Driver must set the result of allocation for every claim in "claims"
-	// parameter items. In case if there was no error encountered and allocation
-	// was successful - claims[i].Allocation field should be set. In case of
-	// particular claim allocation fail - respective item's claims[i].Error field
-	// should be set, in this case claims[i].Allocation will be ignored.
+	// parameter items. If there is no error and allocation
+	// is successful - claims[i].Allocation field should be set. In case of
+	// particular claim allocation failure - respective item's claims[i].Error field
+	// should be set and claims[i].Allocation will be ignored.
 	//
 	// If selectedNode is set, the driver must attempt to allocate for that
 	// node. If that is not possible, it must return an error. The
 	// controller will call UnsuitableNodes and pass the new information to
-	// the scheduler, which then will lead to selecting a different node
+	// the scheduler, which will then lead to selecting a different node
 	// if the current one is not suitable.
 	//
 	// The Claim, ClaimParameters, Class, ClassParameters fields of "claims" parameter
@@ -108,7 +108,7 @@ type Driver interface {
 	// idempotent. In particular it must not return an error when the claim
 	// is currently not allocated.
 	//
-	// Deallocate may get called when a previous allocation got
+	// Deallocate may be called when a previous allocation got
 	// interrupted. Deallocate must then stop any on-going allocation
 	// activity and free resources before returning without an error.
 	Deallocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error
@@ -118,8 +118,8 @@ type Driver interface {
 	// and parameters have been retrieved.
 	//
 	// The driver may consider each claim in isolation, but it's better
-	// to mark nodes as unsuitable for all claims if it not all claims
-	// can be allocated for it (for example, two GPUs requested but
+	// to mark nodes as unsuitable for all claims, if all claims
+	// cannot be allocated for it (for example, two GPUs requested but
 	// the node only has one).
 	//
 	// The potentialNodes slice contains all potential nodes selected
@@ -189,7 +189,7 @@ func New(
 	schedulingCtxInformer := informerFactory.Resource().V1alpha2().PodSchedulingContexts()
 	claimNameLookup := resourceclaim.NewNameLookup(kubeClient)
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	go func() {
 		<-ctx.Done()
 		eventBroadcaster.Shutdown()

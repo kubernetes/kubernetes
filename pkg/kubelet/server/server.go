@@ -210,13 +210,6 @@ func ListenAndServeKubeletReadOnlyServer(
 	}
 }
 
-type PodResourcesProviders struct {
-	Pods    podresources.PodsProvider
-	Devices podresources.DevicesProvider
-	Cpus    podresources.CPUsProvider
-	Memory  podresources.MemoryProvider
-}
-
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
 func ListenAndServePodResources(endpoint string, providers podresources.PodResourcesProviders) {
 	server := grpc.NewServer(apisgrpc.WithRateLimiter("podresources", podresources.DefaultQPS, podresources.DefaultBurstTokens))

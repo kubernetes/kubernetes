@@ -16154,11 +16154,11 @@ func TestValidateServiceCreate(t *testing.T) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
+			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.0/24,  5.6.0.0/16"
 		},
 		numErrs: 0,
 	}, {
-		name: "empty LoadBalancer source range annotation",
+		name: "valid empty LoadBalancer source range annotation",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
@@ -16167,11 +16167,23 @@ func TestValidateServiceCreate(t *testing.T) {
 		},
 		numErrs: 0,
 	}, {
+		name: "valid whitespace-only LoadBalancer source range annotation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "  "
+		},
+		numErrs: 0,
+	}, {
 		name: "invalid LoadBalancer source range annotation (hostname)",
 		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
 		},
-		numErrs: 2,
+		numErrs: 1,
 	}, {
 		name: "invalid LoadBalancer source range annotation (invalid CIDR)",
 		tweakSvc: func(s *core.Service) {
@@ -16182,9 +16194,15 @@ func TestValidateServiceCreate(t *testing.T) {
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid source range for non LoadBalancer type service",
+		name: "invalid LoadBalancer source range annotation for non LoadBalancer type service",
 		tweakSvc: func(s *core.Service) {
-			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/8", "5.6.7.8/16"}
+			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.0/24"
+		},
+		numErrs: 1,
+	}, {
+		name: "invalid empty-but-set LoadBalancer source range annotation for non LoadBalancer type service",
+		tweakSvc: func(s *core.Service) {
+			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = ""
 		},
 		numErrs: 1,
 	}, {
@@ -16193,11 +16211,20 @@ func TestValidateServiceCreate(t *testing.T) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/8", "5.6.7.8/16"}
+			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "5.6.0.0/16"}
 		},
 		numErrs: 0,
 	}, {
-		name: "empty LoadBalancer source range",
+		name: "valid LoadBalancer source range with whitespace",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24  ", " 5.6.0.0/16"}
+		},
+		numErrs: 0,
+	}, {
+		name: "invalid empty LoadBalancer source range",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
@@ -16206,7 +16233,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid LoadBalancer source range",
+		name: "invalid LoadBalancer source range (hostname)",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
@@ -16214,6 +16241,31 @@ func TestValidateServiceCreate(t *testing.T) {
 			s.Spec.LoadBalancerSourceRanges = []string{"foo.bar"}
 		},
 		numErrs: 1,
+	}, {
+		name: "invalid LoadBalancer source range (invalid CIDR)",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/33"}
+		},
+		numErrs: 1,
+	}, {
+		name: "invalid source range for non LoadBalancer type service",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "5.6.0.0/16"}
+		},
+		numErrs: 1,
+	}, {
+		name: "invalid source range annotation ignored with valid source range field",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
+			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "5.6.0.0/16"}
+		},
+		numErrs: 0,
 	}, {
 		name: "valid ExternalName",
 		tweakSvc: func(s *core.Service) {

@@ -257,6 +257,8 @@ message ResourceClaimStatus {
   //
   // +listType=map
   // +listMapKey=uid
+  // +patchStrategy=merge
+  // +patchMergeKey=uid
   // +optional
   repeated ResourceClaimConsumerReference reservedFor = 3;
 

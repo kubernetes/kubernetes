@@ -114,8 +114,10 @@ type ResourceClaimStatus struct {
 	//
 	// +listType=map
 	// +listMapKey=uid
+	// +patchStrategy=merge
+	// +patchMergeKey=uid
 	// +optional
-	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
+	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
 
 	// DeallocationRequested indicates that a ResourceClaim is to be
 	// deallocated.

@@ -21,7 +21,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/integer"
 )
 
 // IsPodAvailable returns true if a pod is available; false otherwise.
@@ -194,7 +193,7 @@ func podReadyTime(pod *corev1.Pod) *metav1.Time {
 func maxContainerRestarts(pod *corev1.Pod) int {
 	maxRestarts := 0
 	for _, c := range pod.Status.ContainerStatuses {
-		maxRestarts = integer.IntMax(maxRestarts, int(c.RestartCount))
+		maxRestarts = max(maxRestarts, int(c.RestartCount))
 	}
 	return maxRestarts
 }

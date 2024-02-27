@@ -89,7 +89,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	podutil.DropDisabledPodFields(pod, nil)
 
-	applyWaitingForSchedulingGatesCondition(pod)
+	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
 }
 
@@ -289,11 +289,15 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+	var indexFields = []string{"spec.nodeName"}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+		indexFields = append(indexFields, "metadata.namespace")
+	}
 	return storage.SelectionPredicate{
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
-		IndexFields: []string{"spec.nodeName"},
+		IndexFields: indexFields,
 	}
 }
 
@@ -311,11 +315,24 @@ func NodeNameIndexFunc(obj interface{}) ([]string, error) {
 	return []string{pod.Spec.NodeName}, nil
 }
 
+// NamespaceIndexFunc return value name of given object.
+func NamespaceIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Namespace}, nil
+}
+
 // Indexers returns the indexers for pod storage.
 func Indexers() *cache.Indexers {
-	return &cache.Indexers{
+	var indexers = cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
+	}
+	return &indexers
 }
 
 // ToSelectableFields returns a field set that represents the object
@@ -720,9 +737,9 @@ func mutatePodAffinity(pod *api.Pod) {
 	}
 }
 
-// applyWaitingForSchedulingGatesCondition adds a {type:PodScheduled, reason:WaitingForGates} condition
+// applySchedulingGatedCondition adds a {type:PodScheduled, reason:SchedulingGated} condition
 // to a new-created Pod if necessary.
-func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
+func applySchedulingGatedCondition(pod *api.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) ||
 		len(pod.Spec.SchedulingGates) == 0 {
 		return

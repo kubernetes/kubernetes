@@ -126,9 +126,13 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		return nil, false, nil
 	}
 
-	// Cannot run cloud ipam controller if cloud provider is nil (--cloud-provider not set or set to 'external')
-	if controllerContext.Cloud == nil && controllerContext.ComponentConfig.KubeCloudShared.CIDRAllocatorType == string(ipam.CloudAllocatorType) {
-		return nil, false, errors.New("--cidr-allocator-type is set to 'CloudAllocator' but cloud provider is not configured")
+	if controllerContext.ComponentConfig.KubeCloudShared.CIDRAllocatorType == string(ipam.CloudAllocatorType) {
+		// Cannot run cloud ipam controller if cloud provider is nil (--cloud-provider not set or set to 'external')
+		if controllerContext.Cloud == nil {
+			return nil, false, errors.New("--cidr-allocator-type is set to 'CloudAllocator' but cloud provider is not configured")
+		}
+		// As part of the removal of all the cloud providers from kubernetes, this support will be removed as well
+		klog.Warningf("DEPRECATED: 'CloudAllocator' bas been deprecated and will be removed in a future release.")
 	}
 
 	clusterCIDRs, err := validateCIDRs(controllerContext.ComponentConfig.KubeCloudShared.ClusterCIDR)
@@ -385,6 +389,7 @@ func startPersistentVolumeAttachDetachController(ctx context.Context, controller
 			GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
+			controllerContext.ComponentConfig.AttachDetachController.DisableForceDetachOnTimeout,
 			attachdetach.DefaultTimerConfig,
 		)
 	if attachDetachControllerErr != nil {
@@ -764,9 +769,6 @@ func newLegacyServiceAccountTokenCleanerControllerDescriptor() *ControllerDescri
 		name:     names.LegacyServiceAccountTokenCleanerController,
 		aliases:  []string{"legacy-service-account-token-cleaner"},
 		initFunc: startLegacyServiceAccountTokenCleanerController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.LegacyServiceAccountTokenCleanUp, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
-		},
 	}
 }
 

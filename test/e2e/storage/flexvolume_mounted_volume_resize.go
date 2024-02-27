@@ -19,9 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
-	"time"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -40,11 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-)
-
-const (
-	// total time to wait for cloudprovider or file system resize to finish
-	totalResizeWaitPeriod = 10 * time.Minute
+	"path"
 )
 
 var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", framework.WithSlow(), func() {

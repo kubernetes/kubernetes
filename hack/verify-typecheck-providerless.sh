@@ -26,7 +26,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 cd "${KUBE_ROOT}"
 # verify the providerless build
 # https://github.com/kubernetes/enhancements/blob/master/keps/sig-cloud-provider/1179-building-without-in-tree-providers/README.md
-hack/verify-typecheck.sh --skip-test --tags=providerless --ignore-dirs=test
+hack/verify-typecheck.sh --skip-test --tags=providerless
 
 # verify using go list
 if _out="$(go list -mod=readonly -tags "providerless" -e -json  k8s.io/kubernetes/cmd/kubelet/... \

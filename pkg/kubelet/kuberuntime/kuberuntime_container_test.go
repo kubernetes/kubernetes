@@ -236,10 +236,6 @@ func TestToKubeContainerStatus(t *testing.T) {
 // TestToKubeContainerStatusWithResources tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
-	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
-	if goruntime.GOOS == "windows" {
-		t.Skip("Updating Pod Container Resources is not supported on Windows.")
-	}
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
@@ -435,17 +431,6 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		t.Run("inconsistent", func(t *testing.T) {
-			ctx := context.Background()
-			defer func() { fakeHTTP.req = nil }()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
-			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
-			testContainer.Lifecycle = httpLifeCycle
-			_ = m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod, nil)
-			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
-				t.Errorf("HTTP Prestop hook was not invoked")
-			}
-		})
 		t.Run("consistent", func(t *testing.T) {
 			ctx := context.Background()
 			defer func() { fakeHTTP.req = nil }()
@@ -859,10 +844,6 @@ func TestKillContainerGracePeriod(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
-	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
-	if goruntime.GOOS == "windows" {
-		t.Skip("Updating Pod Container Resources is not supported on Windows.")
-	}
 	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
 	require.NoError(t, errCreate)
 	pod := &v1.Pod{

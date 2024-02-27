@@ -52,7 +52,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
-	"k8s.io/utils/strings/slices"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -165,6 +164,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups("flowcontrol.apiserver.k8s.io").Resources("prioritylevelconfigurations", "flowschemas").RuleOrDie(),
 			},
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating cluster role %s", n.clusterRole)
@@ -413,7 +413,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 	framework.ExpectNoError(err, "gave up waiting for apiservice wardle to come up successfully")
 }
 
-// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.29 and compiled against 1.29
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image, apiServiceGroupName, apiServiceVersion string) {
 	n := generateSampleAPIServerObjectNames(f.Namespace.Name)
@@ -736,24 +736,6 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	err = wait.PollImmediate(apiServiceRetryPeriod, apiServiceRetryTimeout, checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0))
 	framework.ExpectNoError(err, "failed to count the required APIServices")
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
-
-	ginkgo.By("Confirm that the group path of " + apiServiceName + " was removed from root paths")
-	groupPath := "/apis/" + apiServiceGroupName
-	err = wait.PollUntilContextTimeout(ctx, apiServiceRetryPeriod, apiServiceRetryTimeout, true, func(ctx context.Context) (done bool, err error) {
-		rootPaths := metav1.RootPaths{}
-		statusContent, err = restClient.Get().
-			AbsPath("/").
-			SetHeader("Accept", "application/json").DoRaw(ctx)
-		if err != nil {
-			return false, err
-		}
-		err = json.Unmarshal(statusContent, &rootPaths)
-		if err != nil {
-			return false, err
-		}
-		return !slices.Contains(rootPaths.Paths, groupPath), nil
-	})
-	framework.ExpectNoError(err, "Expected to not find %s from root paths", groupPath)
 
 	cleanupSampleAPIServer(ctx, client, aggrclient, n, apiServiceName)
 }

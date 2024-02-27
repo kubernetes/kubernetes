@@ -106,14 +106,9 @@ func (w *Waiter) WaitForPodToDisappear(podName string) error {
 	return nil
 }
 
-// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-func (w *Waiter) WaitForHealthyKubelet(_ time.Duration, healthzEndpoint string) error {
-	fmt.Printf("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
-	return nil
-}
-
-// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
-func (w *Waiter) WaitForKubeletAndFunc(f func() error) error {
+// WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
+func (w *Waiter) WaitForKubelet() error {
+	fmt.Println("[dryrun] Would make sure the kubelet's /healthz endpoint is healthy")
 	return nil
 }
 

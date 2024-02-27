@@ -229,6 +229,10 @@ type ActualStateOfWorldMounterUpdater interface {
 	// IsVolumeReconstructed returns true if volume currently added to actual state of the world
 	// was found during reconstruction.
 	IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
+	// IsVolumeDeviceReconstructed returns true if volume device identified by volumeName has been
+	// found during reconstruction.
+	IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -445,6 +449,9 @@ type VolumeToMount struct {
 	DesiredPersistentVolumeSize resource.Quantity
 
 	// SELinux label that should be used to mount.
+	// The label is set when:
+	// * SELinuxMountReadWriteOncePod feature gate is enabled and the volume is RWOP and kubelet knows the SELinux label.
+	// * Or, SELinuxMount feature gate is enabled and kubelet knows the SELinux label.
 	SELinuxLabel string
 }
 

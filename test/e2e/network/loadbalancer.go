@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -609,7 +612,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	f.It("should be able to create an internal type load balancer", f.WithSlow(), func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("azure", "gke", "gce")
+		e2eskipper.SkipUnlessProviderIs("gke", "gce")
 
 		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 		pollInterval := framework.Poll * 10

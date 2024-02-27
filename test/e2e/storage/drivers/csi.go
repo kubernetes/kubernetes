@@ -894,6 +894,12 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 		return cfg
 	}
 
+	// Check if the cluster is already running gce-pd CSI Driver
+	deploy, err := f.ClientSet.AppsV1().Deployments("gce-pd-csi-driver").Get(ctx, "csi-gce-pd-controller", metav1.GetOptions{})
+	if err == nil && deploy != nil {
+		framework.Logf("The csi gce-pd driver is already installed.")
+		return cfg
+	}
 	ginkgo.By("deploying csi gce-pd driver")
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(ctx, f)
@@ -922,7 +928,7 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
-	err := utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)
+	err = utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}

@@ -48,7 +48,7 @@ const resetFieldsNamespace = "reset-fields-namespace"
 var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("", "v1", "persistentvolumes"):                              `{"status": {"message": "hello2"}}`,
 	gvr("", "v1", "resourcequotas"):                                 `{"status": {"used": {"cpu": "25M"}}}`,
-	gvr("", "v1", "services"):                                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
+	gvr("", "v1", "services"):                                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2", "ipMode": "VIP"}]}}}`,
 	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,

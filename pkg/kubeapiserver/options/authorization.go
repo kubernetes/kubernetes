@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apiserver/pkg/apis/apiserver/load"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -31,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
-	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	versionedinformers "k8s.io/client-go/informers"
 
@@ -49,9 +47,6 @@ const (
 	authorizationPolicyFileFlag             = "authorization-policy-file"
 	authorizationConfigFlag                 = "authorization-config"
 )
-
-// RepeatableAuthorizerTypes is the list of Authorizer that can be repeated in the Authorization Config
-var repeatableAuthorizerTypes = []string{authzmodes.ModeWebhook}
 
 // BuiltInAuthorizationOptions contains all build-in authorization options for API Server
 type BuiltInAuthorizationOptions struct {
@@ -118,32 +113,10 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 			return append(allErrors, fmt.Errorf("--%s can not be specified when --%s or --authorization-webhook-* flags are defined", authorizationConfigFlag, authorizationModeFlag))
 		}
 
-		// load the file and check for errors
-		config, err := load.LoadFromFile(o.AuthorizationConfigurationFile)
+		// load/validate kube-apiserver authz config with no opinion about required modes
+		_, err := authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, nil)
 		if err != nil {
-			return append(allErrors, fmt.Errorf("failed to load AuthorizationConfiguration from file: %v", err))
-		}
-
-		// validate the file and return any error
-		if errors := validation.ValidateAuthorizationConfiguration(nil, config,
-			sets.NewString(authzmodes.AuthorizationModeChoices...),
-			sets.NewString(repeatableAuthorizerTypes...),
-		); len(errors) != 0 {
-			allErrors = append(allErrors, errors.ToAggregate().Errors()...)
-		}
-
-		// test to check if the authorizer names passed conform to the authorizers for type!=Webhook
-		// this test is only for kube-apiserver and hence checked here
-		// it preserves compatibility with o.buildAuthorizationConfiguration
-		for _, authorizer := range config.Authorizers {
-			if string(authorizer.Type) == authzmodes.ModeWebhook {
-				continue
-			}
-
-			expectedName := getNameForAuthorizerMode(string(authorizer.Type))
-			if expectedName != authorizer.Name {
-				allErrors = append(allErrors, fmt.Errorf("expected name %s for authorizer %s instead of %s", expectedName, authorizer.Type, authorizer.Name))
-			}
+			return append(allErrors, err)
 		}
 
 		return allErrors
@@ -255,24 +228,14 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
 			return nil, fmt.Errorf("--%s cannot be used without enabling StructuredAuthorizationConfiguration feature flag", authorizationConfigFlag)
 		}
-
 		// error out if legacy flags are defined
 		if o.AreLegacyFlagsSet != nil && o.AreLegacyFlagsSet() {
 			return nil, fmt.Errorf("--%s can not be specified when --%s or --authorization-webhook-* flags are defined", authorizationConfigFlag, authorizationModeFlag)
 		}
-
-		// load the file and check for errors
-		authorizationConfiguration, err = load.LoadFromFile(o.AuthorizationConfigurationFile)
+		// load/validate kube-apiserver authz config with no opinion about required modes
+		authorizationConfiguration, err = authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load AuthorizationConfiguration from file: %v", err)
-		}
-
-		// validate the file and return any error
-		if errors := validation.ValidateAuthorizationConfiguration(nil, authorizationConfiguration,
-			sets.NewString(authzmodes.AuthorizationModeChoices...),
-			sets.NewString(repeatableAuthorizerTypes...),
-		); len(errors) != 0 {
-			return nil, fmt.Errorf(errors.ToAggregate().Error())
+			return nil, err
 		}
 	} else {
 		authorizationConfiguration, err = o.buildAuthorizationConfiguration()
@@ -286,6 +249,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		VersionedInformerFactory: versionedInformerFactory,
 		WebhookRetryBackoff:      o.WebhookRetryBackoff,
 
+		ReloadFile:                 o.AuthorizationConfigurationFile,
 		AuthorizationConfiguration: authorizationConfiguration,
 	}, nil
 }
@@ -321,16 +285,10 @@ func (o *BuiltInAuthorizationOptions) buildAuthorizationConfiguration() (*authzc
 		default:
 			authorizers = append(authorizers, authzconfig.AuthorizerConfiguration{
 				Type: authzconfig.AuthorizerType(mode),
-				Name: getNameForAuthorizerMode(mode),
+				Name: authorizer.GetNameForAuthorizerMode(mode),
 			})
 		}
 	}
 
 	return &authzconfig.AuthorizationConfiguration{Authorizers: authorizers}, nil
-}
-
-// getNameForAuthorizerMode returns the name to be set for the mode in AuthorizationConfiguration
-// For now, lower cases the mode name
-func getNameForAuthorizerMode(mode string) string {
-	return strings.ToLower(mode)
 }

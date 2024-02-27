@@ -2,12 +2,17 @@ Zapr :zap:
 ==========
 
 A [logr](https://github.com/go-logr/logr) implementation using
-[Zap](https://github.com/uber-go/zap).
+[Zap](https://github.com/uber-go/zap). Can also be used as
+[slog](https://pkg.go.dev/log/slog) handler.
 
 Usage
 -----
 
+Via logr:
+
 ```go
+package main
+
 import (
     "fmt"
 
@@ -26,6 +31,33 @@ func main() {
     log = zapr.NewLogger(zapLog)
 
     log.Info("Logr in action!", "the answer", 42)
+}
+```
+
+Via slog:
+
+```
+package main
+
+import (
+	"fmt"
+	"log/slog"
+
+	"github.com/go-logr/logr/slogr"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+)
+
+func main() {
+	var log *slog.Logger
+
+	zapLog, err := zap.NewDevelopment()
+	if err != nil {
+		panic(fmt.Sprintf("who watches the watchmen (%v)?", err))
+	}
+	log = slog.New(slogr.NewSlogHandler(zapr.NewLogger(zapLog)))
+
+	log.Info("Logr in action!", "the answer", 42)
 }
 ```
 
@@ -68,3 +100,8 @@ For the most part, concepts in Zap correspond directly with those in logr.
 Unlike Zap, all fields *must* be in the form of sugared fields --
 it's illegal to pass a strongly-typed Zap field in a key position to any
 of the logging methods (`Log`, `Error`).
+
+The zapr `logr.LogSink` implementation also implements `logr.SlogHandler`. That
+enables `slogr.NewSlogHandler` to provide a `slog.Handler` which just passes
+parameters through to zapr. zapr handles special slog values (Group,
+LogValuer), regardless of which front-end API is used.

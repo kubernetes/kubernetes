@@ -43,7 +43,7 @@ import (
 // desirable because it means that CEL expressions are portable across a wider range
 // of Kubernetes versions.
 func DefaultCompatibilityVersion() *version.Version {
-	return version.MajorMinor(1, 28)
+	return version.MajorMinor(1, 29)
 }
 
 var baseOpts = []VersionedOptions{
@@ -62,10 +62,18 @@ var baseOpts = []VersionedOptions{
 			library.URLs(),
 			library.Regex(),
 			library.Lists(),
+
+			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
+			// Since it is a regression fix, we apply it uniformly to all code use v0.17.7.
+			cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
 		},
 		ProgramOptions: []cel.ProgramOption{
 			cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
 			cel.CostLimit(celconfig.PerCallLimit),
+
+			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
+			// Since it is a regression fix, we apply it uniformly to all code use v0.17.7.
+			cel.CostTrackerOptions(interpreter.PresenceTestHasCost(false)),
 		},
 	},
 	{
@@ -113,14 +121,13 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 29),
 		EnvOptions: []cel.EnvOption{
 			ext.Sets(),
-			// cel-go v0.17.7 introduced CostEstimatorOptions.
-			// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
-			cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
 		},
-		ProgramOptions: []cel.ProgramOption{
-			// cel-go v0.17.7 introduced CostTrackerOptions.
-			// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
-			cel.CostTrackerOptions(interpreter.PresenceTestHasCost(false)),
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 30),
+		EnvOptions: []cel.EnvOption{
+			library.IP(),
+			library.CIDR(),
 		},
 	},
 }

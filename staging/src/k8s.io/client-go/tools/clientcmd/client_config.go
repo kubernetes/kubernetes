@@ -72,6 +72,13 @@ type ClientConfig interface {
 	ConfigAccess() ConfigAccess
 }
 
+// OverridingClientConfig is used to enable overrriding the raw KubeConfig
+type OverridingClientConfig interface {
+	ClientConfig
+	// MergedRawConfig return the RawConfig merged with all overrides.
+	MergedRawConfig() (clientcmdapi.Config, error)
+}
+
 type PersistAuthProviderConfigForUser func(user string) restclient.AuthProviderConfigPersister
 
 type promptedCredentials struct {
@@ -91,22 +98,22 @@ type DirectClientConfig struct {
 }
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
-func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) ClientConfig {
+func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) OverridingClientConfig {
 	return &DirectClientConfig{config, config.CurrentContext, overrides, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
 }
 
 // NewNonInteractiveClientConfig creates a DirectClientConfig using the passed context name and does not have a fallback reader for auth information
-func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, configAccess ConfigAccess) ClientConfig {
+func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, configAccess ConfigAccess) OverridingClientConfig {
 	return &DirectClientConfig{config, contextName, overrides, nil, configAccess, promptedCredentials{}}
 }
 
 // NewInteractiveClientConfig creates a DirectClientConfig using the passed context name and a reader in case auth information is not provided via files or flags
-func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader, configAccess ConfigAccess) ClientConfig {
+func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader, configAccess ConfigAccess) OverridingClientConfig {
 	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess, promptedCredentials{}}
 }
 
 // NewClientConfigFromBytes takes your kubeconfig and gives you back a ClientConfig
-func NewClientConfigFromBytes(configBytes []byte) (ClientConfig, error) {
+func NewClientConfigFromBytes(configBytes []byte) (OverridingClientConfig, error) {
 	config, err := Load(configBytes)
 	if err != nil {
 		return nil, err
@@ -127,6 +134,40 @@ func RESTConfigFromKubeConfig(configBytes []byte) (*restclient.Config, error) {
 
 func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return config.config, nil
+}
+
+// MergedRawConfig returns the raw kube config merged with the overrides
+func (config *DirectClientConfig) MergedRawConfig() (clientcmdapi.Config, error) {
+	if err := config.ConfirmUsable(); err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	merged := config.config.DeepCopy()
+
+	// set the AuthInfo merged with overrides in the merged config
+	mergedAuthInfo, err := config.getAuthInfo()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	mergedAuthInfoName, _ := config.getAuthInfoName()
+	merged.AuthInfos[mergedAuthInfoName] = &mergedAuthInfo
+
+	// set the Context merged with overrides in the merged config
+	mergedContext, err := config.getContext()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	mergedContextName, _ := config.getContextName()
+	merged.Contexts[mergedContextName] = &mergedContext
+	merged.CurrentContext = mergedContextName
+
+	// set the Cluster merged with overrides in the merged config
+	configClusterInfo, err := config.getCluster()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	configClusterName, _ := config.getClusterName()
+	merged.Clusters[configClusterName] = &configClusterInfo
+	return *merged, nil
 }
 
 // ClientConfig implements ClientConfig

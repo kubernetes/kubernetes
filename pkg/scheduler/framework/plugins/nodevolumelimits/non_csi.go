@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -209,6 +210,7 @@ func (pl *nonCSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
 	}
 }
 
@@ -244,6 +246,10 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	logger := klog.FromContext(ctx)
 	newVolumes := sets.New[string]()
 	if err := pl.filterVolumes(logger, pod, true /* new pod */, newVolumes); err != nil {
+		if apierrors.IsNotFound(err) {
+			// PVC is not found. This Pod will never be schedulable until PVC is created.
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		}
 		return framework.AsStatus(err)
 	}
 
@@ -336,7 +342,7 @@ func (pl *nonCSILimits) filterVolumes(logger klog.Logger, pod *v1.Pod, newPod bo
 				// The PVC is required to proceed with
 				// scheduling of a new pod because it cannot
 				// run without it. Bail out immediately.
-				return fmt.Errorf("looking up PVC %s/%s: %v", pod.Namespace, pvcName, err)
+				return fmt.Errorf("looking up PVC %s/%s: %w", pod.Namespace, pvcName, err)
 			}
 			// If the PVC is invalid, we don't count the volume because
 			// there's no guarantee that it belongs to the running predicate.

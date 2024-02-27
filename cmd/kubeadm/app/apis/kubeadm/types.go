@@ -69,6 +69,9 @@ type InitConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during
 	// "kubeadm init".
 	Patches *Patches
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	Timeouts *Timeouts
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -144,7 +147,7 @@ type ClusterConfiguration struct {
 	ClusterName string
 
 	// EncryptionAlgorithm holds the type of asymmetric encryption algorithm used for keys and certificates.
-	// Can be "RSA" (default algorithm, key size is 2048) or "ECDSA" (uses the P-256 elliptic curve).
+	// Can be one of "RSA-2048" (default), "RSA-3072", "RSA-4096" or "ECDSA-P256".
 	EncryptionAlgorithm EncryptionAlgorithmType
 }
 
@@ -246,6 +249,9 @@ type NodeRegistrationOptions struct {
 	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
 	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
 	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSerial specifies if image pulling performed by kubeadm must be done serially or in parallel.
+	ImagePullSerial *bool
 }
 
 // Networking contains elements describing cluster's networking configuration.
@@ -343,6 +349,9 @@ type JoinConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during
 	// "kubeadm join".
 	Patches *Patches
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	Timeouts *Timeouts
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
@@ -424,9 +433,9 @@ func (cfg *ClusterConfiguration) EncryptionAlgorithmType() EncryptionAlgorithmTy
 	// TODO: remove this function when the feature gate is removed.
 	if enabled, ok := cfg.FeatureGates[features.PublicKeysECDSA]; ok {
 		if enabled {
-			return EncryptionAlgorithmECDSA
+			return EncryptionAlgorithmECDSAP256
 		}
-		return EncryptionAlgorithmRSA
+		return EncryptionAlgorithmRSA2048
 	}
 	return cfg.EncryptionAlgorithm
 }
@@ -522,7 +531,26 @@ type ResetConfiguration struct {
 	// SkipPhases is a list of phases to skip during command execution.
 	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
 	SkipPhases []string
+
+	// UnmountFlags is a list of unmount2() syscall flags that kubeadm can use when unmounting
+	// directories during "reset". A flag can be one of: MNT_FORCE, MNT_DETACH, MNT_EXPIRE, UMOUNT_NOFOLLOW.
+	// By default this list is empty.
+	UnmountFlags []string
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	Timeouts *Timeouts
 }
+
+const (
+	// UnmountFlagMNTForce represents the flag "MNT_FORCE"
+	UnmountFlagMNTForce = "MNT_FORCE"
+	// UnmountFlagMNTDetach represents the flag "MNT_DETACH"
+	UnmountFlagMNTDetach = "MNT_DETACH"
+	// UnmountFlagMNTExpire represents the flag "MNT_EXPIRE"
+	UnmountFlagMNTExpire = "MNT_EXPIRE"
+	// UnmountFlagUmountNoFollow represents the flag "UMOUNT_NOFOLLOW"
+	UnmountFlagUmountNoFollow = "UMOUNT_NOFOLLOW"
+)
 
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
 type ComponentConfigMap map[string]ComponentConfig
@@ -542,8 +570,39 @@ type EnvVar struct {
 type EncryptionAlgorithmType string
 
 const (
-	// EncryptionAlgorithmECDSA defines the ECDSA encryption algorithm type.
-	EncryptionAlgorithmECDSA EncryptionAlgorithmType = "ECDSA"
-	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
-	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
+	// EncryptionAlgorithmECDSAP256 defines the ECDSA encryption algorithm type with curve P256.
+	EncryptionAlgorithmECDSAP256 EncryptionAlgorithmType = "ECDSA-P256"
+	// EncryptionAlgorithmRSA2048 defines the RSA encryption algorithm type with key size 2048 bits.
+	EncryptionAlgorithmRSA2048 EncryptionAlgorithmType = "RSA-2048"
+	// EncryptionAlgorithmRSA3072 defines the RSA encryption algorithm type with key size 3072 bits.
+	EncryptionAlgorithmRSA3072 EncryptionAlgorithmType = "RSA-3072"
+	// EncryptionAlgorithmRSA4096 defines the RSA encryption algorithm type with key size 4096 bits.
+	EncryptionAlgorithmRSA4096 EncryptionAlgorithmType = "RSA-4096"
 )
+
+// Timeouts holds various timeouts that apply to kubeadm commands.
+type Timeouts struct {
+	// ControlPlaneComponentHealthCheck is the amount of time to wait for a control plane
+	// component, such as the API server, to be healthy during "kubeadm init" and "kubeadm join".
+	ControlPlaneComponentHealthCheck *metav1.Duration
+
+	// KubeletHealthCheck is the amount of time to wait for the kubelet to be healthy
+	// during "kubeadm init" and "kubeadm join".
+	KubeletHealthCheck *metav1.Duration
+
+	// KubernetesAPICall is the amount of time to wait for the kubeadm client to complete a request to
+	// the API server. This applies to all types of methods (GET, POST, etc).
+	KubernetesAPICall *metav1.Duration
+
+	// EtcdAPICall is the amount of time to wait for the kubeadm etcd client to complete a request to
+	// the etcd cluster.
+	EtcdAPICall *metav1.Duration
+
+	// TLSBootstrap is the amount of time to wait for the kubelet to complete TLS bootstrap
+	// for a joining node.
+	TLSBootstrap *metav1.Duration
+
+	// Discovery is the amount of time to wait for kubeadm to validate the API server identity
+	// for a joining node.
+	Discovery *metav1.Duration
+}

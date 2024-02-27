@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -55,220 +58,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
-
-func TestDeleteEndpointConnections(t *testing.T) {
-	const (
-		UDP  = v1.ProtocolUDP
-		TCP  = v1.ProtocolTCP
-		SCTP = v1.ProtocolSCTP
-	)
-
-	testCases := []struct {
-		description  string
-		svcName      string
-		svcIP        string
-		svcPort      int32
-		protocol     v1.Protocol
-		endpoint     string // IP:port endpoint
-		simulatedErr string
-	}{
-		{
-			description: "V4 UDP",
-			svcName:     "v4-udp",
-			svcIP:       "172.30.1.1",
-			svcPort:     80,
-			protocol:    UDP,
-			endpoint:    "10.240.0.3:80",
-		},
-		{
-			description: "V4 TCP",
-			svcName:     "v4-tcp",
-			svcIP:       "172.30.2.2",
-			svcPort:     80,
-			protocol:    TCP,
-			endpoint:    "10.240.0.4:80",
-		},
-		{
-			description: "V4 SCTP",
-			svcName:     "v4-sctp",
-			svcIP:       "172.30.3.3",
-			svcPort:     80,
-			protocol:    SCTP,
-			endpoint:    "10.240.0.5:80",
-		},
-		{
-			description:  "V4 UDP, nothing to delete, benign error",
-			svcName:      "v4-udp-nothing-to-delete",
-			svcIP:        "172.30.4.4",
-			svcPort:      80,
-			protocol:     UDP,
-			endpoint:     "10.240.0.6:80",
-			simulatedErr: conntrack.NoConnectionToDelete,
-		},
-		{
-			description:  "V4 UDP, unexpected error, should be glogged",
-			svcName:      "v4-udp-simulated-error",
-			svcIP:        "172.30.5.5",
-			svcPort:      80,
-			protocol:     UDP,
-			endpoint:     "10.240.0.7:80",
-			simulatedErr: "simulated error",
-		},
-		{
-			description: "V6 UDP",
-			svcName:     "v6-udp",
-			svcIP:       "fd00:1234::20",
-			svcPort:     80,
-			protocol:    UDP,
-			endpoint:    "[2001:db8::2]:80",
-		},
-		{
-			description: "V6 TCP",
-			svcName:     "v6-tcp",
-			svcIP:       "fd00:1234::30",
-			svcPort:     80,
-			protocol:    TCP,
-			endpoint:    "[2001:db8::3]:80",
-		},
-		{
-			description: "V6 SCTP",
-			svcName:     "v6-sctp",
-			svcIP:       "fd00:1234::40",
-			svcPort:     80,
-			protocol:    SCTP,
-			endpoint:    "[2001:db8::4]:80",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			priorGlogErrs := klog.Stats.Error.Lines()
-
-			// Create a fake executor for the conntrack utility.
-			fcmd := fakeexec.FakeCmd{}
-			fexec := &fakeexec.FakeExec{
-				LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
-			}
-			execFunc := func(cmd string, args ...string) exec.Cmd {
-				return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
-			}
-
-			if tc.protocol == UDP {
-				cmdOutput := "1 flow entries have been deleted"
-				var simErr error
-
-				// First call outputs cmdOutput and succeeds
-				fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript,
-					func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, nil },
-				)
-				fexec.CommandScript = append(fexec.CommandScript, execFunc)
-
-				// Second call may succeed or fail
-				if tc.simulatedErr != "" {
-					cmdOutput = ""
-					simErr = fmt.Errorf(tc.simulatedErr)
-				}
-				fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript,
-					func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, simErr },
-				)
-				fexec.CommandScript = append(fexec.CommandScript, execFunc)
-			}
-
-			endpointIP := proxyutil.IPPart(tc.endpoint)
-			isIPv6 := netutils.IsIPv6String(endpointIP)
-
-			var ipt utiliptables.Interface
-			if isIPv6 {
-				ipt = iptablestest.NewIPv6Fake()
-			} else {
-				ipt = iptablestest.NewFake()
-			}
-			fp := NewFakeProxier(ipt)
-			fp.exec = fexec
-
-			makeServiceMap(fp,
-				makeTestService("ns1", tc.svcName, func(svc *v1.Service) {
-					svc.Spec.ClusterIP = tc.svcIP
-					svc.Spec.Ports = []v1.ServicePort{{
-						Name:     "p80",
-						Port:     tc.svcPort,
-						Protocol: tc.protocol,
-					}}
-					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
-				}),
-			)
-			fp.svcPortMap.Update(fp.serviceChanges)
-
-			slice := makeTestEndpointSlice("ns1", tc.svcName, 1, func(eps *discovery.EndpointSlice) {
-				if isIPv6 {
-					eps.AddressType = discovery.AddressTypeIPv6
-				} else {
-					eps.AddressType = discovery.AddressTypeIPv4
-				}
-				eps.Endpoints = []discovery.Endpoint{{
-					Addresses: []string{endpointIP},
-				}}
-				eps.Ports = []discovery.EndpointPort{{
-					Name:     ptr.To("p80"),
-					Port:     ptr.To[int32](80),
-					Protocol: ptr.To(tc.protocol),
-				}}
-			})
-
-			// Add and then remove the endpoint slice
-			fp.OnEndpointSliceAdd(slice)
-			fp.syncProxyRules()
-			fp.OnEndpointSliceDelete(slice)
-			fp.syncProxyRules()
-
-			// Check the executed conntrack command
-			if tc.protocol == UDP {
-				if fexec.CommandCalls != 2 {
-					t.Fatalf("Expected conntrack to be executed 2 times, but got %d", fexec.CommandCalls)
-				}
-
-				// First clear conntrack entries for the clusterIP when the
-				// endpoint is first added.
-				expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", tc.svcIP)
-				if isIPv6 {
-					expectCommand += " -f ipv6"
-				}
-				actualCommand := strings.Join(fcmd.CombinedOutputLog[0], " ")
-				if actualCommand != expectCommand {
-					t.Errorf("Expected command: %s, but executed %s", expectCommand, actualCommand)
-				}
-
-				// Then clear conntrack entries for the endpoint when it is
-				// deleted.
-				expectCommand = fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
-				if isIPv6 {
-					expectCommand += " -f ipv6"
-				}
-				actualCommand = strings.Join(fcmd.CombinedOutputLog[1], " ")
-				if actualCommand != expectCommand {
-					t.Errorf("Expected command: %s, but executed %s", expectCommand, actualCommand)
-				}
-			} else if fexec.CommandCalls != 0 {
-				t.Fatalf("Expected conntrack to be executed 0 times, but got %d", fexec.CommandCalls)
-			}
-
-			// Check the number of new glog errors
-			var expGlogErrs int64
-			if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
-				expGlogErrs = 1
-			}
-			glogErrs := klog.Stats.Error.Lines() - priorGlogErrs
-			if glogErrs != expGlogErrs {
-				t.Errorf("Expected %d glogged errors, but got %d", expGlogErrs, glogErrs)
-			}
-		})
-	}
-}
 
 // Conventions for tests using NewFakeProxier:
 //
@@ -321,7 +113,6 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
 
 	p := &Proxier{
-		exec:                     &fakeexec.FakeExec{},
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
@@ -329,6 +120,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		needFullSync:             true,
 		iptables:                 ipt,
 		masqueradeMark:           "0x4000",
+		conntrack:                conntrack.NewFake(),
 		localDetector:            detectLocal,
 		hostname:                 testHostname,
 		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
@@ -341,7 +133,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		natRules:                 proxyutil.NewLineBuffer(),
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
 		localhostNodePorts:       true,
-		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
+		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil, nil),
 		networkInterfacer:        networkInterfacer,
 	}
 	p.setInitialized(true)
@@ -2123,21 +1915,22 @@ func TestClusterIPGeneral(t *testing.T) {
 					TargetPort: intstr.FromInt32(8443),
 				},
 				{
-					// Of course this should really be UDP, but if we
-					// create a service with UDP ports, the Proxier will
-					// try to do conntrack cleanup and we'd have to set
-					// the FakeExec up to be able to deal with that...
-					Name:     "dns-sctp",
+					Name:     "dns-udp",
 					Port:     53,
-					Protocol: v1.ProtocolSCTP,
+					Protocol: v1.ProtocolUDP,
 				},
 				{
 					Name:     "dns-tcp",
 					Port:     53,
 					Protocol: v1.ProtocolTCP,
-					// We use TargetPort on TCP but not SCTP to help
-					// disambiguate the output.
+					// We use TargetPort on TCP but not UDP/SCTP to
+					// help disambiguate the output.
 					TargetPort: intstr.FromInt32(5353),
+				},
+				{
+					Name:     "dns-sctp",
+					Port:     53,
+					Protocol: v1.ProtocolSCTP,
 				},
 			}
 		}),
@@ -2180,14 +1973,19 @@ func TestClusterIPGeneral(t *testing.T) {
 					Protocol: ptr.To(v1.ProtocolTCP),
 				},
 				{
-					Name:     ptr.To("dns-sctp"),
+					Name:     ptr.To("dns-udp"),
 					Port:     ptr.To[int32](53),
-					Protocol: ptr.To(v1.ProtocolSCTP),
+					Protocol: ptr.To(v1.ProtocolUDP),
 				},
 				{
 					Name:     ptr.To("dns-tcp"),
 					Port:     ptr.To[int32](5353),
 					Protocol: ptr.To(v1.ProtocolTCP),
+				},
+				{
+					Name:     ptr.To("dns-sctp"),
+					Port:     ptr.To[int32](53),
+					Protocol: ptr.To(v1.ProtocolSCTP),
 				},
 			}
 		}),
@@ -2229,7 +2027,7 @@ func TestClusterIPGeneral(t *testing.T) {
 			masq:     false,
 		},
 		{
-			name:     "clusterIP with TCP and SCTP on same port (TCP)",
+			name:     "clusterIP with TCP, UDP, and SCTP on same port (TCP)",
 			sourceIP: "10.180.0.2",
 			protocol: v1.ProtocolTCP,
 			destIP:   "172.30.0.42",
@@ -2238,7 +2036,16 @@ func TestClusterIPGeneral(t *testing.T) {
 			masq:     false,
 		},
 		{
-			name:     "clusterIP with TCP and SCTP on same port (SCTP)",
+			name:     "clusterIP with TCP, UDP, and SCTP on same port (UDP)",
+			sourceIP: "10.180.0.2",
+			protocol: v1.ProtocolUDP,
+			destIP:   "172.30.0.42",
+			destPort: 53,
+			output:   "10.180.0.1:53, 10.180.2.1:53",
+			masq:     false,
+		},
+		{
+			name:     "clusterIP with TCP, UDP, and SCTP on same port (SCTP)",
 			sourceIP: "10.180.0.2",
 			protocol: v1.ProtocolSCTP,
 			destIP:   "172.30.0.42",
@@ -2535,7 +2342,7 @@ func TestNodePorts(t *testing.T) {
 			fp := NewFakeProxier(ipt)
 			fp.localhostNodePorts = tc.localhostNodePorts
 			if tc.nodePortAddresses != nil {
-				fp.nodePortAddresses = proxyutil.NewNodePortAddresses(tc.family, tc.nodePortAddresses)
+				fp.nodePortAddresses = proxyutil.NewNodePortAddresses(tc.family, tc.nodePortAddresses, nil)
 			}
 
 			makeServiceMap(fp,
@@ -2683,7 +2490,7 @@ func TestNodePorts(t *testing.T) {
 func TestHealthCheckNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"}, nil)
 
 	svcIP := "172.30.0.42"
 	svcPort := 80
@@ -4331,139 +4138,6 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 	localReadyEndpoints = fp.endpointsMap.LocalReadyEndpoints()
 	if len(localReadyEndpoints) != 0 {
 		t.Errorf("unexpected number of local ready endpoints, expected 0 but got: %d", len(localReadyEndpoints))
-	}
-}
-
-func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{}
-	fexec := &fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
-	}
-	execFunc := func(cmd string, args ...string) exec.Cmd {
-		return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
-	}
-	cmdOutput := "1 flow entries have been deleted"
-	cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, nil }
-
-	// Delete ClusterIP entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
-	// Delete ExternalIP entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
-	// Delete LoadBalancerIP entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
-	// Delete NodePort entries
-	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-	fexec.CommandScript = append(fexec.CommandScript, execFunc)
-
-	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
-	fp.exec = fexec
-
-	svcIP := "172.30.0.41"
-	extIP := "192.168.99.11"
-	lbIngressIP := "1.2.3.4"
-	svcPort := 80
-	nodePort := 31201
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-		Protocol:       v1.ProtocolUDP,
-	}
-
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.ExternalIPs = []string{extIP}
-			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolUDP,
-				NodePort: int32(nodePort),
-			}}
-			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
-				IP: lbIngressIP,
-			}}
-		}),
-	)
-
-	fp.syncProxyRules()
-	if fexec.CommandCalls != 0 {
-		t.Fatalf("Created service without endpoints must not clear conntrack entries")
-	}
-
-	epIP := "10.180.0.1"
-	populateEndpointSlices(fp,
-		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
-			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{epIP},
-				Conditions: discovery.EndpointConditions{
-					Serving: ptr.To(false),
-				},
-			}}
-			eps.Ports = []discovery.EndpointPort{{
-				Name:     ptr.To(svcPortName.Port),
-				Port:     ptr.To(int32(svcPort)),
-				Protocol: ptr.To(v1.ProtocolUDP),
-			}}
-		}),
-	)
-
-	fp.syncProxyRules()
-
-	if fexec.CommandCalls != 0 {
-		t.Fatalf("Updated UDP service with not ready endpoints must not clear UDP entries")
-	}
-
-	populateEndpointSlices(fp,
-		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
-			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{epIP},
-				Conditions: discovery.EndpointConditions{
-					Serving: ptr.To(true),
-				},
-			}}
-			eps.Ports = []discovery.EndpointPort{{
-				Name:     ptr.To(svcPortName.Port),
-				Port:     ptr.To(int32(svcPort)),
-				Protocol: ptr.To(v1.ProtocolUDP),
-			}}
-		}),
-	)
-
-	fp.syncProxyRules()
-
-	if fexec.CommandCalls != 4 {
-		t.Fatalf("Updated UDP service with new endpoints must clear UDP entries 4 times: ClusterIP, NodePort, ExternalIP and LB")
-	}
-
-	// the order is not guaranteed so we have to compare the strings in any order
-	expectedCommands := []string{
-		// Delete ClusterIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", svcIP, strings.ToLower(string((v1.ProtocolUDP)))),
-		// Delete ExternalIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", extIP, strings.ToLower(string((v1.ProtocolUDP)))),
-		// Delete LoadBalancerIP Conntrack entries
-		fmt.Sprintf("conntrack -D --orig-dst %s -p %s", lbIngressIP, strings.ToLower(string((v1.ProtocolUDP)))),
-		// Delete NodePort Conntrack entrie
-		fmt.Sprintf("conntrack -D -p %s --dport %d", strings.ToLower(string((v1.ProtocolUDP))), nodePort),
-	}
-	actualCommands := []string{
-		strings.Join(fcmd.CombinedOutputLog[0], " "),
-		strings.Join(fcmd.CombinedOutputLog[1], " "),
-		strings.Join(fcmd.CombinedOutputLog[2], " "),
-		strings.Join(fcmd.CombinedOutputLog[3], " "),
-	}
-	sort.Strings(expectedCommands)
-	sort.Strings(actualCommands)
-
-	if !reflect.DeepEqual(expectedCommands, actualCommands) {
-		t.Errorf("Expected commands: %v, but executed %v", expectedCommands, actualCommands)
 	}
 }
 

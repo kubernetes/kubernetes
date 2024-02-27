@@ -92,7 +92,7 @@ func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEventWithHint {
 // isSchedulableAfterNodeChange is invoked whenever a node changed. It checks whether
 // that change made a previously unschedulable pod schedulable.
 func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	_, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
 	}
@@ -107,24 +107,13 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 	if err != nil {
 		return framework.Queue, err
 	}
-	if !isMatched {
-		logger.V(4).Info("node was created or updated, but doesn't matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.QueueSkip, nil
-	}
-
-	wasMatched := false
-	if originalNode != nil {
-		wasMatched, err = requiredNodeAffinity.Match(originalNode)
-		if err != nil {
-			return framework.Queue, err
-		}
-	}
-
-	if !wasMatched {
-		// This modification makes this Node match with Pod's NodeAffinity.
+	if isMatched {
 		logger.V(4).Info("node was created or updated, and matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return framework.Queue, nil
 	}
+
+	// TODO: also check if the original node meets the pod's requestments once preCheck is completely removed.
+	// See: https://github.com/kubernetes/kubernetes/issues/110175
 
 	logger.V(4).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 	return framework.QueueSkip, nil
@@ -225,13 +214,17 @@ func (s *preScoreState) Clone() framework.StateData {
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	if len(nodes) == 0 {
 		return nil
 	}
 	preferredNodeAffinity, err := getPodPreferredNodeAffinity(pod)
 	if err != nil {
 		return framework.AsStatus(err)
+	}
+	if preferredNodeAffinity == nil && pl.addedPrefSchedTerms == nil {
+		// NodeAffinity Score has nothing to do with the Pod.
+		return framework.NewStatus(framework.Skip)
 	}
 	state := &preScoreState{
 		preferredNodeAffinity: preferredNodeAffinity,

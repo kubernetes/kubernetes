@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestReflectorWatchListFallback(t *testing.T) {
@@ -67,7 +68,7 @@ func TestReflectorWatchListFallback(t *testing.T) {
 	lw := &wrappedListWatch{&cache.ListWatch{}}
 	lw.SetClient(ctx, clientSet, ns)
 	target := cache.NewReflector(lw, &v1.Secret{}, store, time.Duration(0))
-	target.UseWatchList = true
+	target.UseWatchList = ptr.To(true)
 
 	t.Log("Waiting until the secret reflector synchronises to the store (call to the Replace method)")
 	reflectorCtx, reflectorCtxCancel := context.WithCancel(context.Background())

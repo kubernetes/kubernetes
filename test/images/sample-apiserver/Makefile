@@ -21,7 +21,7 @@ SRC_DIR = $(notdir $(shell pwd))
 KUBE_CROSS_VERSION ?= $(shell cat ../../../build/build-image/cross/VERSION)
 export
 
-# Build v1.27.1 to ensure the current release supports a prior version of the sample apiserver
+# Build v1.29.2 to ensure the current release supports a prior version of the sample apiserver
 # Get without building to populate module cache
 # Then, get with OS/ARCH-specific env to build
 bin:
@@ -30,7 +30,7 @@ bin:
 			mkdir -p /go/src /go/bin && \
 			git clone https://github.com/kubernetes/sample-apiserver /go/src/k8s.io/sample-apiserver && \
 			cd /go/src/k8s.io/sample-apiserver && \
-			git checkout tags/v0.27.1 && \
+			git checkout tags/v0.29.2 && \
 			go mod tidy && \
 			GO111MODULE=on CGO_ENABLED=0 GOARM=${GOARM} GOOS=${OS} GOARCH=${ARCH} go install . && \
 			find /go/bin -name sample-apiserver* -exec cp {} ${TARGET}/sample-apiserver \;"

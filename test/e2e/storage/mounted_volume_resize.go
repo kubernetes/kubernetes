@@ -18,12 +18,8 @@ package storage
 
 import (
 	"context"
-	"fmt"
-	"time"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,9 +27,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -168,27 +162,3 @@ var _ = utils.SIGDescribe("Mounted volume expand", feature.StorageProvider, func
 		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 	})
 })
-
-func waitForDeploymentToRecreatePod(ctx context.Context, client clientset.Interface, deployment *appsv1.Deployment) (v1.Pod, error) {
-	var runningPod v1.Pod
-	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-		podList, err := e2edeployment.GetPodsForDeployment(ctx, client, deployment)
-		if err != nil {
-			return false, fmt.Errorf("failed to get pods for deployment: %w", err)
-		}
-		for _, pod := range podList.Items {
-			switch pod.Status.Phase {
-			case v1.PodRunning:
-				runningPod = pod
-				return true, nil
-			case v1.PodFailed, v1.PodSucceeded:
-				return false, conditions.ErrPodCompleted
-			}
-		}
-		return false, nil
-	})
-	if waitErr != nil {
-		return runningPod, fmt.Errorf("error waiting for recreated pod: %v", waitErr)
-	}
-	return runningPod, nil
-}

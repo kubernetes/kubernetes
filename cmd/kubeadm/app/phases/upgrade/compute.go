@@ -216,7 +216,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			return upgrades, err
 		}
-		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "experimental version", latestVersionStr)
+		_, _ = printer.Printf("[upgrade/versions] Latest %s: %s\n", "experimental version", latestVersionStr)
 
 		minorUnstable := latestVersion.Components()[1]
 		// Get and output the current latest unstable version
@@ -225,7 +225,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			return upgrades, err
 		}
-		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "previous version", previousBranchLatestVersionStr)
+		_, _ = printer.Printf("[upgrade/versions] Latest %s: %s\n", "previous version", previousBranchLatestVersionStr)
 
 		// If that previous latest version is an RC, RCs are allowed and the cluster version is lower than the RC version, show the upgrade
 		if rcUpgradesAllowed && rcUpgradePossible(clusterVersion, previousBranchLatestVersion) {
