@@ -342,6 +342,9 @@ func New(opts Options) (*Authenticator, error) {
 // or returns an error if the token can not be parsed.  Since the JWT is not
 // verified, the returned issuer should not be trusted.
 func untrustedIssuer(token string) (string, error) {
+	if strings.HasPrefix(strings.TrimSpace(token), "{") {
+		return "", fmt.Errorf("token is not compact JWT")
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return "", fmt.Errorf("malformed token")

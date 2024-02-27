@@ -18,6 +18,8 @@ package serviceaccount_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -200,22 +202,15 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	checkJSONWebSignatureHasKeyID(t, invalidAutoSecretToken, rsaKeyID)
 
 	// Generate the ECDSA token
-	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
-	if err != nil {
-		t.Fatalf("error making generator: %v", err)
-	}
-	ecdsaToken, err := ecdsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *ecdsaSecret))
-	if err != nil {
-		t.Fatalf("error generating token: %v", err)
-	}
-	if len(ecdsaToken) == 0 {
-		t.Fatalf("no token generated")
-	}
+	ecdsaToken := generateECDSAToken(t, serviceaccount.LegacyIssuer, serviceAccount, ecdsaSecret)
+
 	ecdsaSecret.Data = map[string][]byte{
 		"token": []byte(ecdsaToken),
 	}
 
 	checkJSONWebSignatureHasKeyID(t, ecdsaToken, ecdsaKeyID)
+
+	ecdsaTokenMalformedIss := generateECDSATokenWithMalformedIss(t, serviceAccount, ecdsaSecret)
 
 	// Generate signer with same keys as RSA signer but different unrecognized issuer
 	badIssuerGenerator, err := serviceaccount.JWTTokenGenerator("foo", getPrivateKey(rsaPrivateKey))
@@ -356,6 +351,13 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
 			ExpectedErr: true,
 		},
+		"malformed iss": {
+			Token:       ecdsaTokenMalformedIss,
+			Client:      nil,
+			Keys:        []interface{}{getPublicKey(ecdsaPublicKey)},
+			ExpectedErr: false,
+			ExpectedOK:  false,
+		},
 	}
 
 	for k, tc := range testCases {
@@ -456,4 +458,47 @@ func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
 	}
 	obj, err := f.get(namespace, name)
 	return obj, err == nil, err
+}
+
+func generateECDSAToken(t *testing.T, iss string, serviceAccount *v1.ServiceAccount, ecdsaSecret *v1.Secret) string {
+	t.Helper()
+
+	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(iss, getPrivateKey(ecdsaPrivateKey))
+	if err != nil {
+		t.Fatalf("error making generator: %v", err)
+	}
+	ecdsaToken, err := ecdsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *ecdsaSecret))
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(ecdsaToken) == 0 {
+		t.Fatalf("no token generated")
+	}
+
+	return ecdsaToken
+}
+
+func generateECDSATokenWithMalformedIss(t *testing.T, serviceAccount *v1.ServiceAccount, ecdsaSecret *v1.Secret) string {
+	t.Helper()
+
+	ecdsaToken := generateECDSAToken(t, "panda", serviceAccount, ecdsaSecret)
+
+	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dataFullSerialize := map[string]any{}
+	if err := json.Unmarshal([]byte(ecdsaTokenJWS.FullSerialize()), &dataFullSerialize); err != nil {
+		t.Fatal(err)
+	}
+
+	dataFullSerialize["malformed_iss"] = "." + base64.RawURLEncoding.EncodeToString([]byte(`{"iss":"bar"}`)) + "."
+
+	out, err := json.Marshal(dataFullSerialize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return string(out)
 }
