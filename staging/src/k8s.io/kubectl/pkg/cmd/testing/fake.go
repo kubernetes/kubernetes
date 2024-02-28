@@ -437,9 +437,9 @@ func NewTestFactory() *TestFactory {
 		MigrationRules: map[string]string{},
 	}
 
-	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"}}
+	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmdapi.Cluster{}}
 	fallbackReader := bytes.NewBuffer([]byte{})
-	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
+	clientConfig := genericclioptions.NewLocalClientConfig(clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader))
 
 	configFlags := genericclioptions.NewTestConfigFlags().
 		WithClientConfig(clientConfig).
@@ -451,7 +451,7 @@ func NewTestFactory() *TestFactory {
 	}
 
 	return &TestFactory{
-		Factory:           cmdutil.NewFactory(configFlags),
+		Factory:           cmdutil.NewFactory(configFlags, true),
 		kubeConfigFlags:   configFlags,
 		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme),
 		tempConfigFile:    tmpFile,

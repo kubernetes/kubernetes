@@ -370,7 +370,15 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
 	addCmdHeaderHooks(cmds, kubeConfigFlags)
 
-	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
+	var local bool
+	for _, arg := range o.Arguments {
+		// We are setting client factory to local mode.
+		if arg == "--dry-run=client" || arg == "--dry-run" || arg == "--local" {
+			local = true
+		}
+	}
+
+	f := cmdutil.NewFactory(matchVersionKubeConfigFlags, local)
 
 	// Proxy command is incompatible with CommandHeaderRoundTripper, so
 	// clear the WrapConfigFn before running proxy command.

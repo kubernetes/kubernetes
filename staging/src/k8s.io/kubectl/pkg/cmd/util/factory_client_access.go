@@ -40,6 +40,7 @@ import (
 
 type factoryImpl struct {
 	clientGetter genericclioptions.RESTClientGetter
+	local        bool
 
 	// Caches OpenAPI document and parsed resources
 	openAPIParser *openapi.CachedOpenAPIParser
@@ -48,19 +49,25 @@ type factoryImpl struct {
 	getter        sync.Once
 }
 
-func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
+func NewFactory(clientGetter genericclioptions.RESTClientGetter, local bool) Factory {
 	if clientGetter == nil {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
 	f := &factoryImpl{
 		clientGetter: clientGetter,
+		local:        local,
 	}
 
 	return f
 }
 
 func (f *factoryImpl) ToRESTConfig() (*restclient.Config, error) {
-	return f.clientGetter.ToRESTConfig()
+	client, err := f.clientGetter.ToRESTConfig()
+	if err != nil && f.local && clientcmd.IsEmptyConfig(err) {
+		return &restclient.Config{}, nil
+	}
+
+	return client, err
 }
 
 func (f *factoryImpl) ToRESTMapper() (meta.RESTMapper, error) {
@@ -72,6 +79,9 @@ func (f *factoryImpl) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 }
 
 func (f *factoryImpl) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	if f.local {
+		return genericclioptions.NewLocalClientConfig(f.clientGetter.ToRawKubeConfigLoader())
+	}
 	return f.clientGetter.ToRawKubeConfigLoader()
 }
 
@@ -108,7 +118,10 @@ func (f *factoryImpl) RESTClient() (*restclient.RESTClient, error) {
 func (f *factoryImpl) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	cfg, err := f.clientGetter.ToRESTConfig()
 	if err != nil {
-		return nil, err
+		if !f.local || !clientcmd.IsEmptyConfig(err) {
+			return nil, err
+		}
+		cfg = &restclient.Config{}
 	}
 	if err := setKubernetesDefaults(cfg); err != nil {
 		return nil, err
@@ -128,7 +141,10 @@ func (f *factoryImpl) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 func (f *factoryImpl) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	cfg, err := f.clientGetter.ToRESTConfig()
 	if err != nil {
-		return nil, err
+		if !f.local || !clientcmd.IsEmptyConfig(err) {
+			return nil, err
+		}
+		cfg = &restclient.Config{}
 	}
 	if err := restclient.SetKubernetesDefaults(cfg); err != nil {
 		return nil, err

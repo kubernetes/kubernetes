@@ -2351,8 +2351,8 @@ func TestApplySetParentValidation(t *testing.T) {
 				kubeConfig := clientcmdapi.NewConfig()
 				kubeConfig.CurrentContext = "default"
 				kubeConfig.Contexts["default"] = &clientcmdapi.Context{Namespace: "bar"}
-				clientConfig := clientcmd.NewDefaultClientConfig(*kubeConfig, &clientcmd.ConfigOverrides{
-					ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"}})
+				clientConfig := genericclioptions.NewLocalClientConfig(clientcmd.NewDefaultClientConfig(*kubeConfig, &clientcmd.ConfigOverrides{
+					ClusterDefaults: clientcmdapi.Cluster{}}))
 				f.WithClientConfig(clientConfig)
 			},
 			expectBlankParentNs: true,
