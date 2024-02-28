@@ -180,7 +180,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 		}
 		for _, t := range tests {
 			t := t
-			ginkgo.It(t.name, t.feature, func(ctx context.Context) {
+			f.It(t.name, t.feature, func(ctx context.Context) {
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
 				}
@@ -218,6 +218,13 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 
 				// Arrange 2nd part of the test
 				ginkgo.By("Starting the second pod to check if a volume used by the initial pod is / is not unmounted based on SELinux context")
+				// count fresh CSI driver calls between the first and the second pod
+				nodeStageMountOpts = nil
+				nodePublishMountOpts = nil
+				unstageCalls.Store(0)
+				unpublishCalls.Store(0)
+				stageCalls.Store(0)
+				publishCalls.Store(0)
 
 				// Skip scheduler, it would block scheduling the second pod with ReadWriteOncePod PV.
 				pod, err = m.cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
@@ -231,30 +238,31 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				// DesiredStateOfWorld.
 				// In this state, any volume UnPublish / UnStage must be done because of SELinux contexts and not
 				// because of random races because volumes of the second pod are not in DesiredStateOfWorld yet.
-				ginkgo.By("Waiting for the second pod to fail to start because of ReadWriteOncePod.")
-				eventSelector := fields.Set{
-					"involvedObject.kind":      "Pod",
-					"involvedObject.name":      pod2.Name,
-					"involvedObject.namespace": pod2.Namespace,
-					"reason":                   events.FailedMountVolume,
-				}.AsSelector().String()
+				ginkgo.By("Waiting for the second pod to start (or fail to start because of ReadWriteOncePod).")
+				reason := events.FailedMountVolume
 				var msg string
 				if t.expectedUnstage {
 					// This message is emitted before kubelet checks for ReadWriteOncePod
 					msg = "conflicting SELinux labels of volume"
 				} else {
-					msg = "volume uses the ReadWriteOncePod access mode and is already in use by another pod"
+					// Kubelet should re-use staged volume.
+					if t.volumeMode == v1.ReadWriteOncePod {
+						// Wait for the second pod to get stuck because of RWOP.
+						msg = "volume uses the ReadWriteOncePod access mode and is already in use by another pod"
+					} else {
+						// There is nothing blocking the second pod from starting, wait for the second pod to fullly start.
+						reason = string(events.StartedContainer)
+						msg = "Started container"
+					}
 				}
+				eventSelector := fields.Set{
+					"involvedObject.kind":      "Pod",
+					"involvedObject.name":      pod2.Name,
+					"involvedObject.namespace": pod2.Namespace,
+					"reason":                   reason,
+				}.AsSelector().String()
 				err = e2eevents.WaitTimeoutForEvent(ctx, m.cs, pod2.Namespace, eventSelector, msg, f.Timeouts.PodStart)
 				framework.ExpectNoError(err, "waiting for event %q in the second test pod", msg)
-
-				// count fresh CSI driver calls between the first and the second pod
-				nodeStageMountOpts = nil
-				nodePublishMountOpts = nil
-				unstageCalls.Store(0)
-				unpublishCalls.Store(0)
-				stageCalls.Store(0)
-				publishCalls.Store(0)
 
 				// Act 2nd part of the test
 				ginkgo.By("Deleting the initial pod")
@@ -374,7 +382,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 		}
 		for _, t := range tests {
 			t := t
-			ginkgo.It(t.name, t.feature, func(ctx context.Context) {
+			f.It(t.name, t.feature, func(ctx context.Context) {
 				// Some metrics use CSI driver name as a label, which is "csi-mock-" + the namespace name.
 				volumePluginLabel := "{volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\"}"
 
