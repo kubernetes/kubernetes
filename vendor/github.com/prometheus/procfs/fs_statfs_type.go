@@ -11,8 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !netbsd && !openbsd && !solaris && !windows
-// +build !netbsd,!openbsd,!solaris,!windows
+//go:build freebsd || linux
+// +build freebsd linux
 
 package procfs
 

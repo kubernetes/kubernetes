@@ -23,6 +23,10 @@ type urlCredentialSource struct {
 	ctx     context.Context
 }
 
+func (cs urlCredentialSource) credentialSourceType() string {
+	return "url"
+}
+
 func (cs urlCredentialSource) subjectToken() (string, error) {
 	client := oauth2.NewClient(cs.ctx, nil)
 	req, err := http.NewRequest("GET", cs.URL, nil)
