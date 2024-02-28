@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -75,6 +76,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 			expectedFirstMountOptions  []string
 			expectedSecondMountOptions []string
 			expectedUnstage            bool
+			feature                    interface{}
 		}{
 			// Start just a single pod and check its volume is mounted correctly
 			{
@@ -83,6 +85,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				firstPodSELinuxOpts:       &seLinuxOpts1,
 				volumeMode:                v1.ReadWriteOncePod,
 				expectedFirstMountOptions: []string{seLinuxMountOption1},
+				feature:                   framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod),
 			},
 			{
 				name:                      "should add SELinux mount option to existing mount options",
@@ -91,13 +94,23 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				mountOptions:              []string{"noexec", "noatime"},
 				volumeMode:                v1.ReadWriteOncePod,
 				expectedFirstMountOptions: []string{"noexec", "noatime", seLinuxMountOption1},
+				feature:                   framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod),
 			},
 			{
-				name:                      "should not pass SELinux mount option for RWO volume",
+				name:                      "should not pass SELinux mount option for RWO volume with SELinuxMount disabled",
 				csiDriverSELinuxEnabled:   true,
 				firstPodSELinuxOpts:       &seLinuxOpts1,
 				volumeMode:                v1.ReadWriteOnce,
 				expectedFirstMountOptions: nil,
+				feature:                   feature.SELinuxMountReadWriteOncePodOnly,
+			},
+			{
+				name:                      "should pass SELinux mount option for RWO volume with SELinuxMount enabled",
+				csiDriverSELinuxEnabled:   true,
+				firstPodSELinuxOpts:       &seLinuxOpts1,
+				volumeMode:                v1.ReadWriteOnce,
+				expectedFirstMountOptions: []string{seLinuxMountOption1},
+				feature:                   framework.WithFeatureGate(features.SELinuxMount),
 			},
 			{
 				name:                      "should not pass SELinux mount option for Pod without SELinux context",
@@ -105,6 +118,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				firstPodSELinuxOpts:       nil,
 				volumeMode:                v1.ReadWriteOncePod,
 				expectedFirstMountOptions: nil,
+				feature:                   framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod),
 			},
 			{
 				name:                      "should not pass SELinux mount option for CSI driver that does not support SELinux mount",
@@ -112,10 +126,11 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				firstPodSELinuxOpts:       &seLinuxOpts1,
 				volumeMode:                v1.ReadWriteOncePod,
 				expectedFirstMountOptions: nil,
+				feature:                   framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod),
 			},
 			// Start two pods in a sequence and check their volume is / is not unmounted in between
 			{
-				name:                       "should not unstage volume when starting a second pod with the same SELinux context",
+				name:                       "should not unstage RWOP volume when starting a second pod with the same SELinux context",
 				csiDriverSELinuxEnabled:    true,
 				firstPodSELinuxOpts:        &seLinuxOpts1,
 				startSecondPod:             true,
@@ -124,9 +139,10 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				expectedFirstMountOptions:  []string{seLinuxMountOption1},
 				expectedSecondMountOptions: []string{seLinuxMountOption1},
 				expectedUnstage:            false,
+				feature:                    framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod),
 			},
 			{
-				name:                       "should unstage volume when starting a second pod with different SELinux context",
+				name:                       "should unstage RWOP volume when starting a second pod with different SELinux context",
 				csiDriverSELinuxEnabled:    true,
 				firstPodSELinuxOpts:        &seLinuxOpts1,
 				startSecondPod:             true,
@@ -135,11 +151,36 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				expectedFirstMountOptions:  []string{seLinuxMountOption1},
 				expectedSecondMountOptions: []string{seLinuxMountOption2},
 				expectedUnstage:            true,
+				feature:                    framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod),
+			},
+			{
+				name:                       "should not unstage RWO volume when starting a second pod with the same SELinux context",
+				csiDriverSELinuxEnabled:    true,
+				firstPodSELinuxOpts:        &seLinuxOpts1,
+				startSecondPod:             true,
+				secondPodSELinuxOpts:       &seLinuxOpts1,
+				volumeMode:                 v1.ReadWriteOnce,
+				expectedFirstMountOptions:  []string{seLinuxMountOption1},
+				expectedSecondMountOptions: []string{seLinuxMountOption1},
+				expectedUnstage:            false,
+				feature:                    framework.WithFeatureGate(features.SELinuxMount),
+			},
+			{
+				name:                       "should unstage RWO volume when starting a second pod with different SELinux context",
+				csiDriverSELinuxEnabled:    true,
+				firstPodSELinuxOpts:        &seLinuxOpts1,
+				startSecondPod:             true,
+				secondPodSELinuxOpts:       &seLinuxOpts2,
+				volumeMode:                 v1.ReadWriteOnce,
+				expectedFirstMountOptions:  []string{seLinuxMountOption1},
+				expectedSecondMountOptions: []string{seLinuxMountOption2},
+				expectedUnstage:            true,
+				feature:                    framework.WithFeatureGate(features.SELinuxMount),
 			},
 		}
 		for _, t := range tests {
 			t := t
-			ginkgo.It(t.name, func(ctx context.Context) {
+			ginkgo.It(t.name, t.feature, func(ctx context.Context) {
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
 				}
@@ -252,7 +293,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	m := newMockDriverSetup(f)
 
 	// [Serial]: the tests read global kube-controller-manager metrics, so no other test changes them in parallel.
-	f.Context("SELinuxMount metrics [LinuxOnly]", feature.SELinux, feature.SELinuxMountReadWriteOncePod, f.WithSerial(), func() {
+	f.Context("SELinuxMount metrics [LinuxOnly]", feature.SELinux, f.WithSerial(), func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
@@ -276,6 +317,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 			waitForSecondPodStart   bool
 			secondPodFailureEvent   string
 			expectIncreases         sets.String
+			feature                 interface{}
 		}{
 			{
 				name:                    "warning is not bumped on two Pods with the same context on RWO volume",
@@ -285,6 +327,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				volumeMode:              v1.ReadWriteOnce,
 				waitForSecondPodStart:   true,
 				expectIncreases:         sets.NewString( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
+				feature:                 feature.SELinuxMountReadWriteOncePodOnly,
 			},
 			{
 				name:                    "warning is bumped on two Pods with a different context on RWO volume",
@@ -294,6 +337,28 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				volumeMode:              v1.ReadWriteOnce,
 				waitForSecondPodStart:   true,
 				expectIncreases:         sets.NewString("volume_manager_selinux_volume_context_mismatch_warnings_total"),
+				feature:                 feature.SELinuxMountReadWriteOncePodOnly,
+			},
+			{
+				name:                    "error is not bumped on two Pods with the same context on RWO volume and SELinuxMount enabled",
+				csiDriverSELinuxEnabled: true,
+				firstPodSELinuxOpts:     &seLinuxOpts1,
+				secondPodSELinuxOpts:    &seLinuxOpts1,
+				volumeMode:              v1.ReadWriteOnce,
+				waitForSecondPodStart:   true,
+				expectIncreases:         sets.NewString( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
+				feature:                 framework.WithFeatureGate(features.SELinuxMount),
+			},
+			{
+				name:                    "error is bumped on two Pods with a different context on RWO volume and SELinuxMount enabled",
+				csiDriverSELinuxEnabled: true,
+				firstPodSELinuxOpts:     &seLinuxOpts1,
+				secondPodSELinuxOpts:    &seLinuxOpts2,
+				secondPodFailureEvent:   "conflicting SELinux labels of volume",
+				volumeMode:              v1.ReadWriteOnce,
+				waitForSecondPodStart:   false,
+				expectIncreases:         sets.NewString("volume_manager_selinux_volume_context_mismatch_errors_total"),
+				feature:                 framework.WithFeatureGate(features.SELinuxMount),
 			},
 			{
 				name:                    "error is bumped on two Pods with a different context on RWOP volume",
@@ -304,11 +369,12 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				volumeMode:              v1.ReadWriteOncePod,
 				waitForSecondPodStart:   false,
 				expectIncreases:         sets.NewString("volume_manager_selinux_volume_context_mismatch_errors_total"),
+				feature:                 framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod),
 			},
 		}
 		for _, t := range tests {
 			t := t
-			ginkgo.It(t.name, func(ctx context.Context) {
+			ginkgo.It(t.name, t.feature, func(ctx context.Context) {
 				// Some metrics use CSI driver name as a label, which is "csi-mock-" + the namespace name.
 				volumePluginLabel := "{volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\"}"
 
