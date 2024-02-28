@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	"path/filepath"
 	"strconv"
 
@@ -44,40 +45,42 @@ const (
 	cgroupV1MemLimitFile  = "/memory/memory.limit_in_bytes"
 )
 
-var _ = SIGDescribe("Swap", framework.WithNodeConformance(), "[LinuxOnly]", func() {
-	f := framework.NewDefaultFramework("swap-test")
+var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
+	f := framework.NewDefaultFramework("swap-qos")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
-		ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
-		pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
-		pod = runPodAndWaitUntilScheduled(f, pod)
+	f.Context(framework.WithNodeConformance(), func() {
+		ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
+			ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
+			pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
+			pod = runPodAndWaitUntilScheduled(f, pod)
 
-		isCgroupV2 := isPodCgroupV2(f, pod)
-		isLimitedSwap := isLimitedSwap(f, pod)
-		isNoSwap := isNoSwap(f, pod)
+			isCgroupV2 := isPodCgroupV2(f, pod)
+			isLimitedSwap := isLimitedSwap(f, pod)
+			isNoSwap := isNoSwap(f, pod)
 
-		if !isSwapFeatureGateEnabled() || !isCgroupV2 || isNoSwap || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
-			ginkgo.By(fmt.Sprintf("Expecting no swap. isNoSwap? %t, feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isNoSwap, isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
-			expectNoSwap(f, pod, isCgroupV2)
-			return
-		}
+			if !isSwapFeatureGateEnabled() || !isCgroupV2 || isNoSwap || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
+				ginkgo.By(fmt.Sprintf("Expecting no swap. isNoSwap? %t, feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isNoSwap, isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
+				expectNoSwap(f, pod, isCgroupV2)
+				return
+			}
 
-		if !isLimitedSwap {
-			ginkgo.By("expecting no swap")
-			expectNoSwap(f, pod, isCgroupV2)
-			return
-		}
+			if !isLimitedSwap {
+				ginkgo.By("expecting no swap")
+				expectNoSwap(f, pod, isCgroupV2)
+				return
+			}
 
-		ginkgo.By("expecting limited swap")
-		expectedSwapLimit := calcSwapForBurstablePod(f, pod)
-		expectLimitedSwap(f, pod, expectedSwapLimit)
-	},
-		ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
-		ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
-		ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
-		ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
-	)
+			ginkgo.By("expecting limited swap")
+			expectedSwapLimit := calcSwapForBurstablePod(f, pod)
+			expectLimitedSwap(f, pod, expectedSwapLimit)
+		},
+			ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
+			ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
+			ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
+			ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
+		)
+	})
 })
 
 // Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
