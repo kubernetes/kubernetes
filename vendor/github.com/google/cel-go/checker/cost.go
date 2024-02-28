@@ -520,6 +520,9 @@ func (c *coster) costComprehension(e *exprpb.Expr) CostEstimate {
 	c.iterRanges.pop(comp.GetIterVar())
 	sum = sum.Add(c.cost(comp.Result))
 	rangeCnt := c.sizeEstimate(c.newAstNode(comp.GetIterRange()))
+
+	c.computedSizes[e.GetId()] = rangeCnt
+
 	rangeCost := rangeCnt.MultiplyByCost(stepCost.Add(loopCost))
 	sum = sum.Add(rangeCost)
 
