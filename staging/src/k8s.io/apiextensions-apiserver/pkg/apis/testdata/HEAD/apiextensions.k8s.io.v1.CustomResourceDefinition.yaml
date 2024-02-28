@@ -134,6 +134,8 @@ spec:
           optionalOldSelf: true
           reason: reasonValue
           rule: ruleValue
+    selectableFields:
+    - jsonPath: jsonPathValue
     served: true
     storage: true
     subresources:

@@ -273,6 +273,14 @@ message CustomResourceDefinitionSpec {
   // +listType=atomic
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
 
+  // selectableFields specifies paths to fields that may be used as field selectors.
+  // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+  //
+  // +featureGate=CustomResourceFieldSelectors
+  // +optional
+  // +listType=atomic
+  repeated SelectableField selectableFields = 11;
+
   // conversion defines conversion settings for the CRD.
   // +optional
   optional CustomResourceConversion conversion = 9;
@@ -359,6 +367,14 @@ message CustomResourceDefinitionVersion {
   // +optional
   // +listType=atomic
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
+
+  // selectableFields specifies paths to fields that may be used as field selectors.
+  // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+  //
+  // +featureGate=CustomResourceFieldSelectors
+  // +optional
+  // +listType=atomic
+  repeated SelectableField selectableFields = 9;
 }
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
@@ -649,6 +665,19 @@ message JSONSchemaPropsOrStringArray {
 
   // +listType=atomic
   repeated string property = 2;
+}
+
+// SelectableField specifies the JSON path of a field that may be used with field selectors.
+message SelectableField {
+  // jsonPath is a simple JSON path which is evaluated against each custom resource to produce a
+  // field selector value.
+  // Only JSON paths without the array notation are allowed.
+  // Must point to a field of type string, boolean or integer. Types with enum values
+  // and strings with formats are allowed.
+  // If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string.
+  // Must not point to metdata fields.
+  // Required.
+  optional string jsonPath = 1;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

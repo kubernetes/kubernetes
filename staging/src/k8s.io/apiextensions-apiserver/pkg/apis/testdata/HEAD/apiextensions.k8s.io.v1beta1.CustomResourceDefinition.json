@@ -257,6 +257,11 @@
             "priority": 5,
             "JSONPath": "JSONPathValue"
           }
+        ],
+        "selectableFields": [
+          {
+            "jsonPath": "jsonPathValue"
+          }
         ]
       }
     ],
@@ -268,6 +273,11 @@
         "description": "descriptionValue",
         "priority": 5,
         "JSONPath": "JSONPathValue"
+      }
+    ],
+    "selectableFields": [
+      {
+        "jsonPath": "jsonPathValue"
       }
     ],
     "conversion": {
