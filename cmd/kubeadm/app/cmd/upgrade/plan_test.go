@@ -21,6 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/diff"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
+	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
@@ -67,10 +70,26 @@ func TestSortedSliceFromStringIntMap(t *testing.T) {
 }
 
 // TODO Think about modifying this test to be less verbose checking b/c it can be brittle.
-func TestPrintAvailableUpgrades(t *testing.T) {
+func TestPrintUpgradePlan(t *testing.T) {
+	versionStates := []outputapiv1alpha3.ComponentConfigVersionState{
+		{
+			Group:                 "kubeproxy.config.k8s.io",
+			CurrentVersion:        "v1alpha1",
+			PreferredVersion:      "v1alpha1",
+			ManualUpgradeRequired: false,
+		},
+		{
+			Group:                 "kubelet.config.k8s.io",
+			CurrentVersion:        "v1beta1",
+			PreferredVersion:      "v1beta1",
+			ManualUpgradeRequired: false,
+		},
+	}
+
 	var tests = []struct {
 		name          string
 		upgrades      []upgrade.Upgrade
+		versionStates []outputapiv1alpha3.ComponentConfigVersionState
 		buf           *bytes.Buffer
 		expectedBytes []byte
 		externalEtcd  bool
@@ -97,6 +116,7 @@ func TestPrintAvailableUpgrades(t *testing.T) {
 					},
 				},
 			},
+			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.18.1   v1.18.4
@@ -117,6 +137,17 @@ You can now apply the upgrade by executing the following command:
 
 Note: Before you can perform this upgrade, you have to update kubeadm to v1.18.4.
 
+_____________________________________________________________________
+
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
 _____________________________________________________________________
 
 `),
@@ -143,6 +174,7 @@ _____________________________________________________________________
 					},
 				},
 			},
+			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.18.4   v1.19.0
@@ -163,6 +195,17 @@ You can now apply the upgrade by executing the following command:
 
 Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0.
 
+_____________________________________________________________________
+
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
 _____________________________________________________________________
 
 `),
@@ -207,6 +250,7 @@ _____________________________________________________________________
 					},
 				},
 			},
+			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.18.3   v1.18.5
@@ -249,6 +293,17 @@ Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0
 
 _____________________________________________________________________
 
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
+_____________________________________________________________________
+
 `),
 		},
 		{
@@ -273,6 +328,7 @@ _____________________________________________________________________
 					},
 				},
 			},
+			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.18.5   v1.19.0-beta.1
@@ -293,6 +349,17 @@ You can now apply the upgrade by executing the following command:
 
 Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0-beta.1.
 
+_____________________________________________________________________
+
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
 _____________________________________________________________________
 
 `),
@@ -319,6 +386,7 @@ _____________________________________________________________________
 					},
 				},
 			},
+			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.18.5   v1.19.0-rc.1
@@ -339,6 +407,17 @@ You can now apply the upgrade by executing the following command:
 
 Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0-rc.1.
 
+_____________________________________________________________________
+
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
 _____________________________________________________________________
 
 `),
@@ -366,6 +445,7 @@ _____________________________________________________________________
 					},
 				},
 			},
+			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.19.2   v1.19.3
@@ -387,6 +467,17 @@ You can now apply the upgrade by executing the following command:
 
 Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.3.
 
+_____________________________________________________________________
+
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
 _____________________________________________________________________
 
 `),
@@ -414,7 +505,8 @@ _____________________________________________________________________
 					},
 				},
 			},
-			externalEtcd: true,
+			versionStates: versionStates,
+			externalEtcd:  true,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.19.2   v1.19.3
@@ -436,30 +528,38 @@ Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.3
 
 _____________________________________________________________________
 
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
+_____________________________________________________________________
+
 `),
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			rt.buf = bytes.NewBufferString("")
-			outputFlags := newUpgradePlanPrintFlags(output.TextOutput)
+			outputFlags := output.NewOutputFlags(&upgradePlanTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			// Generate and print upgrade plans
-			for _, up := range rt.upgrades {
-				plan, unstableVersionFlag, err := genUpgradePlan(&up, rt.externalEtcd)
-				if err != nil {
-					t.Errorf("failed genUpgradePlan, err: %+v", err)
-				}
-				printUpgradePlan(&up, plan, unstableVersionFlag, rt.externalEtcd, rt.buf, printer)
+			plan := genUpgradePlan(rt.upgrades, rt.versionStates, rt.externalEtcd)
+			if err := printer.PrintObj(plan, rt.buf); err != nil {
+				t.Errorf("unexpected error when print object: %v", err)
 			}
+
 			actualBytes := rt.buf.Bytes()
 			if !bytes.Equal(actualBytes, rt.expectedBytes) {
 				t.Errorf(
-					"failed PrintAvailableUpgrades:\n\texpected: %q\n\n\tactual  : %q",
+					"failed PrintUpgradePlan:\n\texpected: %q\n\n\tactual  : %q",
 					string(rt.expectedBytes),
 					string(actualBytes),
 				)
@@ -468,7 +568,7 @@ _____________________________________________________________________
 	}
 }
 
-func TestPrintAvailableUpgradesStructured(t *testing.T) {
+func TestPrintUpgradePlanStructured(t *testing.T) {
 	upgrades := []upgrade.Upgrade{
 		{
 			Description: "version in the v1.8 series",
@@ -490,6 +590,21 @@ func TestPrintAvailableUpgradesStructured(t *testing.T) {
 		},
 	}
 
+	versionStates := []outputapiv1alpha3.ComponentConfigVersionState{
+		{
+			Group:                 "kubeproxy.config.k8s.io",
+			CurrentVersion:        "v1alpha1",
+			PreferredVersion:      "v1alpha1",
+			ManualUpgradeRequired: false,
+		},
+		{
+			Group:                 "kubelet.config.k8s.io",
+			CurrentVersion:        "v1beta1",
+			PreferredVersion:      "v1beta1",
+			ManualUpgradeRequired: false,
+		},
+	}
+
 	var tests = []struct {
 		name         string
 		outputFormat string
@@ -502,81 +617,117 @@ func TestPrintAvailableUpgradesStructured(t *testing.T) {
 			outputFormat: "json",
 			expected: `{
     "kind": "UpgradePlan",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
-    "components": [
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha3",
+    "availableUpgrades": [
         {
-            "name": "kubelet",
-            "currentVersion": "1 x v1.8.1",
-            "newVersion": "v1.8.3"
-        },
-        {
-            "name": "kube-apiserver",
-            "currentVersion": "v1.8.1",
-            "newVersion": "v1.8.3"
-        },
-        {
-            "name": "kube-controller-manager",
-            "currentVersion": "v1.8.1",
-            "newVersion": "v1.8.3"
-        },
-        {
-            "name": "kube-scheduler",
-            "currentVersion": "v1.8.1",
-            "newVersion": "v1.8.3"
-        },
-        {
-            "name": "kube-proxy",
-            "currentVersion": "v1.8.1",
-            "newVersion": "v1.8.3"
-        },
-        {
-            "name": "CoreDNS",
-            "currentVersion": "1.14.5",
-            "newVersion": "1.14.5"
-        },
-        {
-            "name": "etcd",
-            "currentVersion": "3.0.17",
-            "newVersion": "3.0.17"
+            "description": "version in the v1.8 series",
+            "components": [
+                {
+                    "name": "kubelet",
+                    "currentVersion": "1 x v1.8.1",
+                    "newVersion": "v1.8.3"
+                },
+                {
+                    "name": "kube-apiserver",
+                    "currentVersion": "v1.8.1",
+                    "newVersion": "v1.8.3"
+                },
+                {
+                    "name": "kube-controller-manager",
+                    "currentVersion": "v1.8.1",
+                    "newVersion": "v1.8.3"
+                },
+                {
+                    "name": "kube-scheduler",
+                    "currentVersion": "v1.8.1",
+                    "newVersion": "v1.8.3"
+                },
+                {
+                    "name": "kube-proxy",
+                    "currentVersion": "v1.8.1",
+                    "newVersion": "v1.8.3"
+                },
+                {
+                    "name": "CoreDNS",
+                    "currentVersion": "1.14.5",
+                    "newVersion": "1.14.5"
+                },
+                {
+                    "name": "kubeadm",
+                    "currentVersion": "v1.8.2",
+                    "newVersion": "v1.8.3"
+                },
+                {
+                    "name": "etcd",
+                    "currentVersion": "3.0.17",
+                    "newVersion": "3.0.17"
+                }
+            ]
         }
     ],
-    "configVersions": null
+    "configVersions": [
+        {
+            "group": "kubeproxy.config.k8s.io",
+            "currentVersion": "v1alpha1",
+            "preferredVersion": "v1alpha1",
+            "manualUpgradeRequired": false
+        },
+        {
+            "group": "kubelet.config.k8s.io",
+            "currentVersion": "v1beta1",
+            "preferredVersion": "v1beta1",
+            "manualUpgradeRequired": false
+        }
+    ]
 }
 `,
 		},
 		{
 			name:         "YAML output",
 			outputFormat: "yaml",
-			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha2
-components:
-- currentVersion: 1 x v1.8.1
-  name: kubelet
-  newVersion: v1.8.3
-- currentVersion: v1.8.1
-  name: kube-apiserver
-  newVersion: v1.8.3
-- currentVersion: v1.8.1
-  name: kube-controller-manager
-  newVersion: v1.8.3
-- currentVersion: v1.8.1
-  name: kube-scheduler
-  newVersion: v1.8.3
-- currentVersion: v1.8.1
-  name: kube-proxy
-  newVersion: v1.8.3
-- currentVersion: 1.14.5
-  name: CoreDNS
-  newVersion: 1.14.5
-- currentVersion: 3.0.17
-  name: etcd
-  newVersion: 3.0.17
-configVersions: null
+			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha3
+availableUpgrades:
+- components:
+  - currentVersion: 1 x v1.8.1
+    name: kubelet
+    newVersion: v1.8.3
+  - currentVersion: v1.8.1
+    name: kube-apiserver
+    newVersion: v1.8.3
+  - currentVersion: v1.8.1
+    name: kube-controller-manager
+    newVersion: v1.8.3
+  - currentVersion: v1.8.1
+    name: kube-scheduler
+    newVersion: v1.8.3
+  - currentVersion: v1.8.1
+    name: kube-proxy
+    newVersion: v1.8.3
+  - currentVersion: 1.14.5
+    name: CoreDNS
+    newVersion: 1.14.5
+  - currentVersion: v1.8.2
+    name: kubeadm
+    newVersion: v1.8.3
+  - currentVersion: 3.0.17
+    name: etcd
+    newVersion: 3.0.17
+  description: version in the v1.8 series
+configVersions:
+- currentVersion: v1alpha1
+  group: kubeproxy.config.k8s.io
+  manualUpgradeRequired: false
+  preferredVersion: v1alpha1
+- currentVersion: v1beta1
+  group: kubelet.config.k8s.io
+  manualUpgradeRequired: false
+  preferredVersion: v1beta1
 kind: UpgradePlan
 `,
 		},
 		{
 			name:         "Text output",
-			outputFormat: "Text",
+			outputFormat: "text",
 			expected: `Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.8.1   v1.8.3
@@ -599,6 +750,17 @@ Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.3.
 
 _____________________________________________________________________
 
+
+The table below shows the current state of component configs as understood by this version of kubeadm.
+Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+upgrade to is denoted in the "PREFERRED VERSION" column.
+
+API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
+kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
+kubelet.config.k8s.io     v1beta1           v1beta1             no
+_____________________________________________________________________
+
 `,
 		},
 	}
@@ -606,24 +768,21 @@ _____________________________________________________________________
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			rt.buf = bytes.NewBufferString("")
-			outputFlags := newUpgradePlanPrintFlags(rt.outputFormat)
+			outputFlags := output.NewOutputFlags(&upgradePlanTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(rt.outputFormat)
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			// Generate and print upgrade plans
-			for _, up := range upgrades {
-				plan, unstableVersionFlag, err := genUpgradePlan(&up, rt.externalEtcd)
-				if err != nil {
-					t.Errorf("failed genUpgradePlan, err: %+v", err)
-				}
-				printUpgradePlan(&up, plan, unstableVersionFlag, rt.externalEtcd, rt.buf, printer)
+			plan := genUpgradePlan(upgrades, versionStates, false)
+			if err := printer.PrintObj(plan, rt.buf); err != nil {
+				t.Errorf("unexpected error when print object: %v", err)
 			}
 
 			actual := rt.buf.String()
 			if actual != rt.expected {
-				t.Errorf("failed PrintAvailableUpgrades:\n\nexpected:\n%s\n\nactual:\n%s", rt.expected, actual)
+
+				t.Errorf("failed PrintUpgradePlan:\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff:\n%s", rt.expected, actual, diff.StringDiff(actual, rt.expected))
 			}
 		})
 	}
