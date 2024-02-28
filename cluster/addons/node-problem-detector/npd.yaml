@@ -45,7 +45,7 @@ spec:
     spec:
       containers:
       - name: node-problem-detector
-        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.15
+        image: gcr.io/k8s-staging-npd/node-problem-detector:master
         command:
         - "/bin/sh"
         - "-c"
