@@ -81,7 +81,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 	})
 })
 
-// Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
+// Note that memoryRequestEqualLimit is effective only when qosClass is not PodQOSBestEffort.
 func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
 	podMemoryAmount := resource.MustParse("128Mi")
 
@@ -109,25 +109,28 @@ func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryReque
 		resources.Requests = resources.Limits
 	}
 
-	pod := &v1.Pod{
+	pod := getSleepingPod(f.Namespace.Name)
+
+	return pod
+}
+
+func getSleepingPod(namespace string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod-swap-" + rand.String(5),
-			Namespace: f.Namespace.Name,
+			Name:      "sleeping-test-pod-swap-" + rand.String(5),
+			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyAlways,
 			Containers: []v1.Container{
 				{
-					Name:      "busybox-container",
-					Image:     busyboxImage,
-					Command:   []string{"sleep", "600"},
-					Resources: resources,
+					Name:    "busybox-container",
+					Image:   busyboxImage,
+					Command: []string{"sleep", "600"},
 				},
 			},
 		},
 	}
-
-	return pod
 }
 
 func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
@@ -191,44 +194,41 @@ func expectLimitedSwap(f *framework.Framework, pod *v1.Pod, expectedSwapLimit in
 	)
 }
 
-func getSwapCapacity(f *framework.Framework, pod *v1.Pod) int64 {
+func getSwapCapacity(f *framework.Framework, pod *v1.Pod) *resource.Quantity {
 	output := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-ec", "free -b | grep Swap | xargs | cut -d\" \" -f2")
 
-	swapCapacity, err := strconv.Atoi(output)
+	swapCapacityBytes, err := strconv.Atoi(output)
 	framework.ExpectNoError(err, "cannot convert swap size to int")
 
-	ginkgo.By(fmt.Sprintf("providing swap capacity: %d", swapCapacity))
+	ginkgo.By(fmt.Sprintf("providing swap capacity: %d", swapCapacityBytes))
 
-	return int64(swapCapacity)
+	return resource.NewQuantity(int64(swapCapacityBytes), resource.BinarySI)
 }
 
-func getMemoryCapacity(f *framework.Framework, pod *v1.Pod) int64 {
-	nodes, err := f.ClientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-	framework.ExpectNoError(err, "failed listing nodes")
+func getMemoryCapacity(f *framework.Framework, nodeName string) (memCapacity, usedMemory *resource.Quantity) {
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("failed getting node %s", nodeName))
 
-	for _, node := range nodes.Items {
-		if node.Name != pod.Spec.NodeName {
-			continue
-		}
+	nodeOrigCapacity := node.Status.Capacity[v1.ResourceMemory]
+	memCapacity = cloneQuantity(nodeOrigCapacity)
+	usedMemory = cloneQuantity(nodeOrigCapacity)
 
-		memCapacity := node.Status.Capacity[v1.ResourceMemory]
-		return memCapacity.Value()
-	}
-
-	framework.ExpectNoError(fmt.Errorf("node %s wasn't found", pod.Spec.NodeName))
-	return 0
+	usedMemory.Sub(node.Status.Allocatable[v1.ResourceMemory])
+	return
 }
 
 func calcSwapForBurstablePod(f *framework.Framework, pod *v1.Pod) int64 {
-	nodeMemoryCapacity := getMemoryCapacity(f, pod)
-	nodeSwapCapacity := getSwapCapacity(f, pod)
+	gomega.Expect(pod.Spec.NodeName).ToNot(gomega.BeEmpty(), "pod node name is empty")
+
+	nodeMemoryCapacityQuantity, _ := getMemoryCapacity(f, pod.Spec.NodeName)
+	nodeMemoryCapacity := nodeMemoryCapacityQuantity.Value()
+	nodeSwapCapacity := getSwapCapacity(f, pod).Value()
 	containerMemoryRequest := pod.Spec.Containers[0].Resources.Requests.Memory().Value()
 
 	containerMemoryProportion := float64(containerMemoryRequest) / float64(nodeMemoryCapacity)
 	swapAllocation := containerMemoryProportion * float64(nodeSwapCapacity)
 	ginkgo.By(fmt.Sprintf("Calculating swap for burstable pods: nodeMemoryCapacity: %d, nodeSwapCapacity: %d, containerMemoryRequest: %d, swapAllocation: %d",
 		nodeMemoryCapacity, nodeSwapCapacity, containerMemoryRequest, int64(swapAllocation)))
-
 	return int64(swapAllocation)
 }
 
@@ -244,4 +244,9 @@ func isNoSwap(f *framework.Framework, pod *v1.Pod) bool {
 	framework.ExpectNoError(err, "cannot get kubelet config")
 
 	return kubeletCfg.MemorySwap.SwapBehavior == types.NoSwap || kubeletCfg.MemorySwap.SwapBehavior == ""
+}
+
+func cloneQuantity(resource resource.Quantity) *resource.Quantity {
+	clone := resource.DeepCopy()
+	return &clone
 }
