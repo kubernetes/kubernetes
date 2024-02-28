@@ -40,10 +40,25 @@ func CronJobStatus() *CronJobStatusApplyConfiguration {
 // WithActive adds the given value to the Active field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Active field.
+// Deprecated: WithActive does not replace existing list for atomic list type. Use WithNewActive instead.
 func (b *CronJobStatusApplyConfiguration) WithActive(values ...*v1.ObjectReferenceApplyConfiguration) *CronJobStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithActive")
+		}
+		b.Active = append(b.Active, *values[i])
+	}
+	return b
+}
+
+// WithNewActive replaces the Active field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Active field is set to the values of the last call.
+func (b *CronJobStatusApplyConfiguration) WithNewActive(values ...*v1.ObjectReferenceApplyConfiguration) *CronJobStatusApplyConfiguration {
+	b.Active = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewActive")
 		}
 		b.Active = append(b.Active, *values[i])
 	}

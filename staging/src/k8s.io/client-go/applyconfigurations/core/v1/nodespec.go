@@ -47,10 +47,20 @@ func (b *NodeSpecApplyConfiguration) WithPodCIDR(value string) *NodeSpecApplyCon
 // WithPodCIDRs adds the given value to the PodCIDRs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PodCIDRs field.
+// Deprecated: WithPodCIDRs does not replace existing list for atomic list type. Use WithNewPodCIDRs instead.
 func (b *NodeSpecApplyConfiguration) WithPodCIDRs(values ...string) *NodeSpecApplyConfiguration {
 	for i := range values {
 		b.PodCIDRs = append(b.PodCIDRs, values[i])
 	}
+	return b
+}
+
+// WithNewPodCIDRs replaces the PodCIDRs field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the PodCIDRs field is set to the values of the last call.
+func (b *NodeSpecApplyConfiguration) WithNewPodCIDRs(values ...string) *NodeSpecApplyConfiguration {
+	b.PodCIDRs = make([]string, len(values))
+	copy(b.PodCIDRs, values)
 	return b
 }
 
@@ -73,10 +83,25 @@ func (b *NodeSpecApplyConfiguration) WithUnschedulable(value bool) *NodeSpecAppl
 // WithTaints adds the given value to the Taints field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Taints field.
+// Deprecated: WithTaints does not replace existing list for atomic list type. Use WithNewTaints instead.
 func (b *NodeSpecApplyConfiguration) WithTaints(values ...*TaintApplyConfiguration) *NodeSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTaints")
+		}
+		b.Taints = append(b.Taints, *values[i])
+	}
+	return b
+}
+
+// WithNewTaints replaces the Taints field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Taints field is set to the values of the last call.
+func (b *NodeSpecApplyConfiguration) WithNewTaints(values ...*TaintApplyConfiguration) *NodeSpecApplyConfiguration {
+	b.Taints = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewTaints")
 		}
 		b.Taints = append(b.Taints, *values[i])
 	}

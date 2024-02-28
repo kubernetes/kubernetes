@@ -51,9 +51,19 @@ func (b *WebhookClientConfigApplyConfiguration) WithService(value *ServiceRefere
 // WithCABundle adds the given value to the CABundle field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the CABundle field.
+// Deprecated: WithCABundle does not replace existing list for atomic list type. Use WithNewCABundle instead.
 func (b *WebhookClientConfigApplyConfiguration) WithCABundle(values ...byte) *WebhookClientConfigApplyConfiguration {
 	for i := range values {
 		b.CABundle = append(b.CABundle, values[i])
 	}
+	return b
+}
+
+// WithNewCABundle replaces the CABundle field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the CABundle field is set to the values of the last call.
+func (b *WebhookClientConfigApplyConfiguration) WithNewCABundle(values ...byte) *WebhookClientConfigApplyConfiguration {
+	b.CABundle = make([]byte, len(values))
+	copy(b.CABundle, values)
 	return b
 }

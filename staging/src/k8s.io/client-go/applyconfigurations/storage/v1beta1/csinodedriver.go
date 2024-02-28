@@ -52,10 +52,20 @@ func (b *CSINodeDriverApplyConfiguration) WithNodeID(value string) *CSINodeDrive
 // WithTopologyKeys adds the given value to the TopologyKeys field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the TopologyKeys field.
+// Deprecated: WithTopologyKeys does not replace existing list for atomic list type. Use WithNewTopologyKeys instead.
 func (b *CSINodeDriverApplyConfiguration) WithTopologyKeys(values ...string) *CSINodeDriverApplyConfiguration {
 	for i := range values {
 		b.TopologyKeys = append(b.TopologyKeys, values[i])
 	}
+	return b
+}
+
+// WithNewTopologyKeys replaces the TopologyKeys field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the TopologyKeys field is set to the values of the last call.
+func (b *CSINodeDriverApplyConfiguration) WithNewTopologyKeys(values ...string) *CSINodeDriverApplyConfiguration {
+	b.TopologyKeys = make([]string, len(values))
+	copy(b.TopologyKeys, values)
 	return b
 }
 

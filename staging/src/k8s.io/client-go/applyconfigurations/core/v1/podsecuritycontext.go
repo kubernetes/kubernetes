@@ -86,10 +86,20 @@ func (b *PodSecurityContextApplyConfiguration) WithRunAsNonRoot(value bool) *Pod
 // WithSupplementalGroups adds the given value to the SupplementalGroups field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the SupplementalGroups field.
+// Deprecated: WithSupplementalGroups does not replace existing list for atomic list type. Use WithNewSupplementalGroups instead.
 func (b *PodSecurityContextApplyConfiguration) WithSupplementalGroups(values ...int64) *PodSecurityContextApplyConfiguration {
 	for i := range values {
 		b.SupplementalGroups = append(b.SupplementalGroups, values[i])
 	}
+	return b
+}
+
+// WithNewSupplementalGroups replaces the SupplementalGroups field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the SupplementalGroups field is set to the values of the last call.
+func (b *PodSecurityContextApplyConfiguration) WithNewSupplementalGroups(values ...int64) *PodSecurityContextApplyConfiguration {
+	b.SupplementalGroups = make([]int64, len(values))
+	copy(b.SupplementalGroups, values)
 	return b
 }
 
@@ -104,10 +114,25 @@ func (b *PodSecurityContextApplyConfiguration) WithFSGroup(value int64) *PodSecu
 // WithSysctls adds the given value to the Sysctls field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Sysctls field.
+// Deprecated: WithSysctls does not replace existing list for atomic list type. Use WithNewSysctls instead.
 func (b *PodSecurityContextApplyConfiguration) WithSysctls(values ...*SysctlApplyConfiguration) *PodSecurityContextApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithSysctls")
+		}
+		b.Sysctls = append(b.Sysctls, *values[i])
+	}
+	return b
+}
+
+// WithNewSysctls replaces the Sysctls field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Sysctls field is set to the values of the last call.
+func (b *PodSecurityContextApplyConfiguration) WithNewSysctls(values ...*SysctlApplyConfiguration) *PodSecurityContextApplyConfiguration {
+	b.Sysctls = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewSysctls")
 		}
 		b.Sysctls = append(b.Sysctls, *values[i])
 	}

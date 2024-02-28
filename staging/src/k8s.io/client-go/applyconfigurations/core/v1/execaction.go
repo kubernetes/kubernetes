@@ -33,9 +33,19 @@ func ExecAction() *ExecActionApplyConfiguration {
 // WithCommand adds the given value to the Command field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Command field.
+// Deprecated: WithCommand does not replace existing list for atomic list type. Use WithNewCommand instead.
 func (b *ExecActionApplyConfiguration) WithCommand(values ...string) *ExecActionApplyConfiguration {
 	for i := range values {
 		b.Command = append(b.Command, values[i])
 	}
+	return b
+}
+
+// WithNewCommand replaces the Command field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Command field is set to the values of the last call.
+func (b *ExecActionApplyConfiguration) WithNewCommand(values ...string) *ExecActionApplyConfiguration {
+	b.Command = make([]string, len(values))
+	copy(b.Command, values)
 	return b
 }

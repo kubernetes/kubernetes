@@ -78,10 +78,25 @@ func (b *ReplicationControllerStatusApplyConfiguration) WithObservedGeneration(v
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
+// Deprecated: WithConditions does not replace existing list for atomic list type. Use WithNewConditions instead.
 func (b *ReplicationControllerStatusApplyConfiguration) WithConditions(values ...*ReplicationControllerConditionApplyConfiguration) *ReplicationControllerStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")
+		}
+		b.Conditions = append(b.Conditions, *values[i])
+	}
+	return b
+}
+
+// WithNewConditions replaces the Conditions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Conditions field is set to the values of the last call.
+func (b *ReplicationControllerStatusApplyConfiguration) WithNewConditions(values ...*ReplicationControllerConditionApplyConfiguration) *ReplicationControllerStatusApplyConfiguration {
+	b.Conditions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewConditions")
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}

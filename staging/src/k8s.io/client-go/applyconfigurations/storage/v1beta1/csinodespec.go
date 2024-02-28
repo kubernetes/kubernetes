@@ -33,10 +33,25 @@ func CSINodeSpec() *CSINodeSpecApplyConfiguration {
 // WithDrivers adds the given value to the Drivers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Drivers field.
+// Deprecated: WithDrivers does not replace existing list for atomic list type. Use WithNewDrivers instead.
 func (b *CSINodeSpecApplyConfiguration) WithDrivers(values ...*CSINodeDriverApplyConfiguration) *CSINodeSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithDrivers")
+		}
+		b.Drivers = append(b.Drivers, *values[i])
+	}
+	return b
+}
+
+// WithNewDrivers replaces the Drivers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Drivers field is set to the values of the last call.
+func (b *CSINodeSpecApplyConfiguration) WithNewDrivers(values ...*CSINodeDriverApplyConfiguration) *CSINodeSpecApplyConfiguration {
+	b.Drivers = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewDrivers")
 		}
 		b.Drivers = append(b.Drivers, *values[i])
 	}

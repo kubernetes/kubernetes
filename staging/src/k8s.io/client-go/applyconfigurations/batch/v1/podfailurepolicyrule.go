@@ -55,10 +55,25 @@ func (b *PodFailurePolicyRuleApplyConfiguration) WithOnExitCodes(value *PodFailu
 // WithOnPodConditions adds the given value to the OnPodConditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OnPodConditions field.
+// Deprecated: WithOnPodConditions does not replace existing list for atomic list type. Use WithNewOnPodConditions instead.
 func (b *PodFailurePolicyRuleApplyConfiguration) WithOnPodConditions(values ...*PodFailurePolicyOnPodConditionsPatternApplyConfiguration) *PodFailurePolicyRuleApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOnPodConditions")
+		}
+		b.OnPodConditions = append(b.OnPodConditions, *values[i])
+	}
+	return b
+}
+
+// WithNewOnPodConditions replaces the OnPodConditions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the OnPodConditions field is set to the values of the last call.
+func (b *PodFailurePolicyRuleApplyConfiguration) WithNewOnPodConditions(values ...*PodFailurePolicyOnPodConditionsPatternApplyConfiguration) *PodFailurePolicyRuleApplyConfiguration {
+	b.OnPodConditions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewOnPodConditions")
 		}
 		b.OnPodConditions = append(b.OnPodConditions, *values[i])
 	}

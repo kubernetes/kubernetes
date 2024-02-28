@@ -56,9 +56,19 @@ func (b *CustomResourceDefinitionStatusApplyConfiguration) WithAcceptedNames(val
 // WithStoredVersions adds the given value to the StoredVersions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the StoredVersions field.
+// Deprecated: WithStoredVersions does not replace existing list for atomic list type. Use WithNewStoredVersions instead.
 func (b *CustomResourceDefinitionStatusApplyConfiguration) WithStoredVersions(values ...string) *CustomResourceDefinitionStatusApplyConfiguration {
 	for i := range values {
 		b.StoredVersions = append(b.StoredVersions, values[i])
 	}
+	return b
+}
+
+// WithNewStoredVersions replaces the StoredVersions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the StoredVersions field is set to the values of the last call.
+func (b *CustomResourceDefinitionStatusApplyConfiguration) WithNewStoredVersions(values ...string) *CustomResourceDefinitionStatusApplyConfiguration {
+	b.StoredVersions = make([]string, len(values))
+	copy(b.StoredVersions, values)
 	return b
 }

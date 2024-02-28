@@ -61,10 +61,25 @@ func (b *PodStatusApplyConfiguration) WithPhase(value v1.PodPhase) *PodStatusApp
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
+// Deprecated: WithConditions does not replace existing list for atomic list type. Use WithNewConditions instead.
 func (b *PodStatusApplyConfiguration) WithConditions(values ...*PodConditionApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")
+		}
+		b.Conditions = append(b.Conditions, *values[i])
+	}
+	return b
+}
+
+// WithNewConditions replaces the Conditions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Conditions field is set to the values of the last call.
+func (b *PodStatusApplyConfiguration) WithNewConditions(values ...*PodConditionApplyConfiguration) *PodStatusApplyConfiguration {
+	b.Conditions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewConditions")
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
@@ -106,10 +121,25 @@ func (b *PodStatusApplyConfiguration) WithHostIP(value string) *PodStatusApplyCo
 // WithHostIPs adds the given value to the HostIPs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the HostIPs field.
+// Deprecated: WithHostIPs does not replace existing list for atomic list type. Use WithNewHostIPs instead.
 func (b *PodStatusApplyConfiguration) WithHostIPs(values ...*HostIPApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithHostIPs")
+		}
+		b.HostIPs = append(b.HostIPs, *values[i])
+	}
+	return b
+}
+
+// WithNewHostIPs replaces the HostIPs field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the HostIPs field is set to the values of the last call.
+func (b *PodStatusApplyConfiguration) WithNewHostIPs(values ...*HostIPApplyConfiguration) *PodStatusApplyConfiguration {
+	b.HostIPs = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewHostIPs")
 		}
 		b.HostIPs = append(b.HostIPs, *values[i])
 	}
@@ -127,10 +157,25 @@ func (b *PodStatusApplyConfiguration) WithPodIP(value string) *PodStatusApplyCon
 // WithPodIPs adds the given value to the PodIPs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PodIPs field.
+// Deprecated: WithPodIPs does not replace existing list for atomic list type. Use WithNewPodIPs instead.
 func (b *PodStatusApplyConfiguration) WithPodIPs(values ...*PodIPApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithPodIPs")
+		}
+		b.PodIPs = append(b.PodIPs, *values[i])
+	}
+	return b
+}
+
+// WithNewPodIPs replaces the PodIPs field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the PodIPs field is set to the values of the last call.
+func (b *PodStatusApplyConfiguration) WithNewPodIPs(values ...*PodIPApplyConfiguration) *PodStatusApplyConfiguration {
+	b.PodIPs = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewPodIPs")
 		}
 		b.PodIPs = append(b.PodIPs, *values[i])
 	}
@@ -148,6 +193,7 @@ func (b *PodStatusApplyConfiguration) WithStartTime(value metav1.Time) *PodStatu
 // WithInitContainerStatuses adds the given value to the InitContainerStatuses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the InitContainerStatuses field.
+// Deprecated: WithInitContainerStatuses does not replace existing list for atomic list type. Use WithNewInitContainerStatuses instead.
 func (b *PodStatusApplyConfiguration) WithInitContainerStatuses(values ...*ContainerStatusApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -158,13 +204,42 @@ func (b *PodStatusApplyConfiguration) WithInitContainerStatuses(values ...*Conta
 	return b
 }
 
+// WithNewInitContainerStatuses replaces the InitContainerStatuses field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the InitContainerStatuses field is set to the values of the last call.
+func (b *PodStatusApplyConfiguration) WithNewInitContainerStatuses(values ...*ContainerStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	b.InitContainerStatuses = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewInitContainerStatuses")
+		}
+		b.InitContainerStatuses = append(b.InitContainerStatuses, *values[i])
+	}
+	return b
+}
+
 // WithContainerStatuses adds the given value to the ContainerStatuses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ContainerStatuses field.
+// Deprecated: WithContainerStatuses does not replace existing list for atomic list type. Use WithNewContainerStatuses instead.
 func (b *PodStatusApplyConfiguration) WithContainerStatuses(values ...*ContainerStatusApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithContainerStatuses")
+		}
+		b.ContainerStatuses = append(b.ContainerStatuses, *values[i])
+	}
+	return b
+}
+
+// WithNewContainerStatuses replaces the ContainerStatuses field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ContainerStatuses field is set to the values of the last call.
+func (b *PodStatusApplyConfiguration) WithNewContainerStatuses(values ...*ContainerStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	b.ContainerStatuses = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewContainerStatuses")
 		}
 		b.ContainerStatuses = append(b.ContainerStatuses, *values[i])
 	}
@@ -182,10 +257,25 @@ func (b *PodStatusApplyConfiguration) WithQOSClass(value v1.PodQOSClass) *PodSta
 // WithEphemeralContainerStatuses adds the given value to the EphemeralContainerStatuses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the EphemeralContainerStatuses field.
+// Deprecated: WithEphemeralContainerStatuses does not replace existing list for atomic list type. Use WithNewEphemeralContainerStatuses instead.
 func (b *PodStatusApplyConfiguration) WithEphemeralContainerStatuses(values ...*ContainerStatusApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithEphemeralContainerStatuses")
+		}
+		b.EphemeralContainerStatuses = append(b.EphemeralContainerStatuses, *values[i])
+	}
+	return b
+}
+
+// WithNewEphemeralContainerStatuses replaces the EphemeralContainerStatuses field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the EphemeralContainerStatuses field is set to the values of the last call.
+func (b *PodStatusApplyConfiguration) WithNewEphemeralContainerStatuses(values ...*ContainerStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	b.EphemeralContainerStatuses = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewEphemeralContainerStatuses")
 		}
 		b.EphemeralContainerStatuses = append(b.EphemeralContainerStatuses, *values[i])
 	}

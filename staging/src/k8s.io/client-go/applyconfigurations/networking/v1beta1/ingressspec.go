@@ -52,6 +52,7 @@ func (b *IngressSpecApplyConfiguration) WithBackend(value *IngressBackendApplyCo
 // WithTLS adds the given value to the TLS field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the TLS field.
+// Deprecated: WithTLS does not replace existing list for atomic list type. Use WithNewTLS instead.
 func (b *IngressSpecApplyConfiguration) WithTLS(values ...*IngressTLSApplyConfiguration) *IngressSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -62,13 +63,42 @@ func (b *IngressSpecApplyConfiguration) WithTLS(values ...*IngressTLSApplyConfig
 	return b
 }
 
+// WithNewTLS replaces the TLS field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the TLS field is set to the values of the last call.
+func (b *IngressSpecApplyConfiguration) WithNewTLS(values ...*IngressTLSApplyConfiguration) *IngressSpecApplyConfiguration {
+	b.TLS = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewTLS")
+		}
+		b.TLS = append(b.TLS, *values[i])
+	}
+	return b
+}
+
 // WithRules adds the given value to the Rules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Rules field.
+// Deprecated: WithRules does not replace existing list for atomic list type. Use WithNewRules instead.
 func (b *IngressSpecApplyConfiguration) WithRules(values ...*IngressRuleApplyConfiguration) *IngressSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithRules")
+		}
+		b.Rules = append(b.Rules, *values[i])
+	}
+	return b
+}
+
+// WithNewRules replaces the Rules field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Rules field is set to the values of the last call.
+func (b *IngressSpecApplyConfiguration) WithNewRules(values ...*IngressRuleApplyConfiguration) *IngressSpecApplyConfiguration {
+	b.Rules = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewRules")
 		}
 		b.Rules = append(b.Rules, *values[i])
 	}

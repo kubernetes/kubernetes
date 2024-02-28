@@ -66,10 +66,25 @@ func (b *CustomResourceDefinitionSpecApplyConfiguration) WithScope(value apiexte
 // WithVersions adds the given value to the Versions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Versions field.
+// Deprecated: WithVersions does not replace existing list for atomic list type. Use WithNewVersions instead.
 func (b *CustomResourceDefinitionSpecApplyConfiguration) WithVersions(values ...*CustomResourceDefinitionVersionApplyConfiguration) *CustomResourceDefinitionSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVersions")
+		}
+		b.Versions = append(b.Versions, *values[i])
+	}
+	return b
+}
+
+// WithNewVersions replaces the Versions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Versions field is set to the values of the last call.
+func (b *CustomResourceDefinitionSpecApplyConfiguration) WithNewVersions(values ...*CustomResourceDefinitionVersionApplyConfiguration) *CustomResourceDefinitionSpecApplyConfiguration {
+	b.Versions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVersions")
 		}
 		b.Versions = append(b.Versions, *values[i])
 	}

@@ -37,10 +37,20 @@ func FCVolumeSource() *FCVolumeSourceApplyConfiguration {
 // WithTargetWWNs adds the given value to the TargetWWNs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the TargetWWNs field.
+// Deprecated: WithTargetWWNs does not replace existing list for atomic list type. Use WithNewTargetWWNs instead.
 func (b *FCVolumeSourceApplyConfiguration) WithTargetWWNs(values ...string) *FCVolumeSourceApplyConfiguration {
 	for i := range values {
 		b.TargetWWNs = append(b.TargetWWNs, values[i])
 	}
+	return b
+}
+
+// WithNewTargetWWNs replaces the TargetWWNs field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the TargetWWNs field is set to the values of the last call.
+func (b *FCVolumeSourceApplyConfiguration) WithNewTargetWWNs(values ...string) *FCVolumeSourceApplyConfiguration {
+	b.TargetWWNs = make([]string, len(values))
+	copy(b.TargetWWNs, values)
 	return b
 }
 
@@ -71,9 +81,19 @@ func (b *FCVolumeSourceApplyConfiguration) WithReadOnly(value bool) *FCVolumeSou
 // WithWWIDs adds the given value to the WWIDs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the WWIDs field.
+// Deprecated: WithWWIDs does not replace existing list for atomic list type. Use WithNewWWIDs instead.
 func (b *FCVolumeSourceApplyConfiguration) WithWWIDs(values ...string) *FCVolumeSourceApplyConfiguration {
 	for i := range values {
 		b.WWIDs = append(b.WWIDs, values[i])
 	}
+	return b
+}
+
+// WithNewWWIDs replaces the WWIDs field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the WWIDs field is set to the values of the last call.
+func (b *FCVolumeSourceApplyConfiguration) WithNewWWIDs(values ...string) *FCVolumeSourceApplyConfiguration {
+	b.WWIDs = make([]string, len(values))
+	copy(b.WWIDs, values)
 	return b
 }

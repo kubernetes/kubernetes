@@ -75,6 +75,7 @@ func PodSpec() *PodSpecApplyConfiguration {
 // WithVolumes adds the given value to the Volumes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Volumes field.
+// Deprecated: WithVolumes does not replace existing list for atomic list type. Use WithNewVolumes instead.
 func (b *PodSpecApplyConfiguration) WithVolumes(values ...*VolumeApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -85,9 +86,24 @@ func (b *PodSpecApplyConfiguration) WithVolumes(values ...*VolumeApplyConfigurat
 	return b
 }
 
+// WithNewVolumes replaces the Volumes field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Volumes field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewVolumes(values ...*VolumeApplyConfiguration) *PodSpecApplyConfiguration {
+	b.Volumes = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewVolumes")
+		}
+		b.Volumes = append(b.Volumes, *values[i])
+	}
+	return b
+}
+
 // WithInitContainers adds the given value to the InitContainers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the InitContainers field.
+// Deprecated: WithInitContainers does not replace existing list for atomic list type. Use WithNewInitContainers instead.
 func (b *PodSpecApplyConfiguration) WithInitContainers(values ...*ContainerApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -98,9 +114,24 @@ func (b *PodSpecApplyConfiguration) WithInitContainers(values ...*ContainerApply
 	return b
 }
 
+// WithNewInitContainers replaces the InitContainers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the InitContainers field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewInitContainers(values ...*ContainerApplyConfiguration) *PodSpecApplyConfiguration {
+	b.InitContainers = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewInitContainers")
+		}
+		b.InitContainers = append(b.InitContainers, *values[i])
+	}
+	return b
+}
+
 // WithContainers adds the given value to the Containers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Containers field.
+// Deprecated: WithContainers does not replace existing list for atomic list type. Use WithNewContainers instead.
 func (b *PodSpecApplyConfiguration) WithContainers(values ...*ContainerApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -111,13 +142,42 @@ func (b *PodSpecApplyConfiguration) WithContainers(values ...*ContainerApplyConf
 	return b
 }
 
+// WithNewContainers replaces the Containers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Containers field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewContainers(values ...*ContainerApplyConfiguration) *PodSpecApplyConfiguration {
+	b.Containers = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewContainers")
+		}
+		b.Containers = append(b.Containers, *values[i])
+	}
+	return b
+}
+
 // WithEphemeralContainers adds the given value to the EphemeralContainers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the EphemeralContainers field.
+// Deprecated: WithEphemeralContainers does not replace existing list for atomic list type. Use WithNewEphemeralContainers instead.
 func (b *PodSpecApplyConfiguration) WithEphemeralContainers(values ...*EphemeralContainerApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithEphemeralContainers")
+		}
+		b.EphemeralContainers = append(b.EphemeralContainers, *values[i])
+	}
+	return b
+}
+
+// WithNewEphemeralContainers replaces the EphemeralContainers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the EphemeralContainers field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewEphemeralContainers(values ...*EphemeralContainerApplyConfiguration) *PodSpecApplyConfiguration {
+	b.EphemeralContainers = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewEphemeralContainers")
 		}
 		b.EphemeralContainers = append(b.EphemeralContainers, *values[i])
 	}
@@ -160,10 +220,22 @@ func (b *PodSpecApplyConfiguration) WithDNSPolicy(value corev1.DNSPolicy) *PodSp
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the NodeSelector field,
 // overwriting an existing map entries in NodeSelector field with the same key.
+// Deprecated: WithNodeSelector does not replace existing map for atomic map type. Use WithNewNodeSelector instead.
 func (b *PodSpecApplyConfiguration) WithNodeSelector(entries map[string]string) *PodSpecApplyConfiguration {
 	if b.NodeSelector == nil && len(entries) > 0 {
 		b.NodeSelector = make(map[string]string, len(entries))
 	}
+	for k, v := range entries {
+		b.NodeSelector[k] = v
+	}
+	return b
+}
+
+// WithNewNodeSelector replaces the NodeSelector field in the declarative configuration with given entries
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the NodeSelector field is set to the entries of the last call.
+func (b *PodSpecApplyConfiguration) WithNewNodeSelector(entries map[string]string) *PodSpecApplyConfiguration {
+	b.NodeSelector = make(map[string]string, len(entries))
 	for k, v := range entries {
 		b.NodeSelector[k] = v
 	}
@@ -245,10 +317,25 @@ func (b *PodSpecApplyConfiguration) WithSecurityContext(value *PodSecurityContex
 // WithImagePullSecrets adds the given value to the ImagePullSecrets field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ImagePullSecrets field.
+// Deprecated: WithImagePullSecrets does not replace existing list for atomic list type. Use WithNewImagePullSecrets instead.
 func (b *PodSpecApplyConfiguration) WithImagePullSecrets(values ...*LocalObjectReferenceApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithImagePullSecrets")
+		}
+		b.ImagePullSecrets = append(b.ImagePullSecrets, *values[i])
+	}
+	return b
+}
+
+// WithNewImagePullSecrets replaces the ImagePullSecrets field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ImagePullSecrets field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewImagePullSecrets(values ...*LocalObjectReferenceApplyConfiguration) *PodSpecApplyConfiguration {
+	b.ImagePullSecrets = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewImagePullSecrets")
 		}
 		b.ImagePullSecrets = append(b.ImagePullSecrets, *values[i])
 	}
@@ -290,6 +377,7 @@ func (b *PodSpecApplyConfiguration) WithSchedulerName(value string) *PodSpecAppl
 // WithTolerations adds the given value to the Tolerations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Tolerations field.
+// Deprecated: WithTolerations does not replace existing list for atomic list type. Use WithNewTolerations instead.
 func (b *PodSpecApplyConfiguration) WithTolerations(values ...*TolerationApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -300,13 +388,42 @@ func (b *PodSpecApplyConfiguration) WithTolerations(values ...*TolerationApplyCo
 	return b
 }
 
+// WithNewTolerations replaces the Tolerations field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Tolerations field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewTolerations(values ...*TolerationApplyConfiguration) *PodSpecApplyConfiguration {
+	b.Tolerations = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewTolerations")
+		}
+		b.Tolerations = append(b.Tolerations, *values[i])
+	}
+	return b
+}
+
 // WithHostAliases adds the given value to the HostAliases field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the HostAliases field.
+// Deprecated: WithHostAliases does not replace existing list for atomic list type. Use WithNewHostAliases instead.
 func (b *PodSpecApplyConfiguration) WithHostAliases(values ...*HostAliasApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithHostAliases")
+		}
+		b.HostAliases = append(b.HostAliases, *values[i])
+	}
+	return b
+}
+
+// WithNewHostAliases replaces the HostAliases field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the HostAliases field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewHostAliases(values ...*HostAliasApplyConfiguration) *PodSpecApplyConfiguration {
+	b.HostAliases = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewHostAliases")
 		}
 		b.HostAliases = append(b.HostAliases, *values[i])
 	}
@@ -340,10 +457,25 @@ func (b *PodSpecApplyConfiguration) WithDNSConfig(value *PodDNSConfigApplyConfig
 // WithReadinessGates adds the given value to the ReadinessGates field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ReadinessGates field.
+// Deprecated: WithReadinessGates does not replace existing list for atomic list type. Use WithNewReadinessGates instead.
 func (b *PodSpecApplyConfiguration) WithReadinessGates(values ...*PodReadinessGateApplyConfiguration) *PodSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithReadinessGates")
+		}
+		b.ReadinessGates = append(b.ReadinessGates, *values[i])
+	}
+	return b
+}
+
+// WithNewReadinessGates replaces the ReadinessGates field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ReadinessGates field is set to the values of the last call.
+func (b *PodSpecApplyConfiguration) WithNewReadinessGates(values ...*PodReadinessGateApplyConfiguration) *PodSpecApplyConfiguration {
+	b.ReadinessGates = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewReadinessGates")
 		}
 		b.ReadinessGates = append(b.ReadinessGates, *values[i])
 	}

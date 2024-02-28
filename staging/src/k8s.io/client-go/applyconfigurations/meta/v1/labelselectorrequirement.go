@@ -55,9 +55,19 @@ func (b *LabelSelectorRequirementApplyConfiguration) WithOperator(value v1.Label
 // WithValues adds the given value to the Values field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Values field.
+// Deprecated: WithValues does not replace existing list for atomic list type. Use WithNewValues instead.
 func (b *LabelSelectorRequirementApplyConfiguration) WithValues(values ...string) *LabelSelectorRequirementApplyConfiguration {
 	for i := range values {
 		b.Values = append(b.Values, values[i])
 	}
+	return b
+}
+
+// WithNewValues replaces the Values field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Values field is set to the values of the last call.
+func (b *LabelSelectorRequirementApplyConfiguration) WithNewValues(values ...string) *LabelSelectorRequirementApplyConfiguration {
+	b.Values = make([]string, len(values))
+	copy(b.Values, values)
 	return b
 }

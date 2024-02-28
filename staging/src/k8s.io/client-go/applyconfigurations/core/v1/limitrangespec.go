@@ -33,10 +33,25 @@ func LimitRangeSpec() *LimitRangeSpecApplyConfiguration {
 // WithLimits adds the given value to the Limits field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Limits field.
+// Deprecated: WithLimits does not replace existing list for atomic list type. Use WithNewLimits instead.
 func (b *LimitRangeSpecApplyConfiguration) WithLimits(values ...*LimitRangeItemApplyConfiguration) *LimitRangeSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithLimits")
+		}
+		b.Limits = append(b.Limits, *values[i])
+	}
+	return b
+}
+
+// WithNewLimits replaces the Limits field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Limits field is set to the values of the last call.
+func (b *LimitRangeSpecApplyConfiguration) WithNewLimits(values ...*LimitRangeItemApplyConfiguration) *LimitRangeSpecApplyConfiguration {
+	b.Limits = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewLimits")
 		}
 		b.Limits = append(b.Limits, *values[i])
 	}

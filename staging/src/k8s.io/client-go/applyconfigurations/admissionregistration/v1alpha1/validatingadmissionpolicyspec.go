@@ -59,10 +59,25 @@ func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithMatchConstraints(v
 // WithValidations adds the given value to the Validations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Validations field.
+// Deprecated: WithValidations does not replace existing list for atomic list type. Use WithNewValidations instead.
 func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithValidations(values ...*ValidationApplyConfiguration) *ValidatingAdmissionPolicySpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithValidations")
+		}
+		b.Validations = append(b.Validations, *values[i])
+	}
+	return b
+}
+
+// WithNewValidations replaces the Validations field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Validations field is set to the values of the last call.
+func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithNewValidations(values ...*ValidationApplyConfiguration) *ValidatingAdmissionPolicySpecApplyConfiguration {
+	b.Validations = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewValidations")
 		}
 		b.Validations = append(b.Validations, *values[i])
 	}
@@ -80,10 +95,25 @@ func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithFailurePolicy(valu
 // WithAuditAnnotations adds the given value to the AuditAnnotations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AuditAnnotations field.
+// Deprecated: WithAuditAnnotations does not replace existing list for atomic list type. Use WithNewAuditAnnotations instead.
 func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithAuditAnnotations(values ...*AuditAnnotationApplyConfiguration) *ValidatingAdmissionPolicySpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithAuditAnnotations")
+		}
+		b.AuditAnnotations = append(b.AuditAnnotations, *values[i])
+	}
+	return b
+}
+
+// WithNewAuditAnnotations replaces the AuditAnnotations field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the AuditAnnotations field is set to the values of the last call.
+func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithNewAuditAnnotations(values ...*AuditAnnotationApplyConfiguration) *ValidatingAdmissionPolicySpecApplyConfiguration {
+	b.AuditAnnotations = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewAuditAnnotations")
 		}
 		b.AuditAnnotations = append(b.AuditAnnotations, *values[i])
 	}

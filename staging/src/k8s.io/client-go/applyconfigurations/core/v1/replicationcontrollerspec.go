@@ -53,10 +53,22 @@ func (b *ReplicationControllerSpecApplyConfiguration) WithMinReadySeconds(value 
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Selector field,
 // overwriting an existing map entries in Selector field with the same key.
+// Deprecated: WithSelector does not replace existing map for atomic map type. Use WithNewSelector instead.
 func (b *ReplicationControllerSpecApplyConfiguration) WithSelector(entries map[string]string) *ReplicationControllerSpecApplyConfiguration {
 	if b.Selector == nil && len(entries) > 0 {
 		b.Selector = make(map[string]string, len(entries))
 	}
+	for k, v := range entries {
+		b.Selector[k] = v
+	}
+	return b
+}
+
+// WithNewSelector replaces the Selector field in the declarative configuration with given entries
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Selector field is set to the entries of the last call.
+func (b *ReplicationControllerSpecApplyConfiguration) WithNewSelector(entries map[string]string) *ReplicationControllerSpecApplyConfiguration {
+	b.Selector = make(map[string]string, len(entries))
 	for k, v := range entries {
 		b.Selector[k] = v
 	}

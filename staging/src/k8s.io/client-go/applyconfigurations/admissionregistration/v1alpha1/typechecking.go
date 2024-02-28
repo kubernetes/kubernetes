@@ -33,10 +33,25 @@ func TypeChecking() *TypeCheckingApplyConfiguration {
 // WithExpressionWarnings adds the given value to the ExpressionWarnings field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ExpressionWarnings field.
+// Deprecated: WithExpressionWarnings does not replace existing list for atomic list type. Use WithNewExpressionWarnings instead.
 func (b *TypeCheckingApplyConfiguration) WithExpressionWarnings(values ...*ExpressionWarningApplyConfiguration) *TypeCheckingApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithExpressionWarnings")
+		}
+		b.ExpressionWarnings = append(b.ExpressionWarnings, *values[i])
+	}
+	return b
+}
+
+// WithNewExpressionWarnings replaces the ExpressionWarnings field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ExpressionWarnings field is set to the values of the last call.
+func (b *TypeCheckingApplyConfiguration) WithNewExpressionWarnings(values ...*ExpressionWarningApplyConfiguration) *TypeCheckingApplyConfiguration {
+	b.ExpressionWarnings = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewExpressionWarnings")
 		}
 		b.ExpressionWarnings = append(b.ExpressionWarnings, *values[i])
 	}

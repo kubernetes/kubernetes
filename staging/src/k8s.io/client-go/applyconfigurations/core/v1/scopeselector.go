@@ -33,10 +33,25 @@ func ScopeSelector() *ScopeSelectorApplyConfiguration {
 // WithMatchExpressions adds the given value to the MatchExpressions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MatchExpressions field.
+// Deprecated: WithMatchExpressions does not replace existing list for atomic list type. Use WithNewMatchExpressions instead.
 func (b *ScopeSelectorApplyConfiguration) WithMatchExpressions(values ...*ScopedResourceSelectorRequirementApplyConfiguration) *ScopeSelectorApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithMatchExpressions")
+		}
+		b.MatchExpressions = append(b.MatchExpressions, *values[i])
+	}
+	return b
+}
+
+// WithNewMatchExpressions replaces the MatchExpressions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MatchExpressions field is set to the values of the last call.
+func (b *ScopeSelectorApplyConfiguration) WithNewMatchExpressions(values ...*ScopedResourceSelectorRequirementApplyConfiguration) *ScopeSelectorApplyConfiguration {
+	b.MatchExpressions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewMatchExpressions")
 		}
 		b.MatchExpressions = append(b.MatchExpressions, *values[i])
 	}

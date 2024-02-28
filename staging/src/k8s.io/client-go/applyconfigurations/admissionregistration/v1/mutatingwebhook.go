@@ -65,10 +65,25 @@ func (b *MutatingWebhookApplyConfiguration) WithClientConfig(value *WebhookClien
 // WithRules adds the given value to the Rules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Rules field.
+// Deprecated: WithRules does not replace existing list for atomic list type. Use WithNewRules instead.
 func (b *MutatingWebhookApplyConfiguration) WithRules(values ...*RuleWithOperationsApplyConfiguration) *MutatingWebhookApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithRules")
+		}
+		b.Rules = append(b.Rules, *values[i])
+	}
+	return b
+}
+
+// WithNewRules replaces the Rules field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Rules field is set to the values of the last call.
+func (b *MutatingWebhookApplyConfiguration) WithNewRules(values ...*RuleWithOperationsApplyConfiguration) *MutatingWebhookApplyConfiguration {
+	b.Rules = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewRules")
 		}
 		b.Rules = append(b.Rules, *values[i])
 	}
@@ -126,10 +141,20 @@ func (b *MutatingWebhookApplyConfiguration) WithTimeoutSeconds(value int32) *Mut
 // WithAdmissionReviewVersions adds the given value to the AdmissionReviewVersions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AdmissionReviewVersions field.
+// Deprecated: WithAdmissionReviewVersions does not replace existing list for atomic list type. Use WithNewAdmissionReviewVersions instead.
 func (b *MutatingWebhookApplyConfiguration) WithAdmissionReviewVersions(values ...string) *MutatingWebhookApplyConfiguration {
 	for i := range values {
 		b.AdmissionReviewVersions = append(b.AdmissionReviewVersions, values[i])
 	}
+	return b
+}
+
+// WithNewAdmissionReviewVersions replaces the AdmissionReviewVersions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the AdmissionReviewVersions field is set to the values of the last call.
+func (b *MutatingWebhookApplyConfiguration) WithNewAdmissionReviewVersions(values ...string) *MutatingWebhookApplyConfiguration {
+	b.AdmissionReviewVersions = make([]string, len(values))
+	copy(b.AdmissionReviewVersions, values)
 	return b
 }
 

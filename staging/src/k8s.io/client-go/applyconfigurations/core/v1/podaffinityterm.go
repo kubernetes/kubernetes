@@ -50,10 +50,20 @@ func (b *PodAffinityTermApplyConfiguration) WithLabelSelector(value *v1.LabelSel
 // WithNamespaces adds the given value to the Namespaces field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Namespaces field.
+// Deprecated: WithNamespaces does not replace existing list for atomic list type. Use WithNewNamespaces instead.
 func (b *PodAffinityTermApplyConfiguration) WithNamespaces(values ...string) *PodAffinityTermApplyConfiguration {
 	for i := range values {
 		b.Namespaces = append(b.Namespaces, values[i])
 	}
+	return b
+}
+
+// WithNewNamespaces replaces the Namespaces field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Namespaces field is set to the values of the last call.
+func (b *PodAffinityTermApplyConfiguration) WithNewNamespaces(values ...string) *PodAffinityTermApplyConfiguration {
+	b.Namespaces = make([]string, len(values))
+	copy(b.Namespaces, values)
 	return b
 }
 
@@ -76,6 +86,7 @@ func (b *PodAffinityTermApplyConfiguration) WithNamespaceSelector(value *v1.Labe
 // WithMatchLabelKeys adds the given value to the MatchLabelKeys field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MatchLabelKeys field.
+// Deprecated: WithMatchLabelKeys does not replace existing list for atomic list type. Use WithNewMatchLabelKeys instead.
 func (b *PodAffinityTermApplyConfiguration) WithMatchLabelKeys(values ...string) *PodAffinityTermApplyConfiguration {
 	for i := range values {
 		b.MatchLabelKeys = append(b.MatchLabelKeys, values[i])
@@ -83,12 +94,31 @@ func (b *PodAffinityTermApplyConfiguration) WithMatchLabelKeys(values ...string)
 	return b
 }
 
+// WithNewMatchLabelKeys replaces the MatchLabelKeys field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MatchLabelKeys field is set to the values of the last call.
+func (b *PodAffinityTermApplyConfiguration) WithNewMatchLabelKeys(values ...string) *PodAffinityTermApplyConfiguration {
+	b.MatchLabelKeys = make([]string, len(values))
+	copy(b.MatchLabelKeys, values)
+	return b
+}
+
 // WithMismatchLabelKeys adds the given value to the MismatchLabelKeys field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MismatchLabelKeys field.
+// Deprecated: WithMismatchLabelKeys does not replace existing list for atomic list type. Use WithNewMismatchLabelKeys instead.
 func (b *PodAffinityTermApplyConfiguration) WithMismatchLabelKeys(values ...string) *PodAffinityTermApplyConfiguration {
 	for i := range values {
 		b.MismatchLabelKeys = append(b.MismatchLabelKeys, values[i])
 	}
+	return b
+}
+
+// WithNewMismatchLabelKeys replaces the MismatchLabelKeys field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the MismatchLabelKeys field is set to the values of the last call.
+func (b *PodAffinityTermApplyConfiguration) WithNewMismatchLabelKeys(values ...string) *PodAffinityTermApplyConfiguration {
+	b.MismatchLabelKeys = make([]string, len(values))
+	copy(b.MismatchLabelKeys, values)
 	return b
 }

@@ -69,10 +69,22 @@ func (b *ServiceSpecApplyConfiguration) WithPorts(values ...*ServicePortApplyCon
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Selector field,
 // overwriting an existing map entries in Selector field with the same key.
+// Deprecated: WithSelector does not replace existing map for atomic map type. Use WithNewSelector instead.
 func (b *ServiceSpecApplyConfiguration) WithSelector(entries map[string]string) *ServiceSpecApplyConfiguration {
 	if b.Selector == nil && len(entries) > 0 {
 		b.Selector = make(map[string]string, len(entries))
 	}
+	for k, v := range entries {
+		b.Selector[k] = v
+	}
+	return b
+}
+
+// WithNewSelector replaces the Selector field in the declarative configuration with given entries
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Selector field is set to the entries of the last call.
+func (b *ServiceSpecApplyConfiguration) WithNewSelector(entries map[string]string) *ServiceSpecApplyConfiguration {
+	b.Selector = make(map[string]string, len(entries))
 	for k, v := range entries {
 		b.Selector[k] = v
 	}
@@ -90,10 +102,20 @@ func (b *ServiceSpecApplyConfiguration) WithClusterIP(value string) *ServiceSpec
 // WithClusterIPs adds the given value to the ClusterIPs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ClusterIPs field.
+// Deprecated: WithClusterIPs does not replace existing list for atomic list type. Use WithNewClusterIPs instead.
 func (b *ServiceSpecApplyConfiguration) WithClusterIPs(values ...string) *ServiceSpecApplyConfiguration {
 	for i := range values {
 		b.ClusterIPs = append(b.ClusterIPs, values[i])
 	}
+	return b
+}
+
+// WithNewClusterIPs replaces the ClusterIPs field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ClusterIPs field is set to the values of the last call.
+func (b *ServiceSpecApplyConfiguration) WithNewClusterIPs(values ...string) *ServiceSpecApplyConfiguration {
+	b.ClusterIPs = make([]string, len(values))
+	copy(b.ClusterIPs, values)
 	return b
 }
 
@@ -108,10 +130,20 @@ func (b *ServiceSpecApplyConfiguration) WithType(value corev1.ServiceType) *Serv
 // WithExternalIPs adds the given value to the ExternalIPs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ExternalIPs field.
+// Deprecated: WithExternalIPs does not replace existing list for atomic list type. Use WithNewExternalIPs instead.
 func (b *ServiceSpecApplyConfiguration) WithExternalIPs(values ...string) *ServiceSpecApplyConfiguration {
 	for i := range values {
 		b.ExternalIPs = append(b.ExternalIPs, values[i])
 	}
+	return b
+}
+
+// WithNewExternalIPs replaces the ExternalIPs field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ExternalIPs field is set to the values of the last call.
+func (b *ServiceSpecApplyConfiguration) WithNewExternalIPs(values ...string) *ServiceSpecApplyConfiguration {
+	b.ExternalIPs = make([]string, len(values))
+	copy(b.ExternalIPs, values)
 	return b
 }
 
@@ -134,10 +166,20 @@ func (b *ServiceSpecApplyConfiguration) WithLoadBalancerIP(value string) *Servic
 // WithLoadBalancerSourceRanges adds the given value to the LoadBalancerSourceRanges field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the LoadBalancerSourceRanges field.
+// Deprecated: WithLoadBalancerSourceRanges does not replace existing list for atomic list type. Use WithNewLoadBalancerSourceRanges instead.
 func (b *ServiceSpecApplyConfiguration) WithLoadBalancerSourceRanges(values ...string) *ServiceSpecApplyConfiguration {
 	for i := range values {
 		b.LoadBalancerSourceRanges = append(b.LoadBalancerSourceRanges, values[i])
 	}
+	return b
+}
+
+// WithNewLoadBalancerSourceRanges replaces the LoadBalancerSourceRanges field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the LoadBalancerSourceRanges field is set to the values of the last call.
+func (b *ServiceSpecApplyConfiguration) WithNewLoadBalancerSourceRanges(values ...string) *ServiceSpecApplyConfiguration {
+	b.LoadBalancerSourceRanges = make([]string, len(values))
+	copy(b.LoadBalancerSourceRanges, values)
 	return b
 }
 
@@ -184,10 +226,20 @@ func (b *ServiceSpecApplyConfiguration) WithSessionAffinityConfig(value *Session
 // WithIPFamilies adds the given value to the IPFamilies field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the IPFamilies field.
+// Deprecated: WithIPFamilies does not replace existing list for atomic list type. Use WithNewIPFamilies instead.
 func (b *ServiceSpecApplyConfiguration) WithIPFamilies(values ...corev1.IPFamily) *ServiceSpecApplyConfiguration {
 	for i := range values {
 		b.IPFamilies = append(b.IPFamilies, values[i])
 	}
+	return b
+}
+
+// WithNewIPFamilies replaces the IPFamilies field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the IPFamilies field is set to the values of the last call.
+func (b *ServiceSpecApplyConfiguration) WithNewIPFamilies(values ...corev1.IPFamily) *ServiceSpecApplyConfiguration {
+	b.IPFamilies = make([]corev1.IPFamily, len(values))
+	copy(b.IPFamilies, values)
 	return b
 }
 

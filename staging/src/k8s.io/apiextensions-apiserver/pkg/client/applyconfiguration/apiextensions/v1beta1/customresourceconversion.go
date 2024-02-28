@@ -55,9 +55,19 @@ func (b *CustomResourceConversionApplyConfiguration) WithWebhookClientConfig(val
 // WithConversionReviewVersions adds the given value to the ConversionReviewVersions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ConversionReviewVersions field.
+// Deprecated: WithConversionReviewVersions does not replace existing list for atomic list type. Use WithNewConversionReviewVersions instead.
 func (b *CustomResourceConversionApplyConfiguration) WithConversionReviewVersions(values ...string) *CustomResourceConversionApplyConfiguration {
 	for i := range values {
 		b.ConversionReviewVersions = append(b.ConversionReviewVersions, values[i])
 	}
+	return b
+}
+
+// WithNewConversionReviewVersions replaces the ConversionReviewVersions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ConversionReviewVersions field is set to the values of the last call.
+func (b *CustomResourceConversionApplyConfiguration) WithNewConversionReviewVersions(values ...string) *CustomResourceConversionApplyConfiguration {
+	b.ConversionReviewVersions = make([]string, len(values))
+	copy(b.ConversionReviewVersions, values)
 	return b
 }

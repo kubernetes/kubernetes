@@ -38,10 +38,20 @@ func CephFSVolumeSource() *CephFSVolumeSourceApplyConfiguration {
 // WithMonitors adds the given value to the Monitors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Monitors field.
+// Deprecated: WithMonitors does not replace existing list for atomic list type. Use WithNewMonitors instead.
 func (b *CephFSVolumeSourceApplyConfiguration) WithMonitors(values ...string) *CephFSVolumeSourceApplyConfiguration {
 	for i := range values {
 		b.Monitors = append(b.Monitors, values[i])
 	}
+	return b
+}
+
+// WithNewMonitors replaces the Monitors field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Monitors field is set to the values of the last call.
+func (b *CephFSVolumeSourceApplyConfiguration) WithNewMonitors(values ...string) *CephFSVolumeSourceApplyConfiguration {
+	b.Monitors = make([]string, len(values))
+	copy(b.Monitors, values)
 	return b
 }
 

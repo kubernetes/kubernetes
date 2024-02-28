@@ -91,10 +91,20 @@ func (b *ISCSIVolumeSourceApplyConfiguration) WithReadOnly(value bool) *ISCSIVol
 // WithPortals adds the given value to the Portals field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Portals field.
+// Deprecated: WithPortals does not replace existing list for atomic list type. Use WithNewPortals instead.
 func (b *ISCSIVolumeSourceApplyConfiguration) WithPortals(values ...string) *ISCSIVolumeSourceApplyConfiguration {
 	for i := range values {
 		b.Portals = append(b.Portals, values[i])
 	}
+	return b
+}
+
+// WithNewPortals replaces the Portals field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Portals field is set to the values of the last call.
+func (b *ISCSIVolumeSourceApplyConfiguration) WithNewPortals(values ...string) *ISCSIVolumeSourceApplyConfiguration {
+	b.Portals = make([]string, len(values))
+	copy(b.Portals, values)
 	return b
 }
 

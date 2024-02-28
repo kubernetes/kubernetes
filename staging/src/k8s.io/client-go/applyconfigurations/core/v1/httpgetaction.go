@@ -74,10 +74,25 @@ func (b *HTTPGetActionApplyConfiguration) WithScheme(value v1.URIScheme) *HTTPGe
 // WithHTTPHeaders adds the given value to the HTTPHeaders field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the HTTPHeaders field.
+// Deprecated: WithHTTPHeaders does not replace existing list for atomic list type. Use WithNewHTTPHeaders instead.
 func (b *HTTPGetActionApplyConfiguration) WithHTTPHeaders(values ...*HTTPHeaderApplyConfiguration) *HTTPGetActionApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithHTTPHeaders")
+		}
+		b.HTTPHeaders = append(b.HTTPHeaders, *values[i])
+	}
+	return b
+}
+
+// WithNewHTTPHeaders replaces the HTTPHeaders field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the HTTPHeaders field is set to the values of the last call.
+func (b *HTTPGetActionApplyConfiguration) WithNewHTTPHeaders(values ...*HTTPHeaderApplyConfiguration) *HTTPGetActionApplyConfiguration {
+	b.HTTPHeaders = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewHTTPHeaders")
 		}
 		b.HTTPHeaders = append(b.HTTPHeaders, *values[i])
 	}

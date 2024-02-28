@@ -39,6 +39,7 @@ func Scheduling() *SchedulingApplyConfiguration {
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the NodeSelector field,
 // overwriting an existing map entries in NodeSelector field with the same key.
+// Deprecated: WithNodeSelector does not replace existing map for atomic map type. Use WithNewNodeSelector instead.
 func (b *SchedulingApplyConfiguration) WithNodeSelector(entries map[string]string) *SchedulingApplyConfiguration {
 	if b.NodeSelector == nil && len(entries) > 0 {
 		b.NodeSelector = make(map[string]string, len(entries))
@@ -49,13 +50,39 @@ func (b *SchedulingApplyConfiguration) WithNodeSelector(entries map[string]strin
 	return b
 }
 
+// WithNewNodeSelector replaces the NodeSelector field in the declarative configuration with given entries
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the NodeSelector field is set to the entries of the last call.
+func (b *SchedulingApplyConfiguration) WithNewNodeSelector(entries map[string]string) *SchedulingApplyConfiguration {
+	b.NodeSelector = make(map[string]string, len(entries))
+	for k, v := range entries {
+		b.NodeSelector[k] = v
+	}
+	return b
+}
+
 // WithTolerations adds the given value to the Tolerations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Tolerations field.
+// Deprecated: WithTolerations does not replace existing list for atomic list type. Use WithNewTolerations instead.
 func (b *SchedulingApplyConfiguration) WithTolerations(values ...*v1.TolerationApplyConfiguration) *SchedulingApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTolerations")
+		}
+		b.Tolerations = append(b.Tolerations, *values[i])
+	}
+	return b
+}
+
+// WithNewTolerations replaces the Tolerations field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Tolerations field is set to the values of the last call.
+func (b *SchedulingApplyConfiguration) WithNewTolerations(values ...*v1.TolerationApplyConfiguration) *SchedulingApplyConfiguration {
+	b.Tolerations = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewTolerations")
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
 	}

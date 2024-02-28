@@ -38,6 +38,7 @@ func RuleWithOperations() *RuleWithOperationsApplyConfiguration {
 // WithOperations adds the given value to the Operations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Operations field.
+// Deprecated: WithOperations does not replace existing list for atomic list type. Use WithNewOperations instead.
 func (b *RuleWithOperationsApplyConfiguration) WithOperations(values ...v1.OperationType) *RuleWithOperationsApplyConfiguration {
 	for i := range values {
 		b.Operations = append(b.Operations, values[i])
@@ -45,9 +46,19 @@ func (b *RuleWithOperationsApplyConfiguration) WithOperations(values ...v1.Opera
 	return b
 }
 
+// WithNewOperations replaces the Operations field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Operations field is set to the values of the last call.
+func (b *RuleWithOperationsApplyConfiguration) WithNewOperations(values ...v1.OperationType) *RuleWithOperationsApplyConfiguration {
+	b.Operations = make([]v1.OperationType, len(values))
+	copy(b.Operations, values)
+	return b
+}
+
 // WithAPIGroups adds the given value to the APIGroups field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the APIGroups field.
+// Deprecated: WithAPIGroups does not replace existing list for atomic list type. Use WithNewAPIGroups instead.
 func (b *RuleWithOperationsApplyConfiguration) WithAPIGroups(values ...string) *RuleWithOperationsApplyConfiguration {
 	for i := range values {
 		b.APIGroups = append(b.APIGroups, values[i])
@@ -55,9 +66,19 @@ func (b *RuleWithOperationsApplyConfiguration) WithAPIGroups(values ...string) *
 	return b
 }
 
+// WithNewAPIGroups replaces the APIGroups field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the APIGroups field is set to the values of the last call.
+func (b *RuleWithOperationsApplyConfiguration) WithNewAPIGroups(values ...string) *RuleWithOperationsApplyConfiguration {
+	b.APIGroups = make([]string, len(values))
+	copy(b.APIGroups, values)
+	return b
+}
+
 // WithAPIVersions adds the given value to the APIVersions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the APIVersions field.
+// Deprecated: WithAPIVersions does not replace existing list for atomic list type. Use WithNewAPIVersions instead.
 func (b *RuleWithOperationsApplyConfiguration) WithAPIVersions(values ...string) *RuleWithOperationsApplyConfiguration {
 	for i := range values {
 		b.APIVersions = append(b.APIVersions, values[i])
@@ -65,13 +86,32 @@ func (b *RuleWithOperationsApplyConfiguration) WithAPIVersions(values ...string)
 	return b
 }
 
+// WithNewAPIVersions replaces the APIVersions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the APIVersions field is set to the values of the last call.
+func (b *RuleWithOperationsApplyConfiguration) WithNewAPIVersions(values ...string) *RuleWithOperationsApplyConfiguration {
+	b.APIVersions = make([]string, len(values))
+	copy(b.APIVersions, values)
+	return b
+}
+
 // WithResources adds the given value to the Resources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Resources field.
+// Deprecated: WithResources does not replace existing list for atomic list type. Use WithNewResources instead.
 func (b *RuleWithOperationsApplyConfiguration) WithResources(values ...string) *RuleWithOperationsApplyConfiguration {
 	for i := range values {
 		b.Resources = append(b.Resources, values[i])
 	}
+	return b
+}
+
+// WithNewResources replaces the Resources field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Resources field is set to the values of the last call.
+func (b *RuleWithOperationsApplyConfiguration) WithNewResources(values ...string) *RuleWithOperationsApplyConfiguration {
+	b.Resources = make([]string, len(values))
+	copy(b.Resources, values)
 	return b
 }
 

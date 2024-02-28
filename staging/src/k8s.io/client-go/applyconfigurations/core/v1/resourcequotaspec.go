@@ -47,10 +47,20 @@ func (b *ResourceQuotaSpecApplyConfiguration) WithHard(value v1.ResourceList) *R
 // WithScopes adds the given value to the Scopes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Scopes field.
+// Deprecated: WithScopes does not replace existing list for atomic list type. Use WithNewScopes instead.
 func (b *ResourceQuotaSpecApplyConfiguration) WithScopes(values ...v1.ResourceQuotaScope) *ResourceQuotaSpecApplyConfiguration {
 	for i := range values {
 		b.Scopes = append(b.Scopes, values[i])
 	}
+	return b
+}
+
+// WithNewScopes replaces the Scopes field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Scopes field is set to the values of the last call.
+func (b *ResourceQuotaSpecApplyConfiguration) WithNewScopes(values ...v1.ResourceQuotaScope) *ResourceQuotaSpecApplyConfiguration {
+	b.Scopes = make([]v1.ResourceQuotaScope, len(values))
+	copy(b.Scopes, values)
 	return b
 }
 

@@ -40,10 +40,20 @@ func RBDPersistentVolumeSource() *RBDPersistentVolumeSourceApplyConfiguration {
 // WithCephMonitors adds the given value to the CephMonitors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the CephMonitors field.
+// Deprecated: WithCephMonitors does not replace existing list for atomic list type. Use WithNewCephMonitors instead.
 func (b *RBDPersistentVolumeSourceApplyConfiguration) WithCephMonitors(values ...string) *RBDPersistentVolumeSourceApplyConfiguration {
 	for i := range values {
 		b.CephMonitors = append(b.CephMonitors, values[i])
 	}
+	return b
+}
+
+// WithNewCephMonitors replaces the CephMonitors field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the CephMonitors field is set to the values of the last call.
+func (b *RBDPersistentVolumeSourceApplyConfiguration) WithNewCephMonitors(values ...string) *RBDPersistentVolumeSourceApplyConfiguration {
+	b.CephMonitors = make([]string, len(values))
+	copy(b.CephMonitors, values)
 	return b
 }
 

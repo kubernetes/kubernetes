@@ -33,10 +33,25 @@ func IngressLoadBalancerStatus() *IngressLoadBalancerStatusApplyConfiguration {
 // WithIngress adds the given value to the Ingress field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Ingress field.
+// Deprecated: WithIngress does not replace existing list for atomic list type. Use WithNewIngress instead.
 func (b *IngressLoadBalancerStatusApplyConfiguration) WithIngress(values ...*IngressLoadBalancerIngressApplyConfiguration) *IngressLoadBalancerStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithIngress")
+		}
+		b.Ingress = append(b.Ingress, *values[i])
+	}
+	return b
+}
+
+// WithNewIngress replaces the Ingress field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Ingress field is set to the values of the last call.
+func (b *IngressLoadBalancerStatusApplyConfiguration) WithNewIngress(values ...*IngressLoadBalancerIngressApplyConfiguration) *IngressLoadBalancerStatusApplyConfiguration {
+	b.Ingress = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewIngress")
 		}
 		b.Ingress = append(b.Ingress, *values[i])
 	}

@@ -93,9 +93,19 @@ func (b *DeleteOptionsApplyConfiguration) WithPropagationPolicy(value metav1.Del
 // WithDryRun adds the given value to the DryRun field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the DryRun field.
+// Deprecated: WithDryRun does not replace existing list for atomic list type. Use WithNewDryRun instead.
 func (b *DeleteOptionsApplyConfiguration) WithDryRun(values ...string) *DeleteOptionsApplyConfiguration {
 	for i := range values {
 		b.DryRun = append(b.DryRun, values[i])
 	}
+	return b
+}
+
+// WithNewDryRun replaces the DryRun field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the DryRun field is set to the values of the last call.
+func (b *DeleteOptionsApplyConfiguration) WithNewDryRun(values ...string) *DeleteOptionsApplyConfiguration {
+	b.DryRun = make([]string, len(values))
+	copy(b.DryRun, values)
 	return b
 }

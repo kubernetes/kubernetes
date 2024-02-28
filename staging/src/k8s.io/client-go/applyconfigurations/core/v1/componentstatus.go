@@ -210,6 +210,7 @@ func (b *ComponentStatusApplyConfiguration) WithAnnotations(entries map[string]s
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
+// Deprecated: WithOwnerReferences does not replace existing list for atomic list type. Use WithNewOwnerReferences instead.
 func (b *ComponentStatusApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
@@ -221,14 +222,40 @@ func (b *ComponentStatusApplyConfiguration) WithOwnerReferences(values ...*v1.Ow
 	return b
 }
 
+// WithNewOwnerReferences replaces the OwnerReferences field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the OwnerReferences field is set to the values of the last call.
+func (b *ComponentStatusApplyConfiguration) WithNewOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ComponentStatusApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.OwnerReferences = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewOwnerReferences")
+		}
+		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+	}
+	return b
+}
+
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
+// Deprecated: WithFinalizers does not replace existing list for atomic list type. Use WithNewFinalizers instead.
 func (b *ComponentStatusApplyConfiguration) WithFinalizers(values ...string) *ComponentStatusApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
+	return b
+}
+
+// WithNewFinalizers replaces the Finalizers field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Finalizers field is set to the values of the last call.
+func (b *ComponentStatusApplyConfiguration) WithNewFinalizers(values ...string) *ComponentStatusApplyConfiguration {
+	b.ensureObjectMetaApplyConfigurationExists()
+	b.Finalizers = make([]string, len(values))
+	copy(b.Finalizers, values)
 	return b
 }
 
@@ -241,10 +268,25 @@ func (b *ComponentStatusApplyConfiguration) ensureObjectMetaApplyConfigurationEx
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
+// Deprecated: WithConditions does not replace existing list for atomic list type. Use WithNewConditions instead.
 func (b *ComponentStatusApplyConfiguration) WithConditions(values ...*ComponentConditionApplyConfiguration) *ComponentStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")
+		}
+		b.Conditions = append(b.Conditions, *values[i])
+	}
+	return b
+}
+
+// WithNewConditions replaces the Conditions field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Conditions field is set to the values of the last call.
+func (b *ComponentStatusApplyConfiguration) WithNewConditions(values ...*ComponentConditionApplyConfiguration) *ComponentStatusApplyConfiguration {
+	b.Conditions = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewConditions")
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}

@@ -42,10 +42,25 @@ func (b *NodeAffinityApplyConfiguration) WithRequiredDuringSchedulingIgnoredDuri
 // WithPreferredDuringSchedulingIgnoredDuringExecution adds the given value to the PreferredDuringSchedulingIgnoredDuringExecution field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PreferredDuringSchedulingIgnoredDuringExecution field.
+// Deprecated: WithPreferredDuringSchedulingIgnoredDuringExecution does not replace existing list for atomic list type. Use WithNewPreferredDuringSchedulingIgnoredDuringExecution instead.
 func (b *NodeAffinityApplyConfiguration) WithPreferredDuringSchedulingIgnoredDuringExecution(values ...*PreferredSchedulingTermApplyConfiguration) *NodeAffinityApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithPreferredDuringSchedulingIgnoredDuringExecution")
+		}
+		b.PreferredDuringSchedulingIgnoredDuringExecution = append(b.PreferredDuringSchedulingIgnoredDuringExecution, *values[i])
+	}
+	return b
+}
+
+// WithNewPreferredDuringSchedulingIgnoredDuringExecution replaces the PreferredDuringSchedulingIgnoredDuringExecution field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the PreferredDuringSchedulingIgnoredDuringExecution field is set to the values of the last call.
+func (b *NodeAffinityApplyConfiguration) WithNewPreferredDuringSchedulingIgnoredDuringExecution(values ...*PreferredSchedulingTermApplyConfiguration) *NodeAffinityApplyConfiguration {
+	b.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewPreferredDuringSchedulingIgnoredDuringExecution")
 		}
 		b.PreferredDuringSchedulingIgnoredDuringExecution = append(b.PreferredDuringSchedulingIgnoredDuringExecution, *values[i])
 	}

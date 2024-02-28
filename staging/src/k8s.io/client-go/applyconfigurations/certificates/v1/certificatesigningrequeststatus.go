@@ -47,9 +47,19 @@ func (b *CertificateSigningRequestStatusApplyConfiguration) WithConditions(value
 // WithCertificate adds the given value to the Certificate field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Certificate field.
+// Deprecated: WithCertificate does not replace existing list for atomic list type. Use WithNewCertificate instead.
 func (b *CertificateSigningRequestStatusApplyConfiguration) WithCertificate(values ...byte) *CertificateSigningRequestStatusApplyConfiguration {
 	for i := range values {
 		b.Certificate = append(b.Certificate, values[i])
 	}
+	return b
+}
+
+// WithNewCertificate replaces the Certificate field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the Certificate field is set to the values of the last call.
+func (b *CertificateSigningRequestStatusApplyConfiguration) WithNewCertificate(values ...byte) *CertificateSigningRequestStatusApplyConfiguration {
+	b.Certificate = make([]byte, len(values))
+	copy(b.Certificate, values)
 	return b
 }

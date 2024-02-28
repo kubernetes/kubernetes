@@ -58,6 +58,7 @@ func (b *MatchResourcesApplyConfiguration) WithObjectSelector(value *v1.LabelSel
 // WithResourceRules adds the given value to the ResourceRules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ResourceRules field.
+// Deprecated: WithResourceRules does not replace existing list for atomic list type. Use WithNewResourceRules instead.
 func (b *MatchResourcesApplyConfiguration) WithResourceRules(values ...*NamedRuleWithOperationsApplyConfiguration) *MatchResourcesApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
@@ -68,13 +69,42 @@ func (b *MatchResourcesApplyConfiguration) WithResourceRules(values ...*NamedRul
 	return b
 }
 
+// WithNewResourceRules replaces the ResourceRules field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ResourceRules field is set to the values of the last call.
+func (b *MatchResourcesApplyConfiguration) WithNewResourceRules(values ...*NamedRuleWithOperationsApplyConfiguration) *MatchResourcesApplyConfiguration {
+	b.ResourceRules = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewResourceRules")
+		}
+		b.ResourceRules = append(b.ResourceRules, *values[i])
+	}
+	return b
+}
+
 // WithExcludeResourceRules adds the given value to the ExcludeResourceRules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ExcludeResourceRules field.
+// Deprecated: WithExcludeResourceRules does not replace existing list for atomic list type. Use WithNewExcludeResourceRules instead.
 func (b *MatchResourcesApplyConfiguration) WithExcludeResourceRules(values ...*NamedRuleWithOperationsApplyConfiguration) *MatchResourcesApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithExcludeResourceRules")
+		}
+		b.ExcludeResourceRules = append(b.ExcludeResourceRules, *values[i])
+	}
+	return b
+}
+
+// WithNewExcludeResourceRules replaces the ExcludeResourceRules field in the declarative configuration with given values
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the ExcludeResourceRules field is set to the values of the last call.
+func (b *MatchResourcesApplyConfiguration) WithNewExcludeResourceRules(values ...*NamedRuleWithOperationsApplyConfiguration) *MatchResourcesApplyConfiguration {
+	b.ExcludeResourceRules = nil
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNewExcludeResourceRules")
 		}
 		b.ExcludeResourceRules = append(b.ExcludeResourceRules, *values[i])
 	}
