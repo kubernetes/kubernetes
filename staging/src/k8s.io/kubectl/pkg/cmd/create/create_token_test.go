@@ -219,7 +219,7 @@ status:
 			test:         "invalid duration",
 			name:         "mysa",
 			duration:     -1,
-			expectStderr: `error: --duration must be positive`,
+			expectStderr: `error: --duration must be greater than or equal to 0`,
 		},
 		{
 			test:         "invalid duration unit",
@@ -243,7 +243,22 @@ status:
 			serverResponseToken: "abc",
 			expectStdout:        "abc",
 		},
+		{
+			test: "zero duration act as default",
+			name: "mysa",
 
+			duration: 0 * time.Second,
+
+			expectRequestPath: "/api/v1/namespaces/test/serviceaccounts/mysa/token",
+			expectTokenRequest: &authenticationv1.TokenRequest{
+				TypeMeta: metav1.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenRequest"},
+				Spec: authenticationv1.TokenRequestSpec{
+					ExpirationSeconds: nil,
+				},
+			},
+			serverResponseToken: "abc",
+			expectStdout:        "abc",
+		},
 		{
 			test: "server error",
 			name: "mysa",
