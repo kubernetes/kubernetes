@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -256,7 +256,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				// this is a relative dir, which will not work under gomodules.
 				// join with the local package path, but warn
 				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
-				inputPath = filepath.Join(pkg.Path, inputTags[0])
+				inputPath = path.Join(pkg.Path, inputTags[0])
 			}
 
 			klog.V(5).Infof("  input pkg %v", inputPath)
@@ -409,7 +409,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 		targets = append(targets,
 			&generator.SimpleTarget{
-				PkgName:       filepath.Base(pkg.Path),
+				PkgName:       path.Base(pkg.Path),
 				PkgPath:       pkg.Path,
 				PkgDir:        pkg.Dir, // output pkg is the same as the input
 				HeaderComment: boilerplate,

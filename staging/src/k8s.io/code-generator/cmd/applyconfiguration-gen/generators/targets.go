@@ -161,7 +161,7 @@ func typeName(t *types.Type) string {
 
 func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir string, boilerplate []byte, gv clientgentypes.GroupVersion, typesToGenerate []applyConfig, refs refGraph, models *typeModels) generator.Target {
 	outputDir := filepath.Join(outputDirBase, pkgSubdir)
-	outputPkg := filepath.Join(outputPkgBase, pkgSubdir)
+	outputPkg := path.Join(outputPkgBase, pkgSubdir)
 
 	return &generator.SimpleTarget{
 		PkgName:       gv.Version.PackageName(),
@@ -199,7 +199,7 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 
 func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, applyConfigsForGroupVersion map[clientgentypes.GroupVersion][]applyConfig, groupGoNames map[string]string) generator.Target {
 	return &generator.SimpleTarget{
-		PkgName:       filepath.Base(outputPkgBase),
+		PkgName:       path.Base(outputPkgBase),
 		PkgPath:       outputPkgBase,
 		PkgDir:        outputDirBase,
 		HeaderComment: boilerplate,
@@ -221,9 +221,9 @@ func targetForUtils(outputDirBase, outputPkgBase string, boilerplate []byte, gro
 
 func targetForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, models *typeModels) generator.Target {
 	outputDir := filepath.Join(outputDirBase, "internal")
-	outputPkg := filepath.Join(outputPkgBase, "internal")
+	outputPkg := path.Join(outputPkgBase, "internal")
 	return &generator.SimpleTarget{
-		PkgName:       filepath.Base(outputPkg),
+		PkgName:       path.Base(outputPkg),
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,
 		HeaderComment: boilerplate,
@@ -263,7 +263,7 @@ func packageTypesForInputs(context *generator.Context, outPkgBase string) map[st
 		// For example, if openshift/api/cloudnetwork/v1 contains an apigroup cloud.network.openshift.io, the client-gen
 		// builds a package called cloudnetwork/v1 to contain it. This change makes the applyconfiguration-gen use the same.
 		_, gvPackageString := util.ParsePathGroupVersion(p.Path)
-		pkg := filepath.Join(outPkgBase, strings.ToLower(gvPackageString))
+		pkg := path.Join(outPkgBase, strings.ToLower(gvPackageString))
 		pkgTypes[pkg] = p
 	}
 	return pkgTypes

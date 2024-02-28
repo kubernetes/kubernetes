@@ -84,12 +84,7 @@ func isInternal(m types.Member) bool {
 	return !strings.Contains(m.Tags, "json")
 }
 
-// subdirForInternalInterfaces returns a string which is a subdir of the
-// provided base, which can be a Go import-path or a directory path, depending
-// on what the caller needs.
-func subdirForInternalInterfaces(base string) string {
-	return filepath.Join(base, "internalinterfaces")
-}
+const subdirForInternalInterfaces = "internalinterfaces"
 
 // GetTargets makes the client target definition.
 func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
@@ -104,9 +99,9 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	externalVersionOutputPkg := args.OutputPkg
 	if !args.SingleDirectory {
 		internalVersionOutputDir = filepath.Join(internalVersionOutputDir, "internalversion")
-		internalVersionOutputPkg = filepath.Join(internalVersionOutputPkg, "internalversion")
+		internalVersionOutputPkg = path.Join(internalVersionOutputPkg, "internalversion")
 		externalVersionOutputDir = filepath.Join(externalVersionOutputDir, "externalversions")
-		externalVersionOutputPkg = filepath.Join(externalVersionOutputPkg, "externalversions")
+		externalVersionOutputPkg = path.Join(externalVersionOutputPkg, "externalversions")
 	}
 
 	var targetList []generator.Target
@@ -244,7 +239,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, groupGoNames, pluralExceptions map[string]string, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string,
 	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Target {
 	return &generator.SimpleTarget{
-		PkgName:       filepath.Base(outputDirBase),
+		PkgName:       path.Base(outputDirBase),
 		PkgPath:       outputPkgBase,
 		PkgDir:        outputDirBase,
 		HeaderComment: boilerplate,
@@ -257,7 +252,7 @@ func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, grou
 				imports:                   generator.NewImportTracker(),
 				groupVersions:             groupVersions,
 				clientSetPackage:          clientSetPackage,
-				internalInterfacesPackage: subdirForInternalInterfaces(outputPkgBase),
+				internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
 				gvGoNames:                 groupGoNames,
 			})
 
@@ -279,11 +274,11 @@ func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, grou
 }
 
 func factoryInterfaceTarget(outputDirBase, outputPkgBase string, boilerplate []byte, clientSetPackage string) generator.Target {
-	outputDir := subdirForInternalInterfaces(outputDirBase)
-	outputPkg := subdirForInternalInterfaces(outputPkgBase)
+	outputDir := filepath.Join(outputDirBase, subdirForInternalInterfaces)
+	outputPkg := path.Join(outputPkgBase, subdirForInternalInterfaces)
 
 	return &generator.SimpleTarget{
-		PkgName:       filepath.Base(outputDir),
+		PkgName:       path.Base(outputDir),
 		PkgPath:       outputPkg,
 		PkgDir:        outputDir,
 		HeaderComment: boilerplate,
@@ -304,7 +299,7 @@ func factoryInterfaceTarget(outputDirBase, outputPkgBase string, boilerplate []b
 
 func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Target {
 	outputDir := filepath.Join(outputDirBase, groupVersions.PackageName)
-	outputPkg := filepath.Join(outputPackageBase, groupVersions.PackageName)
+	outputPkg := path.Join(outputPackageBase, groupVersions.PackageName)
 	groupPkgName := strings.Split(string(groupVersions.PackageName), ".")[0]
 
 	return &generator.SimpleTarget{
@@ -320,7 +315,7 @@ func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientge
 				outputPackage:             outputPkg,
 				groupVersions:             groupVersions,
 				imports:                   generator.NewImportTracker(),
-				internalInterfacesPackage: subdirForInternalInterfaces(outputPackageBase),
+				internalInterfacesPackage: path.Join(outputPackageBase, subdirForInternalInterfaces),
 			})
 			return generators
 		},
@@ -332,9 +327,9 @@ func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientge
 }
 
 func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Target {
-	subdir := filepath.Join(groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
-	outputDir := filepath.Join(outputDirBase, subdir)
-	outputPkg := filepath.Join(outputPkgBase, subdir)
+	subdir := []string{groupPkgName, strings.ToLower(gv.Version.NonEmpty())}
+	outputDir := filepath.Join(outputDirBase, filepath.Join(subdir...))
+	outputPkg := path.Join(outputPkgBase, path.Join(subdir...))
 
 	return &generator.SimpleTarget{
 		PkgName:       strings.ToLower(gv.Version.NonEmpty()),
@@ -349,7 +344,7 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 				outputPackage:             outputPkg,
 				imports:                   generator.NewImportTracker(),
 				types:                     typesToGenerate,
-				internalInterfacesPackage: subdirForInternalInterfaces(outputPkgBase),
+				internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
 			})
 
 			for _, t := range typesToGenerate {
@@ -365,7 +360,7 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 					imports:                   generator.NewImportTracker(),
 					clientSetPackage:          clientSetPackage,
 					listersPackage:            listersPackage,
-					internalInterfacesPackage: subdirForInternalInterfaces(outputPkgBase),
+					internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
 				})
 			}
 			return generators

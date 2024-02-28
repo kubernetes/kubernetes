@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -319,7 +319,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 		targets = append(targets,
 			&generator.SimpleTarget{
-				PkgName:       filepath.Base(pkg.Path),
+				PkgName:       path.Base(pkg.Path),
 				PkgPath:       pkg.Path,
 				PkgDir:        pkg.Dir, // output pkg is the same as the input
 				HeaderComment: boilerplate,

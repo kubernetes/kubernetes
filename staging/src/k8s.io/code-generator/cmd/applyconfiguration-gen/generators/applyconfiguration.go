@@ -18,7 +18,7 @@ package generators
 
 import (
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"k8s.io/gengo/v2/generator"
@@ -49,7 +49,7 @@ func (g *applyConfigurationGenerator) Filter(_ *generator.Context, t *types.Type
 }
 
 func (g *applyConfigurationGenerator) Namers(*generator.Context) namer.NameSystems {
-	localPkg := filepath.Join(g.outPkgBase, g.groupVersion.Group.PackageName(), g.groupVersion.Version.PackageName())
+	localPkg := path.Join(g.outPkgBase, g.groupVersion.Group.PackageName(), g.groupVersion.Version.PackageName())
 	return namer.NameSystems{
 		"raw":          namer.NewRawNamer(localPkg, g.imports),
 		"singularKind": namer.NewPublicNamer(0),
@@ -92,7 +92,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 		Tags:        genclientTags(t),
 		APIVersion:  g.groupVersion.ToAPIVersion(),
 		ExtractInto: extractInto,
-		ParserFunc:  types.Ref(filepath.Join(g.outPkgBase, "internal"), "Parser"),
+		ParserFunc:  types.Ref(path.Join(g.outPkgBase, "internal"), "Parser"),
 		OpenAPIType: g.openAPIType,
 	}
 

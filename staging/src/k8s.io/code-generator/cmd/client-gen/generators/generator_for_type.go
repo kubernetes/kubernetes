@@ -19,7 +19,6 @@ package generators
 import (
 	"io"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"k8s.io/gengo/v2/generator"
@@ -81,7 +80,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	defaultVerbTemplates := buildDefaultVerbTemplates(generateApply)
 	subresourceDefaultVerbTemplates := buildSubresourceDefaultVerbTemplates(generateApply)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	pkg := filepath.Base(t.Name.Package)
+	pkg := path.Base(t.Name.Package)
 	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
@@ -171,7 +170,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"ApplyPatchType":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
-		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: filepath.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
+		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
 		"jsonMarshal":          c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
 	}
 

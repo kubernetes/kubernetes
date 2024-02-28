@@ -19,7 +19,7 @@ package prereleaselifecyclegenerators
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"strconv"
 	"strings"
 
@@ -225,7 +225,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		if pkgNeedsGeneration {
 			targets = append(targets,
 				&generator.SimpleTarget{
-					PkgName:       strings.Split(filepath.Base(pkg.Path), ".")[0],
+					PkgName:       strings.Split(path.Base(pkg.Path), ".")[0],
 					PkgPath:       pkg.Path,
 					PkgDir:        pkg.Dir, // output pkg is the same as the input
 					HeaderComment: boilerplate,

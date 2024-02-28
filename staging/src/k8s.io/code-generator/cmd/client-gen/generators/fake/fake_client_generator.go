@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -31,10 +32,10 @@ import (
 
 func TargetForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetDir, clientsetPkg string, groupPkgName string, groupGoName string, inputPkg string, applyBuilderPackage string, boilerplate []byte) generator.Target {
 	// TODO: should make this a function, called by here and in client-generator.go
-	subdir := filepath.Join("typed", strings.ToLower(groupPkgName), strings.ToLower(gv.Version.NonEmpty()))
-	outputDir := filepath.Join(clientsetDir, subdir, "fake")
-	outputPkg := filepath.Join(clientsetPkg, subdir, "fake")
-	realClientPkg := filepath.Join(clientsetPkg, subdir)
+	subdir := []string{"typed", strings.ToLower(groupPkgName), strings.ToLower(gv.Version.NonEmpty())}
+	outputDir := filepath.Join(clientsetDir, filepath.Join(subdir...), "fake")
+	outputPkg := path.Join(clientsetPkg, path.Join(subdir...), "fake")
+	realClientPkg := path.Join(clientsetPkg, path.Join(subdir...))
 
 	return &generator.SimpleTarget{
 		PkgName:       "fake",
@@ -92,7 +93,7 @@ func TargetForClientset(args *args.Args, clientsetDir, clientsetPkg string, grou
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
 		PkgName:       "fake",
-		PkgPath:       filepath.Join(clientsetPkg, "fake"),
+		PkgPath:       path.Join(clientsetPkg, "fake"),
 		PkgDir:        filepath.Join(clientsetDir, "fake"),
 		HeaderComment: boilerplate,
 		PkgDocComment: []byte("// This package has the automatically generated fake clientset.\n"),

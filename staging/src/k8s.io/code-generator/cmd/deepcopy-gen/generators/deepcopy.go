@@ -19,7 +19,7 @@ package generators
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 
@@ -184,7 +184,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			klog.V(3).Infof("Package %q needs generation", i)
 			targets = append(targets,
 				&generator.SimpleTarget{
-					PkgName:       strings.Split(filepath.Base(pkg.Path), ".")[0],
+					PkgName:       strings.Split(path.Base(pkg.Path), ".")[0],
 					PkgPath:       pkg.Path,
 					PkgDir:        pkg.Dir, // output pkg is the same as the input
 					HeaderComment: boilerplate,
