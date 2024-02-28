@@ -81,7 +81,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 	})
 })
 
-// Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
+// Note that memoryRequestEqualLimit is effective only when qosClass is not PodQOSBestEffort.
 func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
 	podMemoryAmount := resource.MustParse("128Mi")
 
@@ -109,25 +109,28 @@ func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryReque
 		resources.Requests = resources.Limits
 	}
 
-	pod := &v1.Pod{
+	pod := getSleepingPod(f.Namespace.Name)
+
+	return pod
+}
+
+func getSleepingPod(namespace string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod-swap-" + rand.String(5),
-			Namespace: f.Namespace.Name,
+			Name:      "sleeping-test-pod-swap-" + rand.String(5),
+			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyAlways,
 			Containers: []v1.Container{
 				{
-					Name:      "busybox-container",
-					Image:     busyboxImage,
-					Command:   []string{"sleep", "600"},
-					Resources: resources,
+					Name:    "busybox-container",
+					Image:   busyboxImage,
+					Command: []string{"sleep", "600"},
 				},
 			},
 		},
 	}
-
-	return pod
 }
 
 func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
