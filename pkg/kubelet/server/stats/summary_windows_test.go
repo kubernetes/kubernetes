@@ -28,7 +28,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -64,7 +64,7 @@ func TestSummaryProvider(t *testing.T) {
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).AnyTimes()
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
 	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, ImageFsStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil).AnyTimes()
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).AnyTimes()
 	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).AnyTimes()
 	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).AnyTimes()
