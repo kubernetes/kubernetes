@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type runtimeState struct {
@@ -35,7 +35,7 @@ type runtimeState struct {
 	storageError             error
 	cidr                     string
 	healthChecks             []*healthCheck
-	rtHandlers               map[string]kubecontainer.RuntimeHandler
+	rtClasses                []v1.RuntimeClass
 }
 
 // A health check function should be efficient and not rely on external
@@ -71,16 +71,16 @@ func (s *runtimeState) setRuntimeState(err error) {
 	s.runtimeError = err
 }
 
-func (s *runtimeState) setRuntimeHandlers(rtHandlers map[string]kubecontainer.RuntimeHandler) {
+func (s *runtimeState) setRuntimeClasses(rtClasses []v1.RuntimeClass) {
 	s.Lock()
 	defer s.Unlock()
-	s.rtHandlers = rtHandlers
+	s.rtClasses = rtClasses
 }
 
-func (s *runtimeState) runtimeHandlers() map[string]kubecontainer.RuntimeHandler {
+func (s *runtimeState) runtimeClasses() []v1.RuntimeClass {
 	s.RLock()
 	defer s.RUnlock()
-	return s.rtHandlers
+	return s.rtClasses
 }
 
 func (s *runtimeState) setStorageState(err error) {

@@ -217,18 +217,21 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 			Message: c.Message,
 		})
 	}
-	retHandlers := make(map[string]kubecontainer.RuntimeHandler)
+	rtClasses := []v1.RuntimeClass{}
 	for _, h := range handlers {
-		supportsUserns := false
+		rtClass := v1.RuntimeClass{
+			Name:     h.Name,
+			Features: &v1.RuntimeClassFeatures{},
+		}
+		// The runtime features are exposed regardless to the values of the Kubernetes feature gates.
+		// https://github.com/kubernetes/kubernetes/pull/123216#discussion_r1484762897
 		if h.Features != nil {
-			supportsUserns = h.Features.UserNamespaces
+			rtClass.Features.RecursiveReadOnlyMounts = &h.Features.RecursiveReadOnlyMounts
+			rtClass.Features.UserNamespaces = &h.Features.UserNamespaces
 		}
-		retHandlers[h.Name] = kubecontainer.RuntimeHandler{
-			Name:                   h.Name,
-			SupportsUserNamespaces: supportsUserns,
-		}
+		rtClasses = append(rtClasses, rtClass)
 	}
-	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers}
+	return &kubecontainer.RuntimeStatus{Conditions: conditions, RuntimeClasses: rtClasses}
 }
 
 func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {

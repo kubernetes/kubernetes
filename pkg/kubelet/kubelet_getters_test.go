@@ -21,7 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestKubeletDirs(t *testing.T) {
@@ -109,14 +110,28 @@ func TestHandlerSupportsUserNamespaces(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	kubelet.runtimeState.setRuntimeHandlers(map[string]kubecontainer.RuntimeHandler{
-		"has-support": {
-			Name:                   "has-support",
-			SupportsUserNamespaces: true,
+	kubelet.runtimeState.setRuntimeClasses([]v1.RuntimeClass{
+		{
+			Name: "has-support",
+			Features: &v1.RuntimeClassFeatures{
+				UserNamespaces: ptr.To(true),
+			},
 		},
-		"has-no-support": {
-			Name:                   "has-support",
-			SupportsUserNamespaces: false,
+		{
+			Name: "has-no-support",
+			Features: &v1.RuntimeClassFeatures{
+				UserNamespaces: ptr.To(false),
+			},
+		},
+		{
+			Name: "has-no-support-2",
+			Features: &v1.RuntimeClassFeatures{
+				UserNamespaces: nil,
+			},
+		},
+		{
+			Name:     "has-no-support-3",
+			Features: nil,
 		},
 	})
 
@@ -125,6 +140,14 @@ func TestHandlerSupportsUserNamespaces(t *testing.T) {
 	assert.NoError(t, err)
 
 	got, err = kubelet.HandlerSupportsUserNamespaces("has-no-support")
+	assert.Equal(t, false, got)
+	assert.NoError(t, err)
+
+	got, err = kubelet.HandlerSupportsUserNamespaces("has-no-support-2")
+	assert.Equal(t, false, got)
+	assert.NoError(t, err)
+
+	got, err = kubelet.HandlerSupportsUserNamespaces("has-no-support-3")
 	assert.Equal(t, false, got)
 	assert.NoError(t, err)
 
