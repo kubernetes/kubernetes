@@ -82,6 +82,7 @@ const (
 	ResourceClaimController                      = "resourceclaim-controller"
 	LegacyServiceAccountTokenCleanerController   = "legacy-serviceaccount-token-cleaner-controller"
 	ValidatingAdmissionPolicyStatusController    = "validatingadmissionpolicy-status-controller"
+	VolumeAttributesClassProtectionController    = "volumeattributesclass-protection-controller"
 	ServiceCIDRController                        = "service-cidr-controller"
 	StorageVersionMigratorController             = "storage-version-migrator-controller"
 )
