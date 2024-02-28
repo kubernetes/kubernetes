@@ -17,6 +17,7 @@ limitations under the License.
 package generic_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -31,8 +33,17 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func makeTestDispatcher(authorizer.Authorizer, *matching.Matcher, kubernetes.Interface) generic.Dispatcher[generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]] {
+type fakeDispatcher struct{}
+
+func (fd *fakeDispatcher) Dispatch(context.Context, admission.Attributes, admission.ObjectInterfaces, []generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]) error {
 	return nil
+}
+func (fd *fakeDispatcher) Run(context.Context) error {
+	return nil
+}
+
+func makeTestDispatcher(authorizer.Authorizer, *matching.Matcher, kubernetes.Interface) generic.Dispatcher[generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]] {
+	return &fakeDispatcher{}
 }
 
 func TestPolicySourceHasSyncedEmpty(t *testing.T) {
@@ -205,6 +216,10 @@ func (fp *FakePolicy) GetParamKind() *v1beta1.ParamKind {
 }
 
 func (fb *FakePolicy) GetMatchConstraints() *v1beta1.MatchResources {
+	return nil
+}
+
+func (fb *FakePolicy) GetFailurePolicy() *v1beta1.FailurePolicyType {
 	return nil
 }
 

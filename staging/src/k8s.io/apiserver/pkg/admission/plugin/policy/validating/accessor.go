@@ -54,6 +54,10 @@ func (v *validatingAdmissionPolicyAccessor) GetMatchConstraints() *v1beta1.Match
 	return v.Spec.MatchConstraints
 }
 
+func (v *validatingAdmissionPolicyAccessor) GetFailurePolicy() *v1beta1.FailurePolicyType {
+	return v.Spec.FailurePolicy
+}
+
 type validatingAdmissionPolicyBindingAccessor struct {
 	*v1beta1.ValidatingAdmissionPolicyBinding
 }

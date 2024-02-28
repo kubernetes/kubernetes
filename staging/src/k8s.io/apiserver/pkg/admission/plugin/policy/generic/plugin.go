@@ -161,14 +161,14 @@ func (c *Plugin[H]) ValidateInitialization() error {
 	go func() {
 		err := c.source.Run(pluginContext)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			utilruntime.HandleError(fmt.Errorf("policy source context unexpectedly closed: %v", err))
+			utilruntime.HandleError(fmt.Errorf("policy source context unexpectedly closed: %w", err))
 		}
 	}()
 
 	go func() {
 		err := c.dispatcher.Run(pluginContext)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			utilruntime.HandleError(fmt.Errorf("policy dispatcher context unexpectedly closed: %v", err))
+			utilruntime.HandleError(fmt.Errorf("policy dispatcher context unexpectedly closed: %w", err))
 		}
 	}()
 
