@@ -30,7 +30,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -167,7 +166,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil && !(o.Local && clientcmd.IsEmptyConfig(err)) {
+	if err != nil {
 		return err
 	}
 
