@@ -684,10 +684,7 @@ done`}
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-		framework.ExpectError(err, "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
-		if !apierrors.IsNotFound(err) {
-			framework.Failf("failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
-		}
+		gomega.Expect(err).To(gomega.MatchError(apierrors.IsNotFound, fmt.Sprintf("failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)))
 	})
 
 	/*
