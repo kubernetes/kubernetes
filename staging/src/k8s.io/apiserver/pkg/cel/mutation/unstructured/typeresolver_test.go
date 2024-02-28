@@ -95,6 +95,17 @@ func TestTypeProvider(t *testing.T) {
 			},
 		},
 		{
+			name: "map string-to-string",
+			expression: `Object{
+				annotations: {"foo": "bar"}
+			}`,
+			expectedValue: map[string]any{
+				"annotations": map[string]any{
+					"foo": "bar",
+				},
+			},
+		},
+		{
 			name: "field access",
 			expression: `Object{
 				intList: [1, 2, 3]
