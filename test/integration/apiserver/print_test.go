@@ -173,7 +173,7 @@ func TestServerSidePrint(t *testing.T) {
 
 	configFlags.WithDiscoveryClient(cachedClient)
 
-	factory := util.NewFactory(configFlags)
+	factory := util.NewFactory(configFlags, false)
 	mapper, err := factory.ToRESTMapper()
 	if err != nil {
 		t.Errorf("unexpected error getting mapper: %v", err)
