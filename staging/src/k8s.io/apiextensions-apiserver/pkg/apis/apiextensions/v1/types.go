@@ -199,6 +199,28 @@ type CustomResourceDefinitionVersion struct {
 	// +optional
 	// +listType=atomic
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,6,rep,name=additionalPrinterColumns"`
+
+	// selectableFields specifies paths to fields that may be used as field selectors.
+	// A maximum of 8 selectable fields are allowed.
+	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+	//
+	// +featureGate=CustomResourceFieldSelectors
+	// +optional
+	// +listType=atomic
+	SelectableFields []SelectableField `json:"selectableFields,omitempty" protobuf:"bytes,9,rep,name=selectableFields"`
+}
+
+// SelectableField specifies the JSON path of a field that may be used with field selectors.
+type SelectableField struct {
+	// jsonPath is a simple JSON path which is evaluated against each custom resource to produce a
+	// field selector value.
+	// Only JSON paths without the array notation are allowed.
+	// Must point to a field of type string, boolean or integer. Types with enum values
+	// and strings with formats are allowed.
+	// If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string.
+	// Must not point to metdata fields.
+	// Required.
+	JSONPath string `json:"jsonPath" protobuf:"bytes,1,opt,name=jsonPath"`
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.

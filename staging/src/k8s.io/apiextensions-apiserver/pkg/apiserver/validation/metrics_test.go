@@ -275,6 +275,7 @@ func TestMetrics(t *testing.T) {
 				sts,
 				nil,
 				nil,
+				nil,
 			)
 
 			iters := 1

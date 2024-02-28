@@ -70,6 +70,12 @@ type CustomResourceDefinitionSpec struct {
 	// Top-level and per-version columns are mutually exclusive.
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
+	// selectableFields specifies paths to fields that may be used as field selectors.
+	// A maximum of 8 selectable fields are allowed.
+	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+	// Top-level and per-version columns are mutually exclusive.
+	// +optional
+	SelectableFields []SelectableField
 
 	// `conversion` defines conversion settings for the CRD.
 	Conversion *CustomResourceConversion
@@ -207,6 +213,25 @@ type CustomResourceDefinitionVersion struct {
 	// be explicitly set to null
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
+
+	// selectableFields specifies paths to fields that may be used as field selectors.
+	// A maximum of 8 selectable fields are allowed.
+	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+	// +optional
+	SelectableFields []SelectableField
+}
+
+// SelectableField specifies the JSON path of a field that may be used with field selectors.
+type SelectableField struct {
+	// jsonPath is a simple JSON path which is evaluated against each custom resource to produce a
+	// field selector value.
+	// Only JSON paths without the array notation are allowed.
+	// Must point to a field of type string, boolean or integer. Types with enum values
+	// and strings with formats are allowed.
+	// If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string.
+	// Must not point to metdata fields.
+	// Required.
+	JSONPath string
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.

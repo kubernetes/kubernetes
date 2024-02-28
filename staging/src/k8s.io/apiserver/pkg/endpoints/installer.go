@@ -26,6 +26,8 @@ import (
 	"unicode"
 
 	restful "github.com/emicklei/go-restful/v3"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -46,12 +48,12 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 const (
-	ROUTE_META_GVK    = "x-kubernetes-group-version-kind"
-	ROUTE_META_ACTION = "x-kubernetes-action"
+	RouteMetaGVK              = "x-kubernetes-group-version-kind"
+	RouteMetaSelectableFields = "x-kubernetes-selectable-fields"
+	RouteMetaAction           = "x-kubernetes-action"
 )
 
 type APIInstaller struct {
@@ -1059,12 +1061,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
 		for _, route := range routes {
-			route.Metadata(ROUTE_META_GVK, metav1.GroupVersionKind{
+			route.Metadata(RouteMetaGVK, metav1.GroupVersionKind{
 				Group:   reqScope.Kind.Group,
 				Version: reqScope.Kind.Version,
 				Kind:    reqScope.Kind.Kind,
 			})
-			route.Metadata(ROUTE_META_ACTION, strings.ToLower(action.Verb))
+			route.Metadata(RouteMetaAction, strings.ToLower(action.Verb))
 			ws.Route(route)
 		}
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.

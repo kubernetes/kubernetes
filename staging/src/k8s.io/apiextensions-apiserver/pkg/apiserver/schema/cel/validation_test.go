@@ -3119,7 +3119,7 @@ func TestValidateFieldPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
+			validField, _, err := ValidFieldPath(tc.fieldPath, tc.schema)
 
 			if err == nil && tc.errDetail != "" {
 				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
