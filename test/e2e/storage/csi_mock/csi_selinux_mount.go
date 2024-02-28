@@ -43,6 +43,19 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
+// Tests for SELinuxMount feature.
+// KEP: https://github.com/kubernetes/enhancements/tree/master/keps/sig-storage/1710-selinux-relabeling
+// There are two feature gates: SELinuxMountReadWriteOncePod and SELinuxMount.
+// These tags are used in the tests:
+//
+// [FeatureGate:SELinuxMountReadWriteOncePod]
+//   - The test requires SELinuxMountReadWriteOncePod enabled. SELinuxMount may be enabled or disabled, except for tests with Feature:SELinuxMountReadWriteOncePodOnly (see below).
+//
+// [FeatureGate:SELinuxMountReadWriteOncePod] [Feature:SELinuxMountReadWriteOncePodOnly]
+//   - The test requires SELinuxMountReadWriteOncePod enabled and SELinuxMount disabled. This checks metrics that are emitted only when SELinuxMount is disabled.
+//
+// [FeatureGate:SELinuxMount]
+//   - The test requires SELinuxMountReadWriteOncePod and SELinuxMount enabled.
 var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-selinux")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
