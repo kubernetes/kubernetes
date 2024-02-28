@@ -25,17 +25,18 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# Detect problematic GOPROXY settings that prevent lookup of dependencies
+if [[ "${GOPROXY:-}" == "off" ]]; then
+  kube::log::error "Cannot run with \$GOPROXY=off"
+  exit 1
+fi
+
 kube::golang::setup_env
 kube::util::require-jq
 
 # Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOWORK=off
 export GOFLAGS=-mod=mod
-# Detect problematic GOPROXY settings that prevent lookup of dependencies
-if [[ "${GOPROXY:-}" == "off" ]]; then
-  kube::log::error "Cannot run with \$GOPROXY=off"
-  exit 1
-fi
 
 dep="${1:-}"
 sha="${2:-}"

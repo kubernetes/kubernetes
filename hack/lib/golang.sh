@@ -582,8 +582,9 @@ kube::golang::setup_env() {
   # Cross-compiles will not work with it set.
   unset GOBIN
 
-  # Explicitly turn on modules.
-  export GO111MODULE=on
+  # Turn on modules and workspaces (both are default-on).
+  unset GO111MODULE
+  unset GOWORK
 
   # This may try to download our specific Go version.  Do it last so it uses
   # the above-configured environment.
