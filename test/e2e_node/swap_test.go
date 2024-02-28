@@ -40,9 +40,7 @@ import (
 
 const (
 	cgroupBasePath        = "/sys/fs/cgroup/"
-	cgroupV1SwapLimitFile = "/memory/memory.memsw.limit_in_bytes"
 	cgroupV2SwapLimitFile = "memory.swap.max"
-	cgroupV1MemLimitFile  = "/memory/memory.limit_in_bytes"
 )
 
 var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
@@ -61,13 +59,13 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 
 			if !isSwapFeatureGateEnabled() || !isCgroupV2 || isNoSwap || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
 				ginkgo.By(fmt.Sprintf("Expecting no swap. isNoSwap? %t, feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isNoSwap, isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
-				expectNoSwap(f, pod, isCgroupV2)
+				expectNoSwap(f, pod)
 				return
 			}
 
 			if !isLimitedSwap {
 				ginkgo.By("expecting no swap")
-				expectNoSwap(f, pod, isCgroupV2)
+				expectNoSwap(f, pod)
 				return
 			}
 
@@ -168,16 +166,9 @@ func isPodCgroupV2(f *framework.Framework, pod *v1.Pod) bool {
 	return output == "true"
 }
 
-func expectNoSwap(f *framework.Framework, pod *v1.Pod, isCgroupV2 bool) {
-	if isCgroupV2 {
-		swapLimit := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
-		gomega.ExpectWithOffset(1, swapLimit).To(gomega.Equal("0"), "max swap allowed should be zero")
-	} else {
-		swapPlusMemLimit := readCgroupFile(f, pod, cgroupV1SwapLimitFile)
-		memLimit := readCgroupFile(f, pod, cgroupV1MemLimitFile)
-		gomega.ExpectWithOffset(1, swapPlusMemLimit).ToNot(gomega.BeEmpty())
-		gomega.ExpectWithOffset(1, swapPlusMemLimit).To(gomega.Equal(memLimit))
-	}
+func expectNoSwap(f *framework.Framework, pod *v1.Pod) {
+	swapLimit := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
+	gomega.ExpectWithOffset(1, swapLimit).To(gomega.Equal("0"), "max swap allowed should be zero")
 }
 
 // supports v2 only as v1 shouldn't support LimitedSwap
