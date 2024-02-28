@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 )
 
 type doNothingAdmission struct{}
@@ -49,7 +50,7 @@ func (p *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
-	initializer := NewPluginInitializer(cloudConfig, nil, nil)
+	initializer := NewPluginInitializer(cloudConfig, nil, nil, exclusion.NewFilter())
 	wantsCloudConfigAdmission := &WantsCloudConfigAdmissionPlugin{}
 	initializer.Initialize(wantsCloudConfigAdmission)
 
@@ -94,7 +95,7 @@ func (p *WantsRESTMapperAdmissionPlugin) SetRESTMapper(mapper meta.RESTMapper) {
 
 func TestRESTMapperAdmissionPlugin(t *testing.T) {
 	mapper := doNothingRESTMapper{}
-	initializer := NewPluginInitializer(nil, mapper, nil)
+	initializer := NewPluginInitializer(nil, mapper, nil, exclusion.NewFilter())
 	wantsRESTMapperAdmission := &WantsRESTMapperAdmissionPlugin{}
 	initializer.Initialize(wantsRESTMapperAdmission)
 
@@ -121,7 +122,7 @@ func (p *WantsQuotaConfigurationAdmissionPlugin) SetQuotaConfiguration(config qu
 
 func TestQuotaConfigurationAdmissionPlugin(t *testing.T) {
 	config := doNothingQuotaConfiguration{}
-	initializer := NewPluginInitializer(nil, nil, config)
+	initializer := NewPluginInitializer(nil, nil, config, exclusion.NewFilter())
 	wantsQuotaConfigurationAdmission := &WantsQuotaConfigurationAdmissionPlugin{}
 	initializer.Initialize(wantsQuotaConfigurationAdmission)
 

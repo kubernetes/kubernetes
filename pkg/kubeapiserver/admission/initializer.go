@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/resourcefilter"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
@@ -35,6 +36,7 @@ type PluginInitializer struct {
 	cloudConfig        []byte
 	restMapper         meta.RESTMapper
 	quotaConfiguration quota.Configuration
+	resourceFilter     resourcefilter.Interface
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -46,11 +48,13 @@ func NewPluginInitializer(
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
 	quotaConfiguration quota.Configuration,
+	resourceFilter resourcefilter.Interface,
 ) *PluginInitializer {
 	return &PluginInitializer{
 		cloudConfig:        cloudConfig,
 		restMapper:         restMapper,
 		quotaConfiguration: quotaConfiguration,
+		resourceFilter:     resourceFilter,
 	}
 }
 
@@ -67,5 +71,9 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(initializer.WantsQuotaConfiguration); ok {
 		wants.SetQuotaConfiguration(i.quotaConfiguration)
+	}
+
+	if wants, ok := plugin.(initializer.WantsResourceFilter); ok {
+		wants.SetResourceFilter(i.resourceFilter)
 	}
 }
