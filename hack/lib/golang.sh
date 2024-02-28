@@ -417,6 +417,9 @@ kube::golang::best_guess_go_targets() {
 # be Go-style names (e.g. example.com/foo/bar or ./foo/bar) or just local paths
 # (e.g. foo/bar) and produces a respective list (on stdout) of Go package
 # names.
+#
+# If this cannot find (go list -find -e) one or more inputs, it will emit the
+# them on stdout, so callers can at least get a useful error.
 kube::golang::normalize_go_targets() {
   local targets=()
   kube::util::read-array targets < <(kube::golang::best_guess_go_targets "$@")
@@ -430,7 +433,7 @@ kube::golang::normalize_go_targets() {
       local tst
       tst="$(basename "${target}")"
       local pkg
-      pkg="$(go list -find "${dir}")"
+      pkg="$(go list -find -e "${dir}")"
       echo "${pkg}/${tst}"
       continue
     fi
@@ -438,11 +441,11 @@ kube::golang::normalize_go_targets() {
       local dir
       dir="$(dirname "${target}")"
       local pkg
-      pkg="$(go list -find "${dir}")"
+      pkg="$(go list -find -e "${dir}")"
       echo "${pkg}/..."
       continue
     fi
-    go list -find "${target}"
+    go list -find -e "${target}"
   done
 }
 
