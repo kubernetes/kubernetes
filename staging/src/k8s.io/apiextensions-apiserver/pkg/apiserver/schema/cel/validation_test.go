@@ -4369,6 +4369,14 @@ func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
 	return s
 }
 
+func withMaxProperties(s schema.Structural, maxProperties *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxProperties = maxProperties
+	return s
+}
+
 func withDefault(dflt interface{}, s schema.Structural) schema.Structural {
 	s.Generic.Default = schema.JSON{Object: dflt}
 	return s
