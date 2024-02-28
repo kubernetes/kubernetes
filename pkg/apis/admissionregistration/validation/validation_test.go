@@ -5787,21 +5787,6 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 		},
 		expectedError: `spec.matchResouces.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
 	}, {
-		name: "validationActions must be unique",
-		config: &admissionregistration.MutatingAdmissionPolicyBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "config",
-			},
-			Spec: admissionregistration.MutatingAdmissionPolicyBindingSpec{
-				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name:                    "xyzlimit-scale-setting.example.com",
-					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
-				},
-			},
-		},
-		expectedError: `spec.validationActions[1]: Duplicate value: "Deny"`,
-	}, {
 		name: "paramRef selector must not be set when name is set",
 		config: &admissionregistration.MutatingAdmissionPolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{

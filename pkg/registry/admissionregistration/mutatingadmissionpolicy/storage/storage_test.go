@@ -118,6 +118,7 @@ func TestWatch(t *testing.T) {
 }
 
 func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPolicy {
+	applyConfigurationPatchType := admissionregistration.ApplyConfigurationPatchType
 	return &admissionregistration.MutatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -135,6 +136,7 @@ func validMutatingAdmissionPolicy() *admissionregistration.MutatingAdmissionPoli
 				{
 					// TODO cici37: update the expression when ready
 					Expression: "{spec.replicas = 1}",
+					PatchType:  &applyConfigurationPatchType,
 				},
 			},
 			MatchConstraints: &admissionregistration.MatchResources{
