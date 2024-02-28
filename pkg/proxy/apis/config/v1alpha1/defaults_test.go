@@ -43,10 +43,8 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 			name:     "empty-config",
 			original: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{},
 			expected: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
-				FeatureGates:       map[string]bool{},
-				BindAddress:        "0.0.0.0",
-				HealthzBindAddress: "0.0.0.0:10256",
-				MetricsBindAddress: "127.0.0.1:10249",
+				FeatureGates: map[string]bool{},
+				BindAddress:  "0.0.0.0",
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					ContentType: "application/vnd.kubernetes.protobuf",
 					QPS:         5,
@@ -83,10 +81,10 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 			},
 		},
 		{
-			name: "metrics and healthz address with no port",
+			name: "metrics and healthz address with port",
 			original: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
-				MetricsBindAddress: "127.0.0.1",
-				HealthzBindAddress: "127.0.0.1",
+				MetricsBindAddress: "127.0.0.1:10249",
+				HealthzBindAddress: "127.0.0.1:10256",
 			},
 			expected: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 				FeatureGates:       map[string]bool{},
