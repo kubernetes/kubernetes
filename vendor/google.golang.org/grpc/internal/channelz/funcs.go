@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/internal"
 )
 
 const (
@@ -55,6 +56,12 @@ func TurnOn() {
 		db.set(newChannelMap())
 		IDGen.Reset()
 		atomic.StoreInt32(&curState, 1)
+	}
+}
+
+func init() {
+	internal.ChannelzTurnOffForTesting = func() {
+		atomic.StoreInt32(&curState, 0)
 	}
 }
 

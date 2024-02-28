@@ -31,9 +31,15 @@ package gax
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"net/http"
 	"runtime"
 	"strings"
 	"unicode"
+
+	"github.com/googleapis/gax-go/v2/callctx"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -116,4 +122,47 @@ func XGoogHeader(keyval ...string) string {
 		buf.WriteString(keyval[i+1])
 	}
 	return buf.String()[1:]
+}
+
+// InsertMetadataIntoOutgoingContext is for use by the Google Cloud Libraries
+// only.
+//
+// InsertMetadataIntoOutgoingContext returns a new context that merges the
+// provided keyvals metadata pairs with any existing metadata/headers in the
+// provided context. keyvals should have a corresponding value for every key
+// provided. If there is an odd number of keyvals this method will panic.
+// Existing values for keys will not be overwritten, instead provided values
+// will be appended to the list of existing values.
+func InsertMetadataIntoOutgoingContext(ctx context.Context, keyvals ...string) context.Context {
+	return metadata.NewOutgoingContext(ctx, insertMetadata(ctx, keyvals...))
+}
+
+// BuildHeaders is for use by the Google Cloud Libraries only.
+//
+// BuildHeaders returns a new http.Header that merges the provided
+// keyvals header pairs with any existing metadata/headers in the provided
+// context. keyvals should have a corresponding value for every key provided.
+// If there is an odd number of keyvals this method will panic.
+// Existing values for keys will not be overwritten, instead provided values
+// will be appended to the list of existing values.
+func BuildHeaders(ctx context.Context, keyvals ...string) http.Header {
+	return http.Header(insertMetadata(ctx, keyvals...))
+}
+
+func insertMetadata(ctx context.Context, keyvals ...string) metadata.MD {
+	if len(keyvals)%2 != 0 {
+		panic(fmt.Sprintf("gax: an even number of key value pairs must be provided, got %d", len(keyvals)))
+	}
+	out, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		out = metadata.MD(make(map[string][]string))
+	}
+	headers := callctx.HeadersFromContext(ctx)
+	for k, v := range headers {
+		out[k] = append(out[k], v...)
+	}
+	for i := 0; i < len(keyvals); i = i + 2 {
+		out[keyvals[i]] = append(out[keyvals[i]], keyvals[i+1])
+	}
+	return out
 }

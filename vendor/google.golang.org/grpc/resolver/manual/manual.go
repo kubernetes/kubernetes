@@ -26,7 +26,9 @@ import (
 	"google.golang.org/grpc/resolver"
 )
 
-// NewBuilderWithScheme creates a new test resolver builder with the given scheme.
+// NewBuilderWithScheme creates a new manual resolver builder with the given
+// scheme. Every instance of the manual resolver may only ever be used with a
+// single grpc.ClientConn. Otherwise, bad things will happen.
 func NewBuilderWithScheme(scheme string) *Resolver {
 	return &Resolver{
 		BuildCallback:       func(resolver.Target, resolver.ClientConn, resolver.BuildOptions) {},
@@ -58,30 +60,34 @@ type Resolver struct {
 	scheme        string
 
 	// Fields actually belong to the resolver.
-	mu             sync.Mutex // Guards access to CC.
-	CC             resolver.ClientConn
-	bootstrapState *resolver.State
+	// Guards access to below fields.
+	mu sync.Mutex
+	CC resolver.ClientConn
+	// Storing the most recent state update makes this resolver resilient to
+	// restarts, which is possible with channel idleness.
+	lastSeenState *resolver.State
 }
 
 // InitialState adds initial state to the resolver so that UpdateState doesn't
 // need to be explicitly called after Dial.
 func (r *Resolver) InitialState(s resolver.State) {
-	r.bootstrapState = &s
+	r.lastSeenState = &s
 }
 
 // Build returns itself for Resolver, because it's both a builder and a resolver.
 func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-	r.mu.Lock()
-	r.CC = cc
-	r.mu.Unlock()
 	r.BuildCallback(target, cc, opts)
-	if r.bootstrapState != nil {
-		r.UpdateState(*r.bootstrapState)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.CC = cc
+	if r.lastSeenState != nil {
+		err := r.CC.UpdateState(*r.lastSeenState)
+		go r.UpdateStateCallback(err)
 	}
 	return r, nil
 }
 
-// Scheme returns the test scheme.
+// Scheme returns the manual resolver's scheme.
 func (r *Resolver) Scheme() string {
 	return r.scheme
 }
@@ -99,14 +105,22 @@ func (r *Resolver) Close() {
 // UpdateState calls CC.UpdateState.
 func (r *Resolver) UpdateState(s resolver.State) {
 	r.mu.Lock()
-	err := r.CC.UpdateState(s)
-	r.mu.Unlock()
+	defer r.mu.Unlock()
+	var err error
+	if r.CC == nil {
+		panic("cannot update state as grpc.Dial with resolver has not been called")
+	}
+	err = r.CC.UpdateState(s)
+	r.lastSeenState = &s
 	r.UpdateStateCallback(err)
 }
 
 // ReportError calls CC.ReportError.
 func (r *Resolver) ReportError(err error) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.CC == nil {
+		panic("cannot report error as grpc.Dial with resolver has not been called")
+	}
 	r.CC.ReportError(err)
-	r.mu.Unlock()
 }

@@ -16,14 +16,16 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google/internal/externalaccount"
+	"golang.org/x/oauth2/google/internal/externalaccountauthorizeduser"
 	"golang.org/x/oauth2/jwt"
 )
 
 // Endpoint is Google's OAuth 2.0 default endpoint.
 var Endpoint = oauth2.Endpoint{
-	AuthURL:   "https://accounts.google.com/o/oauth2/auth",
-	TokenURL:  "https://oauth2.googleapis.com/token",
-	AuthStyle: oauth2.AuthStyleInParams,
+	AuthURL:       "https://accounts.google.com/o/oauth2/auth",
+	TokenURL:      "https://oauth2.googleapis.com/token",
+	DeviceAuthURL: "https://oauth2.googleapis.com/device/code",
+	AuthStyle:     oauth2.AuthStyleInParams,
 }
 
 // MTLSTokenURL is Google's OAuth 2.0 default mTLS endpoint.
@@ -95,10 +97,11 @@ func JWTConfigFromJSON(jsonKey []byte, scope ...string) (*jwt.Config, error) {
 
 // JSON key file types.
 const (
-	serviceAccountKey          = "service_account"
-	userCredentialsKey         = "authorized_user"
-	externalAccountKey         = "external_account"
-	impersonatedServiceAccount = "impersonated_service_account"
+	serviceAccountKey                = "service_account"
+	userCredentialsKey               = "authorized_user"
+	externalAccountKey               = "external_account"
+	externalAccountAuthorizedUserKey = "external_account_authorized_user"
+	impersonatedServiceAccount       = "impersonated_service_account"
 )
 
 // credentialsFile is the unmarshalled representation of a credentials file.
@@ -106,12 +109,13 @@ type credentialsFile struct {
 	Type string `json:"type"`
 
 	// Service Account fields
-	ClientEmail  string `json:"client_email"`
-	PrivateKeyID string `json:"private_key_id"`
-	PrivateKey   string `json:"private_key"`
-	AuthURL      string `json:"auth_uri"`
-	TokenURL     string `json:"token_uri"`
-	ProjectID    string `json:"project_id"`
+	ClientEmail    string `json:"client_email"`
+	PrivateKeyID   string `json:"private_key_id"`
+	PrivateKey     string `json:"private_key"`
+	AuthURL        string `json:"auth_uri"`
+	TokenURL       string `json:"token_uri"`
+	ProjectID      string `json:"project_id"`
+	UniverseDomain string `json:"universe_domain"`
 
 	// User Credential fields
 	// (These typically come from gcloud auth.)
@@ -130,6 +134,9 @@ type credentialsFile struct {
 	CredentialSource               externalaccount.CredentialSource `json:"credential_source"`
 	QuotaProjectID                 string                           `json:"quota_project_id"`
 	WorkforcePoolUserProject       string                           `json:"workforce_pool_user_project"`
+
+	// External Account Authorized User fields
+	RevokeURL string `json:"revoke_url"`
 
 	// Service account impersonation
 	SourceCredentials *credentialsFile `json:"source_credentials"`
@@ -197,6 +204,19 @@ func (f *credentialsFile) tokenSource(ctx context.Context, params CredentialsPar
 			QuotaProjectID:           f.QuotaProjectID,
 			Scopes:                   params.Scopes,
 			WorkforcePoolUserProject: f.WorkforcePoolUserProject,
+		}
+		return cfg.TokenSource(ctx)
+	case externalAccountAuthorizedUserKey:
+		cfg := &externalaccountauthorizeduser.Config{
+			Audience:       f.Audience,
+			RefreshToken:   f.RefreshToken,
+			TokenURL:       f.TokenURLExternal,
+			TokenInfoURL:   f.TokenInfoURL,
+			ClientID:       f.ClientID,
+			ClientSecret:   f.ClientSecret,
+			RevokeURL:      f.RevokeURL,
+			QuotaProjectID: f.QuotaProjectID,
+			Scopes:         params.Scopes,
 		}
 		return cfg.TokenSource(ctx)
 	case impersonatedServiceAccount:

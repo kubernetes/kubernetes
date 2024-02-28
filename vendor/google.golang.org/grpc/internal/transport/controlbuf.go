@@ -535,8 +535,8 @@ const minBatchSize = 1000
 // size is too low to give stream goroutines a chance to fill it up.
 //
 // Upon exiting, if the error causing the exit is not an I/O error, run()
-// flushes and closes the underlying connection.  Otherwise, the connection is
-// left open to allow the I/O error to be encountered by the reader instead.
+// flushes the underlying connection.  The connection is always left open to
+// allow different closing behavior on the client and server.
 func (l *loopyWriter) run() (err error) {
 	defer func() {
 		if l.logger.V(logLevel) {
@@ -544,7 +544,6 @@ func (l *loopyWriter) run() (err error) {
 		}
 		if !isIOError(err) {
 			l.framer.writer.Flush()
-			l.conn.Close()
 		}
 		l.cbuf.finish()
 	}()

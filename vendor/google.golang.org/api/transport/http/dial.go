@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"go.opencensus.io/plugin/ochttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/net/http2"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/googleapi/transport"
@@ -69,6 +70,9 @@ func newTransport(ctx context.Context, base http.RoundTripper, settings *interna
 		requestReason: settings.RequestReason,
 	}
 	var trans http.RoundTripper = paramTransport
+	// Give OpenTelemetry precedence over OpenCensus in case user configuration
+	// causes both to write the same header (`X-Cloud-Trace-Context`).
+	trans = addOpenTelemetryTransport(trans, settings)
 	trans = addOCTransport(trans, settings)
 	switch {
 	case settings.NoAuth:
@@ -83,6 +87,17 @@ func newTransport(ctx context.Context, base http.RoundTripper, settings *interna
 		creds, err := internal.Creds(ctx, settings)
 		if err != nil {
 			return nil, err
+		}
+		credsUniverseDomain, err := internal.GetUniverseDomain(creds)
+		if err != nil {
+			return nil, err
+		}
+		if settings.TokenSource == nil {
+			// We only validate non-tokensource creds, as TokenSource-based credentials
+			// don't propagate universe.
+			if settings.GetUniverseDomain() != credsUniverseDomain {
+				return nil, internal.ErrUniverseNotMatch(settings.GetUniverseDomain(), credsUniverseDomain)
+			}
 		}
 		paramTransport.quotaProject = internal.GetQuotaProject(creds, settings.QuotaProject)
 		ts := creds.TokenSource
@@ -145,22 +160,13 @@ func (t *parameterTransport) RoundTrip(req *http.Request) (*http.Response, error
 	return rt.RoundTrip(&newReq)
 }
 
-// Set at init time by dial_appengine.go. If nil, we're not on App Engine.
-var appengineUrlfetchHook func(context.Context) http.RoundTripper
-
-// defaultBaseTransport returns the base HTTP transport.
-// On App Engine, this is urlfetch.Transport.
-// Otherwise, use a default transport, taking most defaults from
-// http.DefaultTransport.
+// defaultBaseTransport returns the base HTTP transport. It uses a default
+// transport, taking most defaults from http.DefaultTransport.
 // If TLSCertificate is available, set TLSClientConfig as well.
 func defaultBaseTransport(ctx context.Context, clientCertSource cert.Source, dialTLSContext func(context.Context, string, string) (net.Conn, error)) http.RoundTripper {
-	if appengineUrlfetchHook != nil {
-		return appengineUrlfetchHook(ctx)
-	}
-
 	// Copy http.DefaultTransport except for MaxIdleConnsPerHost setting,
-	// which is increased due to reported performance issues under load in the GCS
-	// client. Transport.Clone is only available in Go 1.13 and up.
+	// which is increased due to reported performance issues under load in the
+	// GCS client. Transport.Clone is only available in Go 1.13 and up.
 	trans := clonedTransport(http.DefaultTransport)
 	if trans == nil {
 		trans = fallbackBaseTransport()
@@ -210,6 +216,13 @@ func fallbackBaseTransport() *http.Transport {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
+}
+
+func addOpenTelemetryTransport(trans http.RoundTripper, settings *internal.DialSettings) http.RoundTripper {
+	if settings.TelemetryDisabled {
+		return trans
+	}
+	return otelhttp.NewTransport(trans)
 }
 
 func addOCTransport(trans http.RoundTripper, settings *internal.DialSettings) http.RoundTripper {

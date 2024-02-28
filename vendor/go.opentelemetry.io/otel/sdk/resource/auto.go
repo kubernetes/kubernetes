@@ -21,12 +21,10 @@ import (
 	"strings"
 )
 
-var (
-	// ErrPartialResource is returned by a detector when complete source
-	// information for a Resource is unavailable or the source information
-	// contains invalid values that are omitted from the returned Resource.
-	ErrPartialResource = errors.New("partial resource")
-)
+// ErrPartialResource is returned by a detector when complete source
+// information for a Resource is unavailable or the source information
+// contains invalid values that are omitted from the returned Resource.
+var ErrPartialResource = errors.New("partial resource")
 
 // Detector detects OpenTelemetry resource information.
 type Detector interface {

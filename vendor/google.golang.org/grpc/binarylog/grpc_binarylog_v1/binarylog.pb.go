@@ -430,7 +430,7 @@ type ClientHeader struct {
 	MethodName string `protobuf:"bytes,2,opt,name=method_name,json=methodName,proto3" json:"method_name,omitempty"`
 	// A single process may be used to run multiple virtual
 	// servers with different identities.
-	// The authority is the name of such a server identitiy.
+	// The authority is the name of such a server identity.
 	// It is typically a portion of the URI in the form of
 	// <host> or <host>:<port> .
 	Authority string `protobuf:"bytes,3,opt,name=authority,proto3" json:"authority,omitempty"`

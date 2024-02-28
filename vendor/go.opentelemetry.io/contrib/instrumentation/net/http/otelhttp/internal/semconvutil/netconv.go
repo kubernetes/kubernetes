@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 )
 
 // NetTransport returns a trace attribute describing the transport protocol of the
@@ -57,6 +57,8 @@ type netConv struct {
 	NetHostPortKey     attribute.Key
 	NetPeerNameKey     attribute.Key
 	NetPeerPortKey     attribute.Key
+	NetProtocolName    attribute.Key
+	NetProtocolVersion attribute.Key
 	NetSockFamilyKey   attribute.Key
 	NetSockPeerAddrKey attribute.Key
 	NetSockPeerPortKey attribute.Key
@@ -73,6 +75,8 @@ var nc = &netConv{
 	NetHostPortKey:     semconv.NetHostPortKey,
 	NetPeerNameKey:     semconv.NetPeerNameKey,
 	NetPeerPortKey:     semconv.NetPeerPortKey,
+	NetProtocolName:    semconv.NetProtocolNameKey,
+	NetProtocolVersion: semconv.NetProtocolVersionKey,
 	NetSockFamilyKey:   semconv.NetSockFamilyKey,
 	NetSockPeerAddrKey: semconv.NetSockPeerAddrKey,
 	NetSockPeerPortKey: semconv.NetSockPeerPortKey,
@@ -365,4 +369,10 @@ func splitHostPort(hostport string) (host string, port int) {
 		return
 	}
 	return host, int(p)
+}
+
+func netProtocol(proto string) (name string, version string) {
+	name, version, _ = strings.Cut(proto, "/")
+	name = strings.ToLower(name)
+	return name, version
 }

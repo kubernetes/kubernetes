@@ -56,7 +56,7 @@ func (s *metadataSupplier) Keys() []string {
 // requests.
 // Deprecated: Unnecessary public func.
 func Inject(ctx context.Context, md *metadata.MD, opts ...Option) {
-	c := newConfig(opts)
+	c := newConfig(opts, "")
 	c.Propagators.Inject(ctx, &metadataSupplier{
 		metadata: md,
 	})
@@ -78,7 +78,7 @@ func inject(ctx context.Context, propagators propagation.TextMapPropagator) cont
 // This function is meant to be used on incoming requests.
 // Deprecated: Unnecessary public func.
 func Extract(ctx context.Context, md *metadata.MD, opts ...Option) (baggage.Baggage, trace.SpanContext) {
-	c := newConfig(opts)
+	c := newConfig(opts, "")
 	ctx = c.Propagators.Extract(ctx, &metadataSupplier{
 		metadata: md,
 	})

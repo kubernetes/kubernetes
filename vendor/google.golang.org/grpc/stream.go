@@ -48,6 +48,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var metadataFromOutgoingContextRaw = internal.FromOutgoingContextRaw.(func(context.Context) (metadata.MD, [][]string, bool))
+
 // StreamHandler defines the handler called by gRPC server to complete the
 // execution of a streaming RPC.
 //
@@ -184,7 +186,7 @@ func newClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, meth
 	// when the RPC completes.
 	opts = append([]CallOption{OnFinish(func(error) { cc.idlenessMgr.OnCallEnd() })}, opts...)
 
-	if md, added, ok := metadata.FromOutgoingContextRaw(ctx); ok {
+	if md, added, ok := metadataFromOutgoingContextRaw(ctx); ok {
 		// validate md
 		if err := imetadata.Validate(md); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())

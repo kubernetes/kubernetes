@@ -56,11 +56,15 @@ func IsInvalidLengthError(err error) bool {
 	return ok
 }
 
-// Parse decodes s into a UUID or returns an error.  Both the standard UUID
-// forms of xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx and
-// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx are decoded as well as the
-// Microsoft encoding {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} and the raw hex
-// encoding: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.
+// Parse decodes s into a UUID or returns an error if it cannot be parsed.  Both
+// the standard UUID forms defined in RFC 4122
+// (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx and
+// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) are decoded.  In addition,
+// Parse accepts non-standard strings such as the raw hex encoding
+// xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx and 38 byte "Microsoft style" encodings,
+// e.g.  {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}.  Only the middle 36 bytes are
+// examined in the latter case.  Parse should not be used to validate strings as
+// it parses non-standard encodings as indicated above.
 func Parse(s string) (UUID, error) {
 	var uuid UUID
 	switch len(s) {
@@ -69,7 +73,7 @@ func Parse(s string) (UUID, error) {
 
 	// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	case 36 + 9:
-		if strings.ToLower(s[:9]) != "urn:uuid:" {
+		if !strings.EqualFold(s[:9], "urn:uuid:") {
 			return uuid, fmt.Errorf("invalid urn prefix: %q", s[:9])
 		}
 		s = s[9:]
@@ -101,7 +105,8 @@ func Parse(s string) (UUID, error) {
 		9, 11,
 		14, 16,
 		19, 21,
-		24, 26, 28, 30, 32, 34} {
+		24, 26, 28, 30, 32, 34,
+	} {
 		v, ok := xtob(s[x], s[x+1])
 		if !ok {
 			return uuid, errors.New("invalid UUID format")
@@ -117,7 +122,7 @@ func ParseBytes(b []byte) (UUID, error) {
 	switch len(b) {
 	case 36: // xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	case 36 + 9: // urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-		if !bytes.Equal(bytes.ToLower(b[:9]), []byte("urn:uuid:")) {
+		if !bytes.EqualFold(b[:9], []byte("urn:uuid:")) {
 			return uuid, fmt.Errorf("invalid urn prefix: %q", b[:9])
 		}
 		b = b[9:]
@@ -145,7 +150,8 @@ func ParseBytes(b []byte) (UUID, error) {
 		9, 11,
 		14, 16,
 		19, 21,
-		24, 26, 28, 30, 32, 34} {
+		24, 26, 28, 30, 32, 34,
+	} {
 		v, ok := xtob(b[x], b[x+1])
 		if !ok {
 			return uuid, errors.New("invalid UUID format")
@@ -178,6 +184,59 @@ func Must(uuid UUID, err error) UUID {
 		panic(err)
 	}
 	return uuid
+}
+
+// Validate returns an error if s is not a properly formatted UUID in one of the following formats:
+//   xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+//   urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+//   xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+//   {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}
+// It returns an error if the format is invalid, otherwise nil.
+func Validate(s string) error {
+	switch len(s) {
+	// Standard UUID format
+	case 36:
+
+	// UUID with "urn:uuid:" prefix
+	case 36 + 9:
+		if !strings.EqualFold(s[:9], "urn:uuid:") {
+			return fmt.Errorf("invalid urn prefix: %q", s[:9])
+		}
+		s = s[9:]
+
+	// UUID enclosed in braces
+	case 36 + 2:
+		if s[0] != '{' || s[len(s)-1] != '}' {
+			return fmt.Errorf("invalid bracketed UUID format")
+		}
+		s = s[1 : len(s)-1]
+
+	// UUID without hyphens
+	case 32:
+		for i := 0; i < len(s); i += 2 {
+			_, ok := xtob(s[i], s[i+1])
+			if !ok {
+				return errors.New("invalid UUID format")
+			}
+		}
+
+	default:
+		return invalidLengthError{len(s)}
+	}
+
+	// Check for standard UUID format
+	if len(s) == 36 {
+		if s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
+			return errors.New("invalid UUID format")
+		}
+		for _, x := range []int{0, 2, 4, 6, 9, 11, 14, 16, 19, 21, 24, 26, 28, 30, 32, 34} {
+			if _, ok := xtob(s[x], s[x+1]); !ok {
+				return errors.New("invalid UUID format")
+			}
+		}
+	}
+
+	return nil
 }
 
 // String returns the string form of uuid, xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -291,4 +350,16 @@ func DisableRandPool() {
 	defer poolMu.Unlock()
 	poolMu.Lock()
 	poolPos = randPoolSize
+}
+
+// UUIDs is a slice of UUID types.
+type UUIDs []UUID
+
+// Strings returns a string slice containing the string form of each UUID in uuids.
+func (uuids UUIDs) Strings() []string {
+	var uuidStrs = make([]string, len(uuids))
+	for i, uuid := range uuids {
+		uuidStrs[i] = uuid.String()
+	}
+	return uuidStrs
 }

@@ -279,52 +279,75 @@ func NewSetWithSortableFiltered(kvs []KeyValue, tmp *Sortable, filter Filter) (S
 		position--
 		kvs[offset], kvs[position] = kvs[position], kvs[offset]
 	}
+	kvs = kvs[position:]
+
 	if filter != nil {
-		return filterSet(kvs[position:], filter)
-	}
-	return Set{
-		equivalent: computeDistinct(kvs[position:]),
-	}, nil
-}
-
-// filterSet reorders kvs so that included keys are contiguous at the end of
-// the slice, while excluded keys precede the included keys.
-func filterSet(kvs []KeyValue, filter Filter) (Set, []KeyValue) {
-	var excluded []KeyValue
-
-	// Move attributes that do not match the filter so they're adjacent before
-	// calling computeDistinct().
-	distinctPosition := len(kvs)
-
-	// Swap indistinct keys forward and distinct keys toward the
-	// end of the slice.
-	offset := len(kvs) - 1
-	for ; offset >= 0; offset-- {
-		if filter(kvs[offset]) {
-			distinctPosition--
-			kvs[offset], kvs[distinctPosition] = kvs[distinctPosition], kvs[offset]
-			continue
+		if div := filteredToFront(kvs, filter); div != 0 {
+			return Set{equivalent: computeDistinct(kvs[div:])}, kvs[:div]
 		}
 	}
-	excluded = kvs[:distinctPosition]
+	return Set{equivalent: computeDistinct(kvs)}, nil
+}
 
-	return Set{
-		equivalent: computeDistinct(kvs[distinctPosition:]),
-	}, excluded
+// filteredToFront filters slice in-place using keep function. All KeyValues that need to
+// be removed are moved to the front. All KeyValues that need to be kept are
+// moved (in-order) to the back. The index for the first KeyValue to be kept is
+// returned.
+func filteredToFront(slice []KeyValue, keep Filter) int {
+	n := len(slice)
+	j := n
+	for i := n - 1; i >= 0; i-- {
+		if keep(slice[i]) {
+			j--
+			slice[i], slice[j] = slice[j], slice[i]
+		}
+	}
+	return j
 }
 
 // Filter returns a filtered copy of this Set. See the documentation for
 // NewSetWithSortableFiltered for more details.
 func (l *Set) Filter(re Filter) (Set, []KeyValue) {
 	if re == nil {
-		return Set{
-			equivalent: l.equivalent,
-		}, nil
+		return *l, nil
 	}
 
-	// Note: This could be refactored to avoid the temporary slice
-	// allocation, if it proves to be expensive.
-	return filterSet(l.ToSlice(), re)
+	// Iterate in reverse to the first attribute that will be filtered out.
+	n := l.Len()
+	first := n - 1
+	for ; first >= 0; first-- {
+		kv, _ := l.Get(first)
+		if !re(kv) {
+			break
+		}
+	}
+
+	// No attributes will be dropped, return the immutable Set l and nil.
+	if first < 0 {
+		return *l, nil
+	}
+
+	// Copy now that we know we need to return a modified set.
+	//
+	// Do not do this in-place on the underlying storage of *Set l. Sets are
+	// immutable and filtering should not change this.
+	slice := l.ToSlice()
+
+	// Don't re-iterate the slice if only slice[0] is filtered.
+	if first == 0 {
+		// It is safe to assume len(slice) >= 1 given we found at least one
+		// attribute above that needs to be filtered out.
+		return Set{equivalent: computeDistinct(slice[1:])}, slice[:1]
+	}
+
+	// Move the filtered slice[first] to the front (preserving order).
+	kv := slice[first]
+	copy(slice[1:first+1], slice[:first])
+	slice[0] = kv
+
+	// Do not re-evaluate re(slice[first+1:]).
+	div := filteredToFront(slice[1:first+1], re) + 1
+	return Set{equivalent: computeDistinct(slice[div:])}, slice[:div]
 }
 
 // computeDistinct returns a Distinct using either the fixed- or
