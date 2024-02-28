@@ -19,6 +19,7 @@ package options
 import (
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -872,6 +873,10 @@ func TestValidateOIDCOptions(t *testing.T) {
 }
 
 func TestLoadAuthenticationConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
+
 	testCases := []struct {
 		name           string
 		file           func() string

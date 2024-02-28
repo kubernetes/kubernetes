@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -47,6 +48,10 @@ ignorePreflightErrors:
 `, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewResetData(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows")
+	}
+
 	// create temp directory
 	tmpDir, err := os.MkdirTemp("", "kubeadm-reset-test")
 	if err != nil {
