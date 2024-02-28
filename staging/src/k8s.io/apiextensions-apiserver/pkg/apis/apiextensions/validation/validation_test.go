@@ -4429,9 +4429,9 @@ func TestSelectableFields(t *testing.T) {
 				},
 			},
 			errors: []validationMatch{
-				invalid("spec", "versions[0]", "selectableFields[1]"),
-				invalid("spec", "versions[1]", "selectableFields[0]"),
-				invalid("spec", "versions[1]", "selectableFields[2]"),
+				invalid("spec", "versions[0]", "selectableFields[1].jsonPath"),
+				invalid("spec", "versions[1]", "selectableFields[0].jsonPath"),
+				invalid("spec", "versions[1]", "selectableFields[2].jsonPath"),
 			},
 		},
 		{
@@ -4474,7 +4474,7 @@ func TestSelectableFields(t *testing.T) {
 				},
 			},
 			errors: []validationMatch{
-				invalid("spec", "selectableFields[1]"),
+				invalid("spec", "selectableFields[1].jsonPath"),
 			},
 		},
 		{
@@ -4520,8 +4520,8 @@ func TestSelectableFields(t *testing.T) {
 				},
 			},
 			errors: []validationMatch{
-				invalid("spec", "versions[0]", "selectableFields[1]"),
-				invalid("spec", "versions[1]", "selectableFields[0]"),
+				invalid("spec", "versions[0]", "selectableFields[1].jsonPath"),
+				invalid("spec", "versions[1]", "selectableFields[0].jsonPath"),
 			},
 		},
 		{
@@ -4567,8 +4567,8 @@ func TestSelectableFields(t *testing.T) {
 				},
 			},
 			errors: []validationMatch{
-				duplicate("spec", "versions[0]", "selectableFields[1]"),
-				duplicate("spec", "versions[1]", "selectableFields[1]"),
+				duplicate("spec", "versions[0]", "selectableFields[1].jsonPath"),
+				duplicate("spec", "versions[1]", "selectableFields[1].jsonPath"),
 			},
 		},
 		{

@@ -808,13 +808,13 @@ func ValidateCustomResourceSelectableFields(selectableFields []apiextensions.Sel
 			continue
 		}
 		if path.Root().String() == "metadata" {
-			allErrs = append(allErrs, field.Invalid(indexFldPath, selectableField.JSONPath, "must not point to fields in metadata"))
+			allErrs = append(allErrs, field.Invalid(indexFldPath.Child("jsonPath"), selectableField.JSONPath, "must not point to fields in metadata"))
 		}
 		if !allowedSelectableFieldSchema(foundSchema) {
-			allErrs = append(allErrs, field.Invalid(indexFldPath, selectableField.JSONPath, "must point to a field of type string, boolean or integer. Enum string fields and strings with formats are allowed."))
+			allErrs = append(allErrs, field.Invalid(indexFldPath.Child("jsonPath"), selectableField.JSONPath, "must point to a field of type string, boolean or integer. Enum string fields and strings with formats are allowed."))
 		}
 		if uniqueSelectableFields.Has(path.String()) {
-			allErrs = append(allErrs, field.Duplicate(indexFldPath, selectableField.JSONPath))
+			allErrs = append(allErrs, field.Duplicate(indexFldPath.Child("jsonPath"), selectableField.JSONPath))
 		} else {
 			uniqueSelectableFields.Insert(path.String())
 		}
