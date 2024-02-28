@@ -363,7 +363,7 @@ func (a customResourceStrategy) selectableFields(obj runtime.Object, objectMeta 
 			}
 			var value any
 
-			if len(results) > 0 && len(results[0]) == 1 {
+			if len(results) > 0 && len(results[0]) > 0 {
 				if len(results) > 1 || len(results[0]) > 1 {
 					return nil, fmt.Errorf("unexpectedly received more than one JSON path result")
 				}
