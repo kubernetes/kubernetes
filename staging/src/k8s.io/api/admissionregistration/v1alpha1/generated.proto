@@ -333,20 +333,6 @@ message MutatingAdmissionPolicySpec {
   // +listMapKey=name
   // +optional
   repeated MatchCondition matchConditions = 5;
-
-  // Variables contain definitions of variables that can be used in composition of other expressions.
-  // Each variable is defined as a named CEL expression.
-  // The variables defined here will be available under `variables` in other expressions of the policy
-  // except MatchConditions because MatchConditions are evaluated before the rest of the policy.
-  //
-  // The expression of a variable can refer to other variables defined earlier in the list but not those after.
-  // Thus, Variables must be sorted by the order of first appearance and acyclic.
-  // +patchMergeKey=name
-  // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=name
-  // +optional
-  repeated Variable variables = 6;
 }
 
 // Mutation specifies the CEL expression which is used to apply the Mutation.
@@ -419,6 +405,11 @@ message Mutation {
   // Defaults to "Never".
   // +optional
   optional string reinvocationPolicy = 5;
+
+  // patchType indicates the patch strategy used.
+  // Allowed values are "ApplyConfiguration" and "JSONPatch".
+  // +required
+  optional string patchType = 6;
 }
 
 // NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.

@@ -607,7 +607,6 @@ func autoConvert_v1alpha1_MutatingAdmissionPolicySpec_To_admissionregistration_M
 	out.Mutations = *(*[]admissionregistration.Mutation)(unsafe.Pointer(&in.Mutations))
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchConditions = *(*[]admissionregistration.MatchCondition)(unsafe.Pointer(&in.MatchConditions))
-	out.Variables = *(*[]admissionregistration.Variable)(unsafe.Pointer(&in.Variables))
 	return nil
 }
 
@@ -630,7 +629,6 @@ func autoConvert_admissionregistration_MutatingAdmissionPolicySpec_To_v1alpha1_M
 	out.Mutations = *(*[]v1alpha1.Mutation)(unsafe.Pointer(&in.Mutations))
 	out.FailurePolicy = (*v1alpha1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchConditions = *(*[]v1alpha1.MatchCondition)(unsafe.Pointer(&in.MatchConditions))
-	out.Variables = *(*[]v1alpha1.Variable)(unsafe.Pointer(&in.Variables))
 	return nil
 }
 
@@ -645,6 +643,7 @@ func autoConvert_v1alpha1_Mutation_To_admissionregistration_Mutation(in *v1alpha
 	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
 	out.MessageExpression = in.MessageExpression
 	out.ReinvocationPolicy = (*admissionregistration.ReinvocationPolicyType)(unsafe.Pointer(in.ReinvocationPolicy))
+	out.PatchType = (*admissionregistration.PatchType)(unsafe.Pointer(in.PatchType))
 	return nil
 }
 
@@ -659,6 +658,7 @@ func autoConvert_admissionregistration_Mutation_To_v1alpha1_Mutation(in *admissi
 	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
 	out.MessageExpression = in.MessageExpression
 	out.ReinvocationPolicy = (*admissionregistrationv1.ReinvocationPolicyType)(unsafe.Pointer(in.ReinvocationPolicy))
+	out.PatchType = (*v1alpha1.PatchType)(unsafe.Pointer(in.PatchType))
 	return nil
 }
 

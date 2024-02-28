@@ -382,14 +382,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paramKind
       type:
         namedType: io.k8s.api.admissionregistration.v1alpha1.ParamKind
-    - name: variables
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.admissionregistration.v1alpha1.Variable
-          elementRelationship: associative
-          keys:
-          - name
 - name: io.k8s.api.admissionregistration.v1alpha1.Mutation
   map:
     fields:
@@ -401,6 +393,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
     - name: messageExpression
+      type:
+        scalar: string
+    - name: patchType
       type:
         scalar: string
     - name: reason

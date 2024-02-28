@@ -296,11 +296,6 @@ func (in *MutatingAdmissionPolicySpec) DeepCopyInto(out *MutatingAdmissionPolicy
 		*out = make([]MatchCondition, len(*in))
 		copy(*out, *in)
 	}
-	if in.Variables != nil {
-		in, out := &in.Variables, &out.Variables
-		*out = make([]Variable, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 
@@ -325,6 +320,11 @@ func (in *Mutation) DeepCopyInto(out *Mutation) {
 	if in.ReinvocationPolicy != nil {
 		in, out := &in.ReinvocationPolicy, &out.ReinvocationPolicy
 		*out = new(admissionregistrationv1.ReinvocationPolicyType)
+		**out = **in
+	}
+	if in.PatchType != nil {
+		in, out := &in.PatchType, &out.PatchType
+		*out = new(PatchType)
 		**out = **in
 	}
 	return

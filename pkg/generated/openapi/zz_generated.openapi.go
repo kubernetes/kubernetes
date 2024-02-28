@@ -2428,35 +2428,11 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicySpec
 							},
 						},
 					},
-					"variables": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "name",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Variables contain definitions of variables that can be used in composition of other expressions. Each variable is defined as a named CEL expression. The variables defined here will be available under `variables` in other expressions of the policy except MatchConditions because MatchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after. Thus, Variables must be sorted by the order of first appearance and acyclic.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/admissionregistration/v1alpha1.Variable"),
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/admissionregistration/v1alpha1.MatchCondition", "k8s.io/api/admissionregistration/v1alpha1.MatchResources", "k8s.io/api/admissionregistration/v1alpha1.Mutation", "k8s.io/api/admissionregistration/v1alpha1.ParamKind", "k8s.io/api/admissionregistration/v1alpha1.Variable"},
+			"k8s.io/api/admissionregistration/v1alpha1.MatchCondition", "k8s.io/api/admissionregistration/v1alpha1.MatchResources", "k8s.io/api/admissionregistration/v1alpha1.Mutation", "k8s.io/api/admissionregistration/v1alpha1.ParamKind"},
 	}
 }
 
@@ -2502,6 +2478,14 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Mutation(ref common.Referen
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"IfNeeded", "IfNeeded", "Never", "Never"},
+						},
+					},
+					"patchType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\".\n\nPossible enum values:\n - `\"ApplyConfiguration\"` indicates that the mutation is using apply configuration to mutate the object.\n - `\"JSONPatchPatchType\"` indicates that the object is mutated through JSONPatch.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ApplyConfiguration", "JSONPatchPatchType"},
 						},
 					},
 				},
