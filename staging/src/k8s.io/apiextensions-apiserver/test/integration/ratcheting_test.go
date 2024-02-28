@@ -1752,6 +1752,7 @@ func newValidator(customResourceValidation *apiextensionsinternal.JSONSchemaProp
 		sts,
 		nil, // No need for status
 		nil, // No need for scale
+		nil, // No need for selectable fields
 	)
 
 	return func(new, old *unstructured.Unstructured) {
