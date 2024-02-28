@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
+	"k8s.io/apiserver/pkg/admission/resourcefilter"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -52,6 +53,7 @@ type Plugin[H any] struct {
 	client          kubernetes.Interface
 	restMapper      meta.RESTMapper
 	dynamicClient   dynamic.Interface
+	resourceFilter  resourcefilter.Interface // optional
 	stopCh          <-chan struct{}
 	authorizer      authorizer.Authorizer
 	enabled         bool
@@ -64,6 +66,7 @@ var (
 	_ initializer.WantsDynamicClient               = &Plugin[any]{}
 	_ initializer.WantsDrainedNotification         = &Plugin[any]{}
 	_ initializer.WantsAuthorizer                  = &Plugin[any]{}
+	_ initializer.WantsResourceFilter              = &Plugin[any]{}
 	_ admission.InitializationValidator            = &Plugin[any]{}
 )
 
@@ -109,6 +112,10 @@ func (c *Plugin[H]) SetMatcher(matcher *matching.Matcher) {
 
 func (c *Plugin[H]) SetEnabled(enabled bool) {
 	c.enabled = enabled
+}
+
+func (c *Plugin[H]) SetResourceFilter(filter resourcefilter.Interface) {
+	c.resourceFilter = filter
 }
 
 // ValidateInitialization - once clientset and informer factory are provided, creates and starts the admission controller
@@ -177,7 +184,7 @@ func (c *Plugin[H]) Dispatch(
 ) (err error) {
 	if !c.enabled {
 		return nil
-	} else if isPolicyResource(a) {
+	} else if isPolicyResource(a) || (c.resourceFilter != nil && !c.resourceFilter.ShouldHandle(a)) {
 		return nil
 	} else if !c.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
