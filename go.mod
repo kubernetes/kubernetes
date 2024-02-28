@@ -36,7 +36,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/cadvisor v0.48.1
-	github.com/google/cel-go v0.17.7
+	github.com/google/cel-go v0.17.8
 	github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0
