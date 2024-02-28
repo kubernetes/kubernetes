@@ -326,13 +326,10 @@ type ValidatingWebhook struct {
 	//      - If failurePolicy=Fail, reject the request
 	//      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
 	//
-	// This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
-	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	// +featureGate=AdmissionWebhookMatchConditions
 	// +optional
 	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,11,opt,name=matchConditions"`
 }
@@ -497,13 +494,10 @@ type MutatingWebhook struct {
 	//      - If failurePolicy=Fail, reject the request
 	//      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
 	//
-	// This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
-	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	// +featureGate=AdmissionWebhookMatchConditions
 	// +optional
 	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,12,opt,name=matchConditions"`
 }
