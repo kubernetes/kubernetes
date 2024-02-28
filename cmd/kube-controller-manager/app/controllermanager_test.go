@@ -86,6 +86,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ClusterRoleAggregationController,
 		names.PersistentVolumeClaimProtectionController,
 		names.PersistentVolumeProtectionController,
+		names.VolumeAttributesClassProtectionController,
 		names.TTLAfterFinishedController,
 		names.RootCACertificatePublisherController,
 		names.EphemeralVolumeController,
