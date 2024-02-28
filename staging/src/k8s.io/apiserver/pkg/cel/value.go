@@ -648,7 +648,7 @@ func (lv *ListValue) ConvertToType(t ref.Type) ref.Val {
 func (lv *ListValue) Equal(other ref.Val) ref.Val {
 	oArr, isArr := other.(traits.Lister)
 	if !isArr {
-		return types.MaybeNoSuchOverloadErr(other)
+		return types.False
 	}
 	sz := types.Int(len(lv.Entries))
 	if sz != oArr.Size() {

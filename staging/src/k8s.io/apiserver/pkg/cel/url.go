@@ -62,11 +62,11 @@ func (d URL) ConvertToType(typeVal ref.Type) ref.Val {
 
 // Equal implements ref.Val.Equal.
 func (d URL) Equal(other ref.Val) ref.Val {
-	otherDur, ok := other.(URL)
+	otherURL, ok := other.(URL)
 	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
+		return types.False
 	}
-	return types.Bool(d.URL.String() == otherDur.URL.String())
+	return types.Bool(d.URL.String() == otherURL.URL.String())
 }
 
 // Type implements ref.Val.Type.

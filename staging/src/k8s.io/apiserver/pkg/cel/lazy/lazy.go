@@ -99,7 +99,7 @@ func (m *MapValue) ConvertToType(typeVal ref.Type) ref.Val {
 func (m *MapValue) Equal(other ref.Val) ref.Val {
 	otherMap, ok := other.(*MapValue)
 	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
+		return types.False
 	}
 	return types.Bool(m == otherMap)
 }
@@ -165,7 +165,7 @@ func (i *iterator) ConvertToType(typeValue ref.Type) ref.Val {
 func (i *iterator) Equal(other ref.Val) ref.Val {
 	otherIterator, ok := other.(*iterator)
 	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
+		return types.False
 	}
 	return types.Bool(otherIterator == i)
 }

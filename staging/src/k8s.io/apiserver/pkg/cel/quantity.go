@@ -33,7 +33,7 @@ var (
 	QuantityType      = cel.ObjectType("kubernetes.Quantity")
 )
 
-// Quantity provdes a CEL representation of a resource.Quantity
+// Quantity provides a CEL representation of a resource.Quantity
 type Quantity struct {
 	*resource.Quantity
 }
@@ -60,11 +60,11 @@ func (d Quantity) ConvertToType(typeVal ref.Type) ref.Val {
 }
 
 func (d Quantity) Equal(other ref.Val) ref.Val {
-	otherDur, ok := other.(Quantity)
+	otherQuantity, ok := other.(Quantity)
 	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
+		return types.False
 	}
-	return types.Bool(d.Quantity.Equal(*otherDur.Quantity))
+	return types.Bool(d.Quantity.Equal(*otherQuantity.Quantity))
 }
 
 func (d Quantity) Type() ref.Type {
