@@ -19,6 +19,7 @@ package v1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -47,4 +48,14 @@ type AdmissionPluginConfiguration struct {
 	// configuration. If present, it will be used instead of the path to the configuration file.
 	// +optional
 	Configuration *runtime.Unknown `json:"configuration"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TracingConfiguration provides versioned configuration for tracing clients.
+type TracingConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Embed the component config tracing configuration struct
+	tracingapi.TracingConfiguration `json:",inline"`
 }

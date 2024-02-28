@@ -83,7 +83,7 @@ resources:
 	defer os.Remove(tracingConfigFile.Name())
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 samplingRatePerMillion: 1000000
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
@@ -208,7 +208,7 @@ func TestAPIServerTracingWithEgressSelector(t *testing.T) {
 	defer os.Remove(egressSelectorConfigFile.Name())
 
 	if err := os.WriteFile(egressSelectorConfigFile.Name(), []byte(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
@@ -226,7 +226,7 @@ egressSelections:
 	defer utiltesting.CloseAndRemove(t, tracingConfigFile)
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
@@ -268,7 +268,7 @@ func TestAPIServerTracing(t *testing.T) {
 	defer os.Remove(tracingConfigFile.Name())
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 samplingRatePerMillion: 1000000
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
