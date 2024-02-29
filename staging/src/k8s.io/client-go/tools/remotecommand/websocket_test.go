@@ -1116,6 +1116,14 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 	wg.Wait()
 }
 
+func TestLateStreamCreation(t *testing.T) {
+	c := newWSStreamCreator(nil)
+	c.closeAllStreamReaders(nil)
+	if err := c.setStream(0, nil); err == nil {
+		t.Fatal("expected error adding stream after closeAllStreamReaders")
+	}
+}
+
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
 	// Validate Stream functions.
 	c := newWSStreamCreator(nil)
