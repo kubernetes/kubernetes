@@ -57,7 +57,7 @@ func generateRS(deployment apps.Deployment) apps.ReplicaSet {
 	return apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             randomUID(),
-			Name:            names.SimpleNameGenerator.GenerateName("replicaset"),
+			Name:            names.SimpleNameGenerator.GenerateName(deployment.Name),
 			Labels:          template.Labels,
 			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
@@ -344,42 +344,93 @@ func TestFindOldReplicaSets(t *testing.T) {
 }
 
 func TestGetReplicaCountForReplicaSets(t *testing.T) {
-	rs1 := generateRS(generateDeployment("foo"))
+	rs1 := generateRS(generateDeployment("foo-rs"))
+	rs1.Status.ObservedGeneration = 1
 	*(rs1.Spec.Replicas) = 1
 	rs1.Status.Replicas = 2
-	rs2 := generateRS(generateDeployment("bar"))
+	rs1.Status.TerminatingReplicas = ptr.To[int32](3)
+
+	rs2 := generateRS(generateDeployment("bar-rs"))
+	rs1.Status.ObservedGeneration = 1
 	*(rs2.Spec.Replicas) = 2
 	rs2.Status.Replicas = 3
+	rs2.Status.TerminatingReplicas = ptr.To[int32](1)
+
+	rs3 := generateRS(generateDeployment("unsynced-rs"))
+	*(rs3.Spec.Replicas) = 3
+	rs3.Status.Replicas = 0
+	rs3.Status.TerminatingReplicas = nil
+
+	rs4 := generateRS(generateDeployment("dropped-rs"))
+	rs4.Status.ObservedGeneration = 1
+	*(rs4.Spec.Replicas) = 1
+	rs4.Status.Replicas = 1
+	rs4.Status.TerminatingReplicas = nil
 
 	tests := []struct {
-		Name           string
-		sets           []*apps.ReplicaSet
-		expectedCount  int32
-		expectedActual int32
+		name                string
+		sets                []*apps.ReplicaSet
+		expectedCount       int32
+		expectedActual      int32
+		expectedTerminating *int32
 	}{
 		{
-			"1:2 Replicas",
-			[]*apps.ReplicaSet{&rs1},
-			1,
-			2,
+			name:                "scaling down rs1",
+			sets:                []*apps.ReplicaSet{&rs1},
+			expectedCount:       1,
+			expectedActual:      2,
+			expectedTerminating: ptr.To[int32](3),
 		},
 		{
-			"3:5 Replicas",
-			[]*apps.ReplicaSet{&rs1, &rs2},
-			3,
-			5,
+			name:                "scaling down rs1 and rs2",
+			sets:                []*apps.ReplicaSet{&rs1, &rs2},
+			expectedCount:       3,
+			expectedActual:      5,
+			expectedTerminating: ptr.To[int32](4),
+		},
+		{
+			name:                "scaling up rs3",
+			sets:                []*apps.ReplicaSet{&rs3},
+			expectedCount:       3,
+			expectedActual:      0,
+			expectedTerminating: ptr.To[int32](0),
+		},
+		{
+			name:                "scaling down rs1 and rs2 and scaling up rs3",
+			sets:                []*apps.ReplicaSet{&rs1, &rs2, &rs3},
+			expectedCount:       6,
+			expectedActual:      5,
+			expectedTerminating: ptr.To[int32](4),
+		},
+		{
+			name:                "invalid/unknown terminating status for rs4",
+			sets:                []*apps.ReplicaSet{&rs4},
+			expectedCount:       1,
+			expectedActual:      1,
+			expectedTerminating: nil,
+		},
+		{
+			name:                "invalid/unknown terminating status for rs4 with rs1, rs2 and rs3",
+			sets:                []*apps.ReplicaSet{&rs1, &rs2, &rs3, &rs4},
+			expectedCount:       7,
+			expectedActual:      6,
+			expectedTerminating: nil,
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			rs := GetReplicaCountForReplicaSets(test.sets)
-			if rs != test.expectedCount {
-				t.Errorf("In test case %s, expectedCount %+v, got %+v", test.Name, test.expectedCount, rs)
+		t.Run(test.name, func(t *testing.T) {
+			replicasCount := GetReplicaCountForReplicaSets(test.sets)
+			if replicasCount != test.expectedCount {
+				t.Errorf("expectedCount %d, got %d", test.expectedCount, replicasCount)
 			}
-			rs = GetActualReplicaCountForReplicaSets(test.sets)
-			if rs != test.expectedActual {
-				t.Errorf("In test case %s, expectedActual %+v, got %+v", test.Name, test.expectedActual, rs)
+			actualReplicasCount := GetActualReplicaCountForReplicaSets(test.sets)
+			if actualReplicasCount != test.expectedActual {
+				t.Errorf("expectedActual %d, got %d", test.expectedActual, actualReplicasCount)
+			}
+			terminatingReplicasCount := GetTerminatingReplicaCountForReplicaSets(test.sets)
+			if !ptr.Equal(terminatingReplicasCount, test.expectedTerminating) {
+				t.Errorf("expectedTerminating %d, got %d", ptr.Deref(test.expectedTerminating, -1), ptr.Deref(terminatingReplicasCount, -1))
 			}
 		})
 	}
