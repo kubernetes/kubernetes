@@ -779,7 +779,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	}()
 	select {
 	case <-ctx.Done():
-		err = errors.New("Container receives the ctx.Done signal and cancels the deletion")
+		err = errors.New("container receives the ctx.Done signal and cancels the deletion")
 		return err
 	case <-done:
 	}
