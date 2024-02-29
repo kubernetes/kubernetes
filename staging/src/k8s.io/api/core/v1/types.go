@@ -3797,13 +3797,10 @@ type PodSpec struct {
 	//
 	// SchedulingGates can only be set at pod creation time, and be removed only afterwards.
 	//
-	// This is a beta feature enabled by the PodSchedulingReadiness feature gate.
-	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	// +featureGate=PodSchedulingReadiness
 	// +optional
 	SchedulingGates []PodSchedulingGate `json:"schedulingGates,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,38,opt,name=schedulingGates"`
 	// ResourceClaims defines which ResourceClaims must be allocated

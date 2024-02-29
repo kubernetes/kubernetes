@@ -382,7 +382,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowIndivisibleHugePagesValues:                   false,
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
-		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 		AllowNonLocalProjectedTokenPath:                   false,
 	}
@@ -556,11 +555,6 @@ func dropDisabledFields(
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.HostUsers = nil
 		}
-	}
-
-	// If the feature is disabled and not in use, drop the schedulingGates field.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) && !schedulingGatesInUse(oldPodSpec) {
-		podSpec.SchedulingGates = nil
 	}
 
 	dropDisabledProcMountField(podSpec, oldPodSpec)
@@ -981,14 +975,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 		}
 	}
 	return false
-}
-
-// schedulingGatesInUse returns true if the pod spec is non-nil and it has SchedulingGates field set.
-func schedulingGatesInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	return len(podSpec.SchedulingGates) != 0
 }
 
 // restartableInitContainersInUse returns true if the pod spec is non-nil and

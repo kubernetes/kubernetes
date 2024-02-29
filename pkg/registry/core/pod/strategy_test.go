@@ -314,41 +314,22 @@ func TestGetPodQOS(t *testing.T) {
 
 func TestSchedulingGatedCondition(t *testing.T) {
 	tests := []struct {
-		name           string
-		pod            *api.Pod
-		featureEnabled bool
-		want           api.PodCondition
+		name string
+		pod  *api.Pod
+		want api.PodCondition
 	}{
 		{
-			name:           "pod without .spec.schedulingGates, feature disabled",
-			pod:            &api.Pod{},
-			featureEnabled: false,
-			want:           api.PodCondition{},
+			name: "pod without .spec.schedulingGates",
+			pod:  &api.Pod{},
+			want: api.PodCondition{},
 		},
 		{
-			name:           "pod without .spec.schedulingGates, feature enabled",
-			pod:            &api.Pod{},
-			featureEnabled: true,
-			want:           api.PodCondition{},
-		},
-		{
-			name: "pod with .spec.schedulingGates, feature disabled",
+			name: "pod with .spec.schedulingGates",
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
 				},
 			},
-			featureEnabled: false,
-			want:           api.PodCondition{},
-		},
-		{
-			name: "pod with .spec.schedulingGates, feature enabled",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
-				},
-			},
-			featureEnabled: true,
 			want: api.PodCondition{
 				Type:    api.PodScheduled,
 				Status:  api.ConditionFalse,
@@ -360,8 +341,6 @@ func TestSchedulingGatedCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
-
 			Strategy.PrepareForCreate(genericapirequest.NewContext(), tt.pod)
 			var got api.PodCondition
 			for _, condition := range tt.pod.Status.Conditions {
