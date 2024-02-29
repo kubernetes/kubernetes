@@ -17,6 +17,9 @@ limitations under the License.
 package replicaset
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"reflect"
 	"testing"
 
@@ -148,6 +151,70 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 	errs := StatusStrategy.ValidateUpdate(ctx, newRS, oldRS)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
+	}
+}
+
+func TestReplicaSetStatusStrategyWithDeploymentPodReplacementPolicy(t *testing.T) {
+	tests := []struct {
+		name                                 string
+		enableDeploymentPodReplacementPolicy bool
+		terminatingReplicas                  int32
+		terminatingReplicasUpdate            int32
+		expectedTerminatingReplicas          int32
+	}{
+		{
+			name:                                 "should not allow updates when feature gate is disabled",
+			enableDeploymentPodReplacementPolicy: false,
+			terminatingReplicas:                  0,
+			terminatingReplicasUpdate:            2,
+			expectedTerminatingReplicas:          0,
+		},
+		{
+			name:                                 "should allow update when the field is in use when feature gate is disabled",
+			enableDeploymentPodReplacementPolicy: false,
+			terminatingReplicas:                  2,
+			terminatingReplicasUpdate:            5,
+			expectedTerminatingReplicas:          5,
+		},
+		{
+			name:                                 "should allow updates when feature gate is enabled",
+			enableDeploymentPodReplacementPolicy: true,
+			terminatingReplicas:                  0,
+			terminatingReplicasUpdate:            2,
+			expectedTerminatingReplicas:          2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, tc.enableDeploymentPodReplacementPolicy)()
+
+			ctx := genericapirequest.NewDefaultContext()
+			validSelector := map[string]string{"a": "b"}
+			oldRS := newReplicaSetWithSelectorLabels(validSelector)
+			oldRS.Spec.Replicas = 3
+			oldRS.Status.Replicas = 3
+			oldRS.Status.TerminatingReplicas = tc.terminatingReplicas
+
+			newRS := newReplicaSetWithSelectorLabels(validSelector)
+			newRS.Spec.Replicas = 3
+			newRS.Status.Replicas = 2
+			newRS.Status.TerminatingReplicas = tc.terminatingReplicasUpdate
+
+			StatusStrategy.PrepareForUpdate(ctx, newRS, oldRS)
+			if newRS.Status.Replicas != 2 {
+				t.Errorf("ReplicaSet status updates should allow change of replicas: %v", newRS.Status.Replicas)
+			}
+			if newRS.Status.TerminatingReplicas != tc.expectedTerminatingReplicas {
+				t.Errorf("ReplicaSet status updates failed, expected terminating pods: %v, got: %v", tc.expectedTerminatingReplicas, newRS.Status.TerminatingReplicas)
+			}
+
+			errs := StatusStrategy.ValidateUpdate(ctx, newRS, oldRS)
+
+			if len(errs) != 0 {
+				t.Errorf("Unexpected error %v", errs)
+			}
+		})
 	}
 }
 
