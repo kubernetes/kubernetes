@@ -27,10 +27,7 @@ function get-num-nodes {
 #   NUM_NODES
 #   NUM_WINDOWS_NODES
 function get-master-size {
-  local suggested_master_size=1
-  if [[ "$(get-num-nodes)" -gt "5" ]]; then
-    suggested_master_size=2
-  fi
+  local suggested_master_size=2
   if [[ "$(get-num-nodes)" -gt "10" ]]; then
     suggested_master_size=4
   fi
@@ -42,9 +39,6 @@ function get-master-size {
   fi
   if [[ "$(get-num-nodes)" -gt "500" ]]; then
     suggested_master_size=32
-  fi
-  if [[ "$(get-num-nodes)" -gt "2000" ]]; then
-    suggested_master_size=64
   fi
   echo "${suggested_master_size}"
 }
@@ -142,7 +136,7 @@ export WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
 # CNI storage path for Windows nodes
 export WINDOWS_CNI_STORAGE_PATH="https://storage.googleapis.com/k8s-artifacts-cni/release"
 # CNI version for Windows nodes
-export WINDOWS_CNI_VERSION="v1.3.0"
+export WINDOWS_CNI_VERSION="v1.4.0"
 # Pod manifests directory for Windows nodes on Windows nodes.
 export WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
 # Directory where cert/key files will be stores on Windows nodes.

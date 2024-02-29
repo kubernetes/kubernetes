@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints"
@@ -67,9 +68,9 @@ type DiscoveryAggregationController interface {
 	// Thread-safe
 	RemoveAPIService(apiServiceName string)
 
-	// Spwans a worker which waits for added/updated apiservices and updates
+	// Spawns a worker which waits for added/updated apiservices and updates
 	// the unified discovery document by contacting the aggregated api services
-	Run(stopCh <-chan struct{})
+	Run(stopCh <-chan struct{}, discoverySyncedCh chan<- struct{})
 }
 
 type discoveryManager struct {
@@ -406,13 +407,46 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	return nil
 }
 
-// Spwans a goroutune which waits for added/updated apiservices and updates
+func (dm *discoveryManager) getAPIServiceKeys() []string {
+	dm.servicesLock.RLock()
+	defer dm.servicesLock.RUnlock()
+	keys := []string{}
+	for key := range dm.apiServices {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+// Spawns a goroutine which waits for added/updated apiservices and updates
 // the discovery document accordingly
-func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
+func (dm *discoveryManager) Run(stopCh <-chan struct{}, discoverySyncedCh chan<- struct{}) {
 	klog.Info("Starting ResourceDiscoveryManager")
 
 	// Shutdown the queue since stopCh was signalled
 	defer dm.dirtyAPIServiceQueue.ShutDown()
+
+	// Ensure that apiregistration.k8s.io is the first group in the discovery group.
+	dm.mergedDiscoveryHandler.WithSource(discoveryendpoint.BuiltinSource).SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
+
+	// Ensure that all APIServices are present before readiness check succeeds
+	var wg sync.WaitGroup
+	// Iterate on a copy of the keys to be thread safe with syncAPIService
+	keys := dm.getAPIServiceKeys()
+
+	for _, key := range keys {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			// If an error was returned, the APIService will still have been
+			// added but marked as stale. Ignore the return value here
+			_ = dm.syncAPIService(k)
+		}(key)
+	}
+	wg.Wait()
+
+	if discoverySyncedCh != nil {
+		close(discoverySyncedCh)
+	}
 
 	// Spawn workers
 	// These workers wait for APIServices to be marked dirty.
@@ -440,9 +474,6 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 		}()
 	}
 
-	// Ensure that apiregistration.k8s.io is the first group in the discovery group.
-	dm.mergedDiscoveryHandler.WithSource(discoveryendpoint.BuiltinSource).SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
-
 	wait.PollUntil(1*time.Minute, func() (done bool, err error) {
 		dm.servicesLock.Lock()
 		defer dm.servicesLock.Unlock()
@@ -457,6 +488,36 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 		}
 		return false, nil
 	}, stopCh)
+}
+
+// Takes a snapshot of all currently used services by known APIServices and
+// purges the cache entries of those not present in the snapshot.
+func (dm *discoveryManager) removeUnusedServices() {
+	usedServiceKeys := sets.Set[serviceKey]{}
+
+	func() {
+		dm.servicesLock.Lock()
+		defer dm.servicesLock.Unlock()
+
+		// Mark all non-local APIServices as dirty
+		for _, info := range dm.apiServices {
+			usedServiceKeys.Insert(info.service)
+		}
+	}()
+
+	// Avoids double lock. It is okay if a service is added/removed between these
+	// functions. This is just a cache and that should be infrequent.
+
+	func() {
+		dm.resultsLock.Lock()
+		defer dm.resultsLock.Unlock()
+
+		for key := range dm.cachedResults {
+			if !usedServiceKeys.Has(key) {
+				delete(dm.cachedResults, key)
+			}
+		}
+	}()
 }
 
 // Adds an APIService to be tracked by the discovery manager. If the APIService
@@ -476,12 +537,14 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 		lastMarkedDirty: time.Now(),
 		service:         newServiceKey(*apiService.Spec.Service),
 	})
+	dm.removeUnusedServices()
 	dm.dirtyAPIServiceQueue.Add(apiService.Name)
 }
 
 func (dm *discoveryManager) RemoveAPIService(apiServiceName string) {
 	if dm.setInfoForAPIService(apiServiceName, nil) != nil {
 		// mark dirty if there was actually something deleted
+		dm.removeUnusedServices()
 		dm.dirtyAPIServiceQueue.Add(apiServiceName)
 	}
 }

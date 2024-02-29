@@ -24,9 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/validation"
@@ -102,7 +100,7 @@ func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runt
 	//  'nominalConcurrencyShares' field of 'limited' for CREATE operation.
 	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
 	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: utilfeature.DefaultFeatureGate.Enabled(features.ZeroLimitedNominalConcurrencyShares),
+		AllowZeroLimitedNominalConcurrencyShares: true,
 	}
 	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration), getRequestGroupVersion(ctx), opts)
 }
@@ -128,7 +126,6 @@ func (priorityLevelConfigurationStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPL := obj.(*flowcontrol.PriorityLevelConfiguration)
-	oldPL := old.(*flowcontrol.PriorityLevelConfiguration)
 
 	// 1.28 server is not aware of the roundtrip annotation, and will
 	// default any 0 value persisted (for the NominalConcurrencyShares
@@ -144,8 +141,7 @@ func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, ob
 	//  only if the existing object already contains a zero value.
 	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
 	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: utilfeature.DefaultFeatureGate.Enabled(features.ZeroLimitedNominalConcurrencyShares) ||
-			hasZeroLimitedNominalConcurrencyShares(oldPL),
+		AllowZeroLimitedNominalConcurrencyShares: true,
 	}
 	return validation.ValidatePriorityLevelConfiguration(newPL, getRequestGroupVersion(ctx), opts)
 }
@@ -213,8 +209,4 @@ func getRequestGroupVersion(ctx context.Context) schema.GroupVersion {
 		return schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
 	return schema.GroupVersion{}
-}
-
-func hasZeroLimitedNominalConcurrencyShares(obj *flowcontrol.PriorityLevelConfiguration) bool {
-	return obj != nil && obj.Spec.Limited != nil && obj.Spec.Limited.NominalConcurrencyShares == 0
 }

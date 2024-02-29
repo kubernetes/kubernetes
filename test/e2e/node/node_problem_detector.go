@@ -33,6 +33,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -42,7 +43,7 @@ import (
 
 // This test checks if node-problem-detector (NPD) runs fine without error on
 // the up to 10 nodes in the cluster. NPD's functionality is tested in e2e_node tests.
-var _ = SIGDescribe("NodeProblemDetector", func() {
+var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, func() {
 	const (
 		pollInterval      = 1 * time.Second
 		pollTimeout       = 1 * time.Minute
@@ -383,9 +384,17 @@ func getNpdPodStat(ctx context.Context, f *framework.Framework, nodeName string)
 		if !strings.HasPrefix(pod.PodRef.Name, "node-problem-detector") {
 			continue
 		}
-		cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
-		rss = float64(*pod.Memory.RSSBytes) / 1024 / 1024
-		workingSet = float64(*pod.Memory.WorkingSetBytes) / 1024 / 1024
+		if pod.CPU != nil && pod.CPU.UsageNanoCores != nil {
+			cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
+		}
+		if pod.Memory != nil {
+			if pod.Memory.RSSBytes != nil {
+				rss = float64(*pod.Memory.RSSBytes) / 1024 / 1024
+			}
+			if pod.Memory.WorkingSetBytes != nil {
+				workingSet = float64(*pod.Memory.WorkingSetBytes) / 1024 / 1024
+			}
+		}
 		hasNpdPod = true
 		break
 	}

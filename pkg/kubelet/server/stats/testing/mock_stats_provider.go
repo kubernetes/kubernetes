@@ -88,21 +88,6 @@ func (mr *MockProviderMockRecorder) GetCgroupStats(cgroupName, updateStats inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCgroupStats", reflect.TypeOf((*MockProvider)(nil).GetCgroupStats), cgroupName, updateStats)
 }
 
-// GetContainerInfo mocks base method.
-func (m *MockProvider) GetContainerInfo(ctx context.Context, podFullName string, uid types.UID, containerName string, req *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetContainerInfo", ctx, podFullName, uid, containerName, req)
-	ret0, _ := ret[0].(*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetContainerInfo indicates an expected call of GetContainerInfo.
-func (mr *MockProviderMockRecorder) GetContainerInfo(ctx, podFullName, uid, containerName, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContainerInfo", reflect.TypeOf((*MockProvider)(nil).GetContainerInfo), ctx, podFullName, uid, containerName, req)
-}
-
 // GetNode mocks base method.
 func (m *MockProvider) GetNode() (*v10.Node, error) {
 	m.ctrl.T.Helper()
@@ -188,21 +173,6 @@ func (m *MockProvider) GetPods() []*v10.Pod {
 func (mr *MockProviderMockRecorder) GetPods() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockProvider)(nil).GetPods))
-}
-
-// GetRawContainerInfo mocks base method.
-func (m *MockProvider) GetRawContainerInfo(containerName string, req *v1.ContainerInfoRequest, subcontainers bool) (map[string]*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRawContainerInfo", containerName, req, subcontainers)
-	ret0, _ := ret[0].(map[string]*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRawContainerInfo indicates an expected call of GetRawContainerInfo.
-func (mr *MockProviderMockRecorder) GetRawContainerInfo(containerName, req, subcontainers interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawContainerInfo", reflect.TypeOf((*MockProvider)(nil).GetRawContainerInfo), containerName, req, subcontainers)
 }
 
 // GetRequestedContainersInfo mocks base method.

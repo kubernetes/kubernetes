@@ -313,7 +313,7 @@ func (s cacheSyncWaiterStub) WaitForCacheSync(_ <-chan struct{}) map[reflect.Typ
 	return s.startedByInformerType
 }
 
-func TestInstallReadyzHandlerWithHealthyFunc(t *testing.T) {
+func TestInstallPathHandlerWithHealthyFunc(t *testing.T) {
 	mux := http.NewServeMux()
 	readyzCh := make(chan struct{})
 
@@ -321,7 +321,7 @@ func TestInstallReadyzHandlerWithHealthyFunc(t *testing.T) {
 	hasBeenReadyFn := func() {
 		hasBeenReadyCounter++
 	}
-	InstallReadyzHandlerWithHealthyFunc(mux, hasBeenReadyFn, readyOnChanClose{readyzCh})
+	InstallPathHandlerWithHealthyFunc(mux, "/readyz", hasBeenReadyFn, readyOnChanClose{readyzCh})
 
 	// scenario 1: expect the check to fail since the channel hasn't been closed
 	req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", "/readyz"), nil)

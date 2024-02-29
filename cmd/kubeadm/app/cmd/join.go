@@ -175,7 +175,10 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 				return err
 			}
 
-			data := c.(*joinData)
+			data, ok := c.(*joinData)
+			if !ok {
+				return errors.New("invalid data struct")
+			}
 
 			if err := joinRunner.Run(args); err != nil {
 				return err

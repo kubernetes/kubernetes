@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package kubeletplugin provides helper functions for running a dynamic
 // resource allocation kubelet plugin.
-package kubeletplugin
+package kubeletplugin // import "k8s.io/dynamic-resource-allocation/kubeletplugin"

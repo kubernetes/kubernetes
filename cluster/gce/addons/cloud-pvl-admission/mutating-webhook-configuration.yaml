@@ -16,6 +16,9 @@ webhooks:
   clientConfig:
     url: "https://127.0.0.1:9001/admit"
     caBundle: "__CLOUD_PVL_ADMISSION_CA_CERT__"
+  matchConditions:
+  - name: "only-gce"
+    expression: "has(object.spec.gcePersistentDisk)"
   admissionReviewVersions: ["v1"]
   sideEffects: None
   timeoutSeconds: 5

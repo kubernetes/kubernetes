@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build windows
-// +build windows
 
 // Package mgr can be used to manage Windows service programs.
 // It can be used to install and remove them. It can also start,

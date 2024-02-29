@@ -123,7 +123,7 @@ func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, patchesDir string, 
 
 // MoveFile should move a file from oldPath to newPath
 func (spm *KubeStaticPodPathManager) MoveFile(oldPath, newPath string) error {
-	return os.Rename(oldPath, newPath)
+	return kubeadmutil.MoveFile(oldPath, newPath)
 }
 
 // KubernetesDir should point to the directory Kubernetes owns for storing various configuration files

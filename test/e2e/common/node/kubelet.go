@@ -214,3 +214,48 @@ var _ = SIGDescribe("Kubelet", func() {
 		})
 	})
 })
+
+var _ = SIGDescribe("Kubelet with pods in a privileged namespace", func() {
+	f := framework.NewDefaultFramework("kubelet-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var podClient *e2epod.PodClient
+	ginkgo.BeforeEach(func() {
+		podClient = e2epod.NewPodClient(f)
+	})
+	ginkgo.Context("when scheduling an agnhost Pod with hostAliases and hostNetwork", func() {
+		podName := "agnhost-host-aliases" + string(uuid.NewUUID())
+		/*
+			Release: v1.30
+			Testname: Kubelet, hostAliases, hostNetwork
+			Description: Create a Pod with hostNetwork enabled, hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
+		*/
+		framework.It("should write entries to /etc/hosts when hostNetwork is enabled", f.WithNodeConformance(), func(ctx context.Context) {
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil, "etc-hosts")
+			pod.Spec.HostNetwork = true
+			// Don't restart the Pod since it is expected to exit
+			pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			pod.Spec.HostAliases = []v1.HostAlias{
+				{
+					IP:        "123.45.67.89",
+					Hostnames: []string{"foo", "bar"},
+				},
+			}
+
+			pod = podClient.Create(ctx, pod)
+			ginkgo.By("Waiting for pod completion")
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
+
+			rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
+			framework.ExpectNoError(err)
+			defer rc.Close() // nolint:errcheck
+			buf := new(bytes.Buffer)
+			_, err = buf.ReadFrom(rc)
+			framework.ExpectNoError(err)
+			hostsFileContent := buf.String()
+
+			errMsg := fmt.Sprintf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
+			gomega.Expect(hostsFileContent).To(gomega.ContainSubstring("123.45.67.89\tfoo\tbar"), errMsg)
+		})
+	})
+})

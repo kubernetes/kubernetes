@@ -534,6 +534,10 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 		eventsRule(),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(networkingGroup).Resources("servicecidrs").RuleOrDie())
+	}
+
 	nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
 	roles = append(roles, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
@@ -576,6 +580,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulingcontexts").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulingcontexts/status").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{

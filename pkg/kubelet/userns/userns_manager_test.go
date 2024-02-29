@@ -17,7 +17,9 @@ limitations under the License.
 package userns
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +37,7 @@ import (
 type testUserNsPodsManager struct {
 	podDir  string
 	podList []types.UID
+	userns  bool
 }
 
 func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
@@ -49,6 +52,13 @@ func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 		return nil, nil
 	}
 	return m.podList, nil
+}
+
+func (m *testUserNsPodsManager) HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error) {
+	if runtimeHandler == "error" {
+		return false, errors.New("unknown runtime")
+	}
+	return m.userns, nil
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
@@ -191,14 +201,22 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 	falseVal := false
 
 	cases := []struct {
-		name    string
-		pod     *v1.Pod
-		expMode runtimeapi.NamespaceMode
-		success bool
+		name           string
+		pod            *v1.Pod
+		expMode        runtimeapi.NamespaceMode
+		runtimeUserns  bool
+		runtimeHandler string
+		success        bool
 	}{
 		{
 			name:    "no user namespace",
 			pod:     &v1.Pod{},
+			expMode: runtimeapi.NamespaceMode_NODE,
+			success: true,
+		},
+		{
+			name:    "nil pod",
+			pod:     nil,
 			expMode: runtimeapi.NamespaceMode_NODE,
 			success: true,
 		},
@@ -219,19 +237,42 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 					HostUsers: &falseVal,
 				},
 			},
-			expMode: runtimeapi.NamespaceMode_POD,
-			success: true,
+			expMode:       runtimeapi.NamespaceMode_POD,
+			runtimeUserns: true,
+			success:       true,
+		},
+		{
+			name: "user namespace, but no runtime support",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &falseVal,
+				},
+			},
+			runtimeUserns: false,
+		},
+		{
+			name: "user namespace, but runtime returns error",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &falseVal,
+				},
+			},
+			// This handler name makes the fake runtime return an error.
+			runtimeHandler: "error",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// These tests will create the userns file, so use an existing podDir.
-			testUserNsPodsManager := &testUserNsPodsManager{podDir: t.TempDir()}
+			testUserNsPodsManager := &testUserNsPodsManager{
+				podDir: t.TempDir(),
+				userns: tc.runtimeUserns,
+			}
 			m, err := MakeUserNsManager(testUserNsPodsManager)
 			assert.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod)
+			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod, tc.runtimeHandler)
 			if (tc.success && err != nil) || (!tc.success && err == nil) {
 				t.Errorf("expected success: %v but got error: %v", tc.success, err)
 			}
@@ -297,6 +338,7 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			testUserNsPodsManager := &testUserNsPodsManager{
+				podDir:  t.TempDir(),
 				podList: tc.listPods,
 			}
 			m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -358,4 +400,21 @@ func TestRecordMaxPods(t *testing.T) {
 	// The next allocation should fail, hitting maxPods.
 	err = m.record(types.UID(fmt.Sprintf("%d", maxPods+1)), uint32((maxPods+1)*65536), 65536)
 	assert.Error(t, err)
+}
+
+type failingUserNsPodsManager struct {
+	testUserNsPodsManager
+}
+
+func (m *failingUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
+	return nil, os.ErrPermission
+}
+
+func TestMakeUserNsManagerFailsListPod(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+
+	testUserNsPodsManager := &failingUserNsPodsManager{}
+	_, err := MakeUserNsManager(testUserNsPodsManager)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "read pods from disk")
 }

@@ -79,10 +79,10 @@ type kubeConfigSpec struct {
 // When not using external CA mode, if a kubeconfig file already exists it is used only if evaluated equal,
 // otherwise an error is returned. For external CA mode, the creation of kubeconfig files is skipped.
 func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	var externaCA bool
+	var externalCA bool
 	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
 	if _, err := os.Stat(caKeyPath); os.IsNotExist(err) {
-		externaCA = true
+		externalCA = true
 	}
 
 	files := []string{
@@ -92,7 +92,7 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 	}
 
 	for _, file := range files {
-		if externaCA {
+		if externalCA {
 			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", file)
 			continue
 		}
@@ -593,7 +593,9 @@ func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc)
 
 	ctx := context.Background()
 	return ensureRBACFunc(
-		ctx, adminClient, superAdminClient, kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout)
+		ctx, adminClient, superAdminClient,
+		kubeadmconstants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+	)
 }
 
 // EnsureAdminClusterRoleBindingImpl first attempts to see if the ClusterRoleBinding
@@ -608,7 +610,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 
 	var (
 		err, lastError     error
-		crbResult          *rbac.ClusterRoleBinding
+		crbExists          bool
 		clusterRoleBinding = &rbac.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding,
@@ -635,7 +637,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 		retryInterval,
 		retryTimeout,
 		true, func(ctx context.Context) (bool, error) {
-			if crbResult, err = adminClient.RbacV1().ClusterRoleBindings().Create(
+			if _, err := adminClient.RbacV1().ClusterRoleBindings().Create(
 				ctx,
 				clusterRoleBinding,
 				metav1.CreateOptions{},
@@ -644,15 +646,11 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 					// If it encounters a forbidden error this means that the API server was reached
 					// but the CRB is missing - i.e. the admin.conf user does not have permissions
 					// to create its own permission RBAC yet.
-					//
-					// When a "create" call is made, but the resource is forbidden, a non-nil
-					// CRB will still be returned. Return true here, but update "crbResult" to nil,
-					// to ensure that the process continues with super-admin.conf.
-					crbResult = nil
 					return true, nil
 				} else if apierrors.IsAlreadyExists(err) {
 					// If the CRB exists it means the admin.conf already has the right
 					// permissions; return.
+					crbExists = true
 					return true, nil
 				} else {
 					// Retry on any other error type.
@@ -660,14 +658,15 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 					return false, nil
 				}
 			}
+			crbExists = true
 			return true, nil
 		})
 	if err != nil {
 		return nil, lastError
 	}
 
-	// The CRB exists; return the admin.conf client.
-	if crbResult != nil {
+	// The CRB was created or already existed; return the admin.conf client.
+	if crbExists {
 		return adminClient, nil
 	}
 
@@ -695,9 +694,8 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 			); err != nil {
 				lastError = err
 				if apierrors.IsAlreadyExists(err) {
-					// This should not happen, as the previous "create" call that uses
-					// the admin.conf should have passed. Return the error.
-					return true, err
+					klog.V(5).Infof("ClusterRoleBinding %s already exists.", kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding)
+					return true, nil
 				}
 				// Retry on any other type of error.
 				return false, nil

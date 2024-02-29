@@ -32,6 +32,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestCheckGeneratedNameError(t *testing.T) {
@@ -115,7 +116,10 @@ func TestServiceStatusStrategy(t *testing.T) {
 	newService.Status = api.ServiceStatus{
 		LoadBalancer: api.LoadBalancerStatus{
 			Ingress: []api.LoadBalancerIngress{
-				{IP: "127.0.0.2"},
+				{
+					IP:     "127.0.0.2",
+					IPMode: ptr.To(api.LoadBalancerIPModeVIP),
+				},
 			},
 		},
 	}

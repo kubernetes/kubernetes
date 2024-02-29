@@ -22,10 +22,9 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-
-	"k8s.io/component-helpers/node/util/sysctl"
 )
 
 // Conntracker is an interface to the global sysctl. Descriptions of the various
@@ -47,7 +46,9 @@ type Conntracker interface {
 	SetUDPStreamTimeout(seconds int) error
 }
 
-type realConntracker struct{}
+type realConntracker struct {
+	logger klog.Logger
+}
 
 var errReadOnlySysFS = errors.New("readOnlySysFS")
 
@@ -55,7 +56,7 @@ func (rct realConntracker) SetMax(max int) error {
 	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
 		return err
 	}
-	klog.InfoS("Setting nf_conntrack_max", "nfConntrackMax", max)
+	rct.logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
 
 	// Linux does not support writing to /sys/module/nf_conntrack/parameters/hashsize
 	// when the writer process is not in the initial network namespace
@@ -78,7 +79,7 @@ func (rct realConntracker) SetMax(max int) error {
 	// don't set conntrack hashsize and return a special error
 	// errReadOnlySysFS here. The caller should deal with
 	// errReadOnlySysFS differently.
-	writable, err := isSysFSWritable()
+	writable, err := rct.isSysFSWritable()
 	if err != nil {
 		return err
 	}
@@ -86,7 +87,7 @@ func (rct realConntracker) SetMax(max int) error {
 		return errReadOnlySysFS
 	}
 	// TODO: generify this and sysctl to a new sysfs.WriteInt()
-	klog.InfoS("Setting conntrack hashsize", "conntrackHashsize", max/4)
+	rct.logger.Info("Setting conntrack hashsize", "conntrackHashsize", max/4)
 	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
@@ -110,12 +111,12 @@ func (rct realConntracker) SetUDPStreamTimeout(seconds int) error {
 	return rct.setIntSysCtl("nf_conntrack_udp_timeout_stream", seconds)
 }
 
-func (realConntracker) setIntSysCtl(name string, value int) error {
+func (rct realConntracker) setIntSysCtl(name string, value int) error {
 	entry := "net/netfilter/" + name
 
 	sys := sysctl.New()
 	if val, _ := sys.GetSysctl(entry); val != value {
-		klog.InfoS("Set sysctl", "entry", entry, "value", value)
+		rct.logger.Info("Set sysctl", "entry", entry, "value", value)
 		if err := sys.SetSysctl(entry, value); err != nil {
 			return err
 		}
@@ -124,13 +125,13 @@ func (realConntracker) setIntSysCtl(name string, value int) error {
 }
 
 // isSysFSWritable checks /proc/mounts to see whether sysfs is 'rw' or not.
-func isSysFSWritable() (bool, error) {
+func (rct realConntracker) isSysFSWritable() (bool, error) {
 	const permWritable = "rw"
 	const sysfsDevice = "sysfs"
 	m := mount.New("" /* default mount path */)
 	mountPoints, err := m.List()
 	if err != nil {
-		klog.ErrorS(err, "Failed to list mount points")
+		rct.logger.Error(err, "Failed to list mount points")
 		return false, err
 	}
 
@@ -142,7 +143,7 @@ func isSysFSWritable() (bool, error) {
 		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
 			return true, nil
 		}
-		klog.ErrorS(nil, "Sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
+		rct.logger.Error(nil, "Sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
 		return false, errReadOnlySysFS
 	}
 

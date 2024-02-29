@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -30,11 +29,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
+	"k8s.io/klog/v2"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
-
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -85,11 +83,6 @@ func IsLoopBack(ip string) bool {
 		return netIP.IsLoopback()
 	}
 	return false
-}
-
-// Resolver is an interface for net.Resolver
-type Resolver interface {
-	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
 // GetLocalAddrs returns a list of all network addresses on the local system
@@ -180,49 +173,49 @@ func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName,
 }
 
 // MapIPsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
-func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
-	ipFamilyMap := map[v1.IPFamily][]string{}
-	for _, ip := range ipStrings {
-		// Handle only the valid IPs
-		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != v1.IPFamilyUnknown {
+func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]net.IP {
+	ipFamilyMap := map[v1.IPFamily][]net.IP{}
+	for _, ipStr := range ipStrings {
+		ip := netutils.ParseIPSloppy(ipStr)
+		if ip != nil {
+			// Since ip is parsed ok, GetIPFamilyFromIP will never return v1.IPFamilyUnknown
+			ipFamily := GetIPFamilyFromIP(ip)
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			// this function is called in multiple places. All of which
-			// have sanitized data. Except the case of ExternalIPs which is
-			// not validated by api-server. Specifically empty strings
-			// validation. Which yields into a lot of bad error logs.
-			// check for empty string
-			if len(strings.TrimSpace(ip)) != 0 {
-				klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
-
+			// ExternalIPs may not be validated by the api-server.
+			// Specifically empty strings validation, which yields into a lot
+			// of bad error logs.
+			if len(strings.TrimSpace(ipStr)) != 0 {
+				klog.ErrorS(nil, "Skipping invalid IP", "ip", ipStr)
 			}
 		}
 	}
 	return ipFamilyMap
 }
 
-// MapCIDRsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
-func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
-	ipFamilyMap := map[v1.IPFamily][]string{}
-	for _, cidr := range cidrStrings {
-		// Handle only the valid CIDRs
-		if ipFamily := getIPFamilyFromCIDR(cidr); ipFamily != v1.IPFamilyUnknown {
-			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
-		} else {
-			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
+// MapCIDRsByIPFamily maps a slice of CIDRs to their respective IP families (v4 or v6)
+func MapCIDRsByIPFamily(cidrsStrings []string) map[v1.IPFamily][]*net.IPNet {
+	ipFamilyMap := map[v1.IPFamily][]*net.IPNet{}
+	for _, cidrStrUntrimmed := range cidrsStrings {
+		cidrStr := strings.TrimSpace(cidrStrUntrimmed)
+		_, cidr, err := netutils.ParseCIDRSloppy(cidrStr)
+		if err != nil {
+			// Ignore empty strings. Same as in MapIPsByIPFamily
+			if len(cidrStr) != 0 {
+				klog.ErrorS(err, "Invalid CIDR ignored", "CIDR", cidrStr)
+			}
+			continue
 		}
+		// since we just succefully parsed the CIDR, IPFamilyOfCIDR will never return "IPFamilyUnknown"
+		ipFamily := convertToV1IPFamily(netutils.IPFamilyOfCIDR(cidr))
+		ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 	}
 	return ipFamilyMap
 }
 
 // GetIPFamilyFromIP Returns the IP family of ipStr, or IPFamilyUnknown if ipStr can't be parsed as an IP
-func GetIPFamilyFromIP(ipStr string) v1.IPFamily {
-	return convertToV1IPFamily(netutils.IPFamilyOfString(ipStr))
-}
-
-// Returns the IP family of cidrStr, or IPFamilyUnknown if cidrStr can't be parsed as a CIDR
-func getIPFamilyFromCIDR(cidrStr string) v1.IPFamily {
-	return convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidrStr))
+func GetIPFamilyFromIP(ip net.IP) v1.IPFamily {
+	return convertToV1IPFamily(netutils.IPFamilyOf(ip))
 }
 
 // Convert netutils.IPFamily to v1.IPFamily

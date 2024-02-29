@@ -97,7 +97,8 @@ type Cloud struct {
 	ProviderID     map[types.NodeName]string
 	addCallLock    sync.Mutex
 	cloudprovider.Zone
-	VolumeLabelMap map[string]map[string]string
+	VolumeLabelMap   map[string]map[string]string
+	AdditionalLabels map[string]string
 
 	OverrideInstanceMetadata func(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error)
 
@@ -373,11 +374,12 @@ func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprov
 	}
 
 	return &cloudprovider.InstanceMetadata{
-		ProviderID:    providerID,
-		InstanceType:  f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
-		NodeAddresses: f.Addresses,
-		Zone:          f.Zone.FailureDomain,
-		Region:        f.Zone.Region,
+		ProviderID:       providerID,
+		InstanceType:     f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
+		NodeAddresses:    f.Addresses,
+		Zone:             f.Zone.FailureDomain,
+		Region:           f.Zone.Region,
+		AdditionalLabels: f.AdditionalLabels,
 	}, f.MetadataErr
 }
 

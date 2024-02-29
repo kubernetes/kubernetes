@@ -266,7 +266,7 @@ func (pl *FakePreScoreAndScorePlugin) ScoreExtensions() framework.ScoreExtension
 	return nil
 }
 
-func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	return pl.preScoreStatus
 }
 
@@ -277,6 +277,16 @@ func NewFakePreScoreAndScorePlugin(name string, score int64, preScoreStatus, sco
 			score:          score,
 			preScoreStatus: preScoreStatus,
 			scoreStatus:    scoreStatus,
+		}, nil
+	}
+}
+
+// NewEqualPrioritizerPlugin returns a factory function to build equalPrioritizerPlugin.
+func NewEqualPrioritizerPlugin() frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakePreScoreAndScorePlugin{
+			name:  "EqualPrioritizerPlugin",
+			score: 1,
 		}, nil
 	}
 }

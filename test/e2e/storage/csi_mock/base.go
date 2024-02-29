@@ -46,6 +46,7 @@ import (
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -246,6 +247,17 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 
 	err := utilerrors.NewAggregate(errs)
 	framework.ExpectNoError(err, "while cleaning up after test")
+}
+
+func (m *mockDriverSetup) update(o utils.PatchCSIOptions) {
+	item, err := m.cs.StorageV1().CSIDrivers().Get(context.TODO(), m.config.GetUniqueDriverName(), metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
+
+	err = utils.PatchCSIDeployment(nil, o, item)
+	framework.ExpectNoError(err, "Failed to apply %v to CSIDriver object %v", o, m.config.GetUniqueDriverName())
+
+	_, err = m.cs.StorageV1().CSIDrivers().Update(context.TODO(), item, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "Failed to update CSIDriver %v", m.config.GetUniqueDriverName())
 }
 
 func (m *mockDriverSetup) createPod(ctx context.Context, withVolume volumeType) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
@@ -691,63 +703,81 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-func checkPodLogs(ctx context.Context, getCalls func(ctx context.Context) ([]drivers.MockCSICall, error), pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled bool, expectedNumNodePublish int) error {
+// checkNodePublishVolume goes through all calls to the mock driver and checks that at least one NodePublishVolume call had expected attributes.
+// If a matched call is found but it has unexpected attributes, checkNodePublishVolume skips it and continues searching.
+func checkNodePublishVolume(ctx context.Context, getCalls func(ctx context.Context) ([]drivers.MockCSICall, error), pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled bool) error {
 	expectedAttributes := map[string]string{}
+	unexpectedAttributeKeys := sets.New[string]()
 	if expectPodInfo {
 		expectedAttributes["csi.storage.k8s.io/pod.name"] = pod.Name
 		expectedAttributes["csi.storage.k8s.io/pod.namespace"] = pod.Namespace
 		expectedAttributes["csi.storage.k8s.io/pod.uid"] = string(pod.UID)
 		expectedAttributes["csi.storage.k8s.io/serviceAccount.name"] = "default"
-
+	} else {
+		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/pod.name")
+		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/pod.namespace")
+		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/pod.uid")
+		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/serviceAccount.name")
 	}
 	if csiInlineVolumesEnabled {
 		// This is only passed in 1.15 when the CSIInlineVolume feature gate is set.
 		expectedAttributes["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(ephemeralVolume)
+	} else {
+		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/ephemeral")
 	}
 
 	if csiServiceAccountTokenEnabled {
 		expectedAttributes["csi.storage.k8s.io/serviceAccount.tokens"] = "<nonempty>"
+	} else {
+		unexpectedAttributeKeys.Insert("csi.storage.k8s.io/serviceAccount.tokens")
 	}
 
-	// Find NodePublish in the GRPC calls.
-	foundAttributes := sets.NewString()
-	numNodePublishVolume := 0
-	numNodeUnpublishVolume := 0
 	calls, err := getCalls(ctx)
 	if err != nil {
 		return err
 	}
 
+	var volumeContexts []map[string]string
 	for _, call := range calls {
-		switch call.Method {
-		case "NodePublishVolume":
-			numNodePublishVolume++
-			if numNodePublishVolume == 1 {
-				// Check that NodePublish had expected attributes for first volume
-				for k, v := range expectedAttributes {
-					vv, found := call.Request.VolumeContext[k]
-					if found && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
-						foundAttributes.Insert(k)
-						framework.Logf("Found volume attribute %s: %s", k, vv)
-					}
-				}
-			}
-		case "NodeUnpublishVolume":
-			framework.Logf("Found NodeUnpublishVolume: %+v", call)
-			numNodeUnpublishVolume++
+		if call.Method != "NodePublishVolume" {
+			continue
 		}
-	}
-	if numNodePublishVolume < expectedNumNodePublish {
-		return fmt.Errorf("NodePublish should be called at least %d", expectedNumNodePublish)
+
+		volumeCtx := call.Request.VolumeContext
+
+		// Check that NodePublish had expected attributes
+		foundAttributes := sets.NewString()
+		for k, v := range expectedAttributes {
+			vv, found := volumeCtx[k]
+			if found && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
+				foundAttributes.Insert(k)
+			}
+		}
+		if foundAttributes.Len() != len(expectedAttributes) {
+			framework.Logf("Skipping the NodePublishVolume call: expected attribute %+v, got %+v", format.Object(expectedAttributes, 1), format.Object(volumeCtx, 1))
+			continue
+		}
+
+		// Check that NodePublish had no unexpected attributes
+		unexpectedAttributes := make(map[string]string)
+		for k := range volumeCtx {
+			if unexpectedAttributeKeys.Has(k) {
+				unexpectedAttributes[k] = volumeCtx[k]
+			}
+		}
+		if len(unexpectedAttributes) != 0 {
+			framework.Logf("Skipping the NodePublishVolume call because it contains unexpected attributes %+v", format.Object(unexpectedAttributes, 1))
+			continue
+		}
+
+		return nil
 	}
 
-	if numNodeUnpublishVolume == 0 {
-		return fmt.Errorf("NodeUnpublish was never called")
+	if len(volumeContexts) == 0 {
+		return fmt.Errorf("NodePublishVolume was never called")
 	}
-	if foundAttributes.Len() != len(expectedAttributes) {
-		return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
-	}
-	return nil
+
+	return fmt.Errorf("NodePublishVolume was called %d times, but no call had expected attributes %s or calls have unwanted attributes key %+v", len(volumeContexts), format.Object(expectedAttributes, 1), unexpectedAttributeKeys.UnsortedList())
 }
 
 // createFSGroupRequestPreHook creates a hook that records the fsGroup passed in
@@ -824,7 +854,7 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 	for i, c := range calls {
 		if i >= len(expectedCallSequence) {
 			// Log all unexpected calls first, return error below outside the loop.
-			framework.Logf("Unexpected CSI driver call: %s (%d)", c.Method, c.FullError)
+			framework.Logf("Unexpected CSI driver call: %s (%v)", c.Method, c.FullError)
 			continue
 		}
 

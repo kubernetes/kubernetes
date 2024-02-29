@@ -44,7 +44,6 @@ func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 			SetDefaults_EnvVar(a)
 		}
 	}
-	SetDefaults_APIServer(&in.APIServer)
 	for i := range in.APIServer.ControlPlaneComponent.ExtraEnvs {
 		a := &in.APIServer.ControlPlaneComponent.ExtraEnvs[i]
 		SetDefaults_EnvVar(a)
@@ -62,6 +61,9 @@ func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 	SetDefaults_InitConfiguration(in)
 	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
+	if in.Timeouts != nil {
+		SetDefaults_Timeouts(in.Timeouts)
+	}
 }
 
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
@@ -74,8 +76,14 @@ func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 		SetDefaults_JoinControlPlane(in.ControlPlane)
 		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
 	}
+	if in.Timeouts != nil {
+		SetDefaults_Timeouts(in.Timeouts)
+	}
 }
 
 func SetObjectDefaults_ResetConfiguration(in *ResetConfiguration) {
 	SetDefaults_ResetConfiguration(in)
+	if in.Timeouts != nil {
+		SetDefaults_Timeouts(in.Timeouts)
+	}
 }

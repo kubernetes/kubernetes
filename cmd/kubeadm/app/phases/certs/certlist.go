@@ -352,7 +352,7 @@ func KubeadmCertEtcdServer() *KubeadmCert {
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
 				// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
-				// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
+				// server cert: https://github.com/etcd-io/etcd/issues/9785#issuecomment-396715692
 				// Once the upstream issue is resolved, this should be returned to only allowing
 				// ServerAuth usage.
 				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},

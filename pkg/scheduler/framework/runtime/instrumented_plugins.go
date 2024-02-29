@@ -61,7 +61,7 @@ type instrumentedPreScorePlugin struct {
 
 var _ framework.PreScorePlugin = &instrumentedPreScorePlugin{}
 
-func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	status := p.PreScorePlugin.PreScore(ctx, state, pod, nodes)
 	if !status.IsSkip() {
 		p.metric.Inc()

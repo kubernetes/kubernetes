@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
+	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	admissionregistrationv1beta1apply "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
 	informerv1beta1 "k8s.io/client-go/informers/admissionregistration/v1beta1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"

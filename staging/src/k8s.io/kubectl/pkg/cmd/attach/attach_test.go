@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
@@ -551,5 +552,39 @@ func TestReattachMessage(t *testing.T) {
 				t.Errorf("reattachMessage(%v, %v) = %q, want string containing %q", test.container, test.rawTTY, msg, test.expected)
 			}
 		})
+	}
+}
+
+func TestCreateExecutor(t *testing.T) {
+	url, err := url.Parse("http://localhost:8080/index.html")
+	if err != nil {
+		t.Fatalf("unable to parse test url: %v", err)
+	}
+	config := cmdtesting.DefaultClientConfig()
+	// First, ensure that no environment variable creates the fallback executor.
+	executor, err := createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Next, check turning on feature flag explicitly also creates fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "true")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Finally, check explicit disabling does NOT create the fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
 	}
 }

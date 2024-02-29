@@ -37,11 +37,11 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critest "k8s.io/cri-api/pkg/apis/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubelettypes "k8s.io/kubelet/pkg/types"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
-	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
@@ -162,14 +162,14 @@ func TestCRIListPodStats(t *testing.T) {
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
-		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, kubelettypes.PodInfraContainerName),
 		sandbox0Cgroup:                getTestContainerInfo(seedSandbox0, "", "", ""),
 		container0.ContainerStatus.Id: getTestContainerInfo(seedContainer0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName0),
 		container1.ContainerStatus.Id: getTestContainerInfo(seedContainer1, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName1),
-		sandbox1.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox1, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox1.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox1, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, kubelettypes.PodInfraContainerName),
 		sandbox1Cgroup:                getTestContainerInfo(seedSandbox1, "", "", ""),
 		container2.ContainerStatus.Id: getTestContainerInfo(seedContainer2, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, cName2),
-		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, kubelettypes.PodInfraContainerName),
 		sandbox2Cgroup:                getTestContainerInfo(seedSandbox2, "", "", ""),
 		container4.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, cName3),
 		sandbox3Cgroup:                getTestContainerInfo(seedSandbox3, "", "", ""),
@@ -381,7 +381,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
-		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, kubelettypes.PodInfraContainerName),
 		sandbox0Cgroup:                getTestContainerInfo(seedSandbox0, "", "", ""),
 		container0.ContainerStatus.Id: getTestContainerInfo(seedContainer0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName0),
 		container1.ContainerStatus.Id: getTestContainerInfo(seedContainer1, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName1),
@@ -593,14 +593,14 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
-		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, kubelettypes.PodInfraContainerName),
 		sandbox0Cgroup:                getTestContainerInfo(seedSandbox0, "", "", ""),
 		container0.ContainerStatus.Id: getTestContainerInfo(seedContainer0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName0),
 		container1.ContainerStatus.Id: getTestContainerInfo(seedContainer1, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName1),
-		sandbox1.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox1, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox1.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox1, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, kubelettypes.PodInfraContainerName),
 		sandbox1Cgroup:                getTestContainerInfo(seedSandbox1, "", "", ""),
 		container2.ContainerStatus.Id: getTestContainerInfo(seedContainer2, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, cName2),
-		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, kubelettypes.PodInfraContainerName),
 		sandbox2Cgroup:                getTestContainerInfo(seedSandbox2, "", "", ""),
 		container4.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, cName3),
 		sandbox3Cgroup:                getTestContainerInfo(seedSandbox3, "", "", ""),

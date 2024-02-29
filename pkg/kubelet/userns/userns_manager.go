@@ -49,6 +49,7 @@ const maxPods = 1024
 const mapReInitializeThreshold = 1000
 
 type userNsPodsManager interface {
+	HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error)
 	GetPodDir(podUID types.UID) string
 	ListPodsFromDisk() ([]types.UID, error)
 }
@@ -96,7 +97,7 @@ func (m *UsernsManager) writeMappingsToFile(pod types.UID, userNs userNamespace)
 
 	fstore, err := utilstore.NewFileStore(dir, &utilfs.DefaultFs{})
 	if err != nil {
-		return err
+		return fmt.Errorf("create user namespace store: %w", err)
 	}
 	if err := fstore.Write(mappingsFile, data); err != nil {
 		return err
@@ -123,7 +124,7 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 	dir := m.kl.GetPodDir(pod)
 	fstore, err := utilstore.NewFileStore(dir, &utilfs.DefaultFs{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create user namespace store: %w", err)
 	}
 	return fstore.Read(mappingsFile)
 }
@@ -151,13 +152,13 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 		if os.IsNotExist(err) {
 			return &m, nil
 		}
-		return nil, fmt.Errorf("user namespace manager can't read pods from disk: %w", err)
+		return nil, fmt.Errorf("read pods from disk: %w", err)
 
 	}
 	for _, podUID := range found {
 		klog.V(5).InfoS("reading pod from disk for user namespace", "podUID", podUID)
 		if err := m.recordPodMappings(podUID); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("record pod mappings: %w", err)
 		}
 	}
 
@@ -308,7 +309,7 @@ func (m *UsernsManager) releaseWithLock(pod types.UID) {
 
 func (m *UsernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) (userNs userNamespace, err error) {
 	if err = json.Unmarshal([]byte(content), &userNs); err != nil {
-		err = fmt.Errorf("can't parse file: %w", err)
+		err = fmt.Errorf("invalid user namespace mappings file: %w", err)
 		return
 	}
 
@@ -379,19 +380,40 @@ func (m *UsernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err err
 }
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
+
+	if pod == nil || pod.Spec.HostUsers == nil {
+		// if the feature is enabled, specify to use the node mode...
+		if featureEnabled {
+			return &runtimeapi.UserNamespace{
+				Mode: runtimeapi.NamespaceMode_NODE,
+			}, nil
+		}
+		// ...otherwise don't even specify it
 		return nil, nil
 	}
-
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	if pod.Spec.HostUsers == nil || *pod.Spec.HostUsers {
+	// pod.Spec.HostUsers is set to true/false
+	if !featureEnabled {
+		return nil, fmt.Errorf("the feature gate %q is disabled: can't set spec.HostUsers", features.UserNamespacesSupport)
+	}
+	if *pod.Spec.HostUsers {
 		return &runtimeapi.UserNamespace{
 			Mode: runtimeapi.NamespaceMode_NODE,
 		}, nil
 	}
+
+	// From here onwards, hostUsers=false and the feature gate is enabled.
+
+	// if the pod requested a user namespace and the runtime doesn't support user namespaces then return an error.
+	if handlerSupportsUserns, err := m.kl.HandlerSupportsUserNamespaces(runtimeHandler); err != nil {
+		return nil, err
+	} else if !handlerSupportsUserns {
+		return nil, fmt.Errorf("RuntimeClass handler %q does not support user namespaces", runtimeHandler)
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	content, err := m.readMappingsFromFile(pod.UID)
 	if err != nil && err != utilstore.ErrKeyNotFound {

@@ -210,8 +210,16 @@ func (r ratchetingOptions) shouldRatchetError() bool {
 func (r ratchetingOptions) key(field string) ratchetingOptions {
 	if r.currentCorrelation == nil {
 		return r
+	} else if r.nearestParentCorrelation == nil && (field == "apiVersion" || field == "kind") {
+		// We cannot ratchet changes to the APIVersion and kind fields field since
+		// they aren't visible. (both old and new are converted to the same type)
+		//
+		return ratchetingOptions{}
 	}
 
+	// nearestParentCorrelation is always non-nil except for the root node.
+	// The below line ensures that the next nearestParentCorrelation is set
+	// to a non-nil r.currentCorrelation
 	return ratchetingOptions{currentCorrelation: r.currentCorrelation.Key(field), nearestParentCorrelation: r.currentCorrelation}
 }
 
@@ -361,8 +369,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
+			currentFldPath := fldPath
 			if len(compiled.NormalizedRuleFieldPath) > 0 {
-				fldPath = fldPath.Child(compiled.NormalizedRuleFieldPath)
+				currentFldPath = currentFldPath.Child(compiled.NormalizedRuleFieldPath)
 			}
 
 			addErr := func(e *field.Error) {
@@ -377,22 +386,22 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
 				if msgErr != nil {
 					if msgErr.Type == cel.ErrorTypeInternal {
-						addErr(field.InternalError(fldPath, msgErr))
+						addErr(field.InternalError(currentFldPath, msgErr))
 						return errs, -1
 					} else if msgErr.Type == cel.ErrorTypeInvalid {
-						addErr(field.Invalid(fldPath, sts.Type, msgErr.Error()))
+						addErr(field.Invalid(currentFldPath, sts.Type, msgErr.Error()))
 						return errs, -1
 					} else {
 						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
-						addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+						addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 						remainingBudget = newRemainingBudget
 					}
 				} else {
-					addErr(fieldErrorForReason(fldPath, sts.Type, messageExpression, rule.Reason))
+					addErr(fieldErrorForReason(currentFldPath, sts.Type, messageExpression, rule.Reason))
 					remainingBudget = newRemainingBudget
 				}
 			} else {
-				addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+				addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 			}
 		}
 	}

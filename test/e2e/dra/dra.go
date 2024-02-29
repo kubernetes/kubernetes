@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -48,9 +49,23 @@ const (
 	podStartTimeout = 5 * time.Minute
 )
 
+// networkResources can be passed to NewDriver directly.
 func networkResources() app.Resources {
 	return app.Resources{
 		Shareable: true,
+	}
+}
+
+// perNode returns a function which can be passed to NewDriver. The nodes
+// parameter has be instantiated, but not initialized yet, so the returned
+// function has to capture it and use it when being called.
+func perNode(maxAllocations int, nodes *Nodes) func() app.Resources {
+	return func() app.Resources {
+		return app.Resources{
+			NodeLocal:      true,
+			MaxAllocations: maxAllocations,
+			Nodes:          nodes.NodeNames,
+		}
 	}
 }
 
@@ -294,6 +309,108 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 4)
+
+		ginkgo.Context("with local unshared resources", func() {
+			driver := NewDriver(f, nodes, func() app.Resources {
+				return app.Resources{
+					NodeLocal:      true,
+					MaxAllocations: 10,
+					Nodes:          nodes.NodeNames,
+				}
+			})
+			b := newBuilder(f, driver)
+
+			// This test covers some special code paths in the scheduler:
+			// - Patching the ReservedFor during PreBind because in contrast
+			//   to claims specifically allocated for a pod, here the claim
+			//   gets allocated without reserving it.
+			// - Error handling when PreBind fails: multiple attempts to bind pods
+			//   are started concurrently, only one attempt succeeds.
+			// - Removing a ReservedFor entry because the first inline claim gets
+			//   reserved during allocation.
+			ginkgo.It("reuses an allocated immediate claim", func(ctx context.Context) {
+				objects := []klog.KMetadata{
+					b.parameters(),
+					b.externalClaim(resourcev1alpha2.AllocationModeImmediate),
+				}
+				podExternal := b.podExternal()
+
+				// Create many pods to increase the chance that the scheduler will
+				// try to bind two pods at the same time.
+				numPods := 5
+				for i := 0; i < numPods; i++ {
+					podInline, claimTemplate := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+					podInline.Spec.Containers[0].Resources.Claims = append(podInline.Spec.Containers[0].Resources.Claims, podExternal.Spec.Containers[0].Resources.Claims[0])
+					podInline.Spec.ResourceClaims = append(podInline.Spec.ResourceClaims, podExternal.Spec.ResourceClaims[0])
+					objects = append(objects, claimTemplate, podInline)
+				}
+				b.create(ctx, objects...)
+
+				var runningPod *v1.Pod
+				haveRunningPod := gcustom.MakeMatcher(func(pods []v1.Pod) (bool, error) {
+					numRunning := 0
+					runningPod = nil
+					for _, pod := range pods {
+						if pod.Status.Phase == v1.PodRunning {
+							pod := pod // Don't keep pointer to loop variable...
+							runningPod = &pod
+							numRunning++
+						}
+					}
+					return numRunning == 1, nil
+				}).WithTemplate("Expected one running Pod.\nGot instead:\n{{.FormattedActual}}")
+
+				for i := 0; i < numPods; i++ {
+					ginkgo.By("waiting for exactly one pod to start")
+					runningPod = nil
+					gomega.Eventually(ctx, b.listTestPods).WithTimeout(f.Timeouts.PodStartSlow).Should(haveRunningPod)
+
+					ginkgo.By("checking that no other pod gets scheduled")
+					havePendingPods := gcustom.MakeMatcher(func(pods []v1.Pod) (bool, error) {
+						numPending := 0
+						for _, pod := range pods {
+							if pod.Status.Phase == v1.PodPending {
+								numPending++
+							}
+						}
+						return numPending == numPods-1-i, nil
+					}).WithTemplate("Expected only one running Pod.\nGot instead:\n{{.FormattedActual}}")
+					gomega.Consistently(ctx, b.listTestPods).WithTimeout(time.Second).Should(havePendingPods)
+
+					ginkgo.By(fmt.Sprintf("deleting pod %s", klog.KObj(runningPod)))
+					framework.ExpectNoError(b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, runningPod.Name, metav1.DeleteOptions{}))
+
+					ginkgo.By(fmt.Sprintf("waiting for pod %s to disappear", klog.KObj(runningPod)))
+					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, b.f.ClientSet, runningPod.Name, runningPod.Namespace, f.Timeouts.PodDelete))
+				}
+			})
+		})
+
+		ginkgo.Context("with shared network resources", func() {
+			driver := NewDriver(f, nodes, networkResources)
+			b := newBuilder(f, driver)
+
+			// This test complements "reuses an allocated immediate claim" above:
+			// because the claim can be shared, each PreBind attempt succeeds.
+			ginkgo.It("shares an allocated immediate claim", func(ctx context.Context) {
+				objects := []klog.KMetadata{
+					b.parameters(),
+					b.externalClaim(resourcev1alpha2.AllocationModeImmediate),
+				}
+				// Create many pods to increase the chance that the scheduler will
+				// try to bind two pods at the same time.
+				numPods := 5
+				pods := make([]*v1.Pod, numPods)
+				for i := 0; i < numPods; i++ {
+					pods[i] = b.podExternal()
+					objects = append(objects, pods[i])
+				}
+				b.create(ctx, objects...)
+
+				ginkgo.By("waiting all pods to start")
+				framework.ExpectNoError(e2epod.WaitForPodsRunning(ctx, b.f.ClientSet, f.Namespace.Name, numPods+1 /* driver */, f.Timeouts.PodStartSlow))
+			})
+		})
 
 		// claimTests tries out several different combinations of pods with
 		// claims, both inline and external.
@@ -567,13 +684,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.Context("with node-local resources", func() {
-			driver := NewDriver(f, nodes, func() app.Resources {
-				return app.Resources{
-					NodeLocal:      true,
-					MaxAllocations: 1,
-					Nodes:          nodes.NodeNames,
-				}
-			})
+			driver := NewDriver(f, nodes, perNode(1, nodes))
 			b := newBuilder(f, driver)
 
 			tests := func(allocationMode resourcev1alpha2.AllocationMode) {
@@ -628,13 +739,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		ginkgo.Context("reallocation", func() {
 			var allocateWrapper2 app.AllocateWrapperType
-			driver := NewDriver(f, nodes, func() app.Resources {
-				return app.Resources{
-					NodeLocal:      true,
-					MaxAllocations: 1,
-					Nodes:          nodes.NodeNames,
-				}
-			})
+			driver := NewDriver(f, nodes, perNode(1, nodes))
 			driver2 := NewDriver(f, nodes, func() app.Resources {
 				return app.Resources{
 					NodeLocal:      true,
@@ -765,24 +870,12 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	multipleDrivers := func(nodeV1alpha2, nodeV1alpha3 bool) {
 		nodes := NewNodes(f, 1, 4)
-		driver1 := NewDriver(f, nodes, func() app.Resources {
-			return app.Resources{
-				NodeLocal:      true,
-				MaxAllocations: 2,
-				Nodes:          nodes.NodeNames,
-			}
-		})
+		driver1 := NewDriver(f, nodes, perNode(2, nodes))
 		driver1.NodeV1alpha2 = nodeV1alpha2
 		driver1.NodeV1alpha3 = nodeV1alpha3
 		b1 := newBuilder(f, driver1)
 
-		driver2 := NewDriver(f, nodes, func() app.Resources {
-			return app.Resources{
-				NodeLocal:      true,
-				MaxAllocations: 2,
-				Nodes:          nodes.NodeNames,
-			}
-		})
+		driver2 := NewDriver(f, nodes, perNode(2, nodes))
 		driver2.NameSuffix = "-other"
 		driver2.NodeV1alpha2 = nodeV1alpha2
 		driver2.NodeV1alpha3 = nodeV1alpha3
@@ -1035,26 +1128,25 @@ func (b *builder) podExternalMultiple() *v1.Pod {
 func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMetadata {
 	var createdObjs []klog.KMetadata
 	for _, obj := range objs {
-		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()), func() {
-			var err error
-			var createdObj klog.KMetadata
-			switch obj := obj.(type) {
-			case *resourcev1alpha2.ResourceClass:
-				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
-			case *v1.Pod:
-				createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			case *v1.ConfigMap:
-				_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			case *resourcev1alpha2.ResourceClaim:
-				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			case *resourcev1alpha2.ResourceClaimTemplate:
-				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-			default:
-				framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
-			}
-			framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
-			createdObjs = append(createdObjs, createdObj)
-		})
+		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()))
+		var err error
+		var createdObj klog.KMetadata
+		switch obj := obj.(type) {
+		case *resourcev1alpha2.ResourceClass:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
+		case *v1.Pod:
+			createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *v1.ConfigMap:
+			_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.ResourceClaim:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.ResourceClaimTemplate:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		default:
+			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
+		}
+		framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
+		createdObjs = append(createdObjs, createdObj)
 	}
 	return createdObjs
 }

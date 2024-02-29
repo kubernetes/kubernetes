@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -729,6 +730,15 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 	return n
 }
 
+// Annotation applies a {k,v} annotation pair to the inner node.
+func (n *NodeWrapper) Annotation(k, v string) *NodeWrapper {
+	if n.Annotations == nil {
+		n.Annotations = make(map[string]string)
+	}
+	metav1.SetMetaDataAnnotation(&n.ObjectMeta, k, v)
+	return n
+}
+
 // Capacity sets the capacity and the allocatable resources of the inner node.
 // Each entry in `resources` corresponds to a resource name and its quantity.
 // By default, the capacity and allocatable number of pods are set to 32.
@@ -757,6 +767,27 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 // Taints applies taints to the inner node.
 func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
 	n.Spec.Taints = taints
+	return n
+}
+
+// Unschedulable applies the unschedulable field.
+func (n *NodeWrapper) Unschedulable(unschedulable bool) *NodeWrapper {
+	n.Spec.Unschedulable = unschedulable
+	return n
+}
+
+// Condition applies the node condition.
+func (n *NodeWrapper) Condition(typ v1.NodeConditionType, status v1.ConditionStatus, message, reason string) *NodeWrapper {
+	n.Status.Conditions = []v1.NodeCondition{
+		{
+			Type:               typ,
+			Status:             status,
+			Message:            message,
+			Reason:             reason,
+			LastHeartbeatTime:  metav1.Time{Time: time.Now()},
+			LastTransitionTime: metav1.Time{Time: time.Now()},
+		},
+	}
 	return n
 }
 

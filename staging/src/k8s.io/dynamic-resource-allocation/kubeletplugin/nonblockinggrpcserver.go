@@ -84,9 +84,7 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, interceptors []grpc.
 		finalInterceptors = append(finalInterceptors, s.interceptor)
 	}
 	finalInterceptors = append(finalInterceptors, interceptors...)
-	if len(finalInterceptors) >= 0 {
-		opts = append(opts, grpc.ChainUnaryInterceptor(finalInterceptors...))
-	}
+	opts = append(opts, grpc.ChainUnaryInterceptor(finalInterceptors...))
 	s.server = grpc.NewServer(opts...)
 	for _, service := range services {
 		service(s.server)

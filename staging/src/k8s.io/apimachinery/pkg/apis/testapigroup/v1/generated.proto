@@ -125,7 +125,7 @@ message CarpSpec {
   // +optional
   optional string serviceAccountName = 8;
 
-  // DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
+  // DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
   // +k8s:conversion-gen=false
   // +optional

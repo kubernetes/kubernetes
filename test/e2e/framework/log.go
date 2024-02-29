@@ -18,22 +18,17 @@ package framework
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 )
 
-func nowStamp() string {
-	return time.Now().Format(time.StampMilli)
-}
-
-func log(level string, format string, args ...interface{}) {
-	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
-}
-
 // Logf logs the info.
+//
+// Use this instead of `klog.Infof` because stack unwinding automatically
+// skips over helper functions which marked themselves as helper by
+// calling [ginkgo.GinkgoHelper].
 func Logf(format string, args ...interface{}) {
-	log("INFO", format, args...)
+	log(1, fmt.Sprintf(format, args...))
 }
 
 // Failf logs the fail info, including a stack trace starts with its direct caller

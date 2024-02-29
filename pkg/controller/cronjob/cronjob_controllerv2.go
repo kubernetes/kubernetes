@@ -203,8 +203,8 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 	updateStatusAfterCleanup := jm.cleanupFinishedJobs(ctx, cronJobCopy, jobsToBeReconciled)
 
 	requeueAfter, updateStatusAfterSync, syncErr := jm.syncCronJob(ctx, cronJobCopy, jobsToBeReconciled)
-	if err != nil {
-		logger.V(2).Info("Error reconciling cronjob", "cronjob", klog.KObj(cronJob), "err", err)
+	if syncErr != nil {
+		logger.V(2).Info("Error reconciling cronjob", "cronjob", klog.KObj(cronJob), "err", syncErr)
 	}
 
 	// Update the CronJob if needed
@@ -443,8 +443,8 @@ func (jm *ControllerV2) syncCronJob(
 			deleteFromActiveList(cronJob, j.ObjectMeta.UID)
 			jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, status: %v", j.Name, status)
 			updateStatus = true
-		} else if IsJobFinished(j) {
-			// a job does not have to be in active list, as long as it is finished, we will process the timestamp
+		} else if IsJobSucceeded(j) {
+			// a job does not have to be in active list, as long as it has completed successfully, we will process the timestamp
 			if cronJob.Status.LastSuccessfulTime == nil {
 				cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime
 				updateStatus = true

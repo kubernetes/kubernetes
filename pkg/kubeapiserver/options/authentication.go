@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -461,6 +462,9 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		if ret.AuthenticationConfig, err = loadAuthenticationConfig(o.AuthenticationConfigFile); err != nil {
 			return kubeauthenticator.Config{}, err
 		}
+		// all known signing algs are allowed when using authentication config
+		// TODO: what we really want to express is 'any alg is fine as long it matches a public key'
+		ret.OIDCSigningAlgs = oidc.AllValidSigningAlgorithms()
 	} else if o.OIDC != nil && len(o.OIDC.IssuerURL) > 0 && len(o.OIDC.ClientID) > 0 {
 		usernamePrefix := o.OIDC.UsernamePrefix
 

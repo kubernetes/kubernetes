@@ -53,6 +53,9 @@ type stateData struct {
 	// it's initialized in the PreFilter phase
 	podVolumesByNode map[string]*PodVolumes
 	podVolumeClaims  *PodVolumeClaims
+	// hasStaticBindings declares whether the pod contains one or more StaticBinding.
+	// If not, vloumeBinding will skip score extension point.
+	hasStaticBindings bool
 	sync.Mutex
 }
 
@@ -74,6 +77,7 @@ var _ framework.PreFilterPlugin = &VolumeBinding{}
 var _ framework.FilterPlugin = &VolumeBinding{}
 var _ framework.ReservePlugin = &VolumeBinding{}
 var _ framework.PreBindPlugin = &VolumeBinding{}
+var _ framework.PreScorePlugin = &VolumeBinding{}
 var _ framework.ScorePlugin = &VolumeBinding{}
 var _ framework.EnqueueExtensions = &VolumeBinding{}
 
@@ -258,8 +262,24 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	// multiple goroutines call `Filter` on different nodes simultaneously and the `CycleState` may be duplicated, so we must use a local lock here
 	state.Lock()
 	state.podVolumesByNode[node.Name] = podVolumes
+	state.hasStaticBindings = state.hasStaticBindings || (podVolumes != nil && len(podVolumes.StaticBindings) > 0)
 	state.Unlock()
 	return nil
+}
+
+// PreScore invoked at the preScore extension point. It checks whether volumeBinding can skip Score
+func (pl *VolumeBinding) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+	if pl.scorer == nil {
+		return framework.NewStatus(framework.Skip)
+	}
+	state, err := getStateData(cs)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+	if state.hasStaticBindings {
+		return nil
+	}
+	return framework.NewStatus(framework.Skip)
 }
 
 // Score invoked at the score extension point.

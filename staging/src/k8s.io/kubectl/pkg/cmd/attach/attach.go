@@ -158,22 +158,9 @@ type DefaultRemoteAttach struct{}
 
 // Attach executes attach to a running container
 func (*DefaultRemoteAttach) Attach(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	// Legacy SPDY executor is default. If feature gate enabled, fallback
-	// executor attempts websockets first--then SPDY.
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", url)
+	exec, err := createExecutor(url, config)
 	if err != nil {
 		return err
-	}
-	if cmdutil.RemoteCommandWebsockets.IsEnabled() {
-		// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
-		websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
-		if err != nil {
-			return err
-		}
-		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, httpstream.IsUpgradeFailure)
-		if err != nil {
-			return err
-		}
 	}
 	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:             stdin,
@@ -182,6 +169,27 @@ func (*DefaultRemoteAttach) Attach(url *url.URL, config *restclient.Config, stdi
 		Tty:               tty,
 		TerminalSizeQueue: terminalSizeQueue,
 	})
+}
+
+// createExecutor returns the Executor or an error if one occurred.
+func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Executor, error) {
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", url)
+	if err != nil {
+		return nil, err
+	}
+	// Fallback executor is default, unless feature flag is explicitly disabled.
+	if !cmdutil.RemoteCommandWebsockets.IsDisabled() {
+		// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
+		websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
+		if err != nil {
+			return nil, err
+		}
+		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, httpstream.IsUpgradeFailure)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return exec, nil
 }
 
 // Complete verifies command line arguments and loads data from the command environment

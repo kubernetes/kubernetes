@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/utils/ptr"
 )
 
 func TestCelCostStability(t *testing.T) {
@@ -227,6 +228,8 @@ func TestCelCostStability(t *testing.T) {
 				"!(0 in self.val1)":                           6,
 				"self.val1 + self.val2 == [1, 2, 3, 1, 2, 3]": 6,
 				"self.val1 + [4, 5] == [1, 2, 3, 4, 5]":       4,
+				"has(self.val1)":                              1,
+				"has(self.val1) && has(self.val2)":            2,
 			},
 		},
 		{name: "listSets",
@@ -1091,6 +1094,20 @@ func TestCelCostStability(t *testing.T) {
 				"self.listOfMap[0]['z'] == 'g'":                               5,
 				"self.listOfObj[0].field3 == 'h'":                             5,
 				"self.listOfListMap[0].exists(e, e.k3 == '3' && e.v3 == 'i')": 14,
+
+				// chained comprehensions
+				"self.mapOfMap.map(k, k).map(k, k).size() == 1":      32,
+				"self.mapOfListMap.map(k, k).map(k, k).size() == 1":  32,
+				"self.mapOfList.map(k, k).map(k, k).size() == 1":     32,
+				"self.listOfMap.map(e, e).map(e, e).size() == 1":     32,
+				"self.listOfListMap.map(e, e).map(e, e).size() == 1": 32,
+
+				// nested comprehensions
+				"self.mapOfMap.map(k, self.mapOfMap[k].map(m, m)).size() == 1":         34,
+				"self.mapOfListMap.map(k, self.mapOfListMap[k].map(m, m)).size() == 1": 34,
+				"self.mapOfList.map(k, self.mapOfList[k].map(l, l)).size() == 1":       34,
+				"self.listOfMap.map(e, e.map(m, m)).size() == 1":                       32,
+				"self.listOfListMap.map(e, e.map(e, e)).size() == 1":                   32,
 			},
 		},
 		{name: "optionals",
@@ -1126,6 +1143,26 @@ func TestCelCostStability(t *testing.T) {
 				"self.m[?'k'] == optional.of('v')":                    5,
 				"self.l[?0] == optional.of('a')":                      5,
 				"optional.ofNonZeroValue(1).hasValue()":               2,
+			},
+		},
+		{name: "quantity",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			expectCost: map[string]int64{
+				`isQuantity(self.val1)`: 3,
+				`isQuantity(self.val2)`: 3,
+				`isQuantity("200M")`:    1,
+				`isQuantity("20Mi")`:    1,
+				`quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`:                                           6,
+				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`: 9,
+				`quantity(self.val1).isLessThan(quantity(self.val2))`:                                                                    7,
+				`quantity("50M").isLessThan(quantity("100M"))`:                                                                           3,
+				`quantity("50Mi").isGreaterThan(quantity("50M"))`:                                                                        3,
+				`quantity("200M").compareTo(quantity("0.2G")) == 0`:                                                                      4,
+				`quantity("50k").add(quantity("20")) == quantity("50.02k")`:                                                              5,
+				`quantity("50k").sub(20) == quantity("49980")`:                                                                           4,
+				`quantity("50").isInteger()`:                                                                                             2,
+				`quantity(self.val1).isInteger()`:                                                                                        4,
 			},
 		},
 	}
@@ -1344,9 +1381,9 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"!(0 in self.val1)":                                   1572866,
 				"self.val1 + self.val2 == [1, 2, 3, 1, 2, 3]":         16,
 				"self.val1 + [4, 5] == [1, 2, 3, 4, 5]":               24,
-				"has(self.val1)":                                      2,
-				"has(self.val1) && has(self.val2)":                    4,
-				"!has(self.val1)":                                     3,
+				"has(self.val1)":                                      1,
+				"has(self.val1) && has(self.val2)":                    2,
+				"!has(self.val1)":                                     2,
 				"self.val1.all(k, size(self.val1) > 0)":               11010044,
 				"self.val1.exists_one(k, self.val1 == [2])":           23592949,
 				"!self.val1.exists_one(k, size(self.val1) > 0)":       9437183,
@@ -1365,9 +1402,9 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"!('x' in self.val1)":                                 1048578,
 				"self.val1 + self.val2 == ['a', 'b', 'c']":            16,
 				"self.val1 + ['c', 'd'] == ['a', 'b', 'c', 'd']":      24,
-				"has(self.val1)":                                      2,
-				"has(self.val1) && has(self.val2)":                    4,
-				"!has(self.val1)":                                     3,
+				"has(self.val1)":                                      1,
+				"has(self.val1) && has(self.val2)":                    2,
+				"!has(self.val1)":                                     2,
 				"self.val1.all(k, size(self.val1) > 0)":               7340028,
 				"self.val1.exists_one(k, self.val1 == ['a'])":         15728629,
 				"!self.val1.exists_one(k, size(self.val1) > 0)":       6291455,
@@ -1392,9 +1429,9 @@ func TestCelEstimatedCostStability(t *testing.T) {
 
 				"self.objs[2] + [self.objs[0][0], self.objs[0][1]] == self.objs[0]": 104883, // concat against a declared list
 				"size(self.objs[0] + [self.objs[3][0]]) == 3":                       20,
-				"has(self.objs)":                                            2,
-				"has(self.objs) && has(self.objs)":                          4,
-				"!has(self.objs)":                                           3,
+				"has(self.objs)":                                            1,
+				"has(self.objs) && has(self.objs)":                          2,
+				"!has(self.objs)":                                           2,
 				"self.objs[0].all(k, size(self.objs[0]) > 0)":               8388604,
 				"self.objs[0].exists_one(k, size(self.objs[0]) > 0)":        7340030,
 				"!self.objs[0].exists_one(k, size(self.objs[0]) > 0)":       7340031,
@@ -1409,9 +1446,9 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"'k1' in self.val1":                                   3,
 				"!('k3' in self.val1)":                                4,
 				"self.val1 == {'k1': 'a', 'k2': 'b'}":                 33,
-				"has(self.val1)":                                      2,
-				"has(self.val1) && has(self.val2)":                    4,
-				"!has(self.val1)":                                     3,
+				"has(self.val1)":                                      1,
+				"has(self.val1) && has(self.val2)":                    2,
+				"!has(self.val1)":                                     2,
 				"self.val1.all(k, size(self.val1) > 0)":               2752508,
 				"self.val1.exists_one(k, size(self.val1) > 0)":        2359294,
 				"!self.val1.exists_one(k, size(self.val1) > 0)":       2359295,
@@ -1448,13 +1485,13 @@ func TestCelEstimatedCostStability(t *testing.T) {
 			}),
 			// https://github.com/google/cel-spec/blob/master/doc/langdef.md#field-selection
 			expectCost: map[string]uint64{
-				"has(self.a.b)":                            3,
-				"has(self.a1.b1.c1)":                       4,
-				"!(has(self.a1.d2) && has(self.a1.d2.e2))": 8, // must check intermediate optional fields (see below no such key error for d2)
-				"!has(self.a1.d2)":                         4,
-				"has(self.a)":                              2,
-				"has(self.a) && has(self.a1)":              4,
-				"!has(self.a)":                             3,
+				"has(self.a.b)":                            2,
+				"has(self.a1.b1.c1)":                       3,
+				"!(has(self.a1.d2) && has(self.a1.d2.e2))": 6, // must check intermediate optional fields (see below no such key error for d2)
+				"!has(self.a1.d2)":                         3,
+				"has(self.a)":                              1,
+				"has(self.a) && has(self.a1)":              2,
+				"!has(self.a)":                             2,
 			},
 		},
 		{name: "map access",
@@ -1468,10 +1505,10 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"!('c' in self.val)": 4,
 				"'d' in self.val":    3,
 				// field selection also possible if map key is a valid CEL identifier
-				"!has(self.val.a)":                               4,
-				"has(self.val.b)":                                3,
-				"!has(self.val.c)":                               4,
-				"has(self.val.d)":                                3,
+				"!has(self.val.a)":                               3,
+				"has(self.val.b)":                                2,
+				"!has(self.val.c)":                               3,
+				"has(self.val.d)":                                2,
 				"self.val.all(k, self.val[k] > 0)":               3595115,
 				"self.val.exists_one(k, self.val[k] == 2)":       2696338,
 				"!self.val.exists_one(k, self.val[k] > 0)":       3145728,
@@ -1488,9 +1525,9 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				})),
 			}),
 			expectCost: map[string]uint64{
-				"has(self.listMap[0].v)":                             4,
+				"has(self.listMap[0].v)":                             3,
 				"self.listMap.all(m, m.k.startsWith('a'))":           6291453,
-				"self.listMap.all(m, !has(m.v2) || m.v2 == 'z')":     9437178,
+				"self.listMap.all(m, !has(m.v2) || m.v2 == 'z')":     8388603,
 				"self.listMap.exists(m, m.k.endsWith('1'))":          7340028,
 				"self.listMap.exists_one(m, m.k == 'a3')":            5242879,
 				"!self.listMap.all(m, m.k.endsWith('1'))":            6291454,
@@ -1498,18 +1535,18 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"!self.listMap.exists_one(m, m.k.startsWith('a'))":   5242880,
 				"size(self.listMap.filter(m, m.k == 'a1')) == 1":     16777215,
 				"self.listMap.exists(m, m.k == 'a1' && m.v == 'b1')": 10485753,
-				"self.listMap.map(m, m.v).exists(v, v == 'b1')":      uint64(18446744073709551615),
+				"self.listMap.map(m, m.v).exists(v, v == 'b1')":      uint64(19922939),
 
 				// test comprehensions where the field used in predicates is unset on all but one of the elements:
 				// - with has checks:
 
-				"self.listMap.exists(m, has(m.v2) && m.v2 == 'z')":             9437178,
-				"!self.listMap.all(m, has(m.v2) && m.v2 != 'z')":               8388604,
-				"self.listMap.exists_one(m, has(m.v2) && m.v2 == 'z')":         7340029,
-				"self.listMap.filter(m, has(m.v2) && m.v2 == 'z').size() == 1": 18874365,
+				"self.listMap.exists(m, has(m.v2) && m.v2 == 'z')":             8388603,
+				"!self.listMap.all(m, has(m.v2) && m.v2 != 'z')":               7340029,
+				"self.listMap.exists_one(m, has(m.v2) && m.v2 == 'z')":         6291454,
+				"self.listMap.filter(m, has(m.v2) && m.v2 == 'z').size() == 1": 17825790,
 				// undocumented overload of map that takes a filter argument. This is the same as .filter().map()
-				"self.listMap.map(m, has(m.v2) && m.v2 == 'z', m.v2).size() == 1":           19922940,
-				"self.listMap.filter(m, has(m.v2) && m.v2 == 'z').map(m, m.v2).size() == 1": uint64(18446744073709551615),
+				"self.listMap.map(m, has(m.v2) && m.v2 == 'z', m.v2).size() == 1":           18874365,
+				"self.listMap.filter(m, has(m.v2) && m.v2 == 'z').map(m, m.v2).size() == 1": uint64(32505851),
 				// - without has checks:
 
 				// all() and exists() macros ignore errors from predicates so long as the condition holds for at least one element
@@ -1531,7 +1568,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"!self.array.exists_one(e, e == 2)":                              4718594,
 				"self.array.all(e, e < 100)":                                     7864318,
 				"size(self.array.filter(e, e%2 == 0)) == 3":                      25165823,
-				"self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)": uint64(18446744073709551615),
+				"self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)": uint64(53477367),
 				"size(self.array) == 8":                                          4,
 			},
 		},
@@ -1549,7 +1586,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"!self.set.exists_one(e, e > 3)":                                   6291457,
 				"self.set.all(e, e < 10)":                                          7864318,
 				"size(self.set.filter(e, e%2 == 0)) == 2":                          25165823,
-				"self.set.map(e, e * 20).filter(e, e > 50).exists_one(e, e == 60)": uint64(18446744073709551615),
+				"self.set.map(e, e * 20).filter(e, e > 50).exists_one(e, e == 60)": uint64(50331642),
 				"size(self.set) == 5":                                              4,
 			},
 		},
@@ -1639,7 +1676,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"self.embedded.metadata.generateName == 'pickItForMe'": 6,
 
 				// the object exists
-				"has(self.embedded)": 2,
+				"has(self.embedded)": 1,
 			},
 		},
 		{name: "string in intOrString",
@@ -1691,7 +1728,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"something": withNullable(true, intOrStringType()),
 			}),
 			expectCost: map[string]uint64{
-				"!has(self.something)": 3,
+				"!has(self.something)": 2,
 			},
 		},
 		{name: "percent comparison using intOrString",
@@ -1753,7 +1790,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				},
 			}),
 			expectCost: map[string]uint64{
-				"has(self.withUnknown)":            2,
+				"has(self.withUnknown)":            1,
 				"self.withUnknownList.size() == 5": 4,
 				// fields that are unknown because they were not specified on the object schema are included in equality checks
 				"self.withUnknownList[0] != self.withUnknownList[1]": 6,
@@ -1818,19 +1855,19 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"setToNullNullableStr": withNullable(true, stringType),
 			}),
 			expectCost: map[string]uint64{
-				"!has(self.unsetPlainStr)": 3,
-				"has(self.unsetDefaultedStr) && self.unsetDefaultedStr == 'default value'": 6,
-				"!has(self.unsetNullableStr)": 3,
+				"!has(self.unsetPlainStr)": 2,
+				"has(self.unsetDefaultedStr) && self.unsetDefaultedStr == 'default value'": 5,
+				"!has(self.unsetNullableStr)": 2,
 
-				"has(self.setPlainStr) && self.setPlainStr == 'v1'":         5,
-				"has(self.setDefaultedStr) && self.setDefaultedStr == 'v2'": 5,
-				"has(self.setNullableStr) && self.setNullableStr == 'v3'":   5,
+				"has(self.setPlainStr) && self.setPlainStr == 'v1'":         4,
+				"has(self.setDefaultedStr) && self.setDefaultedStr == 'v2'": 4,
+				"has(self.setNullableStr) && self.setNullableStr == 'v3'":   4,
 				// We treat null fields as absent fields, not as null valued fields.
 				// Note that this is different than how we treat nullable list items or map values.
 				"type(self.setNullableStr) != null_type": 4,
 
 				// a field that is set to null is treated the same as an absent field in validation rules
-				"!has(self.setToNullNullableStr)": 3,
+				"!has(self.setToNullNullableStr)": 2,
 			},
 		},
 		{name: "null values in container types",
@@ -1879,38 +1916,65 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"obj": objectType(map[string]schema.Structural{
 					"field": stringType,
 				}),
-				"mapOfMap": mapType(mapTypePtr(&stringType)),
+				"mapOfMap": withMaxProperties(mapType(ptr.To(
+					withMaxProperties(mapType(&stringType), ptr.To[int64](10)))), ptr.To[int64](10)),
 				"mapOfObj": mapType(objectTypePtr(map[string]schema.Structural{
 					"field2": stringType,
 				})),
-				"mapOfListMap": mapType(listMapTypePtr([]string{"k"}, objectTypePtr(map[string]schema.Structural{
-					"k": stringType,
-					"v": stringType,
-				}))),
-				"mapOfList": mapType(listTypePtr(&stringType)),
-				"listMapOfObj": listMapType([]string{"k2"}, objectTypePtr(map[string]schema.Structural{
+				"mapOfListMap": withMaxProperties(mapType(
+					ptr.To(withMaxItems(listMapType([]string{"k"},
+						objectTypePtr(map[string]schema.Structural{
+							"k": stringType,
+							"v": stringType,
+						}),
+					), ptr.To[int64](10))),
+				), ptr.To[int64](10)),
+				"mapOfList": withMaxProperties(mapType(
+					ptr.To(withMaxItems(listType(&stringType), ptr.To[int64](10))),
+				), ptr.To[int64](10)),
+				"listMapOfObj": withMaxItems(listMapType([]string{"k2"}, objectTypePtr(map[string]schema.Structural{
 					"k2": stringType,
 					"v2": stringType,
-				})),
-				"listOfMap": listType(mapTypePtr(&stringType)),
+				})), ptr.To[int64](10)),
+				"listOfMap": withMaxItems(listType(
+					ptr.To(withMaxProperties(mapType(&stringType), ptr.To[int64](10))),
+				), ptr.To[int64](10)),
 				"listOfObj": listType(objectTypePtr(map[string]schema.Structural{
 					"field3": stringType,
 				})),
-				"listOfListMap": listType(listMapTypePtr([]string{"k3"}, objectTypePtr(map[string]schema.Structural{
-					"k3": stringType,
-					"v3": stringType,
-				}))),
+				"listOfListMap": withMaxItems(listType(
+					ptr.To(withMaxItems(listMapType([]string{"k"},
+						objectTypePtr(map[string]schema.Structural{
+							"k3": stringType,
+							"v3": stringType,
+						}),
+					), ptr.To[int64](10))),
+				), ptr.To[int64](10)),
 			}),
 			expectCost: map[string]uint64{
 				"self.obj.field == 'a'":                                       4,
 				"self.mapOfMap['x']['y'] == 'b'":                              5,
 				"self.mapOfObj['k'].field2 == 'c'":                            5,
-				"self.mapOfListMap['o'].exists(e, e.k == '1' && e.v == 'd')":  10485754,
+				"self.mapOfListMap['o'].exists(e, e.k == '1' && e.v == 'd')":  104,
 				"self.mapOfList['l'][0] == 'e'":                               5,
-				"self.listMapOfObj.exists(e, e.k2 == '2' && e.v2 == 'f')":     10485753,
+				"self.listMapOfObj.exists(e, e.k2 == '2' && e.v2 == 'f')":     103,
 				"self.listOfMap[0]['z'] == 'g'":                               5,
 				"self.listOfObj[0].field3 == 'h'":                             5,
-				"self.listOfListMap[0].exists(e, e.k3 == '3' && e.v3 == 'i')": 10485754,
+				"self.listOfListMap[0].exists(e, e.k3 == '3' && e.v3 == 'i')": 104,
+
+				// chained comprehensions
+				"self.mapOfMap.map(k, k).map(k, k).size() == 1":      286,
+				"self.mapOfListMap.map(k, k).map(k, k).size() == 1":  286,
+				"self.mapOfList.map(k, k).map(k, k).size() == 1":     286,
+				"self.listOfMap.map(e, e).map(e, e).size() == 1":     286,
+				"self.listOfListMap.map(e, e).map(e, e).size() == 1": 286,
+
+				// nested comprehensions
+				"self.mapOfMap.map(k, self.mapOfMap[k].map(m, m)).size() == 1":         1585,
+				"self.mapOfListMap.map(k, self.mapOfListMap[k].map(m, m)).size() == 1": 1585,
+				"self.mapOfList.map(k, self.mapOfList[k].map(l, l)).size() == 1":       1585,
+				"self.listOfMap.map(e, e.map(m, m)).size() == 1":                       1555,
+				"self.listOfListMap.map(e, e.map(e, e)).size() == 1":                   1555,
 			},
 		},
 		{name: "optionals",
@@ -1935,6 +1999,25 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"self.m[?'k'] == optional.of('v')":                    uint64(1844674407370955268),
 				"self.l[?0] == optional.of('a')":                      uint64(1844674407370955268),
 				"optional.ofNonZeroValue(1).hasValue()":               2,
+			},
+		},
+		{name: "quantity",
+			schema: schemas(stringType, stringType),
+			expectCost: map[string]uint64{
+				`isQuantity(self.val1)`: 314575,
+				`isQuantity(self.val2)`: 314575,
+				`isQuantity("200M")`:    1,
+				`isQuantity("20Mi")`:    1,
+				`quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`:                                           uint64(3689348814741910532),
+				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`: uint64(5534023222112865798),
+				`quantity(self.val1).isLessThan(quantity(self.val2))`:                                                                    629151,
+				`quantity("50M").isLessThan(quantity("100M"))`:                                                                           3,
+				`quantity("50Mi").isGreaterThan(quantity("50M"))`:                                                                        3,
+				`quantity("200M").compareTo(quantity("0.2G")) == 0`:                                                                      4,
+				`quantity("50k").add(quantity("20")) == quantity("50.02k")`:                                                              uint64(1844674407370955268),
+				`quantity("50k").sub(20) == quantity("49980")`:                                                                           uint64(1844674407370955267),
+				`quantity("50").isInteger()`:                                                                                             2,
+				`quantity(self.val1).isInteger()`:                                                                                        314576,
 			},
 		},
 	}

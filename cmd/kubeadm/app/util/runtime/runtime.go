@@ -43,6 +43,7 @@ type ContainerRuntime interface {
 	ListKubeContainers() ([]string, error)
 	RemoveContainers(containers []string) error
 	PullImage(image string) error
+	PullImagesInParallel(images []string, ifNotPresent bool) error
 	ImageExists(image string) (bool, error)
 	SandboxImage() (string, error)
 }
@@ -137,6 +138,53 @@ func (runtime *CRIRuntime) PullImage(image string) error {
 		}
 	}
 	return errors.Wrapf(err, "output: %s, error", out)
+}
+
+// PullImagesInParallel pulls a list of images in parallel
+func (runtime *CRIRuntime) PullImagesInParallel(images []string, ifNotPresent bool) error {
+	errs := pullImagesInParallelImpl(images, ifNotPresent, runtime.ImageExists, runtime.PullImage)
+	return errorsutil.NewAggregate(errs)
+}
+
+func pullImagesInParallelImpl(images []string, ifNotPresent bool,
+	imageExistsFunc func(string) (bool, error), pullImageFunc func(string) error) []error {
+
+	var errs []error
+	errChan := make(chan error, len(images))
+
+	klog.V(1).Info("pulling all images in parallel")
+	for _, img := range images {
+		image := img
+		go func() {
+			if ifNotPresent {
+				exists, err := imageExistsFunc(image)
+				if err != nil {
+					errChan <- errors.WithMessagef(err, "failed to check if image %s exists", image)
+					return
+				}
+				if exists {
+					klog.V(1).Infof("image exists: %s", image)
+					errChan <- nil
+					return
+				}
+			}
+			err := pullImageFunc(image)
+			if err != nil {
+				err = errors.WithMessagef(err, "failed to pull image %s", image)
+			} else {
+				klog.V(1).Infof("done pulling: %s", image)
+			}
+			errChan <- err
+		}()
+	}
+
+	for i := 0; i < len(images); i++ {
+		if err := <-errChan; err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
 }
 
 // ImageExists checks to see if the image exists on the system

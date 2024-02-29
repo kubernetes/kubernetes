@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestKubeletDirs(t *testing.T) {
@@ -98,4 +99,33 @@ func TestKubeletDirs(t *testing.T) {
 	got = kubelet.getPodVolumeSubpathsDir("abc123")
 	exp = filepath.Join(root, "pods/abc123/volume-subpaths")
 	assert.Equal(t, exp, got)
+}
+
+func TestHandlerSupportsUserNamespaces(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	kubelet.runtimeState.setRuntimeHandlers(map[string]kubecontainer.RuntimeHandler{
+		"has-support": {
+			Name:                   "has-support",
+			SupportsUserNamespaces: true,
+		},
+		"has-no-support": {
+			Name:                   "has-support",
+			SupportsUserNamespaces: false,
+		},
+	})
+
+	got, err := kubelet.HandlerSupportsUserNamespaces("has-support")
+	assert.Equal(t, true, got)
+	assert.NoError(t, err)
+
+	got, err = kubelet.HandlerSupportsUserNamespaces("has-no-support")
+	assert.Equal(t, false, got)
+	assert.NoError(t, err)
+
+	got, err = kubelet.HandlerSupportsUserNamespaces("unknown")
+	assert.Equal(t, false, got)
+	assert.Error(t, err)
 }

@@ -139,15 +139,9 @@ EOF
   fi
 }
 
-# Returns the name of an arbitrary Linux webserver pod.
-function get_linux_webserver_pod_name {
-  $kubectl get pods -l app=$linux_webserver_pod_label \
-    -o jsonpath='{.items[0].metadata.name}'
-}
-
 # Returns the IP address of an arbitrary Linux webserver pod.
 function get_linux_webserver_pod_ip {
-  $kubectl get pods -l app=$linux_webserver_pod_label \
+  $kubectl get pods -l app="$linux_webserver_pod_label" \
     -o jsonpath='{.items[0].status.podIP}'
 }
 
@@ -194,7 +188,7 @@ EOF
   timeout=$linux_deployment_timeout
   while [[ $timeout -gt 0 ]]; do
     echo "Waiting for $linux_command_replicas Linux $linux_command_pod_label pods to become Ready"
-    statuses=$(${kubectl} get pods -l app=$linux_command_pod_label \
+    statuses=$(${kubectl} get pods -l app="$linux_command_pod_label" \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
       | grep "True" | wc -w)
     if [[ $statuses -eq $linux_command_replicas ]]; then
@@ -210,7 +204,7 @@ EOF
   else
     echo "ERROR: Not all $linux_command_pod_label pods became Ready"
     echo "kubectl get pods -l app=$linux_command_pod_label"
-    ${kubectl} get pods -l app=$linux_command_pod_label
+    ${kubectl} get pods -l app="$linux_command_pod_label"
     cleanup_deployments
     exit 1
   fi
@@ -218,14 +212,8 @@ EOF
 
 # Returns the name of an arbitrary Linux command pod.
 function get_linux_command_pod_name {
-  $kubectl get pods -l app=$linux_command_pod_label \
+  $kubectl get pods -l app="$linux_command_pod_label" \
     -o jsonpath='{.items[0].metadata.name}'
-}
-
-# Returns the IP address of an arbitrary Linux command pod.
-function get_linux_command_pod_ip {
-  $kubectl get pods -l app=$linux_command_pod_label \
-    -o jsonpath='{.items[0].status.podIP}'
 }
 
 # Installs test executables (ping, curl) in the Linux command pod.
@@ -318,18 +306,13 @@ EOF
   fi
 }
 
-function get_windows_webserver_pod_name {
-  $kubectl get pods -l app=$windows_webserver_pod_label \
-    -o jsonpath='{.items[0].metadata.name}'
-}
-
 function get_windows_webserver_pod_ip {
-  $kubectl get pods -l app=$windows_webserver_pod_label \
+  ${kubectl} get pods -l app="$windows_webserver_pod_label" \
     -o jsonpath='{.items[0].status.podIP}'
 }
 
 function undeploy_windows_webserver_pod {
-  ${kubectl} delete deployment $windows_webserver_deployment
+  ${kubectl} delete deployment "$windows_webserver_deployment"
 }
 
 windows_command_deployment=windows-powershell
@@ -399,17 +382,12 @@ EOF
 }
 
 function get_windows_command_pod_name {
-  $kubectl get pods -l app=$windows_command_pod_label \
+  $kubectl get pods -l app="$windows_command_pod_label" \
     -o jsonpath='{.items[0].metadata.name}'
 }
 
-function get_windows_command_pod_ip {
-  $kubectl get pods -l app=$windows_command_pod_label \
-    -o jsonpath='{.items[0].status.podIP}'
-}
-
 function undeploy_windows_command_pod {
-  ${kubectl} delete deployment $windows_command_deployment
+  ${kubectl} delete deployment "$windows_command_deployment"
 }
 
 function test_linux_node_to_linux_pod {
@@ -455,22 +433,6 @@ function test_linux_pod_to_windows_pod {
     echo "Failing output: $(cat $output_file)"
     echo "FAILED: ${FUNCNAME[0]}"
     echo "This test seems to be flaky. TODO(pjh): investigate."
-    exit 1
-  fi
-}
-
-function test_linux_pod_to_internet {
-  echo "TEST: ${FUNCNAME[0]}"
-  local linux_command_pod
-  linux_command_pod="$(get_linux_command_pod_name)"
-  # A stable (hopefully) HTTP server provided by Cloudflare.
-  local internet_ip="1.1.1.1"
-
-  if ! $kubectl exec "$linux_command_pod" -- curl -s -m 20 \
-      "http://$internet_ip" > $output_file; then
-    cleanup_deployments
-    echo "Failing output: $(cat $output_file)"
-    echo "FAILED: ${FUNCNAME[0]}"
     exit 1
   fi
 }

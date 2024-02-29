@@ -109,7 +109,7 @@ func (hu *HostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, p
 	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
 }
 
-// getDeviceNameFromMountLinux find the device name from /proc/mounts in which
+// getDeviceNameFromMount find the device name from /proc/self/mountinfo in which
 // the mount path reference should match the given plugin mount directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
 func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {

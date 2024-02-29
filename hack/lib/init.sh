@@ -31,6 +31,13 @@ unset CDPATH
 # they can explicitly set GO111MODULE=on
 export GO111MODULE=off
 
+# FIXME(dims): Note that here we assume that if GOFLAGS are already set we
+# leave them as-is and not try to add providerless to it. So if you
+# really need to set your own GOFLAGS, ensure you add "providerless" explicitly
+if [[ "${KUBE_PROVIDERLESS:-"n"}" == "y" ]]; then
+  export GOFLAGS=${GOFLAGS:-"-tags=providerless"}
+fi
+
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
@@ -128,6 +135,7 @@ KUBE_NONSERVER_GROUP_VERSIONS="
  abac.authorization.kubernetes.io/v0 \
  abac.authorization.kubernetes.io/v1beta1 \
  apidiscovery.k8s.io/v2beta1 \
+ apidiscovery.k8s.io/v2 \
  componentconfig/v1alpha1 \
  imagepolicy.k8s.io/v1alpha1\
  admission.k8s.io/v1\
