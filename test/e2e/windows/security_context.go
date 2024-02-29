@@ -139,7 +139,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 		// pod object to not have those security contexts. However the pod coming to running state is a sufficient
 		// enough condition for us to validate since prior to https://github.com/kubernetes/kubernetes/pull/93475
 		// the pod would have failed to come up.
-		windowsPodWithSELinux := createTestPod(f, windowsBusyBoximage, windowsOS)
+		windowsPodWithSELinux := createTestPod(f, imageutils.GetE2EImage(imageutils.Agnhost), windowsOS)
 		windowsPodWithSELinux.Spec.Containers[0].Args = []string{"test-webserver-with-selinux"}
 		windowsPodWithSELinux.Spec.SecurityContext = &v1.PodSecurityContext{}
 		containerUserName := "ContainerAdministrator"

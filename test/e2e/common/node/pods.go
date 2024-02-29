@@ -455,7 +455,7 @@ var _ = SIGDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "srv",
-						Image: framework.ServeHostnameImage,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 					},
 				},

@@ -114,11 +114,6 @@ func unknownFieldMetadataJSON(gvk schema.GroupVersionKind, name string) string {
 }
 
 var (
-	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
-	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
-	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
-	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
-
 	// If this suite still flakes due to timeouts we should change this to framework.PodStartTimeout
 	podRunningTimeoutArg = fmt.Sprintf("--pod-running-timeout=%s", framework.PodStartShortTimeout.String())
 )
@@ -344,7 +339,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("creating a replication controller")
 			e2ekubectl.RunKubectlOrDieInput(ns, nautilus, "create", "-f", "-")
-			validateController(ctx, c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(ctx, c, imageutils.GetE2EImage(imageutils.Nautilus), 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		/*
@@ -354,6 +349,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		*/
 		framework.ConformanceIt("should scale a replication controller", func(ctx context.Context) {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
+			nautilusImage := imageutils.GetE2EImage(imageutils.Nautilus)
 
 			ginkgo.By("creating a replication controller")
 			e2ekubectl.RunKubectlOrDieInput(ns, nautilus, "create", "-f", "-")
@@ -695,12 +691,12 @@ metadata:
 
 		ginkgo.Describe("Kubectl run", func() {
 			ginkgo.It("running a successful command", func(ctx context.Context) {
-				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "success", "--", "/bin/sh", "-c", "exit 0").Exec()
+				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=Never", podRunningTimeoutArg, "success", "--", "/bin/sh", "-c", "exit 0").Exec()
 				framework.ExpectNoError(err)
 			})
 
 			ginkgo.It("running a failing command", func(ctx context.Context) {
-				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
+				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=Never", podRunningTimeoutArg, "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
@@ -709,7 +705,7 @@ metadata:
 			})
 
 			f.It(f.WithSlow(), "running a failing command without --restart=Never", func(ctx context.Context) {
-				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
+				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
 				ee, ok := err.(uexec.ExitError)
@@ -722,7 +718,7 @@ metadata:
 			})
 
 			f.It(f.WithSlow(), "running a failing command without --restart=Never, but with --rm", func(ctx context.Context) {
-				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", podRunningTimeoutArg, "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
+				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", "--rm", podRunningTimeoutArg, "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
 				ee, ok := err.(uexec.ExitError)
@@ -736,7 +732,7 @@ metadata:
 			})
 
 			f.It(f.WithSlow(), "running a failing command with --leave-stdin-open", func(ctx context.Context) {
-				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
+				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=Never", podRunningTimeoutArg, "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
 					WithStdinData("abcd1234").
 					Exec()
 				framework.ExpectNoError(err)
@@ -757,7 +753,7 @@ metadata:
 
 			ginkgo.By("executing a command with run and attach with stdin")
 			// We wait for a non-empty line so we know kubectl has attached
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(ns, "run", "run-test", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
 				WithStdinData("value\nabcd1234").
 				ExecOrDie(ns)
 
@@ -774,7 +770,7 @@ metadata:
 			// "stdin closed", but hasn't exited yet.
 			// We wait 10 seconds before printing to give time to kubectl to attach
 			// to the container, this does not solve the race though.
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-2", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				ExecOrDie(ns)
 
@@ -785,7 +781,7 @@ metadata:
 			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test-2", metav1.DeleteOptions{}))
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234\n").
 				ExecOrDie(ns)
 
@@ -814,7 +810,7 @@ metadata:
 
 			ginkgo.By("executing a command with run and attach with stdin")
 			// We wait for a non-empty line so we know kubectl has attached
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(ns, "run", "run-test", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
 				WithStdinData("value\nabcd1234").
 				ExecOrDie(ns)
 
@@ -831,7 +827,7 @@ metadata:
 			// "stdin closed", but hasn't exited yet.
 			// We wait 10 seconds before printing to give time to kubectl to attach
 			// to the container, this does not solve the race though.
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-2", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				ExecOrDie(ns)
 
@@ -842,7 +838,7 @@ metadata:
 			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test-2", metav1.DeleteOptions{}))
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234\n").
 				ExecOrDie(ns)
 
@@ -862,7 +858,7 @@ metadata:
 			podName := "run-log-test"
 
 			ginkgo.By("executing a command with run")
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+imageutils.GetE2EImage(imageutils.BusyBox), "--restart=OnFailure", podRunningTimeoutArg, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
 
 			if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, c, ns, []string{podName}, framework.PodStartTimeout) {
 				framework.Failf("Pod for run-log-test was not ready")
@@ -1051,15 +1047,15 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment, "create", "-f", "-")
 
 			ginkgo.By("verify diff finds difference between live and declared image")
-			deployment = strings.Replace(deployment, httpdImage, busyboxImage, 1)
-			if !strings.Contains(deployment, busyboxImage) {
-				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", httpdImage, busyboxImage, deployment)
+			deployment = strings.Replace(deployment, imageutils.GetE2EImage(imageutils.Httpd), imageutils.GetE2EImage(imageutils.BusyBox), 1)
+			if !strings.Contains(deployment, imageutils.GetE2EImage(imageutils.BusyBox)) {
+				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", imageutils.GetE2EImage(imageutils.Httpd), imageutils.GetE2EImage(imageutils.BusyBox), deployment)
 			}
 			output, err := e2ekubectl.RunKubectlInput(ns, deployment, "diff", "-f", "-")
 			if err, ok := err.(*exec.ExitError); ok && err.ExitCode() == 1 {
 				framework.Failf("Expected kubectl diff exit code of 1, but got %d: %v\n", err.ExitCode(), err)
 			}
-			requiredItems := []string{httpdImage, busyboxImage}
+			requiredItems := []string{imageutils.GetE2EImage(imageutils.Httpd), imageutils.GetE2EImage(imageutils.BusyBox)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
 					framework.Failf("Missing %s in kubectl diff output:\n%s\n%v\n", item, output, err)
@@ -1077,12 +1073,13 @@ metadata:
 			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl patch pod -p {...} --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
 		*/
 		framework.ConformanceIt("should check if kubectl can dry-run update Pods", func(ctx context.Context) {
+			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
 			ginkgo.By("running the image " + httpdImage)
 			podName := "e2e-test-httpd-pod"
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
 
 			ginkgo.By("replace the image in the pod with server-side dry-run")
-			specImage := fmt.Sprintf(`{"spec":{"containers":[{"name": "%s","image": "%s"}]}}`, podName, busyboxImage)
+			specImage := fmt.Sprintf(`{"spec":{"containers":[{"name": "%s","image": "%s"}]}}`, podName, imageutils.GetE2EImage(imageutils.BusyBox))
 			e2ekubectl.RunKubectlOrDie(ns, "patch", "pod", podName, "-p", specImage, "--dry-run=server")
 
 			ginkgo.By("verifying the pod " + podName + " has the right image " + httpdImage)
@@ -1414,7 +1411,7 @@ metadata:
 					{"Status:", "Running"},
 					{"IP:"},
 					{"Controlled By:", "ReplicationController/agnhost-primary"},
-					{"Image:", agnhostImage},
+					{"Image:", imageutils.GetE2EImage(imageutils.Agnhost)},
 					{"State:", "Running"},
 					{"QoS Class:", "BestEffort"},
 				}
@@ -1432,7 +1429,7 @@ metadata:
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
 				{"Pod Template:"},
-				{"Image:", agnhostImage},
+				{"Image:", imageutils.GetE2EImage(imageutils.Agnhost)},
 				{"Events:"}}
 			checkKubectlOutputWithRetry(ns, requiredStrings, "describe", "rc", "agnhost-primary")
 
@@ -1757,6 +1754,7 @@ metadata:
 			Description: Command 'kubectl run' MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
 		framework.ConformanceIt("should create a pod from an image when restart is Never", func(ctx context.Context) {
+			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
 			ginkgo.By("running the image " + httpdImage)
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--restart=Never", podRunningTimeoutArg, "--image="+httpdImage)
 			ginkgo.By("verifying the pod " + podName + " was created")
@@ -1791,6 +1789,7 @@ metadata:
 			Description: Command 'kubectl replace' on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to 'kubectl replace' SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
 		framework.ConformanceIt("should update a single-container pod's image", func(ctx context.Context) {
+			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
 			ginkgo.By("running the image " + httpdImage)
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
 
@@ -1808,6 +1807,7 @@ metadata:
 			}
 
 			ginkgo.By("replace the image in the pod")
+			busyboxImage := imageutils.GetE2EImage(imageutils.BusyBox)
 			podJSON = strings.Replace(podJSON, httpdImage, busyboxImage, 1)
 			e2ekubectl.RunKubectlOrDieInput(ns, podJSON, "replace", "-f", "-")
 
@@ -1991,6 +1991,7 @@ metadata:
 	ginkgo.Describe("Kubectl events", func() {
 		ginkgo.It("should show event when pod is created", func(ctx context.Context) {
 			podName := "e2e-test-httpd-pod"
+			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
 			ginkgo.By("running the image " + httpdImage)
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
 

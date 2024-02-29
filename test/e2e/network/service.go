@@ -281,7 +281,7 @@ func StartServeHostnameService(ctx context.Context, c clientset.Interface, svc *
 	maxContainerFailures := 0
 	config := testutils.RCConfig{
 		Client:               c,
-		Image:                framework.ServeHostnameImage,
+		Image:                imageutils.GetE2EImage(imageutils.Agnhost),
 		Command:              []string{"/agnhost", "serve-hostname"},
 		Name:                 name,
 		Namespace:            ns,
