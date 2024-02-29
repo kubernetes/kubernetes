@@ -59,7 +59,10 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 				//Verify exit code
 				exitCode = pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
 				framework.ExpectNoError(err, "failed to get most recent container exit code for pod %q", podName)
-				framework.ExpectEqual(exitCode, int32(0), "unexpected container exit code for pod %q.code is %d", podName, exitCode)
+				if exitCode != int32(0) {
+					errInt := errors.New("unexpected container exit code for pod")
+					framework.ExpectNoError(errInt, "unexpected container exit code for pod %q.code is %d", podName, exitCode)
+				}
 				// Get pod logs.
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
@@ -70,8 +73,14 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 				// Verify the number of SIGINT
 				SIGINT1 := strings.Count("SIGINT 1", podLogs)
 				SIGINT2 := strings.Count("SIGINT 2", podLogs)
-				framework.ExpectEqual(SIGINT1, int32(1), "Unexpected SIGINT 1 exit volume")
-				framework.ExpectEqual(SIGINT2, int32(1), "Unexpected SIGINT 1 exit volume")
+				if SIGINT1 == 1 {
+					errInt := errors.New("unexpected SIGINT 1 exit volume")
+					framework.ExpectNoError(errInt, "unexpected container exit code for pod %q.code is %d", podName, exitCode)
+				}
+				if SIGINT2 != 1 {
+					errInt := errors.New("unexpected SIGINT 1 exit volume")
+					framework.ExpectNoError(errInt, "unexpected container exit code for pod %q.code is %d", podName, exitCode)
+				}
 				return nil
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
