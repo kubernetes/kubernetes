@@ -2051,6 +2051,9 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 				slicesChangedPerSync:            0, // 0 means either topologyAnnotation or trafficDistribution was used.
 				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
 				slicesChangedPerSyncTrafficDist: 1, // 1 EPS configured using trafficDistribution.
+				servicesCountByTrafficDistribution: map[string]int{
+					"PreferClose": 1,
+				},
 			},
 		},
 		{
@@ -2102,7 +2105,7 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		},
 		{
 			name:                                  "trafficDistribution=<empty>, topologyAnnotation=<empty>",
-			desc:                                  "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added",
+			desc:                                  "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added, but the servicesCountByTrafficDistribution metric should reflect this",
 			trafficDistributionFeatureGateEnabled: true,
 			trafficDistribution:                   "",
 			topologyAnnotation:                    "",
@@ -2119,6 +2122,9 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
 				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
 				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
+				servicesCountByTrafficDistribution: map[string]int{
+					"ImplementationSpecific": 1,
+				},
 			},
 		},
 	}
@@ -2317,19 +2323,20 @@ func reconcileHelper(t *testing.T, r *Reconciler, service *corev1.Service, pods 
 // Metrics helpers
 
 type expectedMetrics struct {
-	desiredSlices                   int
-	actualSlices                    int
-	desiredEndpoints                int
-	addedPerSync                    int
-	removedPerSync                  int
-	numCreated                      int
-	numUpdated                      int
-	numDeleted                      int
-	slicesChangedPerSync            int
-	slicesChangedPerSyncTopology    int
-	slicesChangedPerSyncTrafficDist int
-	syncSuccesses                   int
-	syncErrors                      int
+	desiredSlices                      int
+	actualSlices                       int
+	desiredEndpoints                   int
+	addedPerSync                       int
+	removedPerSync                     int
+	numCreated                         int
+	numUpdated                         int
+	numDeleted                         int
+	slicesChangedPerSync               int
+	slicesChangedPerSyncTopology       int
+	slicesChangedPerSyncTrafficDist    int
+	syncSuccesses                      int
+	syncErrors                         int
+	servicesCountByTrafficDistribution map[string]int
 }
 
 func expectMetrics(t *testing.T, em expectedMetrics) {
@@ -2412,6 +2419,18 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 	if actualSyncErrors != float64(em.syncErrors) {
 		t.Errorf("Expected endpointSliceSyncErrors to be %d, got %v", em.syncErrors, actualSyncErrors)
 	}
+
+	for _, trafficDistribution := range []string{"PreferClose", "ImplementationSpecific"} {
+		gotServicesCount, err := testutil.GetGaugeMetricValue(metrics.ServicesCountByTrafficDistribution.WithLabelValues(trafficDistribution))
+		var wantServicesCount int
+		if em.servicesCountByTrafficDistribution != nil {
+			wantServicesCount = em.servicesCountByTrafficDistribution[trafficDistribution]
+		}
+		handleErr(t, err, fmt.Sprintf("%v[traffic_distribution=%v]", "services_count_by_traffic_distribution", trafficDistribution))
+		if int(gotServicesCount) != wantServicesCount {
+			t.Errorf("Expected servicesCountByTrafficDistribution for traffic_distribution=%v to be %v, got %v", trafficDistribution, wantServicesCount, gotServicesCount)
+		}
+	}
 }
 
 func handleErr(t *testing.T, err error, metricName string) {
@@ -2430,4 +2449,5 @@ func setupMetrics() {
 	metrics.EndpointSliceChanges.Reset()
 	metrics.EndpointSlicesChangedPerSync.Reset()
 	metrics.EndpointSliceSyncs.Reset()
+	metrics.ServicesCountByTrafficDistribution.Reset()
 }

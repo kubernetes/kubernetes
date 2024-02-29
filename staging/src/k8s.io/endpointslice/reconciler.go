@@ -310,7 +310,10 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 	}
 
 	if canUseTrafficDistribution {
+		r.metricsCache.UpdateTrafficDistributionForService(serviceNN, service.Spec.TrafficDistribution)
 		slicesToCreate, slicesToUpdate, _ = trafficdist.ReconcileHints(service.Spec.TrafficDistribution, slicesToCreate, slicesToUpdate, unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete))
+	} else {
+		r.metricsCache.UpdateTrafficDistributionForService(serviceNN, nil)
 	}
 
 	err := r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)

@@ -119,6 +119,18 @@ var (
 		},
 		[]string{"result"}, // either "success", "stale", or "error"
 	)
+
+	// ServicesCountByTrafficDistribution tracks the number of Services using some
+	// specific trafficDistribution
+	ServicesCountByTrafficDistribution = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      EndpointSliceSubsystem,
+			Name:           "services_count_by_traffic_distribution",
+			Help:           "Number of Services using some specific trafficDistribution",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"traffic_distribution"}, // One of ["PreferClose", "ImplementationSpecific"]
+	)
 )
 
 var registerMetrics sync.Once
@@ -134,5 +146,6 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(EndpointSliceChanges)
 		legacyregistry.MustRegister(EndpointSlicesChangedPerSync)
 		legacyregistry.MustRegister(EndpointSliceSyncs)
+		legacyregistry.MustRegister(ServicesCountByTrafficDistribution)
 	})
 }
