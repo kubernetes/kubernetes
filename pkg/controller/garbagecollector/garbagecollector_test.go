@@ -36,7 +36,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/utils/pointer"
 
@@ -62,9 +62,14 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
 )
+
+var gcScheme = runtime.NewScheme()
+
+func init() {
+	install.Install(gcScheme)
+}
 
 type testRESTMapper struct {
 	meta.RESTMapper
@@ -77,7 +82,7 @@ func (m *testRESTMapper) Reset() {
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
-	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(gcScheme)}}
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -221,7 +226,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(gcScheme)}, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -879,7 +884,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Pod"}, schema.GroupVersionResource{Version: "v1", Resource: "pods"}, schema.GroupVersionResource{Version: "v1", Resource: "pod"}, meta.RESTScopeNamespace)
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Secret"}, schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, schema.GroupVersionResource{Version: "v1", Resource: "secret"}, meta.RESTScopeNamespace)
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}, schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployment"}, meta.RESTScopeNamespace)
-	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(gcScheme)}}
 	metadataClient, err := metadata.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -2318,7 +2323,7 @@ func TestConflictingData(t *testing.T) {
 				schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployment"},
 				meta.RESTScopeNamespace,
 			)
-			restMapper := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
+			restMapper := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(gcScheme)}}
 
 			// set up our workqueues
 			attemptToDelete := newTrackingWorkqueue()

@@ -38,9 +38,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -55,9 +55,6 @@ import (
 	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
-
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 )
 
 // From now on, the HPA controller does have history in it (scaleUpEvents, scaleDownEvents)
@@ -587,7 +584,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		}
 
 		name := getForAction.GetName()
-		mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
+		mapper := testrestmapper.TestOnlyStaticRESTMapper(clientsetscheme.Scheme)
 		metrics := &cmapi.MetricValueList{}
 		var matchedTarget *autoscalingv2.MetricSpec
 		for i, target := range tc.metricsTarget {
@@ -771,7 +768,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		eventClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
-		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+		testrestmapper.TestOnlyStaticRESTMapper(clientsetscheme.Scheme),
 		metricsClient,
 		informerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
 		informerFactory.Core().V1().Pods(),
@@ -5296,7 +5293,7 @@ func TestMultipleHPAs(t *testing.T) {
 		testClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
-		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+		testrestmapper.TestOnlyStaticRESTMapper(clientsetscheme.Scheme),
 		metricsClient,
 		informerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
 		informerFactory.Core().V1().Pods(),
