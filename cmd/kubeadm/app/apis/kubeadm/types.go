@@ -658,6 +658,9 @@ type UpgradeConfiguration struct {
 
 	// Plan holds a list of options that are specific to the "kubeadm upgrade plan" command.
 	Plan UpgradePlanConfiguration
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	Timeouts *Timeouts
 }
 
 const (
@@ -724,4 +727,7 @@ type Timeouts struct {
 	// Discovery is the amount of time to wait for kubeadm to validate the API server identity
 	// for a joining node.
 	Discovery *metav1.Duration
+
+	// UpgradeManifests is the timeout for upgradring static Pod manifests
+	UpgradeManifests *metav1.Duration
 }

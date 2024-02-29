@@ -596,6 +596,10 @@ type Timeouts struct {
 	// Default: 5m
 	// +optional
 	Discovery *metav1.Duration `json:"discovery,omitempty"`
+
+	// UpgradeManifests is the timeout for upgradring static Pod manifests
+	// Default: 5m
+	UpgradeManifests *metav1.Duration `json:"upgradeManifests,omitempty"`
 }
 
 // UpgradeApplyConfiguration contains a list of configurable options which are specific to the  "kubeadm upgrade apply" command.
@@ -744,4 +748,8 @@ type UpgradeConfiguration struct {
 	// Plan holds a list of options that are specific to the "kubeadm upgrade plan" command.
 	// +optional
 	Plan UpgradePlanConfiguration `json:"plan,omitempty"`
+
+	// Timeouts holds various timeouts that apply to kubeadm commands.
+	// +optional
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
 }

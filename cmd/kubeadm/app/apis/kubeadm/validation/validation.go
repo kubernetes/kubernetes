@@ -765,5 +765,8 @@ func ValidateUpgradeConfiguration(c *kubeadm.UpgradeConfiguration) field.ErrorLi
 	if c.Apply.Patches != nil {
 		allErrs = append(allErrs, ValidateAbsolutePath(c.Apply.Patches.Directory, field.NewPath("patches").Child("directory"))...)
 	}
+	if c.Node.Patches != nil {
+		allErrs = append(allErrs, ValidateAbsolutePath(c.Node.Patches.Directory, field.NewPath("patches").Child("directory"))...)
+	}
 	return allErrs
 }

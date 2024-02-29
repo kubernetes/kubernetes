@@ -91,4 +91,7 @@ func SetObjectDefaults_ResetConfiguration(in *ResetConfiguration) {
 
 func SetObjectDefaults_UpgradeConfiguration(in *UpgradeConfiguration) {
 	SetDefaults_UpgradeConfiguration(in)
+	if in.Timeouts != nil {
+		SetDefaults_Timeouts(in.Timeouts)
+	}
 }

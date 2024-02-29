@@ -162,4 +162,5 @@ func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue
 	obj.Apply.EtcdUpgrade = ptr.To(true)
 	obj.Apply.CertificateRenewal = ptr.To(false)
 	obj.Node.CertificateRenewal = ptr.To(false)
+	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }

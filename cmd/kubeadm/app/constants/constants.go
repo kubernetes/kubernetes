@@ -241,6 +241,9 @@ const (
 	// KubeletHealthCheckTimeout specifies the default kubelet timeout
 	KubeletHealthCheckTimeout = 4 * time.Minute
 
+	// UpgradeManifestsTimeout specifies the default timeout for upgradring static Pod manifests
+	UpgradeManifestsTimeout = 5 * time.Minute
+
 	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
 	PullImageRetry = 5
 	// RemoveContainerRetry specifies how many times ContainerRuntime retries when removing container failed

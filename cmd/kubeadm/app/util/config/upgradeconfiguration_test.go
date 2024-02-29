@@ -19,11 +19,13 @@ package config
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
-	"github.com/google/go-cmp/cmp"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -96,7 +98,7 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error of DocMapToUpgradeConfiguration: %v\nconfig: %s", err, string(b))
 			}
-			if diff := cmp.Diff(*cfg, tc.expectedCfg); diff != "" {
+			if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
 				t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
 			}
 		})

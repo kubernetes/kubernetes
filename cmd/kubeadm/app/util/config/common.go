@@ -390,11 +390,13 @@ func isKubeadmPrereleaseVersion(versionInfo *apimachineryversion.Info, k8sVersio
 func prepareStaticVariables(config any) {
 	switch c := config.(type) {
 	case *kubeadmapi.InitConfiguration:
-		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
 	case *kubeadmapi.JoinConfiguration:
-		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
 	case *kubeadmapi.ResetConfiguration:
-		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
+	case *kubeadmapi.UpgradeConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
 	}
 }
 

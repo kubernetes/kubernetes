@@ -183,7 +183,7 @@ func runApply(flagSet *pflag.FlagSet, flags *applyFlags, args []string) error {
 		fmt.Println("[upgrade/prepull] Would pull the required images (like 'kubeadm config images pull')")
 	}
 
-	waiter := getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
+	waiter := getWaiter(flags.dryRun, client, upgradeCfg.Timeouts.UpgradeManifests.Duration)
 
 	// If the config is set by flag, just overwrite it!
 	etcdUpgrade, ok := cmdutil.ValueFromFlagsOrConfig(flagSet, options.EtcdUpgrade, upgradeCfg.Apply.EtcdUpgrade, &flags.etcdUpgrade).(*bool)
@@ -260,7 +260,7 @@ func EnforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, initCfg *kubeadmapi.InitConfiguration, upgradeCfg *kubeadmapi.UpgradeConfiguration) error {
 	// OK, the cluster is hosted using static pods. Upgrade a static-pod hosted cluster
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q (timeout: %v)...\n",
-		initCfg.KubernetesVersion, upgrade.UpgradeManifestTimeout)
+		initCfg.KubernetesVersion, upgradeCfg.Timeouts.UpgradeManifests.Duration)
 
 	if flags.dryRun {
 		return upgrade.DryRunStaticPodUpgrade(upgradeCfg.Apply.Patches.Directory, initCfg)

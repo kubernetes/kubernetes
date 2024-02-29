@@ -36,6 +36,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -55,7 +56,9 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	// Fetch the configuration from a file or ConfigMap and validate it
 	_, _ = printer.Printf("[upgrade/config] Making sure the configuration is correct:\n")
 
-	upgradeCfg, err := configutil.LoadUpgradeConfig(flags.cfgPath)
+	externalCfg := &v1beta4.UpgradeConfiguration{}
+	opt := configutil.LoadOrDefaultConfigurationOptions{}
+	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/upgrade config] FATAL")
 	}
