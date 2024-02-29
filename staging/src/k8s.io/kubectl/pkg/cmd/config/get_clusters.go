@@ -18,16 +18,28 @@ package config
 
 import (
 	"fmt"
-	"io"
 
+	"github.com/liggitt/tabwriter"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+type GetClustersOptions struct {
+	configAccess clientcmd.ConfigAccess
+	noHeaders bool
+	showHeaders bool
+
+	genericiooptions.IOStreams
+}
+
 var (
+	getClustersLong = templates.LongDesc(i18n.T(`Display one or many clusters from the kubeconfig file.`))
+
 	getClustersExample = templates.Examples(`
 		# List the clusters that kubectl knows about
 		kubectl config get-clusters`)
@@ -35,27 +47,60 @@ var (
 
 // NewCmdConfigGetClusters creates a command object for the "get-clusters" action, which
 // lists all clusters defined in the kubeconfig.
-func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigGetClusters(streams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &GetClustersOptions{
+		configAccess: configAccess,
+		IOStreams: streams,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "get-clusters",
 		Short:   i18n.T("Display clusters defined in the kubeconfig"),
-		Long:    i18n.T("Display clusters defined in the kubeconfig."),
+		Long:    getClustersLong,
 		Example: getClustersExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runGetClusters(out, configAccess))
+			cmdutil.CheckErr(options.Complete(cmd))
+			cmdutil.CheckErr(options.Validate())
+			cmdutil.CheckErr(options.RunGetClusters())
 		},
 	}
+
+	cmd.Flags().BoolVar(&options.noHeaders, "no-headers", options.noHeaders, "When using the default output format, don't print headers (default print headers).")
 
 	return cmd
 }
 
-func runGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) error {
-	config, err := configAccess.GetStartingConfig()
+// Complete assigns GetClustersOptions from the args
+func (o *GetClustersOptions) Complete(cmd *cobra.Command) error {
+	o.showHeaders = true
+	if cmdutil.GetFlagBool(cmd, "no-headers") {
+		o.showHeaders = false
+	}
+
+	return nil
+}
+
+func (o *GetClustersOptions) Validate() error {
+	return nil
+}
+
+// RunGetClusters implements all the necessary functionality for cluster retrieval.
+func (o *GetClustersOptions) RunGetClusters() error {
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "NAME\n")
+	out, found := o.Out.(*tabwriter.Writer)
+	if !found {
+		out = printers.GetNewTabWriter(o.Out)
+		defer out.Flush()
+	}
+
+	if o.showHeaders {
+		fmt.Fprintf(out, "NAME\n")
+	}
+
 	for name := range config.Clusters {
 		fmt.Fprintf(out, "%s\n", name)
 	}
