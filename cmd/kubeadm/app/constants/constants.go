@@ -223,13 +223,6 @@ const (
 	// TLSBootstrapRetryInterval specifies how long kubeadm should wait before retrying the TLS Bootstrap check
 	TLSBootstrapRetryInterval = 1 * time.Second
 
-	// StaticPodMirroringTimeout specifies how much time kubeadm should wait for the static pods
-	// to be mirrored on the API server.
-	StaticPodMirroringTimeout = 30 * time.Second
-	// StaticPodMirroringRetryInterval specifies how often to check if static pods are mirrored at the
-	// API server.
-	StaticPodMirroringRetryInterval = 500 * time.Millisecond
-
 	// EtcdAPICallTimeout specifies how much time to wait for completion of requests against the etcd API.
 	EtcdAPICallTimeout = 2 * time.Minute
 	// EtcdAPICallRetryInterval specifies how frequently to retry requests against the etcd API.
