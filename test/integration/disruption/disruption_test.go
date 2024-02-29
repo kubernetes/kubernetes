@@ -539,14 +539,15 @@ func createPDBUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, 
 }
 
 func TestPatchCompatibility(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	s, pdbc, _, clientSet, _, _ := setup(ctx, t)
+	tCtx := ktesting.Init(t)
+	s, pdbc, _, clientSet, _, _ := setup(tCtx, t)
 	defer s.TearDownFn()
 	// Even though pdbc isn't used in this test, its creation is already
 	// spawning some goroutines. So we need to run it to ensure they won't leak.
-	cancel()
-	pdbc.Run(ctx)
+	// We can't cancel immediately but later, because when the context is canceled,
+	// the event broadcaster will be shut down .
+	defer tCtx.Cancel("cleaning up")
+	go pdbc.Run(tCtx)
 
 	testcases := []struct {
 		name             string

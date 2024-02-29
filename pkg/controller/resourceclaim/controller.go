@@ -394,7 +394,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting ephemeral volume controller")
 	defer logger.Info("Shutting down ephemeral volume controller")
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ec.kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})

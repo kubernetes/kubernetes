@@ -148,7 +148,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer, j
 }
 
 func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker) (*Controller, error) {
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 
 	jm := &Controller{
@@ -214,7 +214,7 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	logger := klog.FromContext(ctx)
 
 	// Start events processing pipeline.
-	jm.broadcaster.StartStructuredLogging(0)
+	jm.broadcaster.StartStructuredLogging(3)
 	jm.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: jm.kubeClient.CoreV1().Events("")})
 	defer jm.broadcaster.Shutdown()
 

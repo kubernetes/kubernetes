@@ -20,6 +20,7 @@ limitations under the License.
 package nodeipam
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -33,7 +34,7 @@ import (
 )
 
 func createLegacyIPAM(
-	logger klog.Logger,
+	ctx context.Context,
 	ic *Controller,
 	nodeInformer coreinformers.NodeInformer,
 	cloud cloudprovider.Interface,
@@ -59,10 +60,11 @@ func createLegacyIPAM(
 	if len(clusterCIDRs) > 0 {
 		cidr = clusterCIDRs[0]
 	}
+	logger := klog.FromContext(ctx)
 	if len(clusterCIDRs) > 1 {
 		logger.Info("Multiple cidrs were configured with FromCluster or FromCloud. cidrs except first one were discarded")
 	}
-	ipamc, err := ipam.NewController(cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSizes[0])
+	ipamc, err := ipam.NewController(ctx, cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSizes[0])
 	if err != nil {
 		return nil, fmt.Errorf("error creating ipam controller: %w", err)
 	}

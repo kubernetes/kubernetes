@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -767,7 +768,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	defaultDownscalestabilizationWindow := 5 * time.Minute
 
+	tCtx := ktesting.Init(t)
 	hpaController := NewHorizontalController(
+		tCtx,
 		eventClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
@@ -5292,7 +5295,9 @@ func TestMultipleHPAs(t *testing.T) {
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 
+	tCtx := ktesting.Init(t)
 	hpaController := NewHorizontalController(
+		tCtx,
 		testClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
@@ -5310,10 +5315,8 @@ func TestMultipleHPAs(t *testing.T) {
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx, 5)
+	informerFactory.Start(tCtx.Done())
+	go hpaController.Run(tCtx, 5)
 
 	timeoutTime := time.After(15 * time.Second)
 	timeout := false
