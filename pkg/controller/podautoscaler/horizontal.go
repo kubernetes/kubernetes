@@ -86,8 +86,10 @@ type HorizontalController struct {
 	hpaNamespacer   autoscalingclient.HorizontalPodAutoscalersGetter
 	mapper          apimeta.RESTMapper
 
-	replicaCalc   *ReplicaCalculator
-	eventRecorder record.EventRecorder
+	replicaCalc *ReplicaCalculator
+
+	eventRecorder    record.EventRecorder
+	eventBroadcaster record.EventBroadcaster
 
 	downscaleStabilisationWindow time.Duration
 
@@ -147,6 +149,7 @@ func NewHorizontalController(
 
 	hpaController := &HorizontalController{
 		eventRecorder:                   recorder,
+		eventBroadcaster:                broadcaster,
 		scaleNamespacer:                 scaleNamespacer,
 		hpaNamespacer:                   hpaNamespacer,
 		downscaleStabilisationWindow:    downscaleStabilisationWindow,
@@ -195,6 +198,7 @@ func NewHorizontalController(
 func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()
+	defer a.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting HPA controller")

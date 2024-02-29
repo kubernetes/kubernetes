@@ -182,6 +182,9 @@ func New(
 	)
 
 	if err := s.init(); err != nil {
+		s.serviceQueue.ShutDown()
+		s.nodeQueue.ShutDown()
+		s.eventBroadcaster.Shutdown()
 		return nil, err
 	}
 

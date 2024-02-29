@@ -289,3 +289,51 @@ func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
 		DisableRoutes: true, // disable routes for server tests, otherwise --cluster-cidr is required
 	}, nil
 }
+
+func TestControllerGoroutineLeak(t *testing.T) {
+	if !cloudprovider.IsCloudProvider("fake") {
+		cloudprovider.RegisterCloudProvider("fake", fakeCloudProviderFactory)
+	}
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiserverConfig.WriteString(fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: controller-manager
+  name: default-context
+current-context: default-context
+users:
+- name: controller-manager
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, server.ClientConfig.BearerToken))
+	apiserverConfig.Close()
+
+	flags := []string{
+		"--kubeconfig", apiserverConfig.Name(),
+		"--leader-elect=false",
+		"--controllers=*",
+	}
+	_, ctx := ktesting.NewTestContext(t)
+	tester := kubeControllerManagerTester{}
+	_, _, tearDownFn, err := tester.StartTestServer(ctx, append(flags))
+	if tearDownFn != nil {
+		defer tearDownFn()
+	}
+}
