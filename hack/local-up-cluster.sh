@@ -244,6 +244,7 @@ LOG_DIR=${LOG_DIR:-"/tmp"}
 TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
+IMAGE_PULL_REQUEST_TIMEOUT=${IMAGE_PULL_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
@@ -862,6 +863,7 @@ rotateCertificates: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
+imagePullRequestTimeout: "${IMAGE_PULL_REQUEST_TIMEOUT}"
 EOF
 
   if [[ "$ENABLE_TRACING" = true ]]; then

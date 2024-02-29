@@ -197,6 +197,7 @@ func NewKubeGenericRuntimeManager(
 	imagePullBurst int,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
+	imagePullRequestTimeout metav1.Duration,
 	cpuCFSQuota bool,
 	cpuCFSQuotaPeriod metav1.Duration,
 	runtimeService internalapi.RuntimeService,

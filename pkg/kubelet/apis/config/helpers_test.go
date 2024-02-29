@@ -279,6 +279,7 @@ var (
 		"SeccompDefault",
 		"SerializeImagePulls",
 		"MaxParallelImagePulls",
+		"ImagePullRequestTimeout.Duration",
 		"ShowHiddenMetricsForVersion",
 		"ShutdownGracePeriodByPodPriority[*].Priority",
 		"ShutdownGracePeriodByPodPriority[*].ShutdownGracePeriodSeconds",

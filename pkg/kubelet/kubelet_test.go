@@ -3197,7 +3197,7 @@ func TestSyncPodSpans(t *testing.T) {
 
 	fakeRuntime.ImageService.SetFakeImageSize(100)
 	fakeRuntime.ImageService.SetFakeImages([]string{"test:latest"})
-	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp)
+	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, 2*time.Minute, tp)
 	assert.NoError(t, err)
 
 	kubelet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
@@ -3218,6 +3218,7 @@ func TestSyncPodSpans(t *testing.T) {
 		int(kubeCfg.RegistryBurst),
 		"",
 		"",
+		kubeCfg.ImagePullRequestTimeout,
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
 		runtimeSvc,

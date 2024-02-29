@@ -41,12 +41,13 @@ import (
 
 // remoteImageService is a gRPC implementation of internalapi.ImageManagerService.
 type remoteImageService struct {
-	timeout     time.Duration
-	imageClient runtimeapi.ImageServiceClient
+	timeout                 time.Duration
+	imagePullRequestTimeout time.Duration
+	imageClient             runtimeapi.ImageServiceClient
 }
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
-func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider) (internalapi.ImageManagerService, error) {
+func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, imagePullRequestTimeout time.Duration, tp trace.TracerProvider) (internalapi.ImageManagerService, error) {
 	klog.V(3).InfoS("Connecting to image service", "endpoint", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -89,7 +90,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 		return nil, err
 	}
 
-	service := &remoteImageService{timeout: connectionTimeout}
+	service := &remoteImageService{timeout: connectionTimeout, imagePullRequestTimeout: imagePullRequestTimeout}
 	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
 		return nil, fmt.Errorf("validate service connection: %w", err)
 	}
@@ -164,7 +165,7 @@ func (r *remoteImageService) imageStatusV1(ctx context.Context, image *runtimeap
 
 // PullImage pulls an image with authentication config.
 func (r *remoteImageService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, r.imagePullRequestTimeout)
 	defer cancel()
 
 	return r.pullImageV1(ctx, image, auth, podSandboxConfig)

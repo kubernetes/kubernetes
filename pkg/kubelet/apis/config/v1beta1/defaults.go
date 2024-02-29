@@ -215,6 +215,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 			obj.SerializeImagePulls = utilpointer.Bool(false)
 		}
 	}
+	if obj.ImagePullRequestTimeout == zeroDuration {
+		obj.ImagePullRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
+	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}

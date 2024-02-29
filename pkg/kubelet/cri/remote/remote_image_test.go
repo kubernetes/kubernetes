@@ -35,14 +35,14 @@ import (
 )
 
 func createRemoteImageServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp)
+	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, defaultImagePullRequestTimeout, tp)
 	require.NoError(t, err)
 
 	return runtimeService
 }
 
 func createRemoteImageServiceWithoutTracerProvider(endpoint string, t *testing.T) internalapi.ImageManagerService {
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, oteltrace.NewNoopTracerProvider())
+	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, defaultImagePullRequestTimeout, oteltrace.NewNoopTracerProvider())
 	require.NoError(t, err)
 
 	return runtimeService

@@ -47,6 +47,7 @@ imageGCHighThresholdPercent: 85
 imageGCLowThresholdPercent: 80
 imageMaximumGCAge: 0s
 imageMinimumGCAge: 2m0s
+imagePullRequestTimeout: 2m0s
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
 kind: KubeletConfiguration

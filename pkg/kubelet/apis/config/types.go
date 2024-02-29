@@ -297,6 +297,8 @@ type KubeletConfiguration struct {
 	SerializeImagePulls bool
 	// MaxParallelImagePulls sets the maximum number of image pulls in parallel.
 	MaxParallelImagePulls *int32
+	// ImagePullRequestTimeout is the timeout for image pull requests
+	ImagePullRequestTimeout metav1.Duration
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
 	// Some default signals are Linux only: nodefs.inodesFree
 	EvictionHard map[string]string

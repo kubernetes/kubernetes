@@ -59126,6 +59126,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "int32",
 						},
 					},
+					"imagePullRequestTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "imagePullRequestTimeout is the timeout for all image pull requests. Default: \"2m\"",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 					"evictionHard": {
 						SchemaProps: spec.SchemaProps{
 							Description: "evictionHard is a map of signal names to quantities that defines hard eviction thresholds. For example: `{\"memory.available\": \"300Mi\"}`. To explicitly disable, pass a 0% or 100% threshold on an arbitrary resource. Default:\n  memory.available:  \"100Mi\"\n  nodefs.available:  \"10%\"\n  nodefs.inodesFree: \"5%\"\n  imagefs.available: \"15%\"",

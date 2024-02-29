@@ -89,6 +89,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.RegistryPullQPS = 5
 			obj.ResolverConfig = kubetypes.ResolvConfDefault
 			obj.SerializeImagePulls = true
+			obj.ImagePullRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
 			obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
 			obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
 			obj.ContentType = "application/vnd.kubernetes.protobuf"

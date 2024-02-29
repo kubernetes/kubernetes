@@ -249,7 +249,7 @@ func run(config *hollowNodeConfig) error {
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
-			imageService, err = remote.NewRemoteImageService(c.ImageServiceEndpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
+			imageService, err = remote.NewRemoteImageService(c.ImageServiceEndpoint, 15*time.Second, 15*time.Second, oteltrace.NewNoopTracerProvider())
 			if err != nil {
 				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}

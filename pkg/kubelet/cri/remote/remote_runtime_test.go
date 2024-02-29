@@ -38,7 +38,8 @@ import (
 )
 
 const (
-	defaultConnectionTimeout = 15 * time.Second
+	defaultConnectionTimeout       = 15 * time.Second
+	defaultImagePullRequestTimeout = 2 * time.Minute
 )
 
 // createAndStartFakeRemoteRuntime creates and starts fakeremote.RemoteRuntime.

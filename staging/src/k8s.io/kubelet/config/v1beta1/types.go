@@ -493,6 +493,10 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	MaxParallelImagePulls *int32 `json:"maxParallelImagePulls,omitempty"`
+	// imagePullRequestTimeout is the timeout for all image pull requests.
+	// Default: "2m"
+	// +optional
+	ImagePullRequestTimeout metav1.Duration `json:"imagePullRequestTimeout,omitempty"`
 	// evictionHard is a map of signal names to quantities that defines hard eviction
 	// thresholds. For example: `{"memory.available": "300Mi"}`.
 	// To explicitly disable, pass a 0% or 100% threshold on an arbitrary resource.

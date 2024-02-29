@@ -445,6 +445,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 		return err
 	}
 	out.MaxParallelImagePulls = (*int32)(unsafe.Pointer(in.MaxParallelImagePulls))
+	out.ImagePullRequestTimeout = in.ImagePullRequestTimeout
 	out.EvictionHard = *(*map[string]string)(unsafe.Pointer(&in.EvictionHard))
 	out.EvictionSoft = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoft))
 	out.EvictionSoftGracePeriod = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoftGracePeriod))
@@ -639,6 +640,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	out.MaxParallelImagePulls = (*int32)(unsafe.Pointer(in.MaxParallelImagePulls))
+	out.ImagePullRequestTimeout = in.ImagePullRequestTimeout
 	out.EvictionHard = *(*map[string]string)(unsafe.Pointer(&in.EvictionHard))
 	out.EvictionSoft = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoft))
 	out.EvictionSoftGracePeriod = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoftGracePeriod))
