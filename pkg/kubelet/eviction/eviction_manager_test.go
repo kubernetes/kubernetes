@@ -115,6 +115,14 @@ func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceLis
 	return pod, podStats
 }
 
+func makePodWithPIDStats(name string, priority int32, processCount uint64) (*v1.Pod, statsapi.PodStats) {
+	pod := newPod(name, priority, []v1.Container{
+		newContainer(name, nil, nil),
+	}, nil)
+	podStats := newPodProcessStats(pod, processCount)
+	return pod, podStats
+}
+
 func makePodWithDiskStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*v1.Pod, statsapi.PodStats) {
 	pod := newPod(name, priority, []v1.Container{
 		newContainer(name, requests, limits),
@@ -147,6 +155,27 @@ func makePodWithLocalStorageCapacityIsolationOpen(name string, priority int32, r
 		podStats = newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
 	}
 	return pod, podStats
+}
+
+func makePIDStats(nodeAvailablePIDs string, numberOfRunningProcesses string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
+	val := resource.MustParse(nodeAvailablePIDs)
+	availablePIDs := int64(val.Value())
+
+	parsed := resource.MustParse(numberOfRunningProcesses)
+	NumberOfRunningProcesses := int64(parsed.Value())
+	result := &statsapi.Summary{
+		Node: statsapi.NodeStats{
+			Rlimit: &statsapi.RlimitStats{
+				MaxPID:                &availablePIDs,
+				NumOfRunningProcesses: &NumberOfRunningProcesses,
+			},
+		},
+		Pods: []statsapi.PodStats{},
+	}
+	for _, podStat := range podStats {
+		result.Pods = append(result.Pods, podStat)
+	}
+	return result
 }
 
 func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
@@ -230,6 +259,7 @@ type podToMake struct {
 	requests                 v1.ResourceList
 	limits                   v1.ResourceList
 	memoryWorkingSet         string
+	pidUsage                 uint64
 	rootFsUsed               string
 	logsFsUsed               string
 	logsFsInodesUsed         string
@@ -334,6 +364,109 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 						Status:  "True",
 						Reason:  "TerminationByKubelet",
 						Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
+					})
+				}
+
+				// verify the pod status after applying the status update function
+				podKiller.statusFn(&podKiller.pod.Status)
+				if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+func TestPIDPressure_VerifyPodStatus(t *testing.T) {
+	testCases := map[string]struct {
+		wantPodStatus v1.PodStatus
+	}{
+		"eviction due to pid pressure": {
+			wantPodStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "Evicted",
+				Message: "The node was low on resource: pids. Threshold quantity: 1200, available: 500. ",
+			},
+		},
+	}
+	for name, tc := range testCases {
+		for _, enablePodDisruptionConditions := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s;PodDisruptionConditions=%v", name, enablePodDisruptionConditions), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+
+				podMaker := makePodWithPIDStats
+				summaryStatsMaker := makePIDStats
+				podsToMake := []podToMake{
+					{name: "pod1", priority: lowPriority, pidUsage: 500},
+					{name: "pod2", priority: defaultPriority, pidUsage: 500},
+				}
+				pods := []*v1.Pod{}
+				podStats := map[*v1.Pod]statsapi.PodStats{}
+				for _, podToMake := range podsToMake {
+					pod, podStat := podMaker(podToMake.name, podToMake.priority, 2)
+					pods = append(pods, pod)
+					podStats[pod] = podStat
+				}
+				activePodsFunc := func() []*v1.Pod {
+					return pods
+				}
+
+				fakeClock := testingclock.NewFakeClock(time.Now())
+				podKiller := &mockPodKiller{}
+				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+				diskGC := &mockDiskGC{err: nil}
+				nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+				config := Config{
+					PressureTransitionPeriod: time.Minute * 5,
+					Thresholds: []evictionapi.Threshold{
+						{
+							Signal:   evictionapi.SignalPIDAvailable,
+							Operator: evictionapi.OpLessThan,
+							Value: evictionapi.ThresholdValue{
+								Quantity: quantityMustParse("1200"),
+							},
+						},
+					},
+				}
+				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500", "1000", podStats)}
+				manager := &managerImpl{
+					clock:                        fakeClock,
+					killPodFunc:                  podKiller.killPodNow,
+					imageGC:                      diskGC,
+					containerGC:                  diskGC,
+					config:                       config,
+					recorder:                     &record.FakeRecorder{},
+					summaryProvider:              summaryProvider,
+					nodeRef:                      nodeRef,
+					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				}
+
+				// synchronize to detect the PID pressure
+				_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+
+				if err != nil {
+					t.Fatalf("Manager expects no error but got %v", err)
+				}
+
+				// verify PID pressure is detected
+				if !manager.IsUnderPIDPressure() {
+					t.Fatalf("Manager should have detected PID pressure")
+				}
+
+				// verify a pod is selected for eviction
+				if podKiller.pod == nil {
+					t.Fatalf("Manager should have selected a pod for eviction")
+				}
+
+				wantPodStatus := tc.wantPodStatus.DeepCopy()
+				if enablePodDisruptionConditions {
+					wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+						Type:    "DisruptionTarget",
+						Status:  "True",
+						Reason:  "TerminationByKubelet",
+						Message: "The node was low on resource: pids. Threshold quantity: 1200, available: 500. ",
 					})
 				}
 
@@ -782,6 +915,255 @@ func makeContainersByQOS(class v1.PodQOSClass) []v1.Container {
 		fallthrough
 	default:
 		return []v1.Container{newContainer("best-effort-container", nil, nil)}
+	}
+}
+
+func TestPIDPressure(t *testing.T) {
+	testCases := []struct {
+		name                               string
+		podsToMake                         []podToMake
+		evictPodIndex                      int
+		noPressurePIDUsage                 string
+		pressurePIDUsageWithGracePeriod    string
+		pressurePIDUsageWithoutGracePeriod string
+		totalPID                           string
+	}{
+		{
+			name: "eviction due to pid pressure",
+			podsToMake: []podToMake{
+				{name: "high-priority-high-usage", priority: highPriority, pidUsage: 900},
+				{name: "default-priority-low-usage", priority: defaultPriority, pidUsage: 100},
+				{name: "default-priority-medium-usage", priority: defaultPriority, pidUsage: 400},
+				{name: "low-priority-high-usage", priority: lowPriority, pidUsage: 600},
+				{name: "low-priority-low-usage", priority: lowPriority, pidUsage: 50},
+			},
+			evictPodIndex:                      3, // we expect the low-priority-high-usage pod to be evicted
+			noPressurePIDUsage:                 "300",
+			pressurePIDUsageWithGracePeriod:    "700",
+			pressurePIDUsageWithoutGracePeriod: "1200",
+			totalPID:                           "2000",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podMaker := makePodWithPIDStats
+			summaryStatsMaker := makePIDStats
+			pods := []*v1.Pod{}
+			podStats := map[*v1.Pod]statsapi.PodStats{}
+			for _, podToMake := range tc.podsToMake {
+				pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.pidUsage)
+				pods = append(pods, pod)
+				podStats[pod] = podStat
+			}
+			podToEvict := pods[tc.evictPodIndex]
+			activePodsFunc := func() []*v1.Pod { return pods }
+
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			podKiller := &mockPodKiller{}
+			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+			diskGC := &mockDiskGC{err: nil}
+			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+			config := Config{
+				MaxPodGracePeriodSeconds: 5,
+				PressureTransitionPeriod: time.Minute * 5,
+				Thresholds: []evictionapi.Threshold{
+					{
+						Signal:   evictionapi.SignalPIDAvailable,
+						Operator: evictionapi.OpLessThan,
+						Value: evictionapi.ThresholdValue{
+							Quantity: quantityMustParse("1200"),
+						},
+					},
+					{
+						Signal:   evictionapi.SignalPIDAvailable,
+						Operator: evictionapi.OpLessThan,
+						Value: evictionapi.ThresholdValue{
+							Quantity: quantityMustParse("1500"),
+						},
+						GracePeriod: time.Minute * 2,
+					},
+				},
+			}
+
+			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)}
+			manager := &managerImpl{
+				clock:                        fakeClock,
+				killPodFunc:                  podKiller.killPodNow,
+				imageGC:                      diskGC,
+				containerGC:                  diskGC,
+				config:                       config,
+				recorder:                     &record.FakeRecorder{},
+				summaryProvider:              summaryProvider,
+				nodeRef:                      nodeRef,
+				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+			}
+
+			// create a pod to test admission
+			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, 50)
+
+			// synchronize
+			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			// we should not have PID pressure
+			if manager.IsUnderPIDPressure() {
+				t.Fatalf("Manager should not report PID pressure")
+			}
+
+			// try to admit our pod (should succeed)
+			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
+			}
+
+			// induce soft threshold for PID pressure
+			fakeClock.Step(1 * time.Minute)
+			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.pressurePIDUsageWithGracePeriod, podStats)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			// now, we should have PID pressure
+			if !manager.IsUnderPIDPressure() {
+				t.Errorf("Manager should report PID pressure since soft threshold was met")
+			}
+
+			// verify no pod was yet killed because there has not yet been enough time passed
+			if podKiller.pod != nil {
+				t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name)
+			}
+
+			// step forward in time past the grace period
+			fakeClock.Step(3 * time.Minute)
+			// no change in PID stats to simulate continued pressure
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			// verify PID pressure is still reported
+			if !manager.IsUnderPIDPressure() {
+				t.Errorf("Manager should still report PID pressure")
+			}
+
+			// verify the right pod was killed with the right grace period.
+			if podKiller.pod != podToEvict {
+				t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+			}
+			if podKiller.gracePeriodOverride == nil {
+				t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+			}
+			observedGracePeriod := *podKiller.gracePeriodOverride
+			if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
+				t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
+			}
+
+			// reset state
+			podKiller.pod = nil
+			podKiller.gracePeriodOverride = nil
+
+			// remove PID pressure by simulating increased PID availability
+			fakeClock.Step(20 * time.Minute)
+			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats) // Simulate increased PID availability
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			// verify PID pressure is resolved
+			if manager.IsUnderPIDPressure() {
+				t.Errorf("Manager should not report PID pressure")
+			}
+
+			// re-induce PID pressure
+			fakeClock.Step(1 * time.Minute)
+			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.pressurePIDUsageWithoutGracePeriod, podStats)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			// verify PID pressure is reported again
+			if !manager.IsUnderPIDPressure() {
+				t.Errorf("Manager should report PID pressure")
+			}
+
+			// verify the right pod was killed with the right grace period.
+			if podKiller.pod != podToEvict {
+				t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+			}
+			if podKiller.gracePeriodOverride == nil {
+				t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+			}
+			observedGracePeriod = *podKiller.gracePeriodOverride
+			if observedGracePeriod != int64(0) {
+				t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+			}
+
+			// try to admit our pod (should fail)
+			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
+			}
+
+			// reduce PID pressure
+			fakeClock.Step(1 * time.Minute)
+			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)
+			podKiller.pod = nil // reset state
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			// we should have PID pressure (because transition period not yet met)
+			if !manager.IsUnderPIDPressure() {
+				t.Errorf("Manager should report PID pressure")
+			}
+
+			// no pod should have been killed
+			if podKiller.pod != nil {
+				t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+			}
+
+			// try to admit our pod (should fail)
+			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
+			}
+
+			// move the clock past the transition period
+			fakeClock.Step(5 * time.Minute)
+			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+			if err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			// we should not have PID pressure (because transition period met)
+			if manager.IsUnderPIDPressure() {
+				t.Errorf("Manager should not report PID pressure")
+			}
+
+			// no pod should have been killed
+			if podKiller.pod != nil {
+				t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+			}
+
+			// try to admit our pod (should succeed)
+			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
+			}
+		})
 	}
 }
 
