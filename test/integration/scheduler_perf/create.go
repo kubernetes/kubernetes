@@ -95,17 +95,23 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 			return fmt.Errorf("map %q to resource: %v", gk, err)
 		}
 		resourceClient := tCtx.Dynamic().Resource(mapping.Resource)
-
+		options := metav1.CreateOptions{
+			// If the YAML input is invalid, then we want the
+			// apiserver to tell us via an error. This can
+			// happen because decoding into an unstructured object
+			// doesn't validate.
+			FieldValidation: "Strict",
+		}
 		if c.Namespace != "" {
 			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 				return fmt.Errorf("namespace %q set for %q, but %q has scope %q", c.Namespace, c.TemplatePath, gk, mapping.Scope.Name())
 			}
-			_, err = resourceClient.Namespace(c.Namespace).Create(tCtx, obj, metav1.CreateOptions{})
+			_, err = resourceClient.Namespace(c.Namespace).Create(tCtx, obj, options)
 		} else {
 			if mapping.Scope.Name() != meta.RESTScopeNameRoot {
 				return fmt.Errorf("namespace not set for %q, but %q has scope %q", c.TemplatePath, gk, mapping.Scope.Name())
 			}
-			_, err = resourceClient.Create(tCtx, obj, metav1.CreateOptions{})
+			_, err = resourceClient.Create(tCtx, obj, options)
 		}
 		return err
 	}
