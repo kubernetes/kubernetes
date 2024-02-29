@@ -247,6 +247,13 @@ const (
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
+	// A new deployment field, .spec.podReplacementPolicy, can be used to determine whether to replace
+	// terminating or terminated pods in deployments with new pods.
+	DeploymentPodReplacementPolicy featuregate.Feature = "DeploymentPodReplacementPolicy"
+
+	// owner: @atiratree
+	// kep: http://kep.k8s.io/3973
+	//
 	// Deployments and replica sets can now also track terminating pods via .status.terminatingReplicas.
 	DeploymentReplicaSetTerminatingReplicas featuregate.Feature = "DeploymentReplicaSetTerminatingReplicas"
 
@@ -1183,6 +1190,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DeploymentPodReplacementPolicy: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2069,6 +2080,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAResourceClaimDeviceStatus: {}, // Soft dependency on DynamicResourceAllocation due to on/off-by-default conflict.
 
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
+
+	DeploymentPodReplacementPolicy: {DeploymentReplicaSetTerminatingReplicas},
 
 	DeploymentReplicaSetTerminatingReplicas: {},
 
