@@ -107,7 +107,7 @@ func (i *objectCacheItem) stopIfIdle(now time.Time, maxIdleTime time.Duration) b
 	return false
 }
 
-func (i *objectCacheItem) restartReflectorIfNeeded(startTiem time.Time) {
+func (i *objectCacheItem) restartReflectorIfNeeded(startTime time.Time) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	if i.immutable || !i.stopped {
