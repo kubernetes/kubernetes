@@ -817,6 +817,8 @@ func TestWebSocketClient_BadHandshake(t *testing.T) {
 // TestWebSocketClient_HeartbeatTimeout tests the heartbeat by forcing a
 // timeout by setting the ping period greater than the deadline.
 func TestWebSocketClient_HeartbeatTimeout(t *testing.T) {
+	blockRequestCtx, unblockRequest := context.WithCancel(context.Background())
+	defer unblockRequest()
 	// Create fake WebSocket server which blocks.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
@@ -824,8 +826,7 @@ func TestWebSocketClient_HeartbeatTimeout(t *testing.T) {
 			t.Fatalf("error on webSocketServerStreams: %v", err)
 		}
 		defer conns.conn.Close()
-		// Block server; heartbeat timeout (or test timeout) will fire before this returns.
-		time.Sleep(1 * time.Second)
+		<-blockRequestCtx.Done()
 	}))
 	defer websocketServer.Close()
 	// Create websocket client connecting to fake server.
@@ -840,8 +841,8 @@ func TestWebSocketClient_HeartbeatTimeout(t *testing.T) {
 	}
 	streamExec := exec.(*wsStreamExecutor)
 	// Ping period is greater than the ping deadline, forcing the timeout to fire.
-	pingPeriod := 20 * time.Millisecond
-	pingDeadline := 5 * time.Millisecond
+	pingPeriod := wait.ForeverTestTimeout // this lets the heartbeat deadline expire without renewing it
+	pingDeadline := time.Second           // this gives setup 1 second to establish streams
 	streamExec.heartbeatPeriod = pingPeriod
 	streamExec.heartbeatDeadline = pingDeadline
 	// Send some random data to the websocket server through STDIN.
@@ -859,8 +860,7 @@ func TestWebSocketClient_HeartbeatTimeout(t *testing.T) {
 	}()
 
 	select {
-	case <-time.After(pingPeriod * 5):
-		// Give up after about five ping attempts
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("expected heartbeat timeout, got none.")
 	case err := <-errorChan:
 		// Expecting heartbeat timeout error.
@@ -1114,6 +1114,14 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 		t.Errorf("unexpected heartbeat timeout")
 	}
 	wg.Wait()
+}
+
+func TestLateStreamCreation(t *testing.T) {
+	c := newWSStreamCreator(nil)
+	c.closeAllStreamReaders(nil)
+	if err := c.setStream(0, nil); err == nil {
+		t.Fatal("expected error adding stream after closeAllStreamReaders")
+	}
 }
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
