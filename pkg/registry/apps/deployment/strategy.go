@@ -76,6 +76,8 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
+	// drop disabled field
+	dropDisabledSpecFields(&deployment.Spec, nil)
 	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
@@ -112,6 +114,8 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
+	// drop disabled field
+	dropDisabledSpecFields(&newDeployment.Spec, &oldDeployment.Spec)
 	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
@@ -184,6 +188,14 @@ func (deploymentStatusStrategy) ValidateUpdate(ctx context.Context, obj, old run
 // WarningsOnUpdate returns warnings for the given update.
 func (deploymentStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropDisabledSpecFields removes disabled fields from the deployment spec.
+func dropDisabledSpecFields(deploymentSpec, oldDeploymentSpec *apps.DeploymentSpec) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) || !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy)) &&
+		(oldDeploymentSpec == nil || oldDeploymentSpec.PodReplacementPolicy == nil) {
+		deploymentSpec.PodReplacementPolicy = nil
+	}
 }
 
 // dropDisabledStatusFields removes disabled fields from the deployment status.
