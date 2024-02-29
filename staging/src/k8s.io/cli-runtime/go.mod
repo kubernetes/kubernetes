@@ -73,5 +73,6 @@ require (
 replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
 )
