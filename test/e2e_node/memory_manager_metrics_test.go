@@ -67,6 +67,7 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 				},
 			)
 			updateKubeletConfig(ctx, f, newCfg, true)
+			validateMetricsAreZeroed(ctx)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if testPod != nil {
 					deletePodSyncByName(ctx, f, testPod.Name)
@@ -153,3 +154,21 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 		})
 	})
 })
+
+func validateMetricsAreZeroed(ctx context.Context) {
+	ginkgo.GinkgoHelper()
+	ginkgo.By("Checking the memorymanager metrics are zeroed right after the kubelet restart")
+	matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+		"kubelet_memory_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+			"": timelessSample(0),
+		}),
+		"kubelet_memory_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+			"": timelessSample(0),
+		}),
+	})
+
+	ginkgo.By("Giving the Kubelet time to start up and produce metrics")
+	gomega.Eventually(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
+	ginkgo.By("Ensuring the metrics match the expectations a few more times")
+	gomega.Consistently(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
+}
