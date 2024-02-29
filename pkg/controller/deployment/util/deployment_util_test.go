@@ -346,27 +346,32 @@ func TestGetReplicaCountForReplicaSets(t *testing.T) {
 	rs1 := generateRS(generateDeployment("foo"))
 	*(rs1.Spec.Replicas) = 1
 	rs1.Status.Replicas = 2
+	rs1.Status.TerminatingReplicas = 3
 	rs2 := generateRS(generateDeployment("bar"))
 	*(rs2.Spec.Replicas) = 2
 	rs2.Status.Replicas = 3
+	rs2.Status.TerminatingReplicas = 1
 
 	tests := []struct {
-		Name           string
-		sets           []*apps.ReplicaSet
-		expectedCount  int32
-		expectedActual int32
+		Name                string
+		sets                []*apps.ReplicaSet
+		expectedCount       int32
+		expectedActual      int32
+		expectedTerminating int32
 	}{
 		{
-			"1:2 Replicas",
+			"1:2:3 Replicas",
 			[]*apps.ReplicaSet{&rs1},
 			1,
 			2,
+			3,
 		},
 		{
-			"3:5 Replicas",
+			"3:5:4 Replicas",
 			[]*apps.ReplicaSet{&rs1, &rs2},
 			3,
 			5,
+			4,
 		},
 	}
 
@@ -379,6 +384,10 @@ func TestGetReplicaCountForReplicaSets(t *testing.T) {
 			rs = GetActualReplicaCountForReplicaSets(test.sets)
 			if rs != test.expectedActual {
 				t.Errorf("In test case %s, expectedActual %+v, got %+v", test.Name, test.expectedActual, rs)
+			}
+			rs = GetTerminatingReplicaCountForReplicaSets(test.sets)
+			if rs != test.expectedTerminating {
+				t.Errorf("In test case %s, expectedTerminating %+v, got %+v", test.Name, test.expectedTerminating, rs)
 			}
 		})
 	}
