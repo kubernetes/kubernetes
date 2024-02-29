@@ -1,35 +1,4 @@
 rules:
-- destination: code-generator
-  branches:
-  - name: master
-    source:
-      branch: master
-      dirs:
-      - staging/src/k8s.io/code-generator
-  - name: release-1.26
-    go: 1.21.7
-    source:
-      branch: release-1.26
-      dirs:
-      - staging/src/k8s.io/code-generator
-  - name: release-1.27
-    go: 1.21.7
-    source:
-      branch: release-1.27
-      dirs:
-      - staging/src/k8s.io/code-generator
-  - name: release-1.28
-    go: 1.21.7
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/code-generator
-  - name: release-1.29
-    go: 1.21.7
-    source:
-      branch: release-1.29
-      dirs:
-      - staging/src/k8s.io/code-generator
 - destination: apimachinery
   branches:
   - name: master
@@ -186,6 +155,40 @@ rules:
       go build -mod=mod ./...
       go test -mod=mod ./...
   library: true
+- destination: code-generator
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/code-generator
+    dependencies:
+    - repository: apimachinery # for tests
+      branch: master
+  - name: release-1.26
+    go: 1.21.7
+    source:
+      branch: release-1.26
+      dirs:
+      - staging/src/k8s.io/code-generator
+  - name: release-1.27
+    go: 1.21.7
+    source:
+      branch: release-1.27
+      dirs:
+      - staging/src/k8s.io/code-generator
+  - name: release-1.28
+    go: 1.21.7
+    source:
+      branch: release-1.28
+      dirs:
+      - staging/src/k8s.io/code-generator
+  - name: release-1.29
+    go: 1.21.7
+    source:
+      branch: release-1.29
+      dirs:
+      - staging/src/k8s.io/code-generator
 - destination: component-base
   branches:
   - name: master
