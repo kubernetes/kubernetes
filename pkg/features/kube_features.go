@@ -166,6 +166,14 @@ const (
 	// Set the scheduled time as an annotation in the job.
 	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
 
+	// owner: @atiratree
+	// kep: http://kep.k8s.io/3973
+	// alpha: v1.31
+	//
+	// A new deployment field, .spec.podReplacementPolicy, can be used to determine whether to replace
+	// terminating or terminated pods in deployments with new pods.
+	DeploymentPodReplacementPolicy featuregate.Feature = "DeploymentPodReplacementPolicy"
+
 	// owner: @elezar
 	// kep: http://kep.k8s.io/4009
 	// alpha: v1.28
@@ -1001,6 +1009,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableCloudProviders: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	DeploymentPodReplacementPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	DisableNodeKubeProxyVersion: {Default: true, PreRelease: featuregate.Beta},
 
