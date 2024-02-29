@@ -57,7 +57,7 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
 				framework.ExpectNoError(err, "failed to get pod %q", podName)
-				//Verify exit code
+				// Verify exit code
 				exitCode = pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
 				framework.ExpectNoError(err, "failed to get most recent container exit code for pod %q", podName)
 				if exitCode != int32(0) {
