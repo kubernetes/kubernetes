@@ -49,6 +49,7 @@ type ComponentUpgradePlan struct {
 	Name           string
 	CurrentVersion string
 	NewVersion     string
+	NodeName       string
 }
 
 // ComponentConfigVersionState describes the current and desired version of a component config

@@ -17,7 +17,6 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -88,11 +87,12 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 }
 
 // newComponentUpgradePlan helper creates outputapiv1alpha3.ComponentUpgradePlan object
-func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapiv1alpha3.ComponentUpgradePlan {
+func newComponentUpgradePlan(name, currentVersion, newVersion, nodeName string) outputapiv1alpha3.ComponentUpgradePlan {
 	return outputapiv1alpha3.ComponentUpgradePlan{
 		Name:           name,
 		CurrentVersion: currentVersion,
 		NewVersion:     newVersion,
+		NodeName:       nodeName,
 	}
 }
 
@@ -105,10 +105,6 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 	if err != nil {
 		return err
 	}
-
-	// Currently this is the only method we have for distinguishing
-	// external etcd vs static pod etcd
-	isExternalEtcd := initCfg.Etcd.External != nil
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
@@ -124,7 +120,7 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 		return cmdutil.TypeMismatchErr("allowExperimentalUpgrades", "bool")
 	}
 
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, isExternalEtcd, client, constants.GetStaticPodDirectory(), printer)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, client, printer)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -143,16 +139,15 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 	}
 
 	// Generate and print the upgrade plan
-	plan := genUpgradePlan(availUpgrades, configVersionStates, isExternalEtcd)
+	plan := genUpgradePlan(availUpgrades, configVersionStates)
 	return printer.PrintObj(plan, os.Stdout)
 }
 
 // genUpgradePlan generates upgrade plan from available upgrades and component config version states
-func genUpgradePlan(availUpgrades []upgrade.Upgrade, configVersions []outputapiv1alpha3.ComponentConfigVersionState, isExternalEtcd bool) *outputapiv1alpha3.UpgradePlan {
+func genUpgradePlan(availUpgrades []upgrade.Upgrade, configVersions []outputapiv1alpha3.ComponentConfigVersionState) *outputapiv1alpha3.UpgradePlan {
 	plan := &outputapiv1alpha3.UpgradePlan{ConfigVersions: configVersions}
 	for _, up := range availUpgrades {
-		au := genAvailableUpgrade(&up, isExternalEtcd)
-		plan.AvailableUpgrades = append(plan.AvailableUpgrades, au)
+		plan.AvailableUpgrades = append(plan.AvailableUpgrades, genAvailableUpgrade(&up))
 	}
 	return plan
 }
@@ -164,7 +159,7 @@ func appendDNSComponent(components []outputapiv1alpha3.ComponentUpgradePlan, up 
 	afterVersion := up.After.DNSVersion
 
 	if beforeVersion != "" || afterVersion != "" {
-		components = append(components, newComponentUpgradePlan(name, beforeVersion, afterVersion))
+		components = append(components, newComponentUpgradePlan(name, beforeVersion, afterVersion, ""))
 	}
 	return components
 }
@@ -175,41 +170,64 @@ func appendKubeadmComponent(components []outputapiv1alpha3.ComponentUpgradePlan,
 	afterVersion := up.After.KubeadmVersion
 
 	if beforeVersion != "" || afterVersion != "" {
-		components = append(components, newComponentUpgradePlan(name, beforeVersion, afterVersion))
+		components = append(components, newComponentUpgradePlan(name, beforeVersion, afterVersion, ""))
 	}
 	return components
 }
 
-// genAvailableUpgrade generates available upgrade from upgrade object and external etcd boolean
-func genAvailableUpgrade(up *upgrade.Upgrade, isExternalEtcd bool) outputapiv1alpha3.AvailableUpgrade {
+// genAvailableUpgrade generates available upgrade from upgrade object.
+func genAvailableUpgrade(up *upgrade.Upgrade) outputapiv1alpha3.AvailableUpgrade {
 	components := []outputapiv1alpha3.ComponentUpgradePlan{}
 
 	if up.CanUpgradeKubelets() {
-		// The map is of the form <old-version>:<node-count>. Here all the keys are put into a slice and sorted
+		// The map is of the form <old-version>:<node-names>. Here all the keys are put into a slice and sorted
 		// in order to always get the right order. Then the map value is extracted separately
-		for _, oldVersion := range sortedSliceFromStringIntMap(up.Before.KubeletVersions) {
-			nodeCount := up.Before.KubeletVersions[oldVersion]
-			components = append(components, newComponentUpgradePlan(constants.Kubelet, fmt.Sprintf("%d x %s", nodeCount, oldVersion), up.After.KubeVersion))
+		for _, oldVersion := range sortedSliceFromStringStringArrayMap(up.Before.KubeletVersions) {
+			nodeNames := up.Before.KubeletVersions[oldVersion]
+			for _, nodeName := range nodeNames {
+				components = append(components, newComponentUpgradePlan(constants.Kubelet, oldVersion, up.After.KubeVersion, nodeName))
+			}
 		}
 	}
 
-	components = append(components, newComponentUpgradePlan(constants.KubeAPIServer, up.Before.KubeVersion, up.After.KubeVersion))
-	components = append(components, newComponentUpgradePlan(constants.KubeControllerManager, up.Before.KubeVersion, up.After.KubeVersion))
-	components = append(components, newComponentUpgradePlan(constants.KubeScheduler, up.Before.KubeVersion, up.After.KubeVersion))
-	components = append(components, newComponentUpgradePlan(constants.KubeProxy, up.Before.KubeVersion, up.After.KubeVersion))
+	for _, oldVersion := range sortedSliceFromStringStringArrayMap(up.Before.KubeAPIServerVersions) {
+		nodeNames := up.Before.KubeAPIServerVersions[oldVersion]
+		for _, nodeName := range nodeNames {
+			components = append(components, newComponentUpgradePlan(constants.KubeAPIServer, oldVersion, up.After.KubeVersion, nodeName))
+		}
+	}
 
+	for _, oldVersion := range sortedSliceFromStringStringArrayMap(up.Before.KubeControllerManagerVersions) {
+		nodeNames := up.Before.KubeControllerManagerVersions[oldVersion]
+		for _, nodeName := range nodeNames {
+			components = append(components, newComponentUpgradePlan(constants.KubeControllerManager, oldVersion, up.After.KubeVersion, nodeName))
+		}
+	}
+
+	for _, oldVersion := range sortedSliceFromStringStringArrayMap(up.Before.KubeSchedulerVersions) {
+		nodeNames := up.Before.KubeSchedulerVersions[oldVersion]
+		for _, nodeName := range nodeNames {
+			components = append(components, newComponentUpgradePlan(constants.KubeScheduler, oldVersion, up.After.KubeVersion, nodeName))
+		}
+	}
+
+	components = append(components, newComponentUpgradePlan(constants.KubeProxy, up.Before.KubeVersion, up.After.KubeVersion, ""))
 	components = appendDNSComponent(components, up, constants.CoreDNS)
 	components = appendKubeadmComponent(components, up, constants.Kubeadm)
 
-	if !isExternalEtcd {
-		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))
+	// If etcd is not external, we should include it in the upgrade plan
+	for _, oldVersion := range sortedSliceFromStringStringArrayMap(up.Before.EtcdVersions) {
+		nodeNames := up.Before.EtcdVersions[oldVersion]
+		for _, nodeName := range nodeNames {
+			components = append(components, newComponentUpgradePlan(constants.Etcd, oldVersion, up.After.EtcdVersion, nodeName))
+		}
 	}
 
 	return outputapiv1alpha3.AvailableUpgrade{Description: up.Description, Components: components}
 }
 
-// sortedSliceFromStringIntMap returns a slice of the keys in the map sorted alphabetically
-func sortedSliceFromStringIntMap(strMap map[string]uint16) []string {
+// sortedSliceFromStringStringArrayMap returns a slice of the keys in the map sorted alphabetically
+func sortedSliceFromStringStringArrayMap(strMap map[string][]string) []string {
 	strSlice := []string{}
 	for k := range strMap {
 		strSlice = append(strSlice, k)
@@ -280,28 +298,24 @@ func (printer *upgradePlanTextPrinter) printAvailableUpgrade(writer io.Writer, a
 
 	_, _ = printer.Fprintln(writer, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
 	tabw := tabwriter.NewWriter(writer, 10, 4, 3, ' ', 0)
-	_, _ = printer.Fprintln(tabw, strings.Join([]string{"COMPONENT", "CURRENT", "TARGET"}, "\t"))
-	for i, component := range au.Components {
+	_, _ = printer.Fprintln(tabw, strings.Join([]string{"COMPONENT", "NODE", "CURRENT", "TARGET"}, "\t"))
+	for _, component := range au.Components {
 		if component.Name != constants.Kubelet {
 			continue
 		}
-		if i == 0 {
-			_, _ = printer.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
-		} else {
-			_, _ = printer.Fprintf(tabw, "%s\t%s\t%s\n", "", component.CurrentVersion, component.NewVersion)
-		}
+		_, _ = printer.Fprintf(tabw, "%s\t%s\t%s\t%s\n", component.Name, component.NodeName, component.CurrentVersion, component.NewVersion)
 	}
 	_ = tabw.Flush()
 
 	_, _ = printer.Fprintln(writer, "")
 	_, _ = printer.Fprintf(writer, "Upgrade to the latest %s:\n", au.Description)
 	_, _ = printer.Fprintln(writer, "")
-	_, _ = printer.Fprintln(tabw, strings.Join([]string{"COMPONENT", "CURRENT", "TARGET"}, "\t"))
+	_, _ = printer.Fprintln(tabw, strings.Join([]string{"COMPONENT", "NODE", "CURRENT", "TARGET"}, "\t"))
 	for _, component := range au.Components {
 		if component.Name == constants.Kubelet || component.Name == constants.Kubeadm {
 			continue
 		}
-		_, _ = printer.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
+		_, _ = printer.Fprintf(tabw, "%s\t%s\t%s\t%s\n", component.Name, component.NodeName, component.CurrentVersion, component.NewVersion)
 	}
 	_ = tabw.Flush()
 
