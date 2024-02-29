@@ -92,7 +92,7 @@ func TestScheduling(t *testing.T) {
 								t.Skipf("disabled by label filter %q", *testSchedulingLabelFilter)
 							}
 							tCtx := ktesting.WithTB(tCtx, t)
-							runWorkload(tCtx, tc, w, informerFactory, true)
+							runWorkload(tCtx, tc, w, informerFactory)
 						})
 					}
 				})
