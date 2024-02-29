@@ -151,3 +151,8 @@ func GroupVersionKindsHasJoinConfiguration(gvks ...schema.GroupVersionKind) bool
 func GroupVersionKindsHasResetConfiguration(gvks ...schema.GroupVersionKind) bool {
 	return GroupVersionKindsHasKind(gvks, constants.ResetConfigurationKind)
 }
+
+// GroupVersionKindsHasUpgradeConfiguration returns whether the following gvk slice contains a UpgradeConfiguration object
+func GroupVersionKindsHasUpgradeConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.UpgradeConfigurationKind)
+}

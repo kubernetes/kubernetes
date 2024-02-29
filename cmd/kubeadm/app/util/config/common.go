@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package config contains utilities for managing the kubeadm configuration API.
 package config
 
 import (
@@ -489,4 +490,14 @@ func defaultEmptyMigrateMutators() migrateMutators {
 	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
 
 	return *mutators
+}
+
+// isKubeadmConfigPresent checks if a kubeadm config type is found in the provided document map
+func isKubeadmConfigPresent(docmap kubeadmapi.DocumentMap) bool {
+	for gvk := range docmap {
+		if gvk.Group == kubeadmapi.GroupName {
+			return true
+		}
+	}
+	return false
 }

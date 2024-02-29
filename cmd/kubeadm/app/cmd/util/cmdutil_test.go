@@ -128,6 +128,12 @@ func TestValueFromFlagsOrConfig(t *testing.T) {
 			flagValue: false,
 			expected:  false,
 		},
+		{
+			name:      "nil bool is converted to false",
+			cfg:       (*bool)(nil),
+			flagValue: false,
+			expected:  false,
+		},
 	}
 	for _, tt := range tests {
 		type options struct {
@@ -140,11 +146,15 @@ func TestValueFromFlagsOrConfig(t *testing.T) {
 		fs.BoolVar(&fakeOptions.bar, "bar", false, "")
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := fs.Set(tt.flag, fmt.Sprintf("%v", tt.flagValue))
-			if err != nil {
-				t.Fatalf("failed to set the value of the flag %v", tt.flagValue)
+			if tt.flag != "" {
+				if err := fs.Set(tt.flag, fmt.Sprintf("%v", tt.flagValue)); err != nil {
+					t.Fatalf("failed to set the value of the flag %v", tt.flagValue)
+				}
 			}
 			actualResult := ValueFromFlagsOrConfig(&fs, tt.flag, tt.cfg, tt.flagValue)
+			if result, ok := actualResult.(*bool); ok {
+				actualResult = *result
+			}
 			if actualResult != tt.expected {
 				t.Errorf(
 					"failed ValueFromFlagsOrConfig:\n\texpected: %s\n\t  actual: %s",

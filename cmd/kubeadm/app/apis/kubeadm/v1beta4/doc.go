@@ -41,6 +41,9 @@ limitations under the License.
 //     that can be used to configure various timeouts.
 //   - Add the `NodeRegistration.ImagePullSerial` field in 'InitConfiguration` and `JoinConfiguration`, which
 //     can be used to control if kubeadm pulls images serially or in parallel.
+//   - The UpgradeConfiguration kubeadm API is now supported in v1beta4 when passing --config to "kubeadm upgrade" subcommands.
+//     Usage of component configuration for kubelet and kube-proxy, InitConfiguration and ClusterConfiguration is deprecated
+//     and will be ignored when passing --config to upgrade subcommands.
 //
 // Migration from old kubeadm config versions
 //

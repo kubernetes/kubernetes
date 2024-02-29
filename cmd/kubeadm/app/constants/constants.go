@@ -452,6 +452,8 @@ const (
 	EtcdUserName string = "kubeadm-etcd"
 	// ServiceAccountKeyReadersGroupName is the group of users that are allowed to read the service account private key.
 	ServiceAccountKeyReadersGroupName string = "kubeadm-sa-key-readers"
+	// UpgradeConfigurationKind is the string kind value for the UpgradeConfiguration struct
+	UpgradeConfigurationKind = "UpgradeConfiguration"
 )
 
 var (
