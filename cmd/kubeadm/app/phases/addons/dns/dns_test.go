@@ -25,6 +25,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -40,7 +41,8 @@ import (
 
 func TestCompileManifests(t *testing.T) {
 	replicas := int32(coreDNSReplicas)
-	var tests = []struct {
+	resourceRequirements := defaultResourceRequirements()
+	tests := []struct {
 		name     string
 		manifest string
 		data     interface{}
@@ -49,13 +51,17 @@ func TestCompileManifests(t *testing.T) {
 			name:     "CoreDNSDeployment manifest",
 			manifest: CoreDNSDeployment,
 			data: struct {
-				DeploymentName, Image, ControlPlaneTaintKey string
-				Replicas                                    *int32
+				DeploymentName, Image, ControlPlaneTaintKey                                                           string
+				Replicas                                                                                              *int32
+				ResourceRequirementsLimitsMemory, ResourceRequirementsRequestsCpu, ResourceRequirementsRequestsMemory string
 			}{
-				DeploymentName:       "foo",
-				Image:                "foo",
-				ControlPlaneTaintKey: "foo",
-				Replicas:             &replicas,
+				DeploymentName:                     "foo",
+				Image:                              "foo",
+				ControlPlaneTaintKey:               "foo",
+				Replicas:                           &replicas,
+				ResourceRequirementsLimitsMemory:   resourceRequirements.Limits.Memory().String(),
+				ResourceRequirementsRequestsCpu:    resourceRequirements.Requests.Cpu().String(),
+				ResourceRequirementsRequestsMemory: resourceRequirements.Requests.Memory().String(),
 			},
 		},
 		{
@@ -77,7 +83,7 @@ func TestCompileManifests(t *testing.T) {
 }
 
 func TestGetDNSIP(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name, svcSubnet, expectedDNSIP string
 		isDualStack                    bool
 	}{
@@ -123,6 +129,7 @@ func TestGetDNSIP(t *testing.T) {
 
 func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 	replicas := int32(coreDNSReplicas)
+	resourceRequirements := defaultResourceRequirements()
 	testCases := []struct {
 		name     string
 		manifest string
@@ -132,14 +139,18 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 			name:     "CoreDNSDeployment",
 			manifest: CoreDNSDeployment,
 			data: struct {
-				DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string
-				Replicas                                                          *int32
+				DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName                                     string
+				Replicas                                                                                              *int32
+				ResourceRequirementsLimitsMemory, ResourceRequirementsRequestsCpu, ResourceRequirementsRequestsMemory string
 			}{
-				DeploymentName:       "foo",
-				Image:                "foo",
-				ControlPlaneTaintKey: "foo",
-				CoreDNSConfigMapName: "foo",
-				Replicas:             &replicas,
+				DeploymentName:                     "foo",
+				Image:                              "foo",
+				ControlPlaneTaintKey:               "foo",
+				CoreDNSConfigMapName:               "foo",
+				Replicas:                           &replicas,
+				ResourceRequirementsLimitsMemory:   resourceRequirements.Limits.Memory().String(),
+				ResourceRequirementsRequestsCpu:    resourceRequirements.Requests.Cpu().String(),
+				ResourceRequirementsRequestsMemory: resourceRequirements.Requests.Memory().String(),
 			},
 		},
 	}
@@ -557,42 +568,61 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 	return client
 }
 
-func TestDeployedDNSReplicas(t *testing.T) {
+func TestDeployedDNSDeployment(t *testing.T) {
 	tests := []struct {
 		name           string
 		deploymentSize int
-		want           int32
+		memLimit       string
+		wantedReplicas int32
+		wantedMemLimit string
 		wantErr        bool
 	}{
 		{
 			name:           "one coredns addon deployment",
 			deploymentSize: 1,
-			want:           2,
+			memLimit:       "170Mi",
+			wantedMemLimit: "180Mi",
+			wantedReplicas: 2,
+			wantErr:        false,
+		},
+		{
+			name:           "one coredns addon deployment",
+			deploymentSize: 1,
+			memLimit:       "170Mi",
+			wantedMemLimit: "180Mi",
+			wantedReplicas: 2,
 			wantErr:        false,
 		},
 		{
 			name:           "no coredns addon deployment",
 			deploymentSize: 0,
-			want:           5,
+			memLimit:       "170Mi",
+			wantedMemLimit: "180Mi",
+			wantedReplicas: 5,
 			wantErr:        false,
 		},
 		{
 			name:           "multiple coredns addon deployments",
 			deploymentSize: 3,
-			want:           5,
+			memLimit:       "170Mi",
+			wantedMemLimit: "180Mi",
+			wantedReplicas: 5,
 			wantErr:        true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := newMockClientForTest(t, 2, tt.deploymentSize, "")
-			got, err := deployedDNSReplicas(client, 5)
+			client := newMockClientForTest(t, 2, tt.deploymentSize, "", tt.memLimit)
+			replicas, resourceRequirements, err := deployedDNSDeployment(client, 5)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("deployedDNSReplicas() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("deployedDNSDeployment() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if *got != tt.want {
-				t.Errorf("deployedDNSReplicas() = %v, want %v", *got, tt.want)
+			if *replicas != tt.wantedReplicas {
+				t.Errorf("deployedDNSDeployment() = %v, want %v", *replicas, tt.wantedReplicas)
+			}
+			if resourceRequirements.Limits.Memory().String() != "170Mi" {
+				t.Errorf("deployedDNSDeployment() = %v, want %v", resourceRequirements.Limits.Memory().String(), tt.wantedMemLimit)
 			}
 		})
 	}
@@ -614,7 +644,7 @@ func TestCoreDNSAddon(t *testing.T) {
 			name: "cfg is empty",
 			args: args{
 				cfg:           &kubeadmapi.ClusterConfiguration{},
-				client:        newMockClientForTest(t, 2, 1, ""),
+				client:        newMockClientForTest(t, 2, 1, "", "170Mi"),
 				printManifest: false,
 			},
 			wantOut: "",
@@ -633,7 +663,7 @@ func TestCoreDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 2, 1, ""),
+				client:        newMockClientForTest(t, 2, 1, "", "170Mi"),
 				printManifest: false,
 			},
 			wantOut: "[addons] Applied essential addon: CoreDNS\n",
@@ -652,7 +682,7 @@ func TestCoreDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 2, 1, ""),
+				client:        newMockClientForTest(t, 2, 1, "", "170Mi"),
 				printManifest: true,
 			},
 			wantOut: dedent.Dedent(`---
@@ -863,7 +893,7 @@ metadata:
 		t.Run(tt.name, func(t *testing.T) {
 			out := &bytes.Buffer{}
 			var replicas int32 = 3
-			if err := coreDNSAddon(tt.args.cfg, tt.args.client, &replicas, out, tt.args.printManifest); (err != nil) != tt.wantErr {
+			if err := coreDNSAddon(tt.args.cfg, tt.args.client, &replicas, defaultResourceRequirements(), out, tt.args.printManifest); (err != nil) != tt.wantErr {
 				t.Errorf("coreDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -899,7 +929,7 @@ func TestEnsureDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 0, 1, ""),
+				client:        newMockClientForTest(t, 0, 1, "", "170Mi"),
 				printManifest: false,
 			},
 			wantOut: "[addons] Applied essential addon: CoreDNS\n",
@@ -917,7 +947,7 @@ func TestEnsureDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 0, 1, ""),
+				client:        newMockClientForTest(t, 0, 1, "", "170Mi"),
 				printManifest: true,
 			},
 			wantOut: dedent.Dedent(`---
@@ -1375,7 +1405,7 @@ func TestCreateDNSService(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := newMockClientForTest(t, 1, 1, "")
+			client := newMockClientForTest(t, 1, 1, "", "170Mi")
 			if err := createDNSService(tt.args.dnsService, tt.args.serviceBytes, client); (err != nil) != tt.wantErr {
 				t.Errorf("createDNSService() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1424,7 +1454,7 @@ func TestDeployedDNSAddon(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := newMockClientForTest(t, 1, 1, tt.image)
+			client := newMockClientForTest(t, 1, 1, tt.image, "170Mi")
 
 			version, err := DeployedDNSAddon(client)
 			if (err != nil) != tt.wantErr {
@@ -1439,7 +1469,7 @@ func TestDeployedDNSAddon(t *testing.T) {
 
 // replicas is replica of each DNS deployment
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
-func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string) *clientsetfake.Clientset {
+func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image, memLimit string) *clientsetfake.Clientset {
 	if image == "" {
 		image = "registry.k8s.io/coredns/coredns:v1.11.1"
 	}
@@ -1461,7 +1491,18 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, imag
 				Replicas: &replicas,
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
-						Containers: []v1.Container{{Image: image}},
+						Containers: []v1.Container{{
+							Image: image,
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: apiresource.MustParse(memLimit),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    apiresource.MustParse("0.1"),
+									v1.ResourceMemory: apiresource.MustParse("70Mi"),
+								},
+							},
+						}},
 					},
 				},
 			},

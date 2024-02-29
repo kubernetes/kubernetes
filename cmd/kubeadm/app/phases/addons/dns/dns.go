@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -67,49 +68,71 @@ func DeployedDNSAddon(client clientset.Interface) (string, error) {
 	}
 }
 
-// deployedDNSReplicas returns the replica count for the current DNS deployment
-func deployedDNSReplicas(client clientset.Interface, replicas int32) (*int32, error) {
+// defaultResourceRequirements returns the default resourceRequirements
+func defaultResourceRequirements() *v1.ResourceRequirements {
+	return &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: apiresource.MustParse("170Mi"),
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    apiresource.MustParse("0.1"),
+			v1.ResourceMemory: apiresource.MustParse("70Mi"),
+		},
+	}
+}
+
+// deployedDNSDeployment returns the replica count and the resourceRequirements for the current DNS deployment
+func deployedDNSDeployment(client clientset.Interface, replicas int32) (*int32, *v1.ResourceRequirements, error) {
 	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
 	deployments, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
+
+	defaultResourceRequirements := defaultResourceRequirements()
+
 	if err != nil {
-		return &replicas, errors.Wrap(err, "couldn't retrieve DNS addon deployments")
+		return &replicas, defaultResourceRequirements, errors.Wrap(err, "couldn't retrieve DNS addon deployments")
 	}
 	switch len(deployments.Items) {
 	case 0:
-		return &replicas, nil
+		return &replicas, defaultResourceRequirements, nil
 	case 1:
-		return deployments.Items[0].Spec.Replicas, nil
+		return deployments.Items[0].Spec.Replicas, &deployments.Items[0].Spec.Template.Spec.Containers[0].Resources, nil
 	default:
-		return &replicas, errors.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
+		return &replicas, defaultResourceRequirements, errors.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
 	}
 }
 
 // EnsureDNSAddon creates the CoreDNS addon
 func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, out io.Writer, printManifest bool) error {
 	var replicas *int32
+	var resourceRequirements *v1.ResourceRequirements
 	var err error
 	if !printManifest {
-		replicas, err = deployedDNSReplicas(client, coreDNSReplicas)
+		replicas, resourceRequirements, err = deployedDNSDeployment(client, coreDNSReplicas)
 		if err != nil {
 			return err
 		}
 	} else {
 		var defaultReplicas int32 = coreDNSReplicas
 		replicas = &defaultReplicas
+		resourceRequirements = defaultResourceRequirements()
 	}
-	return coreDNSAddon(cfg, client, replicas, out, printManifest)
+	return coreDNSAddon(cfg, client, replicas, resourceRequirements, out, printManifest)
 }
 
-func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, out io.Writer, printManifest bool) error {
+func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, resourceRequirements *v1.ResourceRequirements, out io.Writer, printManifest bool) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct {
-		DeploymentName, Image, ControlPlaneTaintKey string
-		Replicas                                    *int32
+		DeploymentName, Image, ControlPlaneTaintKey                                                           string
+		Replicas                                                                                              *int32
+		ResourceRequirementsLimitsMemory, ResourceRequirementsRequestsCpu, ResourceRequirementsRequestsMemory string
 	}{
-		DeploymentName:       kubeadmconstants.CoreDNSDeploymentName,
-		Image:                images.GetDNSImage(cfg),
-		ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleControlPlane,
-		Replicas:             replicas,
+		DeploymentName:                     kubeadmconstants.CoreDNSDeploymentName,
+		Image:                              images.GetDNSImage(cfg),
+		ControlPlaneTaintKey:               kubeadmconstants.LabelNodeRoleControlPlane,
+		Replicas:                           replicas,
+		ResourceRequirementsLimitsMemory:   resourceRequirements.Limits.Memory().String(),
+		ResourceRequirementsRequestsCpu:    resourceRequirements.Requests.Cpu().String(),
+		ResourceRequirementsRequestsMemory: resourceRequirements.Requests.Memory().String(),
 	})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS deployment template")
