@@ -623,6 +623,13 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// Create a closure to help with device allocation
 	// Returns 'true' once no more devices need to be allocated.
 	allocateRemainingFrom := func(devices sets.Set[string]) bool {
+		// When we call callGetPreferredAllocationIfAvailable below, we will release
+		// the lock and call the device plugin. If someone calls ListResource concurrently,
+		// device manager will recalculate the allocatedDevices map. Some entries with
+		// empty sets may be removed, so we reinit here.
+		if m.allocatedDevices[resource] == nil {
+			m.allocatedDevices[resource] = sets.New[string]()
+		}
 		for device := range devices.Difference(allocated) {
 			m.allocatedDevices[resource].Insert(device)
 			allocated.Insert(device)
@@ -632,11 +639,6 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 			}
 		}
 		return false
-	}
-
-	// Needs to allocate additional devices.
-	if m.allocatedDevices[resource] == nil {
-		m.allocatedDevices[resource] = sets.New[string]()
 	}
 
 	// Allocates from reusableDevices list first.
