@@ -43,7 +43,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -654,6 +654,11 @@ func (g *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	g.eventBroadcaster = record.NewBroadcaster()
 	g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
 	g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
+
+	go func() {
+		defer g.eventBroadcaster.Shutdown()
+		<-stop
+	}()
 
 	go g.watchClusterID(stop)
 	go g.metricsCollector.Run(stop)

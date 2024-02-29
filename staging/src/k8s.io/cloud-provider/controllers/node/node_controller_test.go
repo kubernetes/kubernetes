@@ -32,12 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/controller-manager/pkg/features"
 	_ "k8s.io/controller-manager/pkg/features/register"
 
 	"github.com/google/go-cmp/cmp"
@@ -46,10 +49,12 @@ import (
 
 func Test_syncNode(t *testing.T) {
 	tests := []struct {
-		name         string
-		fakeCloud    *fakecloud.Cloud
-		existingNode *v1.Node
-		updatedNode  *v1.Node
+		name               string
+		fakeCloud          *fakecloud.Cloud
+		existingNode       *v1.Node
+		updatedNode        *v1.Node
+		optionalProviderID bool
+		expectedErr        bool
 	}{
 		{
 			name: "node initialized with provider ID",
@@ -545,7 +550,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "provided node IP address is not valid",
+			name:        "provided node IP address is not valid",
+			expectedErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				Addresses: []v1.NodeAddress{
@@ -643,7 +649,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "provided node IP address is not present",
+			name:        "provided node IP address is not present",
+			expectedErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				Addresses: []v1.NodeAddress{
@@ -836,7 +843,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "provider ID not implemented",
+			name:               "provider ID not implemented and optional",
+			optionalProviderID: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				InstanceTypes:     map[types.NodeName]string{},
@@ -889,6 +897,71 @@ func Test_syncNode(t *testing.T) {
 				},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{},
+				},
+			},
+		},
+		{
+			name:               "provider ID not implemented and required",
+			optionalProviderID: false,
+			expectedErr:        true,
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				InstanceTypes:     map[types.NodeName]string{},
+				Provider:          "test",
+				ExtID:             map[types.NodeName]string{},
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.NotImplemented,
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
 				},
 			},
 		},
@@ -1641,7 +1714,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "[instanceV2] provider ID not implemented",
+			name:               "[instanceV2] provider ID not implemented",
+			optionalProviderID: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: true,
 				InstanceTypes:     map[types.NodeName]string{},
@@ -1698,7 +1772,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "[instanceV2] error getting InstanceMetadata",
+			name:        "[instanceV2] error getting InstanceMetadata",
+			expectedErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: true,
 				InstanceTypes:     map[types.NodeName]string{},
@@ -1764,6 +1839,7 @@ func Test_syncNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OptionalProviderID, test.optionalProviderID)()
 			clientset := fake.NewSimpleClientset(test.existingNode)
 			factory := informers.NewSharedInformerFactory(clientset, 0)
 
@@ -1786,7 +1862,10 @@ func Test_syncNode(t *testing.T) {
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
 
-			cloudNodeController.syncNode(context.TODO(), test.existingNode.Name)
+			err := cloudNodeController.syncNode(context.TODO(), test.existingNode.Name)
+			if (err != nil) != test.expectedErr {
+				t.Fatalf("error got: %v expected: %v", err, test.expectedErr)
+			}
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), test.existingNode.Name, metav1.GetOptions{})
 			if err != nil {
