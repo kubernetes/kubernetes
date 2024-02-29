@@ -2953,6 +2953,38 @@ func TestToken(t *testing.T) {
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{},
 		},
+		// test to assert the minimum valid jwt payload
+		// the required claims are iss, aud, exp and <claimMappings.Username> (in this case user).
+		{
+			name: "minimum valid jwt payload",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.user",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"user": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)
