@@ -67,9 +67,16 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 				// Get pod logs.
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
-				defer logs.Close()
+				defer func() {
+					if err := logs.Close(); err != nil {
+						framework.ExpectNoError(err, "failed to log close")
+					}
+				}()
 				buf := new(bytes.Buffer)
-				buf.ReadFrom(logs)
+				_, err = buf.ReadFrom(logs)
+				if err != nil {
+					framework.ExpectNoError(err, "failed to read from")
+				}
 				podLogs := buf.String()
 				// Verify the number of SIGINT
 				SIGINT1 := strings.Count("SIGINT 1", podLogs)
