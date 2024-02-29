@@ -38,7 +38,9 @@ type PodmanContext struct {
 }
 
 type CrioContext struct {
-	Root string
+	Root       string
+	ImageStore string
+	Driver     string
 }
 
 type DeviceInfo struct {
