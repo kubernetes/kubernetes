@@ -27,6 +27,7 @@ import (
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -779,17 +780,16 @@ func applyAppArmorVersionSkew(pod *api.Pod) {
 			key := api.AppArmorContainerAnnotationKeyPrefix + ctr.Name
 			annotation, hasAnnotation := pod.Annotations[key]
 
-			field, hasField := (*api.AppArmorProfile)(nil), false
-			if ctr.SecurityContext != nil && ctr.SecurityContext.AppArmorProfile != nil {
-				field = ctr.SecurityContext.AppArmorProfile
-				hasField = true
+			var containerProfile *api.AppArmorProfile
+			if ctr.SecurityContext != nil {
+				containerProfile = ctr.SecurityContext.AppArmorProfile
 			}
 
 			// sync field and annotation
 			if !hasAnnotation {
 				newAnnotation := ""
-				if hasField {
-					newAnnotation = appArmorAnnotationForField(field)
+				if containerProfile != nil {
+					newAnnotation = appArmorAnnotationForField(containerProfile)
 				} else if podProfile != nil {
 					newAnnotation = appArmorAnnotationForField(podProfile)
 				}
@@ -800,10 +800,11 @@ func applyAppArmorVersionSkew(pod *api.Pod) {
 					}
 					pod.Annotations[key] = newAnnotation
 				}
-			} else if !hasField {
+			} else if containerProfile == nil {
 				newField := apparmorFieldForAnnotation(annotation)
 
-				if newField != nil {
+				// Only copy the annotation to the field if it is different from the pod-level profile.
+				if newField != nil && !apiequality.Semantic.DeepEqual(newField, podProfile) {
 					if ctr.SecurityContext == nil {
 						ctr.SecurityContext = &api.SecurityContext{}
 					}

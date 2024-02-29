@@ -2141,7 +2141,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Nil(t, pod.Spec.SecurityContext.AppArmorProfile)
 		},
 	}, {
-		description: "Field type unconfined and no annotation present",
+		description: "Pod field unconfined and no annotation present",
 		pod: &api.Pod{
 			Spec: api.PodSpec{
 				SecurityContext: &api.PodSecurityContext{
@@ -2160,7 +2160,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			}, pod.Annotations)
 		},
 	}, {
-		description: "Field type default and no annotation present",
+		description: "Pod field default and no annotation present",
 		pod: &api.Pod{
 			Spec: api.PodSpec{
 				SecurityContext: &api.PodSecurityContext{
@@ -2179,7 +2179,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			}, pod.Annotations)
 		},
 	}, {
-		description: "Field type localhost and no annotation present",
+		description: "Pod field localhost and no annotation present",
 		pod: &api.Pod{
 			Spec: api.PodSpec{
 				SecurityContext: &api.PodSecurityContext{
@@ -2199,7 +2199,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			}, pod.Annotations)
 		},
 	}, {
-		description: "Field type localhost but profile is nil",
+		description: "Pod field localhost but profile is nil",
 		pod: &api.Pod{
 			Spec: api.PodSpec{
 				SecurityContext: &api.PodSecurityContext{
@@ -2215,7 +2215,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Len(t, pod.Annotations, 0)
 		},
 	}, {
-		description: "Security context not nil (container)",
+		description: "Container security context not nil",
 		pod: &api.Pod{
 			Spec: api.PodSpec{
 				Containers: []api.Container{{
@@ -2228,7 +2228,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Len(t, pod.Annotations, 0)
 		},
 	}, {
-		description: "Field type RuntimeDefault and no annotation present (container)",
+		description: "Container field RuntimeDefault and no annotation present",
 		pod: &api.Pod{
 			Spec: api.PodSpec{
 				Containers: []api.Container{{
@@ -2249,7 +2249,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
 		},
 	}, {
-		description: "Field type localhost and no annotation present (container)",
+		description: "Container field localhost and no annotation present",
 		pod: &api.Pod{
 			Spec: api.PodSpec{
 				Containers: []api.Container{{
@@ -2341,7 +2341,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.Containers[2].SecurityContext.AppArmorProfile.Type)
 		},
 	}, {
-		description: "Annotation 'unconfined' and no field present (container)",
+		description: "Annotation 'unconfined' and no fields present",
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -2380,7 +2380,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Nil(t, pod.Spec.SecurityContext)
 		},
 	}, {
-		description: "Annotation 'runtime/default' and no field present (container)",
+		description: "Annotation 'runtime/default' and no fields present",
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -2408,7 +2408,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.SecurityContext.AppArmorProfile.Type)
 		},
 	}, {
-		description: "Multiple containers by annotations (container)",
+		description: "Multiple containers by annotations",
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -2442,7 +2442,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, api.AppArmorProfileTypeLocalhost, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
 			assert.Equal(t, testProfile, *pod.Spec.Containers[0].SecurityContext.AppArmorProfile.LocalhostProfile)
 			assert.Nil(t, pod.Spec.Containers[1].SecurityContext)
-			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.Containers[2].SecurityContext.AppArmorProfile.Type)
+			assert.Nil(t, pod.Spec.Containers[2].SecurityContext)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 		},
 	}, {
@@ -2471,6 +2471,98 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.LocalhostProfile)
 			assert.Nil(t, pod.Spec.SecurityContext)
+		},
+	}, {
+		description: "Pod field and matching annotations",
+		pod: &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+				},
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					AppArmorProfile: &api.AppArmorProfile{
+						Type: api.AppArmorProfileTypeRuntimeDefault,
+					},
+				},
+				Containers: []api.Container{{
+					Name: "ctr",
+				}},
+			},
+		},
+		validation: func(t *testing.T, pod *api.Pod) {
+			assert.Equal(t, map[string]string{
+				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+			}, pod.Annotations)
+			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
+			// Annotation shouldn't be synced to container security context
+			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
+		},
+	}, {
+		description: "Annotation overrides pod field",
+		pod: &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileNameUnconfined,
+				},
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					AppArmorProfile: &api.AppArmorProfile{
+						Type: api.AppArmorProfileTypeRuntimeDefault,
+					},
+				},
+				Containers: []api.Container{{
+					Name: "ctr",
+				}},
+			},
+		},
+		validation: func(t *testing.T, pod *api.Pod) {
+			assert.Equal(t, map[string]string{
+				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileNameUnconfined,
+			}, pod.Annotations)
+			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
+			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
+		},
+	}, {
+		description: "Mixed annotations and fields",
+		pod: &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					api.AppArmorContainerAnnotationKeyPrefix + "unconf-annot": api.AppArmorProfileNameUnconfined,
+				},
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					AppArmorProfile: &api.AppArmorProfile{
+						Type: api.AppArmorProfileTypeRuntimeDefault,
+					},
+				},
+				Containers: []api.Container{{
+					Name: "unconf-annot",
+				}, {
+					Name: "unconf-field",
+					SecurityContext: &api.SecurityContext{
+						AppArmorProfile: &api.AppArmorProfile{
+							Type: api.AppArmorProfileTypeUnconfined,
+						},
+					},
+				}, {
+					Name: "default-pod",
+				}},
+			},
+		},
+		validation: func(t *testing.T, pod *api.Pod) {
+			assert.Equal(t, map[string]string{
+				api.AppArmorContainerAnnotationKeyPrefix + "unconf-annot": api.AppArmorProfileNameUnconfined,
+				api.AppArmorContainerAnnotationKeyPrefix + "unconf-field": api.AppArmorProfileNameUnconfined,
+				api.AppArmorContainerAnnotationKeyPrefix + "default-pod":  api.AppArmorProfileRuntimeDefault,
+			}, pod.Annotations)
+			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
+			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
+			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[1].SecurityContext.AppArmorProfile.Type)
+			assert.Nil(t, pod.Spec.Containers[2].SecurityContext)
 		},
 	}, {
 		description: "Invalid annotation value",
