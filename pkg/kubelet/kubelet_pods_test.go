@@ -408,7 +408,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	testCases := []struct {
 		name               string                 // the name of the test case
 		ns                 string                 // the namespace to generate environment for
-		enablePodHostIPs   bool                   // enable PodHostIPs feature gate
 		enableServiceLinks *bool                  // enabling service links
 		container          *v1.Container          // the container to use
 		nilLister          bool                   // whether the lister should be nil
@@ -643,7 +642,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name:               "downward api pod",
-			enablePodHostIPs:   true,
 			ns:                 "downward-api",
 			enableServiceLinks: &falseValue,
 			container: &v1.Container{
@@ -737,7 +735,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name:               "downward api pod ips reverse order",
-			enablePodHostIPs:   true,
 			ns:                 "downward-api",
 			enableServiceLinks: &falseValue,
 			container: &v1.Container{
@@ -791,7 +788,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name:               "downward api pod ips multiple ips",
-			enablePodHostIPs:   true,
 			ns:                 "downward-api",
 			enableServiceLinks: &falseValue,
 			container: &v1.Container{
@@ -1988,36 +1984,10 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 			expectedError: true,
 		},
-		{
-			name:               "downward api pod without host ips",
-			enablePodHostIPs:   false,
-			ns:                 "downward-api",
-			enableServiceLinks: &falseValue,
-			container: &v1.Container{
-				Env: []v1.EnvVar{
-					{
-						Name: "HOST_IPS",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "status.hostIPs",
-							},
-						},
-					},
-				},
-			},
-			podIPs:    []string{"1.2.3.4", "fd00::6"},
-			nilLister: true,
-			expectedEnvs: []kubecontainer.EnvVar{
-				{Name: "HOST_IPS", Value: ""},
-			},
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, tc.enablePodHostIPs)()
-
 			fakeRecorder := record.NewFakeRecorder(1)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			testKubelet.kubelet.recorder = fakeRecorder
@@ -3304,7 +3274,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 
 	tests := []struct {
 		name                                       string
-		enablePodHostIPs                           bool // enable PodHostIPs feature gate
 		pod                                        *v1.Pod
 		currentStatus                              *kubecontainer.PodStatus
 		unreadyContainer                           []string
@@ -3349,6 +3318,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodFailed,
 				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
@@ -3390,7 +3360,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					runningState("containerB"),
 				},
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodRunning,
 				HostIP:   "127.0.0.1",
@@ -3430,7 +3399,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					runningState("containerB"),
 				},
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodRunning,
 				HostIP:   "127.0.0.1",
@@ -3471,7 +3439,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					runningState("containerB"),
 				},
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodSucceeded,
 				HostIP:   "127.0.0.1",
@@ -3516,7 +3483,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Reason:  "Test",
 				Message: "test",
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodSucceeded,
 				HostIP:   "127.0.0.1",
@@ -3570,7 +3536,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Reason:  "Test",
 				Message: "test",
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodSucceeded,
 				HostIP:   "127.0.0.1",
@@ -3613,7 +3578,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					waitingState("containerB"),
 				},
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodPending,
 				HostIP:   "127.0.0.1",
@@ -3667,7 +3631,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					runningState("containerB"),
 				},
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodPending,
 				Reason:   "Test",
@@ -3729,7 +3692,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					runningState("containerB"),
 				},
 			},
-			enablePodHostIPs: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodRunning,
 				HostIP:   "127.0.0.1",
@@ -3756,7 +3718,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, test.enablePodHostIPs)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)()
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
