@@ -23,6 +23,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	tracing "k8s.io/component-base/tracing"
 )
 
@@ -30,7 +31,7 @@ import (
 func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 	opts := []otelhttp.Option{
 		otelhttp.WithPropagators(tracing.Propagators()),
-		otelhttp.WithPublicEndpoint(),
+		otelhttp.WithPublicEndpointFn(reqHasAnonymousUser),
 		otelhttp.WithTracerProvider(tp),
 	}
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,4 +45,12 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 	// With Noop TracerProvider, the otelhttp still handles context propagation.
 	// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 	return otelhttp.NewHandler(wrappedHandler, "KubernetesAPI", opts...)
+}
+
+func reqHasAnonymousUser(req *http.Request) bool {
+	user, ok := genericapirequest.UserFrom(req.Context())
+	if !ok {
+		return true
+	}
+	return isAnonymousUser(user)
 }
