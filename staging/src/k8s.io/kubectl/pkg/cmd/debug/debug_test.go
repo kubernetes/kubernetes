@@ -1734,6 +1734,56 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "imagePullSecrets targeting with baseline profile",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileBaseline,
+				PullSecrets: []corev1.LocalObjectReference{
+					{
+						Name: "myRegistryKeySecretName",
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts:             nil,
+						},
+					},
+					HostIPC:       false,
+					HostNetwork:   false,
+					HostPID:       false,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{
+							Name: "myRegistryKeySecretName",
+						},
+					},
+					Volumes: nil,
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
