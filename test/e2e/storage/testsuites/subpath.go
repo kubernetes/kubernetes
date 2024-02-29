@@ -54,7 +54,6 @@ var (
 	probeFilePath   = probeVolumePath + "/probe-file"
 	fileName        = "test-file"
 	retryDuration   = 20
-	mountImage      = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 type subPathTestSuite struct {
@@ -578,8 +577,8 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 }
 
 func containerIsUnused(container *v1.Container) bool {
-	// mountImage with nil command and nil Args or with just "mounttest" as Args does nothing. Leave everything else
-	return container.Image == mountImage && container.Command == nil &&
+	// agnhost image with nil command and nil Args or with just "mounttest" as Args does nothing. Leave everything else
+	return container.Image == imageutils.GetE2EImage(imageutils.Agnhost) && container.Command == nil &&
 		(container.Args == nil || (len(container.Args) == 1 && container.Args[0] == "mounttest"))
 }
 

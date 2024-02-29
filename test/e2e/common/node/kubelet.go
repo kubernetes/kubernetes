@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -58,7 +59,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   framework.BusyBoxImage,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 						},
@@ -92,7 +93,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   framework.BusyBoxImage,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Name:    podName,
 							Command: []string{"/bin/false"},
 						},
@@ -191,7 +192,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   framework.BusyBoxImage,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Name:    podName,
 							Command: []string{"/bin/sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &v1.SecurityContext{

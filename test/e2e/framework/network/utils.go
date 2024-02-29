@@ -90,9 +90,6 @@ const (
 	echoHostname = "hostname"
 )
 
-// NetexecImageName is the image name for agnhost.
-var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
-
 // Option is used to configure the NetworkingTest object
 type Option func(*NetworkingTestConfig)
 
@@ -587,7 +584,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 			Containers: []v1.Container{
 				{
 					Name:            "webserver",
-					Image:           NetexecImageName,
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args:            netexecArgs,
 					Ports: []v1.ContainerPort{
@@ -657,7 +654,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            "webserver",
-					Image:           NetexecImageName,
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
