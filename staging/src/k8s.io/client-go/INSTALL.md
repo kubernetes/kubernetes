@@ -82,7 +82,7 @@ If you get a message like `cannot use path@version syntax in GOPATH mode`,
 you likely do not have go modules enabled.
 
 Dependency management tools are built into go 1.11+ in the form of 
-[go modules](https://github.com/golang/go/wiki/Modules).
+[go modules](https://go.dev/wiki/Modules).
 These are used by the main Kubernetes repo (>= `v1.15.0`) and 
 `client-go` (>= `kubernetes-1.15.0`) to manage dependencies.
 If you are using go 1.11 or 1.12 and are working with a project located within `$GOPATH`,

@@ -132,7 +132,7 @@ func TestAllocate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt // NOTE: https://github.com/golang/go/wiki/CommonMistakes#using-goroutines-on-loop-iterator-variables
+		tt := tt // NOTE: https://go.dev/wiki/CommonMistakes#using-goroutines-on-loop-iterator-variables
 		t.Run(tt.name, func(t *testing.T) {
 			err := storage.Allocate(tt.port)
 			if (err == nil) != (tt.errMsg == "") {
@@ -143,7 +143,6 @@ func TestAllocate(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // TestReallocate test that we can not allocate a port already allocated until it is released
@@ -184,7 +183,6 @@ func TestReallocate(t *testing.T) {
 	if err := storage.Allocate(30100); err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func TestAllocateReserved(t *testing.T) {

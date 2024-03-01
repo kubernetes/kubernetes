@@ -56,7 +56,7 @@ func (si *SliceInfo) getAllocatedHintsByZone(allocations map[string]allocation) 
 	allocatedHintsByZone := EndpointZoneInfo{}
 
 	// Using filtering in place to remove any endpoints that are no longer
-	// unchanged (https://github.com/golang/go/wiki/SliceTricks#filter-in-place)
+	// unchanged (https://go.dev/wiki/SliceTricks#filter-in-place)
 	j := 0
 	for _, slice := range si.Unchanged {
 		hintsByZone := getHintsByZone(slice, allocatedHintsByZone, allocations)
