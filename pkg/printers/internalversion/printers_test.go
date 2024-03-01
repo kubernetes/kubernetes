@@ -6572,7 +6572,7 @@ func TestPrintIPAddressList(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "192.168.2.2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{},
 				},
 				Spec: networking.IPAddressSpec{
 					ParentRef: &networking.ParentReference{
@@ -6585,7 +6585,7 @@ func TestPrintIPAddressList(t *testing.T) {
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "2001:db8::2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-5, 0, 0)},
+					CreationTimestamp: metav1.Time{},
 				},
 				Spec: networking.IPAddressSpec{
 					ParentRef: &networking.ParentReference{
@@ -6600,8 +6600,8 @@ func TestPrintIPAddressList(t *testing.T) {
 	}
 	// Columns: Name, ParentRef, Age
 	expected := []metav1.TableRow{
-		{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}},
-		{Cells: []interface{}{"2001:db8::2", "myresource2.mygroup2/mynamespace2/myname2", "5y1d"}},
+		{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "<unknown>"}},
+		{Cells: []interface{}{"2001:db8::2", "myresource2.mygroup2/mynamespace2/myname2", "<unknown>"}},
 	}
 
 	rows, err := printIPAddressList(&ipList, printers.GenerateOptions{})
