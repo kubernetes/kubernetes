@@ -784,6 +784,76 @@ func TestQuantityCost(t *testing.T) {
 	}
 }
 
+func TestSemVerCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "path",
+			expr:                `semver("1.2.3")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name:                "isSemVer",
+			expr:                `isSemVer("20")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name:                "equality_reflexivity",
+			expr:                `semver("1.2.3") == semver("1.2.3")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 1844674407370955266},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "semver_less",
+			expr:                `semver("1.0.0").isLessThan(semver("1.2.3"))`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "semver_greater",
+			expr:                `semver("1.2.3").isGreaterThan(semver("1.0.0"))`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "compare_equal",
+			expr:                `semver("1.2.3").compareTo(semver("1.2.3")) > 0`,
+			expectEstimatedCost: checker.CostEstimate{Min: 4, Max: 4},
+			expectRuntimeCost:   4,
+		},
+		{
+			name:                "major",
+			expr:                `semver("1.2.3").major()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		{
+			name:                "minor",
+			expr:                `semver("1.2.3").major()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		{
+			name:                "patch",
+			expr:                `semver("1.2.3").major()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
 func TestSetsCost(t *testing.T) {
 	cases := []struct {
 		name                string
@@ -1026,6 +1096,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		ext.Sets(),
 		IP(),
 		CIDR(),
+		SemVer(),
 		// cel-go v0.17.7 introduced CostEstimatorOptions.
 		// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
 		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),

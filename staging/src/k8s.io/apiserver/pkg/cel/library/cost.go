@@ -152,7 +152,12 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 			return &cost
 		}
-	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
+	case "semver", "isSemVer":
+		if len(args) >= 1 {
+			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
+			return &cost
+		}
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		cost := uint64(1)
 		return &cost
 	}

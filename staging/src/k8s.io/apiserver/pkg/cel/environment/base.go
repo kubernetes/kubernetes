@@ -128,6 +128,7 @@ var baseOpts = []VersionedOptions{
 		EnvOptions: []cel.EnvOption{
 			library.IP(),
 			library.CIDR(),
+			library.SemVer(),
 		},
 	},
 }
