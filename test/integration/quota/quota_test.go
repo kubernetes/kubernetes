@@ -60,9 +60,7 @@ const (
 //	quota_test.go:100: Took 4.196205966s to scale up without quota
 //	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	// Set up a API server
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{

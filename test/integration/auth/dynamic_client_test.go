@@ -54,11 +54,8 @@ func TestDynamicClientBuilder(t *testing.T) {
 		t.Fatalf("parse duration failed: %v", err)
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	baseClient, baseConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	baseClient, baseConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceAccountSigningKeyFile = tmpfile.Name()
 			opts.ServiceAccountTokenMaxExpiration = maxExpirationDuration
@@ -102,7 +99,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 
 	// We want to trigger token rotation here by deleting service account
 	// the dynamic client was using.
-	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(ctx, saName, metav1.DeleteOptions{}); err != nil {
+	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(tCtx, saName, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("delete service account %s failed: %v", saName, err)
 	}
 	time.Sleep(time.Second * 10)
