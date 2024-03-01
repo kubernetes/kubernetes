@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"k8s.io/kubernetes/cmd/docs-generating/genutils"
 	"os"
 	"strings"
 
@@ -28,7 +29,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	kubectlcmd "k8s.io/kubectl/pkg/cmd"
-	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
