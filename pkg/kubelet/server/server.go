@@ -98,6 +98,7 @@ const (
 	proberMetricsPath   = "/metrics/probes"
 	statsPath           = "/stats/"
 	logsPath            = "/logs/"
+	checkpointPath      = "/checkpoint/"
 	pprofBasePath       = "/debug/pprof/"
 	debugFlagPath       = "/debug/flags/v"
 )
@@ -441,7 +442,7 @@ func (s *Server) InstallDefaultHandlers() {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
 		s.addMetricsBucketMatcher("checkpoint")
 		ws = &restful.WebService{}
-		ws.Path("/checkpoint").Produces(restful.MIME_JSON)
+		ws.Path(checkpointPath).Produces(restful.MIME_JSON)
 		ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
 			To(s.checkpoint).
 			Operation("checkpoint"))
