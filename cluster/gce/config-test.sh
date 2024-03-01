@@ -539,7 +539,7 @@ ROTATE_CERTIFICATES=${ROTATE_CERTIFICATES:-}
 
 # The number of services that are allowed to sync concurrently. Will be passed
 # into kube-controller-manager via `--concurrent-service-syncs`
-CONCURRENT_SERVICE_SYNCS=${CONCURRENT_SERVICE_SYNCS:-}
+CONCURRENT_SERVICE_SYNCS=${CONCURRENT_SERVICE_SYNCS:-5}
 
 # The value kubernetes.default.svc.cluster.local is only usable for full
 # OIDC discovery flows in Pods in the same cluster. For some providers
