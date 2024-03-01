@@ -1968,9 +1968,9 @@ func recordJobPodsCreationTotal(job *batch.Job, jobCtx *syncJobCtx, succeeded, f
 }
 
 func managedByExternalController(jobObj *batch.Job) *string {
-	if feature.DefaultFeatureGate.Enabled(features.JobManagedByLabel) {
-		if controllerName, found := jobObj.Labels[batch.JobManagedByLabel]; found && controllerName != batch.JobControllerName {
-			return &controllerName
+	if feature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
+		if controllerName := jobObj.Spec.ManagedBy; controllerName != nil && *controllerName != batch.JobControllerName {
+			return controllerName
 		}
 	}
 	return nil

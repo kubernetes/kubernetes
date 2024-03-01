@@ -38,6 +38,7 @@ spec:
   backoffLimitPerIndex: 12
   completionMode: completionModeValue
   completions: 2
+  managedBy: managedByValue
   manualSelector: true
   maxFailedIndexes: 13
   parallelism: 1

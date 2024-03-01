@@ -101,6 +101,9 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		job.Spec.PodFailurePolicy = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
+		job.Spec.ManagedBy = nil
+	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
 		job.Spec.BackoffLimitPerIndex = nil
@@ -341,9 +344,9 @@ func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 
 // getStatusValidationOptions returns validation options for Job status
 func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobStatusValidationOptions {
-	if utilfeature.DefaultFeatureGate.Enabled(features.JobManagedByLabel) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
 		// A strengthened validation of the Job status transitions is needed since the
-		// Job managed-by label let's the Job object be controlled by external
+		// Job managedBy field let's the Job object be controlled by external
 		// controllers. We want to make sure the transitions done by the external
 		// controllers meet the expectations of the clients of the Job API.
 		// For example, we verify that a Job in terminal state (Failed or Complete)
@@ -380,7 +383,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
 			RejectFinishedJobWithoutStartTime:            isJobFinishedChanged || isStartTimeChanged,
 			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
-			RejectRemovingStartTimeForUnsuspendedJob:     isStartTimeChanged,
+			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged,
 			RejectCompletionTimeBeforeStartTime:          isStartTimeChanged || isCompletionTimeChanged,
 			RejectMutatingCompletionTime:                 true,
 			RejectNotCompleteJobWithCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,

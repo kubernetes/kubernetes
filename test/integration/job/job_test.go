@@ -1174,10 +1174,10 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 	}
 }
 
-// TestManagedByLabel verifies the Job controller correctly makes a decision to
-// reconcile or skip reconciliation of the Job depending on the Job's managed-by
-// label, and the enablement of the JobManagedByLabel feature gate.
-func TestManagedByLabel(t *testing.T) {
+// TestManagedBy verifies the Job controller correctly makes a decision to
+// reconcile or skip reconciliation of the Job depending on the Job's managedBy
+// field, and the enablement of the JobManagedBy feature gate.
+func TestManagedBy(t *testing.T) {
 	podTemplateSpec := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -1189,13 +1189,13 @@ func TestManagedByLabel(t *testing.T) {
 		},
 	}
 	testCases := map[string]struct {
-		jobManagedByLabelEnabled               bool
+		enableJobManagedBy                     bool
 		job                                    batchv1.Job
 		wantReconciledByBuiltInController      bool
 		wantJobByExternalControllerTotalMetric metricLabelsWithValue
 	}{
-		"the Job controller reconciles jobs without the managed-by label": {
-			jobManagedByLabelEnabled: true,
+		"the Job controller reconciles jobs without the managedBy": {
+			enableJobManagedBy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Template: podTemplateSpec,
@@ -1204,40 +1204,32 @@ func TestManagedByLabel(t *testing.T) {
 			wantReconciledByBuiltInController: true,
 			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
 				// There is no good label value choice to check here, since the
-				// label wasn't specified. Let's go with checking for the reserved
+				// values wasn't specified. Let's go with checking for the reserved
 				// value just so that all test cases verify the metric.
-				Labels: []string{"job-controller.k8s.io"},
+				Labels: []string{batchv1.JobControllerName},
 				Value:  0,
 			},
 		},
-		"the Job controller reconciles jobs with the managed-by label equal to job-controller.k8s.io": {
-			jobManagedByLabelEnabled: true,
+		"the Job controller reconciles jobs with the well known value of the managedBy field": {
+			enableJobManagedBy: true,
 			job: batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						batchv1.JobManagedByLabel: "job-controller.k8s.io",
-					},
-				},
 				Spec: batchv1.JobSpec{
-					Template: podTemplateSpec,
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To(batchv1.JobControllerName),
 				},
 			},
 			wantReconciledByBuiltInController: true,
 			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
-				Labels: []string{"job-controller.k8s.io"},
+				Labels: []string{batchv1.JobControllerName},
 				Value:  0,
 			},
 		},
-		"the Job controller reconciles an unsuspended with the custom value of managed-by; feature disabled": {
-			jobManagedByLabelEnabled: false,
+		"the Job controller reconciles an unsuspended with the custom value of managedBy; feature disabled": {
+			enableJobManagedBy: false,
 			job: batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						batchv1.JobManagedByLabel: "custom-job-controller",
-					},
-				},
 				Spec: batchv1.JobSpec{
-					Template: podTemplateSpec,
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To("custom-job-controller"),
 				},
 			},
 			wantReconciledByBuiltInController: true,
@@ -1246,17 +1238,13 @@ func TestManagedByLabel(t *testing.T) {
 				Value:  0,
 			},
 		},
-		"the Job controller does not reconcile an unsuspended with the custom value of managed-by": {
-			jobManagedByLabelEnabled: true,
+		"the Job controller does not reconcile an unsuspended with the custom value of managedBy": {
+			enableJobManagedBy: true,
 			job: batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						batchv1.JobManagedByLabel: "custom-job-controller",
-					},
-				},
 				Spec: batchv1.JobSpec{
-					Suspend:  ptr.To(false),
-					Template: podTemplateSpec,
+					Suspend:   ptr.To(false),
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To("custom-job-controller"),
 				},
 			},
 			wantReconciledByBuiltInController: false,
@@ -1265,17 +1253,13 @@ func TestManagedByLabel(t *testing.T) {
 				Value:  1,
 			},
 		},
-		"the Job controller does not reconcile a suspended with the custom value of managed-by": {
-			jobManagedByLabelEnabled: true,
+		"the Job controller does not reconcile a suspended with the custom value of managedBy": {
+			enableJobManagedBy: true,
 			job: batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						batchv1.JobManagedByLabel: "custom-job-controller",
-					},
-				},
 				Spec: batchv1.JobSpec{
-					Suspend:  ptr.To(true),
-					Template: podTemplateSpec,
+					Suspend:   ptr.To(true),
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To("custom-job-controller"),
 				},
 			},
 			wantReconciledByBuiltInController: false,
@@ -1288,7 +1272,7 @@ func TestManagedByLabel(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedByLabel, test.jobManagedByLabelEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)()
 
 			closeFn, restConfig, clientSet, ns := setup(t, "managed-by")
 			defer closeFn()
@@ -1326,16 +1310,16 @@ func TestManagedByLabel(t *testing.T) {
 	}
 }
 
-// TestManagedByLabel_RecreatedJob verifies that the Job controller skips
-// reconciliation of a job with managed-by label, when this is a recreated job,
+// TestManagedBy_RecreatedJob verifies that the Job controller skips
+// reconciliation of a job with managedBy field, when this is a recreated job,
 // and there is still a pending sync queued for the previous job.
-// In this scenario we first create a job without managed-by label, and we mark
+// In this scenario we first create a job without managedBy field, and we mark
 // its pod as succeeded. This queues the Job object sync with 1s delay. Then,
 // without waiting for the Job status update we delete and recreate the job under
-// the same name, but with managed-by label. The queued update starts to execute
+// the same name, but with managedBy field. The queued update starts to execute
 // on the new job, but is skipped.
-func TestManagedByLabel_RecreatedJob(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedByLabel, true)()
+func TestManagedBy_RecreatedJob(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)()
 
 	closeFn, restConfig, clientSet, ns := setup(t, "managed-by-recreate-job")
 	defer closeFn()
@@ -1388,7 +1372,7 @@ func TestManagedByLabel_RecreatedJob(t *testing.T) {
 	}
 
 	jobWithManagedBy := baseJob.DeepCopy()
-	jobWithManagedBy.Labels[batchv1.JobManagedByLabel] = "custom-job-controller"
+	jobWithManagedBy.Spec.ManagedBy = ptr.To("custom-job-controller")
 	jobObj, err = createJobWithDefaults(ctx, clientSet, ns.Name, jobWithManagedBy)
 	if err != nil {
 		t.Fatalf("Error %q while creating the job %q", err, klog.KObj(jobObj))

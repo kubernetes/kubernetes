@@ -308,6 +308,11 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		*out = new(PodReplacementPolicy)
 		**out = **in
 	}
+	if in.ManagedBy != nil {
+		in, out := &in.ManagedBy, &out.ManagedBy
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

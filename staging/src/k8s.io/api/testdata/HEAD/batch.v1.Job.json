@@ -1773,7 +1773,8 @@
     "ttlSecondsAfterFinished": 8,
     "completionMode": "completionModeValue",
     "suspend": true,
-    "podReplacementPolicy": "podReplacementPolicyValue"
+    "podReplacementPolicy": "podReplacementPolicyValue",
+    "managedBy": "managedByValue"
   },
   "status": {
     "conditions": [

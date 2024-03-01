@@ -352,14 +352,6 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 	return apimachineryvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
 }
 
-func ValidateImmutableLabel(newVal string, oldVal string, label string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if oldVal != newVal {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("labels", label), newVal, fieldImmutableErrorMsg))
-	}
-	return allErrs
-}
-
 func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

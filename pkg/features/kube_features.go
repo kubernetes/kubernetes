@@ -351,10 +351,10 @@ const (
 
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
-	// beta: v1.30
+	// alpha: v1.30
 	//
 	// Allows to delegate reconciliation of a Job object to an external controller.
-	JobManagedByLabel featuregate.Feature = "JobManagedByLabel"
+	JobManagedBy featuregate.Feature = "JobManagedBy"
 
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/3329
@@ -1038,7 +1038,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobBackoffLimitPerIndex: {Default: true, PreRelease: featuregate.Beta},
 
-	JobManagedByLabel: {Default: true, PreRelease: featuregate.Beta},
+	JobManagedBy: {Default: false, PreRelease: featuregate.Alpha},
 
 	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 

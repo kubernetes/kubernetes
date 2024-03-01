@@ -208,6 +208,9 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 			allErrs = append(allErrs, field.Required(fldPath.Child("backoffLimitPerIndex"), fmt.Sprintf("when maxFailedIndexes is specified")))
 		}
 	}
+	if spec.ManagedBy != nil {
+		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(*spec.ManagedBy, fldPath.Child("managedBy"))...)
+	}
 	if spec.CompletionMode != nil {
 		if *spec.CompletionMode != batch.NonIndexedCompletion && *spec.CompletionMode != batch.IndexedCompletion {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("completionMode"), spec.CompletionMode, []batch.CompletionMode{batch.NonIndexedCompletion, batch.IndexedCompletion}))
@@ -509,22 +512,15 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 
 // ValidateJobUpdate validates an update to a Job and returns an ErrorList with any errors.
 func ValidateJobUpdate(job, oldJob *batch.Job, opts JobValidationOptions) field.ErrorList {
-	allErrs := validateJobMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta)
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
 // ValidateJobUpdateStatus validates an update to the status of a Job and returns an ErrorList with any errors.
 func ValidateJobUpdateStatus(job, oldJob *batch.Job, opts JobStatusValidationOptions) field.ErrorList {
-	allErrs := validateJobMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta)
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobStatusUpdate(job, oldJob, opts)...)
-	return allErrs
-}
-
-func validateJobMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta) field.ErrorList {
-	fldPath := field.NewPath("metadata")
-	allErrs := apivalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableLabel(newMeta.Labels[batch.JobManagedByLabel], oldMeta.Labels[batch.JobManagedByLabel], batch.JobManagedByLabel, fldPath)...)
 	return allErrs
 }
 
@@ -538,6 +534,7 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.CompletionMode, oldSpec.CompletionMode, fldPath.Child("completionMode"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodFailurePolicy, oldSpec.PodFailurePolicy, fldPath.Child("podFailurePolicy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	return allErrs
 }
 
@@ -599,8 +596,8 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 			allErrs = append(allErrs, field.Invalid(statusFld.Child("completionTime"), job.Status.CompletionTime, "completionTime cannot be mutated"))
 		}
 	}
-	if opts.RejectRemovingStartTimeForUnsuspendedJob {
-		if oldJob.Status.StartTime != nil && job.Status.StartTime == nil && !ptr.Deref(job.Spec.Suspend, false) {
+	if opts.RejectStartTimeUpdateForUnsuspendedJob {
+		if oldJob.Status.StartTime != nil && !ptr.Equal(oldJob.Status.StartTime, job.Status.StartTime) && !ptr.Deref(job.Spec.Suspend, false) {
 			allErrs = append(allErrs, field.Required(statusFld.Child("startTime"), "startTime cannot be removed for unsuspended job"))
 		}
 	}
@@ -868,7 +865,7 @@ type JobStatusValidationOptions struct {
 	RejectFinishedJobWithTerminatingPods         bool
 	RejectFinishedJobWithoutStartTime            bool
 	RejectFinishedJobWithUncountedTerminatedPods bool
-	RejectRemovingStartTimeForUnsuspendedJob     bool
+	RejectStartTimeUpdateForUnsuspendedJob       bool
 	RejectCompletionTimeBeforeStartTime          bool
 	RejectMutatingCompletionTime                 bool
 	RejectCompleteJobWithoutCompletionTime       bool

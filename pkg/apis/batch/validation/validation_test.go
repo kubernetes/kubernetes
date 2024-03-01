@@ -34,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -381,6 +382,17 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
+		"valid managedBy field": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("custom-job-controller"),
+				},
+			},
+		},
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
@@ -395,6 +407,17 @@ func TestValidateJob(t *testing.T) {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
+		`spec.managedBy: Invalid value: "invalid custom controller name": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`: {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("invalid custom controller name"),
+				},
+			},
+		},
 		`spec.podFailurePolicy.rules[0]: Invalid value: specifying one of OnExitCodes and OnPodConditions is required`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
@@ -1350,7 +1373,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.ManualSelector = pointer.Bool(true)
 			},
 		},
-		"invalid attempt to update managed-by label": {
+		"invalid attempt to set managedBy field": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "abc",
@@ -1363,31 +1386,31 @@ func TestValidateJobUpdate(t *testing.T) {
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Labels[batch.JobManagedByLabel] = "custom-controller"
+				job.Spec.ManagedBy = ptr.To("custom-controller")
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
-				Field: "metadata.labels.batch.kubernetes.io/managed-by",
+				Field: "spec.managedBy",
 			},
 		},
-		"update managed-by label; feature enabled": {
+		"invalid update of the managedBy field": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "abc",
 					Namespace: metav1.NamespaceDefault,
-					Labels:    map[string]string{},
 				},
 				Spec: batch.JobSpec{
-					Selector: validGeneratedSelector,
-					Template: validPodTemplateSpecForGenerated,
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("custom-controller1"),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Labels[batch.JobManagedByLabel] = "custom-controller"
+				job.Spec.ManagedBy = ptr.To("custom-controller2")
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
-				Field: "metadata.labels.batch.kubernetes.io/managed-by",
+				Field: "spec.managedBy",
 			},
 		},
 		"immutable completions for non-indexed jobs": {
@@ -2088,52 +2111,6 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					Ready:       pointer.Int32(1),
 					Terminating: pointer.Int32(4),
 				},
-			},
-		},
-		"invalid attempt to set managed-by label": {
-			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc",
-					Namespace: metav1.NamespaceDefault,
-					Labels:    map[string]string{},
-				},
-			},
-			update: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "abc",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "1",
-					Labels: map[string]string{
-						batch.JobManagedByLabel: "custom-job-controller",
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "metadata.labels.batch.kubernetes.io/managed-by"},
-			},
-		},
-		"invalid attempt to update managed-by label": {
-			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc",
-					Namespace: metav1.NamespaceDefault,
-					Labels: map[string]string{
-						batch.JobManagedByLabel: "custom-job-controller1",
-					},
-				},
-			},
-			update: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "abc",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "1",
-					Labels: map[string]string{
-						batch.JobManagedByLabel: "custom-job-controller2",
-					},
-				},
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "metadata.labels.batch.kubernetes.io/managed-by"},
 			},
 		},
 		"nil ready and terminating": {

@@ -3599,6 +3599,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: completions
       type:
         scalar: numeric
+    - name: managedBy
+      type:
+        scalar: string
     - name: manualSelector
       type:
         scalar: boolean

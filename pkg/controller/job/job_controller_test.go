@@ -2292,7 +2292,7 @@ func TestSyncJobDeleted(t *testing.T) {
 	}
 }
 
-func TestSyncJobWhenManagedByLabel(t *testing.T) {
+func TestSyncJobWhenManagedBy(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	now := metav1.Now()
 	baseJob := batch.Job{
@@ -2327,24 +2327,24 @@ func TestSyncJobWhenManagedByLabel(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobManagedByLabel bool
-		job                     batch.Job
-		wantStatus              batch.JobStatus
+		enableJobManagedBy bool
+		job                batch.Job
+		wantStatus         batch.JobStatus
 	}{
-		"job with custom value of managed-by label; feature enabled; the status is unchanged": {
-			enableJobManagedByLabel: true,
+		"job with custom value of managedBy; feature enabled; the status is unchanged": {
+			enableJobManagedBy: true,
 			job: func() batch.Job {
 				job := baseJob.DeepCopy()
-				job.Labels[batch.JobManagedByLabel] = "custom-managed-by"
+				job.Spec.ManagedBy = ptr.To("custom-managed-by")
 				return *job
 			}(),
 			wantStatus: baseJob.Status,
 		},
-		"job with managed-by label equal job-controller.k8s.io; feature enabled; the status is updated": {
-			enableJobManagedByLabel: true,
+		"job with well known value of the managedBy; feature enabled; the status is updated": {
+			enableJobManagedBy: true,
 			job: func() batch.Job {
 				job := baseJob.DeepCopy()
-				job.Labels[batch.JobManagedByLabel] = "job-controller.k8s.io"
+				job.Spec.ManagedBy = ptr.To(batch.JobControllerName)
 				return *job
 			}(),
 			wantStatus: batch.JobStatus{
@@ -2355,10 +2355,10 @@ func TestSyncJobWhenManagedByLabel(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
-		"job with custom value of managed-by label; feature disabled; the status is updated": {
+		"job with custom value of managedBy; feature disabled; the status is updated": {
 			job: func() batch.Job {
 				job := baseJob.DeepCopy()
-				job.Labels[batch.JobManagedByLabel] = "custom-managed-by"
+				job.Spec.ManagedBy = ptr.To("custom-managed-by")
 				return *job
 			}(),
 			wantStatus: batch.JobStatus{
@@ -2369,9 +2369,9 @@ func TestSyncJobWhenManagedByLabel(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
-		"job without the managed-by label; feature enabled; the status is updated": {
-			enableJobManagedByLabel: true,
-			job:                     baseJob,
+		"job without the managedBy; feature enabled; the status is updated": {
+			enableJobManagedBy: true,
+			job:                baseJob,
 			wantStatus: batch.JobStatus{
 				Active:                  2,
 				Ready:                   ptr.To[int32](0),
@@ -2383,7 +2383,7 @@ func TestSyncJobWhenManagedByLabel(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedByLabel, tc.enableJobManagedByLabel)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)()
 
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
@@ -4084,7 +4084,7 @@ func TestUpdateJobRequeue(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	cases := map[string]struct {
-		enableJobManagedByLabel bool
+		enableJobManagedBy      bool
 		oldJob                  *batch.Job
 		updateFn                func(job *batch.Job)
 		wantRequeuedImmediately bool
@@ -4097,11 +4097,11 @@ func TestUpdateJobRequeue(t *testing.T) {
 			},
 			wantRequeuedImmediately: true,
 		},
-		"spec update; managed-by label used": {
-			enableJobManagedByLabel: true,
+		"spec update; managedBy used": {
+			enableJobManagedBy: true,
 			oldJob: func() *batch.Job {
 				job := newJob(1, 1, 1, batch.IndexedCompletion)
-				job.Labels = map[string]string{batch.JobManagedByLabel: "custom-job-controller"}
+				job.Spec.ManagedBy = ptr.To("custom-job-controller")
 				return job
 			}(),
 			updateFn: func(job *batch.Job) {
@@ -4120,7 +4120,7 @@ func TestUpdateJobRequeue(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedByLabel, tc.enableJobManagedByLabel)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)()
 			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady

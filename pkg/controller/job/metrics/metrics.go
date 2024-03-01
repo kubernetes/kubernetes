@@ -74,7 +74,7 @@ var (
 	// JobByExternalControllerTotal tracks the number of Jobs that were created
 	// as managed by an external controller.
 	// The value of the label controllerName corresponds to the value of the
-	// managed-by label.
+	// managedBy field.
 	JobByExternalControllerTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,

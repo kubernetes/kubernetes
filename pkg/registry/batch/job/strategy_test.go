@@ -482,6 +482,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
 		enableJobPodReplacementPolicy bool
+		enableJobManageBy             bool
 		job                           batch.Job
 		wantJob                       batch.Job
 	}{
@@ -753,6 +754,47 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
+		"managedBy field is dropped when the feature gate is disabled": {
+			enableJobManageBy: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       validPodTemplateSpec,
+					ManagedBy:      ptr.To("custom-controller-name"),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       expectedPodTemplateSpec,
+				},
+			},
+		},
+		"managedBy field is set when the feature gate is enabled": {
+			enableJobManageBy: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       validPodTemplateSpec,
+					ManagedBy:      ptr.To("custom-controller-name"),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       expectedPodTemplateSpec,
+					ManagedBy:      ptr.To("custom-controller-name"),
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -760,6 +802,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManageBy)()
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForCreate(ctx, &tc.job)
@@ -1870,7 +1913,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 	nowPlusMinute := metav1.Time{Time: now.Add(time.Minute)}
 
 	cases := map[string]struct {
-		enableJobManagedByLabel bool
+		enableJobManagedBy bool
 
 		job      *batch.Job
 		newJob   *batch.Job
@@ -1916,7 +1959,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition of both Failed=True and Complete=True; allowed because feature gate disabled": {
-			enableJobManagedByLabel: false,
+			enableJobManagedBy: false,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -1939,7 +1982,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition of both Failed=True and Complete=True": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -1965,7 +2008,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"completionTime can be removed to fix still running job": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -1981,7 +2024,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Failed=True without startTime": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2001,7 +2044,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Complete=True without startTime": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2022,7 +2065,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Complete=True with active > 0": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2045,7 +2088,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Complete=True with terminating > 0": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2068,7 +2111,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Failed=True with uncountedTerminatedPods.Failed>0": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2092,7 +2135,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Complete=True with uncountedTerminatedPods.Succeeded>0": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2117,7 +2160,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition Complete=True without setting CompletionTime": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2138,7 +2181,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to remove completionTime": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2169,7 +2212,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"verify startTime can be cleared for suspended job": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2190,7 +2233,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"verify startTime cannot be removed for unsuspended job": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2207,8 +2250,26 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
 			},
 		},
+		"verify startTime cannot be updated for unsuspended job": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &nowPlusMinute,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
+			},
+		},
 		"invalid attempt to set completionTime before startTime": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2233,7 +2294,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to modify completionTime": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2264,7 +2325,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid removal of terminal condition Failed=True": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2284,7 +2345,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid removal of terminal condition Complete=True": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2304,7 +2365,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid removal of terminal condition FailureTarget=True": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2324,7 +2385,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt setting of CompletionTime when there is no Complete condition": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2339,7 +2400,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid CompletionTime when there is no Complete condition, but allowed": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2355,7 +2416,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt setting CompletedIndexes when non-indexed completion mode is used": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2379,7 +2440,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid because CompletedIndexes set when non-indexed completion mode is used; but allowed": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2403,7 +2464,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt setting FailedIndexes when not backoffLimitPerIndex": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2426,7 +2487,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to decrease the failed counter": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2450,7 +2511,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to decrease the succeeded counter": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2474,7 +2535,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to set bad format for CompletedIndexes": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2497,7 +2558,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid format for CompletedIndexes, but allowed": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2521,7 +2582,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to set bad format for FailedIndexes": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2546,7 +2607,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid format for FailedIndexes, but allowed": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2571,39 +2632,8 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 		},
-		"invalid attempt to update the managed-by label": {
-			enableJobManagedByLabel: true,
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc",
-					Namespace: metav1.NamespaceDefault,
-					Labels: map[string]string{
-						batch.JobManagedByLabel: "custom-value1",
-					},
-					ResourceVersion: "2",
-				},
-				Spec: batch.JobSpec{},
-			},
-			newJob: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc",
-					Namespace: metav1.NamespaceDefault,
-					Labels: map[string]string{
-						batch.JobManagedByLabel: "custom-value2",
-					},
-					ResourceVersion: "2",
-				},
-				Spec: batch.JobSpec{},
-				Status: batch.JobStatus{
-					Active: 1,
-				},
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "metadata.labels.batch.kubernetes.io/managed-by"},
-			},
-		},
 		"invalid attempt to set more ready pods than active": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2625,7 +2655,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"more ready pods than active, but allowed": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2649,7 +2679,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition of both FailureTarget=True and Complete=True": {
-			enableJobManagedByLabel: true,
+			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2677,7 +2707,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedByLabel, tc.enableJobManagedByLabel)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)()
 			errs := StatusStrategy.ValidateUpdate(ctx, tc.newJob, tc.job)
 			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
