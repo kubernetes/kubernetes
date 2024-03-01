@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 )
 
-func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool, retry bool) (map[corev1.ObjectReference][]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -44,11 +44,11 @@ func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, 
 	if err != nil {
 		return nil, err
 	}
-	return logsForObjectWithClient(clientset, object, options, timeout, allContainers)
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, retry)
 }
 
 // this is split for easy test-ability
-func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool, retry bool) (map[corev1.ObjectReference][]rest.ResponseWrapper, error) {
 	opts, ok := options.(*corev1.PodLogOptions)
 	if !ok {
 		return nil, errors.New("provided options object is not a PodLogOptions")
@@ -56,9 +56,9 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 
 	switch t := object.(type) {
 	case *corev1.PodList:
-		ret := make(map[corev1.ObjectReference]rest.ResponseWrapper)
+		ret := make(map[corev1.ObjectReference][]rest.ResponseWrapper)
 		for i := range t.Items {
-			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
+			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers, retry)
 			if err != nil {
 				return nil, err
 			}
@@ -98,7 +98,6 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 					fmt.Fprintf(os.Stderr, "Defaulted container %q out of: %s\n", currOpts.Container, podcmd.AllContainerNames(t))
 				}
 			}
-
 			container, fieldPath := podcmd.FindContainerByName(t, currOpts.Container)
 			if container == nil {
 				return nil, fmt.Errorf("container %s is not valid for pod %s", currOpts.Container, t.Name)
@@ -108,16 +107,22 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 				return nil, fmt.Errorf("Unable to construct reference to '%#v': %v", t, err)
 			}
 
-			ret := make(map[corev1.ObjectReference]rest.ResponseWrapper, 1)
-			ret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts)
+			ret := make(map[corev1.ObjectReference][]rest.ResponseWrapper, 1)
+			ret[*ref] = append(ret[*ref], clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts))
+
+			// If the need is to print previous logs and then stream, add an additional new pure 'follow' request
+			if retry && currOpts.Previous {
+				currOpts.Previous = false
+				ret[*ref] = append(ret[*ref], clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts))
+			}
 			return ret, nil
 		}
 
-		ret := make(map[corev1.ObjectReference]rest.ResponseWrapper)
+		ret := make(map[corev1.ObjectReference][]rest.ResponseWrapper)
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, retry)
 			if err != nil {
 				return nil, err
 			}
@@ -128,7 +133,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, retry)
 			if err != nil {
 				return nil, err
 			}
@@ -139,7 +144,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.EphemeralContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, retry)
 			if err != nil {
 				return nil, err
 			}
@@ -165,5 +170,5 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 	}
 
-	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers)
+	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers, retry)
 }

@@ -269,7 +269,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			writer.Write([]byte(fmt.Sprintf("==== START logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
 			defer writer.Write([]byte(fmt.Sprintf("==== END logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
 
-			requests, err := o.LogsForObject(o.RESTClientGetter, pod, &corev1.PodLogOptions{Container: container.Name}, timeout, false)
+			requests, err := o.LogsForObject(o.RESTClientGetter, pod, &corev1.PodLogOptions{Container: container.Name}, timeout, false, false)
 			if err != nil {
 				// Print error and return.
 				writer.Write([]byte(fmt.Sprintf("Create log request error: %s\n", err.Error())))
@@ -277,13 +277,18 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			}
 
 			for _, request := range requests {
-				data, err := request.DoRaw(context.TODO())
-				if err != nil {
-					// Print error and return.
-					writer.Write([]byte(fmt.Sprintf("Request log error: %s\n", err.Error())))
-					return
+				for _, req := range request {
+					data, err := req.DoRaw(context.TODO())
+					if err != nil {
+						// Print error and return.
+						if _, err := writer.Write([]byte(fmt.Sprintf("Request log error: %s\n", err.Error()))); err != nil {
+							return
+						}
+					}
+					if _, err := writer.Write(data); err != nil {
+						return
+					}
 				}
-				writer.Write(data)
 			}
 		}
 

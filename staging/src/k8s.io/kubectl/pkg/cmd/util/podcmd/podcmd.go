@@ -102,3 +102,15 @@ func AllContainerNames(pod *v1.Pod) string {
 	}
 	return strings.Join(containers, ", ")
 }
+
+func GetContainerStatusByName(pod *v1.Pod, containerName string) *v1.ContainerStatus {
+	allContainerStatus := [][]v1.ContainerStatus{pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses}
+	for _, statusSlice := range allContainerStatus {
+		for i := range statusSlice {
+			if statusSlice[i].Name == containerName {
+				return &statusSlice[i]
+			}
+		}
+	}
+	return nil
+}

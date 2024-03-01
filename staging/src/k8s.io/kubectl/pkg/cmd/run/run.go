@@ -515,13 +515,15 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 		return err
 	}
 
-	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
+	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false, false)
 	if err != nil {
 		return err
 	}
 	for _, request := range requests {
-		if err := logs.DefaultConsumeRequest(request, opts.Out); err != nil {
-			return err
+		for _, req := range request {
+			if err := logs.DefaultConsumeRequest(req, opts.Out); err != nil {
+				return err
+			}
 		}
 	}
 
