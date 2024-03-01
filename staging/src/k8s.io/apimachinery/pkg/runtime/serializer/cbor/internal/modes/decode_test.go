@@ -276,13 +276,13 @@ func TestDecode(t *testing.T) {
 			assertOnError: assertNilError,
 		},
 	} {
-		ms := tc.modes
-		if len(ms) == 0 {
-			ms = allDecModes
+		decModes := tc.modes
+		if len(decModes) == 0 {
+			decModes = allDecModes
 		}
 
-		for _, dm := range ms {
-			modeName, ok := decModeNames[dm]
+		for _, decMode := range decModes {
+			modeName, ok := decModeNames[decMode]
 			if !ok {
 				t.Fatal("test case configured to run against unrecognized mode")
 			}
@@ -295,7 +295,7 @@ func TestDecode(t *testing.T) {
 				} else {
 					dst = reflect.New(reflect.TypeOf(tc.into))
 				}
-				err := dm.Unmarshal(tc.in, dst.Interface())
+				err := decMode.Unmarshal(tc.in, dst.Interface())
 				tc.assertOnError(t, err)
 				if tc.want != nil {
 					if diff := cmp.Diff(tc.want, dst.Elem().Interface()); diff != "" {

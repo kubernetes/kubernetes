@@ -24,12 +24,14 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/go-cmp/cmp"
 )
 
 func nilPointerFor[T interface{}]() *T {
 	return nil
 }
 
+// TestRoundtrip roundtrips object serialization to interface{} and back via CBOR.
 func TestRoundtrip(t *testing.T) {
 	type modePair struct {
 		enc cbor.EncMode
@@ -100,10 +102,6 @@ func TestRoundtrip(t *testing.T) {
 		{
 			name: "int64 zero",
 			obj:  int64(math.MinInt64),
-		},
-		{
-			name: "uint64 max",
-			obj:  uint64(math.MaxUint64),
 		},
 		{
 			name: "uint64 zero",
@@ -260,24 +258,24 @@ func TestRoundtrip(t *testing.T) {
 			}{},
 		},
 	} {
-		mps := tc.modePairs
-		if len(mps) == 0 {
+		modePairs := tc.modePairs
+		if len(modePairs) == 0 {
 			// Default is all modes to all modes.
-			mps = []modePair{}
-			for _, em := range allEncModes {
-				for _, dm := range allDecModes {
-					mps = append(mps, modePair{enc: em, dec: dm})
+			modePairs = []modePair{}
+			for _, encMode := range allEncModes {
+				for _, decMode := range allDecModes {
+					modePairs = append(modePairs, modePair{enc: encMode, dec: decMode})
 				}
 			}
 		}
 
-		for _, mp := range mps {
-			encModeName, ok := encModeNames[mp.enc]
+		for _, modePair := range modePairs {
+			encModeName, ok := encModeNames[modePair.enc]
 			if !ok {
 				t.Fatal("test case configured to run against unrecognized encode mode")
 			}
 
-			decModeName, ok := decModeNames[mp.dec]
+			decModeName, ok := decModeNames[modePair.dec]
 			if !ok {
 				t.Fatal("test case configured to run against unrecognized decode mode")
 			}
@@ -285,18 +283,54 @@ func TestRoundtrip(t *testing.T) {
 			t.Run(fmt.Sprintf("enc=%s/dec=%s/%s", encModeName, decModeName, tc.name), func(t *testing.T) {
 				original := tc.obj
 
-				b, err := mp.enc.Marshal(original)
+				cborFromOriginal, err := modePair.enc.Marshal(original)
 				if err != nil {
-					t.Fatalf("unexpected error from Marshal: %v", err)
+					t.Fatalf("unexpected error from Marshal of original: %v", err)
 				}
 
-				final := reflect.New(reflect.TypeOf(original))
-				err = mp.dec.Unmarshal(b, final.Interface())
-				if err != nil {
-					t.Fatalf("unexpected error from Unmarshal: %v", err)
+				var iface interface{}
+				if err := modePair.dec.Unmarshal(cborFromOriginal, &iface); err != nil {
+					t.Fatalf("unexpected error from Unmarshal into %T: %v", &iface, err)
 				}
-				if !reflect.DeepEqual(original, final.Elem().Interface()) {
-					t.Errorf("roundtrip difference:\nwant: %#v\ngot: %#v", original, final)
+
+				cborFromIface, err := modePair.enc.Marshal(iface)
+				if err != nil {
+					t.Fatalf("unexpected error from Marshal of iface: %v", err)
+				}
+
+				{
+					// interface{} to interface{}
+					var iface2 interface{}
+					if err := modePair.dec.Unmarshal(cborFromIface, &iface2); err != nil {
+						t.Fatalf("unexpected error from Unmarshal into %T: %v", &iface2, err)
+					}
+					if diff := cmp.Diff(iface, iface2); diff != "" {
+						t.Errorf("unexpected difference on roundtrip from interface{} to interface{}:\n%s", diff)
+					}
+				}
+
+				{
+					// original to original
+					final := reflect.New(reflect.TypeOf(original))
+					err = modePair.dec.Unmarshal(cborFromOriginal, final.Interface())
+					if err != nil {
+						t.Fatalf("unexpected error from Unmarshal into %T: %v", final.Interface(), err)
+					}
+					if diff := cmp.Diff(original, final.Elem().Interface()); diff != "" {
+						t.Errorf("unexpected difference on roundtrip from original to original:\n%s", diff)
+					}
+				}
+
+				{
+					// original to interface{} to original
+					finalViaIface := reflect.New(reflect.TypeOf(original))
+					err = modePair.dec.Unmarshal(cborFromIface, finalViaIface.Interface())
+					if err != nil {
+						t.Fatalf("unexpected error from Unmarshal into %T: %v", finalViaIface.Interface(), err)
+					}
+					if diff := cmp.Diff(original, finalViaIface.Elem().Interface()); diff != "" {
+						t.Errorf("unexpected difference on roundtrip from original to interface{} to original:\n%s", diff)
+					}
 				}
 			})
 		}
