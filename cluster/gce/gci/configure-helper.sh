@@ -2301,6 +2301,7 @@ function start-cloud-controller-manager {
   params+=("--secure-port=10258")
   params+=("--use-service-account-credentials")
   params+=("--cloud-provider=gce")
+  params+=("--concurrent-node-syncs=10")
   params+=("--kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
   params+=("--authorization-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
   params+=("--authentication-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
