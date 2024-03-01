@@ -19,6 +19,7 @@ package dynamiccertificates
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -44,6 +45,8 @@ type DynamicCertKeyPairContent struct {
 	// certKeyPair is a certKeyContent that contains the last read, non-zero length content of the key and cert
 	certKeyPair atomic.Value
 
+	certValidator CertificateValidator
+
 	listeners []Listener
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
@@ -54,17 +57,32 @@ var _ CertKeyContentProvider = &DynamicCertKeyPairContent{}
 var _ ControllerRunner = &DynamicCertKeyPairContent{}
 
 // NewDynamicServingContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
+// Deprecated: use NewDynamicCertKeyPairContentFromFiles instead
 func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
+	return NewDynamicCertKeyPairContentFromFiles(purpose, certFile, keyFile)
+}
+
+func NewDynamicServingCertKeyContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
+	return NewDynamicCertKeyPairContentFromFiles(purpose, certFile, keyFile, &ServerCertValidator{})
+}
+
+func NewDynamicClientCertKeyContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
+	return NewDynamicCertKeyPairContentFromFiles(purpose, certFile, keyFile, &ClientCertValidator{})
+}
+
+// NewDynamicCertKeyPairContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
+func NewDynamicCertKeyPairContentFromFiles(purpose, certFile, keyFile string, certificateValidators ...CertificateValidator) (*DynamicCertKeyPairContent, error) {
 	if len(certFile) == 0 || len(keyFile) == 0 {
-		return nil, fmt.Errorf("missing filename for serving cert")
+		return nil, fmt.Errorf("missing filename for %q cert", purpose)
 	}
 	name := fmt.Sprintf("%s::%s::%s", purpose, certFile, keyFile)
 
 	ret := &DynamicCertKeyPairContent{
-		name:     name,
-		certFile: certFile,
-		keyFile:  keyFile,
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
+		name:          name,
+		certFile:      certFile,
+		keyFile:       keyFile,
+		certValidator: certValidatorUnion(certificateValidators),
+		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
 	}
 	if err := ret.loadCertKeyPair(); err != nil {
 		return nil, err
@@ -73,7 +91,7 @@ func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*Dyna
 	return ret, nil
 }
 
-// AddListener adds a listener to be notified when the serving cert content changes.
+// AddListener adds a listener to be notified when the cert content changes.
 func (c *DynamicCertKeyPairContent) AddListener(listener Listener) {
 	c.listeners = append(c.listeners, listener)
 }
@@ -89,13 +107,23 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 		return err
 	}
 	if len(cert) == 0 || len(key) == 0 {
-		return fmt.Errorf("missing content for serving cert %q", c.Name())
+		return fmt.Errorf("missing content for cert %q", c.Name())
 	}
 
 	// Ensure that the key matches the cert and both are valid
-	_, err = tls.X509KeyPair(cert, key)
+	tlsCert, err := tls.X509KeyPair(cert, key)
 	if err != nil {
 		return err
+	}
+
+	// parse the leaf certificate to submit it to validation
+	certObj, err := x509.ParseCertificate(tlsCert.Certificate[0])
+	if err != nil {
+		return fmt.Errorf("failed to parse cert PEM: %v", err)
+	}
+
+	if errs := c.certValidator.Validate(certObj); len(errs) > 0 {
+		return fmt.Errorf("cert %q validation failed: %v", c.Name(), errs)
 	}
 
 	newCertKey := &certKeyContent{

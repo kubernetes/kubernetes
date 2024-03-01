@@ -295,7 +295,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
 		var err error
-		c.Cert, err = dynamiccertificates.NewDynamicServingContentFromFiles("serving-cert", serverCertFile, serverKeyFile)
+		c.Cert, err = dynamiccertificates.NewDynamicCertKeyPairContentFromFiles("serving-cert", serverCertFile, serverKeyFile)
 		if err != nil {
 			return err
 		}

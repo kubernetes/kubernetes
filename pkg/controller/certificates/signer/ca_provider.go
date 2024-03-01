@@ -29,7 +29,7 @@ import (
 )
 
 func newCAProvider(caFile, caKeyFile string) (*caProvider, error) {
-	caLoader, err := dynamiccertificates.NewDynamicServingContentFromFiles("csr-controller", caFile, caKeyFile)
+	caLoader, err := dynamiccertificates.NewDynamicCertKeyPairContentFromFiles("csr-controller", caFile, caKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error reading CA cert file %q: %v", caFile, err)
 	}
