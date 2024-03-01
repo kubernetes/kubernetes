@@ -3111,15 +3111,18 @@ var _ = common.SIGDescribe("Services", func() {
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
 			// pausePod0 -> node1 node port fails because it's "external" and there are no local endpoints
 			// pausePod1 -> node0 node port succeeds because webserver0 is running on node0
-			// pausePod0 -> node0 and pausePod1 -> node1 both succeed because pod-to-same-node-NodePort
-			// connections are neither internal nor external and always get Cluster traffic policy.
+			// pausePod0 -> node0 node port succeeds because webserver0 is running on node0
+			//
+			// NOTE: pausePod1 -> node1 will succeed for kube-proxy because kube-proxy considers pod-to-same-node-NodePort
+			// connections as neither internal nor external and always get Cluster traffic policy. However, we do not test
+			// this here because not all Network implementations follow kube-proxy's interpretation of "destination"
+			// traffic policy. See: https://github.com/kubernetes/kubernetes/pull/123622
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
-			execHostnameTest(*pausePod1, nodePortAddress1, webserverPod0.Name)
 
 			time.Sleep(5 * time.Second)
 		}
