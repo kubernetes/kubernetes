@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -276,6 +277,9 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		}
 		infos, err := builder.Do().Infos()
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				err = fmt.Errorf("error from server (NotFound): %w in namespace %q", err, o.Namespace)
+			}
 			return err
 		}
 		if o.Selector == "" && len(infos) != 1 {
