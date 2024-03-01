@@ -55,10 +55,9 @@ type userNsPodsManager interface {
 }
 
 type UsernsManager struct {
-	used         *allocator.AllocationBitmap
-	usedBy       map[types.UID]uint32 // Map pod.UID to range used
-	removed      int
-	numAllocated int
+	used    *allocator.AllocationBitmap
+	usedBy  map[types.UID]uint32 // Map pod.UID to range used
+	removed int
 
 	off int
 	len int
@@ -216,16 +215,6 @@ func (m *UsernsManager) isSet(v uint32) bool {
 // The first return value is the first ID in the user namespace, the second returns
 // the length for the user namespace range.
 func (m *UsernsManager) allocateOne(pod types.UID) (firstID uint32, length uint32, err error) {
-	if m.numAllocated >= maxPods {
-		return 0, 0, fmt.Errorf("limit on count of pods with user namespaces exceeded (limit is %v, current pods with userns: %v)", maxPods, m.numAllocated)
-	}
-	m.numAllocated++
-	defer func() {
-		if err != nil {
-			m.numAllocated--
-		}
-	}()
-
 	firstZero, found, err := m.used.AllocateNext()
 	if err != nil {
 		return 0, 0, err
@@ -265,15 +254,6 @@ func (m *UsernsManager) record(pod types.UID, from, length uint32) (err error) {
 	if found && prevFrom == from {
 		return nil
 	}
-	if m.numAllocated >= maxPods {
-		return fmt.Errorf("limit on count of pods with user namespaces exceeded (limit is %v, current pods with userns: %v)", maxPods, m.numAllocated)
-	}
-	m.numAllocated++
-	defer func() {
-		if err != nil {
-			m.numAllocated--
-		}
-	}()
 
 	klog.V(5).InfoS("new pod user namespace allocation", "podUID", pod)
 
@@ -318,7 +298,6 @@ func (m *UsernsManager) releaseWithLock(pod types.UID) {
 	delete(m.usedBy, pod)
 
 	klog.V(5).InfoS("releasing pod user namespace allocation", "podUID", pod)
-	m.numAllocated--
 	m.removed++
 
 	_ = os.Remove(filepath.Join(m.kl.GetPodDir(pod), mappingsFile))

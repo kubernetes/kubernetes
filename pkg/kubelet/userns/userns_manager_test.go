@@ -378,42 +378,6 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 	}
 }
 
-func TestAllocateMaxPods(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
-
-	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
-	require.NoError(t, err)
-
-	// The first maxPods allocations should succeed.
-	for i := 0; i < maxPods; i++ {
-		_, _, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
-		require.NoError(t, err)
-	}
-
-	// The next allocation should fail, hitting maxPods.
-	_, _, err = m.allocateOne(types.UID(fmt.Sprintf("%d", maxPods+1)))
-	assert.Error(t, err)
-}
-
-func TestRecordMaxPods(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
-
-	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
-	require.NoError(t, err)
-
-	// The first maxPods allocations should succeed.
-	for i := 0; i < maxPods; i++ {
-		err = m.record(types.UID(fmt.Sprintf("%d", i)), uint32((i+1)*65536), 65536)
-		require.NoError(t, err)
-	}
-
-	// The next allocation should fail, hitting maxPods.
-	err = m.record(types.UID(fmt.Sprintf("%d", maxPods+1)), uint32((maxPods+1)*65536), 65536)
-	assert.Error(t, err)
-}
-
 type failingUserNsPodsManager struct {
 	testUserNsPodsManager
 }
