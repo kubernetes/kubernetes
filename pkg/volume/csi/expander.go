@@ -72,7 +72,7 @@ func (c *csiPlugin) nodeExpandWithClient(
 	}
 
 	if !nodeExpandSet {
-		return false, fmt.Errorf("Expander.NodeExpand found CSI plugin %s/%s to not support node expansion", c.GetPluginName(), driverName)
+		return false, volumetypes.NewOperationNotSupportedError(fmt.Sprintf("NodeExpand is not supported by the CSI driver %s", driverName))
 	}
 
 	pv := resizeOptions.VolumeSpec.PersistentVolume
