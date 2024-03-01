@@ -36,6 +36,7 @@ if ! ${ALL} ; then
 fi
 
 BASH_TARGETS=(
+	update-go-workspace
 	update-codegen
 	update-generated-api-compatibility-data
 	update-generated-docs

@@ -579,20 +579,22 @@ func TestRBAC(t *testing.T) {
 			previousResourceVersion := make(map[string]float64)
 
 			for j, r := range tc.requests {
-				path := "/"
+				// This is a URL-path, not a local path, so we use the "path"
+				// package (aliased as "gopath") instead of "path/filepath".
+				urlPath := "/"
 				if r.apiGroup == "" {
-					path = gopath.Join(path, "api/v1")
+					urlPath = gopath.Join(urlPath, "api/v1")
 				} else {
-					path = gopath.Join(path, "apis", r.apiGroup, "v1")
+					urlPath = gopath.Join(urlPath, "apis", r.apiGroup, "v1")
 				}
 				if r.namespace != "" {
-					path = gopath.Join(path, "namespaces", r.namespace)
+					urlPath = gopath.Join(urlPath, "namespaces", r.namespace)
 				}
 				if r.resource != "" {
-					path = gopath.Join(path, r.resource)
+					urlPath = gopath.Join(urlPath, r.resource)
 				}
 				if r.name != "" {
-					path = gopath.Join(path, r.name)
+					urlPath = gopath.Join(urlPath, r.name)
 				}
 
 				var body io.Reader
@@ -600,14 +602,14 @@ func TestRBAC(t *testing.T) {
 					sub := ""
 					if r.verb == "PUT" {
 						// For update operations, insert previous resource version
-						if resVersion := previousResourceVersion[getPreviousResourceVersionKey(path, "")]; resVersion != 0 {
+						if resVersion := previousResourceVersion[getPreviousResourceVersionKey(urlPath, "")]; resVersion != 0 {
 							sub += fmt.Sprintf(",\"resourceVersion\": \"%v\"", resVersion)
 						}
 					}
 					body = strings.NewReader(fmt.Sprintf(r.body, sub))
 				}
 
-				req, err := http.NewRequest(r.verb, kubeConfig.Host+path, body)
+				req, err := http.NewRequest(r.verb, kubeConfig.Host+urlPath, body)
 				if r.verb == "PATCH" {
 					// For patch operations, use the apply content type
 					req.Header.Add("Content-Type", string(types.ApplyPatchType))
@@ -658,7 +660,7 @@ func TestRBAC(t *testing.T) {
 						// For successful create operations, extract resourceVersion
 						id, currentResourceVersion, err := parseResourceVersion(b)
 						if err == nil {
-							key := getPreviousResourceVersionKey(path, id)
+							key := getPreviousResourceVersionKey(urlPath, id)
 							previousResourceVersion[key] = currentResourceVersion
 						} else {
 							t.Logf("error in trying to extract resource version: %s", err)

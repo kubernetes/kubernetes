@@ -69,7 +69,7 @@ groups_without_codegen=(
 	"imagepolicy"
 	"admission"
 )
-client_gen_file="${KUBE_ROOT}/vendor/k8s.io/code-generator/cmd/client-gen/main.go"
+client_gen_file="${KUBE_ROOT}/staging/src/k8s.io/code-generator/cmd/client-gen/main.go"
 
 for group_dirname in "${group_dirnames[@]}"; do
 	if ! grep -q "${group_dirname}/" "${client_gen_file}" ; then

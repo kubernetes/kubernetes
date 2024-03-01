@@ -17,7 +17,7 @@ limitations under the License.
 package protobuf
 
 import (
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2"
 	"k8s.io/klog/v2"
 )
 
@@ -25,7 +25,7 @@ import (
 // it exists, the value is boolean.  If the tag did not exist, it returns
 // false.
 func extractBoolTagOrDie(key string, lines []string) bool {
-	val, err := types.ExtractSingleBoolCommentTag("+", key, false, lines)
+	val, err := gengo.ExtractSingleBoolCommentTag("+", key, false, lines)
 	if err != nil {
 		klog.Fatal(err)
 	}

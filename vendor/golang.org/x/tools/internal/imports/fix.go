@@ -13,6 +13,7 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -700,20 +701,21 @@ func ScoreImportPaths(ctx context.Context, env *ProcessEnv, paths []string) (map
 	return result, nil
 }
 
-func PrimeCache(ctx context.Context, env *ProcessEnv) error {
+func PrimeCache(ctx context.Context, resolver Resolver) error {
 	// Fully scan the disk for directories, but don't actually read any Go files.
 	callback := &scanCallback{
-		rootFound: func(gopathwalk.Root) bool {
-			return true
+		rootFound: func(root gopathwalk.Root) bool {
+			// See getCandidatePkgs: walking GOROOT is apparently expensive and
+			// unnecessary.
+			return root.Type != gopathwalk.RootGOROOT
 		},
 		dirFound: func(pkg *pkg) bool {
 			return false
 		},
-		packageNameLoaded: func(pkg *pkg) bool {
-			return false
-		},
+		// packageNameLoaded and exportsLoaded must never be called.
 	}
-	return getCandidatePkgs(ctx, callback, "", "", env)
+
+	return resolver.scan(ctx, callback)
 }
 
 func candidateImportName(pkg *pkg) string {
@@ -827,16 +829,45 @@ func GetPackageExports(ctx context.Context, wrapped func(PackageExport), searchP
 	return getCandidatePkgs(ctx, callback, filename, filePkg, env)
 }
 
-var requiredGoEnvVars = []string{"GO111MODULE", "GOFLAGS", "GOINSECURE", "GOMOD", "GOMODCACHE", "GONOPROXY", "GONOSUMDB", "GOPATH", "GOPROXY", "GOROOT", "GOSUMDB", "GOWORK"}
+// TODO(rfindley): we should depend on GOOS and GOARCH, to provide accurate
+// imports when doing cross-platform development.
+var requiredGoEnvVars = []string{
+	"GO111MODULE",
+	"GOFLAGS",
+	"GOINSECURE",
+	"GOMOD",
+	"GOMODCACHE",
+	"GONOPROXY",
+	"GONOSUMDB",
+	"GOPATH",
+	"GOPROXY",
+	"GOROOT",
+	"GOSUMDB",
+	"GOWORK",
+}
 
 // ProcessEnv contains environment variables and settings that affect the use of
 // the go command, the go/build package, etc.
+//
+// ...a ProcessEnv *also* overwrites its Env along with derived state in the
+// form of the resolver. And because it is lazily initialized, an env may just
+// be broken and unusable, but there is no way for the caller to detect that:
+// all queries will just fail.
+//
+// TODO(rfindley): refactor this package so that this type (perhaps renamed to
+// just Env or Config) is an immutable configuration struct, to be exchanged
+// for an initialized object via a constructor that returns an error. Perhaps
+// the signature should be `func NewResolver(*Env) (*Resolver, error)`, where
+// resolver is a concrete type used for resolving imports. Via this
+// refactoring, we can avoid the need to call ProcessEnv.init and
+// ProcessEnv.GoEnv everywhere, and implicitly fix all the places where this
+// these are misused. Also, we'd delegate the caller the decision of how to
+// handle a broken environment.
 type ProcessEnv struct {
 	GocmdRunner *gocommand.Runner
 
 	BuildFlags []string
 	ModFlag    string
-	ModFile    string
 
 	// SkipPathInScan returns true if the path should be skipped from scans of
 	// the RootCurrentModule root type. The function argument is a clean,
@@ -846,7 +877,7 @@ type ProcessEnv struct {
 	// Env overrides the OS environment, and can be used to specify
 	// GOPROXY, GO111MODULE, etc. PATH cannot be set here, because
 	// exec.Command will not honor it.
-	// Specifying all of RequiredGoEnvVars avoids a call to `go env`.
+	// Specifying all of requiredGoEnvVars avoids a call to `go env`.
 	Env map[string]string
 
 	WorkingDir string
@@ -854,9 +885,17 @@ type ProcessEnv struct {
 	// If Logf is non-nil, debug logging is enabled through this function.
 	Logf func(format string, args ...interface{})
 
-	initialized bool
+	// If set, ModCache holds a shared cache of directory info to use across
+	// multiple ProcessEnvs.
+	ModCache *DirInfoCache
 
-	resolver Resolver
+	initialized bool // see TODO above
+
+	// resolver and resolverErr are lazily evaluated (see GetResolver).
+	// This is unclean, but see the big TODO in the docstring for ProcessEnv
+	// above: for now, we can't be sure that the ProcessEnv is fully initialized.
+	resolver    Resolver
+	resolverErr error
 }
 
 func (e *ProcessEnv) goEnv() (map[string]string, error) {
@@ -936,20 +975,31 @@ func (e *ProcessEnv) env() []string {
 }
 
 func (e *ProcessEnv) GetResolver() (Resolver, error) {
-	if e.resolver != nil {
-		return e.resolver, nil
-	}
 	if err := e.init(); err != nil {
 		return nil, err
 	}
-	if len(e.Env["GOMOD"]) == 0 && len(e.Env["GOWORK"]) == 0 {
-		e.resolver = newGopathResolver(e)
-		return e.resolver, nil
+
+	if e.resolver == nil && e.resolverErr == nil {
+		// TODO(rfindley): we should only use a gopathResolver here if the working
+		// directory is actually *in* GOPATH. (I seem to recall an open gopls issue
+		// for this behavior, but I can't find it).
+		//
+		// For gopls, we can optionally explicitly choose a resolver type, since we
+		// already know the view type.
+		if len(e.Env["GOMOD"]) == 0 && len(e.Env["GOWORK"]) == 0 {
+			e.resolver = newGopathResolver(e)
+		} else {
+			e.resolver, e.resolverErr = newModuleResolver(e, e.ModCache)
+		}
 	}
-	e.resolver = newModuleResolver(e)
-	return e.resolver, nil
+
+	return e.resolver, e.resolverErr
 }
 
+// buildContext returns the build.Context to use for matching files.
+//
+// TODO(rfindley): support dynamic GOOS, GOARCH here, when doing cross-platform
+// development.
 func (e *ProcessEnv) buildContext() (*build.Context, error) {
 	ctx := build.Default
 	goenv, err := e.goEnv()
@@ -1029,15 +1079,23 @@ func addStdlibCandidates(pass *pass, refs references) error {
 type Resolver interface {
 	// loadPackageNames loads the package names in importPaths.
 	loadPackageNames(importPaths []string, srcDir string) (map[string]string, error)
+
 	// scan works with callback to search for packages. See scanCallback for details.
 	scan(ctx context.Context, callback *scanCallback) error
+
 	// loadExports returns the set of exported symbols in the package at dir.
 	// loadExports may be called concurrently.
 	loadExports(ctx context.Context, pkg *pkg, includeTest bool) (string, []string, error)
+
 	// scoreImportPath returns the relevance for an import path.
 	scoreImportPath(ctx context.Context, path string) float64
 
-	ClearForNewScan()
+	// ClearForNewScan returns a new Resolver based on the receiver that has
+	// cleared its internal caches of directory contents.
+	//
+	// The new resolver should be primed and then set via
+	// [ProcessEnv.UpdateResolver].
+	ClearForNewScan() Resolver
 }
 
 // A scanCallback controls a call to scan and receives its results.
@@ -1120,7 +1178,7 @@ func addExternalCandidates(ctx context.Context, pass *pass, refs references, fil
 		go func(pkgName string, symbols map[string]bool) {
 			defer wg.Done()
 
-			found, err := findImport(ctx, pass, found[pkgName], pkgName, symbols, filename)
+			found, err := findImport(ctx, pass, found[pkgName], pkgName, symbols)
 
 			if err != nil {
 				firstErrOnce.Do(func() {
@@ -1151,6 +1209,17 @@ func addExternalCandidates(ctx context.Context, pass *pass, refs references, fil
 	}()
 
 	for result := range results {
+		// Don't offer completions that would shadow predeclared
+		// names, such as github.com/coreos/etcd/error.
+		if types.Universe.Lookup(result.pkg.name) != nil { // predeclared
+			// Ideally we would skip this candidate only
+			// if the predeclared name is actually
+			// referenced by the file, but that's a lot
+			// trickier to compute and would still create
+			// an import that is likely to surprise the
+			// user before long.
+			continue
+		}
 		pass.addCandidate(result.imp, result.pkg)
 	}
 	return firstErr
@@ -1193,31 +1262,22 @@ func ImportPathToAssumedName(importPath string) string {
 type gopathResolver struct {
 	env      *ProcessEnv
 	walked   bool
-	cache    *dirInfoCache
+	cache    *DirInfoCache
 	scanSema chan struct{} // scanSema prevents concurrent scans.
 }
 
 func newGopathResolver(env *ProcessEnv) *gopathResolver {
 	r := &gopathResolver{
-		env: env,
-		cache: &dirInfoCache{
-			dirs:      map[string]*directoryPackageInfo{},
-			listeners: map[*int]cacheListener{},
-		},
+		env:      env,
+		cache:    NewDirInfoCache(),
 		scanSema: make(chan struct{}, 1),
 	}
 	r.scanSema <- struct{}{}
 	return r
 }
 
-func (r *gopathResolver) ClearForNewScan() {
-	<-r.scanSema
-	r.cache = &dirInfoCache{
-		dirs:      map[string]*directoryPackageInfo{},
-		listeners: map[*int]cacheListener{},
-	}
-	r.walked = false
-	r.scanSema <- struct{}{}
+func (r *gopathResolver) ClearForNewScan() Resolver {
+	return newGopathResolver(r.env)
 }
 
 func (r *gopathResolver) loadPackageNames(importPaths []string, srcDir string) (map[string]string, error) {
@@ -1538,7 +1598,7 @@ func loadExportsFromFiles(ctx context.Context, env *ProcessEnv, dir string, incl
 
 // findImport searches for a package with the given symbols.
 // If no package is found, findImport returns ("", false, nil)
-func findImport(ctx context.Context, pass *pass, candidates []pkgDistance, pkgName string, symbols map[string]bool, filename string) (*pkg, error) {
+func findImport(ctx context.Context, pass *pass, candidates []pkgDistance, pkgName string, symbols map[string]bool) (*pkg, error) {
 	// Sort the candidates by their import package length,
 	// assuming that shorter package names are better than long
 	// ones.  Note that this sorts by the de-vendored name, so

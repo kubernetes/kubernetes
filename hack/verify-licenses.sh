@@ -39,11 +39,8 @@ git worktree add -f "${KUBE_TEMP}"/tmp_test_licenses/kubernetes HEAD >/dev/null 
 cd "${KUBE_TEMP}"/tmp_test_licenses/kubernetes && rm -rf vendor
 
 # Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BINPATH}"
+export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
-
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
 
 function http_code() {
     curl -I -s -o /dev/null -w "%{http_code}" "$1"

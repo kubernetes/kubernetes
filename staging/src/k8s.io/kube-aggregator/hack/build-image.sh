@@ -23,11 +23,11 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # Register function to be called on EXIT to remove generated binary.
 function cleanup {
-  rm "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/artifacts/simple-image/kube-aggregator"
+  rm "${KUBE_ROOT}/staging/src/k8s.io/kube-aggregator/artifacts/simple-image/kube-aggregator"
 }
 trap cleanup EXIT
 
-pushd "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator"
+pushd "${KUBE_ROOT}/staging/src/k8s.io/kube-aggregator"
 cp -v ../../../../_output/local/bin/linux/amd64/kube-aggregator ./artifacts/simple-image/kube-aggregator
 docker build -t kube-aggregator:latest ./artifacts/simple-image
 popd

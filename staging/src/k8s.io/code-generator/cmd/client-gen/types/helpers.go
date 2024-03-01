@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/namer"
+	"k8s.io/gengo/v2/namer"
 )
 
 // ToGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
@@ -116,6 +116,6 @@ func ToGroupInstallPackages(groups []GroupVersions, groupGoNames map[GroupVersio
 }
 
 // NormalizeGroupVersion calls normalizes the GroupVersion.
-//func NormalizeGroupVersion(gv GroupVersion) GroupVersion {
-//	return GroupVersion{Group: gv.Group.NonEmpty(), Version: gv.Version, NonEmptyVersion: normalization.Version(gv.Version)}
-//}
+// func NormalizeGroupVersion(gv GroupVersion) GroupVersion {
+// 	 return GroupVersion{Group: gv.Group.NonEmpty(), Version: gv.Version, NonEmptyVersion: normalization.Version(gv.Version)}
+// }

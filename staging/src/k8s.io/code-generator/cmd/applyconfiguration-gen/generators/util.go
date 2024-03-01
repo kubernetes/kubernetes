@@ -23,14 +23,14 @@ import (
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 // utilGenerator generates the ForKind() utility function.
 type utilGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage        string
 	imports              namer.ImportTracker
 	groupVersions        map[string]clientgentypes.GroupVersions

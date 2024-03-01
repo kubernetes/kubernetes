@@ -23,15 +23,11 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 
 source "${CODEGEN_PKG}/kube_codegen.sh"
 
-# generate the code with:
-# --output-base    because this script should also be able to run inside the vendor dir of
-#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
-#                  instead of the $GOPATH directly. For normal projects this can be dropped.
+THIS_PKG="k8s.io/sample-apiserver"
 
 kube::codegen::gen_helpers \
-    --input-pkg-root k8s.io/sample-apiserver/pkg/apis \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
 
 if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
     report_filename="${API_KNOWN_VIOLATIONS_DIR}/sample_apiserver_violation_exceptions.list"
@@ -41,17 +37,17 @@ if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
 fi
 
 kube::codegen::gen_openapi \
-    --input-pkg-root k8s.io/sample-apiserver/pkg/apis \
-    --output-pkg-root k8s.io/sample-apiserver/pkg/generated \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+    --output-dir "${SCRIPT_ROOT}/pkg/generated/openapi" \
+    --output-pkg "${THIS_PKG}/pkg/generated/openapi" \
     --report-filename "${report_filename:-"/dev/null"}" \
     ${update_report:+"${update_report}"} \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
 
 kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
-    --input-pkg-root k8s.io/sample-apiserver/pkg/apis \
-    --output-pkg-root k8s.io/sample-apiserver/pkg/generated \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --output-dir "${SCRIPT_ROOT}/pkg/generated" \
+    --output-pkg "${THIS_PKG}/pkg/generated" \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"

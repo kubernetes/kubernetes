@@ -29,16 +29,13 @@ MODULES=(
     staging/src/k8s.io/kms/internal/plugins/_mock
 )
 
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
-
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
   kube::log::error "Cannot run hack/update-internal-modules.sh with \$GOPROXY=off"
   exit 1
 fi
 
-kube::golang::verify_go_version
+kube::golang::setup_env
 
 for mod in "${MODULES[@]}"; do
   pushd "${KUBE_ROOT}/${mod}" >/dev/null

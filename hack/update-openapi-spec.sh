@@ -30,6 +30,8 @@ kube::util::require-jq
 kube::golang::setup_env
 kube::etcd::install
 
+# We need to call `make` here because that includes all of the compile and link
+# flags that we use for a production build, which we need for this script.
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
@@ -70,7 +72,7 @@ fi
 # Start kube-apiserver
 # omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+kube-apiserver \
   --bind-address="${API_HOST}" \
   --secure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \

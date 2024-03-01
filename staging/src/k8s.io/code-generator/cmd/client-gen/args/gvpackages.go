@@ -129,7 +129,9 @@ func (p *groupVersionsBuilder) update() error {
 
 		versionPkg := types.PackageVersion{Package: path.Join(p.importBasePath, pth, gv.Group.NonEmpty(), gv.Version.String()), Version: gv.Version}
 		if group, ok := seenGroups[gv.Group]; ok {
-			seenGroups[gv.Group].Versions = append(group.Versions, versionPkg)
+			vers := group.Versions
+			vers = append(vers, versionPkg)
+			seenGroups[gv.Group].Versions = vers
 		} else {
 			seenGroups[gv.Group] = &types.GroupVersions{
 				PackageName: gv.Group.NonEmpty(),

@@ -18,14 +18,17 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -35,17 +38,25 @@ const (
 	kubeMetricImportPath = `"k8s.io/component-base/metrics"`
 	// Should equal to final directory name of kubeMetricImportPath
 	kubeMetricsDefaultImportName = "metrics"
-
-	kubeURLRoot = "k8s.io/kubernetes/"
 )
 
 var (
 	// env configs
-	GOROOT                string = os.Getenv("GOROOT")
-	GOOS                  string = os.Getenv("GOOS")
-	KUBE_ROOT             string = os.Getenv("KUBE_ROOT")
+	GOOS                  string = findGOOS()
 	ALL_STABILITY_CLASSES bool
 )
+
+func findGOOS() string {
+	cmd := exec.Command("go", "env", "GOOS")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		panic(fmt.Sprintf("running `go env` failed: %v\n\n%s", err, string(out)))
+	}
+	if len(out) == 0 {
+		panic("empty result from `go env GOOS`")
+	}
+	return string(out)
+}
 
 func main() {
 
@@ -202,33 +213,24 @@ func globalVariableDeclarations(tree *ast.File) map[string]ast.Expr {
 	return consts
 }
 
-func localImportPath(importExpr string) (string, error) {
-	// parse directory path
-	var pathPrefix string
-	if strings.Contains(importExpr, kubeURLRoot) {
-		// search k/k local checkout
-		pathPrefix = KUBE_ROOT
-		importExpr = strings.Replace(importExpr, kubeURLRoot, "", 1)
-	} else if strings.Contains(importExpr, "k8s.io/klog/v2") || strings.Contains(importExpr, "k8s.io/util") {
-		pathPrefix = strings.Join([]string{KUBE_ROOT, "vendor"}, string(os.PathSeparator))
-	} else if strings.Contains(importExpr, "k8s.io/") {
-		// search k/k/staging local checkout
-		pathPrefix = strings.Join([]string{KUBE_ROOT, "staging", "src"}, string(os.PathSeparator))
-	} else if strings.Contains(importExpr, ".") {
-		// not stdlib -> prefix with GOMODCACHE
-		// pathPrefix = strings.Join([]string{KUBE_ROOT, "vendor"}, string(os.PathSeparator))
+func findPkgDir(pkg string) (string, error) {
+	// Use Go's module mechanism.
+	cmd := exec.Command("go", "list", "-find", "-json=Dir", pkg)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("running `go list` failed: %w\n\n%s", err, string(out))
+	}
+	result := struct {
+		Dir string
+	}{}
+	if err := json.Unmarshal(out, &result); err != nil {
+		return "", fmt.Errorf("json unmarshal of `go list` failed: %w", err)
+	}
+	if result.Dir != "" {
+		return result.Dir, nil
+	}
 
-		//  this requires implementing SIV, skip for now
-		return "", fmt.Errorf("unable to handle general, non STL imports for metric analysis.  import path:  %s", importExpr)
-	} else {
-		// stdlib -> prefix with GOROOT
-		pathPrefix = strings.Join([]string{GOROOT, "src"}, string(os.PathSeparator))
-	} // ToDo: support non go mod
-
-	crossPlatformImportExpr := strings.Replace(importExpr, "/", string(os.PathSeparator), -1)
-	importDirectory := strings.Join([]string{pathPrefix, strings.Trim(crossPlatformImportExpr, "\"")}, string(os.PathSeparator))
-
-	return importDirectory, nil
+	return "", fmt.Errorf("empty respose from `go list`")
 }
 
 func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, imports []*ast.ImportSpec) (map[string]ast.Expr, error) {
@@ -243,17 +245,18 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 		}
 
 		// find local path on disk for listed import
-		importDirectory, err := localImportPath(im.Path.Value)
+		pkg, err := strconv.Unquote(im.Path.Value)
 		if err != nil {
-			// uncomment the below log line if you want to start using non k8s/non stl libs for resolving const/var in metric definitions
-			// fmt.Fprint(os.Stderr, err.Error() + "\n")
-			continue
+			return nil, fmt.Errorf("can't handle import '%s': %w", im.Path.Value, err)
+		}
+		importDirectory, err := findPkgDir(pkg)
+		if err != nil {
+			return nil, fmt.Errorf("can't find import '%s': %w", im.Path.Value, err)
 		}
 
 		files, err := os.ReadDir(importDirectory)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to read import path directory %s with error %s, skipping\n", importDirectory, err)
-			continue
+			return nil, fmt.Errorf("failed to read import directory %s: %w", importDirectory, err)
 		}
 
 		for _, file := range files {

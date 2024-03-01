@@ -23,9 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-# run in module mode to match test command in readme.md
-export GO111MODULE=on
-
 # Nuke old files so we don't accidentally carry stuff forward.
 rm -f staging/src/k8s.io/api/testdata/HEAD/*.{yaml,json,pb}
 rm -f staging/src/k8s.io/apiextensions-apiserver/pkg/apis/testdata/HEAD/*.{yaml,json,pb}

@@ -48,7 +48,6 @@ MAKEFLAGS += --warn-undefined-variables
 .EXPORT_ALL_VARIABLES:
 OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
-PRJ_SRC_PATH := k8s.io/kubernetes
 
 ifdef KUBE_GOFLAGS
 $(info KUBE_GOFLAGS is now deprecated. Please use GOFLAGS instead.)
@@ -67,9 +66,9 @@ define ALL_HELP_INFO
 # Build code.
 #
 # Args:
-#   WHAT: Directory names to build.  If any of these directories has a 'main'
-#     package, the build will produce executable files under $(OUT_DIR)/bin.
-#     If not specified, "everything" will be built.
+#   WHAT: Directory or Go package names to build.  If any of these directories
+#   has a 'main' package, the build will produce executable files under
+#   $(OUT_DIR)/bin.  If not specified, "everything" will be built.
 #     "vendor/<module>/<path>" is accepted as alias for "<module>/<path>".
 #     "ginkgo" is an alias for the ginkgo CLI.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
@@ -83,9 +82,9 @@ define ALL_HELP_INFO
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
 #   make all DBG=1
-#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
-#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
-#           information.
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to
+#     use code debugging tools like delve. When DBG is unspecified, it defaults
+#     to "-s -w" which strips debug information.
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)

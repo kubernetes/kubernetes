@@ -2,7 +2,7 @@
 
 module k8s.io/mount-utils
 
-go 1.21
+go 1.22.0
 
 require (
 	github.com/moby/sys/mountinfo v0.6.2

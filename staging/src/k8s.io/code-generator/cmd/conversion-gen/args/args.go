@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
 )
 
 // DefaultBasePeerDirs are the peer-dirs nearly everybody will use, i.e. those coming from
@@ -31,8 +30,10 @@ var DefaultBasePeerDirs = []string{
 	"k8s.io/apimachinery/pkg/runtime",
 }
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
+type Args struct {
+	// The filename of the generated results.
+	OutputFile string
+
 	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core. Peer dirs
 	// are declared to make the generator pick up manually written conversion funcs from external
 	// packages.
@@ -52,39 +53,40 @@ type CustomArgs struct {
 	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
 	// allow structs that are identical to be assigned to each other.
 	SkipUnsafe bool
+
+	// GoHeaderFile is the path to a boilerplate header file for generated
+	// code.
+	GoHeaderFile string
 }
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	customArgs := &CustomArgs{
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{
 		BasePeerDirs: DefaultBasePeerDirs,
 		SkipUnsafe:   false,
 	}
-	genericArgs.CustomArgs = customArgs
-	genericArgs.OutputFileBaseName = "conversion_generated"
-	return genericArgs, customArgs
 }
 
 // AddFlags add the generator flags to the flag set.
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	fs.StringSliceVar(&ca.BasePeerDirs, "base-peer-dirs", ca.BasePeerDirs,
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputFile, "output-file", "generated.conversion.go",
+		"the name of the file to be generated")
+	fs.StringSliceVar(&args.BasePeerDirs, "base-peer-dirs", args.BasePeerDirs,
 		"Comma-separated list of apimachinery import paths which are considered, after tag-specified peers, for conversions. Only change these if you have very good reasons.")
-	fs.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
+	fs.StringSliceVar(&args.ExtraPeerDirs, "extra-peer-dirs", args.ExtraPeerDirs,
 		"Application specific comma-separated list of import paths which are considered, after tag-specified peers and base-peer-dirs, for conversions.")
-	fs.StringSliceVar(&ca.ExtraDirs, "extra-dirs", ca.ExtraDirs,
+	fs.StringSliceVar(&args.ExtraDirs, "extra-dirs", args.ExtraDirs,
 		"Application specific comma-separated list of import paths which are loaded and considered for callable conversions, but are not considered peers for conversion.")
-	fs.BoolVar(&ca.SkipUnsafe, "skip-unsafe", ca.SkipUnsafe,
+	fs.BoolVar(&args.SkipUnsafe, "skip-unsafe", args.SkipUnsafe,
 		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*CustomArgs)
-
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
+func (args *Args) Validate() error {
+	if len(args.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
 	}
-
 	return nil
 }
