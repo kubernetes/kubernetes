@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -45,7 +44,6 @@ import (
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
-	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 )
 
@@ -481,19 +479,6 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 		newNode := curNode.DeepCopy()
 		for _, modify := range nodeModifiers {
 			modify(newNode)
-		}
-
-		// spec.ProviderID is required for multiple controllers, like loadbalancers, so we should not
-		// untaint the node until is set. Once it is set, the field is immutable, so no need to reconcile.
-		// We only set this value during initialization and is never reconciled, so if for some reason
-		// we are not able to set it, the instance will never be able to acquire it.
-		// Before external cloud providers were enabled by default, the field was set by the kubelet, and the
-		// node was created with the value.
-		// xref: https://issues.k8s.io/123024
-		if !utilfeature.DefaultFeatureGate.Enabled(features.OptionalProviderID) {
-			if newNode.Spec.ProviderID == "" {
-				return fmt.Errorf("failed to get provider ID for node %s at cloudprovider", nodeName)
-			}
 		}
 
 		_, err = cnc.kubeClient.CoreV1().Nodes().Update(context.TODO(), newNode, metav1.UpdateOptions{})
