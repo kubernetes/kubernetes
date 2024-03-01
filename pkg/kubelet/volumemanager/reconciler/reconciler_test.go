@@ -1279,6 +1279,16 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			newPVSize:       resource.MustParse("15G"),
 			oldPVSize:       resource.MustParse("13G"),
 		},
+		{
+			name:            "expand-fs-volume with unsupported error",
+			volumeMode:      &fsMode,
+			expansionFailed: false,
+			pvName:          volumetesting.FailWithUnSupportedVolumeName,
+			pvcSize:         resource.MustParse("10G"),
+			pvcStatusSize:   resource.MustParse("10G"),
+			newPVSize:       resource.MustParse("15G"),
+			oldPVSize:       resource.MustParse("13G"),
+		},
 	}
 
 	for _, tc := range tests {
