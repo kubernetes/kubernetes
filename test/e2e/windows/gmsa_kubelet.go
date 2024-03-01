@@ -113,10 +113,13 @@ var _ = sigDescribe(feature.Windows, "GMSA Kubelet", framework.WithSlow(), skipU
 					// even for bogus creds, `nltest /PARENTDOMAIN` simply returns the AD domain, which is enough for our purpose here.
 					// note that the "eventually" part seems to be needed to account for the fact that powershell containers
 					// are a bit slow to become responsive, even when docker reports them as running.
-					gomega.Eventually(ctx, func() bool {
+					gomega.Eventually(ctx, func() error {
 						output, err = e2ekubectl.RunKubectl(f.Namespace.Name, "exec", namespaceOption, podName, containerOption, "--", "nltest", "/PARENTDOMAIN")
-						return err == nil
-					}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
+						if err != nil {
+							return err
+						}
+						return nil
+					}, 1*time.Minute, 1*time.Second).Should(gomega.Succeed())
 
 					if !strings.HasPrefix(output, domain) {
 						framework.Failf("Expected %q to start with %q", output, domain)

@@ -102,7 +102,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 			}
 
 			return false
-		}, framework.PodStartTimeout, 1*time.Second).Should(gomega.BeTrue())
+		}, framework.PodStartTimeout, 1*time.Second).Should(gomega.BeTrueBecause("expected pod to be terminated"))
 	})
 
 	ginkgo.It("should not be able to create pods with unknown usernames at Container level", func(ctx context.Context) {

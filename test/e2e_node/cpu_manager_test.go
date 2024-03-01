@@ -186,7 +186,7 @@ func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS 
 			return false
 		}
 		return len(containers) == 0
-	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
+	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrueBecause("Containers were expected to be removed"))
 }
 
 func isHTEnabled() bool {
@@ -770,8 +770,8 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		gomega.Expect(cpus.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", cpus.String())
 
-		gomega.Expect(reusableCPUs.Equals(nonReusableCPUs)).To(gomega.BeTrue(), "expected reusable cpuset [%s] to be equal to non-reusable cpuset [%s]", reusableCPUs.String(), nonReusableCPUs.String())
-		gomega.Expect(nonReusableCPUs.Intersection(cpus).IsEmpty()).To(gomega.BeTrue(), "expected non-reusable cpuset [%s] to be disjoint from cpuset [%s]", nonReusableCPUs.String(), cpus.String())
+		gomega.Expect(reusableCPUs.Equals(nonReusableCPUs)).To(gomega.BeTrueBecause("expected reusable cpuset [%s] to be equal to non-reusable cpuset [%s]", reusableCPUs.String(), nonReusableCPUs.String()))
+		gomega.Expect(nonReusableCPUs.Intersection(cpus).IsEmpty()).To(gomega.BeTrueBecause("expected non-reusable cpuset [%s] to be disjoint from cpuset [%s]", nonReusableCPUs.String(), cpus.String()))
 
 		ginkgo.By("by deleting the pods and waiting for container removal")
 		deletePods(ctx, f, []string{pod.Name})

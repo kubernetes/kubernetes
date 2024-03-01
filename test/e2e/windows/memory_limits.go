@@ -173,7 +173,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 			}
 		}
 		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrue())
+	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("Expected %s pod to be failed scheduling", podName))
 }
 
 // getNodeMemory populates a nodeMemory struct with information from the first

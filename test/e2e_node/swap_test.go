@@ -365,7 +365,7 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 
 	isReady, err := testutils.PodRunningReady(pod)
 	framework.ExpectNoError(err)
-	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrueBecause("pod should be ready"))
+	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrueBecause("pod %+v was expected to be ready", pod))
 
 	return pod
 }
