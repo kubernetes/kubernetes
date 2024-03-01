@@ -217,13 +217,10 @@ message MutatingWebhook {
   //      - If failurePolicy=Fail, reject the request
   //      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
   //
-  // This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=AdmissionWebhookMatchConditions
   // +optional
   repeated MatchCondition matchConditions = 12;
 }
@@ -479,13 +476,10 @@ message ValidatingWebhook {
   //      - If failurePolicy=Fail, reject the request
   //      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
   //
-  // This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=AdmissionWebhookMatchConditions
   // +optional
   repeated MatchCondition matchConditions = 11;
 }

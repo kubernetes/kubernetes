@@ -36,10 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -110,7 +107,6 @@ func newMatchConditionHandler(recorder *admissionRecorder) http.Handler {
 
 // TestMatchConditions tests ValidatingWebhookConfigurations and MutatingWebhookConfigurations that validates different cases of matchCondition fields
 func TestMatchConditions(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 
 	fail := admissionregistrationv1.Fail
 	ignore := admissionregistrationv1.Ignore
@@ -567,7 +563,6 @@ func TestMatchConditions(t *testing.T) {
 }
 
 func TestMatchConditions_validation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 
 	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--disable-admission-plugins=ServiceAccount",
@@ -732,197 +727,6 @@ func TestMatchConditions_validation(t *testing.T) {
 				}
 			} else if !testcase.expectError && err != nil {
 				t.Fatalf("Unexpected error creating MutatingWebhookConfiguration: %v", err)
-			}
-		})
-	}
-}
-
-func TestFeatureGateEnablement(t *testing.T) {
-	testcases := []struct {
-		name                                       string
-		matchConditionsFeatureGateInitiallyEnabled bool
-		matchConditions                            []admissionregistrationv1.MatchCondition
-		expectMatchConditionsPreSwitch             bool
-		expectMatchConditionsPostSwitch            bool
-	}{
-		{
-			name: "start with match conditions enabled - no match conditions",
-			matchConditionsFeatureGateInitiallyEnabled: true,
-			expectMatchConditionsPreSwitch:             false,
-			expectMatchConditionsPostSwitch:            false,
-		},
-		{
-			name: "start with match conditions enabled - with match conditions",
-			matchConditionsFeatureGateInitiallyEnabled: true,
-			matchConditions: []admissionregistrationv1.MatchCondition{{
-				Name:       "test-expression",
-				Expression: "true",
-			}},
-			expectMatchConditionsPreSwitch:  true,
-			expectMatchConditionsPostSwitch: true,
-		},
-		{
-			name: "start with match conditions disabled - no match conditions",
-			matchConditionsFeatureGateInitiallyEnabled: false,
-			expectMatchConditionsPreSwitch:             false,
-			expectMatchConditionsPostSwitch:            false,
-		},
-		{
-			name: "start with match conditions disabled - with match conditions",
-			matchConditionsFeatureGateInitiallyEnabled: false,
-			matchConditions: []admissionregistrationv1.MatchCondition{{
-				Name:       "test-expression",
-				Expression: "true",
-			}},
-			expectMatchConditionsPreSwitch:  false,
-			expectMatchConditionsPostSwitch: false,
-		},
-	}
-
-	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
-		"--disable-admission-plugins=ServiceAccount",
-	}, framework.SharedEtcd())
-	defer server.TearDownFn()
-
-	endpoint := "https://localhost:1234/server"
-	clientConfig := admissionregistrationv1.WebhookClientConfig{
-		URL:      &endpoint,
-		CABundle: localhostCert,
-	}
-
-	rules := []admissionregistrationv1.RuleWithOperations{{
-		Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
-		Rule: admissionregistrationv1.Rule{
-			APIGroups:   []string{""},
-			APIVersions: []string{"v1"},
-			Resources:   []string{"pods"},
-		},
-	}}
-	versions := []string{"v1"}
-
-	client := clientset.NewForConfigOrDie(server.ClientConfig)
-
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			if testcase.matchConditionsFeatureGateInitiallyEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
-			}
-
-			validatingwebhook := &admissionregistrationv1.ValidatingWebhookConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "validating-webhook.integration.test",
-				},
-				Webhooks: []admissionregistrationv1.ValidatingWebhook{
-					{
-						Name:                    "admission.integration.test",
-						Rules:                   rules,
-						ClientConfig:            clientConfig,
-						SideEffects:             &noSideEffects,
-						AdmissionReviewVersions: versions,
-						MatchConditions:         testcase.matchConditions,
-					},
-				},
-			}
-
-			mutatingWebhook := &admissionregistrationv1.MutatingWebhookConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "mutating-webhook.integration.test",
-				},
-				Webhooks: []admissionregistrationv1.MutatingWebhook{
-					{
-						Name:                    "admission.integration.test",
-						Rules:                   rules,
-						ClientConfig:            clientConfig,
-						SideEffects:             &noSideEffects,
-						AdmissionReviewVersions: versions,
-						MatchConditions:         testcase.matchConditions,
-					},
-				},
-			}
-
-			// Create the validating webhook
-			_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(
-				context.Background(), validatingwebhook, metav1.CreateOptions{},
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error creating validating webhook: %v", err)
-			}
-			t.Cleanup(func() {
-				// Make sure to cleanup the validating webhook before running the next test case
-				err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(
-					context.Background(), validatingwebhook.Name, metav1.DeleteOptions{},
-				)
-				if err != nil {
-					t.Fatalf("Unexpected error deleting validating webhook: %v", err)
-				}
-			})
-
-			// Create the mutating webhook
-			_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(
-				context.Background(), mutatingWebhook, metav1.CreateOptions{},
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error creating mutating webhook: %v", err)
-			}
-			t.Cleanup(func() {
-				// Make sure to cleanup the mutating webhook before running the next test case
-				err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(
-					context.Background(), mutatingWebhook.Name, metav1.DeleteOptions{},
-				)
-				if err != nil {
-					t.Fatalf("Unexpected error deleting mutating webhook: %v", err)
-				}
-			})
-
-			// Assert the validating webhook match conditions field - pre switch
-			validatingWebhookConfig, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-				context.Background(), validatingwebhook.Name, metav1.GetOptions{},
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error getting validating webhook: %v", err)
-			}
-			if testcase.expectMatchConditionsPreSwitch && validatingWebhookConfig.Webhooks[0].MatchConditions == nil {
-				t.Fatal("Expected match conditions to be present in the validating webhook pre switch; got: nil")
-			}
-
-			// Assert the mutating webhook match conditions field - pre switch
-			mutatingWebhookConfig, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
-				context.Background(), mutatingWebhook.Name, metav1.GetOptions{},
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error getting mutating webhook: %v", err)
-			}
-			if testcase.expectMatchConditionsPreSwitch && mutatingWebhookConfig.Webhooks[0].MatchConditions == nil {
-				t.Fatal("Expected match conditions to be present in the mutating webhook pre switch; got: nil")
-			}
-
-			// Switch the featureGate state
-			if testcase.matchConditionsFeatureGateInitiallyEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, false)()
-			} else {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
-			}
-
-			// Assert the validating webhook match conditions field - post switch
-			validatingWebhookConfig, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-				context.Background(), validatingwebhook.Name, metav1.GetOptions{},
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error getting validating webhook: %v", err)
-			}
-			if testcase.expectMatchConditionsPostSwitch && validatingWebhookConfig.Webhooks[0].MatchConditions == nil {
-				t.Fatal("Expected match conditions to be present in the validating webhook post switch; got: nil")
-			}
-
-			// Assert the mutating webhook match conditions field - post switch
-			mutatingWebhookConfig, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
-				context.Background(), mutatingWebhook.Name, metav1.GetOptions{},
-			)
-			if err != nil {
-				t.Fatalf("Unexpected error getting mutating webhook: %v", err)
-			}
-			if testcase.expectMatchConditionsPostSwitch && mutatingWebhookConfig.Webhooks[0].MatchConditions == nil {
-				t.Fatal("Expected match conditions to be present in the mutating webhook post switch; got: nil")
 			}
 		})
 	}
