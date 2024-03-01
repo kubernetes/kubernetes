@@ -73,6 +73,8 @@ func TestAddUpdateAPIService(t *testing.T) {
 
 	apiService := &v1.APIService{
 		Spec: v1.APIServiceSpec{
+			Group:   "apiservicegroup",
+			Version: "v1",
 			Service: &v1.ServiceReference{Name: "dummy"},
 		},
 	}
@@ -82,7 +84,7 @@ func TestAddUpdateAPIService(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/apiservicegroup/v1": {},
+					"/apis/apiservicegroup/v1/path1": {},
 				},
 			},
 		},
@@ -100,7 +102,7 @@ func TestAddUpdateAPIService(t *testing.T) {
 		t.Error(err)
 	}
 
-	expectPath(t, swagger, "/apis/apiservicegroup/v1")
+	expectPath(t, swagger, "/apis/apiservicegroup/v1/path1")
 	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
 
 	t.Log("Update APIService OpenAPI")
@@ -108,7 +110,7 @@ func TestAddUpdateAPIService(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/apiservicegroup/v2": {},
+					"/apis/apiservicegroup/v1/path2": {},
 				},
 			},
 		},
@@ -123,7 +125,100 @@ func TestAddUpdateAPIService(t *testing.T) {
 	}
 	// Ensure that the if the APIService OpenAPI is updated, the
 	// aggregated OpenAPI is also updated.
+	expectPath(t, swagger, "/apis/apiservicegroup/v1/path2")
+	expectNoPath(t, swagger, "/apis/apiservicegroup/v1/path1")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+}
+
+// Tests that an APIService that registers OpenAPI will only have the OpenAPI
+// for its specific group version served registered.
+// See https://github.com/kubernetes/kubernetes/pull/123570 for full context.
+func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
+	mux := http.NewServeMux()
+	var delegationHandlers []http.Handler
+	delegate1 := &openAPIHandler{openapi: &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Paths: &spec.Paths{
+				Paths: map[string]spec.PathItem{
+					"/apis/foo/v1": {},
+				},
+			},
+		},
+	}}
+	delegationHandlers = append(delegationHandlers, delegate1)
+
+	s := buildAndRegisterSpecAggregator(delegationHandlers, mux)
+
+	apiService := &v1.APIService{
+		Spec: v1.APIServiceSpec{
+			Group:   "apiservicegroup",
+			Version: "v1",
+			Service: &v1.ServiceReference{Name: "dummy"},
+		},
+	}
+	apiService.Name = "apiservice"
+
+	apiService2 := &v1.APIService{
+		Spec: v1.APIServiceSpec{
+			Group:   "apiservicegroup",
+			Version: "v2",
+			Service: &v1.ServiceReference{Name: "dummy2"},
+		},
+	}
+	apiService2.Name = "apiservice2"
+
+	handler := &openAPIHandler{openapi: &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Paths: &spec.Paths{
+				Paths: map[string]spec.PathItem{
+					"/apis/apiservicegroup/v1": {},
+				},
+			},
+		},
+	}}
+
+	handler2 := &openAPIHandler{openapi: &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Paths: &spec.Paths{
+				Paths: map[string]spec.PathItem{
+					"/apis/a":                  {},
+					"/apis/apiservicegroup/v1": {},
+					"/apis/apiservicegroup/v2": {},
+				},
+			},
+		},
+	}}
+
+	if err := s.AddUpdateAPIService(apiService, handler); err != nil {
+		t.Error(err)
+	}
+	if err := s.UpdateAPIServiceSpec(apiService.Name); err != nil {
+		t.Error(err)
+	}
+
+	if err := s.AddUpdateAPIService(apiService2, handler2); err != nil {
+		t.Error(err)
+	}
+	if err := s.UpdateAPIServiceSpec(apiService2.Name); err != nil {
+		t.Error(err)
+	}
+
+	swagger, err := fetchOpenAPI(mux)
+	if err != nil {
+		t.Error(err)
+	}
+	expectPath(t, swagger, "/apis/apiservicegroup/v1")
 	expectPath(t, swagger, "/apis/apiservicegroup/v2")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+
+	t.Logf("Remove APIService %s", apiService.Name)
+	s.RemoveAPIService(apiService.Name)
+
+	swagger, err = fetchOpenAPI(mux)
+	if err != nil {
+		t.Error(err)
+	}
+	// Ensure that the if the APIService is added then removed, the OpenAPI disappears from the aggregated OpenAPI as well.
 	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
 	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
 }
@@ -146,6 +241,8 @@ func TestAddRemoveAPIService(t *testing.T) {
 
 	apiService := &v1.APIService{
 		Spec: v1.APIServiceSpec{
+			Group:   "apiservicegroup",
+			Version: "v1",
 			Service: &v1.ServiceReference{Name: "dummy"},
 		},
 	}
@@ -205,6 +302,8 @@ func TestUpdateAPIService(t *testing.T) {
 
 	apiService := &v1.APIService{
 		Spec: v1.APIServiceSpec{
+			Group:   "apiservicegroup",
+			Version: "v1",
 			Service: &v1.ServiceReference{Name: "dummy"},
 		},
 	}
@@ -277,6 +376,8 @@ func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
 
 	apiServiceFailed := &v1.APIService{
 		Spec: v1.APIServiceSpec{
+			Group:   "failed",
+			Version: "v1",
 			Service: &v1.ServiceReference{Name: "dummy"},
 		},
 	}
@@ -297,6 +398,8 @@ func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
 
 	apiServiceSuccess := &v1.APIService{
 		Spec: v1.APIServiceSpec{
+			Group:   "success",
+			Version: "v1",
 			Service: &v1.ServiceReference{Name: "dummy2"},
 		},
 	}
@@ -355,6 +458,8 @@ func TestAPIServiceFailSuccessTransition(t *testing.T) {
 
 	apiService := &v1.APIService{
 		Spec: v1.APIServiceSpec{
+			Group:   "apiservicegroup",
+			Version: "v1",
 			Service: &v1.ServiceReference{Name: "dummy"},
 		},
 	}
@@ -419,6 +524,8 @@ func TestFailingAPIServiceDoesNotBlockAdd(t *testing.T) {
 
 	apiServiceFailed := &v1.APIService{
 		Spec: v1.APIServiceSpec{
+			Group:   "failed",
+			Version: "v1",
 			Service: &v1.ServiceReference{Name: "dummy"},
 		},
 	}
