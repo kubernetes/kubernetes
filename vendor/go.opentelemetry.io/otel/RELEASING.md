@@ -123,12 +123,12 @@ Once verified be sure to [make a release for the `contrib` repository](https://g
 
 ### Website Documentation
 
-Update the [Go instrumentation documentation] in the OpenTelemetry website under [content/en/docs/instrumentation/go].
+Update the [Go instrumentation documentation] in the OpenTelemetry website under [content/en/docs/languages/go].
 Importantly, bump any package versions referenced to be the latest one you just released and ensure all code examples still compile and are accurate.
 
 [OpenTelemetry Semantic Conventions]: https://github.com/open-telemetry/semantic-conventions
-[Go instrumentation documentation]: https://opentelemetry.io/docs/instrumentation/go/
-[content/en/docs/instrumentation/go]: https://github.com/open-telemetry/opentelemetry.io/tree/main/content/en/docs/instrumentation/go
+[Go instrumentation documentation]: https://opentelemetry.io/docs/languages/go/
+[content/en/docs/languages/go]: https://github.com/open-telemetry/opentelemetry.io/tree/main/content/en/docs/languages/go
 
 ### Demo Repository
 

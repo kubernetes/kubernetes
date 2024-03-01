@@ -82,9 +82,7 @@
       "cloud.google.com/go/compute": [
         "cloud.google.com/go/compute/metadata",
         "github.com/google/cadvisor",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "golang.org/x/oauth2",
-        "google.golang.org/genproto",
         "google.golang.org/grpc"
       ],
       "cloud.google.com/go/firestore": [
@@ -218,10 +216,7 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/api",
-        "google.golang.org/genproto/googleapis/api",
-        "google.golang.org/genproto/googleapis/rpc",
         "google.golang.org/grpc"
       ]
     },

@@ -274,49 +274,6 @@ type awsRequest struct {
 	Headers []awsRequestHeader `json:"headers"`
 }
 
-func (cs awsCredentialSource) validateMetadataServers() error {
-	if err := cs.validateMetadataServer(cs.RegionURL, "region_url"); err != nil {
-		return err
-	}
-	if err := cs.validateMetadataServer(cs.CredVerificationURL, "url"); err != nil {
-		return err
-	}
-	return cs.validateMetadataServer(cs.IMDSv2SessionTokenURL, "imdsv2_session_token_url")
-}
-
-var validHostnames []string = []string{"169.254.169.254", "fd00:ec2::254"}
-
-func (cs awsCredentialSource) isValidMetadataServer(metadataUrl string) bool {
-	if metadataUrl == "" {
-		// Zero value means use default, which is valid.
-		return true
-	}
-
-	u, err := url.Parse(metadataUrl)
-	if err != nil {
-		// Unparseable URL means invalid
-		return false
-	}
-
-	for _, validHostname := range validHostnames {
-		if u.Hostname() == validHostname {
-			// If it's one of the valid hostnames, everything is good
-			return true
-		}
-	}
-
-	// hostname not found in our allowlist, so not valid
-	return false
-}
-
-func (cs awsCredentialSource) validateMetadataServer(metadataUrl, urlName string) error {
-	if !cs.isValidMetadataServer(metadataUrl) {
-		return fmt.Errorf("oauth2/google: invalid hostname %s for %s", metadataUrl, urlName)
-	}
-
-	return nil
-}
-
 func (cs awsCredentialSource) doRequest(req *http.Request) (*http.Response, error) {
 	if cs.client == nil {
 		cs.client = oauth2.NewClient(cs.ctx, nil)
@@ -337,6 +294,10 @@ func canRetrieveSecurityCredentialFromEnvironment() bool {
 
 func shouldUseMetadataServer() bool {
 	return !canRetrieveRegionFromEnvironment() || !canRetrieveSecurityCredentialFromEnvironment()
+}
+
+func (cs awsCredentialSource) credentialSourceType() string {
+	return "aws"
 }
 
 func (cs awsCredentialSource) subjectToken() (string, error) {

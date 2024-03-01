@@ -22,8 +22,30 @@ func (o defaultEndpointOption) Apply(settings *internal.DialSettings) {
 // It should only be used internally by generated clients.
 //
 // This is similar to WithEndpoint, but allows us to determine whether the user has overridden the default endpoint.
+//
+// Deprecated: WithDefaultEndpoint does not support setting the universe domain.
+// Use WithDefaultEndpointTemplate and WithDefaultUniverseDomain to compose the
+// default endpoint instead.
 func WithDefaultEndpoint(url string) option.ClientOption {
 	return defaultEndpointOption(url)
+}
+
+type defaultEndpointTemplateOption string
+
+func (o defaultEndpointTemplateOption) Apply(settings *internal.DialSettings) {
+	settings.DefaultEndpointTemplate = string(o)
+}
+
+// WithDefaultEndpointTemplate provides a template for creating the endpoint
+// using a universe domain. See also WithDefaultUniverseDomain and
+// option.WithUniverseDomain. The placeholder UNIVERSE_DOMAIN should be used
+// instead of a concrete universe domain such as "googleapis.com".
+//
+// Example: WithDefaultEndpointTemplate("https://logging.UNIVERSE_DOMAIN/")
+//
+// It should only be used internally by generated clients.
+func WithDefaultEndpointTemplate(url string) option.ClientOption {
+	return defaultEndpointTemplateOption(url)
 }
 
 type defaultMTLSEndpointOption string
@@ -126,8 +148,29 @@ func (w withDefaultScopes) Apply(o *internal.DialSettings) {
 	copy(o.DefaultScopes, w)
 }
 
+// WithDefaultUniverseDomain returns a ClientOption that sets the default universe domain.
+//
+// It should only be used internally by generated clients.
+//
+// This is similar to the public WithUniverse, but allows us to determine whether the user has
+// overridden the default universe.
+func WithDefaultUniverseDomain(ud string) option.ClientOption {
+	return withDefaultUniverseDomain(ud)
+}
+
+type withDefaultUniverseDomain string
+
+func (w withDefaultUniverseDomain) Apply(o *internal.DialSettings) {
+	o.DefaultUniverseDomain = string(w)
+}
+
 // EnableJwtWithScope returns a ClientOption that specifies if scope can be used
 // with self-signed JWT.
+//
+// EnableJwtWithScope is ignored when option.WithUniverseDomain is set
+// to a value other than the Google Default Universe (GDU) of "googleapis.com".
+// For non-GDU domains, token exchange is impossible and services must
+// support self-signed JWTs with scopes.
 func EnableJwtWithScope() option.ClientOption {
 	return enableJwtWithScope(true)
 }
@@ -148,6 +191,19 @@ type withCreds google.Credentials
 
 func (w *withCreds) Apply(o *internal.DialSettings) {
 	o.InternalCredentials = (*google.Credentials)(w)
+}
+
+// EnableNewAuthLibrary returns a ClientOption that specifies if libraries in this
+// module to delegate auth to our new library. This option will be removed in
+// the future once all clients have been moved to the new auth layer.
+func EnableNewAuthLibrary() option.ClientOption {
+	return enableNewAuthLibrary(true)
+}
+
+type enableNewAuthLibrary bool
+
+func (w enableNewAuthLibrary) Apply(o *internal.DialSettings) {
+	o.EnableNewAuthLibrary = bool(w)
 }
 
 // EmbeddableAdapter is a no-op option.ClientOption that allow libraries to

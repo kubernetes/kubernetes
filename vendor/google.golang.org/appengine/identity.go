@@ -5,9 +5,8 @@
 package appengine
 
 import (
+	"context"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"google.golang.org/appengine/internal"
 	pb "google.golang.org/appengine/internal/app_identity"
