@@ -116,7 +116,7 @@ func runDensityBatchTest(ctx context.Context, f *framework.Framework, testArg de
 
 	gomega.Eventually(ctx, func() bool {
 		return len(watchTimes) == testArg.podsNr
-	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
+	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("All pods should be observed by the watch."))
 
 	if len(watchTimes) < testArg.podsNr {
 		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")

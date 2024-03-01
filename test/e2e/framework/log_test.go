@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("log", func() {
 		}()
 	})
 	ginkgo.It("asserts", func() {
-		gomega.Expect(false).To(gomega.BeTrue(), "false is never true")
+		gomega.Expect(false).To(gomega.BeTrueBecause("Assertion failed: expected false, got true"))
 	})
 	ginkgo.It("error", func() {
 		err := errors.New("an error with a long, useless description")

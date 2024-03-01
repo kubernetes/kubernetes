@@ -26,7 +26,7 @@ Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flag
    -a: automatically select the common base of origin/master and HEAD
        as revision
    -s: select a strict configuration for new code
-   -n: in addition to strict checking, also enable hints (aka nits) that may are may not
+   -n: in addition to strict checking, also enable hints (aka nits) that may or may not
        be useful
    -g <github action file>: also write results with --out-format=github-actions
        to a separate file

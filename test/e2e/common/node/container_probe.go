@@ -113,7 +113,7 @@ var _ = SIGDescribe("Probing container", func() {
 				return false, err
 			}
 			return podutil.IsPodReady(p), nil
-		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod should not be ready")
+		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrueBecause("pod should not be ready"))
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -726,7 +726,7 @@ done
 				}
 			}
 			return false, nil
-		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrue(), "should not see liveness probes")
+		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrueBecause("should not see liveness probes"))
 	})
 })
 
@@ -792,7 +792,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "P
 				return false, err
 			}
 			return podutil.IsPodReady(p), nil
-		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod should not be ready")
+		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrueBecause("pod should not be ready"))
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -1484,7 +1484,7 @@ done
 				}
 			}
 			return false, nil
-		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrue(), "should not see liveness probes")
+		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrueBecause("should not see liveness probes"))
 	})
 })
 
