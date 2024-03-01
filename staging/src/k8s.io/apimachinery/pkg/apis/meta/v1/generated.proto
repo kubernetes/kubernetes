@@ -609,6 +609,12 @@ message ListOptions {
   // compatibility reasons) and to false otherwise.
   // +optional
   optional bool sendInitialEvents = 11;
+
+  // SkipCache bypasses the server cache, forcing the request to be served directly from etcd.
+  //
+  // Caution: This dramatically increases the request resource cost.
+  // Use only for debugging cache staleness or corruption. Not intended for regular client usage.
+  optional bool skipCache = 12;
 }
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource

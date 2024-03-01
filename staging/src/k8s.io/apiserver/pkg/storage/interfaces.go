@@ -302,4 +302,9 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// SkipCache bypasses the server cache, forcing the request to be served directly from etcd.
+	//
+	// Caution: This dramatically increases the request resource cost.
+	// Use only for debugging cache staleness or corruption. Not intended for regular client usage.
+	SkipCache bool
 }
