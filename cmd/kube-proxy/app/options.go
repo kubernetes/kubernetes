@@ -36,6 +36,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
+	"k8s.io/kube-proxy/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -432,7 +433,7 @@ func (o *Options) writeConfigFile() (err error) {
 		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
 
-	encoder := proxyconfigscheme.Codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
+	encoder := proxyconfigscheme.Codecs.EncoderForVersion(info.Serializer, v1alpha2.SchemeGroupVersion)
 
 	configFile, err := os.Create(o.WriteConfigTo)
 	if err != nil {
@@ -488,7 +489,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 		// Try strict decoding first. If that fails decode with a lenient
 		// decoder, which has only v1alpha1 registered, and log a warning.
 		// The lenient path is to be dropped when support for v1alpha1 is dropped.
-		if !runtime.IsStrictDecodingError(err) {
+		if !(runtime.IsStrictDecodingError(err) && gvk.GroupVersion() == v1alpha1.SchemeGroupVersion) {
 			return nil, fmt.Errorf("failed to decode: %w", err)
 		}
 

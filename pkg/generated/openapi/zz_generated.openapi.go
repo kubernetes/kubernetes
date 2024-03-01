@@ -1106,6 +1106,15 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration":                                          schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref),
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyNFTablesConfiguration":                                      schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyNFTablesConfiguration(ref),
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration":                                     schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyWinkernelConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.DetectLocalConfiguration":                                            schema_k8sio_kube_proxy_config_v1alpha2_DetectLocalConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyConfiguration":                                              schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyConntrackConfiguration":                                     schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyConntrackConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyIPTablesConfiguration":                                      schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyIPTablesConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyIPVSConfiguration":                                          schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyIPVSConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyLinuxConfiguration":                                         schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyLinuxConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyNFTablesConfiguration":                                      schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyNFTablesConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyWindowsConfiguration":                                       schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyWindowsConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha2.KubeProxyWinkernelConfiguration":                                     schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyWinkernelConfiguration(ref),
 		"k8s.io/kube-scheduler/config/v1.DefaultPreemptionArgs":                                                 schema_k8sio_kube_scheduler_config_v1_DefaultPreemptionArgs(ref),
 		"k8s.io/kube-scheduler/config/v1.Extender":                                                              schema_k8sio_kube_scheduler_config_v1_Extender(ref),
 		"k8s.io/kube-scheduler/config/v1.ExtenderManagedResource":                                               schema_k8sio_kube_scheduler_config_v1_ExtenderManagedResource(ref),
@@ -56888,6 +56897,590 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyWinkernelConfiguration(ref
 					},
 				},
 				Required: []string{"networkName", "sourceVip", "enableDSR", "rootHnsEndpointName", "forwardHealthCheckVip"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_DetectLocalConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DetectLocalConfiguration contains optional settings related to DetectLocalMode option",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"bridgeInterface": {
+						SchemaProps: spec.SchemaProps{
+							Description: "bridgeInterface is a bridge interface name. When DetectLocalMode is set to LocalModeBridgeInterface, kube-proxy will consider traffic to be local if it originates from this bridge.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"interfaceNamePrefix": {
+						SchemaProps: spec.SchemaProps{
+							Description: "interfaceNamePrefix is an interface name prefix. When DetectLocalMode is set to LocalModeInterfaceNamePrefix, kube-proxy will consider traffic to be local if it originates from any interface whose name begins with this prefix.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"clusterCIDRs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clusterCIDRs is the list of CIDR ranges of the pods in the cluster. When DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider traffic to be local if its source IP is in this range.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyConfiguration contains everything necessary to configure the Kubernetes proxy server.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"featureGates": {
+						SchemaProps: spec.SchemaProps{
+							Description: "featureGates is a map of feature names to bools that enable or disable alpha/experimental features.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"clientConnection": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clientConnection specifies the kubeconfig file and client connection settings for the proxy server to use when communicating with the apiserver.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration"),
+						},
+					},
+					"logging": {
+						SchemaProps: spec.SchemaProps{
+							Description: "logging specifies the options of logging. Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/component-base/logs/api/v1.LoggingConfiguration"),
+						},
+					},
+					"hostnameOverride": {
+						SchemaProps: spec.SchemaProps{
+							Description: "hostnameOverride, if non-empty, will be used as the name of the Node that kube-proxy is running on. If unset, the node name is assumed to be the same as the node's hostname.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeIPOverride": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeIPOverride can be used to override kube-proxy's idea of what its node's primary IPs are.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"healthzBindAddresses": {
+						SchemaProps: spec.SchemaProps{
+							Description: "healthzBindAddresses is a list of CIDR ranges that contains a valid node IP on which healthz server will be served on, defaulting to [ \"0.0.0.0/0\", \"::/0\" ].",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"healthzBindPort": {
+						SchemaProps: spec.SchemaProps{
+							Description: "healthzBindPort is the port on which helathz server will be exposed, defaulting to 10256.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"metricsBindAddresses": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metricsBindAddresses is a list of CIDR ranges that contains a valid node IP on which metrics server will be served on, defaulting to [ \"127.0.0.0/8\", \"::1/128\" ].",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"metricsBindPort": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metricsBindPort is the port on which metrics server will be exposed, defaulting to 10249.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"configHardFail": {
+						SchemaProps: spec.SchemaProps{
+							Description: "configHardFail if set to true kube-proxy will exit rather than just warning on config errors.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"bindAddressHardFail": {
+						SchemaProps: spec.SchemaProps{
+							Default: false,
+							Type:    []string{"boolean"},
+							Format:  "",
+						},
+					},
+					"enableProfiling": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enableProfiling enables profiling via web interface on /debug/pprof handler. Profiling handlers will be handled by metrics server.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"showHiddenMetricsForVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "showHiddenMetricsForVersion is the version for which you want to show hidden metrics.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"mode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mode specifies which proxy mode to use.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"linux": {
+						SchemaProps: spec.SchemaProps{
+							Description: "linux contains linux-platform-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.KubeProxyLinuxConfiguration"),
+						},
+					},
+					"windows": {
+						SchemaProps: spec.SchemaProps{
+							Description: "windows contains windows-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.KubeProxyWindowsConfiguration"),
+						},
+					},
+					"iptables": {
+						SchemaProps: spec.SchemaProps{
+							Description: "iptables contains iptables-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.KubeProxyIPTablesConfiguration"),
+						},
+					},
+					"ipvs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ipvs contains ipvs-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.KubeProxyIPVSConfiguration"),
+						},
+					},
+					"nftables": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nftables contains nftables-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.KubeProxyNFTablesConfiguration"),
+						},
+					},
+					"winkernel": {
+						SchemaProps: spec.SchemaProps{
+							Description: "winkernel contains winkernel-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.KubeProxyWinkernelConfiguration"),
+						},
+					},
+					"detectLocalMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "detectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"detectLocal": {
+						SchemaProps: spec.SchemaProps{
+							Description: "detectLocal contains optional configuration settings related to DetectLocalMode.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.DetectLocalConfiguration"),
+						},
+					},
+					"nodePortAddresses": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If unset, NodePort connections will be accepted on all local IPs.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"syncPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"minSyncPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "minSyncPeriod is the minimum period between proxier rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate proxier resync.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"configSyncPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater than 0.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+				},
+				Required: []string{"clientConnection", "bindAddressHardFail", "enableProfiling"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/kube-proxy/config/v1alpha2.DetectLocalConfiguration", "k8s.io/kube-proxy/config/v1alpha2.KubeProxyIPTablesConfiguration", "k8s.io/kube-proxy/config/v1alpha2.KubeProxyIPVSConfiguration", "k8s.io/kube-proxy/config/v1alpha2.KubeProxyLinuxConfiguration", "k8s.io/kube-proxy/config/v1alpha2.KubeProxyNFTablesConfiguration", "k8s.io/kube-proxy/config/v1alpha2.KubeProxyWindowsConfiguration", "k8s.io/kube-proxy/config/v1alpha2.KubeProxyWinkernelConfiguration"},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyConntrackConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyConntrackConfiguration contains conntrack settings for the Kubernetes proxy server.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"maxPerCore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "maxPerCore is the maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore min).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"min": {
+						SchemaProps: spec.SchemaProps{
+							Description: "min is the minimum value of connect-tracking records to allocate, regardless of maxPerCore (set maxPerCore=0 to leave the limit as-is).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"tcpEstablishedTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "tcpEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0 to set.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"tcpCloseWaitTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "tcpCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"tcpBeLiberal": {
+						SchemaProps: spec.SchemaProps{
+							Description: "tcpBeLiberal, if true, kube-proxy will configure conntrack to run in liberal mode for TCP connections and packets with out-of-window sequence numbers won't be marked INVALID.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"udpTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "udpTimeout is how long an idle UDP conntrack entry in UNREPLIED state will remain in the conntrack table (e.g. '30s'). Must be greater than 0 to set.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"udpStreamTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "udpStreamTimeout is how long an idle UDP conntrack entry in ASSURED state will remain in the conntrack table (e.g. '300s'). Must be greater than 0 to set.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+				},
+				Required: []string{"tcpBeLiberal"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyIPTablesConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyIPTablesConfiguration contains iptables-related configuration details for the Kubernetes proxy server.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"masqueradeBit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using the iptables proxy mode. Values must be within the range [0, 31].",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"localhostNodePorts": {
+						SchemaProps: spec.SchemaProps{
+							Description: "localhostNodePorts, if false, tells kube-proxy to disable the legacy behavior of allowing NodePort services to be accessed via localhost. (Applies only to iptables mode and IPv4; localhost NodePorts are never allowed with other proxy modes or with IPv6.)",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyIPVSConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyIPVSConfiguration contains ipvs-related configuration details for the Kubernetes proxy server.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"masqueradeBit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using the ipvs proxy mode. Values must be within the range [0, 31].",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"scheduler": {
+						SchemaProps: spec.SchemaProps{
+							Description: "scheduler is the IPVS scheduler to use",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"excludeCIDRs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "excludeCIDRs is a list of CIDRs which the ipvs proxier should not touch when cleaning up ipvs services.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strictARP": {
+						SchemaProps: spec.SchemaProps{
+							Description: "strictARP configures arp_ignore and arp_announce to avoid answering ARP queries from kube-ipvs0 interface",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"tcpTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "tcpTimeout is the timeout value used for idle IPVS TCP sessions. The default value is 0, which preserves the current timeout value on the system.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"tcpFinTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN. The default value is 0, which preserves the current timeout value on the system.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"udpTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "udpTimeout is the timeout value used for IPVS UDP packets. The default value is 0, which preserves the current timeout value on the system.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+				},
+				Required: []string{"strictARP"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyLinuxConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyLinuxConfiguration contains linux-platform-related configuration details for the Kubernetes proxy server that aren't specific to a particular backend.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"oomScoreAdj": {
+						SchemaProps: spec.SchemaProps{
+							Description: "oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"conntrack": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conntrack contains conntrack-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha2.KubeProxyConntrackConfiguration"),
+						},
+					},
+					"masqueradeAll": {
+						SchemaProps: spec.SchemaProps{
+							Description: "masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs. This may be required with some CNI plugins.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"masqueradeAll"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kube-proxy/config/v1alpha2.KubeProxyConntrackConfiguration"},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyNFTablesConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyNFTablesConfiguration contains nftables-related configuration details for the Kubernetes proxy server.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"masqueradeBit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using the nftables proxy mode. Values must be within the range [0, 31].",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyWindowsConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyWindowsConfiguration contains windows-platform-related configuration details for the Kubernetes proxy server that aren't specific to a particular backend",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"runAsService": {
+						SchemaProps: spec.SchemaProps{
+							Description: "runAsService, if true, enables windows service control manager API integration.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"runAsService"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha2_KubeProxyWinkernelConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyWinkernelConfiguration contains Windows/HNS settings for the Kubernetes proxy server.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"networkName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "networkName is the name of the network kube-proxy will use to create endpoints and policies",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"sourceVip": {
+						SchemaProps: spec.SchemaProps{
+							Description: "sourceVip is the IP address of the source VIP endpoint used for NAT when loadbalancing",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"enableDSR": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enableDSR tells kube-proxy whether HNS policies should be created with DSR",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"rootHnsEndpointName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "rootHnsEndpointName is the name of hnsendpoint that is attached to l2bridge for root network namespace",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"forwardHealthCheckVip": {
+						SchemaProps: spec.SchemaProps{
+							Description: "forwardHealthCheckVip forwards service VIP for health check port on Windows",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"enableDSR", "forwardHealthCheckVip"},
 			},
 		},
 	}

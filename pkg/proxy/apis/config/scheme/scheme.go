@@ -22,6 +22,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha2"
 )
 
 var (
@@ -39,5 +40,6 @@ func init() {
 // AddToScheme adds the types of this group into the given scheme.
 func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1alpha2.AddToScheme(scheme))
 	utilruntime.Must(config.AddToScheme(scheme))
 }

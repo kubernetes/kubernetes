@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -32,14 +33,15 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/ptr"
 )
 
-// TestLoadConfig tests proper operation of loadConfig()
-func TestLoadConfig(t *testing.T) {
+// TestLoadConfigV1Alpha1 tests proper operation of loadConfig()
+func TestLoadConfigV1Alpha1(t *testing.T) {
 
 	yamlTemplate := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: %s
@@ -313,70 +315,271 @@ nodePortAddresses:
 	}
 }
 
-// TestLoadConfigFailures tests failure modes for loadConfig()
-func TestLoadConfigFailures(t *testing.T) {
-	// TODO(phenixblue): Uncomment below template when v1alpha2+ of kube-proxy config is
-	// released with strict decoding. These associated tests will fail with
-	// the lenient codec and only one config API version.
-	/*
-			yamlTemplate := `bindAddress: 0.0.0.0
-		clusterCIDR: "1.2.3.0/24"
-		configSyncPeriod: 15s
-		kind: KubeProxyConfiguration`
-	*/
+// TestLoadConfigV1Alpha2 tests proper operation of loadConfig()
+func TestLoadConfigV1Alpha2(t *testing.T) {
+
+	yamlTemplate := `apiVersion: kubeproxy.config.k8s.io/v1alpha2
+clientConnection:
+  acceptContentTypes: "abc"
+  burst: 100
+  contentType: content-type
+  kubeconfig: "/path/to/kubeconfig"
+  qps: 7
+configSyncPeriod: 15s
+healthzBindAddresses: %s
+healthzBindPort: %d
+hostnameOverride: "foo"
+iptables:
+  masqueradeBit: 12
+  localhostNodePorts: false
+ipvs:
+  excludeCIDRs:
+    - "10.20.30.40/16"
+    - "fd00:1::0/64"
+  masqueradeBit: 15
+nftables:
+  masqueradeBit: 18
+kind: KubeProxyConfiguration
+linux:
+  conntrack:
+    maxPerCore: 2
+    min: 1
+    tcpCloseWaitTimeout: 10s
+    tcpEstablishedTimeout: 20s
+  masqueradeAll: false
+  oomScoreAdj: 17
+metricsBindAddresses: %s
+metricsBindPort: %d
+minSyncPeriod: 10s
+mode: "%s"
+detectLocalMode: "ClusterCIDR"
+detectLocal:
+  bridgeInterface: "cbr0"
+  clusterCIDRs: %s
+  interfaceNamePrefix: "veth"
+nodePortAddresses:
+  - "10.20.30.40/16"
+  - "fd00:1::0/64"
+syncPeriod: 60s
+`
 
 	testCases := []struct {
-		name    string
-		config  string
-		expErr  string
-		checkFn func(err error) bool
+		name                 string
+		mode                 string
+		clusterCIDRs         []string
+		healthzBindAddresses []string
+		healthzBindPort      int32
+		metricsBindAddresses []string
+		metricsBindPort      int32
+		extraConfig          string
 	}{
 		{
-			name:   "Decode error test",
-			config: "Twas bryllyg, and ye slythy toves",
-			expErr: "could not find expected ':'",
+			name:                 "iptables mode, IPv4 family",
+			mode:                 "iptables",
+			clusterCIDRs:         []string{"10.244.0.0/16"},
+			healthzBindAddresses: []string{"192.168.11.0/24"},
+			healthzBindPort:      10256,
+			metricsBindAddresses: []string{"172.16.120.0/24"},
+			metricsBindPort:      10249,
 		},
 		{
-			name:   "Bad config type test",
-			config: "kind: KubeSchedulerConfiguration",
-			expErr: "no kind",
+			name:                 "ipvs mode, IPv6 family",
+			mode:                 "ipvs",
+			clusterCIDRs:         []string{"fd00:1::0/64"},
+			healthzBindAddresses: []string{"fd00:1::5/48"},
+			healthzBindPort:      54321,
+			metricsBindAddresses: []string{"fd00:2::5/48"},
+			metricsBindPort:      98765,
 		},
 		{
-			name:   "Missing quotes around :: bindAddress",
-			config: "bindAddress: ::",
-			expErr: "mapping values are not allowed in this context",
+			name:                 "nftables mode, dual stack",
+			mode:                 "nftables",
+			clusterCIDRs:         []string{"10.244.0.0/16", "fd00:1::0/64"},
+			healthzBindAddresses: []string{"192.168.11.0/24", "fd00:1::5/48"},
+			healthzBindPort:      54321,
+			metricsBindAddresses: []string{"172.16.120.0/24", "fd00:2::5/48"},
+			metricsBindPort:      98765,
 		},
-		// TODO(phenixblue): Uncomment below tests when v1alpha2+ of kube-proxy config is
-		// released with strict decoding. These tests will fail with the
-		// lenient codec and only one config API version.
-		/*
-			{
-				name:    "Duplicate fields",
-				config:  fmt.Sprintf("%s\nbindAddress: 1.2.3.4", yamlTemplate),
-				checkFn: kuberuntime.IsStrictDecodingError,
-			},
-			{
-				name:    "Unknown field",
-				config:  fmt.Sprintf("%s\nfoo: bar", yamlTemplate),
-				checkFn: kuberuntime.IsStrictDecodingError,
-			},
-		*/
+		{
+			name:                 "dual stack unspecified addresses",
+			mode:                 "nftables",
+			clusterCIDRs:         []string{"10.244.0.0/16", "fd00:1::0/64"},
+			healthzBindAddresses: []string{"0.0.0.0/0", "::/0"},
+			healthzBindPort:      54321,
+			metricsBindAddresses: []string{"127.0.0.0/8", "::1/128"},
+			metricsBindPort:      98765,
+		},
 	}
 
-	version := "apiVersion: kubeproxy.config.k8s.io/v1alpha1"
+	for _, tc := range testCases {
+		expected := &kubeproxyconfig.KubeProxyConfiguration{
+			ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+				AcceptContentTypes: "abc",
+				Burst:              100,
+				ContentType:        "content-type",
+				Kubeconfig:         "/path/to/kubeconfig",
+				QPS:                7,
+			},
+
+			MinSyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+			SyncPeriod:       metav1.Duration{Duration: 60 * time.Second},
+			ConfigHardFail:   ptr.To(true),
+			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
+			Linux: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](2),
+					Min:                   ptr.To[int32](1),
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
+				},
+				MasqueradeAll: false,
+				OOMScoreAdj:   ptr.To[int32](17),
+			},
+			FeatureGates:         map[string]bool{},
+			HealthzBindAddresses: tc.healthzBindAddresses,
+			HealthzBindPort:      tc.healthzBindPort,
+			HostnameOverride:     "foo",
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+
+				MasqueradeBit:      ptr.To[int32](12),
+				LocalhostNodePorts: ptr.To(false),
+			},
+			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				MasqueradeBit: ptr.To[int32](15),
+				ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+			},
+			NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
+				MasqueradeBit: ptr.To[int32](18),
+			},
+			MetricsBindAddresses: tc.metricsBindAddresses,
+			MetricsBindPort:      tc.metricsBindPort,
+			Mode:                 kubeproxyconfig.ProxyMode(tc.mode),
+			NodePortAddresses:    []string{"10.20.30.40/16", "fd00:1::0/64"},
+			DetectLocalMode:      kubeproxyconfig.LocalModeClusterCIDR,
+			DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+				BridgeInterface:     "cbr0",
+				ClusterCIDRs:        tc.clusterCIDRs,
+				InterfaceNamePrefix: "veth",
+			},
+			Logging: logsapi.LoggingConfiguration{
+				Format:         "text",
+				FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
+			},
+		}
+
+		options := NewOptions()
+
+		getYamlRepr := func(list []string) string {
+			output := "["
+			for i, item := range list {
+				output += fmt.Sprintf(`"%s"`, item)
+				if i != len(list)-1 {
+					output += ","
+				}
+			}
+			output += "]"
+			return output
+		}
+
+		baseYAML := fmt.Sprintf(
+			yamlTemplate,
+			getYamlRepr(tc.healthzBindAddresses), tc.healthzBindPort,
+			getYamlRepr(tc.metricsBindAddresses), tc.metricsBindPort,
+			tc.mode, getYamlRepr(tc.clusterCIDRs),
+		)
+
+		// Append additional configuration to the base yaml template
+		yaml := fmt.Sprintf("%s\n%s", baseYAML, tc.extraConfig)
+		config, err := options.loadConfig([]byte(yaml))
+		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+		if diff := cmp.Diff(config, expected); diff != "" {
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff)
+		}
+
+	}
+}
+
+// TestLoadConfigFailures tests failure modes for loadConfig()
+func TestLoadConfigFailures(t *testing.T) {
+	yamlTemplate := `apiVersion: kubeproxy.config.k8s.io/%s
+kind: %s
+mode: iptables
+`
+
+	testCases := []struct {
+		name                 string
+		kind                 string
+		extraConfig          string
+		version              string
+		expErr               string
+		expStrictDecodingErr bool
+	}{
+		{
+			name:        "decode error v1alpha1",
+			version:     "v1alpha1",
+			extraConfig: "Twas bryllyg, and ye slythy toves",
+			expErr:      "could not find expected ':'",
+		},
+		{
+			name:        "decode error v1alpha2",
+			version:     "v1alpha2",
+			extraConfig: "lorem ipsum dolor sit amet",
+			expErr:      "could not find expected ':'",
+		},
+		{
+			name:    "bad config type v1alpha1",
+			version: "v1alpha1",
+			kind:    "KubeSchedulerConfiguration",
+			expErr:  "no kind",
+		},
+		{
+			name:    "bad config type v1alpha2",
+			version: "v1alpha2",
+			kind:    "KubeletConfiguration",
+			expErr:  "no kind",
+		},
+		{
+			name:        "missing quotes around :: bindAddress",
+			version:     "v1alpha1",
+			extraConfig: "bindAddress: ::",
+			expErr:      "mapping values are not allowed in this context",
+		},
+		{
+			name:                 "duplicate fields in v1alpha2",
+			version:              "v1alpha2",
+			extraConfig:          "mode: ipvs",
+			expErr:               "key \"mode\" already set in map",
+			expStrictDecodingErr: true,
+		},
+		{
+			name:                 "unknown field in v1alpha2",
+			version:              "v1alpha2",
+			extraConfig:          "foo: bar",
+			expErr:               "unknown field \"foo\"",
+			expStrictDecodingErr: true,
+		},
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			options := NewOptions()
-			config := fmt.Sprintf("%s\n%s", version, tc.config)
-			_, err := options.loadConfig([]byte(config))
 
-			if assert.Error(t, err, tc.name) {
-				if tc.expErr != "" {
-					assert.Contains(t, err.Error(), tc.expErr)
-				}
-				if tc.checkFn != nil {
-					assert.True(t, tc.checkFn(err), tc.name)
-				}
+			kind := "KubeProxyConfiguration"
+			if tc.kind != "" {
+				kind = tc.kind
+			}
+
+			config := fmt.Sprintf(yamlTemplate, tc.version, kind)
+			if tc.extraConfig != "" {
+				config += "\n" + tc.extraConfig
+			}
+
+			_, err := options.loadConfig([]byte(config))
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, tc.expErr)
+
+			if tc.expStrictDecodingErr {
+				assert.True(t, runtime.IsStrictDecodingError(errors.Unwrap(err)))
 			}
 		})
 	}
