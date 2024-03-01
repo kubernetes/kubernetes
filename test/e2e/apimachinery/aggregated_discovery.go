@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -143,7 +143,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		},
 	}
 
-	const aggregatedAccept = "application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
+	const aggregatedAccept = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 
 	/*
 		Release : v1.30
@@ -156,7 +156,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 			framework.Failf("Failed to get raw aggregated discovery document")
 		}
 
-		groupList := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+		groupList := apidiscoveryv2.APIGroupDiscoveryList{}
 		err = json.Unmarshal(d, &groupList)
 		if err != nil {
 			framework.Failf("Failed to parse discovery: %v", err)
@@ -174,7 +174,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 			framework.Failf("Failed to get raw aggregated discovery document")
 		}
 
-		groupListLegacy := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+		groupListLegacy := apidiscoveryv2.APIGroupDiscoveryList{}
 		err = json.Unmarshal(d2, &groupListLegacy)
 		if err != nil {
 			framework.Failf("Failed to parse discovery: %v", err)
@@ -238,7 +238,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 				framework.Failf("Failed to get raw aggregated discovery document")
 			}
 
-			groupList := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+			groupList := apidiscoveryv2.APIGroupDiscoveryList{}
 			err = json.Unmarshal(d, &groupList)
 			if err != nil {
 				framework.Failf("Failed to parse discovery: %v", err)
@@ -392,7 +392,7 @@ func isGVPresent(gvs *metav1.APIGroupList, gv schema.GroupVersion) bool {
 	return false
 }
 
-func isGVRPresentAPIDiscovery(apidiscovery apidiscoveryv2beta1.APIGroupDiscoveryList, gvr schema.GroupVersionResource) bool {
+func isGVRPresentAPIDiscovery(apidiscovery apidiscoveryv2.APIGroupDiscoveryList, gvr schema.GroupVersionResource) bool {
 	for _, group := range apidiscovery.Items {
 		if gvr.Group == group.Name {
 			for _, version := range group.Versions {
