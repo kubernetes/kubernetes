@@ -173,3 +173,17 @@ func TestJSONFrameReaderShortBuffer(t *testing.T) {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
 	}
 }
+
+func TestJSONFrameReaderShortBufferNoUnderlyingArrayReuse(t *testing.T) {
+	b := bytes.NewBufferString("{}")
+	r := NewJSONFramedReader(io.NopCloser(b))
+	buf := make([]byte, 1, 2) // cap(buf) > len(buf) && cap(buf) <= len("{}")
+
+	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 1 || string(buf[:n]) != "{" {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	buf = append(buf, make([]byte, 1)...) // stomps the second byte of the backing array
+	if n, err := r.Read(buf[1:]); err != nil || n != 1 || string(buf[1:1+n]) != "}" {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+}
