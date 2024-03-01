@@ -1977,6 +1977,10 @@ message HostPathVolumeSource {
   // path of the directory on the host.
   // If the path is a symlink, it will follow the link to the real path.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+  // +required
+  // +k8s:validation:minLength=1
+  // +k8s:validation:cel[0]:rule>self.split('/').all(e, e != "..")
+  // +k8s:validation:cel[0]:message>must not contain '..'
   optional string path = 1;
 
   // type for HostPath Volume
@@ -2856,6 +2860,14 @@ message PersistentVolume {
   // Provisioned by an administrator.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes
   // +optional
+  // +k8s:validation:cel[0]:rule>has(self.capacity) && self.capacity.size() > 0
+  // +k8s:validation:cel[0]:reason>FieldValueRequired
+  // +k8s:validation:cel[0]:fieldPath>.capacity
+  // +k8s:validation:cel[0]:message>must specify a capacity
+  // +k8s:validation:cel[1]:rule>has(self.capacity) && has(self.capacity.storage) && self.capacity.size() == 1
+  // +k8s:validation:cel[1]:reason>FieldValueInvalid
+  // +k8s:validation:cel[1]:fieldPath>.capacity
+  // +k8s:validation:cel[1]:message>Supported values: ["storage"]
   optional PersistentVolumeSpec spec = 2;
 
   // status represents the current information/status for the persistent volume.
@@ -3269,6 +3281,35 @@ message PersistentVolumeSource {
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
+//
+// +k8s:validation:cel[0]:rule>    has(self.gcePersistentDisk)
+// +k8s:validation:cel[0]:rule> || has(self.awsElasticBlockStore)
+// +k8s:validation:cel[0]:rule> || has(self.hostPath)
+// +k8s:validation:cel[0]:rule> || has(self.glusterfs)
+// +k8s:validation:cel[0]:rule> || has(self.nfs)
+// +k8s:validation:cel[0]:rule> || has(self.rbd)
+// +k8s:validation:cel[0]:rule> || has(self.iscsi)
+// +k8s:validation:cel[0]:rule> || has(self.cinder)
+// +k8s:validation:cel[0]:rule> || has(self.cephfs)
+// +k8s:validation:cel[0]:rule> || has(self.fc)
+// +k8s:validation:cel[0]:rule> || has(self.flocker)
+// +k8s:validation:cel[0]:rule> || has(self.flexVolume)
+// +k8s:validation:cel[0]:rule> || has(self.azureFile)
+// +k8s:validation:cel[0]:rule> || has(self.vsphereVolume)
+// +k8s:validation:cel[0]:rule> || has(self.quobyte)
+// +k8s:validation:cel[0]:rule> || has(self.azureDisk)
+// +k8s:validation:cel[0]:rule> || has(self.photonPersistentDisk)
+// +k8s:validation:cel[0]:rule> || has(self.portworxVolume)
+// +k8s:validation:cel[0]:rule> || has(self.scaleIO)
+// +k8s:validation:cel[0]:rule> || has(self.local)
+// +k8s:validation:cel[0]:rule> || has(self.storageos)
+// +k8s:validation:cel[0]:rule> || has(self.csi)
+// +k8s:validation:cel[0]:message>must specify a volume type
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:rule>!has(self.hostPath) || self.hostPath.path != "/" || self.persistentVolumeReclaimPolicy != "Recycle"
+// +k8s:validation:cel[1]:fieldPath>.persistentVolumeReclaimPolicy
+// +k8s:validation:cel[1]:message>may not be 'recycle' for a hostPath mount of '/'
+// +k8s:validation:cel[1]:reason>FieldValueForbidden
 message PersistentVolumeSpec {
   // capacity is the description of the persistent volume's resources and capacity.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
@@ -3280,8 +3321,12 @@ message PersistentVolumeSpec {
 
   // accessModes contains all ways the volume can be mounted.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
-  // +optional
+  // +required
   // +listType=atomic
+  // +k8s:validation:minItems=1
+  // +k8s:validation:cel[0]:rule>!self.exists(c, c == "ReadWriteOncePod") || self.size() == 1
+  // +k8s:validation:cel[0]:message>may not use ReadWriteOncePod with other access modes
+  // +k8s:validation:cel[0]:reason>FieldValueForbidden
   repeated string accessModes = 3;
 
   // claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
@@ -6194,6 +6239,7 @@ message VolumeMount {
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 message VolumeNodeAffinity {
   // required specifies hard node constraints that must be met.
+  // +required
   optional NodeSelector required = 1;
 }
 

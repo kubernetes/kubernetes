@@ -31,6 +31,7 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	common "k8s.io/kube-openapi/pkg/common"
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
+	ptr "k8s.io/utils/ptr"
 )
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
@@ -5242,7 +5243,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionCondition(ref com
 						},
 					},
 				},
-				Required: []string{"type", "status", "reason"},
+				Required: []string{"type", "status", "lastTransitionTime", "reason", "message"},
 			},
 		},
 		Dependencies: []string{
@@ -21951,9 +21952,15 @@ func schema_k8sio_api_core_v1_HostPathVolumeSource(ref common.ReferenceCallback)
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"path": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not contain '..'", "rule": "self.split('/').all(e, e != \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -24020,8 +24027,13 @@ func schema_k8sio_api_core_v1_PersistentVolume(ref common.ReferenceCallback) com
 						},
 					},
 					"spec": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must specify a volume type", "reason": "FieldValueRequired", "rule": "has(self.gcePersistentDisk)\n|| has(self.awsElasticBlockStore)\n|| has(self.hostPath)\n|| has(self.glusterfs)\n|| has(self.nfs)\n|| has(self.rbd)\n|| has(self.iscsi)\n|| has(self.cinder)\n|| has(self.cephfs)\n|| has(self.fc)\n|| has(self.flocker)\n|| has(self.flexVolume)\n|| has(self.azureFile)\n|| has(self.vsphereVolume)\n|| has(self.quobyte)\n|| has(self.azureDisk)\n|| has(self.photonPersistentDisk)\n|| has(self.portworxVolume)\n|| has(self.scaleIO)\n|| has(self.local)\n|| has(self.storageos)\n|| has(self.csi)"}, map[string]interface{}{"fieldPath": ".persistentVolumeReclaimPolicy", "message": "may not be 'recycle' for a hostPath mount of '/'", "reason": "FieldValueForbidden", "rule": "!has(self.hostPath) || self.hostPath.path != \"/\" || self.persistentVolumeReclaimPolicy != \"Recycle\""}, map[string]interface{}{"fieldPath": ".capacity", "message": "must specify a capacity", "reason": "FieldValueRequired", "rule": "has(self.capacity) && self.capacity.size() > 0"}, map[string]interface{}{"fieldPath": ".capacity", "message": "Supported values: [\"storage\"]", "reason": "FieldValueInvalid", "rule": "has(self.capacity) && has(self.capacity.storage) && self.capacity.size() == 1"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
-							Description: "spec defines a specification of a persistent volume owned by the cluster. Provisioned by an administrator. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes",
+							Description: "spec defines a specification of a persistent volume owned by the cluster. Provisioned by an administrator. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes\n\nDesired rule to fix issue checking capacity > 0 constraint with proper error message/field paths -k8s:validation:override:capacity:additionalProperties:cel[0]:rule>quantity(self).isGreaterThan(0)",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.PersistentVolumeSpec"),
 						},
@@ -24829,11 +24841,13 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 					"accessModes": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not use ReadWriteOncePod with other access modes", "reason": "FieldValueForbidden", "rule": "!self.exists(c, c == \"ReadWriteOncePod\") || self.size() == 1"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "accessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -24913,6 +24927,12 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+				},
+				Required: []string{"accessModes"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must specify a volume type", "reason": "FieldValueRequired", "rule": "has(self.gcePersistentDisk)\n|| has(self.awsElasticBlockStore)\n|| has(self.hostPath)\n|| has(self.glusterfs)\n|| has(self.nfs)\n|| has(self.rbd)\n|| has(self.iscsi)\n|| has(self.cinder)\n|| has(self.cephfs)\n|| has(self.fc)\n|| has(self.flocker)\n|| has(self.flexVolume)\n|| has(self.azureFile)\n|| has(self.vsphereVolume)\n|| has(self.quobyte)\n|| has(self.azureDisk)\n|| has(self.photonPersistentDisk)\n|| has(self.portworxVolume)\n|| has(self.scaleIO)\n|| has(self.local)\n|| has(self.storageos)\n|| has(self.csi)"}, map[string]interface{}{"fieldPath": ".persistentVolumeReclaimPolicy", "message": "may not be 'recycle' for a hostPath mount of '/'", "reason": "FieldValueForbidden", "rule": "!has(self.hostPath) || self.hostPath.path != \"/\" || self.persistentVolumeReclaimPolicy != \"Recycle\""}},
 				},
 			},
 		},
@@ -30440,6 +30460,7 @@ func schema_k8sio_api_core_v1_VolumeNodeAffinity(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"required"},
 			},
 		},
 		Dependencies: []string{
@@ -39631,6 +39652,7 @@ func schema_k8sio_api_networking_v1alpha1_IPAddressSpec(ref common.ReferenceCall
 						},
 					},
 				},
+				Required: []string{"parentRef"},
 			},
 		},
 		Dependencies: []string{
@@ -39674,6 +39696,7 @@ func schema_k8sio_api_networking_v1alpha1_ParentReference(ref common.ReferenceCa
 						},
 					},
 				},
+				Required: []string{"resource", "name"},
 			},
 		},
 	}

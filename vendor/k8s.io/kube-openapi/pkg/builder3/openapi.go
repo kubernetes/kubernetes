@@ -326,6 +326,9 @@ func BuildOpenAPISpecFromRoutes(webServices []common.RouteContainer, config *com
 	if err != nil {
 		return nil, err
 	}
+	if config.PostProcessSpec != nil {
+		return config.PostProcessSpec(a.spec)
+	}
 	return a.spec, nil
 }
 

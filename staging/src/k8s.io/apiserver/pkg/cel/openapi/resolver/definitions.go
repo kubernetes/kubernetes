@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -54,6 +55,39 @@ func NewDefinitionsSchemaResolver(getDefinitions common.GetOpenAPIDefinitions, s
 		gvkToRef: gvkToRef,
 		defs:     defs,
 	}
+}
+
+func (d *DefinitionsSchemaResolver) LookupSchema(name string) *spec.Schema {
+	s, err := PopulateRefs(func(ref string) (*spec.Schema, bool) {
+		// find the schema by the ref string, and return a deep copy
+		def, ok := d.defs[ref]
+		if !ok {
+			return nil, false
+		}
+
+		s := def.Schema
+
+		//!TODO: Fix codegen to do this
+		//!TODO: I think this bug also affects VAP? int-or-string fields
+		// have no type and are ignored by CEL decltype construction
+		if len(s.Type) == 0 && len(s.OneOf) == 2 && len(s.OneOf[0].Type) > 0 && len(s.OneOf[1].Type) > 0 {
+			oneOfTypes := sets.New[string](s.OneOf[0].Type[0], s.OneOf[1].Type[0])
+			if oneOfTypes.Has("string") && (oneOfTypes.Has("number") || oneOfTypes.Has("integer")) {
+				extCopy := make(spec.Extensions, len(s.Extensions))
+				for k, v := range s.Extensions {
+					extCopy[k] = v
+				}
+				s.Extensions = extCopy
+				s.AddExtension("x-kubernetes-int-or-string", true)
+			}
+		}
+
+		return &s, true
+	}, name)
+	if err != nil {
+		return nil
+	}
+	return s
 }
 
 func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.Schema, error) {

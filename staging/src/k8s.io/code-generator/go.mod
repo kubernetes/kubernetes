@@ -11,7 +11,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
 	k8s.io/klog/v2 v2.120.1
-	k8s.io/kube-openapi v0.0.0-20231113174909-778a5567bc1e
+	k8s.io/kube-openapi v0.0.0-20240214200250-374587b72861
 )
 
 require (
@@ -43,4 +43,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	k8s.io/code-generator => ../code-generator
+	k8s.io/kube-openapi => github.com/alexzielenski/kube-openapi v0.0.0-20240214200250-374587b72861
+)

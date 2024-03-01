@@ -292,6 +292,10 @@ const (
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
+// Desired rule to fix issue checking capacity > 0 constraint with proper
+// error message/field paths
+// -k8s:validation:allOf[0]:properties:capacity:additionalProperties:cel[0]:rule>quantity(self).isGreaterThan(0)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -310,6 +314,15 @@ type PersistentVolume struct {
 	// Provisioned by an administrator.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes
 	// +optional
+	// +k8s:validation:cel[0]:rule>has(self.capacity) && self.capacity.size() > 0
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:cel[0]:fieldPath>.capacity
+	// +k8s:validation:cel[0]:message>must specify a capacity
+	// +k8s:validation:cel[1]:rule>has(self.capacity) && has(self.capacity.storage) && self.capacity.size() == 1
+	// +k8s:validation:cel[1]:reason>FieldValueInvalid
+	// +k8s:validation:cel[1]:fieldPath>.capacity
+	// +k8s:validation:cel[1]:message>Supported values: ["storage"]
+	//
 	Spec PersistentVolumeSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status represents the current information/status for the persistent volume.
@@ -320,7 +333,40 @@ type PersistentVolume struct {
 	Status PersistentVolumeStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// CEL Rules needed to be placed here (rather than directly on PersistentVolumeSource)
+// due to embedded types not sharing their validations with their parent types.
+// (bug in kube-openapi?)
+
 // PersistentVolumeSpec is the specification of a persistent volume.
+//
+// +k8s:validation:cel[0]:rule>    has(self.gcePersistentDisk)
+// +k8s:validation:cel[0]:rule> || has(self.awsElasticBlockStore)
+// +k8s:validation:cel[0]:rule> || has(self.hostPath)
+// +k8s:validation:cel[0]:rule> || has(self.glusterfs)
+// +k8s:validation:cel[0]:rule> || has(self.nfs)
+// +k8s:validation:cel[0]:rule> || has(self.rbd)
+// +k8s:validation:cel[0]:rule> || has(self.iscsi)
+// +k8s:validation:cel[0]:rule> || has(self.cinder)
+// +k8s:validation:cel[0]:rule> || has(self.cephfs)
+// +k8s:validation:cel[0]:rule> || has(self.fc)
+// +k8s:validation:cel[0]:rule> || has(self.flocker)
+// +k8s:validation:cel[0]:rule> || has(self.flexVolume)
+// +k8s:validation:cel[0]:rule> || has(self.azureFile)
+// +k8s:validation:cel[0]:rule> || has(self.vsphereVolume)
+// +k8s:validation:cel[0]:rule> || has(self.quobyte)
+// +k8s:validation:cel[0]:rule> || has(self.azureDisk)
+// +k8s:validation:cel[0]:rule> || has(self.photonPersistentDisk)
+// +k8s:validation:cel[0]:rule> || has(self.portworxVolume)
+// +k8s:validation:cel[0]:rule> || has(self.scaleIO)
+// +k8s:validation:cel[0]:rule> || has(self.local)
+// +k8s:validation:cel[0]:rule> || has(self.storageos)
+// +k8s:validation:cel[0]:rule> || has(self.csi)
+// +k8s:validation:cel[0]:message>must specify a volume type
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:rule>!has(self.hostPath) || self.hostPath.path != "/" || self.persistentVolumeReclaimPolicy != "Recycle"
+// +k8s:validation:cel[1]:fieldPath>.persistentVolumeReclaimPolicy
+// +k8s:validation:cel[1]:message>may not be 'recycle' for a hostPath mount of '/'
+// +k8s:validation:cel[1]:reason>FieldValueForbidden
 type PersistentVolumeSpec struct {
 	// capacity is the description of the persistent volume's resources and capacity.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
@@ -330,8 +376,12 @@ type PersistentVolumeSpec struct {
 	PersistentVolumeSource `json:",inline" protobuf:"bytes,2,opt,name=persistentVolumeSource"`
 	// accessModes contains all ways the volume can be mounted.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
-	// +optional
+	// +required
 	// +listType=atomic
+	// +k8s:validation:minItems=1
+	// +k8s:validation:cel[0]:rule>!self.exists(c, c == "ReadWriteOncePod") || self.size() == 1
+	// +k8s:validation:cel[0]:message>may not use ReadWriteOncePod with other access modes
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,3,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// Expected to be non-nil when bound.
@@ -380,6 +430,7 @@ type PersistentVolumeSpec struct {
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 type VolumeNodeAffinity struct {
 	// required specifies hard node constraints that must be met.
+	// +required
 	Required *NodeSelector `json:"required,omitempty" protobuf:"bytes,1,opt,name=required"`
 }
 
@@ -853,6 +904,10 @@ type HostPathVolumeSource struct {
 	// path of the directory on the host.
 	// If the path is a symlink, it will follow the link to the real path.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+	// +required
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.split('/').all(e, e != "..")
+	// +k8s:validation:cel[0]:message>must not contain '..'
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 	// type for HostPath Volume
 	// Defaults to ""
@@ -3167,12 +3222,23 @@ type NodeSelectorTerm struct {
 	// A list of node selector requirements by node's labels.
 	// +optional
 	// +listType=atomic
-	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
+	MatchExpressions []MatchExpressionsRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
 	// A list of node selector requirements by node's fields.
 	// +optional
 	// +listType=atomic
 	MatchFields []NodeSelectorRequirement `json:"matchFields,omitempty" protobuf:"bytes,2,rep,name=matchFields"`
 }
+
+// +k8s:validation:cel[0]:rule>self.operator == 'In' || self.operator == 'NotIn' ? self.values.length() > 0 : true
+// +k8s:validation:cel[0]:message>values must be non-empty when operator is 'In' or 'NotIn'
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:rule>self.operator == 'Exists' || self.operator == 'DoesNotExist' ? self.values.length() == 0 : true
+// +k8s:validation:cel[1]:message>values must be empty when operator is 'Exists' or 'DoesNotExist'
+// +k8s:validation:cel[1]:reason>FieldValueForbidden
+// +k8s:validation:cel[2]:rule>self.operator == 'Gt' || self.operator == 'Lt' ? self.values.length() == 1 : true
+// +k8s:validation:cel[2]:message>values must have a single element when operator is 'Gt' or 'Lt'
+// +k8s:validation:cel[2]:reason>FieldValueRequired
+type MatchExpressionsRequirement = NodeSelectorRequirement
 
 // A node selector requirement is a selector that contains values, a key, and an operator
 // that relates the key and values.

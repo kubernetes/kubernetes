@@ -163,7 +163,7 @@ func parseUnionStruct(t *types.Type) (*union, []error) {
 		if types.ExtractCommentTags("+", m.CommentLines)[tagUnionDiscriminator] != nil {
 			errors = append(errors, u.setDiscriminator(jsonName)...)
 		} else {
-			if !hasOptionalTag(&m) {
+			if isOptional, _ := hasOptionalTag(&m); !isOptional {
 				errors = append(errors, fmt.Errorf("union members must be optional: %v.%v", t.Name, m.Name))
 			}
 			u.addMember(jsonName, m.Name)
@@ -194,7 +194,7 @@ func parseUnionMembers(t *types.Type) (*union, []error) {
 			continue
 		}
 		if types.ExtractCommentTags("+", m.CommentLines)[tagUnionDeprecated] != nil {
-			if !hasOptionalTag(&m) {
+			if isOptional, _ := hasOptionalTag(&m); !isOptional {
 				errors = append(errors, fmt.Errorf("union members must be optional: %v.%v", t.Name, m.Name))
 			}
 			u.addMember(jsonName, m.Name)
