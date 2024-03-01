@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/cel"
 )
 
 func TestAuthorizerMetrics(t *testing.T) {
@@ -76,11 +77,7 @@ func TestAuthorizerMetrics(t *testing.T) {
 			defer server.Close()
 
 			fakeAuthzMetrics := &fakeAuthorizerMetrics{}
-			authzMetrics := AuthorizerMetrics{
-				RecordRequestTotal:   fakeAuthzMetrics.RequestTotal,
-				RecordRequestLatency: fakeAuthzMetrics.RequestLatency,
-			}
-			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, authzMetrics, []apiserver.WebhookMatchCondition{})
+			wh, err := newV1Authorizer(server.URL, scenario.clientCert, scenario.clientKey, scenario.clientCA, 0, fakeAuthzMetrics, []apiserver.WebhookMatchCondition{}, "")
 			if err != nil {
 				t.Error("failed to create client")
 				return
@@ -110,13 +107,15 @@ type fakeAuthorizerMetrics struct {
 
 	latency     float64
 	latencyCode string
+
+	cel.NoopMatcherMetrics
 }
 
-func (f *fakeAuthorizerMetrics) RequestTotal(_ context.Context, code string) {
+func (f *fakeAuthorizerMetrics) RecordRequestTotal(_ context.Context, code string) {
 	f.totalCode = code
 }
 
-func (f *fakeAuthorizerMetrics) RequestLatency(_ context.Context, code string, latency float64) {
+func (f *fakeAuthorizerMetrics) RecordRequestLatency(_ context.Context, code string, latency float64) {
 	f.latency = latency
 	f.latencyCode = code
 }

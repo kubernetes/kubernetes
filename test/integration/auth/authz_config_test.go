@@ -36,6 +36,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	celmetrics "k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/features"
 	authzmetrics "k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
@@ -275,40 +276,50 @@ users:
 		serverAllowCalled.Store(0)
 		serverAllowReloadedCalled.Store(0)
 		authorizationmetrics.ResetMetricsForTest()
+		celmetrics.ResetMetricsForTest()
 	}
 	var adminClient *clientset.Clientset
-	assertCounts := func(errorCount, timeoutCount, denyCount, noOpinionCount, allowCount, allowReloadedCount int32) {
+	type counts struct {
+		errorCount, timeoutCount, denyCount, noOpinionCount, allowCount, allowReloadedCount, webhookExclusionCount, evalErrorsCount int32
+	}
+	assertCounts := func(c counts) {
 		t.Helper()
 		metrics, err := getMetrics(t, adminClient)
 		if err != nil {
-			t.Errorf("error getting metrics: %v", err)
+			t.Fatalf("error getting metrics: %v", err)
 		}
-		if e, a := errorCount, serverErrorCalled.Load(); e != a {
-			t.Errorf("expected fail webhook calls: %d, got %d", e, a)
+		if e, a := c.errorCount, serverErrorCalled.Load(); e != a {
+			t.Fatalf("expected fail webhook calls: %d, got %d", e, a)
 		}
-		if e, a := timeoutCount, serverTimeoutCalled.Load(); e != a {
-			t.Errorf("expected timeout webhook calls: %d, got %d", e, a)
+		if e, a := c.timeoutCount, serverTimeoutCalled.Load(); e != a {
+			t.Fatalf("expected timeout webhook calls: %d, got %d", e, a)
 		}
-		if e, a := denyCount, serverDenyCalled.Load(); e != a {
-			t.Errorf("expected deny webhook calls: %d, got %d", e, a)
+		if e, a := c.denyCount, serverDenyCalled.Load(); e != a {
+			t.Fatalf("expected deny webhook calls: %d, got %d", e, a)
 		}
-		if e, a := denyCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: denyName}]["denied"]; e != int32(a) {
-			t.Errorf("expected deny webhook denied metrics calls: %d, got %d", e, a)
+		if e, a := c.denyCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: denyName}]["denied"]; e != int32(a) {
+			t.Fatalf("expected deny webhook denied metrics calls: %d, got %d", e, a)
 		}
-		if e, a := noOpinionCount, serverNoOpinionCalled.Load(); e != a {
-			t.Errorf("expected noOpinion webhook calls: %d, got %d", e, a)
+		if e, a := c.noOpinionCount, serverNoOpinionCalled.Load(); e != a {
+			t.Fatalf("expected noOpinion webhook calls: %d, got %d", e, a)
 		}
-		if e, a := allowCount, serverAllowCalled.Load(); e != a {
-			t.Errorf("expected allow webhook calls: %d, got %d", e, a)
+		if e, a := c.allowCount, serverAllowCalled.Load(); e != a {
+			t.Fatalf("expected allow webhook calls: %d, got %d", e, a)
 		}
-		if e, a := allowCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowName}]["allowed"]; e != int32(a) {
-			t.Errorf("expected allow webhook allowed metrics calls: %d, got %d", e, a)
+		if e, a := c.allowCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowName}]["allowed"]; e != int32(a) {
+			t.Fatalf("expected allow webhook allowed metrics calls: %d, got %d", e, a)
 		}
-		if e, a := allowReloadedCount, serverAllowReloadedCalled.Load(); e != a {
-			t.Errorf("expected allowReloaded webhook calls: %d, got %d", e, a)
+		if e, a := c.allowReloadedCount, serverAllowReloadedCalled.Load(); e != a {
+			t.Fatalf("expected allowReloaded webhook calls: %d, got %d", e, a)
 		}
-		if e, a := allowReloadedCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowReloadedName}]["allowed"]; e != int32(a) {
-			t.Errorf("expected allowReloaded webhook allowed metrics calls: %d, got %d", e, a)
+		if e, a := c.allowReloadedCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowReloadedName}]["allowed"]; e != int32(a) {
+			t.Fatalf("expected allowReloaded webhook allowed metrics calls: %d, got %d", e, a)
+		}
+		if e, a := c.webhookExclusionCount, metrics.exclusions; e != int32(a) {
+			t.Fatalf("expected webhook exclusions due to match conditions: %d, got %d", e, a)
+		}
+		if e, a := c.evalErrorsCount, metrics.evalErrors; e != int32(a) {
+			t.Fatalf("expected webhook match condition eval errors: %d, got %d", e, a)
 		}
 		resetCounts()
 	}
@@ -348,7 +359,8 @@ authorizers:
       type: KubeConfigFile
       kubeConfigFile: `+serverTimeoutKubeconfigName+`
     matchConditions:
-    - expression: has(request.resourceAttributes)
+    # intentionally skip this check so we can trigger an eval error with a non-resource request
+    # - expression: has(request.resourceAttributes)
     - expression: 'request.resourceAttributes.namespace == "fail"'
     - expression: 'request.resourceAttributes.name == "timeout"'
 
@@ -423,7 +435,7 @@ authorizers:
 		t.Fatal("expected denied, got allowed")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(1, 0, 0, 0, 0, 0)
+		assertCounts(counts{errorCount: 1})
 	}
 
 	// timeout webhook short circuits
@@ -444,7 +456,7 @@ authorizers:
 		t.Fatal("expected denied, got allowed")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(0, 1, 0, 0, 0, 0)
+		assertCounts(counts{timeoutCount: 1, webhookExclusionCount: 1})
 	}
 
 	// deny webhook short circuits
@@ -465,7 +477,7 @@ authorizers:
 		t.Fatal("expected denied, got allowed")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(0, 0, 1, 0, 0, 0)
+		assertCounts(counts{denyCount: 1, webhookExclusionCount: 2})
 	}
 
 	// no-opinion webhook passes through, allow webhook allows
@@ -486,7 +498,26 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(0, 0, 0, 1, 1, 0)
+		assertCounts(counts{noOpinionCount: 1, allowCount: 1, webhookExclusionCount: 3})
+	}
+
+	// the timeout webhook results in match condition eval errors when evaluating a non-resource request
+	// failure policy is deny
+	t.Log("checking match condition eval error")
+	if result, err := adminClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), &authorizationv1.SubjectAccessReview{Spec: authorizationv1.SubjectAccessReviewSpec{
+		User: "alice",
+		NonResourceAttributes: &authorizationv1.NonResourceAttributes{
+			Verb: "list",
+		},
+	}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	} else if result.Status.Allowed {
+		t.Fatal("expected denied, got allowed")
+	} else {
+		t.Log(result.Status.Reason)
+		// error webhook matchConditions skip non-resource request
+		// timeout webhook matchConditions error on non-resource request
+		assertCounts(counts{webhookExclusionCount: 1, evalErrorsCount: 1})
 	}
 
 	// check last loaded success/failure metric timestamps, ensure success is present, failure is not
@@ -550,7 +581,7 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(0, 0, 0, 1, 1, 0)
+		assertCounts(counts{noOpinionCount: 1, allowCount: 1, webhookExclusionCount: 3})
 	}
 
 	// write good config with different webhook
@@ -621,7 +652,7 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(0, 0, 0, 0, 0, 1)
+		assertCounts(counts{allowReloadedCount: 1})
 	}
 
 	// delete file (do this test last because it makes file watch fall back to one minute poll interval)
@@ -677,7 +708,7 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(0, 0, 0, 0, 0, 1)
+		assertCounts(counts{allowReloadedCount: 1})
 	}
 }
 
@@ -685,6 +716,8 @@ type metrics struct {
 	reloadSuccess *time.Time
 	reloadFailure *time.Time
 	decisions     map[authorizerKey]map[string]int
+	exclusions    int
+	evalErrors    int
 }
 type authorizerKey struct {
 	authorizerType string
@@ -692,6 +725,8 @@ type authorizerKey struct {
 }
 
 var decisionMetric = regexp.MustCompile(`apiserver_authorization_decisions_total\{decision="(.*?)",name="(.*?)",type="(.*?)"\} (\d+)`)
+var webhookExclusionMetric = regexp.MustCompile(`apiserver_authorization_match_condition_exclusions_total\{name="(.*?)",type="(.*?)"\} (\d+)`)
+var webhookMatchConditionEvalErrorMetric = regexp.MustCompile(`apiserver_authorization_match_condition_evaluation_errors_total\{name="(.*?)",type="(.*?)"\} (\d+)`)
 
 func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 	data, err := client.RESTClient().Get().AbsPath("/metrics").DoRaw(context.TODO())
@@ -703,11 +738,13 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 	//  apiserver_authorization_decisions_total{decision="denied",name="deny.example.com",type="Webhook"} 1
 	//  apiserver_authorization_decisions_total{decision="denied",name="error.example.com",type="Webhook"} 1
 	//  apiserver_authorization_decisions_total{decision="denied",name="timeout.example.com",type="Webhook"} 1
+	//  apiserver_authorization_match_condition_exclusions_total{name="exclusion.example.com",type="webhook"} 1
 	if err != nil {
 		return nil, err
 	}
 
 	var m metrics
+	m.exclusions = 0
 	for _, line := range strings.Split(string(data), "\n") {
 		if matches := decisionMetric.FindStringSubmatch(line); matches != nil {
 			t.Log(line)
@@ -724,6 +761,24 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 			}
 			m.decisions[key][matches[1]] = count
 
+		}
+		if matches := webhookExclusionMetric.FindStringSubmatch(line); matches != nil {
+			t.Log(matches)
+			count, err := strconv.Atoi(matches[3])
+			if err != nil {
+				return nil, err
+			}
+			t.Log(count)
+			m.exclusions += count
+		}
+		if matches := webhookMatchConditionEvalErrorMetric.FindStringSubmatch(line); matches != nil {
+			t.Log(matches)
+			count, err := strconv.Atoi(matches[3])
+			if err != nil {
+				return nil, err
+			}
+			t.Log(count)
+			m.evalErrors += count
 		}
 		if strings.HasPrefix(line, "apiserver_authorization_config_controller_automatic_reload_last_timestamp_seconds") {
 			t.Log(line)
