@@ -39,10 +39,6 @@ import (
 // length for the user namespace to create (65536).
 const userNsLength = (1 << 16)
 
-// Limit the total number of pods using userns in this node to this value.
-// This is an alpha limitation that will probably be lifted later.
-const maxPods = 1024
-
 // Create a new map when we removed enough pods to avoid memory leaks
 // since Go maps never free memory.
 const mapReInitializeThreshold = 1000
@@ -52,6 +48,7 @@ type userNsPodsManager interface {
 	GetPodDir(podUID types.UID) string
 	ListPodsFromDisk() ([]types.UID, error)
 	GetKubeletMappings() (uint32, uint32, error)
+	GetMaxPods() int
 }
 
 type UsernsManager struct {
@@ -148,8 +145,8 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	if kubeletMappingLen%userNsLength != 0 {
 		return nil, fmt.Errorf("kubelet user assigned IDs length %v is not a multiple of %v", kubeletMappingLen, userNsLength)
 	}
-	if kubeletMappingLen/userNsLength < maxPods {
-		return nil, fmt.Errorf("kubelet user assigned IDs are not enough to support %v pods", maxPods)
+	if kubeletMappingLen/userNsLength < uint32(kl.GetMaxPods()) {
+		return nil, fmt.Errorf("kubelet user assigned IDs are not enough to support %v pods", kl.GetMaxPods())
 	}
 	off := int(kubeletMappingID / userNsLength)
 	len := int(kubeletMappingLen / userNsLength)

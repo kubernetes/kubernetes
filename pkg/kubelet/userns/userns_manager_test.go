@@ -38,13 +38,15 @@ const (
 	// skip the first block
 	minimumMappingUID = userNsLength
 	// allocate enough space for 2000 user namespaces
-	mappingLen = userNsLength * 2000
+	mappingLen  = userNsLength * 2000
+	testMaxPods = 110
 )
 
 type testUserNsPodsManager struct {
 	podDir  string
 	podList []types.UID
 	userns  bool
+	maxPods int
 }
 
 func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
@@ -70,6 +72,14 @@ func (m *testUserNsPodsManager) HandlerSupportsUserNamespaces(runtimeHandler str
 
 func (m *testUserNsPodsManager) GetKubeletMappings() (uint32, uint32, error) {
 	return minimumMappingUID, mappingLen, nil
+}
+
+func (m *testUserNsPodsManager) GetMaxPods() int {
+	if m.maxPods != 0 {
+		return m.maxPods
+	}
+
+	return testMaxPods
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
