@@ -268,11 +268,15 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SeccompDefault = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-storage
+	// This feature marks tests that need all schedulable Linux nodes in the cluster to have SELinux enabled.
 	SELinux = framework.WithFeature(framework.ValidFeatures.Add("SELinux"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	SELinuxMountReadWriteOncePod = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePod"))
+	// Owner: sig-storage
+	// This feature marks tests that need SELinuxMountReadWriteOncePod feature gate enabled and SELinuxMount **disabled**.
+	// This is a temporary feature to allow testing of metrics when SELinuxMount is disabled.
+	// TODO: remove when SELinuxMount feature gate is enabled by default.
+	SELinuxMountReadWriteOncePodOnly = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePodOnly"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ServiceCIDRs = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
