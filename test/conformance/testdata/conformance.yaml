@@ -60,6 +60,28 @@
     and attempt to create an object; the webhook MUST deny the create.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, create and update mutating webhook configuration
+    with matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    be able to create and update mutating webhook configurations with match conditions
+    [Conformance]'
+  description: Register a mutating webhook configuration. Verify that the match conditions
+    field are properly stored in the api-server.  Update the mutating webhook configuration
+    and retrieve it; the retrieved object must contain the newly update matchConditions
+    fields.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
+- testname: Validating Admission webhook, create and update validating webhook configuration
+    with matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    be able to create and update validating webhook configurations with match conditions
+    [Conformance]'
+  description: Register a validating webhook configuration. Verify that the match
+    conditions field are properly stored in the api-server.  Update the validating
+    webhook configuration and retrieve it; the retrieved object must contain the newly
+    update matchConditions fields.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny attach
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     be able to deny attaching pod [Conformance]'
@@ -150,6 +172,16 @@
     present.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, mutating webhook excluding object with specific
+    name
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    mutate everything except ''skip-me'' configmaps [Conformance]'
+  description: Create a mutating webhook configuration with matchConditions field
+    that will reject all resources except ones with a specific name 'skip-me'. Create
+    a configMap with the name 'skip-me' and verify that it's mutated. Create a configMap
+    with a different name than 'skip-me' and verify that it's mustated.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutation with defaulting
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     mutate pod and apply defaults after mutation [Conformance]'
@@ -166,6 +198,24 @@
     objects. Attempt to create and delete a webhook configuration object; both operations
     MUST be allowed and the webhook configuration object MUST NOT be mutated the webhooks.
   release: v1.16
+  file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, reject mutating webhook configurations with
+    invalid matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    reject mutating webhook configurations with invalid match conditions [Conformance]'
+  description: Creates a mutating webhook configuration with an invalid CEL expression
+    in it's matchConditions field. The api-server server should reject the create
+    request with a "compilation failed" error message.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
+- testname: Validing Admission webhook, reject validating webhook configurations with
+    invalid matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    reject validating webhook configurations with invalid match conditions [Conformance]'
+  description: Creates a validating webhook configuration with an invalid CEL expression
+    in it's matchConditions field. The api-server server should reject the create
+    request with a "compilation failed" error message.
+  release: v1.28
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, fail closed
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
