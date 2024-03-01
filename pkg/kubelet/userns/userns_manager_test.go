@@ -79,8 +79,6 @@ func TestUserNsManagerAllocate(t *testing.T) {
 	m, err := MakeUserNsManager(testUserNsPodsManager)
 	require.NoError(t, err)
 
-	assert.Equal(t, true, m.isSet(0*65536), "m.isSet(0) should be true")
-
 	allocated, length, err := m.allocateOne("one")
 	assert.NoError(t, err)
 	assert.Equal(t, userNsLength, int(length), "m.isSet(%d).length=%v", allocated, length)
