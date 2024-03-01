@@ -47,13 +47,6 @@ const (
 	// `alpha.kubernetes.io/provided-node-ip` annotation
 	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
 
-	// owner: @aojea
-	// Deprecated: v1.30
-	// issue: https://issues.k8s.io/123024
-	//
-	// If enabled, the ProviderID field is not required for the node initialization.
-	OptionalProviderID featuregate.Feature = "OptionalProviderID"
-
 	// owner: @alexanderConstantinescu
 	// kep: http://kep.k8s.io/3458
 	// beta: v1.27
@@ -73,6 +66,5 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 	CloudDualStackNodeIPs:         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-	OptionalProviderID:            {Default: false, PreRelease: featuregate.Deprecated},             // remove after 1.31
 	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30, remove in 1.31
 }
