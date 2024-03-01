@@ -19998,7 +19998,7 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref common.ReferenceCallback
 					},
 					"fieldRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
+							Description: "Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.",
 							Ref:         ref("k8s.io/api/core/v1.ObjectFieldSelector"),
 						},
 					},

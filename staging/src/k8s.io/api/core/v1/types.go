@@ -7093,7 +7093,7 @@ const (
 type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
-	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	// Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
 	// +optional
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,2,opt,name=fieldRef"`
 	// Selects a resource of the container: only resources limits and requests
