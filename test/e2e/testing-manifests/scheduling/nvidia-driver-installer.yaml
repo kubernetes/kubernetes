@@ -30,6 +30,8 @@ spec:
             - matchExpressions:
               - key: cloud.google.com/gke-accelerator
                 operator: Exists
+              - key: cloud.google.com/gke-gpu-driver-version
+                operator: DoesNotExist
       tolerations:
       - operator: "Exists"
       hostNetwork: true
@@ -47,30 +49,40 @@ spec:
       - name: root-mount
         hostPath:
           path: /
+      - name: cos-tools
+        hostPath:
+          path: /var/lib/cos-tools
+      - name: nvidia-config
+        hostPath:
+          path: /etc/nvidia
       initContainers:
         # The COS GPU installer image version may be dependent on the version of COS being used.
         # Refer to details about the installer in https://cos.googlesource.com/cos/tools/+/refs/heads/master/src/cmd/cos_gpu_installer/
         # and the COS release notes (https://cloud.google.com/container-optimized-os/docs/release-notes) to determine version COS GPU installer for a given version of COS.
 
-        # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.1.9 - suitable for COS M109 as per https://cloud.google.com/container-optimized-os/docs/release-notes
-      - image: gcr.io/cos-cloud/cos-gpu-installer:v2.1.9
+        # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.2.0 - suitable for COS M109 as per https://cloud.google.com/container-optimized-os/docs/release-notes
+      - image: gcr.io/cos-cloud/cos-gpu-installer:v2.2.0
         name: nvidia-driver-installer
         resources:
           requests:
-            cpu: 0.15
+            cpu: 150m
         securityContext:
           privileged: true
         env:
-          - name: NVIDIA_INSTALL_DIR_HOST
-            value: /home/kubernetes/bin/nvidia
-          - name: NVIDIA_INSTALL_DIR_CONTAINER
-            value: /usr/local/nvidia
-          - name: VULKAN_ICD_DIR_HOST
-            value: /home/kubernetes/bin/nvidia/vulkan/icd.d
-          - name: VULKAN_ICD_DIR_CONTAINER
-            value: /etc/vulkan/icd.d
-          - name: ROOT_MOUNT_DIR
-            value: /root
+        - name: NVIDIA_INSTALL_DIR_HOST
+          value: /home/kubernetes/bin/nvidia
+        - name: NVIDIA_INSTALL_DIR_CONTAINER
+          value: /usr/local/nvidia
+        - name: VULKAN_ICD_DIR_HOST
+          value: /home/kubernetes/bin/nvidia/vulkan/icd.d
+        - name: VULKAN_ICD_DIR_CONTAINER
+          value: /etc/vulkan/icd.d
+        - name: ROOT_MOUNT_DIR
+          value: /root
+        - name: COS_TOOLS_DIR_HOST
+          value: /var/lib/cos-tools
+        - name: COS_TOOLS_DIR_CONTAINER
+          value: /build/cos-tools
         volumeMounts:
         - name: nvidia-install-dir-host
           mountPath: /usr/local/nvidia
@@ -80,7 +92,38 @@ spec:
           mountPath: /dev
         - name: root-mount
           mountPath: /root
+        - name: cos-tools
+          mountPath: /build/cos-tools
+        command:
+        - bash
+        - -c
+        - | 
+          echo "Checking for existing GPU driver modules"
+          if lsmod | grep nvidia; then
+            echo "GPU driver is already installed, the installed version may or may not be the driver version being tried to install, skipping installation"
+            exit 0
+          else
+            echo "No GPU driver module detected, installing now"
+            /cos-gpu-installer install --no-verify --version=latest
+            chmod 755 /root/home/kubernetes/bin/nvidia
+          fi
+      - image: "gcr.io/gke-release/nvidia-partition-gpu@sha256:e226275da6c45816959fe43cde907ee9a85c6a2aa8a429418a4cadef8ecdb86a"
+        name: partition-gpus
+        env:
+          - name: LD_LIBRARY_PATH
+            value: /usr/local/nvidia/lib64
+        resources:
+          requests:
+            cpu: 150m
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: nvidia-install-dir-host
+          mountPath: /usr/local/nvidia
+        - name: dev
+          mountPath: /dev
+        - name: nvidia-config
+          mountPath: /etc/nvidia
       containers:
       - image: "registry.k8s.io/pause:3.9"
         name: pause
-
