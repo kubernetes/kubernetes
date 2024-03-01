@@ -3,11 +3,11 @@
 // license that can be found in the LICENSE file.
 
 // Package protodesc provides functionality for converting
-// FileDescriptorProto messages to/from protoreflect.FileDescriptor values.
+// FileDescriptorProto messages to/from [protoreflect.FileDescriptor] values.
 //
 // The google.protobuf.FileDescriptorProto is a protobuf message that describes
 // the type information for a .proto file in a form that is easily serializable.
-// The protoreflect.FileDescriptor is a more structured representation of
+// The [protoreflect.FileDescriptor] is a more structured representation of
 // the FileDescriptorProto message where references and remote dependencies
 // can be directly followed.
 package protodesc
@@ -24,11 +24,11 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// Resolver is the resolver used by NewFile to resolve dependencies.
+// Resolver is the resolver used by [NewFile] to resolve dependencies.
 // The enums and messages provided must belong to some parent file,
 // which is also registered.
 //
-// It is implemented by protoregistry.Files.
+// It is implemented by [protoregistry.Files].
 type Resolver interface {
 	FindFileByPath(string) (protoreflect.FileDescriptor, error)
 	FindDescriptorByName(protoreflect.FullName) (protoreflect.Descriptor, error)
@@ -61,19 +61,19 @@ type FileOptions struct {
 	AllowUnresolvable bool
 }
 
-// NewFile creates a new protoreflect.FileDescriptor from the provided
-// file descriptor message. See FileOptions.New for more information.
+// NewFile creates a new [protoreflect.FileDescriptor] from the provided
+// file descriptor message. See [FileOptions.New] for more information.
 func NewFile(fd *descriptorpb.FileDescriptorProto, r Resolver) (protoreflect.FileDescriptor, error) {
 	return FileOptions{}.New(fd, r)
 }
 
-// NewFiles creates a new protoregistry.Files from the provided
-// FileDescriptorSet message. See FileOptions.NewFiles for more information.
+// NewFiles creates a new [protoregistry.Files] from the provided
+// FileDescriptorSet message. See [FileOptions.NewFiles] for more information.
 func NewFiles(fd *descriptorpb.FileDescriptorSet) (*protoregistry.Files, error) {
 	return FileOptions{}.NewFiles(fd)
 }
 
-// New creates a new protoreflect.FileDescriptor from the provided
+// New creates a new [protoreflect.FileDescriptor] from the provided
 // file descriptor message. The file must represent a valid proto file according
 // to protobuf semantics. The returned descriptor is a deep copy of the input.
 //
@@ -93,8 +93,14 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 		f.L1.Syntax = protoreflect.Proto2
 	case "proto3":
 		f.L1.Syntax = protoreflect.Proto3
+	case "editions":
+		f.L1.Syntax = protoreflect.Editions
+		f.L1.Edition = fromEditionProto(fd.GetEdition())
 	default:
 		return nil, errors.New("invalid syntax: %q", fd.GetSyntax())
+	}
+	if f.L1.Syntax == protoreflect.Editions && (fd.GetEdition() < SupportedEditionsMinimum || fd.GetEdition() > SupportedEditionsMaximum) {
+		return nil, errors.New("use of edition %v not yet supported by the Go Protobuf runtime", fd.GetEdition())
 	}
 	f.L1.Path = fd.GetName()
 	if f.L1.Path == "" {
@@ -107,6 +113,9 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 	if opts := fd.GetOptions(); opts != nil {
 		opts = proto.Clone(opts).(*descriptorpb.FileOptions)
 		f.L2.Options = func() protoreflect.ProtoMessage { return opts }
+	}
+	if f.L1.Syntax == protoreflect.Editions {
+		initFileDescFromFeatureSet(f, fd.GetOptions().GetFeatures())
 	}
 
 	f.L2.Imports = make(filedesc.FileImports, len(fd.GetDependency()))
@@ -231,7 +240,7 @@ func (is importSet) importPublic(imps protoreflect.FileImports) {
 	}
 }
 
-// NewFiles creates a new protoregistry.Files from the provided
+// NewFiles creates a new [protoregistry.Files] from the provided
 // FileDescriptorSet message. The descriptor set must include only
 // valid files according to protobuf semantics. The returned descriptors
 // are a deep copy of the input.

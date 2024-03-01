@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-// Unmarshal reads the given []byte into the given proto.Message.
+// Unmarshal reads the given []byte into the given [proto.Message].
 // The provided message must be mutable (e.g., a non-nil pointer to a message).
 func Unmarshal(b []byte, m proto.Message) error {
 	return UnmarshalOptions{}.Unmarshal(b, m)
@@ -51,7 +51,7 @@ type UnmarshalOptions struct {
 	}
 }
 
-// Unmarshal reads the given []byte and populates the given proto.Message
+// Unmarshal reads the given []byte and populates the given [proto.Message]
 // using options in the UnmarshalOptions object.
 // The provided message must be mutable (e.g., a non-nil pointer to a message).
 func (o UnmarshalOptions) Unmarshal(b []byte, m proto.Message) error {
@@ -739,7 +739,9 @@ func (d decoder) skipValue() error {
 			case text.ListClose:
 				return nil
 			case text.MessageOpen:
-				return d.skipMessageValue()
+				if err := d.skipMessageValue(); err != nil {
+					return err
+				}
 			default:
 				// Skip items. This will not validate whether skipped values are
 				// of the same type or not, same behavior as C++

@@ -15,6 +15,7 @@ package procfs
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -35,6 +36,12 @@ type Proc struct {
 // Procs represents a list of Proc structs.
 type Procs []Proc
 
+var (
+	ErrFileParse  = errors.New("Error Parsing File")
+	ErrFileRead   = errors.New("Error Reading File")
+	ErrMountPoint = errors.New("Error Accessing Mount point")
+)
+
 func (p Procs) Len() int           { return len(p) }
 func (p Procs) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p Procs) Less(i, j int) bool { return p[i].PID < p[j].PID }
@@ -42,7 +49,7 @@ func (p Procs) Less(i, j int) bool { return p[i].PID < p[j].PID }
 // Self returns a process for the current process read via /proc/self.
 func Self() (Proc, error) {
 	fs, err := NewFS(DefaultMountPoint)
-	if err != nil {
+	if err != nil || errors.Unwrap(err) == ErrMountPoint {
 		return Proc{}, err
 	}
 	return fs.Self()
@@ -104,7 +111,7 @@ func (fs FS) AllProcs() (Procs, error) {
 
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return Procs{}, fmt.Errorf("could not read %q: %w", d.Name(), err)
+		return Procs{}, fmt.Errorf("%s: Cannot read file: %v: %w", ErrFileRead, names, err)
 	}
 
 	p := Procs{}
@@ -205,7 +212,7 @@ func (p Proc) FileDescriptors() ([]uintptr, error) {
 	for i, n := range names {
 		fd, err := strconv.ParseInt(n, 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse fd %q: %w", n, err)
+			return nil, fmt.Errorf("%s: Cannot parse line: %v: %w", ErrFileParse, i, err)
 		}
 		fds[i] = uintptr(fd)
 	}
@@ -237,7 +244,7 @@ func (p Proc) FileDescriptorTargets() ([]string, error) {
 // a process.
 func (p Proc) FileDescriptorsLen() (int, error) {
 	// Use fast path if available (Linux v6.2): https://github.com/torvalds/linux/commit/f1f1f2569901
-	if p.fs.real {
+	if p.fs.isReal {
 		stat, err := os.Stat(p.path("fd"))
 		if err != nil {
 			return 0, err
@@ -290,7 +297,7 @@ func (p Proc) fileDescriptors() ([]string, error) {
 
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return nil, fmt.Errorf("could not read %q: %w", d.Name(), err)
+		return nil, fmt.Errorf("%s: Cannot read file: %v: %w", ErrFileRead, names, err)
 	}
 
 	return names, nil

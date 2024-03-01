@@ -22,7 +22,7 @@ import "github.com/prometheus/client_golang/prometheus"
 // Prometheus metrics. Note that the data models of expvar and Prometheus are
 // fundamentally different, and that the expvar Collector is inherently slower
 // than native Prometheus metrics. Thus, the expvar Collector is probably great
-// for experiments and prototying, but you should seriously consider a more
+// for experiments and prototyping, but you should seriously consider a more
 // direct implementation of Prometheus metrics for monitoring production
 // systems.
 //

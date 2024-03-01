@@ -21,14 +21,12 @@ import (
 	"strings"
 )
 
-var (
-	// ZeroSample is the pseudo zero-value of Sample used to signal a
-	// non-existing sample. It is a Sample with timestamp Earliest, value 0.0,
-	// and metric nil. Note that the natural zero value of Sample has a timestamp
-	// of 0, which is possible to appear in a real Sample and thus not suitable
-	// to signal a non-existing Sample.
-	ZeroSample = Sample{Timestamp: Earliest}
-)
+// ZeroSample is the pseudo zero-value of Sample used to signal a
+// non-existing sample. It is a Sample with timestamp Earliest, value 0.0,
+// and metric nil. Note that the natural zero value of Sample has a timestamp
+// of 0, which is possible to appear in a real Sample and thus not suitable
+// to signal a non-existing Sample.
+var ZeroSample = Sample{Timestamp: Earliest}
 
 // Sample is a sample pair associated with a metric. A single sample must either
 // define Value or Histogram but not both. Histogram == nil implies the Value
@@ -274,7 +272,7 @@ func (s *Scalar) UnmarshalJSON(b []byte) error {
 
 	value, err := strconv.ParseFloat(f, 64)
 	if err != nil {
-		return fmt.Errorf("error parsing sample value: %s", err)
+		return fmt.Errorf("error parsing sample value: %w", err)
 	}
 	s.Value = SampleValue(value)
 	return nil

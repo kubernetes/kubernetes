@@ -68,7 +68,7 @@ func parseV21SlabEntry(line string) (*Slab, error) {
 	l := slabSpace.ReplaceAllString(line, " ")
 	s := strings.Split(l, " ")
 	if len(s) != 16 {
-		return nil, fmt.Errorf("unable to parse: %q", line)
+		return nil, fmt.Errorf("%w: unable to parse: %q", ErrFileParse, line)
 	}
 	var err error
 	i := &Slab{Name: s[0]}

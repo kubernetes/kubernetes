@@ -62,7 +62,7 @@ type GaugeVecOpts struct {
 	GaugeOpts
 
 	// VariableLabels are used to partition the metric vector by the given set
-	// of labels. Each label value will be constrained with the optional Contraint
+	// of labels. Each label value will be constrained with the optional Constraint
 	// function, if provided.
 	VariableLabels ConstrainableLabels
 }
@@ -135,7 +135,7 @@ func (g *gauge) Sub(val float64) {
 
 func (g *gauge) Write(out *dto.Metric) error {
 	val := math.Float64frombits(atomic.LoadUint64(&g.valBits))
-	return populateMetric(GaugeValue, val, g.labelPairs, nil, out)
+	return populateMetric(GaugeValue, val, g.labelPairs, nil, out, nil)
 }
 
 // GaugeVec is a Collector that bundles a set of Gauges that all share the same
@@ -166,8 +166,8 @@ func (v2) NewGaugeVec(opts GaugeVecOpts) *GaugeVec {
 	)
 	return &GaugeVec{
 		MetricVec: NewMetricVec(desc, func(lvs ...string) Metric {
-			if len(lvs) != len(desc.variableLabels) {
-				panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels.labelNames(), lvs))
+			if len(lvs) != len(desc.variableLabels.names) {
+				panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels.names, lvs))
 			}
 			result := &gauge{desc: desc, labelPairs: MakeLabelPairs(desc, lvs)}
 			result.init(result) // Init self-collection.

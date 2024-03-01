@@ -103,7 +103,7 @@ func (p Proc) Limits() (ProcLimits, error) {
 		//fields := limitsMatch.Split(s.Text(), limitsFields)
 		fields := limitsMatch.FindStringSubmatch(s.Text())
 		if len(fields) != limitsFields {
-			return ProcLimits{}, fmt.Errorf("couldn't parse %q line %q", f.Name(), s.Text())
+			return ProcLimits{}, fmt.Errorf("%w: couldn't parse %q line %q", ErrFileParse, f.Name(), s.Text())
 		}
 
 		switch fields[1] {
@@ -154,7 +154,7 @@ func parseUint(s string) (uint64, error) {
 	}
 	i, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("couldn't parse value %q: %w", s, err)
+		return 0, fmt.Errorf("%s: couldn't parse value %q: %w", ErrFileParse, s, err)
 	}
 	return i, nil
 }
