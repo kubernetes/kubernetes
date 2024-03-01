@@ -24,8 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 // This test proves that the kube fake client does not return GVKs.  This is consistent with actual client (see tests below)
@@ -89,5 +91,25 @@ func TestListDecoding(t *testing.T) {
 
 	if obj.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
 		t.Fatal(obj.GetObjectKind().GroupVersionKind())
+	}
+}
+
+func Test_ConfigMapNewSimpleClientsetWithObjectTrackerOption(t *testing.T) {
+	fakeKubeClient := fake.NewSimpleClientsetWithObjectTrackerOption(clientgotesting.WithFakeWatchers(watch.NewFakeWithChanSize(1000, false)),
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "foo-name"}})
+
+	cm, err := fakeKubeClient.CoreV1().ConfigMaps("foo-ns").Get(context.TODO(), "foo-name", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cm.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
+		t.Fatal(cm.GetObjectKind().GroupVersionKind())
+	}
+	cmList, err := fakeKubeClient.CoreV1().ConfigMaps("foo-ns").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cmList.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
+		t.Fatal(cmList.GetObjectKind().GroupVersionKind())
 	}
 }

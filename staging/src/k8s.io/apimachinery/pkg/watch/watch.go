@@ -37,6 +37,20 @@ type Interface interface {
 	ResultChan() <-chan Event
 }
 
+// Watcher lets you test anything that consumes a watch.Interface; threadsafe.
+type Watcher interface {
+	Interface
+
+	// Modify sends a modify event.
+	Modify(obj runtime.Object)
+
+	// Add sends an add event.
+	Add(obj runtime.Object)
+
+	// Delete sends a delete event.
+	Delete(lastValue runtime.Object)
+}
+
 // EventType defines the possible types of events.
 type EventType string
 
