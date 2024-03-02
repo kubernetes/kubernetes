@@ -25,6 +25,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	authzmetrics "k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -145,6 +147,7 @@ users:
 `
 
 	// returns malformed responses when called
+	errorName := "error.example.com"
 	serverErrorCalled := atomic.Int32{}
 	serverError := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serverErrorCalled.Add(1)
@@ -164,6 +167,7 @@ users:
 	}
 
 	// hangs for 2 seconds when called
+	timeoutName := "timeout.example.com"
 	serverTimeoutCalled := atomic.Int32{}
 	serverTimeout := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serverTimeoutCalled.Add(1)
@@ -204,6 +208,7 @@ users:
 	}
 
 	// returns a no opinion response when called
+	noOpinionName := "noopinion.example.com"
 	serverNoOpinionCalled := atomic.Int32{}
 	serverNoOpinion := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serverNoOpinionCalled.Add(1)
@@ -221,6 +226,26 @@ users:
 	defer serverNoOpinion.Close()
 	serverNoOpinionKubeconfigName := filepath.Join(dir, "serverNoOpinion.yaml")
 	if err := os.WriteFile(serverNoOpinionKubeconfigName, []byte(fmt.Sprintf(kubeconfigTemplate, serverNoOpinion.URL)), os.FileMode(0644)); err != nil {
+		t.Fatal(err)
+	}
+
+	// returns malformed responses when called, which is then configured to fail open
+	failOpenName := "failopen.example.com"
+	serverFailOpenCalled := atomic.Int32{}
+	serverFailOpen := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		serverFailOpenCalled.Add(1)
+		sar := &authorizationv1.SubjectAccessReview{}
+		if err := json.NewDecoder(req.Body).Decode(sar); err != nil {
+			t.Error(err)
+		}
+		t.Log("serverFailOpen", sar)
+		if _, err := w.Write([]byte(`malformed response`)); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer serverFailOpen.Close()
+	serverFailOpenKubeconfigName := filepath.Join(dir, "failOpen.yaml")
+	if err := os.WriteFile(serverFailOpenKubeconfigName, []byte(fmt.Sprintf(kubeconfigTemplate, serverFailOpen.URL)), os.FileMode(0644)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -273,14 +298,16 @@ users:
 		serverTimeoutCalled.Store(0)
 		serverDenyCalled.Store(0)
 		serverNoOpinionCalled.Store(0)
+		serverFailOpenCalled.Store(0)
 		serverAllowCalled.Store(0)
 		serverAllowReloadedCalled.Store(0)
 		authorizationmetrics.ResetMetricsForTest()
 		celmetrics.ResetMetricsForTest()
+		webhookmetrics.ResetMetricsForTest()
 	}
 	var adminClient *clientset.Clientset
 	type counts struct {
-		errorCount, timeoutCount, denyCount, noOpinionCount, allowCount, allowReloadedCount, webhookExclusionCount, evalErrorsCount int32
+		errorCount, timeoutCount, denyCount, noOpinionCount, failOpenCount, allowCount, allowReloadedCount, webhookExclusionCount, evalErrorsCount int32
 	}
 	assertCounts := func(c counts) {
 		t.Helper()
@@ -288,30 +315,40 @@ users:
 		if err != nil {
 			t.Fatalf("error getting metrics: %v", err)
 		}
-		if e, a := c.errorCount, serverErrorCalled.Load(); e != a {
-			t.Fatalf("expected fail webhook calls: %d, got %d", e, a)
+
+		assertCount := func(name string, expected int32, serverCalls *atomic.Int32) {
+			t.Helper()
+			if actual := serverCalls.Load(); expected != actual {
+				t.Fatalf("expected %q webhook calls: %d, got %d", name, expected, actual)
+			}
+			if actual := int32(metrics.whTotal[name]); expected != actual {
+				t.Fatalf("expected %q webhook metric call count: %d, got %d (%#v)", name, expected, actual, metrics.whTotal)
+			}
+			if actual := int32(metrics.whDurationCount[name]); expected != actual {
+				t.Fatalf("expected %q webhook metric duration count: %d, got %d (%#v)", name, expected, actual, metrics.whDurationCount)
+			}
 		}
-		if e, a := c.timeoutCount, serverTimeoutCalled.Load(); e != a {
-			t.Fatalf("expected timeout webhook calls: %d, got %d", e, a)
-		}
-		if e, a := c.denyCount, serverDenyCalled.Load(); e != a {
-			t.Fatalf("expected deny webhook calls: %d, got %d", e, a)
-		}
+
+		assertCount(errorName, c.errorCount, &serverErrorCalled)
+		assertCount(timeoutName, c.timeoutCount, &serverTimeoutCalled)
+		assertCount(denyName, c.denyCount, &serverDenyCalled)
 		if e, a := c.denyCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: denyName}]["denied"]; e != int32(a) {
 			t.Fatalf("expected deny webhook denied metrics calls: %d, got %d", e, a)
 		}
-		if e, a := c.noOpinionCount, serverNoOpinionCalled.Load(); e != a {
-			t.Fatalf("expected noOpinion webhook calls: %d, got %d", e, a)
+		assertCount(noOpinionName, c.noOpinionCount, &serverNoOpinionCalled)
+		assertCount(failOpenName, c.failOpenCount, &serverFailOpenCalled)
+		expectedFailOpenCounts := map[string]int{}
+		if c.failOpenCount > 0 {
+			expectedFailOpenCounts[failOpenName] = int(c.failOpenCount)
 		}
-		if e, a := c.allowCount, serverAllowCalled.Load(); e != a {
-			t.Fatalf("expected allow webhook calls: %d, got %d", e, a)
+		if !reflect.DeepEqual(expectedFailOpenCounts, metrics.whFailOpenTotal) {
+			t.Fatalf("expected fail open %#v, got %#v", expectedFailOpenCounts, metrics.whFailOpenTotal)
 		}
+		assertCount(allowName, c.allowCount, &serverAllowCalled)
 		if e, a := c.allowCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowName}]["allowed"]; e != int32(a) {
 			t.Fatalf("expected allow webhook allowed metrics calls: %d, got %d", e, a)
 		}
-		if e, a := c.allowReloadedCount, serverAllowReloadedCalled.Load(); e != a {
-			t.Fatalf("expected allowReloaded webhook calls: %d, got %d", e, a)
-		}
+		assertCount(allowReloadedName, c.allowReloadedCount, &serverAllowReloadedCalled)
 		if e, a := c.allowReloadedCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowReloadedName}]["allowed"]; e != int32(a) {
 			t.Fatalf("expected allowReloaded webhook allowed metrics calls: %d, got %d", e, a)
 		}
@@ -330,7 +367,7 @@ apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: AuthorizationConfiguration
 authorizers:
 - type: Webhook
-  name: error.example.com
+  name: `+errorName+`
   webhook:
     timeout: 5s
     failurePolicy: Deny
@@ -347,7 +384,7 @@ authorizers:
     - expression: 'request.resourceAttributes.name == "error"'
 
 - type: Webhook
-  name: timeout.example.com
+  name: `+timeoutName+`
   webhook:
     timeout: 1s
     failurePolicy: Deny
@@ -381,7 +418,7 @@ authorizers:
     - expression: 'request.resourceAttributes.namespace == "fail"'
 
 - type: Webhook
-  name: noopinion.example.com
+  name: `+noOpinionName+`
   webhook:
     timeout: 5s
     failurePolicy: Deny
@@ -391,6 +428,19 @@ authorizers:
     connectionInfo:
       type: KubeConfigFile
       kubeConfigFile: `+serverNoOpinionKubeconfigName+`
+
+- type: Webhook
+  name: `+failOpenName+`
+  webhook:
+    timeout: 5s
+    failurePolicy: NoOpinion
+    subjectAccessReviewVersion: v1
+    matchConditionSubjectAccessReviewVersion: v1
+    authorizedTTL: 1ms
+    unauthorizedTTL: 1ms
+    connectionInfo:
+      type: KubeConfigFile
+      kubeConfigFile: `+serverFailOpenKubeconfigName+`
 
 - type: Webhook
   name: `+allowName+`
@@ -498,7 +548,7 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(counts{noOpinionCount: 1, allowCount: 1, webhookExclusionCount: 3})
+		assertCounts(counts{noOpinionCount: 1, failOpenCount: 1, allowCount: 1, webhookExclusionCount: 3})
 	}
 
 	// the timeout webhook results in match condition eval errors when evaluating a non-resource request
@@ -581,7 +631,7 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(counts{noOpinionCount: 1, allowCount: 1, webhookExclusionCount: 3})
+		assertCounts(counts{noOpinionCount: 1, failOpenCount: 1, allowCount: 1, webhookExclusionCount: 3})
 	}
 
 	// write good config with different webhook
@@ -718,6 +768,10 @@ type metrics struct {
 	decisions     map[authorizerKey]map[string]int
 	exclusions    int
 	evalErrors    int
+
+	whTotal         map[string]int
+	whFailOpenTotal map[string]int
+	whDurationCount map[string]int
 }
 type authorizerKey struct {
 	authorizerType string
@@ -727,6 +781,9 @@ type authorizerKey struct {
 var decisionMetric = regexp.MustCompile(`apiserver_authorization_decisions_total\{decision="(.*?)",name="(.*?)",type="(.*?)"\} (\d+)`)
 var webhookExclusionMetric = regexp.MustCompile(`apiserver_authorization_match_condition_exclusions_total\{name="(.*?)",type="(.*?)"\} (\d+)`)
 var webhookMatchConditionEvalErrorMetric = regexp.MustCompile(`apiserver_authorization_match_condition_evaluation_errors_total\{name="(.*?)",type="(.*?)"\} (\d+)`)
+var whTotalMetric = regexp.MustCompile(`apiserver_authorization_webhook_evaluations_total{name="(.*?)",result="(.*?)"} (\d+)`)
+var webhookDurationMetric = regexp.MustCompile(`apiserver_authorization_webhook_duration_seconds_count{name="(.*?)",result="(.*?)"} (\d+)`)
+var webhookFailOpenMetric = regexp.MustCompile(`apiserver_authorization_webhook_evaluations_fail_open_total{name="(.*?)",result="(.*?)"} (\d+)`)
 
 func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 	data, err := client.RESTClient().Get().AbsPath("/metrics").DoRaw(context.TODO())
@@ -744,6 +801,10 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 	}
 
 	var m metrics
+
+	m.whTotal = map[string]int{}
+	m.whFailOpenTotal = map[string]int{}
+	m.whDurationCount = map[string]int{}
 	m.exclusions = 0
 	for _, line := range strings.Split(string(data), "\n") {
 		if matches := decisionMetric.FindStringSubmatch(line); matches != nil {
@@ -779,6 +840,33 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 			}
 			t.Log(count)
 			m.evalErrors += count
+		}
+		if matches := whTotalMetric.FindStringSubmatch(line); matches != nil {
+			t.Log(matches)
+			count, err := strconv.Atoi(matches[3])
+			if err != nil {
+				return nil, err
+			}
+			t.Log(count)
+			m.whTotal[matches[1]] += count
+		}
+		if matches := webhookDurationMetric.FindStringSubmatch(line); matches != nil {
+			t.Log(matches)
+			count, err := strconv.Atoi(matches[3])
+			if err != nil {
+				return nil, err
+			}
+			t.Log(count)
+			m.whDurationCount[matches[1]] += count
+		}
+		if matches := webhookFailOpenMetric.FindStringSubmatch(line); matches != nil {
+			t.Log(matches)
+			count, err := strconv.Atoi(matches[3])
+			if err != nil {
+				return nil, err
+			}
+			t.Log(count)
+			m.whFailOpenTotal[matches[1]] += count
 		}
 		if strings.HasPrefix(line, "apiserver_authorization_config_controller_automatic_reload_last_timestamp_seconds") {
 			t.Log(line)

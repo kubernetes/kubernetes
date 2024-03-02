@@ -145,7 +145,7 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				decisionOnError,
 				configuredAuthorizer.Webhook.MatchConditions,
 				configuredAuthorizer.Name,
-				kubeapiserverWebhookMetrics{MatcherMetrics: cel.NewMatcherMetrics()},
+				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: cel.NewMatcherMetrics()},
 			)
 			if err != nil {
 				return nil, nil, err
@@ -169,6 +169,8 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 type kubeapiserverWebhookMetrics struct {
 	// kube-apiserver doesn't report request metrics
 	webhookmetrics.NoopRequestMetrics
+	// kube-apiserver does report webhook metrics
+	webhookmetrics.WebhookMetrics
 	// kube-apiserver does report matchCondition metrics
 	cel.MatcherMetrics
 }
