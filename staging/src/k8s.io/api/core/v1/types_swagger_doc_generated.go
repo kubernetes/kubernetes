@@ -1203,15 +1203,6 @@ func (NodeProxyOptions) SwaggerDoc() map[string]string {
 	return map_NodeProxyOptions
 }
 
-var map_NodeResources = map[string]string{
-	"":         "NodeResources is an object for conveying resource information about a node. see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.",
-	"Capacity": "Capacity represents the available resources of a node",
-}
-
-func (NodeResources) SwaggerDoc() map[string]string {
-	return map_NodeResources
-}
-
 var map_NodeSelector = map[string]string{
 	"":                  "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
 	"nodeSelectorTerms": "Required. A list of node selector terms. The terms are ORed.",

@@ -460,7 +460,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.NodeDaemonEndpoints":                                                                schema_k8sio_api_core_v1_NodeDaemonEndpoints(ref),
 		"k8s.io/api/core/v1.NodeList":                                                                           schema_k8sio_api_core_v1_NodeList(ref),
 		"k8s.io/api/core/v1.NodeProxyOptions":                                                                   schema_k8sio_api_core_v1_NodeProxyOptions(ref),
-		"k8s.io/api/core/v1.NodeResources":                                                                      schema_k8sio_api_core_v1_NodeResources(ref),
 		"k8s.io/api/core/v1.NodeSelector":                                                                       schema_k8sio_api_core_v1_NodeSelector(ref),
 		"k8s.io/api/core/v1.NodeSelectorRequirement":                                                            schema_k8sio_api_core_v1_NodeSelectorRequirement(ref),
 		"k8s.io/api/core/v1.NodeSelectorTerm":                                                                   schema_k8sio_api_core_v1_NodeSelectorTerm(ref),
@@ -23352,36 +23351,6 @@ func schema_k8sio_api_core_v1_NodeProxyOptions(ref common.ReferenceCallback) com
 				},
 			},
 		},
-	}
-}
-
-func schema_k8sio_api_core_v1_NodeResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeResources is an object for conveying resource information about a node. see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"Capacity": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Capacity represents the available resources of a node",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"Capacity"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 

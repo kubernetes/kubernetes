@@ -36,7 +36,6 @@ API rule violation: names_match,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,D
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,SessionCHAPAuth
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIVolumeSource,DiscoveryCHAPAuth
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIVolumeSource,SessionCHAPAuth
-API rule violation: names_match,k8s.io/api/core/v1,NodeResources,Capacity
 API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUseExternalID
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS
