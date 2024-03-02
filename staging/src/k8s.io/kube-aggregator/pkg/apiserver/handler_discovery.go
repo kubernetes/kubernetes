@@ -187,10 +187,10 @@ func NewDiscoveryManager(
 	target discoveryendpoint.ResourceManager,
 ) DiscoveryAggregationController {
 	discoveryScheme := runtime.NewScheme()
-	// Register conversion for apidiscovery
-	apidiscoveryv2.SchemeBuilder.Register(apidiscoveryv2conversion.RegisterConversions)
 	utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(discoveryScheme))
+	// Register conversion for apidiscovery
+	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(discoveryScheme))
 	codecs := serializer.NewCodecFactory(discoveryScheme)
 
 	return &discoveryManager{

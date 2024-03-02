@@ -37,8 +37,9 @@ func TestConversionRoundTrip(t *testing.T) {
 	scheme := runtime.NewScheme()
 	err := v2beta1scheme.AddToScheme(scheme)
 	require.NoError(t, err)
-	v2scheme.SchemeBuilder.Register(v2scheme.RegisterConversions)
 	err = v2scheme.AddToScheme(scheme)
+	require.NoError(t, err)
+	err = v2scheme.RegisterConversions(scheme)
 	require.NoError(t, err)
 
 	fuzzer := fuzz.NewWithSeed(2374375)
