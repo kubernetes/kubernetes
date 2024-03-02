@@ -99,7 +99,7 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 //	    client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
-// https://kubernetes.io/docs/user-guide/kubeconfig-file/.
+// https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/.
 func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, name string, metrics metrics.AuthorizerMetrics) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromConfig(config, version, retryBackoff)
 	if err != nil {
