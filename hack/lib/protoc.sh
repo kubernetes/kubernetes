@@ -69,6 +69,7 @@ function kube::protoc::protoc() {
     PATH="${gogopath}:${PATH}" protoc \
       --proto_path="$(pwd -P)" \
       --proto_path="${KUBE_ROOT}/vendor" \
+      --proto_path="${KUBE_ROOT}/staging/src" \
       --proto_path="${KUBE_ROOT}/third_party/protobuf" \
       --gogo_out=paths=source_relative,plugins=grpc:. \
       api.proto
