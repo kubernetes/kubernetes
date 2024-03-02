@@ -235,8 +235,12 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
 		info := doTokenReview(t, cs, treq, false)
+		// we are not testing the credential-id feature, so delete this value from the returned extra info map
 		if info.Extra != nil {
-			t.Fatalf("expected Extra to be nil but got: %#v", info.Extra)
+			delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+		}
+		if len(info.Extra) > 0 {
+			t.Fatalf("expected Extra to be empty but got: %#v", info.Extra)
 		}
 		delSvcAcct()
 		doTokenReview(t, cs, treq, true)
@@ -304,6 +308,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "node")
 
 		info := doTokenReview(t, cs, treq, false)
+		// we are not testing the credential-id feature, so delete this value from the returned extra info map
+		delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
 		if len(info.Extra) != 2 {
 			t.Fatalf("expected Extra have length of 2 but was length %d: %#v", len(info.Extra), info.Extra)
 		}
@@ -398,6 +404,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			}
 
 			info := doTokenReview(t, cs, treq, false)
+			// we are not testing the credential-id feature, so delete this value from the returned extra info map
+			delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
 			if len(info.Extra) != len(expectedExtraValues) {
 				t.Fatalf("expected Extra have length of %d but was length %d: %#v", len(expectedExtraValues), len(info.Extra), info.Extra)
 			}

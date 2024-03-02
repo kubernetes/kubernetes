@@ -36,19 +36,22 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/utils/pointer"
 )
 
 func TestAuthenticationValidate(t *testing.T) {
 	testCases := []struct {
-		name                         string
-		testOIDC                     *OIDCAuthenticationOptions
-		testSA                       *ServiceAccountAuthenticationOptions
-		testWebHook                  *WebHookAuthenticationOptions
-		testAuthenticationConfigFile string
-		expectErr                    string
+		name                              string
+		testOIDC                          *OIDCAuthenticationOptions
+		testSA                            *ServiceAccountAuthenticationOptions
+		testWebHook                       *WebHookAuthenticationOptions
+		testAuthenticationConfigFile      string
+		expectErr                         string
+		enabledFeatures, disabledFeatures []featuregate.Feature
 	}{
 		{
 			name: "test when OIDC and ServiceAccounts are nil",
@@ -227,6 +230,12 @@ func TestAuthenticationValidate(t *testing.T) {
 			},
 			expectErr: "authentication-config file and oidc-* flags are mutually exclusive",
 		},
+		{
+			name:             "fails to validate if ServiceAccountTokenNodeBindingValidation is disabled and ServiceAccountTokenNodeBinding is enabled",
+			enabledFeatures:  []featuregate.Feature{kubefeatures.ServiceAccountTokenNodeBinding},
+			disabledFeatures: []featuregate.Feature{kubefeatures.ServiceAccountTokenNodeBindingValidation},
+			expectErr:        "the \"ServiceAccountTokenNodeBinding\" feature gate can only be enabled if the \"ServiceAccountTokenNodeBindingValidation\" feature gate is also enabled",
+		},
 	}
 
 	for _, testcase := range testCases {
@@ -236,7 +245,12 @@ func TestAuthenticationValidate(t *testing.T) {
 			options.ServiceAccounts = testcase.testSA
 			options.WebHook = testcase.testWebHook
 			options.AuthenticationConfigFile = testcase.testAuthenticationConfigFile
-
+			for _, f := range testcase.enabledFeatures {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)()
+			}
+			for _, f := range testcase.disabledFeatures {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, false)()
+			}
 			errs := options.Validate()
 			if len(errs) > 0 && (!strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) || testcase.expectErr == "") {
 				t.Errorf("Got err: %v, Expected err: %s", errs, testcase.expectErr)
