@@ -412,7 +412,7 @@ func validateUserValidationRules(compiler authenticationcel.Compiler, celMapper 
 func compileClaimsCELExpression(compiler authenticationcel.Compiler, expression authenticationcel.ExpressionAccessor, fldPath *field.Path) (*authenticationcel.CompilationResult, *field.Error) {
 	compilationResult, err := compiler.CompileClaimsExpression(expression)
 	if err != nil {
-		return nil, convertCELErrorToValidationError(fldPath, expression, err)
+		return nil, convertCELErrorToValidationError(fldPath, expression.GetExpression(), err)
 	}
 	return &compilationResult, nil
 }
@@ -420,7 +420,7 @@ func compileClaimsCELExpression(compiler authenticationcel.Compiler, expression 
 func compileUserCELExpression(compiler authenticationcel.Compiler, expression authenticationcel.ExpressionAccessor, fldPath *field.Path) (*authenticationcel.CompilationResult, *field.Error) {
 	compilationResult, err := compiler.CompileUserExpression(expression)
 	if err != nil {
-		return nil, convertCELErrorToValidationError(fldPath, expression, err)
+		return nil, convertCELErrorToValidationError(fldPath, expression.GetExpression(), err)
 	}
 	return &compilationResult, nil
 }
@@ -609,19 +609,19 @@ func compileMatchConditionsExpression(fldPath *field.Path, compiler authorizatio
 	}
 	compilationResult, err := compiler.CompileCELExpression(authzExpression)
 	if err != nil {
-		return compilationResult, convertCELErrorToValidationError(fldPath, authzExpression, err)
+		return compilationResult, convertCELErrorToValidationError(fldPath, authzExpression.GetExpression(), err)
 	}
 	return compilationResult, nil
 }
 
-func convertCELErrorToValidationError(fldPath *field.Path, expression authorizationcel.ExpressionAccessor, err error) *field.Error {
+func convertCELErrorToValidationError(fldPath *field.Path, expression string, err error) *field.Error {
 	var celErr *cel.Error
 	if errors.As(err, &celErr) {
 		switch celErr.Type {
 		case cel.ErrorTypeRequired:
 			return field.Required(fldPath, celErr.Detail)
 		case cel.ErrorTypeInvalid:
-			return field.Invalid(fldPath, expression.GetExpression(), celErr.Detail)
+			return field.Invalid(fldPath, expression, celErr.Detail)
 		default:
 			return field.InternalError(fldPath, celErr)
 		}
