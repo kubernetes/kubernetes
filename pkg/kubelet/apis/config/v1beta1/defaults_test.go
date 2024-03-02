@@ -128,6 +128,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				MemorySwap:                    v1beta1.MemorySwapConfiguration{SwapBehavior: "NoSwap"},
 			},
 		},
 		{
@@ -226,7 +227,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				IPTablesDropBit:                  utilpointer.Int32(0),
 				FeatureGates:                     map[string]bool{},
 				FailSwapOn:                       utilpointer.Bool(false),
-				MemorySwap:                       v1beta1.MemorySwapConfiguration{SwapBehavior: ""},
+				MemorySwap:                       v1beta1.MemorySwapConfiguration{SwapBehavior: "NoSwap"},
 				ContainerLogMaxSize:              "",
 				ContainerLogMaxFiles:             utilpointer.Int32(0),
 				ContainerLogMaxWorkers:           utilpointer.Int32(1),
@@ -334,7 +335,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				IPTablesDropBit:                           utilpointer.Int32(0),
 				FeatureGates:                              map[string]bool{},
 				FailSwapOn:                                utilpointer.Bool(false),
-				MemorySwap:                                v1beta1.MemorySwapConfiguration{SwapBehavior: ""},
+				MemorySwap:                                v1beta1.MemorySwapConfiguration{SwapBehavior: "NoSwap"},
 				ContainerLogMaxSize:                       "10Mi",
 				ContainerLogMaxFiles:                      utilpointer.Int32(0),
 				ContainerLogMaxWorkers:                    utilpointer.Int32(1),
@@ -747,6 +748,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				MemorySwap:                    v1beta1.MemorySwapConfiguration{SwapBehavior: "NoSwap"},
 			},
 		},
 		{
@@ -838,6 +840,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				MemorySwap:                    v1beta1.MemorySwapConfiguration{SwapBehavior: "NoSwap"},
 			},
 		},
 		{
@@ -929,6 +932,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
+				MemorySwap:                    v1beta1.MemorySwapConfiguration{SwapBehavior: "NoSwap"},
 			},
 		},
 	}

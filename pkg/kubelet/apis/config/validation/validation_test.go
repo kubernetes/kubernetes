@@ -77,6 +77,7 @@ var (
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
 		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
+		MemorySwap:                  kubeletconfig.MemorySwapConfiguration{SwapBehavior: "NoSwap"},
 	}
 )
 
@@ -366,7 +367,15 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			conf.MemorySwap.SwapBehavior = "invalid-behavior"
 			return conf
 		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"LimitedSwap\" or \"NoSwap\"",
+	}, {
+		name: "invalid MemorySwap.SwapBehavior",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"NodeSwap": true}
+			conf.MemorySwap.SwapBehavior = ""
+			return conf
+		},
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"\" must be one of: \"LimitedSwap\" or \"NoSwap\"",
 	}, {
 		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

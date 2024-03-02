@@ -59203,7 +59203,7 @@ func schema_k8sio_kubelet_config_v1beta1_MemorySwapConfiguration(ref common.Refe
 				Properties: map[string]spec.Schema{
 					"swapBehavior": {
 						SchemaProps: spec.SchemaProps{
-							Description: "swapBehavior configures swap memory available to container workloads. May be one of \"\", \"NoSwap\": workloads can not use swap, default option. \"LimitedSwap\": workload swap usage is limited. The swap limit is proportionate to the container's memory request.",
+							Description: "swapBehavior configures swap memory available to container workloads. May be one of \"NoSwap\": workloads can not use swap, default option. \"LimitedSwap\": workload swap usage is limited. The swap limit is proportionate to the container's memory request. \"\": we used to allow this case to mean default but we are now failing this case. we will default to NoSwap in 1.30 and default will be set to NoSwap.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

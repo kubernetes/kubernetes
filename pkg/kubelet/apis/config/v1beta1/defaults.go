@@ -280,4 +280,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.ContainerRuntimeEndpoint == "" {
 		obj.ContainerRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
 	}
+	if obj.MemorySwap.SwapBehavior == "" {
+		obj.MemorySwap.SwapBehavior = "NoSwap"
+	}
 }
