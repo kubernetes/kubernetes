@@ -257,14 +257,15 @@ dependencies:
     - path: build/common.sh
       match: __default_setcap_version=
 
-  # cadvisor
-  - name: "gcr.io/cadvisor/cadvisor: dependents"
-    version: "v0.47.2"
-    refPaths:
-    - path: test/e2e_node/resource_collector.go
-      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
-    - path: test/e2e_node/image_list.go
-      mathc: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+# FIXME(dims): Update to latest cadvisor when ready
+#  # cadvisor
+#  - name: "gcr.io/cadvisor/cadvisor: dependents"
+#    version: "v0.47.2"
+#    refPaths:
+#    - path: test/e2e_node/resource_collector.go
+#      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+#    - path: test/e2e_node/image_list.go
+#      mathc: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
 
   # GCB docker gcloud image
   - name: "gcb-docker-gcloud: dependents"

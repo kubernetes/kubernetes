@@ -52,7 +52,7 @@ const (
 // before test running so that the image pulling won't fail in actual test.
 var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
-	"gcr.io/cadvisor/cadvisor:v0.47.2",
+	"gcr.io/cadvisor/cadvisor@sha256:ad910043713c057387f2fbd84a7b4c1588432da9f759a70ce0dfd4c2023fded7",
 	busyboxImage,
 	"registry.k8s.io/e2e-test-images/busybox@sha256:a9155b13325b2abef48e71de77bb8ac015412a566829f621d06bfae5c699b1b9",
 	imageutils.GetE2EImage(imageutils.Nginx),
