@@ -27,9 +27,10 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"sigs.k8s.io/yaml"
+
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/yaml"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -713,6 +714,7 @@ func dropDefaults(s *spec.Schema) {
 	delete(s.Properties, "apiVersion")
 	delete(s.Properties, "kind")
 	delete(s.Extensions, "x-kubernetes-group-version-kind")
+	delete(s.Extensions, "x-kubernetes-selectable-fields")
 }
 
 func verifyKubectlExplain(ns, name, pattern string) error {
