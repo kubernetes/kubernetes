@@ -82,7 +82,13 @@ func UpgradeManagedFields(
 	obj runtime.Object,
 	csaManagerNames sets.Set[string],
 	ssaManagerName string,
+	opts ...Option,
 ) error {
+	o := options{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -92,7 +98,7 @@ func UpgradeManagedFields(
 
 	for csaManagerName := range csaManagerNames {
 		filteredManagers, err = upgradedManagedFields(
-			filteredManagers, csaManagerName, ssaManagerName)
+			filteredManagers, csaManagerName, ssaManagerName, o)
 
 		if err != nil {
 			return err
@@ -116,7 +122,14 @@ func UpgradeManagedFields(
 func UpgradeManagedFieldsPatch(
 	obj runtime.Object,
 	csaManagerNames sets.Set[string],
-	ssaManagerName string) ([]byte, error) {
+	ssaManagerName string,
+	opts ...Option,
+) ([]byte, error) {
+	o := options{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -126,7 +139,7 @@ func UpgradeManagedFieldsPatch(
 	filteredManagers := accessor.GetManagedFields()
 	for csaManagerName := range csaManagerNames {
 		filteredManagers, err = upgradedManagedFields(
-			filteredManagers, csaManagerName, ssaManagerName)
+			filteredManagers, csaManagerName, ssaManagerName, o)
 		if err != nil {
 			return nil, err
 		}
@@ -166,6 +179,7 @@ func upgradedManagedFields(
 	managedFields []metav1.ManagedFieldsEntry,
 	csaManagerName string,
 	ssaManagerName string,
+	opts options,
 ) ([]metav1.ManagedFieldsEntry, error) {
 	if managedFields == nil {
 		return nil, nil
@@ -183,7 +197,7 @@ func upgradedManagedFields(
 		func(entry metav1.ManagedFieldsEntry) bool {
 			return entry.Manager == ssaManagerName &&
 				entry.Operation == metav1.ManagedFieldsOperationApply &&
-				entry.Subresource == ""
+				entry.Subresource == opts.subresource
 		})
 
 	if !managerExists {
@@ -196,7 +210,7 @@ func upgradedManagedFields(
 			func(entry metav1.ManagedFieldsEntry) bool {
 				return entry.Manager == csaManagerName &&
 					entry.Operation == metav1.ManagedFieldsOperationUpdate &&
-					entry.Subresource == ""
+					entry.Subresource == opts.subresource
 			})
 
 		if !managerExists {
@@ -209,7 +223,7 @@ func upgradedManagedFields(
 		managedFields[replaceIndex].Operation = metav1.ManagedFieldsOperationApply
 		managedFields[replaceIndex].Manager = ssaManagerName
 	}
-	err := unionManagerIntoIndex(managedFields, replaceIndex, csaManagerName)
+	err := unionManagerIntoIndex(managedFields, replaceIndex, csaManagerName, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +232,7 @@ func upgradedManagedFields(
 	filteredManagers := filter(managedFields, func(entry metav1.ManagedFieldsEntry) bool {
 		return !(entry.Manager == csaManagerName &&
 			entry.Operation == metav1.ManagedFieldsOperationUpdate &&
-			entry.Subresource == "")
+			entry.Subresource == opts.subresource)
 	})
 
 	return filteredManagers, nil
@@ -231,6 +245,7 @@ func unionManagerIntoIndex(
 	entries []metav1.ManagedFieldsEntry,
 	targetIndex int,
 	csaManagerName string,
+	opts options,
 ) error {
 	ssaManager := entries[targetIndex]
 
@@ -240,9 +255,7 @@ func unionManagerIntoIndex(
 		func(entry metav1.ManagedFieldsEntry) bool {
 			return entry.Manager == csaManagerName &&
 				entry.Operation == metav1.ManagedFieldsOperationUpdate &&
-				//!TODO: some users may want to migrate subresources.
-				// should thread through the args at some point.
-				entry.Subresource == "" &&
+				entry.Subresource == opts.subresource &&
 				entry.APIVersion == ssaManager.APIVersion
 		})
 
