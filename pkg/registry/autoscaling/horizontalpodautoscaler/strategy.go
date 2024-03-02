@@ -65,7 +65,12 @@ func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
+func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
+
+	// create cannot set status
+	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
+}
 
 // Validate validates a new autoscaler.
 func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -88,7 +93,12 @@ func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
+func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
+	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
+	// Update is not allowed to set status
+	newHPA.Status = oldHPA.Status
+}
 
 // ValidateUpdate is the default update validation for an end user.
 func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
