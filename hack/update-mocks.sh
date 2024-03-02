@@ -27,9 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 echo 'installing mockgen'
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  go install github.com/golang/mock/mockgen
-popd >/dev/null
+go -C "${KUBE_ROOT}/hack/tools" install github.com/golang/mock/mockgen
 
 function git_grep() {
   git grep --untracked --exclude-standard \
