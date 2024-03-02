@@ -179,21 +179,12 @@ func saveAllTestInfo(dataSet []*ConformanceData) {
 }
 
 func getConformanceData(targetFrame frame) (*ConformanceData, error) {
-	// TODO: This is terribly hacky.  Why can't we rely on the --source flag in
-	// all cases? https://issues.k8s.io/123567
-	//
-	// Filenames may be in a couple special places, depending on if they were
-	// built dockerized or with the host go.  We want to trim this prefix to
-	// produce portable relative paths.
-	containerGopath := "/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/"
-
 	root := *k8sPath
 	if !strings.HasSuffix(root, string(os.PathSeparator)) {
 		root += string(os.PathSeparator)
 	}
 
 	trimmedFile := strings.TrimPrefix(targetFrame.File, root)
-	trimmedFile = strings.TrimPrefix(trimmedFile, containerGopath)
 	targetFrame.File = trimmedFile
 
 	freader, err := os.Open(targetFrame.File)
