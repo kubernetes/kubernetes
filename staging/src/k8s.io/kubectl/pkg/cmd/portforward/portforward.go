@@ -420,10 +420,13 @@ func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
 	signal.Notify(signals, os.Interrupt)
 	defer signal.Stop(signals)
 
+	returnCtx, returnCtxCancel := context.WithCancel(ctx)
+	defer returnCtxCancel()
+
 	go func() {
 		select {
 		case <-signals:
-		case <-ctx.Done():
+		case <-returnCtx.Done():
 		}
 		if o.StopChannel != nil {
 			close(o.StopChannel)
