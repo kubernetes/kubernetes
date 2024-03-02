@@ -14,22 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhook
+package metrics
 
 import (
 	"context"
+
+	"k8s.io/apiserver/pkg/authorization/cel"
 )
 
 // AuthorizerMetrics specifies a set of methods that are used to register various metrics for the webhook authorizer
-type AuthorizerMetrics struct {
-	// RecordRequestTotal increments the total number of requests for the webhook authorizer
-	RecordRequestTotal func(ctx context.Context, code string)
-
-	// RecordRequestLatency measures request latency in seconds for webhooks. Broken down by status code.
-	RecordRequestLatency func(ctx context.Context, code string, latency float64)
+type AuthorizerMetrics interface {
+	// Request total and latency metrics
+	RequestMetrics
+	// match condition metrics
+	cel.MatcherMetrics
 }
 
-type noopMetrics struct{}
+type NoopAuthorizerMetrics struct {
+	NoopRequestMetrics
+	cel.NoopMatcherMetrics
+}
 
-func (noopMetrics) RecordRequestTotal(context.Context, string)            {}
-func (noopMetrics) RecordRequestLatency(context.Context, string, float64) {}
+type RequestMetrics interface {
+	// RecordRequestTotal increments the total number of requests for the webhook authorizer
+	RecordRequestTotal(ctx context.Context, code string)
+
+	// RecordRequestLatency measures request latency in seconds for webhooks. Broken down by status code.
+	RecordRequestLatency(ctx context.Context, code string, latency float64)
+}
+
+type NoopRequestMetrics struct{}
+
+func (NoopRequestMetrics) RecordRequestTotal(context.Context, string)            {}
+func (NoopRequestMetrics) RecordRequestLatency(context.Context, string, float64) {}
