@@ -586,7 +586,7 @@ authorizers:
 
 	// write good config with different webhook
 	if err := os.WriteFile(configFileName, []byte(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1beta1
 kind: AuthorizationConfiguration
 authorizers:
 - type: Webhook
