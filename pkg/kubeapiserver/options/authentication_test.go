@@ -49,6 +49,8 @@ func TestAuthenticationValidate(t *testing.T) {
 		testWebHook                  *WebHookAuthenticationOptions
 		testAuthenticationConfigFile string
 		expectErr                    string
+		clientCert                   *apiserveroptions.ClientCertAuthenticationOptions
+		requestHeader                *apiserveroptions.RequestHeaderAuthenticationOptions
 	}{
 		{
 			name: "test when OIDC and ServiceAccounts are nil",
@@ -227,11 +229,44 @@ func TestAuthenticationValidate(t *testing.T) {
 			},
 			expectErr: "authentication-config file and oidc-* flags are mutually exclusive",
 		},
+		{
+			name: "overlapping client-ca and requestheader-client-ca-file without requestheader-allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{
+				ClientCA: "/etc/kubernetes/pki/ca.crt",
+			},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+				AllowedNames: []string{}, // Empty on purpose
+			},
+			expectErr: "when 'requestheader-client-ca-file' and 'client-ca-file' are the same, 'requestheader-allowed-names' must be specified",
+		},
+		{
+			name: "overlapping client-ca and requestheader-client-ca-file with requestheader-allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{
+				ClientCA: "/etc/kubernetes/pki/ca.crt",
+			},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+				AllowedNames: []string{"foo"},
+			},
+		},
+		{
+			name: "different client-ca and requestheader-client-ca-file without requestheader-allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{
+				ClientCA: "/etc/kubernetes/pki/ca.crt",
+			},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile: "/etc/kubernetes/pki/requestheader-ca.crt",
+				AllowedNames: []string{},
+			},
+		},
 	}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
 			options := NewBuiltInAuthenticationOptions()
+			options.ClientCert = testcase.clientCert
+			options.RequestHeader = testcase.requestHeader
 			options.OIDC = testcase.testOIDC
 			options.ServiceAccounts = testcase.testSA
 			options.WebHook = testcase.testWebHook
