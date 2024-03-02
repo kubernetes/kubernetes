@@ -151,10 +151,10 @@ type priorityInfo struct {
 
 func NewResourceManager(path string) ResourceManager {
 	scheme := runtime.NewScheme()
-	// Register conversion for apidiscovery
-	apidiscoveryv2.SchemeBuilder.Register(apidiscoveryv2conversion.RegisterConversions)
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
+	// Register conversion for apidiscovery
+	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(scheme))
 
 	codecs := serializer.NewCodecFactory(scheme)
 	rdm := &resourceDiscoveryManager{

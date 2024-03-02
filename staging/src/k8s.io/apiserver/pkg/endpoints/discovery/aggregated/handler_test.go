@@ -32,6 +32,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,10 +51,10 @@ var codecs = runtimeserializer.NewCodecFactory(scheme)
 const discoveryPath = "/apis"
 
 func init() {
-	// Register conversion for apidiscovery
-	apidiscoveryv2.SchemeBuilder.Register(apidiscoveryv2conversion.RegisterConversions)
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
+	// Register conversion for apidiscovery
+	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(scheme))
 	codecs = runtimeserializer.NewCodecFactory(scheme)
 }
 
