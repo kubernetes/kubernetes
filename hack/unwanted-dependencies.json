@@ -199,6 +199,7 @@
       ],
       "google.golang.org/appengine": [
         "cloud.google.com/go/compute",
+        "github.com/coreos/go-oidc/v3",
         "github.com/grpc-ecosystem/grpc-gateway/v2",
         "github.com/prometheus/client_golang",
         "github.com/prometheus/common",

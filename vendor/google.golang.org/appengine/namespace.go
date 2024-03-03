@@ -5,10 +5,9 @@
 package appengine
 
 import (
+	"context"
 	"fmt"
 	"regexp"
-
-	"golang.org/x/net/context"
 
 	"google.golang.org/appengine/internal"
 )
