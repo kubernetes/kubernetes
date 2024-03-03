@@ -33,4 +33,7 @@ type AttachDetachControllerConfiguration struct {
 	// time is exceeded. Is false by default, and thus force detach on unmount is
 	// enabled.
 	DisableForceDetachOnTimeout bool
+	// ErrorLogInterval is the amount of time between logging errors for the same volume.
+	// Is set to 1 min by default.
+	ErrorLogInterval metav1.Duration
 }
