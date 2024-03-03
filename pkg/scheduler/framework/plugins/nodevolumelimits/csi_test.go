@@ -657,10 +657,10 @@ func TestCSILimitsQHint(t *testing.T) {
 	}{
 		{
 			newPod:      podEbs.Obj(),
-			deletedPod:  st.MakePod().PVC("csi-ebs.csi.aws.com-2").Obj(),
+			deletedPod:  st.MakePod().PVC("not.available").PVC("csi-ebs.csi.aws.com-2").PVC("not.available").Obj(),
 			filterName:  "csi",
 			driverNames: []string{ebsCSIDriverName},
-			test:        "return a Queue when a deleted pod has a PVC from the same driver",
+			test:        "return a Queue when a deleted pod has a PVC from the same driver even if some PVCs that are not available are included.",
 			limitSource: "csinode",
 			wantQHint:   framework.Queue,
 		},
@@ -702,8 +702,8 @@ func TestCSILimitsQHint(t *testing.T) {
 			wantQHint:              framework.QueueSkip,
 		},
 		{
-			newPod:      st.MakePod().PVC("not-found").Obj(),
-			deletedPod:  st.MakePod().PVC("not-found").Obj(),
+			newPod:      st.MakePod().PVC("not.available").Obj(),
+			deletedPod:  st.MakePod().PVC("not.available").Obj(),
 			filterName:  "csi",
 			driverNames: []string{ebsCSIDriverName},
 			test:        "return a QueueSkip when a PVC newPod has is not found.",
