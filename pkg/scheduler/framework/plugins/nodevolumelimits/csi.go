@@ -86,7 +86,12 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
 		// There is a possibility that a PVC is deleted when isSchedulableAfterPodDeleted is called.
 		// In this case, it's impossible if PVCs are relevant to the scheduling pod.
-		// To catch this case, we register PVC/Delete event.
+		// e.g.
+		//  1. Pod-A has PVC-A.
+		//  2. PVC-A is deleted.
+		//  3. Pod-A is deleted.
+		//  4. isSchedulableAfterPodDeleted is called but PVC-A is not found. So it's impossible to know if PVC-A is relevant to the scheduling pod.
+		// To catch this case, we register PVC/Delete events.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete}},
 	}
 }
@@ -129,7 +134,6 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		if apierrors.IsNotFound(err) {
 			// pod requires non-existing PVC - pod will never be schedulable until PVC is created.
 			// We return QueueSkip here and catch the moment that a required PVC is created via PVC/Added event.
-			fmt.Println("QSkip3")
 			return framework.QueueSkip, nil
 		}
 		return framework.Queue, fmt.Errorf("failed to filter attachable volumes from %v: %w", klog.KObj(pod), err)
