@@ -28,39 +28,39 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-func TestSortedSliceFromStringIntMap(t *testing.T) {
+func TestSortedSliceFromStringStringArrayMap(t *testing.T) {
 	var tests = []struct {
 		name          string
-		strMap        map[string]uint16
+		strMap        map[string][]string
 		expectedSlice []string
 	}{
 		{
 			name:          "the returned slice should be alphabetically sorted based on the string keys in the map",
-			strMap:        map[string]uint16{"foo": 1, "bar": 2},
+			strMap:        map[string][]string{"foo": {"1"}, "bar": {"1", "2"}},
 			expectedSlice: []string{"bar", "foo"},
 		},
 		{
 			name:          "the int value should not affect this func",
-			strMap:        map[string]uint16{"foo": 2, "bar": 1},
+			strMap:        map[string][]string{"foo": {"1", "2"}, "bar": {"1"}},
 			expectedSlice: []string{"bar", "foo"},
 		},
 		{
 			name:          "slice with 4 keys and different values",
-			strMap:        map[string]uint16{"b": 2, "a": 1, "cb": 0, "ca": 1000},
+			strMap:        map[string][]string{"b": {"1", "2"}, "a": {"1"}, "cb": {}, "ca": {"1", "2", "3"}},
 			expectedSlice: []string{"a", "b", "ca", "cb"},
 		},
 		{
 			name:          "this should work for version numbers as well; and the lowest version should come first",
-			strMap:        map[string]uint16{"v1.7.0": 1, "v1.6.1": 1, "v1.6.2": 1, "v1.8.0": 1, "v1.8.0-alpha.1": 1},
+			strMap:        map[string][]string{"v1.7.0": {"1"}, "v1.6.1": {"1"}, "v1.6.2": {"1"}, "v1.8.0": {"1"}, "v1.8.0-alpha.1": {"1"}},
 			expectedSlice: []string{"v1.6.1", "v1.6.2", "v1.7.0", "v1.8.0", "v1.8.0-alpha.1"},
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualSlice := sortedSliceFromStringIntMap(rt.strMap)
+			actualSlice := sortedSliceFromStringStringArrayMap(rt.strMap)
 			if !reflect.DeepEqual(actualSlice, rt.expectedSlice) {
 				t.Errorf(
-					"failed SortedSliceFromStringIntMap:\n\texpected: %v\n\t  actual: %v",
+					"failed sortedSliceFromStringStringArrayMap:\n\texpected: %v\n\t  actual: %v",
 					rt.expectedSlice,
 					actualSlice,
 				)
@@ -101,12 +101,23 @@ func TestPrintUpgradePlan(t *testing.T) {
 					Description: "version in the v1.18 series",
 					Before: upgrade.ClusterState{
 						KubeVersion: "v1.18.1",
-						KubeletVersions: map[string]uint16{
-							"v1.18.1": 1,
+						KubeAPIServerVersions: map[string][]string{
+							"v1.18.1": {"node1"},
+						},
+						KubeControllerManagerVersions: map[string][]string{
+							"v1.18.1": {"node1"},
+						},
+						KubeSchedulerVersions: map[string][]string{
+							"v1.18.1": {"node1"},
+						},
+						KubeletVersions: map[string][]string{
+							"v1.18.1": {"node1"},
+						},
+						EtcdVersions: map[string][]string{
+							"3.4.3-0": {"node1"},
 						},
 						KubeadmVersion: "v1.18.1",
 						DNSVersion:     "1.6.7",
-						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.18.4",
@@ -118,18 +129,18 @@ func TestPrintUpgradePlan(t *testing.T) {
 			},
 			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.18.1   v1.18.4
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.18.1   v1.18.4
 
 Upgrade to the latest version in the v1.18 series:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.18.1   v1.18.4
-kube-controller-manager   v1.18.1   v1.18.4
-kube-scheduler            v1.18.1   v1.18.4
-kube-proxy                v1.18.1   v1.18.4
-CoreDNS                   1.6.7     1.6.7
-etcd                      3.4.3-0   3.4.3-0
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.18.1   v1.18.4
+kube-controller-manager   node1     v1.18.1   v1.18.4
+kube-scheduler            node1     v1.18.1   v1.18.4
+kube-proxy                          v1.18.1   v1.18.4
+CoreDNS                             1.6.7     1.6.7
+etcd                      node1     3.4.3-0   3.4.3-0
 
 You can now apply the upgrade by executing the following command:
 
@@ -159,12 +170,23 @@ _____________________________________________________________________
 					Description: "stable version",
 					Before: upgrade.ClusterState{
 						KubeVersion: "v1.18.4",
-						KubeletVersions: map[string]uint16{
-							"v1.18.4": 1,
+						KubeAPIServerVersions: map[string][]string{
+							"v1.18.4": {"node1"},
+						},
+						KubeControllerManagerVersions: map[string][]string{
+							"v1.18.4": {"node1"},
+						},
+						KubeSchedulerVersions: map[string][]string{
+							"v1.18.4": {"node1"},
+						},
+						KubeletVersions: map[string][]string{
+							"v1.18.4": {"node1"},
+						},
+						EtcdVersions: map[string][]string{
+							"3.4.3-0": {"node1"},
 						},
 						KubeadmVersion: "v1.18.4",
 						DNSVersion:     "1.6.7",
-						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.19.0",
@@ -176,18 +198,18 @@ _____________________________________________________________________
 			},
 			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.18.4   v1.19.0
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.18.4   v1.19.0
 
 Upgrade to the latest stable version:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.18.4   v1.19.0
-kube-controller-manager   v1.18.4   v1.19.0
-kube-scheduler            v1.18.4   v1.19.0
-kube-proxy                v1.18.4   v1.19.0
-CoreDNS                   1.6.7     1.7.0
-etcd                      3.4.3-0   3.4.7-0
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.18.4   v1.19.0
+kube-controller-manager   node1     v1.18.4   v1.19.0
+kube-scheduler            node1     v1.18.4   v1.19.0
+kube-proxy                          v1.18.4   v1.19.0
+CoreDNS                             1.6.7     1.7.0
+etcd                      node1     3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
@@ -217,12 +239,23 @@ _____________________________________________________________________
 					Description: "version in the v1.18 series",
 					Before: upgrade.ClusterState{
 						KubeVersion: "v1.18.3",
-						KubeletVersions: map[string]uint16{
-							"v1.18.3": 1,
+						KubeAPIServerVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						KubeControllerManagerVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						KubeSchedulerVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						KubeletVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						EtcdVersions: map[string][]string{
+							"3.4.3-0": {"node1"},
 						},
 						KubeadmVersion: "v1.18.3",
 						DNSVersion:     "1.6.7",
-						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.18.5",
@@ -235,12 +268,23 @@ _____________________________________________________________________
 					Description: "stable version",
 					Before: upgrade.ClusterState{
 						KubeVersion: "v1.18.3",
-						KubeletVersions: map[string]uint16{
-							"v1.18.3": 1,
+						KubeAPIServerVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						KubeControllerManagerVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						KubeSchedulerVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						KubeletVersions: map[string][]string{
+							"v1.18.3": {"node1"},
+						},
+						EtcdVersions: map[string][]string{
+							"3.4.3-0": {"node1"},
 						},
 						KubeadmVersion: "v1.18.3",
 						DNSVersion:     "1.6.7",
-						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.19.0",
@@ -252,18 +296,18 @@ _____________________________________________________________________
 			},
 			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.18.3   v1.18.5
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.18.3   v1.18.5
 
 Upgrade to the latest version in the v1.18 series:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.18.3   v1.18.5
-kube-controller-manager   v1.18.3   v1.18.5
-kube-scheduler            v1.18.3   v1.18.5
-kube-proxy                v1.18.3   v1.18.5
-CoreDNS                   1.6.7     1.6.7
-etcd                      3.4.3-0   3.4.3-0
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.18.3   v1.18.5
+kube-controller-manager   node1     v1.18.3   v1.18.5
+kube-scheduler            node1     v1.18.3   v1.18.5
+kube-proxy                          v1.18.3   v1.18.5
+CoreDNS                             1.6.7     1.6.7
+etcd                      node1     3.4.3-0   3.4.3-0
 
 You can now apply the upgrade by executing the following command:
 
@@ -272,18 +316,18 @@ You can now apply the upgrade by executing the following command:
 _____________________________________________________________________
 
 Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.18.3   v1.19.0
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.18.3   v1.19.0
 
 Upgrade to the latest stable version:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.18.3   v1.19.0
-kube-controller-manager   v1.18.3   v1.19.0
-kube-scheduler            v1.18.3   v1.19.0
-kube-proxy                v1.18.3   v1.19.0
-CoreDNS                   1.6.7     1.7.0
-etcd                      3.4.3-0   3.4.7-0
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.18.3   v1.19.0
+kube-controller-manager   node1     v1.18.3   v1.19.0
+kube-scheduler            node1     v1.18.3   v1.19.0
+kube-proxy                          v1.18.3   v1.19.0
+CoreDNS                             1.6.7     1.7.0
+etcd                      node1     3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
@@ -313,12 +357,23 @@ _____________________________________________________________________
 					Description: "experimental version",
 					Before: upgrade.ClusterState{
 						KubeVersion: "v1.18.5",
-						KubeletVersions: map[string]uint16{
-							"v1.18.5": 1,
+						KubeAPIServerVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						KubeControllerManagerVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						KubeSchedulerVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						KubeletVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						EtcdVersions: map[string][]string{
+							"3.4.3-0": {"node1"},
 						},
 						KubeadmVersion: "v1.18.5",
 						DNSVersion:     "1.6.7",
-						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.19.0-beta.1",
@@ -330,18 +385,18 @@ _____________________________________________________________________
 			},
 			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.18.5   v1.19.0-beta.1
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.18.5   v1.19.0-beta.1
 
 Upgrade to the latest experimental version:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.18.5   v1.19.0-beta.1
-kube-controller-manager   v1.18.5   v1.19.0-beta.1
-kube-scheduler            v1.18.5   v1.19.0-beta.1
-kube-proxy                v1.18.5   v1.19.0-beta.1
-CoreDNS                   1.6.7     1.7.0
-etcd                      3.4.3-0   3.4.7-0
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.18.5   v1.19.0-beta.1
+kube-controller-manager   node1     v1.18.5   v1.19.0-beta.1
+kube-scheduler            node1     v1.18.5   v1.19.0-beta.1
+kube-proxy                          v1.18.5   v1.19.0-beta.1
+CoreDNS                             1.6.7     1.7.0
+etcd                      node1     3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
@@ -371,12 +426,23 @@ _____________________________________________________________________
 					Description: "release candidate version",
 					Before: upgrade.ClusterState{
 						KubeVersion: "v1.18.5",
-						KubeletVersions: map[string]uint16{
-							"v1.18.5": 1,
+						KubeAPIServerVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						KubeControllerManagerVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						KubeSchedulerVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						KubeletVersions: map[string][]string{
+							"v1.18.5": {"node1"},
+						},
+						EtcdVersions: map[string][]string{
+							"3.4.3-0": {"node1"},
 						},
 						KubeadmVersion: "v1.18.5",
 						DNSVersion:     "1.6.7",
-						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.19.0-rc.1",
@@ -388,18 +454,18 @@ _____________________________________________________________________
 			},
 			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.18.5   v1.19.0-rc.1
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.18.5   v1.19.0-rc.1
 
 Upgrade to the latest release candidate version:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.18.5   v1.19.0-rc.1
-kube-controller-manager   v1.18.5   v1.19.0-rc.1
-kube-scheduler            v1.18.5   v1.19.0-rc.1
-kube-proxy                v1.18.5   v1.19.0-rc.1
-CoreDNS                   1.6.7     1.7.0
-etcd                      3.4.3-0   3.4.7-0
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.18.5   v1.19.0-rc.1
+kube-controller-manager   node1     v1.18.5   v1.19.0-rc.1
+kube-scheduler            node1     v1.18.5   v1.19.0-rc.1
+kube-proxy                          v1.18.5   v1.19.0-rc.1
+CoreDNS                             1.6.7     1.7.0
+etcd                      node1     3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
@@ -429,13 +495,24 @@ _____________________________________________________________________
 					Description: "version in the v1.19 series",
 					Before: upgrade.ClusterState{
 						KubeVersion: "v1.19.2",
-						KubeletVersions: map[string]uint16{
-							"v1.19.2": 1,
-							"v1.19.3": 2,
+						KubeAPIServerVersions: map[string][]string{
+							"v1.19.2": {"node1"},
+						},
+						KubeControllerManagerVersions: map[string][]string{
+							"v1.19.2": {"node1"},
+						},
+						KubeSchedulerVersions: map[string][]string{
+							"v1.19.2": {"node1"},
+						},
+						KubeletVersions: map[string][]string{
+							"v1.19.2": {"node1"},
+							"v1.19.3": {"node2", "node3"},
+						},
+						EtcdVersions: map[string][]string{
+							"3.4.7-0": {"node1"},
 						},
 						KubeadmVersion: "v1.19.2",
 						DNSVersion:     "1.7.0",
-						EtcdVersion:    "3.4.7-0",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.19.3",
@@ -447,78 +524,20 @@ _____________________________________________________________________
 			},
 			versionStates: versionStates,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.19.2   v1.19.3
-            2 x v1.19.3   v1.19.3
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.19.2   v1.19.3
+kubelet     node2     v1.19.3   v1.19.3
+kubelet     node3     v1.19.3   v1.19.3
 
 Upgrade to the latest version in the v1.19 series:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.19.2   v1.19.3
-kube-controller-manager   v1.19.2   v1.19.3
-kube-scheduler            v1.19.2   v1.19.3
-kube-proxy                v1.19.2   v1.19.3
-CoreDNS                   1.7.0     1.7.0
-etcd                      3.4.7-0   3.4.7-0
-
-You can now apply the upgrade by executing the following command:
-
-	kubeadm upgrade apply v1.19.3
-
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.3.
-
-_____________________________________________________________________
-
-
-The table below shows the current state of component configs as understood by this version of kubeadm.
-Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
-resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
-upgrade to is denoted in the "PREFERRED VERSION" column.
-
-API GROUP                 CURRENT VERSION   PREFERRED VERSION   MANUAL UPGRADE REQUIRED
-kubeproxy.config.k8s.io   v1alpha1          v1alpha1            no
-kubelet.config.k8s.io     v1beta1           v1beta1             no
-_____________________________________________________________________
-
-`),
-		},
-
-		{
-			name: "external etcd upgrade available",
-			upgrades: []upgrade.Upgrade{
-				{
-					Description: "version in the v1.19 series",
-					Before: upgrade.ClusterState{
-						KubeVersion: "v1.19.2",
-						KubeletVersions: map[string]uint16{
-							"v1.19.2": 1,
-						},
-						KubeadmVersion: "v1.19.2",
-						DNSVersion:     "1.7.0",
-						EtcdVersion:    "3.4.7-0",
-					},
-					After: upgrade.ClusterState{
-						KubeVersion:    "v1.19.3",
-						KubeadmVersion: "v1.19.3",
-						DNSVersion:     "1.7.0",
-						EtcdVersion:    "3.4.7-0",
-					},
-				},
-			},
-			versionStates: versionStates,
-			externalEtcd:  true,
-			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.19.2   v1.19.3
-
-Upgrade to the latest version in the v1.19 series:
-
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.19.2   v1.19.3
-kube-controller-manager   v1.19.2   v1.19.3
-kube-scheduler            v1.19.2   v1.19.3
-kube-proxy                v1.19.2   v1.19.3
-CoreDNS                   1.7.0     1.7.0
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.19.2   v1.19.3
+kube-controller-manager   node1     v1.19.2   v1.19.3
+kube-scheduler            node1     v1.19.2   v1.19.3
+kube-proxy                          v1.19.2   v1.19.3
+CoreDNS                             1.7.0     1.7.0
+etcd                      node1     3.4.7-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
@@ -551,7 +570,7 @@ _____________________________________________________________________
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			plan := genUpgradePlan(rt.upgrades, rt.versionStates, rt.externalEtcd)
+			plan := genUpgradePlan(rt.upgrades, rt.versionStates)
 			if err := printer.PrintObj(plan, rt.buf); err != nil {
 				t.Errorf("unexpected error when print object: %v", err)
 			}
@@ -559,7 +578,7 @@ _____________________________________________________________________
 			actualBytes := rt.buf.Bytes()
 			if !bytes.Equal(actualBytes, rt.expectedBytes) {
 				t.Errorf(
-					"failed PrintUpgradePlan:\n\texpected: %q\n\n\tactual  : %q",
+					"failed PrintUpgradePlan:\n\texpected: %s\n\n\tactual: %s",
 					string(rt.expectedBytes),
 					string(actualBytes),
 				)
@@ -574,12 +593,23 @@ func TestPrintUpgradePlanStructured(t *testing.T) {
 			Description: "version in the v1.8 series",
 			Before: upgrade.ClusterState{
 				KubeVersion: "v1.8.1",
-				KubeletVersions: map[string]uint16{
-					"v1.8.1": 1,
+				KubeAPIServerVersions: map[string][]string{
+					"v1.8.1": {"node1"},
+				},
+				KubeControllerManagerVersions: map[string][]string{
+					"v1.8.1": {"node1"},
+				},
+				KubeSchedulerVersions: map[string][]string{
+					"v1.8.1": {"node1"},
+				},
+				KubeletVersions: map[string][]string{
+					"v1.8.1": {"node1"},
+				},
+				EtcdVersions: map[string][]string{
+					"3.0.17": {"node1"},
 				},
 				KubeadmVersion: "v1.8.2",
 				DNSVersion:     "1.14.5",
-				EtcdVersion:    "3.0.17",
 			},
 			After: upgrade.ClusterState{
 				KubeVersion:    "v1.8.3",
@@ -624,23 +654,27 @@ func TestPrintUpgradePlanStructured(t *testing.T) {
             "components": [
                 {
                     "name": "kubelet",
-                    "currentVersion": "1 x v1.8.1",
-                    "newVersion": "v1.8.3"
+                    "currentVersion": "v1.8.1",
+                    "newVersion": "v1.8.3",
+                    "nodeName": "node1"
                 },
                 {
                     "name": "kube-apiserver",
                     "currentVersion": "v1.8.1",
-                    "newVersion": "v1.8.3"
+                    "newVersion": "v1.8.3",
+                    "nodeName": "node1"
                 },
                 {
                     "name": "kube-controller-manager",
                     "currentVersion": "v1.8.1",
-                    "newVersion": "v1.8.3"
+                    "newVersion": "v1.8.3",
+                    "nodeName": "node1"
                 },
                 {
                     "name": "kube-scheduler",
                     "currentVersion": "v1.8.1",
-                    "newVersion": "v1.8.3"
+                    "newVersion": "v1.8.3",
+                    "nodeName": "node1"
                 },
                 {
                     "name": "kube-proxy",
@@ -660,7 +694,8 @@ func TestPrintUpgradePlanStructured(t *testing.T) {
                 {
                     "name": "etcd",
                     "currentVersion": "3.0.17",
-                    "newVersion": "3.0.17"
+                    "newVersion": "3.0.17",
+                    "nodeName": "node1"
                 }
             ]
         }
@@ -688,18 +723,22 @@ func TestPrintUpgradePlanStructured(t *testing.T) {
 			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha3
 availableUpgrades:
 - components:
-  - currentVersion: 1 x v1.8.1
+  - currentVersion: v1.8.1
     name: kubelet
     newVersion: v1.8.3
+    nodeName: node1
   - currentVersion: v1.8.1
     name: kube-apiserver
     newVersion: v1.8.3
+    nodeName: node1
   - currentVersion: v1.8.1
     name: kube-controller-manager
     newVersion: v1.8.3
+    nodeName: node1
   - currentVersion: v1.8.1
     name: kube-scheduler
     newVersion: v1.8.3
+    nodeName: node1
   - currentVersion: v1.8.1
     name: kube-proxy
     newVersion: v1.8.3
@@ -712,6 +751,7 @@ availableUpgrades:
   - currentVersion: 3.0.17
     name: etcd
     newVersion: 3.0.17
+    nodeName: node1
   description: version in the v1.8 series
 configVersions:
 - currentVersion: v1alpha1
@@ -729,18 +769,18 @@ kind: UpgradePlan
 			name:         "Text output",
 			outputFormat: "text",
 			expected: `Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.8.1   v1.8.3
+COMPONENT   NODE      CURRENT   TARGET
+kubelet     node1     v1.8.1    v1.8.3
 
 Upgrade to the latest version in the v1.8 series:
 
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.8.1    v1.8.3
-kube-controller-manager   v1.8.1    v1.8.3
-kube-scheduler            v1.8.1    v1.8.3
-kube-proxy                v1.8.1    v1.8.3
-CoreDNS                   1.14.5    1.14.5
-etcd                      3.0.17    3.0.17
+COMPONENT                 NODE      CURRENT   TARGET
+kube-apiserver            node1     v1.8.1    v1.8.3
+kube-controller-manager   node1     v1.8.1    v1.8.3
+kube-scheduler            node1     v1.8.1    v1.8.3
+kube-proxy                          v1.8.1    v1.8.3
+CoreDNS                             1.14.5    1.14.5
+etcd                      node1     3.0.17    3.0.17
 
 You can now apply the upgrade by executing the following command:
 
@@ -774,7 +814,7 @@ _____________________________________________________________________
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			plan := genUpgradePlan(upgrades, versionStates, false)
+			plan := genUpgradePlan(upgrades, versionStates)
 			if err := printer.PrintObj(plan, rt.buf); err != nil {
 				t.Errorf("unexpected error when print object: %v", err)
 			}

@@ -49,6 +49,7 @@ type ComponentUpgradePlan struct {
 	Name           string `json:"name"`
 	CurrentVersion string `json:"currentVersion"`
 	NewVersion     string `json:"newVersion"`
+	NodeName       string `json:"nodeName,omitempty"`
 }
 
 // ComponentConfigVersionState describes the current and desired version of a component config

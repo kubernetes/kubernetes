@@ -243,6 +243,7 @@ func autoConvert_v1alpha3_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in
 	out.Name = in.Name
 	out.CurrentVersion = in.CurrentVersion
 	out.NewVersion = in.NewVersion
+	out.NodeName = in.NodeName
 	return nil
 }
 
@@ -255,6 +256,7 @@ func autoConvert_output_ComponentUpgradePlan_To_v1alpha3_ComponentUpgradePlan(in
 	out.Name = in.Name
 	out.CurrentVersion = in.CurrentVersion
 	out.NewVersion = in.NewVersion
+	out.NodeName = in.NodeName
 	return nil
 }
 

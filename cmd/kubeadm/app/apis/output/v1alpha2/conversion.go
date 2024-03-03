@@ -26,3 +26,8 @@ import (
 func Convert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in *output.UpgradePlan, out *UpgradePlan, s conversion.Scope) error {
 	return autoConvert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in, out, s)
 }
+
+// Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan converts a private ComponentUpgradePlan to public ComponentUpgradePlan.
+func Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in *output.ComponentUpgradePlan, out *ComponentUpgradePlan, s conversion.Scope) error {
+	return autoConvert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in, out, s)
+}
