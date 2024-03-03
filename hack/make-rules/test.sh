@@ -190,10 +190,8 @@ produceJUnitXMLReport() {
   junit_xml_filename="${junit_filename_prefix}.xml"
 
   if ! command -v gotestsum >/dev/null 2>&1; then
-    kube::log::status "gotestsum not found; installing from hack/tools"
-    pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-      go install gotest.tools/gotestsum
-    popd >/dev/null
+    kube::log::status "gotestsum not found; installing from ./hack/tools"
+    go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
   fi
   gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
@@ -201,10 +199,8 @@ produceJUnitXMLReport() {
   fi
 
   if ! command -v prune-junit-xml >/dev/null 2>&1; then
-    kube::log::status "prune-junit-xml not found; installing from hack/tools"
-    pushd "${KUBE_ROOT}/cmd/prune-junit-xml" >/dev/null
-      go install .
-    popd >/dev/null
+    kube::log::status "prune-junit-xml not found; installing from ./cmd"
+    go -C "${KUBE_ROOT}/cmd/prune-junit-xml" install .
   fi
   prune-junit-xml "${junit_xml_filename}"
 
