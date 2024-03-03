@@ -84,13 +84,15 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
-		// There is a possibility that a PVC is deleted when isSchedulableAfterPodDeleted is called.
-		// In this case, it's impossible if PVCs are relevant to the scheduling pod.
-		// e.g.
-		//  1. Pod-A has PVC-A.
-		//  2. PVC-A is deleted.
-		//  3. Pod-A is deleted.
-		//  4. isSchedulableAfterPodDeleted is called but PVC-A is not found. So it's impossible to know if PVC-A is relevant to the scheduling pod.
+		// If a deleted Pod has PVC, but PVC is deleted before Pod is deleted,
+		// isSchedulableAfterPodDeleted cannot make a decision correctly.
+		// e.g.,
+		//  1. An unscheduled Pod-A has PVC-A, and got rejected by CSILimits plugin.
+		//  2. Pod-B has PVC-B, and is running.
+		//  3. PVC-A and PVC-B get the same `volumeLimitKey`.
+		// In this case, when Pod-B/PVC-B is deleted, if the scheduler receives Pod-B's deletion event after PVC-B is deleted,
+		// it's impossible to determine whether Pod-A should be requeued or not in `isSchedulableAfterPodDeleted`,
+		// which actually we should requeue in that case.
 		// To catch this case, we register PVC/Delete events.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete}},
 	}
