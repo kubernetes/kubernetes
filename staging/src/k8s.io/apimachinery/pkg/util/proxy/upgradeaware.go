@@ -422,7 +422,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		} else {
 			writer = backendConn
 		}
-		_, err := io.Copy(writer, &loggingReader{name: "client->backend", delegate: requestHijackedConn})
+		_, err := io.Copy(writer, requestHijackedConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			klog.Errorf("Error proxying data from client to backend: %v", err)
 		}
@@ -436,7 +436,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		} else {
 			reader = backendConn
 		}
-		_, err := io.Copy(requestHijackedConn, &loggingReader{name: "backend->client", delegate: reader})
+		_, err := io.Copy(requestHijackedConn, reader)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			klog.Errorf("Error proxying data from backend to client: %v", err)
 		}
@@ -452,18 +452,6 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
 
 	return true
-}
-
-// loggingReader logs the bytes read from the "delegate" with a "name" prefix.
-type loggingReader struct {
-	name     string
-	delegate io.Reader
-}
-
-func (l *loggingReader) Read(p []byte) (int, error) {
-	n, err := l.delegate.Read(p)
-	klog.V(8).Infof("%s: %d bytes, err=%v, bytes=% X", l.name, n, err, p[:n])
-	return n, err
 }
 
 // FIXME: Taken from net/http/httputil/reverseproxy.go as singleJoiningSlash is not exported to be re-used.

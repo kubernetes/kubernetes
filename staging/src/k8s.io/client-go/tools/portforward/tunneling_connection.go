@@ -114,8 +114,13 @@ func (c *TunnelingConnection) Close() error {
 		klog.V(7).Infof("%s: tunneling connection Close()...", c.name)
 		// Signal other endpoint that websocket connection is closing; ignore error.
 		normalCloseMsg := gwebsocket.FormatCloseMessage(gwebsocket.CloseNormalClosure, "")
-		c.conn.WriteControl(gwebsocket.CloseMessage, normalCloseMsg, time.Now().Add(time.Second)) //nolint:errcheck
-		err = c.conn.Close()
+		writeControlErr := c.conn.WriteControl(gwebsocket.CloseMessage, normalCloseMsg, time.Now().Add(time.Second))
+		closeErr := c.conn.Close()
+		if closeErr != nil {
+			err = closeErr
+		} else if writeControlErr != nil {
+			err = writeControlErr
+		}
 	})
 	return err
 }
