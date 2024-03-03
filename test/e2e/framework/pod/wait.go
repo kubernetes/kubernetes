@@ -47,7 +47,7 @@ const (
 	defaultPodDeletionTimeout = 3 * time.Minute
 
 	// podListTimeout is how long to wait for the pod to be listable.
-	podListTimeout = time.Minute
+	podListTimeout = 20 * time.Minute
 
 	podRespondingTimeout = 15 * time.Minute
 
