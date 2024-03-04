@@ -679,6 +679,7 @@ func TestOverlappingDeployments(t *testing.T) {
 
 // Deployment should not block rollout when updating spec replica number and template at the same time.
 func TestScaledRolloutDeployment(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, true)()
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -701,6 +702,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	tester.deployment.Spec.Strategy.RollingUpdate.MaxSurge = ptr.To(intstr.FromInt32(3))
 	tester.deployment.Spec.Strategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(2))
 	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(context.TODO(), tester.deployment, metav1.CreateOptions{})
+	tester.deployment.Spec.PodReplacementPolicy = ptr.To(apps.TerminationComplete)
 	if err != nil {
 		t.Fatalf("failed to create deployment %q: %v", name, err)
 	}
