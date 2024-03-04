@@ -275,6 +275,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			err)
 	}
 	volumePluginName := getVolumePluginNameWithDriver(volumePlugin, volumeSpec)
+	accessMode := getVolumeAccessMode(volumeSpec)
 
 	var volumeName v1.UniqueVolumeName
 
@@ -328,7 +329,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			effectiveSELinuxMountLabel = ""
 		}
 		if seLinuxFileLabel != "" {
-			seLinuxVolumesAdmitted.WithLabelValues(volumePluginName).Add(1.0)
+			seLinuxVolumesAdmitted.WithLabelValues(volumePluginName, accessMode).Add(1.0)
 		}
 		vmt := volumeToMount{
 			volumeName:                     volumeName,
@@ -369,8 +370,8 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				err := handleSELinuxMetricError(
 					fullErr,
 					supported,
-					seLinuxVolumeContextMismatchWarnings.WithLabelValues(volumePluginName),
-					seLinuxVolumeContextMismatchErrors.WithLabelValues(volumePluginName))
+					seLinuxVolumeContextMismatchWarnings.WithLabelValues(volumePluginName, accessMode),
+					seLinuxVolumeContextMismatchErrors.WithLabelValues(volumePluginName, accessMode))
 				if err != nil {
 					return "", err
 				}
@@ -414,7 +415,13 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 				newLabel, err := dsw.seLinuxTranslator.SELinuxOptionsToFileLabel(containerContext)
 				if err != nil {
 					fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %s", containerContext, err)
-					if err := handleSELinuxMetricError(fullErr, seLinuxSupported, seLinuxContainerContextWarnings, seLinuxContainerContextErrors); err != nil {
+					accessMode := getVolumeAccessMode(volumeSpec)
+					err := handleSELinuxMetricError(
+						fullErr,
+						seLinuxSupported,
+						seLinuxContainerContextWarnings.WithLabelValues(accessMode),
+						seLinuxContainerContextErrors.WithLabelValues(accessMode))
+					if err != nil {
 						return "", false, err
 					}
 				}
@@ -423,8 +430,15 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 					continue
 				}
 				if seLinuxFileLabel != newLabel {
+					accessMode := getVolumeAccessMode(volumeSpec)
+
 					fullErr := fmt.Errorf("volume %s is used with two different SELinux contexts in the same pod: %q, %q", volumeSpec.Name(), seLinuxFileLabel, newLabel)
-					if err := handleSELinuxMetricError(fullErr, seLinuxSupported, seLinuxPodContextMismatchWarnings, seLinuxPodContextMismatchErrors); err != nil {
+					err := handleSELinuxMetricError(
+						fullErr,
+						seLinuxSupported,
+						seLinuxPodContextMismatchWarnings.WithLabelValues(accessMode),
+						seLinuxPodContextMismatchErrors.WithLabelValues(accessMode))
+					if err != nil {
 						return "", false, err
 					}
 				}
@@ -684,4 +698,27 @@ func getVolumePluginNameWithDriver(plugin volume.VolumePlugin, spec *volume.Spec
 	}
 	// `/` is used to separate plugin + CSI driver in util.GetUniqueVolumeName() too
 	return pluginName + "/" + driverName
+}
+
+func getVolumeAccessMode(spec *volume.Spec) string {
+	if spec.PersistentVolume == nil {
+		// In-line volumes in pod do not have a specific access mode, using "inline".
+		return "inline"
+	}
+	// For purpose of this PR, report only the "highest" access mode in this order: RWX (highest priority), ROX, RWO, RWOP (lowest priority
+	pv := spec.PersistentVolume
+	if util.ContainsAccessMode(pv.Spec.AccessModes, v1.ReadWriteMany) {
+		return "RWX"
+	}
+	if util.ContainsAccessMode(pv.Spec.AccessModes, v1.ReadOnlyMany) {
+		return "ROX"
+	}
+	if util.ContainsAccessMode(pv.Spec.AccessModes, v1.ReadWriteOnce) {
+		return "RWO"
+	}
+	if util.ContainsAccessMode(pv.Spec.AccessModes, v1.ReadWriteOncePod) {
+		return "RWOP"
+	}
+	// This should not happen, validation does not allow empty or unknown AccessModes.
+	return ""
 }

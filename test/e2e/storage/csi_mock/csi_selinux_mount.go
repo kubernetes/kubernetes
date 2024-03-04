@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -316,6 +318,24 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	})
 })
 
+var (
+	// SELinux metrics that have volume_plugin and access_mode labels
+	metricsWithVolumePluginLabel = sets.New[string](
+		"volume_manager_selinux_volume_context_mismatch_errors_total",
+		"volume_manager_selinux_volume_context_mismatch_warnings_total",
+		"volume_manager_selinux_volumes_admitted_total",
+	)
+	// SELinuxMetrics that have only access_mode label
+	metricsWithoutVolumePluginLabel = sets.New[string](
+		"volume_manager_selinux_container_errors_total",
+		"volume_manager_selinux_container_warnings_total",
+		"volume_manager_selinux_pod_context_mismatch_errors_total",
+		"volume_manager_selinux_pod_context_mismatch_warnings_total",
+	)
+	// All SELinux metrics
+	allMetrics = metricsWithoutVolumePluginLabel.Union(metricsWithVolumePluginLabel)
+)
+
 var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-selinux-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -345,7 +365,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 			volumeMode              v1.PersistentVolumeAccessMode
 			waitForSecondPodStart   bool
 			secondPodFailureEvent   string
-			expectIncreases         sets.String
+			expectIncreases         sets.Set[string]
 			testTags                []interface{}
 		}{
 			{
@@ -355,7 +375,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				secondPodSELinuxOpts:    &seLinuxOpts1,
 				volumeMode:              v1.ReadWriteOnce,
 				waitForSecondPodStart:   true,
-				expectIncreases:         sets.NewString( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
+				expectIncreases:         sets.New[string]( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
 				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod), feature.SELinuxMountReadWriteOncePodOnly},
 			},
 			{
@@ -365,7 +385,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				secondPodSELinuxOpts:    &seLinuxOpts2,
 				volumeMode:              v1.ReadWriteOnce,
 				waitForSecondPodStart:   true,
-				expectIncreases:         sets.NewString("volume_manager_selinux_volume_context_mismatch_warnings_total"),
+				expectIncreases:         sets.New[string]("volume_manager_selinux_volume_context_mismatch_warnings_total"),
 				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod), feature.SELinuxMountReadWriteOncePodOnly},
 			},
 			{
@@ -375,7 +395,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				secondPodSELinuxOpts:    &seLinuxOpts1,
 				volumeMode:              v1.ReadWriteOnce,
 				waitForSecondPodStart:   true,
-				expectIncreases:         sets.NewString( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
+				expectIncreases:         sets.New[string]( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
 				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod), framework.WithFeatureGate(features.SELinuxMount)},
 			},
 			{
@@ -386,7 +406,18 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				secondPodFailureEvent:   "conflicting SELinux labels of volume",
 				volumeMode:              v1.ReadWriteOnce,
 				waitForSecondPodStart:   false,
-				expectIncreases:         sets.NewString("volume_manager_selinux_volume_context_mismatch_errors_total"),
+				expectIncreases:         sets.New[string]("volume_manager_selinux_volume_context_mismatch_errors_total"),
+				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod), framework.WithFeatureGate(features.SELinuxMount)},
+			},
+			{
+				name:                    "error is bumped on two Pods with a different context on RWX volume and SELinuxMount enabled",
+				csiDriverSELinuxEnabled: true,
+				firstPodSELinuxOpts:     &seLinuxOpts1,
+				secondPodSELinuxOpts:    &seLinuxOpts2,
+				secondPodFailureEvent:   "conflicting SELinux labels of volume",
+				volumeMode:              v1.ReadWriteMany,
+				waitForSecondPodStart:   false,
+				expectIncreases:         sets.New[string]("volume_manager_selinux_volume_context_mismatch_errors_total"),
 				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod), framework.WithFeatureGate(features.SELinuxMount)},
 			},
 			{
@@ -397,7 +428,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				secondPodFailureEvent:   "conflicting SELinux labels of volume",
 				volumeMode:              v1.ReadWriteOncePod,
 				waitForSecondPodStart:   false,
-				expectIncreases:         sets.NewString("volume_manager_selinux_volume_context_mismatch_errors_total"),
+				expectIncreases:         sets.New[string]("volume_manager_selinux_volume_context_mismatch_errors_total"),
 				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod)},
 			},
 		}
@@ -405,19 +436,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 			t := t
 			testFunc := func(ctx context.Context) {
 				// Some metrics use CSI driver name as a label, which is "csi-mock-" + the namespace name.
-				volumePluginLabel := "{volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\"}"
-
-				// All SELinux metrics. Unless explicitly mentioned in test.expectIncreases, these metrics must not grow during
-				// a test.
-				allMetrics := sets.NewString(
-					"volume_manager_selinux_container_errors_total",
-					"volume_manager_selinux_container_warnings_total",
-					"volume_manager_selinux_pod_context_mismatch_errors_total",
-					"volume_manager_selinux_pod_context_mismatch_warnings_total",
-					"volume_manager_selinux_volume_context_mismatch_errors_total"+volumePluginLabel,
-					"volume_manager_selinux_volume_context_mismatch_warnings_total"+volumePluginLabel,
-					"volume_manager_selinux_volumes_admitted_total"+volumePluginLabel,
-				)
+				volumePluginLabel := "volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\""
 
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
@@ -444,7 +463,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				ginkgo.By("Grabbing initial metrics")
 				pod, err = m.cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "getting the initial pod")
-				metrics, err := grabMetrics(ctx, grabber, pod.Spec.NodeName, allMetrics)
+				metrics, err := grabMetrics(ctx, grabber, pod.Spec.NodeName, allMetrics, volumePluginLabel)
 				framework.ExpectNoError(err, "collecting the initial metrics")
 				dumpMetrics(metrics)
 
@@ -472,8 +491,9 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 				}
 
 				// Assert: count the metrics
-				ginkgo.By("Waiting for expected metric changes")
-				err = waitForMetricIncrease(ctx, grabber, pod.Spec.NodeName, allMetrics, t.expectIncreases, metrics, framework.PodStartShortTimeout)
+				expectIncreaseWithLabels := addLabels(t.expectIncreases, volumePluginLabel, t.volumeMode)
+				framework.Logf("Waiting for changes of metrics %+v", expectIncreaseWithLabels)
+				err = waitForMetricIncrease(ctx, grabber, pod.Spec.NodeName, volumePluginLabel, allMetrics, expectIncreaseWithLabels, metrics, framework.PodStartShortTimeout)
 				framework.ExpectNoError(err, "waiting for metrics %s to increase", t.expectIncreases)
 			}
 			// t.testTags is array and it's not possible to use It("name", func(){xxx}, t.testTags...)
@@ -488,7 +508,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	})
 })
 
-func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, metricNames sets.String) (map[string]float64, error) {
+func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, metricNames sets.Set[string], volumePluginLabel string) (map[string]float64, error) {
 	response, err := grabber.GrabFromKubelet(ctx, nodeName)
 	framework.ExpectNoError(err)
 
@@ -497,12 +517,19 @@ func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName stri
 		if len(samples) == 0 {
 			continue
 		}
-		// Find the *last* sample that has the label we are interested in.
-		for i := len(samples) - 1; i >= 0; i-- {
-			metricNameWithLabels := samples[i].Metric.String()
-			if metricNames.Has(metricNameWithLabels) {
+		// For each metric + label combination, remember the last sample
+		for i := range samples {
+			// E.g. "volume_manager_selinux_pod_context_mismatch_errors_total"
+			metricName := samples[i].Metric[testutil.MetricNameLabel]
+			if metricNames.Has(string(metricName)) {
+				// E.g. "volume_manager_selinux_pod_context_mismatch_errors_total{access_mode="RWOP",volume_plugin="kubernetes.io/csi/csi-mock-ns"}
+				metricNameWithLabels := samples[i].Metric.String()
+				// Filter out metrics of any other volume plugin
+				if strings.Contains(metricNameWithLabels, "volume_plugin=") && !strings.Contains(metricNameWithLabels, volumePluginLabel) {
+					continue
+				}
+				// Overwrite any previous value, so only the last one is stored.
 				metrics[metricNameWithLabels] = float64(samples[i].Value)
-				break
 			}
 		}
 	}
@@ -510,32 +537,21 @@ func grabMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName stri
 	return metrics, nil
 }
 
-func waitForMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, allMetricNames, expectedIncreaseNames sets.String, initialValues map[string]float64, timeout time.Duration) error {
-	var noIncreaseMetrics sets.String
+func waitForMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, volumePluginLabel string, allMetricNames, expectedIncreaseNames sets.Set[string], initialValues map[string]float64, timeout time.Duration) error {
+	var noIncreaseMetrics sets.Set[string]
 	var metrics map[string]float64
 
 	err := wait.Poll(time.Second, timeout, func() (bool, error) {
 		var err error
-		metrics, err = grabMetrics(ctx, grabber, nodeName, allMetricNames)
+		metrics, err = grabMetrics(ctx, grabber, nodeName, allMetricNames, volumePluginLabel)
 		if err != nil {
 			return false, err
 		}
 
-		noIncreaseMetrics = sets.NewString()
+		noIncreaseMetrics = sets.New[string]()
 		// Always evaluate all SELinux metrics to check that the other metrics are not unexpectedly increased.
-		for name := range allMetricNames {
-			expectIncrease := false
-
-			// allMetricNames can include "{volume_plugin="XXX"}", while expectedIncreaseNames does not.
-			// Compare them properly. Value of volume_plugin="XXX" was already checked in grabMetrics(),
-			// we can ignore it here.
-			for expectedIncreaseMetricName := range expectedIncreaseNames {
-				if strings.HasPrefix(name, expectedIncreaseMetricName) {
-					expectIncrease = true
-					break
-				}
-			}
-			if expectIncrease {
+		for name := range metrics {
+			if expectedIncreaseNames.Has(name) {
 				if metrics[name] <= initialValues[name] {
 					noIncreaseMetrics.Insert(name)
 				}
@@ -553,7 +569,7 @@ func waitForMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber, nod
 	dumpMetrics(metrics)
 
 	if err == context.DeadlineExceeded {
-		return fmt.Errorf("timed out waiting for metrics %v", noIncreaseMetrics.List())
+		return fmt.Errorf("timed out waiting for metrics %v", noIncreaseMetrics.UnsortedList())
 	}
 	return err
 }
@@ -569,4 +585,23 @@ func dumpMetrics(metrics map[string]float64) {
 	for _, key := range keys {
 		framework.Logf("Metric %s: %v", key, metrics[key])
 	}
+}
+
+// Add labels to the metric name based on the current test case
+func addLabels(metricNames sets.Set[string], volumePluginLabel string, accessMode v1.PersistentVolumeAccessMode) sets.Set[string] {
+	ret := sets.New[string]()
+	accessModeShortString := helper.GetAccessModesAsString([]v1.PersistentVolumeAccessMode{accessMode})
+
+	for metricName := range metricNames {
+		var metricWithLabels string
+		if metricsWithVolumePluginLabel.Has(metricName) {
+			metricWithLabels = fmt.Sprintf("%s{access_mode=\"%s\", %s}", metricName, accessModeShortString, volumePluginLabel)
+		} else {
+			metricWithLabels = fmt.Sprintf("%s{access_mode=\"%s\"}", metricName, accessModeShortString)
+		}
+
+		ret.Insert(metricWithLabels)
+	}
+
+	return ret
 }
