@@ -401,14 +401,14 @@ func WaitForPodTerminatingInNamespaceTimeout(ctx context.Context, c clientset.In
 func WaitForPodSuccessInNamespaceTimeout(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(ctx, c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.DeletionTimestamp == nil && pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
-			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName))
 		}
 		switch pod.Status.Phase {
 		case v1.PodSucceeded:
 			ginkgo.By("Saw pod success")
 			return true, nil
 		case v1.PodFailed:
-			return true, fmt.Errorf("pod %q failed with status: %+v", podName, pod.Status)
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q failed with status: %+v", podName, pod.Status))
 		default:
 			return false, nil
 		}
