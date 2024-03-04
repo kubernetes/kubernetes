@@ -36,6 +36,7 @@ import (
 
 	"gopkg.in/square/go-jose.v2"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/features"
@@ -134,18 +135,19 @@ var (
 )
 
 type claimsTest struct {
-	name               string
-	options            Options
-	optsFunc           func(*Options)
-	signingKey         *jose.JSONWebKey
-	pubKeys            []*jose.JSONWebKey
-	claims             string
-	want               *user.DefaultInfo
-	wantSkip           bool
-	wantErr            string
-	wantInitErr        string
-	claimToResponseMap map[string]string
-	openIDConfig       string
+	name                string
+	options             Options
+	optsFunc            func(*Options)
+	signingKey          *jose.JSONWebKey
+	pubKeys             []*jose.JSONWebKey
+	claims              string
+	want                *user.DefaultInfo
+	wantSkip            bool
+	wantErr             string
+	wantInitErr         string
+	claimToResponseMap  map[string]string
+	openIDConfig        string
+	fetchKeysFromRemote bool
 }
 
 // Replace formats the contents of v into the provided template.
@@ -175,7 +177,8 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 			klog.V(5).Infof("%v: returning: %+v", r.URL, string(keyBytes))
 			w.Write(keyBytes)
 
-		case "/.well-known/openid-configuration":
+		// /c/d/bar/.well-known/openid-configuration is used to test issuer url and discovery url with a path
+		case "/.well-known/openid-configuration", "/c/d/bar/.well-known/openid-configuration":
 			w.Header().Set("Content-Type", "application/json")
 			klog.V(5).Infof("%v: returning: %+v", r.URL, *openIDConfig)
 			w.Write([]byte(*openIDConfig))
@@ -262,14 +265,17 @@ func (c *claimsTest) run(t *testing.T) {
 	c.claims = replace(c.claims, &v)
 	c.openIDConfig = replace(c.openIDConfig, &v)
 	c.options.JWTAuthenticator.Issuer.URL = replace(c.options.JWTAuthenticator.Issuer.URL, &v)
+	c.options.JWTAuthenticator.Issuer.DiscoveryURL = replace(c.options.JWTAuthenticator.Issuer.DiscoveryURL, &v)
 	for claim, response := range c.claimToResponseMap {
 		c.claimToResponseMap[claim] = replace(response, &v)
 	}
 	c.wantErr = replace(c.wantErr, &v)
 	c.wantInitErr = replace(c.wantInitErr, &v)
 
-	// Set the verifier to use the public key set instead of reading from a remote.
-	c.options.KeySet = &staticKeySet{keys: c.pubKeys}
+	if !c.fetchKeysFromRemote {
+		// Set the verifier to use the public key set instead of reading from a remote.
+		c.options.KeySet = &staticKeySet{keys: c.pubKeys}
+	}
 
 	if c.optsFunc != nil {
 		c.optsFunc(&c.options)
@@ -307,7 +313,27 @@ func (c *claimsTest) run(t *testing.T) {
 		t.Fatalf("serialize token: %v", err)
 	}
 
-	got, ok, err := a.AuthenticateToken(testContext(t), token)
+	ia, ok := a.(*instrumentedAuthenticator)
+	if !ok {
+		t.Fatalf("expected authenticator to be instrumented")
+	}
+	authenticator, ok := ia.delegate.(*Authenticator)
+	if !ok {
+		t.Fatalf("expected delegate to be Authenticator")
+	}
+	ctx := testContext(t)
+	// wait for the authenticator to be initialized
+	err = wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
+		if v, _ := authenticator.idTokenVerifier(); v == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to initialize the authenticator: %v", err)
+	}
+
+	got, ok, err := a.AuthenticateToken(ctx, token)
 
 	expectErr := len(c.wantErr) > 0
 
@@ -2982,6 +3008,191 @@ func TestToken(t *testing.T) {
 				"user": "jane",
 				"exp": %d
 			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery-url",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com",
+						DiscoveryURL: "{{.URL}}/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url, issuer has a path",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com/a/b/foo",
+						DiscoveryURL: "{{.URL}}/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com/a/b/foo",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com/a/b/foo",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url has a path, issuer url has no path",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com",
+						DiscoveryURL: "{{.URL}}/c/d/bar/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url and issuer url have paths",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com/a/b/foo",
+						DiscoveryURL: "{{.URL}}/c/d/bar/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com/a/b/foo",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com/a/b/foo",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url and issuer url have paths, issuer url has trailing slash",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com/a/b/foo/",
+						DiscoveryURL: "{{.URL}}/c/d/bar/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com/a/b/foo/",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com/a/b/foo/",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
 			want: &user.DefaultInfo{
 				Name: "jane",
 			},

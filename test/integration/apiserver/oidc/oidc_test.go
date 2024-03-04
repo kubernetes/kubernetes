@@ -141,7 +141,7 @@ func runTests(t *testing.T, useAuthenticationConfig bool) {
 			) {
 				caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
 				signingPrivateKey, publicKey := keyFunc(t)
-				oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath)
+				oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
 
 				if useAuthenticationConfig {
 					authenticationConfig := fmt.Sprintf(`
@@ -274,7 +274,7 @@ jwt:
 
 				signingPrivateKey, _ = keyFunc(t)
 
-				oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath)
+				oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
 
 				if useAuthenticationConfig {
 					authenticationConfig := fmt.Sprintf(`
@@ -888,6 +888,104 @@ jwt:
 	}
 }
 
+// TestStructuredAuthenticationDiscoveryURL tests that the discovery URL configured in jwt.issuer.discoveryURL is used to
+// fetch the discovery document and the issuer in jwt.issuer.url is used to validate the ID token.
+func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+
+	tests := []struct {
+		name         string
+		issuerURL    string
+		discoveryURL func(baseURL string) string
+	}{
+		{
+			name:         "discovery url and issuer url with no path",
+			issuerURL:    "https://example.com",
+			discoveryURL: func(baseURL string) string { return baseURL },
+		},
+		{
+			name:         "discovery url has path, issuer url has no path",
+			issuerURL:    "https://example.com",
+			discoveryURL: func(baseURL string) string { return fmt.Sprintf("%s/c/d/bar", baseURL) },
+		},
+		{
+			name:         "discovery url has no path, issuer url has path",
+			issuerURL:    "https://example.com/a/b/foo",
+			discoveryURL: func(baseURL string) string { return baseURL },
+		},
+		{
+			name:      "discovery url and issuer url have paths",
+			issuerURL: "https://example.com/a/b/foo",
+			discoveryURL: func(baseURL string) string {
+				return fmt.Sprintf("%s/c/d/bar", baseURL)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
+			signingPrivateKey, publicKey := rsaGenerateKey(t)
+			// set the issuer in the discovery document to issuer url (different from the discovery URL) to assert
+			// 1. discovery URL is used to fetch the discovery document and
+			// 2. issuer in the discovery document is used to validate the ID token
+			oidcServer := utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, tt.issuerURL)
+			discoveryURL := strings.TrimSuffix(tt.discoveryURL(oidcServer.URL()), "/") + "/.well-known/openid-configuration"
+
+			authenticationConfig := fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    discoveryURL: %s
+    audiences:
+    - foo
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+  claimValidationRules:
+  - expression: 'claims.hd == "example.com"'
+    message: "the hd claim must be set to example.com"
+`, tt.issuerURL, discoveryURL, indentCertificateAuthority(string(caCertContent)))
+
+			oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey))
+
+			apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey)
+
+			idTokenLifetime := time.Second * 1200
+			oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				t,
+				signingPrivateKey,
+				map[string]interface{}{
+					"iss": tt.issuerURL, // issuer in the discovery document is used to validate the ID token
+					"sub": defaultOIDCClaimedUsername,
+					"aud": "foo",
+					"exp": time.Now().Add(idTokenLifetime).Unix(),
+					"hd":  "example.com",
+				},
+				defaultStubAccessToken,
+				defaultStubRefreshToken,
+			))
+
+			tokenURL, err := oidcServer.TokenURL()
+			require.NoError(t, err)
+
+			client := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent, caFilePath, oidcServer.URL(), tokenURL)
+			ctx := testContext(t)
+			res, err := client.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			}, res.Status.UserInfo)
+		})
+	}
+}
+
 func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 	t.Helper()
 
@@ -919,7 +1017,7 @@ func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePub
 
 	signingPrivateKey, publicKey := keyFunc(t)
 
-	oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath)
+	oidcServer = utilsoidc.BuildAndRunTestServer(t, caFilePath, caKeyFilePath, "")
 
 	authenticationConfig := fn(t, oidcServer.URL(), string(caCertContent))
 	if len(authenticationConfig) > 0 {

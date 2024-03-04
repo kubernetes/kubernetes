@@ -100,20 +100,39 @@ func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field
 func validateIssuer(issuer api.Issuer, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validateURL(issuer.URL, fldPath.Child("url"))...)
+	allErrs = append(allErrs, validateIssuerURL(issuer.URL, fldPath.Child("url"))...)
+	allErrs = append(allErrs, validateIssuerDiscoveryURL(issuer.URL, issuer.DiscoveryURL, fldPath.Child("discoveryURL"))...)
 	allErrs = append(allErrs, validateAudiences(issuer.Audiences, issuer.AudienceMatchPolicy, fldPath.Child("audiences"), fldPath.Child("audienceMatchPolicy"))...)
 	allErrs = append(allErrs, validateCertificateAuthority(issuer.CertificateAuthority, fldPath.Child("certificateAuthority"))...)
 
 	return allErrs
 }
 
-func validateURL(issuerURL string, fldPath *field.Path) field.ErrorList {
+func validateIssuerURL(issuerURL string, fldPath *field.Path) field.ErrorList {
+	if len(issuerURL) == 0 {
+		return field.ErrorList{field.Required(fldPath, "URL is required")}
+	}
+
+	return validateURL(issuerURL, fldPath)
+}
+
+func validateIssuerDiscoveryURL(issuerURL, issuerDiscoveryURL string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if len(issuerURL) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "URL is required"))
-		return allErrs
+	if len(issuerDiscoveryURL) == 0 {
+		return nil
 	}
+
+	if len(issuerURL) > 0 && strings.TrimRight(issuerURL, "/") == strings.TrimRight(issuerDiscoveryURL, "/") {
+		allErrs = append(allErrs, field.Invalid(fldPath, issuerDiscoveryURL, "discoveryURL must be different from URL"))
+	}
+
+	allErrs = append(allErrs, validateURL(issuerDiscoveryURL, fldPath)...)
+	return allErrs
+}
+
+func validateURL(issuerURL string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
 
 	u, err := url.Parse(issuerURL)
 	if err != nil {
