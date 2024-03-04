@@ -225,6 +225,35 @@
     all MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Aggregated Discovery Interface
+  codename: '[sig-api-machinery] AggregatedDiscovery should support aggregated discovery
+    interface [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery client interface.
+    Built-in resources MUST all be present.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Interface CRDs
+  codename: '[sig-api-machinery] AggregatedDiscovery should support aggregated discovery
+    interface for CRDs [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery client interface.
+    Add a CRD to the apiserver. The CRD resource MUST be present in the discovery
+    document.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Endpoint Accept Headers
+  codename: '[sig-api-machinery] AggregatedDiscovery should support raw aggregated
+    discovery endpoint Accept headers [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery endpoint Accept
+    headers. Built-in resources MUST all be present.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Endpoint Accept Headers CRDs
+  codename: '[sig-api-machinery] AggregatedDiscovery should support raw aggregated
+    discovery request for CRDs [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery endpoint Accept
+    headers. Add a CRD to the apiserver. The CRD MUST appear in the discovery document.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
     API Server using the current Aggregator [Conformance]'

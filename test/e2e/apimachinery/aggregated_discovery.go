@@ -34,8 +34,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("AggregatedDiscovery", func() {
@@ -150,7 +148,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		Testname: Aggregated Discovery Endpoint Accept Headers
 		Description: An apiserver MUST support the Aggregated Discovery endpoint Accept headers. Built-in resources MUST all be present.
 	*/
-	ginkgo.It("should support raw aggregated discovery endpoint Accept headers", func(ctx context.Context) {
+	framework.ConformanceIt("should support raw aggregated discovery endpoint Accept headers", func(ctx context.Context) {
 		d, err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis").SetHeader("Accept", aggregatedAccept).Do(ctx).Raw()
 		if err != nil {
 			framework.Failf("Failed to get raw aggregated discovery document")
@@ -193,7 +191,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		Description: An apiserver MUST support the Aggregated Discovery endpoint Accept headers.
 		Add a CRD to the apiserver. The CRD MUST appear in the discovery document.
 	*/
-	ginkgo.It("should support raw aggregated discovery request for CRDs", func(ctx context.Context) {
+	framework.ConformanceIt("should support raw aggregated discovery request for CRDs", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
@@ -258,7 +256,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		Testname: Aggregated Discovery Interface
 		Description: An apiserver MUST support the Aggregated Discovery client interface. Built-in resources MUST all be present.
 	*/
-	ginkgo.It("should support aggregated discovery interface", func(ctx context.Context) {
+	framework.ConformanceIt("should support aggregated discovery interface", func(ctx context.Context) {
 		d := f.ClientSet.Discovery()
 
 		ad, ok := d.(clientdiscovery.AggregatedDiscoveryInterface)
@@ -302,7 +300,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		Description: An apiserver MUST support the Aggregated Discovery client interface.
 		Add a CRD to the apiserver. The CRD resource MUST be present in the discovery document.
 	*/
-	ginkgo.It("should support aggregated discovery interface for CRDs", func(ctx context.Context) {
+	framework.ConformanceIt("should support aggregated discovery interface for CRDs", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
