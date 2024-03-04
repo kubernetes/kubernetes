@@ -79,6 +79,9 @@ type worker struct {
 	// for the ProberDuration metric by result.
 	proberDurationSuccessfulMetricLabels metrics.Labels
 	proberDurationUnknownMetricLabels    metrics.Labels
+
+	// proberRunner encapsulates the logic of running probes.
+	probeRunner probeRunner
 }
 
 // Creates and starts a new probe worker.
@@ -139,6 +142,7 @@ func newWorker(
 	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 
+	w.probeRunner = newProbeRunner(container, probeType)
 	return w
 }
 
@@ -284,7 +288,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.probeRunner)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true

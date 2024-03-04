@@ -134,7 +134,6 @@ func TestGetTCPAddrParts(t *testing.T) {
 
 func TestProbe(t *testing.T) {
 	ctx := context.Background()
-	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
 
 	execProbe := &v1.Probe{
 		ProbeHandler: v1.ProbeHandler{
@@ -221,7 +220,7 @@ func TestProbe(t *testing.T) {
 				recorder: &record.FakeRecorder{},
 			}
 			testID := fmt.Sprintf("%d-%s", i, probeType)
-			testContainer := v1.Container{Env: test.env}
+			testContainer := v1.Container{Name: "test", Env: test.env}
 			switch probeType {
 			case liveness:
 				testContainer.LivenessProbe = test.probe
@@ -230,13 +229,24 @@ func TestProbe(t *testing.T) {
 			case startup:
 				testContainer.StartupProbe = test.probe
 			}
+
+			runner := newProbeRunner(testContainer, probeType)
+
 			if test.execError {
 				prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}
 			} else {
 				prober.exec = fakeExecProber{test.execResult, nil}
 			}
 
-			result, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			podStatus := v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "test",
+						ContainerID: "test://foobar",
+					}},
+			}
+
+			result, err := prober.probe(ctx, probeType, &v1.Pod{}, podStatus, testContainer, runner)
 			if test.expectError && err == nil {
 				t.Errorf("[%s] Expected probe error but no error was returned.", testID)
 			}
@@ -250,7 +260,7 @@ func TestProbe(t *testing.T) {
 			if len(test.expectCommand) > 0 {
 				prober.exec = execprobe.New()
 				prober.runner = &containertest.FakeContainerCommandRunner{}
-				_, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+				_, err := prober.probe(ctx, probeType, &v1.Pod{}, podStatus, testContainer, runner)
 				if err != nil {
 					t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
 					continue
