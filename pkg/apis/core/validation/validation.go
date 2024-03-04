@@ -5918,6 +5918,7 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path, op
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, nil, fldPath.Child("spec"), opts)...)
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(spec.ObjectMeta, &spec.Spec, fldPath.Child("spec"))...)
+	allErrs = append(allErrs, validateAppArmorAnnotationsAndFieldsMatchOnCreate(spec.ObjectMeta, &spec.Spec, fldPath.Child("spec"))...)
 
 	if len(spec.Spec.EphemeralContainers) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec", "ephemeralContainers"), "ephemeral containers not allowed in pod template"))
