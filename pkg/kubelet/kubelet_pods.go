@@ -19,14 +19,18 @@ package kubelet
 import (
 	"bytes"
 	"context"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
@@ -76,7 +80,89 @@ const (
 const (
 	PodInitializing   = "PodInitializing"
 	ContainerCreating = "ContainerCreating"
+
+	kubeletUser = "kubelet"
 )
+
+// parseGetSubIdsOutput parses the output from the `getsubids` tool, which is used to query subordinate user or group ID ranges for
+// a given user or group. getsubids produces a line for each mapping configured.
+// Here we expect that there is a single mapping, and the same values are used for the subordinate user and group ID ranges.
+// The output is something like:
+// $ getsubids kubelet
+// 0: kubelet 65536 2147483648
+// $ getsubids -g kubelet
+// 0: kubelet 65536 2147483648
+func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
+	lines := strings.Split(strings.Trim(input, "\n"), "\n")
+	if len(lines) != 1 {
+		return 0, 0, fmt.Errorf("error parsing line %q: it must contain only one line", input)
+	}
+
+	parts := strings.Fields(lines[0])
+	if len(parts) != 4 {
+		return 0, 0, fmt.Errorf("invalid line %q", input)
+	}
+
+	// Parsing the numbers
+	num1, err := strconv.ParseUint(parts[2], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	num2, err := strconv.ParseUint(parts[3], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	return uint32(num1), uint32(num2), nil
+}
+
+// getKubeletMappings returns the range of IDs that can be used to configure user namespaces.
+// If subordinate user or group ID ranges are specified for the kubelet user and the getsubids tool
+// is installed, then the single mapping specified both for user and group IDs will be used.
+// If the tool is not installed, or there are no IDs configured, the default mapping is returned.
+// The default mapping includes the entire IDs range except IDs below 65536.
+func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
+	// default mappings to return if there is no specific configuration
+	const defaultFirstID = 1 << 16
+	const defaultLen = 1<<32 - defaultFirstID
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		return defaultFirstID, defaultLen, nil
+	}
+
+	_, err := user.Lookup(kubeletUser)
+	if err != nil {
+		var unknownUserErr user.UnknownUserError
+		if goerrors.As(err, &unknownUserErr) {
+			// if the user is not found, we assume that the user is not configured
+			return defaultFirstID, defaultLen, nil
+		}
+		return 0, 0, err
+	}
+
+	execName := "getsubids"
+	cmd, err := exec.LookPath(execName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			klog.V(2).InfoS("Could not find executable, default mappings will be used for the user namespaces", "executable", execName, "err", err)
+			return defaultFirstID, defaultLen, nil
+		}
+		return 0, 0, err
+	}
+	outUids, err := exec.Command(cmd, kubeletUser).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("error retrieving additional ids for user %q", kubeletUser)
+	}
+	outGids, err := exec.Command(cmd, "-g", kubeletUser).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("error retrieving additional gids for user %q", kubeletUser)
+	}
+	if string(outUids) != string(outGids) {
+		return 0, 0, fmt.Errorf("mismatched subuids and subgids for user %q", kubeletUser)
+	}
+	return parseGetSubIdsOutput(string(outUids))
+}
 
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
