@@ -59,7 +59,8 @@ type NamedResourcesAttributeValue struct {
 	StringValue *string
 	// StringSliceValue is an array of strings.
 	StringSliceValue *NamedResourcesStringSlice
-	// TODO: VersionValue     *SemVersion
+	// VersionValue is a semantic version according to semver.org spec 2.0.0.
+	VersionValue *string
 }
 
 // NamedResourcesIntSlice contains a slice of 64-bit integers.
@@ -73,17 +74,6 @@ type NamedResourcesStringSlice struct {
 	// Strings is the slice of strings.
 	Strings []string
 }
-
-// TODO
-//
-// A wrapper around https://pkg.go.dev/github.com/blang/semver/v4#Version which
-// is encoded as a string. During decoding, it validates that the string
-// can be parsed using tolerant parsing (currently trims spaces, removes a "v" prefix,
-// adds a 0 patch number to versions with only major and minor components specified,
-// and removes leading 0s).
-// type SemVersion struct {
-//	semver.Version
-//}
 
 // NamedResourcesRequest is used in ResourceRequestModel.
 type NamedResourcesRequest struct {

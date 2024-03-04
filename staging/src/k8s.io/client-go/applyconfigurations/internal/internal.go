@@ -12001,6 +12001,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: stringSlice
       type:
         namedType: io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice
+    - name: version
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1alpha2.NamedResourcesFilter
   map:
     fields:

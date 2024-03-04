@@ -134,6 +134,9 @@ message NamedResourcesAttributeValue {
 
   // StringSliceValue is an array of strings.
   optional NamedResourcesStringSlice stringSlice = 9;
+
+  // VersionValue is a semantic version according to semver.org spec 2.0.0.
+  optional string version = 10;
 }
 
 // NamedResourcesFilter is used in ResourceFilterModel.

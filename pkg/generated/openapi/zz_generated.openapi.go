@@ -44907,6 +44907,13 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttribute(ref common.Refer
 							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice"),
 						},
 					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
@@ -44960,6 +44967,13 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttributeValue(ref common.
 						SchemaProps: spec.SchemaProps{
 							Description: "StringSliceValue is an array of strings.",
 							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice"),
+						},
+					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},

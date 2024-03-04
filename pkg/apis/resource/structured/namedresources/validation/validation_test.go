@@ -75,7 +75,44 @@ func TestValidateResources(t *testing.T) {
 		"string-slice": {
 			resources: testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{StringSliceValue: &resourceapi.NamedResourcesStringSlice{Strings: []string{"hello"}}}}}}}),
 		},
-		// TODO: semver
+		"version-okay": {
+			resources: testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0.0")}}}}}),
+		},
+		"version-beta": {
+			resources: testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0.0-beta")}}}}}),
+		},
+		"version-beta-1": {
+			resources: testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0.0-beta.1")}}}}}),
+		},
+		"version-build": {
+			resources: testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0.0+build")}}}}}),
+		},
+		"version-build-1": {
+			resources: testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0.0+build.1")}}}}}),
+		},
+		"version-beta-1-build-1": {
+			resources: testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0.0-beta.1+build.1")}}}}}),
+		},
+		"version-bad": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("instances").Index(0).Child("attributes").Index(0).Child("version"), "1.0", "must be a string compatible with semver.org spec 2.0.0")},
+			resources:    testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0")}}}}}),
+		},
+		"version-bad-leading-zeros": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("instances").Index(0).Child("attributes").Index(0).Child("version"), "01.0.0", "must be a string compatible with semver.org spec 2.0.0")},
+			resources:    testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("01.0.0")}}}}}),
+		},
+		"version-bad-leading-zeros-middle": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("instances").Index(0).Child("attributes").Index(0).Child("version"), "1.00.0", "must be a string compatible with semver.org spec 2.0.0")},
+			resources:    testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.00.0")}}}}}),
+		},
+		"version-bad-leading-zeros-end": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("instances").Index(0).Child("attributes").Index(0).Child("version"), "1.0.00", "must be a string compatible with semver.org spec 2.0.0")},
+			resources:    testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To("1.0.00")}}}}}),
+		},
+		"version-bad-spaces": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("instances").Index(0).Child("attributes").Index(0).Child("version"), " 1.0.0 ", "must be a string compatible with semver.org spec 2.0.0")},
+			resources:    testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName, NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{VersionValue: ptr.To(" 1.0.0 ")}}}}}),
+		},
 		"empty-attribute": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("instances").Index(0).Child("attributes").Index(0), "exactly one value must be set")},
 			resources:    testResources([]resourceapi.NamedResourcesInstance{{Name: goodName, Attributes: []resourceapi.NamedResourcesAttribute{{Name: goodName}}}}),
@@ -132,7 +169,9 @@ func TestValidateSelector(t *testing.T) {
 		"stringslice": {
 			selector: `attributes.stringslice["name"].isSorted()`,
 		},
-		// TODO: semver
+		"version": {
+			selector: `attributes.version["name"].isGreaterThan(semver("1.0.0"))`,
+		},
 	}
 
 	for name, scenario := range scenarios {

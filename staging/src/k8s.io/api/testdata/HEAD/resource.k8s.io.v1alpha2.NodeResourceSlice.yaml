@@ -47,5 +47,6 @@ namedResources:
       stringSlice:
         strings:
         - stringsValue
+      version: versionValue
     name: nameValue
 nodeName: nodeNameValue

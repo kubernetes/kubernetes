@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -63,6 +64,27 @@ func validateInstances(instances []resource.NamedResourcesInstance, fldPath *fie
 	return allErrs
 }
 
+var (
+	numericIdentifier = `(0|[1-9]\d*)`
+
+	preReleaseIdentifier = `(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)`
+
+	buildIdentifier = `[0-9a-zA-Z-]+`
+
+	semverRe = regexp.MustCompile(`^` +
+
+		// dot-separated version segments (e.g. 1.2.3)
+		numericIdentifier + `\.` + numericIdentifier + `\.` + numericIdentifier +
+
+		// optional dot-separated prerelease segments (e.g. -alpha.PRERELEASE.1)
+		`(-` + preReleaseIdentifier + `(\.` + preReleaseIdentifier + `)*)?` +
+
+		// optional dot-separated build identifier segments (e.g. +build.id.20240305)
+		`(\+` + buildIdentifier + `(\.` + buildIdentifier + `)*)?` +
+
+		`$`)
+)
+
 func validateAttributes(attributes []resource.NamedResourcesAttribute, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	attributeNames := sets.New[string]()
@@ -95,7 +117,12 @@ func validateAttributes(attributes []resource.NamedResourcesAttribute, fldPath *
 		if attribute.StringSliceValue != nil {
 			entries.Insert("stringSlice")
 		}
-		// TODO: VersionValue
+		if attribute.VersionValue != nil {
+			entries.Insert("version")
+			if !semverRe.MatchString(*attribute.VersionValue) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("version"), *attribute.VersionValue, "must be a string compatible with semver.org spec 2.0.0"))
+			}
+		}
 
 		switch len(entries) {
 		case 0:

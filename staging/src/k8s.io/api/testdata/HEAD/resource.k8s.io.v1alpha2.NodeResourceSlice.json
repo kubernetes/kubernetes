@@ -65,7 +65,8 @@
               "strings": [
                 "stringsValue"
               ]
-            }
+            },
+            "version": "versionValue"
           }
         ]
       }

@@ -183,6 +183,11 @@ func (in *NamedResourcesAttributeValue) DeepCopyInto(out *NamedResourcesAttribut
 		*out = new(NamedResourcesStringSlice)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.VersionValue != nil {
+		in, out := &in.VersionValue, &out.VersionValue
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

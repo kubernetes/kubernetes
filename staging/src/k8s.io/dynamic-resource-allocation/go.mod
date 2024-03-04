@@ -5,6 +5,7 @@ module k8s.io/dynamic-resource-allocation
 go 1.22.0
 
 require (
+	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v1.4.1
 	github.com/google/cel-go v0.17.8
 	github.com/google/go-cmp v0.6.0

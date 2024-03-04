@@ -14900,6 +14900,10 @@
         "stringSlice": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice",
           "description": "StringSliceValue is an array of strings."
+        },
+        "version": {
+          "description": "VersionValue is a semantic version according to semver.org spec 2.0.0.",
+          "type": "string"
         }
       },
       "required": [

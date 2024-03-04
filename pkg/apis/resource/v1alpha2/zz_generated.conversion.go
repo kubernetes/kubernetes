@@ -679,6 +679,7 @@ func autoConvert_v1alpha2_NamedResourcesAttributeValue_To_resource_NamedResource
 	out.IntSliceValue = (*resource.NamedResourcesIntSlice)(unsafe.Pointer(in.IntSliceValue))
 	out.StringValue = (*string)(unsafe.Pointer(in.StringValue))
 	out.StringSliceValue = (*resource.NamedResourcesStringSlice)(unsafe.Pointer(in.StringSliceValue))
+	out.VersionValue = (*string)(unsafe.Pointer(in.VersionValue))
 	return nil
 }
 
@@ -694,6 +695,7 @@ func autoConvert_resource_NamedResourcesAttributeValue_To_v1alpha2_NamedResource
 	out.IntSliceValue = (*v1alpha2.NamedResourcesIntSlice)(unsafe.Pointer(in.IntSliceValue))
 	out.StringValue = (*string)(unsafe.Pointer(in.StringValue))
 	out.StringSliceValue = (*v1alpha2.NamedResourcesStringSlice)(unsafe.Pointer(in.StringSliceValue))
+	out.VersionValue = (*string)(unsafe.Pointer(in.VersionValue))
 	return nil
 }
 

@@ -31,6 +31,7 @@ type NamedResourcesAttributeValueApplyConfiguration struct {
 	IntSliceValue    *NamedResourcesIntSliceApplyConfiguration    `json:"intSlice,omitempty"`
 	StringValue      *string                                      `json:"string,omitempty"`
 	StringSliceValue *NamedResourcesStringSliceApplyConfiguration `json:"stringSlice,omitempty"`
+	VersionValue     *string                                      `json:"version,omitempty"`
 }
 
 // NamedResourcesAttributeValueApplyConfiguration constructs an declarative configuration of the NamedResourcesAttributeValue type for use with
@@ -84,5 +85,13 @@ func (b *NamedResourcesAttributeValueApplyConfiguration) WithStringValue(value s
 // If called multiple times, the StringSliceValue field is set to the value of the last call.
 func (b *NamedResourcesAttributeValueApplyConfiguration) WithStringSliceValue(value *NamedResourcesStringSliceApplyConfiguration) *NamedResourcesAttributeValueApplyConfiguration {
 	b.StringSliceValue = value
+	return b
+}
+
+// WithVersionValue sets the VersionValue field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the VersionValue field is set to the value of the last call.
+func (b *NamedResourcesAttributeValueApplyConfiguration) WithVersionValue(value string) *NamedResourcesAttributeValueApplyConfiguration {
+	b.VersionValue = &value
 	return b
 }
