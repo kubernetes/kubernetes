@@ -193,6 +193,7 @@ func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *
 }
 
 func (r *withRetry) Before(ctx context.Context, request *Request) error {
+	logger := klog.FromContext(ctx)
 	// If the request context is already canceled there
 	// is no need to retry.
 	if ctx.Err() != nil {
@@ -209,14 +210,14 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		// we do a backoff sleep before the first attempt is made,
 		// (preserving current behavior).
 		if request.backoff != nil {
-			request.backoff.Sleep(request.backoff.CalculateBackoff(url))
+			request.backoff.Sleep(request.backoff.CalculateBackoffWithContext(ctx, url))
 		}
 		return nil
 	}
 
 	// if we are here, we have made attempt(s) at least once before.
 	if request.backoff != nil {
-		delay := request.backoff.CalculateBackoff(url)
+		delay := request.backoff.CalculateBackoffWithContext(ctx, url)
 		if r.retryAfter.Wait > delay {
 			delay = r.retryAfter.Wait
 		}
@@ -226,12 +227,12 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	// We are retrying the request that we already send to
 	// apiserver at least once before. This request should
 	// also be throttled with the client-internal rate limiter.
-	if err := request.tryThrottleWithInfo(ctx, r.retryAfter.Reason); err != nil {
+	if err := request.tryThrottleWithInfo(r.retryAfter.Reason); err != nil {
 		r.trackPreviousError(ctx.Err())
 		return err
 	}
-
-	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", r.retryAfter.Wait, r.retryAfter.Attempt, request.URL().String())
+	logger.V(4).Info("got a Retry-After response header",
+		"wait", r.retryAfter.Wait, "attempt", r.retryAfter.Attempt, "url", request.URL().String())
 	return nil
 }
 
@@ -258,9 +259,9 @@ func (r *withRetry) After(ctx context.Context, request *Request, resp *http.Resp
 
 	if request.c.base != nil {
 		if err != nil {
-			request.backoff.UpdateBackoff(request.URL(), err, 0)
+			request.backoff.UpdateBackoffWithContext(ctx, request.URL(), err, 0)
 		} else {
-			request.backoff.UpdateBackoff(request.URL(), err, resp.StatusCode)
+			request.backoff.UpdateBackoffWithContext(ctx, request.URL(), err, resp.StatusCode)
 		}
 	}
 }

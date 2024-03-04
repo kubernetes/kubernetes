@@ -508,11 +508,24 @@ func DefaultKubernetesUserAgent() string {
 // kubernetes gives to pods. It's intended for clients that expect to be
 // running inside a pod running on kubernetes. It will return ErrNotInCluster
 // if called from a process not running in a kubernetes environment.
+//
+//logcheck:context // Use InClusterConfigWithContext instead in code which supports contextual logging.
 func InClusterConfig() (*Config, error) {
+	return InClusterConfigWithContext(context.Background())
+}
+
+// InClusterConfig returns a config object which uses the service account
+// kubernetes gives to pods. It's intended for clients that expect to be
+// running inside a pod running on kubernetes. It will return ErrNotInCluster
+// if called from a process not running in a kubernetes environment.
+// This function supports contextual logging.
+func InClusterConfigWithContext(ctx context.Context) (*Config, error) {
 	const (
 		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	)
+	logger := klog.FromContext(ctx)
+
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {
 		return nil, ErrNotInCluster
@@ -526,7 +539,7 @@ func InClusterConfig() (*Config, error) {
 	tlsClientConfig := TLSClientConfig{}
 
 	if _, err := certutil.NewPool(rootCAFile); err != nil {
-		klog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+		logger.Error(err, "expected to load root CA config, but got an err", "rootCAFile", rootCAFile)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
 	}
