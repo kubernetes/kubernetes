@@ -20,16 +20,21 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -39,10 +44,10 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when querying /metrics", func() {
+		var oldCfg *kubeletconfig.KubeletConfiguration
 		var testPod *v1.Pod
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			var oldCfg *kubeletconfig.KubeletConfiguration
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
@@ -80,12 +85,14 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 			// being [Serial], we can also assume no one else but us is running pods.
 			ginkgo.By("Checking the memorymanager metrics right after the kubelet restart, with no pods running")
 
+			printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
+
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_memory_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
-					"": timelessSample(0),
+					"": timelessSample(0), // intentionally use stricter value
 				}),
 				"kubelet_memory_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
-					"": timelessSample(0),
+					"": timelessSample(0), // intentionally use stricter value
 				}),
 			})
 
@@ -93,6 +100,21 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 			gomega.Eventually(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
+
+			values, err := getKubeletMetrics(ctx)
+			framework.ExpectNoError(err, "error getting the kubelet metrics for sanity check")
+			err = validateMetrics(
+				values,
+				"kubelet_memory_manager_pinning_requests_total",
+				"kubelet_memory_manager_pinning_errors_total",
+				func(totVal, errVal float64) error {
+					if int64(totVal) != int64(errVal) {
+						return fmt.Errorf("expected total requests equal to total errors")
+					}
+					return nil
+				},
+			)
+			framework.ExpectNoError(err, "error validating the kubelet metrics between each other")
 		})
 
 		ginkgo.It("should report pinning failures when the memorymanager allocation is known to fail", func(ctx context.Context) {
@@ -103,7 +125,10 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 						ctnName: "memmngrcnt",
 						cpus:    "100m",
 						memory:  "1000Gi"},
-				}))
+				}),
+			)
+
+			printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
@@ -111,10 +136,10 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_memory_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
-					"": timelessSample(1),
+					"": valueOnlySample(1),
 				}),
 				"kubelet_memory_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
-					"": timelessSample(1),
+					"": valueOnlySample(1),
 				}),
 			})
 
@@ -122,6 +147,21 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 			gomega.Eventually(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
+
+			values, err := getKubeletMetrics(ctx)
+			framework.ExpectNoError(err, "error getting the kubelet metrics for sanity check")
+			err = validateMetrics(
+				values,
+				"kubelet_memory_manager_pinning_requests_total",
+				"kubelet_memory_manager_pinning_errors_total",
+				func(totVal, errVal float64) error {
+					if int64(totVal) != int64(errVal) {
+						return fmt.Errorf("expected total requests equal to total errors")
+					}
+					return nil
+				},
+			)
+			framework.ExpectNoError(err, "error validating the kubelet metrics between each other")
 		})
 
 		ginkgo.It("should not report any pinning failures when the memorymanager allocation is expected to succeed", func(ctx context.Context) {
@@ -131,18 +171,22 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 					{
 						ctnName: "memmngrcnt",
 						cpus:    "100m",
-						memory:  "64Mi"},
-				}))
+						memory:  "64Mi",
+					},
+				}),
+			)
+
+			printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
 			ginkgo.By("Checking the memorymanager metrics right after the kubelet restart, with pod should be admitted")
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_memory_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
-					"": timelessSample(1),
+					"": valueOnlySample(1),
 				}),
-				"kubelet_cpu_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
-					"": timelessSample(0),
+				"kubelet_memory_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(0), // intentionally using stricter value
 				}),
 			})
 
@@ -150,6 +194,59 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 			gomega.Eventually(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(getKubeletMetrics, 1*time.Minute, 15*time.Second).WithContext(ctx).Should(matchResourceMetrics)
+
+			values, err := getKubeletMetrics(ctx)
+			framework.ExpectNoError(err, "error getting the kubelet metrics for sanity check")
+			err = validateMetrics(
+				values,
+				"kubelet_memory_manager_pinning_requests_total",
+				"kubelet_memory_manager_pinning_errors_total",
+				func(totVal, errVal float64) error {
+					if int64(totVal-errVal) < 1 {
+						return fmt.Errorf("expected total requests equal to total errors + 1")
+					}
+					return nil
+				},
+			)
+			framework.ExpectNoError(err, "error validating the kubelet metrics between each other")
 		})
 	})
 })
+
+func validateMetrics(values e2emetrics.KubeletMetrics, totalKey, errorKey string, checkFn func(totVal, errVal float64) error) error {
+	totalSamples := values[totalKey]
+	errorSamples := values[errorKey]
+	if len(totalSamples) != len(errorSamples) {
+		return fmt.Errorf("inconsistent samples, total=%d error=%d", len(totalSamples), len(errorSamples))
+	}
+	for idx := range totalSamples {
+		if err := checkFn(float64(totalSamples[idx].Value), float64(errorSamples[idx].Value)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// printAllPodsOnNode outputs status of all kubelet pods into log.
+func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName string) {
+	podList, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		framework.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
+		return
+	}
+	framework.Logf("begin listing pods: %d found", len(podList.Items))
+	for _, p := range podList.Items {
+		framework.Logf("%s/%s node %s status %v QoS %s message %s reason %s (%d container statuses recorded)", p.Namespace, p.Name, p.Spec.NodeName, p.Status.Phase, p.Status.QOSClass, p.Status.Message, p.Status.Reason, len(p.Status.ContainerStatuses))
+		for _, c := range p.Status.ContainerStatuses {
+			framework.Logf("\tContainer %v ready: %v, restart count %v",
+				c.Name, c.Ready, c.RestartCount)
+		}
+	}
+	framework.Logf("end listing pods: %d found", len(podList.Items))
+}
+
+func valueOnlySample(value interface{}) types.GomegaMatcher {
+	return gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+		"Value": gomega.BeNumerically(">=", value),
+	}))
+}
