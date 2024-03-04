@@ -21,33 +21,40 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
 func TestFallbackDialer(t *testing.T) {
-	protocol := "v6.fake.k8s.io"
-	// If "shouldFallback" is false, then only primary should be dialed.
-	primary := &fakeDialer{dialed: false}
-	primary.negotiatedProtocol = protocol
-	secondary := &fakeDialer{dialed: false}
-	fallbackDialer := NewFallbackDialer(primary, secondary, alwaysFalse)
-	_, negotiated, err := fallbackDialer.Dial(protocol)
+	primaryProtocol := "primary.fake.protocol"
+	secondaryProtocol := "secondary.fake.protocol"
+	protocols := []string{primaryProtocol, secondaryProtocol}
+	// If primary dialer error is nil, then no fallback and primary negotiated protocol returned.
+	primary := &fakeDialer{dialed: false, negotiatedProtocol: primaryProtocol}
+	secondary := &fakeDialer{dialed: false, negotiatedProtocol: secondaryProtocol}
+	fallbackDialer := NewFallbackDialer(primary, secondary, notCalled)
+	_, negotiated, err := fallbackDialer.Dial(protocols...)
 	assert.True(t, primary.dialed, "no fallback; primary should have dialed")
-	assert.Equal(t, protocol, negotiated, "")
 	assert.False(t, secondary.dialed, "no fallback; secondary should *not* have dialed")
-	assert.Nil(t, err, "error should be nil")
-	// If "shouldFallback" is true, then primary AND secondary should be dialed.
-	primary.dialed = false // reset dialed field
-	primary.err = fmt.Errorf("bad handshake")
-	secondary.dialed = false // reset dialed field
-	secondary.negotiatedProtocol = protocol
-	fallbackDialer = NewFallbackDialer(primary, secondary, alwaysTrue)
-	_, negotiated, err = fallbackDialer.Dial(protocol)
-	assert.True(t, primary.dialed, "fallback; primary should have dialed (first)")
+	assert.Equal(t, primaryProtocol, negotiated, "primary negotiated protocol returned")
+	assert.Nil(t, err, "error from primary dialer should be nil")
+	// If primary dialer error is upgrade error, then fallback returning secondary dial response.
+	primary = &fakeDialer{dialed: false, negotiatedProtocol: primaryProtocol, err: &httpstream.UpgradeFailureError{}}
+	secondary = &fakeDialer{dialed: false, negotiatedProtocol: secondaryProtocol}
+	fallbackDialer = NewFallbackDialer(primary, secondary, httpstream.IsUpgradeFailure)
+	_, negotiated, err = fallbackDialer.Dial(protocols...)
+	assert.True(t, primary.dialed, "fallback; primary should have dialed")
 	assert.True(t, secondary.dialed, "fallback; secondary should have dialed")
-	assert.Equal(t, protocol, negotiated)
-	assert.Nil(t, err)
+	assert.Equal(t, secondaryProtocol, negotiated, "negotiated protocol is from secondary dialer")
+	assert.Nil(t, err, "error from secondary dialer should be nil")
+	// If primary dialer returns non-upgrade error, then primary error is returned.
+	nonUpgradeErr := fmt.Errorf("This is a non-upgrade error")
+	primary = &fakeDialer{dialed: false, err: nonUpgradeErr}
+	secondary = &fakeDialer{dialed: false}
+	fallbackDialer = NewFallbackDialer(primary, secondary, httpstream.IsUpgradeFailure)
+	_, _, err = fallbackDialer.Dial(protocols...)
+	assert.True(t, primary.dialed, "no fallback; primary should have dialed")
+	assert.False(t, secondary.dialed, "no fallback; secondary should *not* have dialed")
+	assert.Equal(t, nonUpgradeErr, err, "error is from primary dialer")
 }
 
-func alwaysTrue(err error) bool { return true }
-
-func alwaysFalse(err error) bool { return false }
+func notCalled(err error) bool { return false }
