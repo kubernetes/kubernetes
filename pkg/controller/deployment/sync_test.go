@@ -17,6 +17,9 @@ limitations under the License.
 package deployment
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"math"
 	"testing"
 	"time"
@@ -267,6 +270,9 @@ func TestScale(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, true)()
+			//test.deployment.Spec.PodReplacementPolicy = ptr.To(apps.TerminationComplete)
+
 			_ = olderTimestamp
 			t.Log(test.name)
 			fake := fake.Clientset{}
@@ -276,22 +282,26 @@ func TestScale(t *testing.T) {
 			}
 
 			if test.newRS != nil {
-				desiredReplicas := *(test.oldDeployment.Spec.Replicas)
+				tmpDesiredReplicas := test.oldDeployment.Spec.Replicas
 				if desired, ok := test.desiredReplicasAnnotations[test.newRS.Name]; ok {
-					desiredReplicas = desired
+					test.oldDeployment.Spec.Replicas = ptr.To(desired)
 				}
-				deploymentutil.SetReplicasAnnotations(test.newRS, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
+				annotationUpdate, _ := deploymentutil.ComputeReplicaSetScaleAnnotations(test.newRS, test.oldDeployment, false)
+				deploymentutil.SetReplicaSetScaleAnnotations(test.newRS, annotationUpdate)
+				test.oldDeployment.Spec.Replicas = tmpDesiredReplicas
 			}
 			for i := range test.oldRSs {
 				rs := test.oldRSs[i]
 				if rs == nil {
 					continue
 				}
-				desiredReplicas := *(test.oldDeployment.Spec.Replicas)
+				tmpDesiredReplicas := test.oldDeployment.Spec.Replicas
 				if desired, ok := test.desiredReplicasAnnotations[rs.Name]; ok {
-					desiredReplicas = desired
+					test.oldDeployment.Spec.Replicas = ptr.To(desired)
 				}
-				deploymentutil.SetReplicasAnnotations(rs, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
+				annotationUpdate, _ := deploymentutil.ComputeReplicaSetScaleAnnotations(rs, test.oldDeployment, false)
+				deploymentutil.SetReplicaSetScaleAnnotations(rs, annotationUpdate)
+				test.oldDeployment.Spec.Replicas = tmpDesiredReplicas
 			}
 
 			_, ctx := ktesting.NewTestContext(t)
