@@ -2199,7 +2199,6 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 		maxEndpointsPerSlice,
 		endpointsliceutil.NewEndpointSliceTracker(),
 		nil,
-		false,
 		eventRecorder,
 		controllerName,
 	)

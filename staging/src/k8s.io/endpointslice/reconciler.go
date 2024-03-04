@@ -59,6 +59,16 @@ type Reconciler struct {
 	controllerName string
 }
 
+type ReconcilerOption func(*Reconciler)
+
+// WithTrafficDistributionEnabled controls whether the Reconciler considers the
+// `trafficDistribution` field while reconciling EndpointSlices.
+func WithTrafficDistributionEnabled(enabled bool) ReconcilerOption {
+	return func(r *Reconciler) {
+		r.trafficDistributionEnabled = enabled
+	}
+}
+
 // endpointMeta includes the attributes we group slices on, this type helps with
 // that logic in Reconciler
 type endpointMeta struct {
@@ -327,18 +337,21 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 
 }
 
-func NewReconciler(client clientset.Interface, nodeLister corelisters.NodeLister, maxEndpointsPerSlice int32, endpointSliceTracker *endpointsliceutil.EndpointSliceTracker, topologyCache *topologycache.TopologyCache, trafficDistributionEnabled bool, eventRecorder record.EventRecorder, controllerName string) *Reconciler {
-	return &Reconciler{
-		client:                     client,
-		nodeLister:                 nodeLister,
-		maxEndpointsPerSlice:       maxEndpointsPerSlice,
-		endpointSliceTracker:       endpointSliceTracker,
-		metricsCache:               metrics.NewCache(maxEndpointsPerSlice),
-		topologyCache:              topologyCache,
-		trafficDistributionEnabled: trafficDistributionEnabled,
-		eventRecorder:              eventRecorder,
-		controllerName:             controllerName,
+func NewReconciler(client clientset.Interface, nodeLister corelisters.NodeLister, maxEndpointsPerSlice int32, endpointSliceTracker *endpointsliceutil.EndpointSliceTracker, topologyCache *topologycache.TopologyCache, eventRecorder record.EventRecorder, controllerName string, options ...ReconcilerOption) *Reconciler {
+	r := &Reconciler{
+		client:               client,
+		nodeLister:           nodeLister,
+		maxEndpointsPerSlice: maxEndpointsPerSlice,
+		endpointSliceTracker: endpointSliceTracker,
+		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
+		topologyCache:        topologyCache,
+		eventRecorder:        eventRecorder,
+		controllerName:       controllerName,
 	}
+	for _, option := range options {
+		option(r)
+	}
+	return r
 }
 
 // placeholderSliceCompare is a conversion func for comparing two placeholder endpoint slices.
