@@ -28,6 +28,14 @@ type FakeAdmissionregistrationV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAdmissionregistrationV1alpha1) MutatingAdmissionPolicies() v1alpha1.MutatingAdmissionPolicyInterface {
+	return &FakeMutatingAdmissionPolicies{c}
+}
+
+func (c *FakeAdmissionregistrationV1alpha1) MutatingAdmissionPolicyBindings() v1alpha1.MutatingAdmissionPolicyBindingInterface {
+	return &FakeMutatingAdmissionPolicyBindings{c}
+}
+
 func (c *FakeAdmissionregistrationV1alpha1) ValidatingAdmissionPolicies() v1alpha1.ValidatingAdmissionPolicyInterface {
 	return &FakeValidatingAdmissionPolicies{c}
 }
