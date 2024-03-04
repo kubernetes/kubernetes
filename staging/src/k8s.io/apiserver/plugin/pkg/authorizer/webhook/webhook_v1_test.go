@@ -315,11 +315,18 @@ type mockV1Service struct {
 	allow      bool
 	statusCode int
 	called     int
+
+	// reviewHook is called just before returning from the Review() method
+	reviewHook func(*authorizationv1.SubjectAccessReview)
 }
 
 func (m *mockV1Service) Review(r *authorizationv1.SubjectAccessReview) {
 	m.called++
 	r.Status.Allowed = m.allow
+
+	if m.reviewHook != nil {
+		m.reviewHook(r)
+	}
 }
 func (m *mockV1Service) Allow()              { m.allow = true }
 func (m *mockV1Service) Deny()               { m.allow = false }
@@ -1414,5 +1421,6 @@ func celAuthorizerMetrics() metrics.AuthorizerMetrics {
 
 type celAuthorizerMetricsType struct {
 	metrics.NoopRequestMetrics
+	metrics.NoopWebhookMetrics
 	celmetrics.MatcherMetrics
 }

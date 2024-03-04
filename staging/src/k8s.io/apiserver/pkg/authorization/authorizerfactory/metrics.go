@@ -60,6 +60,8 @@ var (
 var _ = webhookmetrics.AuthorizerMetrics(delegatingAuthorizerMetrics{})
 
 type delegatingAuthorizerMetrics struct {
+	// no-op for webhook metrics for now, delegating authorization reports original total/latency metrics
+	webhookmetrics.NoopWebhookMetrics
 	// no-op for matchCondition metrics for now, delegating authorization doesn't configure match conditions
 	celmetrics.NoopMatcherMetrics
 }
