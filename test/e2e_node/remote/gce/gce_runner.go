@@ -646,7 +646,10 @@ func (g *GCERunner) imageToInstanceName(imageConfig *internalGCEImage) string {
 	// different machine types with the same image in parallel
 	name := imageConfig.machine + "-" + imageConfig.image + "-" + uuid.New().String()[:8]
 	// Sometimes the image is too long, we need instance names to have a max length of 63
-	return name[:63]
+	if len(name) > 63 {
+		return name[:63]
+	}
+	return name
 }
 
 func (g *GCERunner) registerGceHostIP(host string) error {
