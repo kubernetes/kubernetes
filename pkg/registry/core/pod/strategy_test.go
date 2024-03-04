@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -2580,6 +2581,23 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, map[string]string{
 				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": "not-a-real-type",
 			}, pod.Annotations)
+			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
+			assert.Nil(t, pod.Spec.SecurityContext)
+		},
+	}, {
+		description: "Invalid localhost annotation",
+		pod: &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + strings.Repeat("a", 4096),
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{{Name: "ctr"}},
+			},
+		},
+		validation: func(t *testing.T, pod *api.Pod) {
+			assert.Contains(t, pod.Annotations, api.DeprecatedAppArmorAnnotationKeyPrefix+"ctr")
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
 			assert.Nil(t, pod.Spec.SecurityContext)
 		},

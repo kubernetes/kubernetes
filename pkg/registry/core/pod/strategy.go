@@ -802,6 +802,10 @@ func applyAppArmorVersionSkew(pod *api.Pod) {
 				}
 			} else if containerProfile == nil {
 				newField := apparmorFieldForAnnotation(annotation)
+				if errs := corevalidation.ValidateAppArmorProfileField(newField, &field.Path{}); len(errs) > 0 {
+					// Skip copying invalid value.
+					newField = nil
+				}
 
 				// Only copy the annotation to the field if it is different from the pod-level profile.
 				if newField != nil && !apiequality.Semantic.DeepEqual(newField, podProfile) {

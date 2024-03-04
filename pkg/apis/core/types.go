@@ -3650,6 +3650,7 @@ type AppArmorProfile struct {
 	LocalhostProfile *string
 }
 
+// +enum
 type AppArmorProfileType string
 
 const (

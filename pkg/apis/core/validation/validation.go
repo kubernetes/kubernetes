@@ -4663,7 +4663,7 @@ func validateSeccompProfileType(fldPath *field.Path, seccompProfileType core.Sec
 	}
 }
 
-func validateAppArmorProfileField(profile *core.AppArmorProfile, fldPath *field.Path) field.ErrorList {
+func ValidateAppArmorProfileField(profile *core.AppArmorProfile, fldPath *field.Path) field.ErrorList {
 	if profile == nil {
 		return nil
 	}
@@ -4680,6 +4680,11 @@ func validateAppArmorProfileField(profile *core.AppArmorProfile, fldPath *field.
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), *profile.LocalhostProfile, "must not be padded with whitespace"))
 			} else if localhostProfile == "" {
 				allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when AppArmor type is Localhost"))
+			}
+
+			const maxLocalhostProfileLength = 4095 // PATH_MAX - 1
+			if len(*profile.LocalhostProfile) > maxLocalhostProfileLength {
+				allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("localhostProfile"), *profile.LocalhostProfile, maxLocalhostProfileLength))
 			}
 		}
 
@@ -4894,7 +4899,7 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 
 		allErrs = append(allErrs, validateSeccompProfileField(securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
-		allErrs = append(allErrs, validateAppArmorProfileField(securityContext.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
+		allErrs = append(allErrs, ValidateAppArmorProfileField(securityContext.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 	}
 
 	return allErrs
@@ -7181,7 +7186,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 	}
 
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
-	allErrs = append(allErrs, validateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
+	allErrs = append(allErrs, ValidateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 
 	return allErrs
 }
