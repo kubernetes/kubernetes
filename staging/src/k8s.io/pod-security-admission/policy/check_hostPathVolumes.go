@@ -61,7 +61,7 @@ func hostPathVolumesV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSp
 	for i, volume := range podSpec.Volumes {
 		if volume.HostPath != nil {
 			if opts.withFieldErrors {
-				hostVolumes.Add(volume.Name, forbidden(specPath.Child("volumes").Index(i).Child("hostPath")))
+				hostVolumes.Add(volume.Name, withBadValue(forbidden(specPath.Child("volumes").Index(i).Child("hostPath")), volume.HostPath.Path))
 			} else {
 				hostVolumes.Add(volume.Name)
 			}
