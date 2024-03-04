@@ -195,5 +195,8 @@ func (p *streamProtocolV2) stream(conn streamCreator) error {
 type errorDecoderV2 struct{}
 
 func (d *errorDecoderV2) decode(message []byte) error {
-	return fmt.Errorf("error executing remote command: %s", message)
+	if len(message) > 0 {
+		return fmt.Errorf("error executing remote command: %s", message)
+	}
+	return nil
 }

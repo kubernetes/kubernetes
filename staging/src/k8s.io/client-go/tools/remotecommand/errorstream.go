@@ -42,10 +42,8 @@ func watchErrorStream(errorStream io.Reader, d errorStreamDecoder) chan error {
 		switch {
 		case err != nil && err != io.EOF:
 			errorChan <- fmt.Errorf("error reading from error stream: %s", err)
-		case len(message) > 0:
-			errorChan <- d.decode(message)
 		default:
-			errorChan <- nil
+			errorChan <- d.decode(message)
 		}
 		close(errorChan)
 	}()
