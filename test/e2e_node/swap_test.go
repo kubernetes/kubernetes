@@ -19,10 +19,17 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
+	"math/big"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -39,8 +46,15 @@ import (
 )
 
 const (
-	cgroupBasePath        = "/sys/fs/cgroup/"
-	cgroupV2SwapLimitFile = "memory.swap.max"
+	cgroupBasePath                 = "/sys/fs/cgroup/"
+	cgroupV2SwapLimitFile          = "memory.swap.max"
+	cgroupV2swapCurrentUsageFile   = "memory.swap.current"
+	cgroupV2MemoryCurrentUsageFile = "memory.current"
+)
+
+var (
+	noRequests *resource.Quantity = nil
+	noLimits   *resource.Quantity = nil
 )
 
 var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
@@ -59,25 +73,187 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 
 			if !isSwapFeatureGateEnabled() || !isCgroupV2 || isNoSwap || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
 				ginkgo.By(fmt.Sprintf("Expecting no swap. isNoSwap? %t, feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isNoSwap, isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
-				expectNoSwap(f, pod)
+				expectNoSwap(pod)
 				return
 			}
 
 			if !isLimitedSwap {
 				ginkgo.By("expecting no swap")
-				expectNoSwap(f, pod)
+				expectNoSwap(pod)
 				return
 			}
 
 			ginkgo.By("expecting limited swap")
 			expectedSwapLimit := calcSwapForBurstablePod(f, pod)
-			expectLimitedSwap(f, pod, expectedSwapLimit)
+			expectLimitedSwap(pod, expectedSwapLimit)
 		},
 			ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
 			ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
 			ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
 			ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
 		)
+	})
+
+	f.Context(framework.WithSerial(), func() {
+		// These tests assume the following, and will fail otherwise:
+		// - The node is provisioned with swap
+		// - The node is configured with cgroup v2
+		// - The swap feature gate is enabled
+		// - The node has no more than 15GB of memory
+		f.Context("with swap stress", func() {
+			var (
+				nodeName           string
+				nodeTotalMemory    *resource.Quantity
+				nodeUsedMemory     *resource.Quantity
+				swapCapacity       *resource.Quantity
+				stressMemAllocSize *resource.Quantity
+				podClient          *e2epod.PodClient
+			)
+
+			ginkgo.BeforeEach(func() {
+				podClient = e2epod.NewPodClient(f)
+
+				sleepingPod := getSleepingPod(f.Namespace.Name)
+				sleepingPod = runPodAndWaitUntilScheduled(f, sleepingPod)
+				gomega.Expect(isPodCgroupV2(f, sleepingPod)).To(gomega.BeTrue(), "node uses cgroup v1")
+
+				nodeName = sleepingPod.Spec.NodeName
+				gomega.Expect(nodeName).ToNot(gomega.BeEmpty(), "node name is empty")
+
+				nodeTotalMemory, nodeUsedMemory = getMemoryCapacity(f, nodeName)
+				gomega.Expect(nodeTotalMemory.IsZero()).To(gomega.BeFalse(), "node memory capacity is zero")
+				gomega.Expect(nodeUsedMemory.IsZero()).To(gomega.BeFalse(), "node used memory is zero")
+
+				swapCapacity = getSwapCapacity(f, sleepingPod)
+				gomega.Expect(swapCapacity.IsZero()).To(gomega.BeFalse(), "node swap capacity is zero")
+
+				err := podClient.Delete(context.Background(), sleepingPod.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+
+				stressMemAllocSize = multiplyQuantity(divideQuantity(nodeTotalMemory, 1000), 4)
+
+				ginkgo.By(fmt.Sprintf("Setting node values. nodeName: %s, nodeTotalMemory: %s, nodeUsedMemory: %s, swapCapacity: %s, stressMemAllocSize: %s",
+					nodeName, nodeTotalMemory.String(), nodeUsedMemory.String(), swapCapacity.String(), stressMemAllocSize.String()))
+			})
+
+			ginkgo.Context("LimitedSwap", func() {
+				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+					msg := "swap behavior is already set to LimitedSwap"
+
+					if swapBehavior := initialConfig.MemorySwap.SwapBehavior; swapBehavior != types.LimitedSwap {
+						initialConfig.MemorySwap.SwapBehavior = types.LimitedSwap
+						msg = "setting swap behavior to LimitedSwap"
+					}
+
+					ginkgo.By(msg)
+				})
+
+				getRequestBySwapLimit := func(swapPercentage int64) *resource.Quantity {
+					gomega.ExpectWithOffset(1, swapPercentage).To(gomega.And(
+						gomega.BeNumerically(">=", 1),
+						gomega.BeNumerically("<=", 100),
+					), "percentage has to be between 1 and 100")
+
+					// <swap-limit> = <memory-request>*(<swap-capacity>/<node-capacity>).
+					// if x is the percentage, and <memory-request> == (x/100)*<node-capacity>, then:
+					// <swap-limit> = (x/100)*<node-capacity>*(<swap-capacity>/<node-capacity>) = (x/100)*<swap-capacity>.
+					return multiplyQuantity(divideQuantity(nodeTotalMemory, 100), swapPercentage)
+				}
+
+				getStressPod := func(stressSize *resource.Quantity) *v1.Pod {
+					pod := getStressPod(f, stressSize, stressMemAllocSize)
+					pod.Spec.NodeName = nodeName
+
+					return pod
+				}
+
+				ginkgo.It("should be able over-commit the node memory", func() {
+					stressSize := cloneQuantity(nodeTotalMemory)
+
+					stressPod := getStressPod(stressSize)
+					// Request will use a lot more swap memory than needed, since we don't test swap limits in this test
+					memRequest := getRequestBySwapLimit(30)
+					setPodMmoryResources(stressPod, memRequest, noLimits)
+					gomega.Expect(qos.GetPodQOS(stressPod)).To(gomega.Equal(v1.PodQOSBurstable))
+
+					ginkgo.By(fmt.Sprintf("creating a stress pod with stress size %s and request of %s", stressSize.String(), memRequest.String()))
+					stressPod = runPodAndWaitUntilScheduled(f, stressPod)
+
+					ginkgo.By("Expecting the swap usage to be non-zero")
+					var swapUsage *resource.Quantity
+					gomega.Eventually(func() error {
+						stressPod = getUpdatedPod(f, stressPod)
+						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
+
+						var err error
+						swapUsage, err = getSwapUsage(stressPod)
+						if err != nil {
+							return err
+						}
+
+						if swapUsage.IsZero() {
+							return fmt.Errorf("swap usage is zero")
+						}
+
+						return nil
+					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
+
+					// Better to delete the stress pod ASAP to avoid node failures
+					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err)
+				})
+
+				ginkgo.It("should be able to use more memory than memory limits", func() {
+					stressSize := divideQuantity(nodeTotalMemory, 5)
+					ginkgo.By("Creating a stress pod with stress size: " + stressSize.String())
+					stressPod := getStressPod(stressSize)
+
+					memoryLimit := cloneQuantity(stressSize)
+					memoryLimit.Sub(resource.MustParse("50Mi"))
+					memoryRequest := divideQuantity(memoryLimit, 2)
+					ginkgo.By("Adding memory request of " + memoryRequest.String() + " and memory limit of " + memoryLimit.String())
+					setPodMmoryResources(stressPod, memoryRequest, memoryLimit)
+					gomega.Expect(qos.GetPodQOS(stressPod)).To(gomega.Equal(v1.PodQOSBurstable))
+
+					var swapUsage, memoryUsage *resource.Quantity
+					// This is sanity check to ensure that swap usage is not caused by a system-level pressure, but
+					// due to a container-level (cgroup-level) pressure that's caused because of the memory limits.
+					minExpectedMemoryUsage := multiplyQuantity(divideQuantity(memoryLimit, 4), 3)
+
+					stressPod = runPodAndWaitUntilScheduled(f, stressPod)
+
+					ginkgo.By("Expecting the pod exceed limits and avoid an OOM kill since it would use swap")
+					gomega.Eventually(func() error {
+						stressPod = getUpdatedPod(f, stressPod)
+						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
+
+						var err error
+						swapUsage, err = getSwapUsage(stressPod)
+						if err != nil {
+							return err
+						}
+
+						memoryUsage, err = getMemoryUsage(stressPod)
+						if err != nil {
+							return err
+						}
+
+						if memoryUsage.Cmp(*minExpectedMemoryUsage) == -1 {
+							return fmt.Errorf("memory usage (%s) is smaller than minimum expected memory usage (%s)", memoryUsage.String(), minExpectedMemoryUsage.String())
+						}
+						if swapUsage.IsZero() {
+							return fmt.Errorf("swap usage is zero")
+						}
+
+						return nil
+					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed())
+
+					// Better to delete the stress pod ASAP to avoid node failures
+					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err)
+				})
+			})
+		})
 	})
 })
 
@@ -133,14 +309,41 @@ func getSleepingPod(namespace string) *v1.Pod {
 	}
 }
 
+func getStressPod(f *framework.Framework, stressSize, memAllocSize *resource.Quantity) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "stress-pod-" + rand.String(5),
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:            "stress-container",
+					Image:           "registry.k8s.io/stress:v1",
+					ImagePullPolicy: v1.PullAlways,
+					Args:            []string{"-mem-alloc-size", memAllocSize.String(), "-mem-alloc-sleep", "500ms", "-mem-total", strconv.Itoa(int(stressSize.Value()))},
+				},
+			},
+		},
+	}
+}
+
+func getUpdatedPod(f *framework.Framework, pod *v1.Pod) *v1.Pod {
+	podClient := e2epod.NewPodClient(f)
+	pod, err := podClient.Get(context.Background(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	return pod
+}
+
 func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 	ginkgo.By("running swap test pod")
 	podClient := e2epod.NewPodClient(f)
 
 	pod = podClient.CreateSync(context.Background(), pod)
-	pod, err := podClient.Get(context.Background(), pod.Name, metav1.GetOptions{})
+	pod = getUpdatedPod(f, pod)
 
-	framework.ExpectNoError(err)
 	isReady, err := testutils.PodRunningReady(pod)
 	framework.ExpectNoError(err)
 	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrue(), "pod should be ready")
@@ -153,15 +356,6 @@ func isSwapFeatureGateEnabled() bool {
 	return e2eskipper.IsFeatureGateEnabled(features.NodeSwap)
 }
 
-func readCgroupFile(f *framework.Framework, pod *v1.Pod, filename string) string {
-	filePath := filepath.Join(cgroupBasePath, filename)
-
-	ginkgo.By("reading cgroup file " + filePath)
-	output := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-ec", "cat "+filePath)
-
-	return output
-}
-
 func isPodCgroupV2(f *framework.Framework, pod *v1.Pod) bool {
 	ginkgo.By("figuring is test pod runs cgroup v2")
 	output := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-ec", `if test -f "/sys/fs/cgroup/cgroup.controllers"; then echo "true"; else echo "false"; fi`)
@@ -169,14 +363,20 @@ func isPodCgroupV2(f *framework.Framework, pod *v1.Pod) bool {
 	return output == "true"
 }
 
-func expectNoSwap(f *framework.Framework, pod *v1.Pod) {
-	swapLimit := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
-	gomega.ExpectWithOffset(1, swapLimit).To(gomega.Equal("0"), "max swap allowed should be zero")
+func expectNoSwap(pod *v1.Pod) {
+	ginkgo.By("expecting no swap")
+	const offest = 1
+
+	swapLimit, err := readCgroupFile(pod, cgroupV2SwapLimitFile)
+	gomega.ExpectWithOffset(offest, err).ToNot(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(offest, swapLimit).To(gomega.Equal("0"), "max swap allowed should be zero")
 }
 
 // supports v2 only as v1 shouldn't support LimitedSwap
-func expectLimitedSwap(f *framework.Framework, pod *v1.Pod, expectedSwapLimit int64) {
-	swapLimitStr := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
+func expectLimitedSwap(pod *v1.Pod, expectedSwapLimit int64) {
+	ginkgo.By("expecting limited swap")
+	swapLimitStr, err := readCgroupFile(pod, cgroupV2SwapLimitFile)
+	framework.ExpectNoError(err)
 
 	swapLimit, err := strconv.Atoi(swapLimitStr)
 	framework.ExpectNoError(err, "cannot convert swap limit to int")
@@ -210,8 +410,8 @@ func getMemoryCapacity(f *framework.Framework, nodeName string) (memCapacity, us
 	framework.ExpectNoError(err, fmt.Sprintf("failed getting node %s", nodeName))
 
 	nodeOrigCapacity := node.Status.Capacity[v1.ResourceMemory]
-	memCapacity = cloneQuantity(nodeOrigCapacity)
-	usedMemory = cloneQuantity(nodeOrigCapacity)
+	memCapacity = cloneQuantity(&nodeOrigCapacity)
+	usedMemory = cloneQuantity(&nodeOrigCapacity)
 
 	usedMemory.Sub(node.Status.Allocatable[v1.ResourceMemory])
 	return
@@ -246,7 +446,128 @@ func isNoSwap(f *framework.Framework, pod *v1.Pod) bool {
 	return kubeletCfg.MemorySwap.SwapBehavior == types.NoSwap || kubeletCfg.MemorySwap.SwapBehavior == ""
 }
 
-func cloneQuantity(resource resource.Quantity) *resource.Quantity {
+func cloneQuantity(resource *resource.Quantity) *resource.Quantity {
 	clone := resource.DeepCopy()
 	return &clone
+}
+
+func divideQuantity(quantity *resource.Quantity, divideBy int64) *resource.Quantity {
+	dividedBigInt := new(big.Int).Div(
+		quantity.AsDec().UnscaledBig(),
+		big.NewInt(divideBy),
+	)
+
+	return resource.NewQuantity(dividedBigInt.Int64(), quantity.Format)
+}
+
+func multiplyQuantity(quantity *resource.Quantity, multiplier int64) *resource.Quantity {
+	product := new(big.Int).Mul(
+		quantity.AsDec().UnscaledBig(),
+		big.NewInt(multiplier),
+	)
+
+	return resource.NewQuantity(product.Int64(), quantity.Format)
+}
+
+func multiplyQuantities(quantity1, quantity2 *resource.Quantity) *resource.Quantity {
+	product := new(big.Int).Mul(quantity1.AsDec().UnscaledBig(), quantity2.AsDec().UnscaledBig())
+
+	return resource.NewQuantity(product.Int64(), quantity1.Format)
+}
+
+func getPodCgroupPath(pod *v1.Pod) string {
+	podQos := qos.GetPodQOS(pod)
+	cgroupQosComponent := ""
+
+	switch podQos {
+	case v1.PodQOSBestEffort:
+		cgroupQosComponent = bestEffortCgroup
+	case v1.PodQOSBurstable:
+		cgroupQosComponent = burstableCgroup
+	}
+
+	var rootCgroupName cm.CgroupName
+	if cgroupQosComponent != "" {
+		rootCgroupName = cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, cgroupQosComponent)
+	} else {
+		rootCgroupName = cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)
+	}
+
+	cgroupsToVerify := "pod" + string(pod.UID)
+	cgroupName := cm.NewCgroupName(rootCgroupName, cgroupsToVerify)
+	cgroupFsPath := toCgroupFsName(cgroupName)
+
+	return filepath.Join(cgroupBasePath, cgroupFsPath)
+}
+
+func readCgroupFile(pod *v1.Pod, cgroupFile string) (string, error) {
+	cgroupPath := getPodCgroupPath(pod)
+	cgroupFilePath := filepath.Join(cgroupPath, cgroupFile)
+
+	ginkgo.By("Reading cgroup file: " + cgroupFilePath)
+	cmd := "cat " + cgroupFilePath
+	outputBytes, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("error running cmd %s: %w", cmd, err)
+	}
+
+	outputStr := strings.TrimSpace(string(outputBytes))
+	ginkgo.By("cgroup found value: " + outputStr)
+
+	return outputStr, nil
+}
+
+func parseBytesStrToQuantity(bytesStr string) (*resource.Quantity, error) {
+	bytesInt, err := strconv.ParseInt(bytesStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing swap usage %s to int: %w", bytesStr, err)
+	}
+
+	return resource.NewQuantity(bytesInt, resource.BinarySI), nil
+}
+
+func getSwapUsage(pod *v1.Pod) (*resource.Quantity, error) {
+	outputStr, err := readCgroupFile(pod, cgroupV2swapCurrentUsageFile)
+	if err != nil {
+		return nil, err
+	}
+
+	ginkgo.By("swap usage found: " + outputStr + " bytes")
+
+	return parseBytesStrToQuantity(outputStr)
+}
+
+func getMemoryUsage(pod *v1.Pod) (*resource.Quantity, error) {
+	outputStr, err := readCgroupFile(pod, cgroupV2MemoryCurrentUsageFile)
+	if err != nil {
+		return nil, err
+	}
+
+	ginkgo.By("memory usage found: " + outputStr + " bytes")
+
+	return parseBytesStrToQuantity(outputStr)
+}
+
+// Sets memory request or limit can be null, then it's dismissed.
+// Sets the same value for all containers.
+func setPodMmoryResources(pod *v1.Pod, memoryRequest, memoryLimit *resource.Quantity) {
+	for i := range pod.Spec.Containers {
+		resources := &pod.Spec.Containers[i].Resources
+
+		if memoryRequest != nil {
+			if resources.Requests == nil {
+				resources.Requests = make(map[v1.ResourceName]resource.Quantity)
+			}
+
+			resources.Requests[v1.ResourceMemory] = *memoryRequest
+		}
+
+		if memoryLimit != nil {
+			if resources.Limits == nil {
+				resources.Limits = make(map[v1.ResourceName]resource.Quantity)
+			}
+
+			resources.Limits[v1.ResourceMemory] = *memoryLimit
+		}
+	}
 }
