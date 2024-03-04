@@ -54,6 +54,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -336,7 +337,7 @@ func TestRequestBody(t *testing.T) {
 }
 
 func TestResultIntoWithErrReturnsErr(t *testing.T) {
-	res := Result{err: errors.New("test")}
+	res := Result{err: errors.New("test"), logger: klog.Background()}
 	if err := res.Into(&v1.Pod{}); err != res.err {
 		t.Errorf("should have returned exact error from result")
 	}
@@ -346,6 +347,7 @@ func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
 	res := Result{
 		body:    []byte{},
 		decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+		logger:  klog.Background(),
 	}
 	if err := res.Into(&v1.Pod{}); err == nil || !strings.Contains(err.Error(), "0-length") {
 		t.Errorf("should have complained about 0 length body")
@@ -601,7 +603,7 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(test.Response, &http.Request{}, klog.Background())
 		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -765,7 +767,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(test.Response, &http.Request{}, klog.Background())
 		_, err := result.body, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -897,7 +899,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 				resourceName: testCase.Name,
 				resource:     testCase.Resource,
 			}
-			result := r.transformResponse(testCase.Res, testCase.Req)
+			result := r.transformResponse(testCase.Res, testCase.Req, klog.Background())
 			err := result.err
 			if !testCase.ErrFn(err) {
 				t.Fatalf("unexpected error: %v", err)
@@ -1502,32 +1504,27 @@ func TestBackoffLifecycle(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusGatewayTimeout)
-		return
 	}))
 	defer testServer.Close()
 	c := testRESTClient(t, testServer)
-
+	_, ctx := ktesting.NewTestContext(t)
 	// Test backoff recovery and increase.  This correlates to the constants
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
 	clock := testingclock.FakeClock{}
-	request.backoff = &URLBackoff{
-		// Use a fake backoff here to avoid flakes and speed the test up.
-		Backoff: flowcontrol.NewFakeBackOff(
-			time.Duration(1)*time.Second,
-			time.Duration(200)*time.Second,
-			&clock,
-		)}
+	// Use a fake backoff here to avoid flakes and speed the test up.
+	request.backoff = NewURLBackoff(flowcontrol.NewFakeBackOff(
+		time.Duration(1)*time.Second, time.Duration(200)*time.Second, &clock))
 
 	for _, sec := range seconds {
-		thisBackoff := request.backoff.CalculateBackoff(request.URL())
+		thisBackoff := request.backoff.CalculateBackoffWithContext(ctx, request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
 		if thisBackoff != time.Duration(sec)*time.Second {
 			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
 		}
 		now := clock.Now()
-		request.DoRaw(context.Background())
+		request.DoRaw(ctx)
 		elapsed := clock.Since(now)
 		if clock.Since(now) != thisBackoff {
 			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
@@ -1542,7 +1539,14 @@ type testBackoffManager struct {
 func (b *testBackoffManager) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
 }
 
+func (b *testBackoffManager) UpdateBackoffWithContext(ctx context.Context, actualUrl *url.URL, err error, responseCode int) {
+}
+
 func (b *testBackoffManager) CalculateBackoff(actualUrl *url.URL) time.Duration {
+	return time.Duration(0)
+}
+
+func (b *testBackoffManager) CalculateBackoffWithContext(ctx context.Context, actualUrl *url.URL) time.Duration {
 	return time.Duration(0)
 }
 
@@ -1979,7 +1983,7 @@ func TestBody(t *testing.T) {
 		{typedObject, "", nil},
 	}
 	for i, tt := range tests {
-		r := c.Post().Body(tt.input)
+		r := c.Post().Context(context.Background()).Body(tt.input)
 		if r.err != nil {
 			t.Errorf("%d: r.Body(%#v) error: %v", i, tt, r.err)
 			continue
@@ -1992,7 +1996,7 @@ func TestBody(t *testing.T) {
 			}
 		}
 
-		req, err := r.newHTTPRequest(context.Background())
+		req, err := r.newHTTPRequest()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2341,16 +2345,19 @@ func TestTruncateBody(t *testing.T) {
 			want:  buildString(20000),
 		},
 	}
-
+	var level klog.Level
 	l := flag.Lookup("v").Value.(flag.Getter).Get().(klog.Level)
 	for _, test := range tests {
-		flag.Set("v", test.level)
-		got := truncateBody(test.body)
+		err := level.Set(test.level)
+		if err != nil {
+			t.Error(err)
+		}
+		got := truncateBody(test.body, klog.TODO())
 		if got != test.want {
 			t.Errorf("truncateBody(%v) = %v, want %v", test.body, got, test.want)
 		}
 	}
-	flag.Set("v", l.String())
+	_ = flag.Set("v", l.String())
 }
 
 func defaultResourcePathWithPrefix(prefix, resource, namespace, name string) string {
@@ -2446,13 +2453,14 @@ func TestThrottledLogger(t *testing.T) {
 	clock := testingclock.NewFakeClock(now)
 	globalThrottledLogger.clock = clock
 
+	logger := klog.Background()
 	logMessages := 0
 	for i := 0; i < 1000; i++ {
 		var wg sync.WaitGroup
 		wg.Add(10)
 		for j := 0; j < 10; j++ {
 			go func() {
-				if _, ok := globalThrottledLogger.attemptToLog(); ok {
+				if _, ok := globalThrottledLogger.attemptToLog(logger); ok {
 					logMessages++
 				}
 				wg.Done()
@@ -2676,7 +2684,7 @@ func TestRequestWithRetry(t *testing.T) {
 			roundTripInvokedExpected:     1,
 		},
 	}
-
+	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var roundTripInvoked int
@@ -2694,10 +2702,11 @@ func TestRequestWithRetry(t *testing.T) {
 				backoff:    &noSleepBackOff{},
 				maxRetries: 1,
 				retryFn:    defaultRequestRetryFn,
+				ctx:        ctx,
 			}
 
 			var transformFuncInvoked int
-			err := req.request(context.Background(), func(request *http.Request, response *http.Response) {
+			err := req.request(func(request *http.Request, response *http.Response) {
 				transformFuncInvoked++
 			})
 
@@ -3018,6 +3027,10 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Wait(ctx context.Context) err
 }
 
 func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *url.URL) time.Duration {
+	return lb.CalculateBackoffWithContext(context.Background(), actualUrl)
+}
+
+func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoffWithContext(ctx context.Context, actualUrl *url.URL) time.Duration {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.CalculateBackoff")
 
 	waitFor := lb.calculateBackoffFn(lb.calculateBackoffSeq)
@@ -3026,6 +3039,10 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *u
 }
 
 func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+	lb.UpdateBackoffWithContext(context.Background(), actualUrl, err, responseCode)
+}
+
+func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoffWithContext(ctx context.Context, actualUrl *url.URL, err error, responseCode int) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.UpdateBackoff")
 }
 
