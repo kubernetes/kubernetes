@@ -53,7 +53,9 @@ func NewTunnelingHandler(upgradeHandler http.Handler) *TunnelingHandler {
 
 // ServeHTTP uses the upgradeHandler to tunnel between a downstream tunneling
 // connection and an upstream SPDY connection. The tunneling connection is
-// a wrapped WebSockets connection which communicates SPDY framed data.
+// a wrapped WebSockets connection which communicates SPDY framed data. In the
+// case the upstream upgrade fails, we delegate communication to the passed
+// in "w" ResponseWriter.
 func (h *TunnelingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	klog.V(4).Infoln("TunnelingHandler ServeHTTP")
 
@@ -65,8 +67,13 @@ func (h *TunnelingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	spdyRequest := createSPDYRequest(req, spdyProtocols...)
 
+	// The fields "w" and "conn" are mutually exclusive. Either a successful upgrade occurs
+	// and the "conn" is hijacked and used in the subsequent upgradeHandler, or
+	// the upgrade failed, and "w" is the delegate used for the non-upgrade response.
 	writer := &tunnelingResponseWriter{
+		// "w" is used in the non-upgrade error cases called in the upgradeHandler.
 		w: w,
+		// "conn" is returned in the successful upgrade case when hijacked in the upgradeHandler.
 		conn: &headerInterceptingConn{
 			initializableConn: &tunnelingWebsocketUpgraderConn{
 				w:   w,
