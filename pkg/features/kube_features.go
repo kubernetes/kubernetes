@@ -627,8 +627,9 @@ const (
 	// Enables PortForward to be proxied with a websocket client
 	PortForwardWebsockets featuregate.Feature = "PortForwardWebsockets"
 
-	// owner: @jessfraz
+	// owner: @jessfraz @haircommander
 	// alpha: v1.12
+	// beta: v1.30
 	//
 	// Enables control over ProcMountType for containers.
 	ProcMountType featuregate.Feature = "ProcMountType"
@@ -1125,7 +1126,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PortForwardWebsockets: {Default: false, PreRelease: featuregate.Alpha},
 
-	ProcMountType: {Default: false, PreRelease: featuregate.Alpha},
+	ProcMountType: {Default: false, PreRelease: featuregate.Beta},
 
 	QOSReserved: {Default: false, PreRelease: featuregate.Alpha},
 
