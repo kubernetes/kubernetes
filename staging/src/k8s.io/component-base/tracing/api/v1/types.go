@@ -29,4 +29,9 @@ type TracingConfiguration struct {
 	// rate, but otherwise never samples.
 	// +optional
 	SamplingRatePerMillion *int32 `json:"samplingRatePerMillion,omitempty"`
+
+	// Authentication for endpoint of the collector this component will report traces to.
+	// Recommended is unset. If unset, authentication is not used.
+	// +optional
+	Authentication *string `json:"authentication,omitempty"`
 }

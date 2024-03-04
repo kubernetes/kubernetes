@@ -34,6 +34,11 @@ func (in *TracingConfiguration) DeepCopyInto(out *TracingConfiguration) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Authentication != nil {
+		in, out := &in.Authentication, &out.Authentication
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

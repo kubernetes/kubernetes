@@ -299,6 +299,7 @@ var (
 		"ImageServiceEndpoint",
 		"Tracing.Endpoint",
 		"Tracing.SamplingRatePerMillion",
+		"Tracing.Authentication",
 		"LocalStorageCapacityIsolation",
 	)
 )

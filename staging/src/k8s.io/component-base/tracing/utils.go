@@ -64,6 +64,11 @@ func NewProvider(ctx context.Context,
 		opts = append(opts, otlptracegrpc.WithEndpoint(*tracingConfig.Endpoint))
 	}
 	opts = append(opts, otlptracegrpc.WithInsecure())
+	if tracingConfig.Authentication != nil {
+		opts = append(opts, otlptracegrpc.WithHeaders(map[string]string{
+			"Authentication": *tracingConfig.Authentication,
+		}))
+	}
 	exporter, err := otlptracegrpc.New(ctx, opts...)
 	if err != nil {
 		return nil, err
