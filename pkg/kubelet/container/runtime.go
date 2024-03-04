@@ -357,6 +357,8 @@ type Status struct {
 	Image string
 	// ID of the image.
 	ImageID string
+	// The digested reference of the image used by the container.
+	ImageRef string
 	// Runtime handler used to pull the image if any.
 	ImageRuntimeHandler string
 	// Hash of the container, used for comparison.

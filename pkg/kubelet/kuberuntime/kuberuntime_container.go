@@ -609,6 +609,13 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		// If runtime reports cpu & memory resources info, add it to container status
 		cStatusResources = toKubeContainerResources(status.Resources)
 	}
+
+	// Keep backwards compatibility to older runtimes, status.ImageId has been added in v1.30
+	imageID := status.ImageRef
+	if status.ImageId != "" {
+		imageID = status.ImageId
+	}
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
@@ -616,7 +623,8 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		},
 		Name:                 labeledInfo.ContainerName,
 		Image:                status.Image.Image,
-		ImageID:              status.ImageRef,
+		ImageID:              imageID,
+		ImageRef:             status.ImageRef,
 		ImageRuntimeHandler:  status.Image.RuntimeHandler,
 		Hash:                 annotatedInfo.Hash,
 		HashWithoutResources: annotatedInfo.HashWithoutResources,

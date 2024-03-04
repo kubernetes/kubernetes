@@ -4585,7 +4585,8 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 		Name:      testContainerName,
 		ID:        testContainerID,
 		Image:     "img",
-		ImageID:   "img1234",
+		ImageID:   "1234",
+		ImageRef:  "img1234",
 		State:     kubecontainer.ContainerStateRunning,
 		StartedAt: nowTime,
 	}

@@ -1986,8 +1986,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Name:         cs.Name,
 			RestartCount: int32(cs.RestartCount),
 			Image:        cs.Image,
-			ImageID:      cs.ImageID,
-			ContainerID:  cid,
+			// Converting the digested image ref to the Kubernetes public
+			// ContainerStatus.ImageID is historically intentional and should
+			// not change.
+			ImageID:     cs.ImageRef,
+			ContainerID: cid,
 		}
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
