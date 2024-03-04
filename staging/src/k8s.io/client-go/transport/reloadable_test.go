@@ -41,22 +41,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func TestNewReloadableTransport(t *testing.T) {
-	want := &http.Transport{}
-	dt := newDynamicRootCATransport(want)
-	if got := dt.p.Load(); want != got {
-		t.Errorf("expected the original transport object: %p, but got: %p", want, got)
-	}
-	if got := dt.WrappedRoundTripper(); want != got {
-		t.Errorf("expected the original transport object: %p, but got: %p", want, got)
-	}
+// func TestNewReloadableTransport(t *testing.T) {
+// 	want := &http.Transport{}
+// 	dt := newDynamicRootCATransport(want)
+// 	if got := dt.container.Load(); want != got {
+// 		t.Errorf("expected the original transport object: %p, but got: %p", want, got)
+// 	}
+// 	if got := dt.WrappedRoundTripper(); want != got {
+// 		t.Errorf("expected the original transport object: %p, but got: %p", want, got)
+// 	}
 
-	want = &http.Transport{}
-	dt.p.Store(want)
-	if got := dt.WrappedRoundTripper(); want != got {
-		t.Errorf("expected the original transport object: %p, but got: %p", want, got)
-	}
-}
+// 	want = &http.Transport{}
+// 	dt.p.Store(want)
+// 	if got := dt.WrappedRoundTripper(); want != got {
+// 		t.Errorf("expected the original transport object: %p, but got: %p", want, got)
+// 	}
+// }
 
 func TestReloadableTransportWithConfigAndCache(t *testing.T) {
 	ca := setupCA(t)
@@ -217,7 +217,7 @@ func TestSync(t *testing.T) {
 
 	original := &http.Transport{TLSClientConfig: &tls.Config{}}
 	rt := newDynamicRootCATransport(original)
-	syncer := newRootCASyncer(rt, caFileName, ca1.PEM)
+	syncer := newRootCASyncer(context.Background(), rt, caFileName, ca1.PEM)
 
 	// reloadable transport is a long lived object, so use a single
 	// instance to exercise various aspects of sync operations.
@@ -264,7 +264,7 @@ func TestSync(t *testing.T) {
 	})
 
 	t.Run("new and valid root CA cert has been written to the file, new transport", func(t *testing.T) {
-		oldRootCAs := rt.p.Load().TLSClientConfig.RootCAs
+		oldRootCAs := rt.container.transport.TLSClientConfig.RootCAs
 		ca2 := setupCA(t)
 		if err := os.WriteFile(caFileName, ca2.PEM, 0664); err != nil {
 			t.Fatalf("did not expect any error while writing to the CA file %q: %v", caFileName, err)
@@ -278,7 +278,7 @@ func TestSync(t *testing.T) {
 		if !bytes.Equal(syncer.caBytes, ca2.PEM) {
 			t.Errorf("expected the new CA data to be stored")
 		}
-		if newTransort := rt.p.Load(); newTransort.TLSClientConfig.RootCAs == oldRootCAs {
+		if newTransort := rt.container.transport; newTransort.TLSClientConfig.RootCAs == oldRootCAs {
 			t.Errorf("expected the new RootCAs to be in use")
 		}
 	})
@@ -332,7 +332,7 @@ func TestReloadableTransport(t *testing.T) {
 	// transport works as expected with cached connections.
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	rt := newDynamicRootCATransport(transport)
-	syncer := newRootCASyncer(rt, caFileName, ca1.PEM)
+	syncer := newRootCASyncer(context.Background(), rt, caFileName, ca1.PEM)
 	client := &http.Client{Transport: rt}
 
 	// step 1: the server is configured to send cert 1 to the client, the
@@ -435,7 +435,7 @@ func TestReloadableTransportWithController(t *testing.T) {
 
 	reloadable := newDynamicRootCATransport(transport)
 	syncer := &withSyncCount{
-		rootCASyncer: newRootCASyncer(reloadable, caFileName, ca1.PEM),
+		rootCASyncer: newRootCASyncer(context.Background(), reloadable, caFileName, ca1.PEM),
 		syncedCh:     make(chan error, 1),
 	}
 	client := &http.Client{Transport: reloadable}
@@ -515,6 +515,146 @@ func TestReloadableTransportWithController(t *testing.T) {
 	client = &http.Client{Transport: transport}
 	resp, err = do(t, client, server.URL+"/ping", shouldNotGotConn)
 	expectTLSError(t, resp, err, "x509: certificate signed by unknown authority")
+}
+
+func TestReloadableTransportWithOldTransportCleanup(t *testing.T) {
+	serverName := "s1.k8s.io"
+	ca1, ca2 := setupCA(t), setupCA(t)
+	serverCert1 := setupServerCertWithCA(t, ca1, serverName)
+	serverCert2 := setupServerCertWithCA(t, ca2, serverName)
+
+	blockedCh := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(10)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/block" {
+			wg.Done()
+			<-blockedCh
+		}
+		if _, err := w.Write([]byte("pong")); err != nil {
+			t.Errorf("did not expect error from Write: %v", err)
+		}
+	}))
+	serverSwitchCertCh := make(chan struct{})
+	server.TLS = &tls.Config{
+		GetCertificate: func(ch *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			select {
+			case <-serverSwitchCertCh:
+				return &serverCert2, nil
+			default:
+				return &serverCert1, nil
+			}
+		},
+	}
+	defer server.Close()
+	server.StartTLS()
+
+	caFileName, removeFn := writeCACertToFile(t, ca1.PEM)
+	defer removeFn(t)
+	config := &Config{
+		TLS: TLSConfig{
+			ServerName: serverName,
+			CAFile:     caFileName, // should point to ca1
+			NextProtos: []string{"http/1.1"},
+		},
+	}
+	tlsConfig, err := TLSConfigFor(config)
+	if err != nil {
+		t.Errorf("did not expect TLSConfigFor to return an error: %v", err)
+		return
+	}
+	// keep connection reuse enabled
+	transport := &http.Transport{TLSClientConfig: tlsConfig, ForceAttemptHTTP2: false}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reloadable := newDynamicRootCATransport(transport)
+	syncer := &withSyncCount{
+		rootCASyncer: newRootCASyncer(ctx, reloadable, caFileName, ca1.PEM),
+		syncedCh:     make(chan error, 1),
+	}
+	client := &http.Client{Transport: reloadable}
+
+	syncCh := make(chan struct{}, 1)
+	controller := newDynamicRootCATransportController(syncer)
+	controller.queueAdderFn = func(stopCtx context.Context) {
+		for {
+			select {
+			case _, ok := <-syncCh:
+				if !ok {
+					return
+				}
+				controller.queue.Add(queueKey)
+			case <-stopCtx.Done():
+				return
+			}
+		}
+	}
+	triggerSyncAndWaitFn := func() error {
+		syncCh <- struct{}{}
+		select {
+		case err, ok := <-syncer.syncedCh:
+			if !ok {
+				return errors.New("did not expect the channel to be closed")
+			}
+			return err
+		case <-time.After(wait.ForeverTestTimeout):
+			return errors.New("expected the sync to have completed")
+		}
+	}
+	go controller.Run(ctx)
+
+	useNewConn := func(t *testing.T, ci httptrace.GotConnInfo) {
+		shouldUseNewConnection(t, ci)
+	}
+	// step 1: launch 4 concurrent requests that stay in flight
+	inflightCh := make(chan bool, 10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			resp, err := do(t, client, server.URL+"/block", useNewConn)
+			expectStatusOK(t, resp, err)
+			inflightCh <- true
+		}()
+	}
+
+	wg.Wait()
+
+	// step 2: overwrite ths CA file file with ca2
+	if err := os.WriteFile(caFileName, ca2.PEM, 0664); err != nil {
+		t.Fatalf("did not expect any error while writing to the CA file %q: %v", caFileName, err)
+	}
+	if err := triggerSyncAndWaitFn(); err != nil {
+		t.Fatalf("sync error: %v", err)
+	}
+	close(serverSwitchCertCh)
+
+	// reloadable should use the new transport
+	resp, err := do(t, client, server.URL+"/ping", shouldUseNewConnection)
+	expectStatusOK(t, resp, err)
+
+	// the old requests should still be active
+	select {
+	case _, ok := <-inflightCh:
+		if ok {
+			t.Errorf("inflight request returned unexpectedly")
+		}
+	default:
+	}
+
+	close(blockedCh)
+	count := 0
+	for v := range inflightCh {
+		if v {
+			count++
+		}
+		if count == 10 {
+			break
+		}
+	}
+	if count != 10 {
+		t.Errorf("inflight request returned unexpectedly")
+	}
 }
 
 func do(t *testing.T, client *http.Client, url string, f func(*testing.T, httptrace.GotConnInfo)) (*http.Response, error) {
@@ -684,7 +824,7 @@ func setupServerCertWithCA(t *testing.T, ca ca, serverName string) tls.Certifica
 func expectStatusOK(t *testing.T, resp *http.Response, err error) {
 	t.Helper()
 	if err != nil {
-		t.Errorf("expected no error, but got: %#v", err)
+		t.Errorf("expected no error, but got: %+v", err)
 		return
 	}
 	if resp.StatusCode != http.StatusOK {

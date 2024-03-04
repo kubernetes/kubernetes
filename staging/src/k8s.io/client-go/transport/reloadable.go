@@ -41,11 +41,14 @@ const (
 func newDynamicRootCATransport(transport *http.Transport) *dynamicRootCATransport {
 	p := &atomic.Pointer[http.Transport]{}
 	p.Store(transport)
-	return &dynamicRootCATransport{p: p}
+	return &dynamicRootCATransport{
+		container: transportWaitGroup{transport: transport, wg: &sync.WaitGroup{}},
+	}
 }
 
-func newRootCASyncer(dt *dynamicRootCATransport, caFile string, caBytes []byte) *rootCASyncer {
+func newRootCASyncer(stopCtx context.Context, dt *dynamicRootCATransport, caFile string, caBytes []byte) *rootCASyncer {
 	return &rootCASyncer{
+		stopCtx:                stopCtx,
 		dynamicRootCATransport: dt,
 		caFile:                 caFile,
 		caBytes:                caBytes,
@@ -74,30 +77,52 @@ func newDynamicRootCATransportController(syncer syncer) *dynamicRootCATransportC
 	return controller
 }
 
+type transportWaitGroup struct {
+	transport *http.Transport
+	wg        *sync.WaitGroup
+}
+
 type dynamicRootCATransport struct {
-	p *atomic.Pointer[http.Transport]
+	lock      sync.RWMutex
+	container transportWaitGroup
 }
 
 func (dt *dynamicRootCATransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	transport := dt.p.Load()
-	return transport.RoundTrip(req)
+	var container transportWaitGroup
+	dt.lock.RLock()
+	container = dt.container
+	container.wg.Add(1)
+	dt.lock.RUnlock()
+
+	defer container.wg.Done()
+	return container.transport.RoundTrip(req)
 }
 
 func (dt *dynamicRootCATransport) WrappedRoundTripper() http.RoundTripper {
+	var transport *http.Transport
+	dt.lock.RLock()
+	transport = dt.container.transport
+	dt.lock.RUnlock()
+
 	// TODO: side effects for exposing the internal transport object?
-	return dt.p.Load()
+	return transport
 }
 
-func (dt *dynamicRootCATransport) refresh(rootCAs *x509.CertPool) *http.Transport {
-	old := dt.p.Load()
-	new := old.Clone()
-	new.TLSClientConfig.RootCAs = rootCAs
-	dt.p.Store(new)
-	return old
+func (dt *dynamicRootCATransport) refresh(rootCAs *x509.CertPool) transportWaitGroup {
+	dt.lock.Lock()
+	defer dt.lock.Unlock()
+
+	t := dt.container.transport.Clone()
+	t.TLSClientConfig.RootCAs = rootCAs
+
+	container := dt.container
+	dt.container = transportWaitGroup{transport: t, wg: &sync.WaitGroup{}}
+	return container
 }
 
 type rootCASyncer struct {
 	*dynamicRootCATransport
+	stopCtx context.Context
 
 	lock    sync.Mutex
 	caBytes []byte
@@ -127,12 +152,35 @@ func (r *rootCASyncer) sync() error {
 		return fmt.Errorf("failed to build cert pool from CA file: %q - err: %w", r.caFile, err)
 	}
 
-	old := r.refresh(rootCAs)
+	c := r.refresh(rootCAs)
 	r.caBytes = newCABytes
 	klog.InfoS("Root CA has been reloaded", "controller", dynamicRootCATransportControllerName, "file", r.caFile)
 
-	old.CloseIdleConnections()
+	go r.clean(c)
 	return nil
+}
+
+func (r *rootCASyncer) clean(c transportWaitGroup) <-chan struct{} {
+	defer utilruntime.HandleCrash()
+
+	doneCh, roundTripperDoneCh := make(chan struct{}), make(chan struct{})
+	defer close(doneCh)
+	go func() {
+		defer utilruntime.HandleCrash()
+		defer close(roundTripperDoneCh)
+		c.wg.Wait()
+	}()
+
+	// first close the idle connections
+	c.transport.CloseIdleConnections()
+	select {
+	case <-roundTripperDoneCh:
+		c.transport.CloseIdleConnections()
+		klog.InfoS("All HTTP.Transport.RoundTripper(s) have returned", "controller", dynamicRootCATransportControllerName, "file", r.caFile, "transport", fmt.Sprintf("%p", c.transport))
+	case <-r.stopCtx.Done():
+	}
+
+	return doneCh
 }
 
 type dynamicRootCATransportController struct {

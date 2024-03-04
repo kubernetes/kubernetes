@@ -144,7 +144,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	if config.TLS.ReloadCAFile && tlsConfig != nil {
 		reloadable := newDynamicRootCATransport(transport)
 		rt = reloadable
-		controller := newDynamicRootCATransportController(newRootCASyncer(reloadable, config.TLS.CAFile, config.TLS.CAData))
+		controller := newDynamicRootCATransportController(newRootCASyncer(ControllerStopCtx, reloadable, config.TLS.CAFile, config.TLS.CAData))
 		go controller.Run(ControllerStopCtx)
 	}
 
