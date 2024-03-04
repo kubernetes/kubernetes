@@ -504,6 +504,8 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 		}
 	}
 	if opts.RejectFailedIndexesForNoBackoffLimitPerIndex {
+		// Note that this check also verifies that FailedIndexes are not used for
+		// regular (non-indexed) jobs, because regular jobs have backoffLimitPerIndex = nil.
 		if job.Spec.BackoffLimitPerIndex == nil && status.FailedIndexes != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("failedIndexes"), *status.FailedIndexes, "cannot set non-null failedIndexes when backoffLimitPerIndex is null"))
 		}
@@ -605,11 +607,16 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 		}
 	}
 	if opts.RejectMutatingCompletionTime {
+		// Note that we check the condition only when `job.Status.CompletionTime != nil`, this is because
+		// we don't want to block transitions to completionTime = nil when the job is not finished yet.
+		// Setting completionTime = nil for finished jobs is prevented in RejectCompleteJobWithoutCompletionTime.
 		if job.Status.CompletionTime != nil && oldJob.Status.CompletionTime != nil && !ptr.Equal(job.Status.CompletionTime, oldJob.Status.CompletionTime) {
 			allErrs = append(allErrs, field.Invalid(statusFld.Child("completionTime"), job.Status.CompletionTime, "completionTime cannot be mutated"))
 		}
 	}
 	if opts.RejectStartTimeUpdateForUnsuspendedJob {
+		// Note that we check `oldJob.Status.StartTime != nil` to allow transitioning from
+		// startTime = nil to startTime != nil for unsuspended jobs, which is a desired transition.
 		if oldJob.Status.StartTime != nil && !ptr.Equal(oldJob.Status.StartTime, job.Status.StartTime) && !ptr.Deref(job.Spec.Suspend, false) {
 			allErrs = append(allErrs, field.Required(statusFld.Child("startTime"), "startTime cannot be removed for unsuspended job"))
 		}

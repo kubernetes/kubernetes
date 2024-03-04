@@ -475,7 +475,7 @@ type JobStatus struct {
 
 	// The number of pods which are terminating (in phase Pending or Running
 	// and have a deletionTimestamp).
-	// The value is zero (or nil) for finished jobs.
+	// The value is zero (or null) for finished jobs.
 	//
 	// This field is beta-level. The job controller populates the field when
 	// the feature gate JobPodReplacementPolicy is enabled (enabled by default).
@@ -483,7 +483,7 @@ type JobStatus struct {
 	Terminating *int32
 
 	// The number of active pods which have a Ready condition.
-	// The value is zero (or nil) for finished jobs.
+	// The value is zero (or null) for finished jobs.
 	// +optional
 	Ready *int32
 
