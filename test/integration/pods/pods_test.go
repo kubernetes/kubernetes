@@ -25,12 +25,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -689,47 +686,11 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	cases := []struct {
-		name                  string
-		create                *v1.Pod
-		update                *v1.Pod
-		enableSchedulingGates bool
-		err                   string
+		name   string
+		create *v1.Pod
+		update *v1.Pod
+		err    string
 	}{
-		{
-			name: "node selector is immutable when AllowMutableNodeSelector is false",
-			create: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pod",
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "fake-name",
-							Image: "fakeimage",
-						},
-					},
-					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			update: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pod",
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "fake-name",
-							Image: "fakeimage",
-						},
-					},
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
-				},
-			},
-			err: "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
-		},
 		{
 			name: "adding node selector is allowed for gated pods",
 			create: &v1.Pod{
@@ -763,7 +724,6 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
 				},
 			},
-			enableSchedulingGates: true,
 		},
 		{
 			name: "addition to nodeAffinity is allowed for gated pods",
@@ -842,7 +802,6 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
 				},
 			},
-			enableSchedulingGates: true,
 		},
 		{
 			name: "addition to nodeAffinity is allowed for gated pods with nil affinity",
@@ -899,12 +858,9 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
 				},
 			},
-			enableSchedulingGates: true,
 		},
 	}
 	for _, tc := range cases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tc.enableSchedulingGates)()
-
 		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), tc.create, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}

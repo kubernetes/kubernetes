@@ -3974,8 +3974,6 @@ type PodValidationOptions struct {
 	AllowHostIPsField bool
 	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
-	// Allow node selector additions for gated pods.
-	AllowMutableNodeSelectorAndNodeAffinity bool
 	// Allow projected token volumes with non-local paths
 	AllowNonLocalProjectedTokenPath bool
 	// Allow namespaced sysctls in hostNet and hostIPC pods
@@ -5056,7 +5054,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	// Handle validations specific to gated pods.
 	podIsGated := len(oldPod.Spec.SchedulingGates) > 0
-	if opts.AllowMutableNodeSelectorAndNodeAffinity && podIsGated {
+	if podIsGated {
 		// Additions to spec.nodeSelector are allowed (no deletions or mutations) for gated pods.
 		if !apiequality.Semantic.DeepEqual(mungedPodSpec.NodeSelector, oldPod.Spec.NodeSelector) {
 			allErrs = append(allErrs, validateNodeSelectorMutation(specPath.Child("nodeSelector"), mungedPodSpec.NodeSelector, oldPod.Spec.NodeSelector)...)

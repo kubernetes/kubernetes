@@ -4194,13 +4194,10 @@ message PodSpec {
   //
   // SchedulingGates can only be set at pod creation time, and be removed only afterwards.
   //
-  // This is a beta feature enabled by the PodSchedulingReadiness feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=PodSchedulingReadiness
   // +optional
   repeated PodSchedulingGate schedulingGates = 38;
 

@@ -51,7 +51,6 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableMinDomainsInPodTopologySpread:          feature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread),
 		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:      feature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
-		EnablePodSchedulingReadiness:                 feature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
 		EnablePodDisruptionConditions:                feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions),
 		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
@@ -80,7 +79,7 @@ func NewInTreeRegistry() runtime.Registry {
 		queuesort.Name:                       queuesort.New,
 		defaultbinder.Name:                   defaultbinder.New,
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
-		schedulinggates.Name:                 runtime.FactoryAdapter(fts, schedulinggates.New),
+		schedulinggates.Name:                 schedulinggates.New,
 	}
 
 	return registry

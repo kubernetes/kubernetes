@@ -331,6 +331,7 @@ func TestSchedulerDefaults(t *testing.T) {
 						Plugins: &configv1.Plugins{
 							MultiPoint: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
+									{Name: names.SchedulingGates},
 									{Name: names.PrioritySort},
 									{Name: names.NodeUnschedulable},
 									{Name: names.NodeName},
@@ -351,7 +352,6 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 									{Name: names.DefaultBinder},
-									{Name: names.SchedulingGates},
 								},
 							},
 							Bind: configv1.PluginSet{

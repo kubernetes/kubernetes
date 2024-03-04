@@ -58,55 +58,33 @@ func TestSchedulingGates(t *testing.T) {
 	tests := []struct {
 		name                  string
 		pods                  []*v1.Pod
-		featureEnabled        bool
 		want                  []string
 		rmPodsSchedulingGates []int
 		wantPostGatesRemoval  []string
 	}{
 		{
-			name: "feature disabled, regular pods",
+			name: "regular pods",
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").Container("pause").Obj(),
 				st.MakePod().Name("p2").Container("pause").Obj(),
 			},
-			featureEnabled: false,
-			want:           []string{"p1", "p2"},
+			want: []string{"p1", "p2"},
 		},
 		{
-			name: "feature enabled, regular pods",
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Container("pause").Obj(),
-				st.MakePod().Name("p2").Container("pause").Obj(),
-			},
-			featureEnabled: true,
-			want:           []string{"p1", "p2"},
-		},
-		{
-			name: "feature disabled, one pod carrying scheduling gates",
+			name: "one pod carrying scheduling gates",
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).Container("pause").Obj(),
 				st.MakePod().Name("p2").Container("pause").Obj(),
 			},
-			featureEnabled: false,
-			want:           []string{"p1", "p2"},
+			want: []string{"p2"},
 		},
 		{
-			name: "feature enabled, one pod carrying scheduling gates",
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).Container("pause").Obj(),
-				st.MakePod().Name("p2").Container("pause").Obj(),
-			},
-			featureEnabled: true,
-			want:           []string{"p2"},
-		},
-		{
-			name: "feature enabled, two pod carrying scheduling gates, and remove gates of one pod",
+			name: "two pod carrying scheduling gates, and remove gates of one pod",
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).Container("pause").Obj(),
 				st.MakePod().Name("p2").SchedulingGates([]string{"bar"}).Container("pause").Obj(),
 				st.MakePod().Name("p3").Container("pause").Obj(),
 			},
-			featureEnabled:        true,
 			want:                  []string{"p3"},
 			rmPodsSchedulingGates: []int{1}, // remove gates of 'p2'
 			wantPostGatesRemoval:  []string{"p2"},
@@ -115,8 +93,6 @@ func TestSchedulingGates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
-
 			// Use zero backoff seconds to bypass backoffQ.
 			// It's intended to not start the scheduler's queue, and hence to
 			// not start any flushing logic. We will pop and schedule the Pods manually later.

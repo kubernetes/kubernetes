@@ -3352,9 +3352,6 @@ type PodSpec struct {
 	//
 	// SchedulingGates can only be set at pod creation time, and be removed only afterwards.
 	//
-	// This is a beta feature enabled by the PodSchedulingReadiness feature gate.
-	//
-	// +featureGate=PodSchedulingReadiness
 	// +optional
 	SchedulingGates []PodSchedulingGate
 	// ResourceClaims defines which ResourceClaims must be allocated

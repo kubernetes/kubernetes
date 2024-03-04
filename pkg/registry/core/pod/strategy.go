@@ -740,8 +740,7 @@ func mutatePodAffinity(pod *api.Pod) {
 // applySchedulingGatedCondition adds a {type:PodScheduled, reason:SchedulingGated} condition
 // to a new-created Pod if necessary.
 func applySchedulingGatedCondition(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) ||
-		len(pod.Spec.SchedulingGates) == 0 {
+	if len(pod.Spec.SchedulingGates) == 0 {
 		return
 	}
 

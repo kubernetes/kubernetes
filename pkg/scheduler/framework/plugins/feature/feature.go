@@ -25,7 +25,6 @@ type Features struct {
 	EnableMinDomainsInPodTopologySpread          bool
 	EnableNodeInclusionPolicyInPodTopologySpread bool
 	EnableMatchLabelKeysInPodTopologySpread      bool
-	EnablePodSchedulingReadiness                 bool
 	EnablePodDisruptionConditions                bool
 	EnableInPlacePodVerticalScaling              bool
 	EnableSidecarContainers                      bool
