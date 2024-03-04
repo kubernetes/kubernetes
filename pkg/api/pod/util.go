@@ -541,7 +541,7 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations, oldPodSpec) {
 		for k := range podAnnotations {
-			if strings.HasPrefix(k, api.AppArmorContainerAnnotationKeyPrefix) {
+			if strings.HasPrefix(k, api.DeprecatedAppArmorAnnotationKeyPrefix) {
 				delete(podAnnotations, k)
 			}
 		}
@@ -954,7 +954,7 @@ func appArmorInUse(podAnnotations map[string]string, podSpec *api.PodSpec) bool 
 	}
 
 	for k := range podAnnotations {
-		if strings.HasPrefix(k, api.AppArmorContainerAnnotationKeyPrefix) {
+		if strings.HasPrefix(k, api.DeprecatedAppArmorAnnotationKeyPrefix) {
 			return true
 		}
 	}

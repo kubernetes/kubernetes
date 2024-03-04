@@ -52,7 +52,7 @@ func TestGetProfile(t *testing.T) {
 		expectedProfile:  unconfined,
 	}, {
 		name:              "annotation profile",
-		annotationProfile: v1.AppArmorBetaProfileNamePrefix + "test",
+		annotationProfile: v1.DeprecatedAppArmorBetaProfileNamePrefix + "test",
 		expectedProfile:   localhost,
 	}, {
 		name:              "invalid annotation",
@@ -65,7 +65,7 @@ func TestGetProfile(t *testing.T) {
 		expectedProfile:   runtimeDefault,
 	}, {
 		name:              "container field before annotation",
-		annotationProfile: v1.AppArmorBetaProfileNameUnconfined,
+		annotationProfile: v1.DeprecatedAppArmorBetaProfileNameUnconfined,
 		containerProfile:  runtimeDefault,
 		expectedProfile:   runtimeDefault,
 	}, {
@@ -75,12 +75,12 @@ func TestGetProfile(t *testing.T) {
 		expectedProfile:  runtimeDefault,
 	}, {
 		name:              "annotation before pod field",
-		annotationProfile: v1.AppArmorBetaProfileNameUnconfined,
+		annotationProfile: v1.DeprecatedAppArmorBetaProfileNameUnconfined,
 		podProfile:        runtimeDefault,
 		expectedProfile:   unconfined,
 	}, {
 		name:              "all profiles",
-		annotationProfile: v1.AppArmorBetaProfileRuntimeDefault,
+		annotationProfile: v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
 		containerProfile:  localhost,
 		podProfile:        unconfined,
 		expectedProfile:   localhost,
@@ -101,7 +101,7 @@ func TestGetProfile(t *testing.T) {
 					Name: "bar",
 					Annotations: map[string]string{
 						"unrelated": "baz",
-						v1.AppArmorBetaContainerAnnotationKeyPrefix + "other": v1.AppArmorBetaProfileRuntimeDefault,
+						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "other": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
 					},
 				},
 				Spec: v1.PodSpec{
@@ -109,7 +109,7 @@ func TestGetProfile(t *testing.T) {
 				},
 			}
 			if test.annotationProfile != "" {
-				pod.Annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+container.Name] = test.annotationProfile
+				pod.Annotations[v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+container.Name] = test.annotationProfile
 			}
 			if test.podProfile != nil {
 				pod.Spec.SecurityContext = &v1.PodSecurityContext{

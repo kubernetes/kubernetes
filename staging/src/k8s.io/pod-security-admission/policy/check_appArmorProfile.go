@@ -66,8 +66,8 @@ func CheckAppArmorProfile() Check {
 
 func allowedAnnotationValue(profile string) bool {
 	return len(profile) == 0 ||
-		profile == corev1.AppArmorBetaProfileRuntimeDefault ||
-		strings.HasPrefix(profile, corev1.AppArmorBetaProfileNamePrefix)
+		profile == corev1.DeprecatedAppArmorBetaProfileRuntimeDefault ||
+		strings.HasPrefix(profile, corev1.DeprecatedAppArmorBetaProfileNamePrefix)
 }
 
 func allowedProfileType(profile corev1.AppArmorProfileType) bool {
@@ -114,7 +114,7 @@ func appArmorProfile_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec
 
 	var forbiddenAnnotations []string
 	for k, v := range podMetadata.Annotations {
-		if strings.HasPrefix(k, corev1.AppArmorBetaContainerAnnotationKeyPrefix) && !allowedAnnotationValue(v) {
+		if strings.HasPrefix(k, corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) && !allowedAnnotationValue(v) {
 			forbiddenAnnotations = append(forbiddenAnnotations, fmt.Sprintf("%s=%q", k, v))
 		}
 	}

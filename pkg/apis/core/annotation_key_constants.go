@@ -52,18 +52,18 @@ const (
 	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
 
-	// AppArmorContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// DeprecatedAppArmorAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
 	// Deprecated: use a pod or container security context `appArmorProfile` field instead.
-	AppArmorContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
+	DeprecatedAppArmorAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 
-	// AppArmorProfileRuntimeDefault is the profile specifying the runtime default.
-	AppArmorProfileRuntimeDefault = "runtime/default"
+	// DeprecatedAppArmorAnnotationValueRuntimeDefault is the profile specifying the runtime default.
+	DeprecatedAppArmorAnnotationValueRuntimeDefault = "runtime/default"
 
-	// AppArmorProfileLocalhostPrefix is the prefix for specifying profiles loaded on the node.
-	AppArmorProfileLocalhostPrefix = "localhost/"
+	// DeprecatedAppArmorAnnotationValueLocalhostPrefix is the prefix for specifying profiles loaded on the node.
+	DeprecatedAppArmorAnnotationValueLocalhostPrefix = "localhost/"
 
-	// AppArmorProfileNameUnconfined is the Unconfined AppArmor profile
-	AppArmorProfileNameUnconfined = "unconfined"
+	// DeprecatedAppArmorAnnotationValueUnconfined is the Unconfined AppArmor profile
+	DeprecatedAppArmorAnnotationValueUnconfined = "unconfined"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.

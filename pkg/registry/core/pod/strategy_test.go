@@ -2155,8 +2155,8 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "init": api.AppArmorProfileNameUnconfined,
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr":  api.AppArmorProfileNameUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "init": api.DeprecatedAppArmorAnnotationValueUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr":  api.DeprecatedAppArmorAnnotationValueUnconfined,
 			}, pod.Annotations)
 		},
 	}, {
@@ -2174,8 +2174,8 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "init": api.AppArmorProfileRuntimeDefault,
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr":  api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "init": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr":  api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 		},
 	}, {
@@ -2194,8 +2194,8 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "init": api.AppArmorProfileLocalhostPrefix + testProfile,
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr":  api.AppArmorProfileLocalhostPrefix + testProfile,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "init": api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr":  api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
 			}, pod.Annotations)
 		},
 	}, {
@@ -2243,7 +2243,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 			assert.Nil(t, pod.Spec.SecurityContext)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
@@ -2265,7 +2265,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileLocalhostPrefix + testProfile,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
 			}, pod.Annotations)
 			assert.Nil(t, pod.Spec.SecurityContext)
 			assert.Equal(t, api.AppArmorProfileTypeLocalhost, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
@@ -2291,7 +2291,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileNameUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueUnconfined,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
@@ -2330,9 +2330,9 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "init": api.AppArmorProfileLocalhostPrefix + testProfile,
-				api.AppArmorContainerAnnotationKeyPrefix + "a":    api.AppArmorProfileNameUnconfined,
-				api.AppArmorContainerAnnotationKeyPrefix + "c":    api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "init": api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "a":    api.DeprecatedAppArmorAnnotationValueUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "c":    api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 			assert.Nil(t, pod.Spec.SecurityContext)
 			assert.Equal(t, api.AppArmorProfileTypeLocalhost, pod.Spec.InitContainers[0].SecurityContext.AppArmorProfile.Type)
@@ -2345,7 +2345,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileNameUnconfined,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueUnconfined,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2354,7 +2354,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileNameUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueUnconfined,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.LocalhostProfile)
@@ -2365,7 +2365,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "foo-bar": api.AppArmorProfileNameUnconfined,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "foo-bar": api.DeprecatedAppArmorAnnotationValueUnconfined,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2374,7 +2374,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "foo-bar": api.AppArmorProfileNameUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "foo-bar": api.DeprecatedAppArmorAnnotationValueUnconfined,
 			}, pod.Annotations)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
 			assert.Nil(t, pod.Spec.SecurityContext)
@@ -2384,7 +2384,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2401,7 +2401,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.LocalhostProfile)
@@ -2412,9 +2412,9 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "init": api.AppArmorProfileNameUnconfined,
-					api.AppArmorContainerAnnotationKeyPrefix + "a":    api.AppArmorProfileLocalhostPrefix + testProfile,
-					api.AppArmorContainerAnnotationKeyPrefix + "c":    api.AppArmorProfileRuntimeDefault,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "init": api.DeprecatedAppArmorAnnotationValueUnconfined,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "a":    api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "c":    api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2433,10 +2433,10 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "init": api.AppArmorProfileNameUnconfined,
-				api.AppArmorContainerAnnotationKeyPrefix + "a":    api.AppArmorProfileLocalhostPrefix + testProfile,
-				api.AppArmorContainerAnnotationKeyPrefix + "b":    api.AppArmorProfileRuntimeDefault,
-				api.AppArmorContainerAnnotationKeyPrefix + "c":    api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "init": api.DeprecatedAppArmorAnnotationValueUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "a":    api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "b":    api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "c":    api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.InitContainers[0].SecurityContext.AppArmorProfile.Type)
 			assert.Equal(t, api.AppArmorProfileTypeLocalhost, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
@@ -2450,7 +2450,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileLocalhostPrefix + testProfile,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2466,7 +2466,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileLocalhostPrefix + testProfile,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + testProfile,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.LocalhostProfile)
@@ -2477,7 +2477,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2493,7 +2493,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 			// Annotation shouldn't be synced to container security context
@@ -2504,7 +2504,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileNameUnconfined,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueUnconfined,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2520,7 +2520,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileNameUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueUnconfined,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
@@ -2530,7 +2530,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "unconf-annot": api.AppArmorProfileNameUnconfined,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "unconf-annot": api.DeprecatedAppArmorAnnotationValueUnconfined,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2555,9 +2555,9 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "unconf-annot": api.AppArmorProfileNameUnconfined,
-				api.AppArmorContainerAnnotationKeyPrefix + "unconf-field": api.AppArmorProfileNameUnconfined,
-				api.AppArmorContainerAnnotationKeyPrefix + "default-pod":  api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "unconf-annot": api.DeprecatedAppArmorAnnotationValueUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "unconf-field": api.DeprecatedAppArmorAnnotationValueUnconfined,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "default-pod":  api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
@@ -2569,7 +2569,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "ctr": "not-a-real-type",
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": "not-a-real-type",
 				},
 			},
 			Spec: api.PodSpec{
@@ -2578,7 +2578,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": "not-a-real-type",
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": "not-a-real-type",
 			}, pod.Annotations)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
 			assert.Nil(t, pod.Spec.SecurityContext)
@@ -2604,7 +2604,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 				},
 			},
 			Spec: api.PodSpec{
@@ -2614,7 +2614,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.AppArmorContainerAnnotationKeyPrefix + "ctr": api.AppArmorProfileRuntimeDefault,
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": api.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 			}, pod.Annotations)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
 		},

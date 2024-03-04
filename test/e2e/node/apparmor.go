@@ -66,9 +66,9 @@ var _ = SIGDescribe("AppArmor", func() {
 			pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, true)
 			// Move AppArmor profile to the annotations.
 			profile := pod.Spec.SecurityContext.AppArmorProfile
-			key := v1.AppArmorBetaContainerAnnotationKeyPrefix + pod.Spec.Containers[0].Name
+			key := v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + pod.Spec.Containers[0].Name
 			pod.Annotations = map[string]string{
-				key: v1.AppArmorBetaProfileNamePrefix + *profile.LocalhostProfile,
+				key: v1.DeprecatedAppArmorBetaProfileNamePrefix + *profile.LocalhostProfile,
 			}
 			pod.Spec.SecurityContext = nil
 

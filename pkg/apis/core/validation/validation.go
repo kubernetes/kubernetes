@@ -204,7 +204,7 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		if newVal, exists := newAnnotations[k]; exists && newVal == oldVal {
 			continue // No change.
 		}
-		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
+		if strings.HasPrefix(k, v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove or update AppArmor annotations"))
 		}
 		if k == core.MirrorPodAnnotationKey {
@@ -216,7 +216,7 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		if _, ok := oldAnnotations[k]; ok {
 			continue // No change.
 		}
-		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
+		if strings.HasPrefix(k, v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add AppArmor annotations"))
 		}
 		if k == core.MirrorPodAnnotationKey {
@@ -4703,10 +4703,10 @@ func validateAppArmorProfileField(profile *core.AppArmorProfile, fldPath *field.
 func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for k, p := range annotations {
-		if !strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
+		if !strings.HasPrefix(k, v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) {
 			continue
 		}
-		containerName := strings.TrimPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix)
+		containerName := strings.TrimPrefix(k, v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix)
 		if !podSpecHasContainer(spec, containerName) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), containerName, "container not found"))
 		}
@@ -4720,10 +4720,10 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 }
 
 func ValidateAppArmorProfileFormat(profile string) error {
-	if profile == "" || profile == v1.AppArmorBetaProfileRuntimeDefault || profile == v1.AppArmorBetaProfileNameUnconfined {
+	if profile == "" || profile == v1.DeprecatedAppArmorBetaProfileRuntimeDefault || profile == v1.DeprecatedAppArmorBetaProfileNameUnconfined {
 		return nil
 	}
-	if !strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
+	if !strings.HasPrefix(profile, v1.DeprecatedAppArmorBetaProfileNamePrefix) {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
 	}
 	return nil
@@ -4752,25 +4752,25 @@ func validateAppArmorAnnotationsAndFieldsMatchOnCreate(objectMeta metav1.ObjectM
 			return true
 		}
 
-		key := core.AppArmorContainerAnnotationKeyPrefix + c.Name
+		key := core.DeprecatedAppArmorAnnotationKeyPrefix + c.Name
 		if annotation, found := objectMeta.Annotations[key]; found {
 			apparmorPath := cFldPath.Child("securityContext").Child("appArmorProfile")
 
 			switch containerProfile.Type {
 			case core.AppArmorProfileTypeUnconfined:
-				if annotation != core.AppArmorProfileNameUnconfined {
+				if annotation != core.DeprecatedAppArmorAnnotationValueUnconfined {
 					allErrs = append(allErrs, field.Forbidden(apparmorPath.Child("type"), "apparmor type in annotation and field must match"))
 				}
 
 			case core.AppArmorProfileTypeRuntimeDefault:
-				if annotation != core.AppArmorProfileRuntimeDefault {
+				if annotation != core.DeprecatedAppArmorAnnotationValueRuntimeDefault {
 					allErrs = append(allErrs, field.Forbidden(apparmorPath.Child("type"), "apparmor type in annotation and field must match"))
 				}
 
 			case core.AppArmorProfileTypeLocalhost:
-				if !strings.HasPrefix(annotation, core.AppArmorProfileLocalhostPrefix) {
+				if !strings.HasPrefix(annotation, core.DeprecatedAppArmorAnnotationValueLocalhostPrefix) {
 					allErrs = append(allErrs, field.Forbidden(apparmorPath.Child("type"), "apparmor type in annotation and field must match"))
-				} else if containerProfile.LocalhostProfile == nil || strings.TrimPrefix(annotation, core.AppArmorProfileLocalhostPrefix) != *containerProfile.LocalhostProfile {
+				} else if containerProfile.LocalhostProfile == nil || strings.TrimPrefix(annotation, core.DeprecatedAppArmorAnnotationValueLocalhostPrefix) != *containerProfile.LocalhostProfile {
 					allErrs = append(allErrs, field.Forbidden(apparmorPath.Child("localhostProfile"), "apparmor profile in annotation and field must match"))
 				}
 			}

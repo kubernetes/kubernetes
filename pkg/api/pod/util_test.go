@@ -714,7 +714,7 @@ func TestDropAppArmor(t *testing.T) {
 		description: "with AppArmor Annotations",
 		hasAppArmor: true,
 		pod: api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.AppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
 			Spec:       api.PodSpec{},
 		},
 	}, {

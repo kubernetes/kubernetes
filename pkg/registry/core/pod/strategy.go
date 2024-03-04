@@ -777,7 +777,7 @@ func applyAppArmorVersionSkew(pod *api.Pod) {
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(),
 		func(ctr *api.Container, _ podutil.ContainerType) bool {
 			// get possible annotation and field
-			key := api.AppArmorContainerAnnotationKeyPrefix + ctr.Name
+			key := api.DeprecatedAppArmorAnnotationKeyPrefix + ctr.Name
 			annotation, hasAnnotation := pod.Annotations[key]
 
 			var containerProfile *api.AppArmorProfile
@@ -824,14 +824,14 @@ func appArmorAnnotationForField(field *api.AppArmorProfile) string {
 	// trails the API version
 	switch field.Type {
 	case api.AppArmorProfileTypeUnconfined:
-		return api.AppArmorProfileNameUnconfined
+		return api.DeprecatedAppArmorAnnotationValueUnconfined
 
 	case api.AppArmorProfileTypeRuntimeDefault:
-		return api.AppArmorProfileRuntimeDefault
+		return api.DeprecatedAppArmorAnnotationValueRuntimeDefault
 
 	case api.AppArmorProfileTypeLocalhost:
 		if field.LocalhostProfile != nil {
-			return api.AppArmorProfileLocalhostPrefix + *field.LocalhostProfile
+			return api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + *field.LocalhostProfile
 		}
 	}
 
@@ -844,16 +844,16 @@ func appArmorAnnotationForField(field *api.AppArmorProfile) string {
 // apparmorFieldForAnnotation takes a pod annotation and returns the converted
 // apparmor profile field.
 func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
-	if annotation == api.AppArmorProfileNameUnconfined {
+	if annotation == api.DeprecatedAppArmorAnnotationValueUnconfined {
 		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
 	}
 
-	if annotation == api.AppArmorProfileRuntimeDefault {
+	if annotation == api.DeprecatedAppArmorAnnotationValueRuntimeDefault {
 		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
 	}
 
-	if strings.HasPrefix(annotation, api.AppArmorProfileLocalhostPrefix) {
-		localhostProfile := strings.TrimPrefix(annotation, api.AppArmorProfileLocalhostPrefix)
+	if strings.HasPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix)
 		if localhostProfile != "" {
 			return &api.AppArmorProfile{
 				Type:             api.AppArmorProfileTypeLocalhost,

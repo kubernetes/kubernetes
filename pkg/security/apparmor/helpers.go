@@ -43,8 +43,8 @@ func isRequired(pod *v1.Pod) bool {
 	}
 
 	for key, value := range pod.Annotations {
-		if strings.HasPrefix(key, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
-			return value != v1.AppArmorBetaProfileNameUnconfined
+		if strings.HasPrefix(key, v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) {
+			return value != v1.DeprecatedAppArmorBetaProfileNameUnconfined
 		}
 	}
 	return false
@@ -72,21 +72,21 @@ func GetProfile(pod *v1.Pod, container *v1.Container) *v1.AppArmorProfile {
 // getProfileFromPodAnnotations gets the AppArmor profile to use with container from
 // (deprecated) pod annotations.
 func getProfileFromPodAnnotations(annotations map[string]string, containerName string) *v1.AppArmorProfile {
-	val, ok := annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName]
+	val, ok := annotations[v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+containerName]
 	if !ok {
 		return nil
 	}
 
 	switch {
-	case val == v1.AppArmorBetaProfileRuntimeDefault:
+	case val == v1.DeprecatedAppArmorBetaProfileRuntimeDefault:
 		return &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeRuntimeDefault}
 
-	case val == v1.AppArmorBetaProfileNameUnconfined:
+	case val == v1.DeprecatedAppArmorBetaProfileNameUnconfined:
 		return &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeUnconfined}
 
-	case strings.HasPrefix(val, v1.AppArmorBetaProfileNamePrefix):
+	case strings.HasPrefix(val, v1.DeprecatedAppArmorBetaProfileNamePrefix):
 		// Note: an invalid empty localhost profile will be rejected by kubelet admission.
-		profileName := strings.TrimPrefix(val, v1.AppArmorBetaProfileNamePrefix)
+		profileName := strings.TrimPrefix(val, v1.DeprecatedAppArmorBetaProfileNamePrefix)
 		return &v1.AppArmorProfile{
 			Type:             v1.AppArmorProfileTypeLocalhost,
 			LocalhostProfile: &profileName,
