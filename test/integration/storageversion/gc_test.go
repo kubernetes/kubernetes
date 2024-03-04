@@ -33,11 +33,11 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -63,14 +63,13 @@ func TestStorageVersionGarbageCollection(t *testing.T) {
 	leaseInformer := informers.Coordination().V1().Leases()
 	storageVersionInformer := informers.Internal().V1alpha1().StorageVersions()
 
-	_, ctx := ktesting.NewTestContext(t)
-	controller := storageversiongc.NewStorageVersionGC(ctx, kubeclient, leaseInformer, storageVersionInformer)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	controller := storageversiongc.NewStorageVersionGC(tCtx, kubeclient, leaseInformer, storageVersionInformer)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go leaseInformer.Informer().Run(ctx.Done())
-	go storageVersionInformer.Informer().Run(ctx.Done())
-	go controller.Run(ctx)
+	go leaseInformer.Informer().Run(tCtx.Done())
+	go storageVersionInformer.Informer().Run(tCtx.Done())
+	go controller.Run(tCtx)
 
 	createTestAPIServerIdentityLease(t, kubeclient, idA)
 	createTestAPIServerIdentityLease(t, kubeclient, idB)
@@ -84,7 +83,7 @@ func TestStorageVersionGarbageCollection(t *testing.T) {
 		createTestStorageVersion(t, kubeclient, idA)
 		time.Sleep(10 * time.Second)
 		sv, err := kubeclient.InternalV1alpha1().StorageVersions().Get(
-			context.TODO(), svName, metav1.GetOptions{})
+			tCtx, svName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to retrieve valid storage version: %v", err)
 		}

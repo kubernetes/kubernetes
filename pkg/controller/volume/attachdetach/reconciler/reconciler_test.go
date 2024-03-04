@@ -32,7 +32,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
@@ -41,6 +40,7 @@ import (
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -78,10 +78,8 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 0 /* expectedCallCount */, fakePlugin)
@@ -131,10 +129,8 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -185,10 +181,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	}
 
 	// Act
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	logger, tCtx := ktesting.NewTestContext(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -264,10 +258,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -342,10 +334,8 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	}
 
 	// Act
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	logger, tCtx := ktesting.NewTestContext(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -422,10 +412,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 2 /* expectedCallCount */, fakePlugin)
@@ -517,10 +505,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -600,10 +586,8 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/)
 
 	// Act
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	logger, tCtx := ktesting.NewTestContext(t)
+	go reconciler.Run(tCtx)
 
 	// Add the pod in which the volume is attached to the uncertain node
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -651,12 +635,10 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	logger, tCtx := ktesting.NewTestContext(t)
 	rc := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
-	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc(ctx)
+	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc(tCtx)
 	podName1 := "pod-uid1"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -671,7 +653,7 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	}
 
 	// Act
-	reconciliationLoopFunc(ctx)
+	reconciliationLoopFunc(tCtx)
 
 	// Volume is added to asw, volume should be reported as attached to the node.
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
@@ -683,10 +665,10 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 
 	// Mock NodeStatusUpdate fail
 	rc.(*reconciler).nodeStatusUpdater = statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
-	reconciliationLoopFunc(ctx)
+	reconciliationLoopFunc(tCtx)
 	// The first detach will be triggered after at least 50ms (maxWaitForUnmountDuration in test).
 	time.Sleep(100 * time.Millisecond)
-	reconciliationLoopFunc(ctx)
+	reconciliationLoopFunc(tCtx)
 	// Right before detach operation is performed, the volume will be first removed from being reported
 	// as attached on node status (RemoveVolumeFromReportAsAttached). After UpdateNodeStatus operation which is expected to fail,
 	// controller then added the volume back as attached.
@@ -728,10 +710,8 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/)
 
 	// Act
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	logger, tCtx := ktesting.NewTestContext(t)
+	go reconciler.Run(tCtx)
 
 	// Add the pod in which the volume is attached to the FailDetachNode
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -814,10 +794,8 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/)
 
 	// Act
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	logger, tCtx := ktesting.NewTestContext(t)
+	go reconciler.Run(tCtx)
 
 	// Add the pod in which the volume is attached to the timeout node
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -907,10 +885,8 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -988,10 +964,8 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1073,10 +1047,8 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
@@ -1188,10 +1160,8 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	}
 
 	// Act
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go reconciler.Run(ctx)
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 
 	// Assert
 	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)

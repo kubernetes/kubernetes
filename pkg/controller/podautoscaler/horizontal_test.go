@@ -17,7 +17,6 @@ limitations under the License.
 package podautoscaler
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -806,10 +805,10 @@ func coolCPUCreationTime() metav1.Time {
 }
 
 func (tc *testCase) runTestWithController(t *testing.T, hpaController *HorizontalController, informerFactory informers.SharedInformerFactory) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx, 5)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	informerFactory.Start(tCtx.Done())
+	go hpaController.Run(tCtx, 5)
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents

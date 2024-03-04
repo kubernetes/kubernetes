@@ -34,6 +34,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -254,10 +255,11 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("tearing down controller")
+
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,7 +274,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -300,10 +302,10 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -318,13 +320,13 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
 	service.Spec.LoadBalancerClass = utilpointer.String("test.com/update")
-	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(tCtx, service, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatal("Error: updating test service load balancer class should throw error, field is immutable")
 	}
@@ -351,10 +353,10 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -368,13 +370,13 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
 	service.Spec.LoadBalancerClass = utilpointer.String("test.com/test")
-	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(tCtx, service, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatal("Error: updating test service load balancer class should throw error, field is immutable")
 	}
@@ -401,10 +403,10 @@ func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -494,10 +496,10 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 			controller, cloud, informer := newServiceController(t, client)
 			cloud.ExternalIP = net.ParseIPSloppy(tc.externalIP)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			informer.Start(ctx.Done())
-			go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+			tCtx := ktesting.Init(t)
+			defer tCtx.Cancel("test has completed")
+			informer.Start(tCtx.Done())
+			go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -511,13 +513,13 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 				},
 			}
 
-			service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+			service, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating test service: %v", err)
 			}
 
 			time.Sleep(5 * time.Second) // sleep 5 second to wait for the service controller reconcile
-			service, err = client.CoreV1().Services(ns.Name).Get(ctx, service.Name, metav1.GetOptions{})
+			service, err = client.CoreV1().Services(ns.Name).Get(tCtx, service.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Error getting test service: %v", err)
 			}

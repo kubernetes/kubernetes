@@ -35,7 +35,6 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -49,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -331,9 +331,7 @@ func TestSyncDeploymentDeletionRace(t *testing.T) {
 
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	f := newFixture(t)
 
@@ -344,7 +342,7 @@ func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 
 	// Normally there should be a status update to sync observedGeneration but the fake
 	// deployment has no generation set so there is no action happening here.
-	f.run(ctx, testutil.GetKey(d, t))
+	f.run(tCtx, testutil.GetKey(d, t))
 }
 
 func TestReentrantRollback(t *testing.T) {

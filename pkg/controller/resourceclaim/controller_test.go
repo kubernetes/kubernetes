@@ -17,7 +17,6 @@ limitations under the License.
 package resourceclaim
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -99,10 +99,6 @@ var (
 		},
 	}
 )
-
-func init() {
-	klog.InitFlags(nil)
-}
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
@@ -406,8 +402,7 @@ func TestSyncHandler(t *testing.T) {
 	for _, tc := range tests {
 		// Run sequentially because of global logging and global metrics.
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
 			var objects []runtime.Object
 			for _, pod := range tc.pods {
@@ -433,20 +428,20 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1alpha2().ResourceClaimTemplates()
 
-			ec, err := NewController(klog.FromContext(ctx), fakeKubeClient, podInformer, podSchedulingInformer, claimInformer, templateInformer)
+			ec, err := NewController(klog.FromContext(tCtx), fakeKubeClient, podInformer, podSchedulingInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
 
 			// Ensure informers are up-to-date.
-			go informerFactory.Start(ctx.Done())
+			go informerFactory.Start(tCtx.Done())
 			stopInformers := func() {
-				cancel()
+				tCtx.Cancel("shutdown informers")
 				informerFactory.Shutdown()
 			}
 			defer stopInformers()
-			informerFactory.WaitForCacheSync(ctx.Done())
-			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, claimInformer.Informer().HasSynced, templateInformer.Informer().HasSynced)
+			informerFactory.WaitForCacheSync(tCtx.Done())
+			cache.WaitForCacheSync(tCtx.Done(), podInformer.Informer().HasSynced, claimInformer.Informer().HasSynced, templateInformer.Informer().HasSynced)
 
 			// Add claims that only exist in the mutation cache.
 			for _, claim := range tc.claimsInCache {
@@ -456,13 +451,13 @@ func TestSyncHandler(t *testing.T) {
 			// Simulate race: stop informers, add more pods that the controller doesn't know about.
 			stopInformers()
 			for _, pod := range tc.podsLater {
-				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error while creating pod: %v", err)
 				}
 			}
 
-			err = ec.syncHandler(context.TODO(), tc.key)
+			err = ec.syncHandler(tCtx, tc.key)
 			if err != nil && !tc.expectedError {
 				t.Fatalf("unexpected error while running handler: %v", err)
 			}
@@ -470,13 +465,13 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("unexpected success")
 			}
 
-			claims, err := fakeKubeClient.ResourceV1alpha2().ResourceClaims("").List(ctx, metav1.ListOptions{})
+			claims, err := fakeKubeClient.ResourceV1alpha2().ResourceClaims("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing claims: %v", err)
 			}
 			assert.Equal(t, normalizeClaims(tc.expectedClaims), normalizeClaims(claims.Items))
 
-			pods, err := fakeKubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+			pods, err := fakeKubeClient.CoreV1().Pods("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing pods: %v", err)
 			}
@@ -492,7 +487,7 @@ func TestSyncHandler(t *testing.T) {
 			}
 			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
-			scheduling, err := fakeKubeClient.ResourceV1alpha2().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
+			scheduling, err := fakeKubeClient.ResourceV1alpha2().PodSchedulingContexts("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing claims: %v", err)
 			}

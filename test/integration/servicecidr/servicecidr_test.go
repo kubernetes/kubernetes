@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestServiceAllocNewServiceCIDR(t *testing.T) {
@@ -60,17 +61,17 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	// ServiceCIDR controller
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
 	resyncPeriod := 12 * time.Hour
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
-		ctx,
+		tCtx,
 		informerFactory.Networking().V1alpha1().ServiceCIDRs(),
 		informerFactory.Networking().V1alpha1().IPAddresses(),
 		client,
-	).Run(ctx, 5)
-	informerFactory.Start(ctx.Done())
+	).Run(tCtx, 5)
+	informerFactory.Start(tCtx.Done())
 
 	// /29 = 6 services, kubernetes.default takes the first address
 	// make 5 more services to take up all IPs
@@ -161,17 +162,17 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	// ServiceCIDR controller
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
 	resyncPeriod := 12 * time.Hour
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
-		ctx,
+		tCtx,
 		informerFactory.Networking().V1alpha1().ServiceCIDRs(),
 		informerFactory.Networking().V1alpha1().IPAddresses(),
 		client,
-	).Run(ctx, 5)
-	informerFactory.Start(ctx.Done())
+	).Run(tCtx, 5)
+	informerFactory.Start(tCtx.Done())
 
 	// /29 = 6 services, kubernetes.default takes the first address
 	// make 5 more services to take up all IPs
@@ -181,7 +182,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		}
 	}
 	// create a new ServiceCIDRs that overlaps the default one
-	_, err = client.NetworkingV1alpha1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr1", cidr1, ""), metav1.CreateOptions{})
+	_, err = client.NetworkingV1alpha1().ServiceCIDRs().Create(tCtx, makeServiceCIDR("cidr1", cidr1, ""), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal((err))
 	}
@@ -196,7 +197,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		t.Fatalf("cidr1 is not ready")
 	}
 	// we should be able to delete the ServiceCIDR despite it contains IP addresses as it overlaps with the default ServiceCIDR
-	err = client.NetworkingV1alpha1().ServiceCIDRs().Delete(ctx, "cidr1", metav1.DeleteOptions{})
+	err = client.NetworkingV1alpha1().ServiceCIDRs().Delete(tCtx, "cidr1", metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal((err))
 	}
@@ -212,7 +213,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 
 	// add a new ServiceCIDR with a new range
-	_, err = client.NetworkingV1alpha1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr2", cidr2, ""), metav1.CreateOptions{})
+	_, err = client.NetworkingV1alpha1().ServiceCIDRs().Create(tCtx, makeServiceCIDR("cidr2", cidr2, ""), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal((err))
 	}
@@ -238,7 +239,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 
 	// add a new ServiceCIDR that overlaps the existing one
-	_, err = client.NetworkingV1alpha1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr3", cidr3, ""), metav1.CreateOptions{})
+	_, err = client.NetworkingV1alpha1().ServiceCIDRs().Create(tCtx, makeServiceCIDR("cidr3", cidr3, ""), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal((err))
 	}
@@ -253,7 +254,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		t.Fatalf("cidr3 is not ready")
 	}
 	// we should be able to delete the ServiceCIDR2 despite it contains IP addresses as it is contained on ServiceCIDR3
-	err = client.NetworkingV1alpha1().ServiceCIDRs().Delete(ctx, "cidr2", metav1.DeleteOptions{})
+	err = client.NetworkingV1alpha1().ServiceCIDRs().Delete(tCtx, "cidr2", metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal((err))
 	}
@@ -269,7 +270,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 
 	// serviceCIDR3 will not be able to be deleted until the IPAddress is removed
-	err = client.NetworkingV1alpha1().ServiceCIDRs().Delete(ctx, "cidr3", metav1.DeleteOptions{})
+	err = client.NetworkingV1alpha1().ServiceCIDRs().Delete(tCtx, "cidr3", metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal((err))
 	}

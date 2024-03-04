@@ -39,6 +39,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var timeForControllerToProgressForSanityCheck = 20 * time.Millisecond
@@ -204,31 +205,29 @@ func TestCreatePod(t *testing.T) {
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
-			ctx, cancel := context.WithCancel(context.Background())
+			tCtx := ktesting.Init(t)
+			defer tCtx.Cancel("test has completed")
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.pod}})
-			controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
+			controller, podIndexer, _ := setupNewController(tCtx, fakeClientset)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
+			go controller.Run(tCtx)
 			controller.taintedNodes = item.taintedNodes
 
 			podIndexer.Add(item.pod)
 			controller.PodUpdated(nil, item.pod)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
-
-			cancel()
 		})
 	}
 }
 
 func TestDeletePod(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	fakeClientset := fake.NewSimpleClientset()
-	controller, _, _ := setupNewController(ctx, fakeClientset)
+	controller, _, _ := setupNewController(tCtx, fakeClientset)
 	controller.recorder = testutil.NewFakeRecorder()
-	go controller.Run(ctx)
+	go controller.Run(tCtx)
 	controller.taintedNodes = map[string][]corev1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
@@ -302,12 +301,13 @@ func TestUpdatePod(t *testing.T) {
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
-			ctx, cancel := context.WithCancel(context.Background())
+			tCtx := ktesting.Init(t)
+			defer tCtx.Cancel("test has completed")
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.prevPod}})
-			controller, podIndexer, _ := setupNewController(context.TODO(), fakeClientset)
+			controller, podIndexer, _ := setupNewController(tCtx, fakeClientset)
 			controller.recorder = testutil.NewFakeRecorder()
 			controller.taintedNodes = item.taintedNodes
-			go controller.Run(ctx)
+			go controller.Run(tCtx)
 
 			podIndexer.Add(item.prevPod)
 			controller.PodUpdated(nil, item.prevPod)
@@ -327,7 +327,6 @@ func TestUpdatePod(t *testing.T) {
 			controller.PodUpdated(item.prevPod, item.newPod)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
-			cancel()
 		})
 	}
 }
@@ -370,29 +369,33 @@ func TestCreateNode(t *testing.T) {
 	}
 
 	for _, item := range testCases {
-		ctx, cancel := context.WithCancel(context.Background())
-		fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: item.pods})
-		controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
-		nodeIndexer.Add(item.node)
-		controller.recorder = testutil.NewFakeRecorder()
-		go controller.Run(ctx)
-		controller.NodeUpdated(nil, item.node)
+		t.Run(item.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			defer tCtx.Cancel("test has completed")
+			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: item.pods})
+			controller, _, nodeIndexer := setupNewController(tCtx, fakeClientset)
+			err := nodeIndexer.Add(item.node)
+			if err != nil {
+				t.Fatal(err)
+			}
+			controller.recorder = testutil.NewFakeRecorder()
+			go controller.Run(tCtx)
+			controller.NodeUpdated(nil, item.node)
 
-		verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
-
-		cancel()
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
+		})
 	}
 }
 
 func TestDeleteNode(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	tCtx := ktesting.Init(t)
 	fakeClientset := fake.NewSimpleClientset()
-	controller, _, _ := setupNewController(ctx, fakeClientset)
+	controller, _, _ := setupNewController(tCtx, fakeClientset)
 	controller.recorder = testutil.NewFakeRecorder()
 	controller.taintedNodes = map[string][]corev1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
-	go controller.Run(ctx)
+	go controller.Run(tCtx)
 	controller.NodeUpdated(testutil.NewNode("node1"), nil)
 
 	// await until controller.taintedNodes is empty
@@ -405,7 +408,6 @@ func TestDeleteNode(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to await for processing node deleted: %q", err)
 	}
-	cancel()
 }
 
 func TestUpdateNode(t *testing.T) {
@@ -501,14 +503,13 @@ func TestUpdateNode(t *testing.T) {
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: item.pods})
-			controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
+			controller, _, nodeIndexer := setupNewController(tCtx, fakeClientset)
 			nodeIndexer.Add(item.newNode)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
+			go controller.Run(tCtx)
 			controller.NodeUpdated(item.oldNode, item.newNode)
 
 			if item.additionalSleep > 0 {
@@ -540,15 +541,15 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 	singleTaintedNode := testutil.NewNode("node1")
 	singleTaintedNode.Spec.Taints = []corev1.Taint{taint1}
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	tCtx := ktesting.Init(t)
 	fakeClientset := fake.NewSimpleClientset(pod)
-	controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
+	controller, _, nodeIndexer := setupNewController(tCtx, fakeClientset)
 	controller.recorder = testutil.NewFakeRecorder()
-	go controller.Run(ctx)
+	go controller.Run(tCtx)
 
 	// no taint
 	nodeIndexer.Add(untaintedNode)
-	controller.handleNodeUpdate(ctx, nodeUpdateItem{"node1"})
+	controller.handleNodeUpdate(tCtx, nodeUpdateItem{"node1"})
 	// verify pod is not queued for deletion
 	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) != nil {
 		t.Fatalf("pod queued for deletion with no taints")
@@ -556,7 +557,7 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 
 	// no taint -> infinitely tolerated taint
 	nodeIndexer.Update(singleTaintedNode)
-	controller.handleNodeUpdate(ctx, nodeUpdateItem{"node1"})
+	controller.handleNodeUpdate(tCtx, nodeUpdateItem{"node1"})
 	// verify pod is not queued for deletion
 	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) != nil {
 		t.Fatalf("pod queued for deletion with permanently tolerated taint")
@@ -564,7 +565,7 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 
 	// infinitely tolerated taint -> temporarily tolerated taint
 	nodeIndexer.Update(doubleTaintedNode)
-	controller.handleNodeUpdate(ctx, nodeUpdateItem{"node1"})
+	controller.handleNodeUpdate(tCtx, nodeUpdateItem{"node1"})
 	// verify pod is queued for deletion
 	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) == nil {
 		t.Fatalf("pod not queued for deletion after addition of temporarily tolerated taint")
@@ -572,7 +573,7 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 
 	// temporarily tolerated taint -> infinitely tolerated taint
 	nodeIndexer.Update(singleTaintedNode)
-	controller.handleNodeUpdate(ctx, nodeUpdateItem{"node1"})
+	controller.handleNodeUpdate(tCtx, nodeUpdateItem{"node1"})
 	// verify pod is not queued for deletion
 	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) != nil {
 		t.Fatalf("pod queued for deletion after removal of temporarily tolerated taint")
@@ -584,7 +585,6 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 			t.Error("Unexpected deletion")
 		}
 	}
-	cancel()
 }
 
 func TestUpdateNodeWithMultiplePods(t *testing.T) {
@@ -627,15 +627,14 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
 			t.Logf("Starting testcase %q", item.description)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: item.pods})
 			sort.Sort(item.expectedDeleteTimes)
-			controller, _, nodeIndexer := setupNewController(ctx, fakeClientset)
+			controller, _, nodeIndexer := setupNewController(tCtx, fakeClientset)
 			nodeIndexer.Add(item.newNode)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
+			go controller.Run(tCtx)
 			controller.NodeUpdated(item.oldNode, item.newNode)
 
 			startedAt := time.Now()
@@ -835,14 +834,13 @@ func TestEventualConsistency(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: item.pods})
-			controller, podIndexer, nodeIndexer := setupNewController(ctx, fakeClientset)
+			controller, podIndexer, nodeIndexer := setupNewController(tCtx, fakeClientset)
 			nodeIndexer.Add(item.newNode)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
+			go controller.Run(tCtx)
 
 			if item.prevPod != nil {
 				podIndexer.Add(item.prevPod)

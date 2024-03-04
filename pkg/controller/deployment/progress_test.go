@@ -17,7 +17,6 @@ limitations under the License.
 package deployment
 
 import (
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -27,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func newDeploymentStatus(replicas, updatedReplicas, availableReplicas int32) apps.DeploymentStatus {
@@ -177,10 +176,8 @@ func TestRequeueStuckDeployment(t *testing.T) {
 			if test.nowFn != nil {
 				nowFn = test.nowFn
 			}
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			got := dc.requeueStuckDeployment(ctx, test.d, test.status)
+			tCtx := ktesting.Init(t)
+			got := dc.requeueStuckDeployment(tCtx, test.d, test.status)
 			if got != test.expected {
 				t.Errorf("%s: got duration: %v, expected duration: %v", test.name, got, test.expected)
 			}

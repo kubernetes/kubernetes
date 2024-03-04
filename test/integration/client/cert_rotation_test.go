@@ -39,6 +39,7 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestCertRotation(t *testing.T) {
@@ -123,7 +124,7 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 
 	client := clientset.NewForConfigOrDie(kubeconfig)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	tCtx := ktesting.Init(t)
 
 	go func() {
 		time.Sleep(10 * time.Second)
@@ -132,11 +133,11 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 
 		// Wait for old cert to expire (30s)
 		time.Sleep(30 * time.Second)
-		cancel()
+		tCtx.Cancel("test has completed")
 	}()
 
 	for range time.Tick(time.Second) {
-		_, err := client.CoreV1().ServiceAccounts("default").List(ctx, v1.ListOptions{})
+		_, err := client.CoreV1().ServiceAccounts("default").List(tCtx, v1.ListOptions{})
 		if err != nil {
 			// client may wrap the context.Canceled error, so we can't
 			// do 'err == ctx.Err()', instead use 'errors.Is'.

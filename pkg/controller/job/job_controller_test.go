@@ -51,12 +51,12 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
@@ -2123,22 +2123,20 @@ func hasTrueCondition(job *batch.Job) *batch.JobConditionType {
 // TestPastDeadlineJobFinished ensures that a Job is correctly tracked until
 // reaching the active deadline, at which point it is marked as Failed.
 func TestPastDeadlineJobFinished(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	clientset := fake.NewSimpleClientset()
 	fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
-	manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
+	manager, sharedInformerFactory := newControllerFromClientWithClock(tCtx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 	manager.expectations = FakeJobExpectations{
 		controller.NewControllerExpectations(), true, func() {
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	sharedInformerFactory.Start(ctx.Done())
-	sharedInformerFactory.WaitForCacheSync(ctx.Done())
+	sharedInformerFactory.Start(tCtx.Done())
+	sharedInformerFactory.WaitForCacheSync(tCtx.Done())
 
-	go manager.Run(ctx, 1)
+	go manager.Run(tCtx, 1)
 
 	tests := []struct {
 		name         string
@@ -2165,13 +2163,13 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 				job.Status.StartTime = &start
 			}
 
-			_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+			_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(tCtx, job, metav1.CreateOptions{})
 			if err != nil {
 				t.Errorf("Could not create Job: %v", err)
 			}
 
 			var j *batch.Job
-			err = wait.PollUntilContextTimeout(ctx, 200*time.Microsecond, 3*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			err = wait.PollUntilContextTimeout(tCtx, 200*time.Microsecond, 3*time.Second, true, func(ctx context.Context) (done bool, err error) {
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -2181,7 +2179,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 			if err != nil {
 				t.Errorf("Job failed to ensure that start time was set: %v", err)
 			}
-			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (done bool, err error) {
+			err = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (done bool, err error) {
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
 					return false, nil
@@ -5270,13 +5268,11 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 }
 
 func TestFinalizerCleanup(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	clientset := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager, err := NewController(tCtx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -5284,21 +5280,21 @@ func TestFinalizerCleanup(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	// Start the Pod and Job informers.
-	sharedInformers.Start(ctx.Done())
-	sharedInformers.WaitForCacheSync(ctx.Done())
+	sharedInformers.Start(tCtx.Done())
+	sharedInformers.WaitForCacheSync(tCtx.Done())
 	// Initialize the controller with 0 workers to make sure the
 	// pod finalizers are not removed by the "syncJob" function.
-	go manager.Run(ctx, 0)
+	go manager.Run(tCtx, 0)
 
 	// Create a simple Job
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
-	job, err = clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+	job, err = clientset.BatchV1().Jobs(job.GetNamespace()).Create(tCtx, job, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating job: %v", err)
 	}
 
 	// Await for the Job to appear in the jobLister to ensure so that Job Pod gets tracked correctly.
-	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		job, _ := manager.jobLister.Jobs(job.GetNamespace()).Get(job.Name)
 		return job != nil, nil
 	}); err != nil {
@@ -5308,7 +5304,7 @@ func TestFinalizerCleanup(t *testing.T) {
 	// Create a Pod with the job tracking finalizer
 	pod := newPod("test-pod", job)
 	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
-	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
+	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(tCtx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating pod: %v", err)
 	}
@@ -5316,7 +5312,7 @@ func TestFinalizerCleanup(t *testing.T) {
 	// Await for the Pod to appear in the podStore to ensure that the pod exists when cleaning up the Job.
 	// In a production environment, there wouldn't be these guarantees, but the Pod would be cleaned up
 	// by the orphan pod worker, when the Pod finishes.
-	if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		pod, _ := manager.podStore.Pods(pod.GetNamespace()).Get(pod.Name)
 		return pod != nil, nil
 	}); err != nil {
@@ -5328,14 +5324,14 @@ func TestFinalizerCleanup(t *testing.T) {
 		Type:   batch.JobComplete,
 		Status: v1.ConditionTrue,
 	})
-	_, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	_, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(tCtx, job, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Updating job status: %v", err)
 	}
 
 	// Verify the pod finalizer is removed for a finished Job,
 	// even if the jobs pods are not tracked by the main reconciliation loop.
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

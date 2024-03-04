@@ -38,15 +38,16 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
+	defer tCtx.Cancel("test has completed")
 
 	client := clientset.NewForConfigOrDie(server.ClientConfig)
 
@@ -54,7 +55,7 @@ func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	// Create fake node
-	_, err := client.CoreV1().Nodes().Create(ctx, makeNode("node0"), metav1.CreateOptions{})
+	_, err := client.CoreV1().Nodes().Create(tCtx, makeNode("node0"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create Node %v", err)
 	}
@@ -111,11 +112,11 @@ func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
 			return fakeCloud, nil
 		})
 
-	ccm := ccmservertesting.StartTestServerOrDie(ctx, args)
+	ccm := ccmservertesting.StartTestServerOrDie(tCtx, args)
 	defer ccm.TearDownFn()
 
 	// There should be only the taint TaintNodeNotReady, added by the admission plugin TaintNodesByCondition
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 50*time.Second, true, func(ctx context.Context) (done bool, err error) {
+	err = wait.PollUntilContextTimeout(tCtx, 1*time.Second, 50*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		n, err := client.CoreV1().Nodes().Get(ctx, "node0", metav1.GetOptions{})
 		if err != nil {
 			return false, err
