@@ -546,6 +546,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 			if field == c.indexedTrigger.indexName {
 				if value, ok := pred.Field.RequiresExactMatch(field); ok {
 					triggerValue, triggerSupported = value, true
+					break
 				}
 			}
 		}
