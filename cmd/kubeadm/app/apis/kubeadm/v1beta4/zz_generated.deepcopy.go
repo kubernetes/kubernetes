@@ -646,6 +646,11 @@ func (in *Timeouts) DeepCopyInto(out *Timeouts) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.UpgradeManifests != nil {
+		in, out := &in.UpgradeManifests, &out.UpgradeManifests
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 
@@ -733,6 +738,11 @@ func (in *UpgradeConfiguration) DeepCopyInto(out *UpgradeConfiguration) {
 	out.Diff = in.Diff
 	in.Node.DeepCopyInto(&out.Node)
 	in.Plan.DeepCopyInto(&out.Plan)
+	if in.Timeouts != nil {
+		in, out := &in.Timeouts, &out.Timeouts
+		*out = new(Timeouts)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

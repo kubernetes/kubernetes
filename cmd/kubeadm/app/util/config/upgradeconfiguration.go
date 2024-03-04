@@ -38,17 +38,6 @@ import (
 
 var componentCfgGV = sets.New(kubeproxyconfig.GroupName, kubeletconfig.GroupName)
 
-// DefaultUpgradeConfiguration return a default UpgradeConfiguration
-func DefaultUpgradeConfiguration() (*kubeadmapi.UpgradeConfiguration, error) {
-	versionedCfg := &kubeadmapiv1.UpgradeConfiguration{}
-	kubeadmscheme.Scheme.Default(versionedCfg)
-	cfg := &kubeadmapi.UpgradeConfiguration{}
-	if err := kubeadmscheme.Scheme.Convert(versionedCfg, cfg, nil); err != nil {
-		return nil, errors.Wrap(err, "could not prepare a defaulted UpgradeConfiguration")
-	}
-	return cfg, nil
-}
-
 // documentMapToUpgradeConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
 // finds a UpgradeConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
 func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.UpgradeConfiguration, error) {
@@ -114,16 +103,10 @@ func DocMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap) (*kubeadmapi.Up
 	return documentMapToUpgradeConfiguration(gvkmap, false)
 }
 
-// LoadUpgradeConfig loads UpgradeConfiguration from a file.
-func LoadUpgradeConfig(cfgPath string) (*kubeadmapi.UpgradeConfiguration, error) {
+// LoadUpgradeConfigurationFromFile loads UpgradeConfiguration from a file.
+func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurationOptions) (*kubeadmapi.UpgradeConfiguration, error) {
 	var err error
 	var upgradeCfg *kubeadmapi.UpgradeConfiguration
-	if cfgPath == "" {
-		if upgradeCfg, err = DefaultUpgradeConfiguration(); err != nil {
-			return nil, err
-		}
-		return upgradeCfg, nil
-	}
 
 	// Otherwise, we have a config file. Let's load it.
 	configBytes, err := os.ReadFile(cfgPath)
@@ -155,4 +138,45 @@ func LoadUpgradeConfig(cfgPath string) (*kubeadmapi.UpgradeConfiguration, error)
 	}
 
 	return upgradeCfg, nil
+}
+
+// LoadOrDefaultUpgradeConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
+// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
+// Then the external, versioned configuration is defaulted and converted to the internal type.
+// Right thereafter, the configuration is defaulted again with dynamic values
+// Lastly, the internal config is validated and returned.
+func LoadOrDefaultUpgradeConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1.UpgradeConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.UpgradeConfiguration, error) {
+	var (
+		config *kubeadmapi.UpgradeConfiguration
+		err    error
+	)
+	if cfgPath != "" {
+		// Loads configuration from config file, if provided
+		config, err = LoadUpgradeConfigurationFromFile(cfgPath, opts)
+	} else {
+		config, err = DefaultedUpgradeConfiguration(defaultversionedcfg, opts)
+	}
+	if err == nil {
+		prepareStaticVariables(config)
+	}
+	return config, err
+}
+
+// DefaultedUpgradeConfiguration takes a versioned UpgradeConfiguration (usually filled in by command line parameters), defaults it, converts it to internal and validates it
+func DefaultedUpgradeConfiguration(defaultversionedcfg *kubeadmapiv1.UpgradeConfiguration, _ LoadOrDefaultConfigurationOptions) (*kubeadmapi.UpgradeConfiguration, error) {
+	internalcfg := &kubeadmapi.UpgradeConfiguration{}
+
+	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
+	// static default values to cfg only for values not provided with flags
+	kubeadmscheme.Scheme.Default(defaultversionedcfg)
+	if err := kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil); err != nil {
+		return nil, err
+	}
+
+	// Validates cfg
+	if err := validation.ValidateUpgradeConfiguration(internalcfg).ToAggregate(); err != nil {
+		return nil, err
+	}
+
+	return internalcfg, nil
 }

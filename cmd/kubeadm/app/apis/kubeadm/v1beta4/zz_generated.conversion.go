@@ -968,6 +968,7 @@ func autoConvert_v1beta4_Timeouts_To_kubeadm_Timeouts(in *Timeouts, out *kubeadm
 	out.EtcdAPICall = (*metav1.Duration)(unsafe.Pointer(in.EtcdAPICall))
 	out.TLSBootstrap = (*metav1.Duration)(unsafe.Pointer(in.TLSBootstrap))
 	out.Discovery = (*metav1.Duration)(unsafe.Pointer(in.Discovery))
+	out.UpgradeManifests = (*metav1.Duration)(unsafe.Pointer(in.UpgradeManifests))
 	return nil
 }
 
@@ -983,6 +984,7 @@ func autoConvert_kubeadm_Timeouts_To_v1beta4_Timeouts(in *kubeadm.Timeouts, out 
 	out.EtcdAPICall = (*metav1.Duration)(unsafe.Pointer(in.EtcdAPICall))
 	out.TLSBootstrap = (*metav1.Duration)(unsafe.Pointer(in.TLSBootstrap))
 	out.Discovery = (*metav1.Duration)(unsafe.Pointer(in.Discovery))
+	out.UpgradeManifests = (*metav1.Duration)(unsafe.Pointer(in.UpgradeManifests))
 	return nil
 }
 
@@ -1044,6 +1046,7 @@ func autoConvert_v1beta4_UpgradeConfiguration_To_kubeadm_UpgradeConfiguration(in
 	if err := Convert_v1beta4_UpgradePlanConfiguration_To_kubeadm_UpgradePlanConfiguration(&in.Plan, &out.Plan, s); err != nil {
 		return err
 	}
+	out.Timeouts = (*kubeadm.Timeouts)(unsafe.Pointer(in.Timeouts))
 	return nil
 }
 
@@ -1065,6 +1068,7 @@ func autoConvert_kubeadm_UpgradeConfiguration_To_v1beta4_UpgradeConfiguration(in
 	if err := Convert_kubeadm_UpgradePlanConfiguration_To_v1beta4_UpgradePlanConfiguration(&in.Plan, &out.Plan, s); err != nil {
 		return err
 	}
+	out.Timeouts = (*Timeouts)(unsafe.Pointer(in.Timeouts))
 	return nil
 }
 
