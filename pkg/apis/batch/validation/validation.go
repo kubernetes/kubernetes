@@ -470,7 +470,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	}
 	if opts.RejectFinishedJobWithTerminatingPods {
 		if status.Terminating != nil && *status.Terminating > 0 && isJobFinished {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("terminating"), status.Active, "active>0 is invalid for finished job"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("terminating"), status.Terminating, "terminating>0 is invalid for finished job"))
 		}
 	}
 	if opts.RejectFinishedJobWithoutStartTime {

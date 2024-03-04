@@ -351,9 +351,20 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		// controllers meet the expectations of the clients of the Job API.
 		// For example, we verify that a Job in terminal state (Failed or Complete)
 		// does not flip to a non-terminal state.
+		//
 		// In the checks below we fail validation for Job status fields (or conditions) only if they change their values
 		// (compared to the oldJob). This allows proceeding with status updates unrelated to the fields violating the
 		// checks, while blocking bad status updates for jobs with correct status.
+		//
+		// Also note, there is another reason we run the validation rules only
+		// if the associated status fields changed. We do it also because some of
+		// the validation rules might be temporarily violated just after a user
+		// updating the spec. In that case we want to give time to the Job
+		// controller to "fix" the status in the following sync. For example, the
+		// rule for checking the format of completedIndexes expects them to be
+		// below .spec.completions, however, this it is ok if the
+		// status.completedIndexes go beyond completions just after a user scales
+		// down a Job.
 		isIndexed := ptr.Deref(newJob.Spec.CompletionMode, batch.NonIndexedCompletion) == batch.IndexedCompletion
 
 		isJobFinishedChanged := batchvalidation.IsJobFinished(oldJob) != batchvalidation.IsJobFinished(newJob)
