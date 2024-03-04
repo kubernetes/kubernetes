@@ -162,8 +162,8 @@ func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 }
 
 func TestGetListNonRecursive(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, store)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(client), store)
 }
 
 type storeWithPrefixTransformer struct {

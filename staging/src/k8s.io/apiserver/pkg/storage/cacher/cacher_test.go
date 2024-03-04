@@ -182,9 +182,20 @@ func TestListWithListFromCache(t *testing.T) {
 }
 
 func TestGetListNonRecursive(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, cacher)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
+}
+
+func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	// Wait before sending watch progress request to avoid https://github.com/etcd-io/etcd/issues/17507
+	// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove sleep when etcd is upgraded to version with fix.
+	time.Sleep(100 * time.Millisecond)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
 }
 
 func checkStorageCalls(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
