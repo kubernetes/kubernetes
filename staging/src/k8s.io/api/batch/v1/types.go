@@ -59,7 +59,7 @@ const (
 	JobIndexIgnoredFailureCountAnnotation = labelPrefix + "job-index-ignored-failure-count"
 	// JobControllerName reserved value for the managedBy field for the built-in
 	// Job controller.
-	JobControllerName = "job-controller.k8s.io"
+	JobControllerName = "kubernetes.io/job-controller"
 )
 
 // +genclient
@@ -416,9 +416,12 @@ type JobSpec struct {
 
 	// ManagedBy field indicates the controller that manages a Job. The k8s Job
 	// controller reconciles jobs which don't have this field at all or the field
-	// value is the reserved string `job-controller.k8s.io`, but skips reconciling
-	// Jobs with a custom value for this field.
-	// The value must be a valid DNS subdomain name.
+	// value is the reserved string `kubernetes.io/job-controller`, but skips
+	// reconciling Jobs with a custom value for this field.
+	// The value must be a valid domain-prefixed path (e.g. acme.io/foo) -
+	// all characters before the first "/" must be a valid subdomain as defined
+	// by RFC 1123. All characters trailing the first "/" must be valid HTTP Path
+	// characters as defined by RFC 3986. The value cannot exceed 64 characters.
 	//
 	// This field is alpha-level. The job controller accepts setting the field
 	// when the feature gate JobManagedBy is enabled (disabled by default).
@@ -435,9 +438,10 @@ type JobStatus struct {
 	// become false. When a Job is completed, one of the conditions will have
 	// type "Complete" and status true.
 	//
-	// A job is considered finished when it is either in the "Complete" or "Failed"
-	// condition. Job cannot be in the "Complete" condition together we neither
-	// "Failed" nor "FailureTarget" condition.
+	// A job is considered finished when it is in a terminal condition, either
+	// "Complete" or "Failed". At that point, all pods of the job are in terminal
+	// phase. Job cannot be both in the "Complete" and "Failed" conditions.
+	// Additionally, it cannot be in the "Complete" and "FailureTarget" conditions.
 	// The "Complete", "Failed" and "FailureTarget" conditions cannot be disabled.
 	//
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
@@ -462,8 +466,8 @@ type JobStatus struct {
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// The completion time is set when the job finishes successfully, and only then.
-	// The value cannot be updated or removed. The value is equal or later
-	// than startTime.
+	// The value cannot be updated or removed. The value indicates the same or
+	// later point in time as the startTime field.
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
 
@@ -474,8 +478,8 @@ type JobStatus struct {
 	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
 
 	// The number of pods which reached phase Succeeded.
-	// The value increases monotonically, with the exception of elastic indexed
-	// jobs (with completions = parallelism), which can be scaled down.
+	// The value increases monotonically for a given spec. However, it may
+	// decrease in reaction to scale down of elastic indexed jobs.
 	// +optional
 	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
 
@@ -503,7 +507,7 @@ type JobStatus struct {
 	// +optional
 	CompletedIndexes string `json:"completedIndexes,omitempty" protobuf:"bytes,7,opt,name=completedIndexes"`
 
-	// FailedIndexes holds the failed indexes when backoffLimitPerIndex=true.
+	// FailedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set.
 	// The indexes are represented in the text format analogous as for the
 	// `completedIndexes` field, ie. they are kept as decimal integers
 	// separated by commas. The numbers are listed in increasing order. Three or
@@ -511,6 +515,8 @@ type JobStatus struct {
 	// last element of the series, separated by a hyphen.
 	// For example, if the failed indexes are 1, 3, 4, 5 and 7, they are
 	// represented as "1,3-5,7".
+	// The set of failed indexes cannot overlap with the set of completed indexes.
+	//
 	// This field is beta-level. It can be used when the `JobBackoffLimitPerIndex`
 	// feature gate is enabled (enabled by default).
 	// +optional

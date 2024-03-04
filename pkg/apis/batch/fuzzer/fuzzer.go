@@ -65,7 +65,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			j.PodReplacementPolicy = &podReplacementPolicy
 			if c.RandBool() {
-				j.ManagedBy = pointer.String(batch.JobControllerName)
+				c.Fuzz(j.ManagedBy)
 			}
 		},
 		func(sj *batch.CronJobSpec, c fuzz.Continue) {

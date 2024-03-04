@@ -389,7 +389,7 @@ func TestValidateJob(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:  validGeneratedSelector,
 					Template:  validPodTemplateSpecForGenerated,
-					ManagedBy: ptr.To("custom-job-controller"),
+					ManagedBy: ptr.To("example.com/foo"),
 				},
 			},
 		},
@@ -407,7 +407,18 @@ func TestValidateJob(t *testing.T) {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
-		`spec.managedBy: Invalid value: "invalid custom controller name": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`: {
+		`spec.managedBy: Too long: may not be longer than 63`: {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("example.com/" + strings.Repeat("x", 60)),
+				},
+			},
+		},
+		`spec.managedBy: Invalid value: "invalid custom controller name": must be a domain-prefixed path (such as "acme.io/foo")`: {
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
@@ -1375,18 +1386,14 @@ func TestValidateJobUpdate(t *testing.T) {
 		},
 		"invalid attempt to set managedBy field": {
 			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc",
-					Namespace: metav1.NamespaceDefault,
-					Labels:    map[string]string{},
-				},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGenerated,
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.ManagedBy = ptr.To("custom-controller")
+				job.Spec.ManagedBy = ptr.To("example.com/custom-controller")
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -1395,18 +1402,15 @@ func TestValidateJobUpdate(t *testing.T) {
 		},
 		"invalid update of the managedBy field": {
 			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc",
-					Namespace: metav1.NamespaceDefault,
-				},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
 					Selector:  validGeneratedSelector,
 					Template:  validPodTemplateSpecForGenerated,
-					ManagedBy: ptr.To("custom-controller1"),
+					ManagedBy: ptr.To("example.com/custom-controller1"),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.ManagedBy = ptr.To("custom-controller2")
+				job.Spec.ManagedBy = ptr.To("example.com/custom-controller2")
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -3657,7 +3661,7 @@ func TestTimeZones(t *testing.T) {
 func TestValidateIndexesString(t *testing.T) {
 	testCases := map[string]struct {
 		indexesString string
-		completions   int
+		completions   int32
 		wantError     error
 	}{
 		"empty is valid": {
@@ -3726,6 +3730,79 @@ func TestValidateIndexesString(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			gotErr := validateIndexesFormat(tc.indexesString, tc.completions)
+			if tc.wantError == nil && gotErr != nil {
+				t.Errorf("unexpected error: %s", gotErr)
+			} else if tc.wantError != nil && gotErr == nil {
+				t.Errorf("missing error: %s", tc.wantError)
+			} else if tc.wantError != nil && gotErr != nil {
+				if diff := cmp.Diff(tc.wantError.Error(), gotErr.Error()); diff != "" {
+					t.Errorf("unexpected error, diff: %s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateFailedIndexesNotOverlapCompleted(t *testing.T) {
+	testCases := map[string]struct {
+		completedIndexesStr string
+		failedIndexesStr    string
+		completions         int32
+		wantError           error
+	}{
+		"empty intervals": {
+			completedIndexesStr: "",
+			failedIndexesStr:    "",
+			completions:         6,
+		},
+		"empty completed intervals": {
+			completedIndexesStr: "",
+			failedIndexesStr:    "1-3",
+			completions:         6,
+		},
+		"empty failed intervals": {
+			completedIndexesStr: "1-2",
+			failedIndexesStr:    "",
+			completions:         6,
+		},
+		"non-overlapping intervals": {
+			completedIndexesStr: "0,2-4,6-8,12-19",
+			failedIndexesStr:    "1,9-10",
+			completions:         20,
+		},
+		"overlapping intervals": {
+			completedIndexesStr: "0,2-4,6-8,12-19",
+			failedIndexesStr:    "1,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"overlapping intervals, corrupted completed interval skipped": {
+			completedIndexesStr: "0,2-4,x,6-8,12-19",
+			failedIndexesStr:    "1,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"overlapping intervals, corrupted failed interval skipped": {
+			completedIndexesStr: "0,2-4,6-8,12-19",
+			failedIndexesStr:    "1,y,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"overlapping intervals, first corrupted intervals skipped": {
+			completedIndexesStr: "x,0,2-4,6-8,12-19",
+			failedIndexesStr:    "y,1,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"non-overlapping intervals, last intervals corrupted": {
+			completedIndexesStr: "0,2-4,6-8,12-19,x",
+			failedIndexesStr:    "1,9-10,y",
+			completions:         20,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validateFailedIndexesNotOverlapCompleted(tc.completedIndexesStr, tc.failedIndexesStr, tc.completions)
 			if tc.wantError == nil && gotErr != nil {
 				t.Errorf("unexpected error: %s", gotErr)
 			} else if tc.wantError != nil && gotErr == nil {

@@ -63,6 +63,9 @@ const (
 
 	// maximum number of patterns for a OnPodConditions requirement in pod failure policy
 	maxPodFailurePolicyOnPodConditionsPatterns = 20
+
+	// maximum length of the value of the managedBy field
+	maxManagedByLength = 63
 )
 
 var (
@@ -209,7 +212,10 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 		}
 	}
 	if spec.ManagedBy != nil {
-		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(*spec.ManagedBy, fldPath.Child("managedBy"))...)
+		allErrs = append(allErrs, apimachineryvalidation.IsDomainPrefixedPath(fldPath.Child("managedBy"), *spec.ManagedBy)...)
+		if len(*spec.ManagedBy) > maxManagedByLength {
+			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("managedBy"), *spec.ManagedBy, maxManagedByLength))
+		}
 	}
 	if spec.CompletionMode != nil {
 		if *spec.CompletionMode != batch.NonIndexedCompletion && *spec.CompletionMode != batch.IndexedCompletion {
@@ -432,12 +438,12 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 		}
 	}
 	if opts.RejectCompleteJobWithFailedCondition {
-		if IsConditionTrue(status.Conditions, batch.JobComplete) && IsConditionTrue(status.Conditions, batch.JobFailed) {
+		if IsJobComplete(job) && IsJobFailed(job) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Complete=True and Failed=true conditions"))
 		}
 	}
 	if opts.RejectCompleteJobWithFailureTargetCondition {
-		if IsConditionTrue(status.Conditions, batch.JobComplete) && IsConditionTrue(status.Conditions, batch.JobFailureTarget) {
+		if IsJobComplete(job) && IsConditionTrue(status.Conditions, batch.JobFailureTarget) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Complete=True and FailureTarget=true conditions"))
 		}
 	}
@@ -479,14 +485,14 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	}
 	if opts.RejectInvalidCompletedIndexes {
 		if job.Spec.Completions != nil {
-			if err := validateIndexesFormat(status.CompletedIndexes, int(*job.Spec.Completions)); err != nil {
+			if err := validateIndexesFormat(status.CompletedIndexes, int32(*job.Spec.Completions)); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("completedIndexes"), status.CompletedIndexes, fmt.Sprintf("error parsing completedIndexes: %s", err.Error())))
 			}
 		}
 	}
 	if opts.RejectInvalidFailedIndexes {
 		if job.Spec.Completions != nil && job.Spec.BackoffLimitPerIndex != nil && status.FailedIndexes != nil {
-			if err := validateIndexesFormat(*status.FailedIndexes, int(*job.Spec.Completions)); err != nil {
+			if err := validateIndexesFormat(*status.FailedIndexes, int32(*job.Spec.Completions)); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("failedIndexes"), status.FailedIndexes, fmt.Sprintf("error parsing failedIndexes: %s", err.Error())))
 			}
 		}
@@ -505,6 +511,13 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	if opts.RejectMoreReadyThanActivePods {
 		if status.Ready != nil && *status.Ready > status.Active {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("ready"), *status.Ready, "cannot set more ready pods than active"))
+		}
+	}
+	if opts.RejectFailedIndexesOverlappingCompleted {
+		if job.Spec.Completions != nil && status.FailedIndexes != nil {
+			if err := validateFailedIndexesNotOverlapCompleted(status.CompletedIndexes, *status.FailedIndexes, int32(*job.Spec.Completions)); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("failedIndexes"), *status.FailedIndexes, err.Error()))
+			}
 		}
 	}
 	return allErrs
@@ -804,42 +817,96 @@ func IsConditionTrue(list []batch.JobCondition, cType batch.JobConditionType) bo
 	return false
 }
 
-func validateIndexesFormat(indexesStr string, completions int) error {
-	if indexesStr == "" {
+func validateFailedIndexesNotOverlapCompleted(completedIndexesStr string, failedIndexesStr string, completions int32) error {
+	if len(completedIndexesStr) == 0 || len(failedIndexesStr) == 0 {
 		return nil
 	}
-	var lastIndex *int
+	completedIndexesIntervals := strings.Split(completedIndexesStr, ",")
+	failedIndexesIntervals := strings.Split(failedIndexesStr, ",")
+	var completedPos, failedPos int
+	cX, cY, cErr := parseIndexInterval(completedIndexesIntervals[completedPos], completions)
+	fX, fY, fErr := parseIndexInterval(failedIndexesIntervals[failedPos], completions)
+	for completedPos < len(completedIndexesIntervals) && failedPos < len(failedIndexesIntervals) {
+		if cErr != nil {
+			// Failure to parse "completed" interval. We go to the next interval,
+			// the error will be reported to the user when validating the format.
+			completedPos++
+			if completedPos < len(completedIndexesIntervals) {
+				cX, cY, cErr = parseIndexInterval(completedIndexesIntervals[completedPos], completions)
+			}
+		} else if fErr != nil {
+			// Failure to parse "failed" interval. We go to the next interval,
+			// the error will be reported to the user when validating the format.
+			failedPos++
+			if failedPos < len(failedIndexesIntervals) {
+				fX, fY, fErr = parseIndexInterval(failedIndexesIntervals[failedPos], completions)
+			}
+		} else {
+			// We have one failed and one completed interval parsed.
+			if cX <= fY && fX <= cY {
+				return fmt.Errorf("failedIndexes and completedIndexes overlap at index: %d", max(cX, fX))
+			}
+			// No overlap, let's move to the next one.
+			if cX <= fX {
+				completedPos++
+				if completedPos < len(completedIndexesIntervals) {
+					cX, cY, cErr = parseIndexInterval(completedIndexesIntervals[completedPos], completions)
+				}
+			} else {
+				failedPos++
+				if failedPos < len(failedIndexesIntervals) {
+					fX, fY, fErr = parseIndexInterval(failedIndexesIntervals[failedPos], completions)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateIndexesFormat(indexesStr string, completions int32) error {
+	if len(indexesStr) == 0 {
+		return nil
+	}
+	var lastIndex *int32
 	for _, intervalStr := range strings.Split(indexesStr, ",") {
-		limitsStr := strings.Split(intervalStr, "-")
-		if len(limitsStr) > 2 {
-			return fmt.Errorf("the fragment %q violates the requirement that an index interval can have at most two parts separated by '-'", intervalStr)
-		}
-		x, err := strconv.Atoi(limitsStr[0])
+		x, y, err := parseIndexInterval(intervalStr, completions)
 		if err != nil {
-			return fmt.Errorf("cannot convert string to integer for index: %q", limitsStr[0])
-		}
-		if x >= completions {
-			return fmt.Errorf("too large index: %q", limitsStr[0])
+			return err
 		}
 		if lastIndex != nil && *lastIndex >= x {
 			return fmt.Errorf("non-increasing order, previous: %d, current: %d", *lastIndex, x)
 		}
-		lastIndex = &x
-		if len(limitsStr) > 1 {
-			y, err := strconv.Atoi(limitsStr[1])
-			if err != nil {
-				return fmt.Errorf("cannot convert string to integer for index: %q", limitsStr[1])
-			}
-			if y >= completions {
-				return fmt.Errorf("too large index: %q", limitsStr[1])
-			}
-			if *lastIndex >= y {
-				return fmt.Errorf("non-increasing order, previous: %d, current: %d", *lastIndex, y)
-			}
-			lastIndex = &y
-		}
+		lastIndex = &y
 	}
 	return nil
+}
+
+func parseIndexInterval(intervalStr string, completions int32) (int32, int32, error) {
+	limitsStr := strings.Split(intervalStr, "-")
+	if len(limitsStr) > 2 {
+		return 0, 0, fmt.Errorf("the fragment %q violates the requirement that an index interval can have at most two parts separated by '-'", intervalStr)
+	}
+	x, err := strconv.Atoi(limitsStr[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("cannot convert string to integer for index: %q", limitsStr[0])
+	}
+	if x >= int(completions) {
+		return 0, 0, fmt.Errorf("too large index: %q", limitsStr[0])
+	}
+	if len(limitsStr) > 1 {
+		y, err := strconv.Atoi(limitsStr[1])
+		if err != nil {
+			return 0, 0, fmt.Errorf("cannot convert string to integer for index: %q", limitsStr[1])
+		}
+		if y >= int(completions) {
+			return 0, 0, fmt.Errorf("too large index: %q", limitsStr[1])
+		}
+		if x >= y {
+			return 0, 0, fmt.Errorf("non-increasing order, previous: %d, current: %d", x, y)
+		}
+		return int32(x), int32(y), nil
+	}
+	return int32(x), int32(x), nil
 }
 
 type JobValidationOptions struct {
@@ -858,6 +925,7 @@ type JobStatusValidationOptions struct {
 	RejectDisablingTerminalCondition             bool
 	RejectInvalidCompletedIndexes                bool
 	RejectInvalidFailedIndexes                   bool
+	RejectFailedIndexesOverlappingCompleted      bool
 	RejectCompletedIndexesForNonIndexedJob       bool
 	RejectFailedIndexesForNoBackoffLimitPerIndex bool
 	RejectMoreReadyThanActivePods                bool

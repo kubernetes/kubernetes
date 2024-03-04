@@ -359,6 +359,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isJobFinishedChanged := batchvalidation.IsJobFinished(oldJob) != batchvalidation.IsJobFinished(newJob)
 		isJobCompleteChanged := batchvalidation.IsJobComplete(oldJob) != batchvalidation.IsJobComplete(newJob)
 		isJobFailedChanged := batchvalidation.IsJobFailed(oldJob) != batchvalidation.IsJobFailed(newJob)
+		isJobFailureTargetChanged := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobFailureTarget) != batchvalidation.IsConditionTrue(newJob.Status.Conditions, batch.JobFailureTarget)
 		isCompletedIndexesChanged := oldJob.Status.CompletedIndexes != newJob.Status.CompletedIndexes
 		isFailedIndexesChanged := !ptr.Equal(oldJob.Status.FailedIndexes, newJob.Status.FailedIndexes)
 		isActiveChanged := oldJob.Status.Active != newJob.Status.Active
@@ -366,18 +367,19 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
 		isStartTimeChanged := !ptr.Equal(oldJob.Status.StartTime, newJob.Status.StartTime)
 		isCompletionTimeChanged := !ptr.Equal(oldJob.Status.CompletionTime, newJob.Status.CompletionTime)
-		isUncountedTerminatedPodsChanged := isUncountedTerminatedPodsChanged(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
+		isUncountedTerminatedPodsChanged := !apiequality.Semantic.DeepEqual(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
 
 		return batchvalidation.JobStatusValidationOptions{
 			// We allow to decrease the counter for succeeded pods for jobs which
 			// have equal parallelism and completions, as they can be scaled-down.
-			RejectDecreasingSucceededCounter:             !isIndexed || !ptr.Equal(newJob.Spec.Completions, oldJob.Spec.Parallelism),
+			RejectDecreasingSucceededCounter:             !isIndexed || !ptr.Equal(newJob.Spec.Completions, newJob.Spec.Parallelism),
 			RejectDecreasingFailedCounter:                true,
 			RejectDisablingTerminalCondition:             true,
 			RejectInvalidCompletedIndexes:                isCompletedIndexesChanged,
 			RejectInvalidFailedIndexes:                   isFailedIndexesChanged,
 			RejectCompletedIndexesForNonIndexedJob:       isCompletedIndexesChanged,
 			RejectFailedIndexesForNoBackoffLimitPerIndex: isFailedIndexesChanged,
+			RejectFailedIndexesOverlappingCompleted:      isFailedIndexesChanged || isCompletedIndexesChanged,
 			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
 			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
 			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
@@ -389,20 +391,10 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectNotCompleteJobWithCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
 			RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
 			RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
-			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailedChanged,
+			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailureTargetChanged,
 		}
-	} else {
-		return batchvalidation.JobStatusValidationOptions{}
 	}
-}
-
-func isUncountedTerminatedPodsChanged(old, new *batch.UncountedTerminatedPods) bool {
-	if (old == nil && new != nil) || (old != nil && new == nil) {
-		return true
-	} else if old != nil && new != nil {
-		return len(old.Failed) != len(new.Failed) || len(old.Succeeded) != len(new.Succeeded)
-	}
-	return false
+	return batchvalidation.JobStatusValidationOptions{}
 }
 
 // WarningsOnUpdate returns warnings for the given update.

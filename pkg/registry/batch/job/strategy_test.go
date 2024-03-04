@@ -2134,6 +2134,83 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods"},
 			},
 		},
+		"invalid attempt to update uncountedTerminatedPods.Succeeded for Complete job": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"b"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods"},
+			},
+		},
+		"non-empty uncountedTerminatedPods for complete job, unrelated update": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobConditionType("CustomJobCondition"),
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+		},
 		"invalid attempt to transition to Complete=True with uncountedTerminatedPods.Succeeded>0": {
 			enableJobManagedBy: true,
 			job: &batch.Job{
@@ -2379,6 +2456,42 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of FailureTarget=True when Complete=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
@@ -2702,6 +2815,60 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid failedIndexes, which overlap with completedIndexes": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "3-4",
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "2-4",
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.failedIndexes"},
+			},
+		},
+		"failedIndexes overlap with completedIndexes, unrelated field change": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "2-4",
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "2-4",
+					Active:           1,
+				},
 			},
 		},
 	}

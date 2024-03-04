@@ -757,8 +757,8 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	// Skip syncing of the job it is managed by another controller.
 	// We cannot rely solely on skipping of queueing such jobs for synchronization,
 	// because it is possible a synchronization task is queued for a job, without
-	// the managed by label, but the job is quickly replaced by another job with
-	// the label. Then, the syncJob might be invoked for a job with the label.
+	// the managedBy field, but the job is quickly replaced by another job with
+	// the field. Then, the syncJob might be invoked for a job with the field.
 	if controllerName := managedByExternalController(sharedJob); controllerName != nil {
 		logger.V(2).Info("Skip syncing the job as it is managed by an external controller", "key", key, "uid", sharedJob.UID, "controllerName", controllerName)
 		return nil

@@ -2300,7 +2300,6 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
 			Namespace: metav1.NamespaceDefault,
-			Labels:    make(map[string]string),
 		},
 		Spec: batch.JobSpec{
 			Template: v1.PodTemplateSpec{
