@@ -195,7 +195,7 @@ func testFileContent(filePath string, retryDuration int, breakOnExpectedContent 
 		fmt.Printf("content of file %q: %v\n", filePath, string(contentBytes))
 		if breakOnExpectedContent {
 			if string(contentBytes) != initialContent {
-				fmt.Printf("Unexpected content. Expected: %s. Retrying", initialContent)
+				fmt.Printf("Unexpected content. Expected: %s. Retrying\n", initialContent)
 				continue
 			}
 			break
