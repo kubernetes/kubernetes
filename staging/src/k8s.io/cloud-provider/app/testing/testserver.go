@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	cloudprovider "k8s.io/cloud-provider"
@@ -104,7 +105,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
-	s, err := options.NewCloudControllerManagerOptions()
+	s, err := options.NewCloudControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		return TestServer{}, err
 	}

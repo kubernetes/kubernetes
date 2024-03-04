@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/configz"
@@ -97,7 +98,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	opts := options.NewOptions()
+	opts := options.NewOptions(utilfeature.DefaultMutableFeatureGate)
 	nfs := opts.Flags
 	for _, f := range nfs.FlagSets {
 		fs.AddFlagSet(f)

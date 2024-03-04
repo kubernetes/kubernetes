@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cpoptions "k8s.io/cloud-provider/options"
@@ -169,7 +170,7 @@ var args = []string{
 
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
+	s, _ := NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -464,7 +465,7 @@ func TestAddFlags(t *testing.T) {
 
 func TestApplyTo(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
+	s, _ := NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	// flag set to parse the args that are required to start the kube controller manager
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
@@ -1277,7 +1278,7 @@ func TestValidateControllersOptions(t *testing.T) {
 }
 
 func TestValidateControllerManagerOptions(t *testing.T) {
-	opts, err := NewKubeControllerManagerOptions()
+	opts, err := NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		t.Errorf("expected no error, error found %+v", err)
 	}
@@ -1290,7 +1291,7 @@ func TestValidateControllerManagerOptions(t *testing.T) {
 }
 
 func TestControllerManagerAliases(t *testing.T) {
-	opts, err := NewKubeControllerManagerOptions()
+	opts, err := NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		t.Errorf("expected no error, error found %+v", err)
 	}
@@ -1337,7 +1338,7 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 	assertWatchListClientFeatureDefaultValue(t)
 
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
+	s, _ := NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -1358,7 +1359,7 @@ func TestWatchListClientFlagChange(t *testing.T) {
 	assertWatchListClientFeatureDefaultValue(t)
 
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
+	s, _ := NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}

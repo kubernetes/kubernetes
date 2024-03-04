@@ -74,7 +74,7 @@ type Option func(runtime.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
-	opts := options.NewOptions()
+	opts := options.NewOptions(utilfeature.DefaultMutableFeatureGate)
 
 	cmd := &cobra.Command{
 		Use: "kube-scheduler",

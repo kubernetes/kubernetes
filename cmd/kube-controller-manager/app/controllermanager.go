@@ -102,7 +102,7 @@ const (
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
-	s, err := options.NewKubeControllerManagerOptions()
+	s, err := options.NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		klog.Background().Error(err, "Unable to initialize command options")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)

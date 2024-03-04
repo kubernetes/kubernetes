@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appconfig "k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
@@ -42,7 +43,7 @@ import (
 )
 
 func TestDefaultFlags(t *testing.T) {
-	s, err := NewCloudControllerManagerOptions()
+	s, err := NewCloudControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		t.Errorf("unexpected err: %v", err)
 	}
@@ -157,7 +158,7 @@ func TestDefaultFlags(t *testing.T) {
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 
-	s, err := NewCloudControllerManagerOptions()
+	s, err := NewCloudControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		t.Errorf("unexpected err: %v", err)
 	}
@@ -316,7 +317,7 @@ func TestAddFlags(t *testing.T) {
 func TestCreateConfig(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 
-	s, err := NewCloudControllerManagerOptions()
+	s, err := NewCloudControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		t.Errorf("unexpected err: %v", err)
 	}
@@ -449,7 +450,7 @@ func TestCreateConfig(t *testing.T) {
 }
 
 func TestCloudControllerManagerAliases(t *testing.T) {
-	opts, err := NewCloudControllerManagerOptions()
+	opts, err := NewCloudControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		t.Errorf("expected no error, error found %+v", err)
 	}
