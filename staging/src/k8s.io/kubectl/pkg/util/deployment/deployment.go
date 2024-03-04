@@ -45,6 +45,10 @@ const (
 	// is deployment.spec.replicas + maxSurge. Used by the underlying replica sets to estimate their
 	// proportions in case the deployment has surge replicas.
 	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
+	// ReplicaSetReplicasBeforeScaleAnnotation is the number of replicas a replica set had before scaling began.
+	// Used by the underlying replica sets to estimate their proportions in case the deployment has surge replicas
+	// if the replica set is partially scaled due to the deployment's .spec.podReplacementPolicy.
+	ReplicaSetReplicasBeforeScaleAnnotation = "deployment.kubernetes.io/replicaset-replicas-before-scale"
 	// RollbackRevisionNotFound is not found rollback event reason
 	RollbackRevisionNotFound = "DeploymentRollbackRevisionNotFound"
 	// RollbackTemplateUnchanged is the template unchanged rollback event reason
