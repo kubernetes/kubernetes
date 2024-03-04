@@ -60,6 +60,84 @@ func (MatchResources) SwaggerDoc() map[string]string {
 	return map_MatchResources
 }
 
+var map_MutatingAdmissionPolicy = map[string]string{
+	"":         "MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutate the object coming into admission chain.",
+	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+	"spec":     "Specification of the desired behavior of the MutatingAdmissionPolicy.",
+}
+
+func (MutatingAdmissionPolicy) SwaggerDoc() map[string]string {
+	return map_MutatingAdmissionPolicy
+}
+
+var map_MutatingAdmissionPolicyBinding = map[string]string{
+	"":         "MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with paramerized resources. MutatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.\n\nFor a given admission request, each binding will cause its policy to be evaluated N times, where N is 1 for policies/bindings that don't use params, otherwise N is the number of parameters selected by the binding.\n\nThe CEL expressions of a policy must have a computed CEL cost below the maximum CEL budget. Each evaluation of the policy is given an independent CEL cost budget. Adding/removing policies, bindings, or params can not affect whether a given (policy, binding, param) combination is within its own CEL budget.",
+	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+	"spec":     "Specification of the desired behavior of the MutatingAdmissionPolicyBinding.",
+}
+
+func (MutatingAdmissionPolicyBinding) SwaggerDoc() map[string]string {
+	return map_MutatingAdmissionPolicyBinding
+}
+
+var map_MutatingAdmissionPolicyBindingList = map[string]string{
+	"":         "MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+	"items":    "List of PolicyBinding.",
+}
+
+func (MutatingAdmissionPolicyBindingList) SwaggerDoc() map[string]string {
+	return map_MutatingAdmissionPolicyBindingList
+}
+
+var map_MutatingAdmissionPolicyBindingSpec = map[string]string{
+	"":               "MutatingAdmissionPolicyBindingSpec is the specification of the MutatingAdmissionPolicyBinding.",
+	"policyName":     "PolicyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to. If the referenced resource does not exist, this binding is considered invalid and will be ignored Required.",
+	"paramRef":       "paramRef specifies the parameter resource used to configure the admission control policy. It should point to a resource of the type specified in ParamKind of the bound MutatingAdmissionPolicy. If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the MutatingAdmissionPolicy applied. If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param.",
+	"matchResources": "MatchResources declares what resources match this binding and will be validated by it. Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this. If this is unset, all resources matched by the policy are validated by this binding When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated. Note that this is differs from MutatingAdmissionPolicy matchConstraints, where resourceRules are required.",
+}
+
+func (MutatingAdmissionPolicyBindingSpec) SwaggerDoc() map[string]string {
+	return map_MutatingAdmissionPolicyBindingSpec
+}
+
+var map_MutatingAdmissionPolicyList = map[string]string{
+	"":         "MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+	"items":    "List of ValidatingAdmissionPolicy.",
+}
+
+func (MutatingAdmissionPolicyList) SwaggerDoc() map[string]string {
+	return map_MutatingAdmissionPolicyList
+}
+
+var map_MutatingAdmissionPolicySpec = map[string]string{
+	"":                 "MutatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.",
+	"paramKind":        "ParamKind specifies the kind of resources used to parameterize this policy. If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions. If ParamKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied. If paramKind is specified but paramRef is unset in MutatingAdmissionPolicyBinding, the params variable will be null.",
+	"matchConstraints": "MatchConstraints specifies what resources this policy is designed to validate. The AdmissionPolicy cares about a request if it matches _all_ Constraints. However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding. Required.",
+	"mutations":        "Mutations contain CEL expressions which is used to apply the mutation. Mutations may not be empty; a minimum of one Mutations is required.",
+	"failurePolicy":    "failurePolicy defines how to handle failures for the admission policy. Failures can occur from CEL expression parse errors, type check errors, runtime errors and invalid or mis-configured policy definitions or bindings.\n\nA policy is invalid if spec.paramKind refers to a non-existent Kind. A binding is invalid if spec.paramRef.name refers to a non-existent resource.\n\nfailurePolicy does not define how validations that evaluate to false are handled.\n\nAllowed values are Ignore or Fail. Defaults to Fail.",
+	"matchConditions":  "MatchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the rules, namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed.\n\nIf a parameter object is provided, it can be accessed via the `params` handle in the same manner as validation expressions.\n\nThe exact matching logic is (in order):\n  1. If ANY matchCondition evaluates to FALSE, the policy is skipped.\n  2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.\n  3. If any matchCondition evaluates to an error (but none are FALSE):\n     - If failurePolicy=Fail, reject the request\n     - If failurePolicy=Ignore, the policy is skipped",
+}
+
+func (MutatingAdmissionPolicySpec) SwaggerDoc() map[string]string {
+	return map_MutatingAdmissionPolicySpec
+}
+
+var map_Mutation = map[string]string{
+	"":                   "Mutation specifies the CEL expression which is used to apply the Mutation.",
+	"expression":         "Expression represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:\n\n- 'object' - The object from the incoming request. The value is null for DELETE requests. - 'oldObject' - The existing object. The value is null for CREATE requests. - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind. - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources. - 'variables' - Map of composited variables, from its name to its lazily evaluated value.\n  For example, a variable named 'foo' can be accessed as 'variables.foo'.\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object. No other metadata properties are accessible.\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Required.",
+	"message":            "Message represents the message displayed when validation fails. The message is required if the Expression contains line breaks. The message must not contain line breaks. If unset, the message is \"failed rule: {Rule}\". e.g. \"must be a URL with the host matching spec.host\" If the Expression contains line breaks. Message is required. The message must not contain line breaks. If unset, the message is \"failed Expression: {Expression}\".",
+	"reason":             "Reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. The currently supported reasons are: \"Unauthorized\", \"Forbidden\", \"Invalid\", \"RequestEntityTooLarge\". If not set, StatusReasonInvalid is used in the response to the client.",
+	"messageExpression":  "messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails. Since messageExpression is used as a failure message, it must evaluate to a string. If both message and messageExpression are present on a validation, then messageExpression will be used if validation fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged. messageExpression has access to all the same variables as the `expression` except for 'authorizer' and 'authorizer.requestResource'. Example: \"object.x must be less than max (\"+string(params.max)+\")\"",
+	"reinvocationPolicy": "reinvocationPolicy indicates whether this mutation should be called multiple times as part of a single admission evaluation. Allowed values are \"Never\" and \"IfNeeded\".\n\nNever: the mutation will not be called more than once in a single admission evaluation.\n\nIfNeeded: the mutation will be called at least one additional time as part of the admission evaluation if the object being admitted is modified by other admission plugins after the initial mutation call. mutations that specify this option *must* be idempotent, able to process objects they previously admitted. Note: * the number of additional invocations is not guaranteed to be exactly one. * if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again. * mutations that use this option may be reordered to minimize the number of additional invocations. * to validate an object after all mutations are guaranteed complete, use a validating admission policy instead.\n\nDefaults to \"Never\".",
+	"patchType":          "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\".",
+}
+
+func (Mutation) SwaggerDoc() map[string]string {
+	return map_Mutation
+}
+
 var map_NamedRuleWithOperations = map[string]string{
 	"":              "NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.",
 	"resourceNames": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",

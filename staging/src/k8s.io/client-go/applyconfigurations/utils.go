@@ -186,6 +186,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.MatchConditionApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MatchResources"):
 		return &admissionregistrationv1alpha1.MatchResourcesApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicy"):
+		return &admissionregistrationv1alpha1.MutatingAdmissionPolicyApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBinding"):
+		return &admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBindingSpec"):
+		return &admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicySpec"):
+		return &admissionregistrationv1alpha1.MutatingAdmissionPolicySpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Mutation"):
+		return &admissionregistrationv1alpha1.MutationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NamedRuleWithOperations"):
 		return &admissionregistrationv1alpha1.NamedRuleWithOperationsApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ParamKind"):
