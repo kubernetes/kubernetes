@@ -595,10 +595,15 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	}
 
 	errCh := parallelize.NewErrorChannel()
-	var statusesLock sync.Mutex
 	var feasibleNodesLen int32
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	type nodeStatus struct {
+		node   string
+		status *framework.Status
+	}
+	result := make([]*nodeStatus, numAllNodes)
 	checkNode := func(i int) {
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
@@ -617,10 +622,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 				feasibleNodes[length-1] = nodeInfo
 			}
 		} else {
-			statusesLock.Lock()
-			diagnosis.NodeToStatusMap[nodeInfo.Node().Name] = status
-			diagnosis.AddPluginStatus(status)
-			statusesLock.Unlock()
+			result[i] = &nodeStatus{node: nodeInfo.Node().Name, status: status}
 		}
 	}
 
@@ -637,6 +639,13 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// are found.
 	fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
+	for _, item := range result {
+		if item == nil {
+			continue
+		}
+		diagnosis.NodeToStatusMap[item.node] = item.status
+		diagnosis.AddPluginStatus(item.status)
+	}
 	if err := errCh.ReceiveError(); err != nil {
 		statusCode = framework.Error
 		return feasibleNodes, err
