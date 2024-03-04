@@ -88,8 +88,7 @@ func (p *streamProtocolV3) stream(conn streamCreator) error {
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
-
-	errorChan := watchErrorStream(p.errorStream, &errorDecoderV3{})
+	errorChan := watchErrorStream(p.errorStream, &errorDecoderV3{}, true)
 
 	p.handleResizes()
 

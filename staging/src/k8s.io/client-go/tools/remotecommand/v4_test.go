@@ -32,6 +32,10 @@ func TestV4ErrorDecoder(t *testing.T) {
 
 	for _, test := range []Test{
 		{
+			message: "",
+			err:     "error stream protocol error: no status",
+		},
+		{
 			message: "{}",
 			err:     "error stream protocol error: unknown error",
 		},

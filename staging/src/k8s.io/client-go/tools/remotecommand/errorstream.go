@@ -30,9 +30,11 @@ type errorStreamDecoder interface {
 
 // watchErrorStream watches the errorStream for remote command error data,
 // decodes it with the given errorStreamDecoder, sends the decoded error (or nil if the remote
-// command exited successfully) to the returned error channel, and closes it.
+// command exited successfully) to the returned error channel, and closes it. If the protocol
+// version understands an empty message as success (that is, up until streaming v4), we treat
+// the zero length message as a success.
 // This function returns immediately.
-func watchErrorStream(errorStream io.Reader, d errorStreamDecoder) chan error {
+func watchErrorStream(errorStream io.Reader, d errorStreamDecoder, emptyIsSuccess bool) chan error {
 	errorChan := make(chan error)
 
 	go func() {
@@ -45,7 +47,10 @@ func watchErrorStream(errorStream io.Reader, d errorStreamDecoder) chan error {
 		case len(message) > 0:
 			errorChan <- d.decode(message)
 		default:
-			errorChan <- nil
+			if emptyIsSuccess {
+				errorChan <- nil
+			}
+			errorChan <- fmt.Errorf("expected a status response: %w", io.ErrUnexpectedEOF)
 		}
 		close(errorChan)
 	}()

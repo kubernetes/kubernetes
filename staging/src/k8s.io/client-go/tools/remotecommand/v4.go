@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"sync"
 
@@ -57,8 +58,7 @@ func (p *streamProtocolV4) stream(conn streamCreator) error {
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
-
-	errorChan := watchErrorStream(p.errorStream, &errorDecoderV4{})
+	errorChan := watchErrorStream(p.errorStream, &errorDecoderV4{}, false)
 
 	p.handleResizes()
 
@@ -80,6 +80,9 @@ func (p *streamProtocolV4) stream(conn streamCreator) error {
 type errorDecoderV4 struct{}
 
 func (d *errorDecoderV4) decode(message []byte) error {
+	if len(message) == 0 {
+		return fmt.Errorf("error stream protocol error: no status: %w", io.ErrUnexpectedEOF)
+	}
 	status := metav1.Status{}
 	err := json.Unmarshal(message, &status)
 	if err != nil {
