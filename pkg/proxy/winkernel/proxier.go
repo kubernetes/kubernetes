@@ -167,7 +167,7 @@ func newHostNetworkService(hcnImpl HcnService) (HostNetworkService, hcn.Supporte
 
 // logFormattedEndpoints will log all endpoints and its states which are taking part in endpointmap change.
 // This mostly for debugging purpose and verbosity is set to 5.
-func logFormattedEndpoints(logMsg string, logLevel klog.Level, svcPortName proxy.ServicePortName, eps []proxy.Endpoint) {
+func logFormattedEndpoints(logMsg string, logLevel klog.Level, svcPortName proxy.ServicePortName, eps []*endpointInfo) {
 	if klog.V(logLevel).Enabled() {
 		var epInfo string
 		for _, v := range eps {
@@ -344,7 +344,7 @@ func conjureMac(macPrefix string, ip net.IP) string {
 	return "02-11-22-33-44-55"
 }
 
-func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
+func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap[*endpointInfo]) {
 	// This will optimize remote endpoint and loadbalancer deletion based on the annotation
 	var svcPortMap = make(map[proxy.ServicePortName]bool)
 	var logLevel klog.Level = 5
@@ -364,16 +364,8 @@ func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap prox
 
 func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName, redundantCleanup bool) {
 
-	svc, exists := proxier.svcPortMap[*svcPortName]
-
+	svcInfo, exists := proxier.svcPortMap[*svcPortName]
 	if exists {
-		svcInfo, ok := svc.(*serviceInfo)
-
-		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
-			return
-		}
-
 		if svcInfo.winProxyOptimization && redundantCleanup {
 			// This is a second cleanup call.
 			// Second cleanup on the same svcPort will be ignored if the
@@ -391,19 +383,14 @@ func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName,
 
 		if exists {
 			// Cleanup Endpoints references
-			for _, ep := range epInfos {
-				epInfo, ok := ep.(*endpointInfo)
-
-				if ok {
-					epInfo.Cleanup()
-				}
-
+			for _, epInfo := range epInfos {
+				epInfo.Cleanup()
 			}
 		}
 	}
 }
 
-func (proxier *Proxier) serviceMapChange(previous, current proxy.ServicePortMap) {
+func (proxier *Proxier) serviceMapChange(previous, current proxy.ServicePortMap[*serviceInfo]) {
 	for svcPortName := range current {
 		proxier.onServiceMapChange(&svcPortName)
 	}
@@ -418,23 +405,15 @@ func (proxier *Proxier) serviceMapChange(previous, current proxy.ServicePortMap)
 
 func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 
-	svc, exists := proxier.svcPortMap[*svcPortName]
-
+	svcInfo, exists := proxier.svcPortMap[*svcPortName]
 	if exists {
-		svcInfo, ok := svc.(*serviceInfo)
-
-		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
-			return
-		}
-
 		klog.V(3).InfoS("Updating existing service port", "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP(), "port", svcInfo.Port(), "protocol", svcInfo.Protocol())
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName], proxier.mapStaleLoadbalancers, false)
 	}
 }
 
 // returns a new proxy.Endpoint which abstracts a endpointInfo
-func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, _ *proxy.ServicePortName) proxy.Endpoint {
+func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, _ *proxy.ServicePortName) *endpointInfo {
 
 	info := &endpointInfo{
 		ip:         baseInfo.IP(),
@@ -507,7 +486,7 @@ func (refCountMap endPointsReferenceCountMap) getRefCount(hnsID string) *uint16 
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
-func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
+func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) *serviceInfo {
 	info := &serviceInfo{BaseServicePortInfo: bsvcPortInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
 	// Annotation introduced to enable optimized loadbalancing
@@ -582,12 +561,12 @@ type Proxier struct {
 	// services that happened since policies were synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
-	endpointsChanges  *proxy.EndpointsChangeTracker
-	serviceChanges    *proxy.ServiceChangeTracker
+	endpointsChanges  *proxy.EndpointsChangeTracker[*endpointInfo]
+	serviceChanges    *proxy.ServiceChangeTracker[*serviceInfo]
 	endPointsRefCount endPointsReferenceCountMap
 	mu                sync.Mutex // protects the following fields
-	svcPortMap        proxy.ServicePortMap
-	endpointsMap      proxy.EndpointsMap
+	svcPortMap        proxy.ServicePortMap[*serviceInfo]
+	endpointsMap      proxy.EndpointsMap[*endpointInfo]
 	// endpointSlicesSynced and servicesSynced are set to true when corresponding
 	// objects are synced after startup. This is used to avoid updating hns policies
 	// with some partial data after kube-proxy restart.
@@ -755,8 +734,8 @@ func NewProxier(
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
 		endPointsRefCount:     make(endPointsReferenceCountMap),
-		svcPortMap:            make(proxy.ServicePortMap),
-		endpointsMap:          make(proxy.EndpointsMap),
+		svcPortMap:            make(proxy.ServicePortMap[*serviceInfo]),
+		endpointsMap:          make(proxy.EndpointsMap[*endpointInfo]),
 		hostname:              hostname,
 		nodeIP:                nodeIP,
 		recorder:              recorder,
@@ -829,7 +808,7 @@ func CleanupLeftovers() (encounteredError bool) {
 	return encounteredError
 }
 
-func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, mapStaleLoadbalancers map[string]bool, isEndpointChange bool) {
+func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []*endpointInfo, mapStaleLoadbalancers map[string]bool, isEndpointChange bool) {
 	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
 	// if it's an endpoint change and winProxyOptimization annotation enable, skip lb deletion and remoteEndpoint deletion
 	winProxyOptimization := isEndpointChange && svcInfo.winProxyOptimization
@@ -840,14 +819,11 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, mapSt
 		svcInfo.deleteLoadBalancerPolicy(mapStaleLoadbalancers)
 	}
 	// Cleanup Endpoints references
-	for _, ep := range endpoints {
-		epInfo, ok := ep.(*endpointInfo)
-		if ok {
-			if winProxyOptimization {
-				epInfo.DecrementRefCount()
-			} else {
-				epInfo.Cleanup()
-			}
+	for _, epInfo := range endpoints {
+		if winProxyOptimization {
+			epInfo.DecrementRefCount()
+		} else {
+			epInfo.Cleanup()
 		}
 	}
 	if svcInfo.remoteEndpoint != nil {
@@ -1012,12 +988,7 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
 
 func (proxier *Proxier) cleanupAllPolicies() {
-	for svcName, svc := range proxier.svcPortMap {
-		svcInfo, ok := svc.(*serviceInfo)
-		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
-			continue
-		}
+	for svcName, svcInfo := range proxier.svcPortMap {
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName], proxier.mapStaleLoadbalancers, false)
 	}
 }
@@ -1038,11 +1009,7 @@ func isNetworkNotFoundError(err error) bool {
 // isAllEndpointsTerminating function will return true if all the endpoints are terminating.
 // If atleast one is not terminating, then return false
 func (proxier *Proxier) isAllEndpointsTerminating(svcName proxy.ServicePortName, isLocalTrafficDSR bool) bool {
-	for _, epInfo := range proxier.endpointsMap[svcName] {
-		ep, ok := epInfo.(*endpointInfo)
-		if !ok {
-			continue
-		}
+	for _, ep := range proxier.endpointsMap[svcName] {
 		if isLocalTrafficDSR && !ep.IsLocal() {
 			// KEP-1669: Ignore remote endpoints when the ExternalTrafficPolicy is Local (DSR Mode)
 			continue
@@ -1063,11 +1030,7 @@ func (proxier *Proxier) isAllEndpointsTerminating(svcName proxy.ServicePortName,
 // isAllEndpointsNonServing function will return true if all the endpoints are non serving.
 // If atleast one is serving, then return false
 func (proxier *Proxier) isAllEndpointsNonServing(svcName proxy.ServicePortName, isLocalTrafficDSR bool) bool {
-	for _, epInfo := range proxier.endpointsMap[svcName] {
-		ep, ok := epInfo.(*endpointInfo)
-		if !ok {
-			continue
-		}
+	for _, ep := range proxier.endpointsMap[svcName] {
 		if isLocalTrafficDSR && !ep.IsLocal() {
 			continue
 		}
@@ -1169,13 +1132,7 @@ func (proxier *Proxier) syncProxyRules() {
 	klog.V(3).InfoS("Syncing Policies")
 
 	// Program HNS by adding corresponding policies for each service.
-	for svcName, svc := range proxier.svcPortMap {
-		svcInfo, ok := svc.(*serviceInfo)
-		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
-			continue
-		}
-
+	for svcName, svcInfo := range proxier.svcPortMap {
 		if svcInfo.policyApplied {
 			klog.V(4).InfoS("Policy already applied", "serviceInfo", svcInfo)
 			continue
@@ -1225,13 +1182,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
 
-		for _, epInfo := range proxier.endpointsMap[svcName] {
-			ep, ok := epInfo.(*endpointInfo)
-			if !ok {
-				klog.ErrorS(nil, "Failed to cast endpointInfo", "serviceName", svcName)
-				continue
-			}
-
+		for _, ep := range proxier.endpointsMap[svcName] {
 			if svcInfo.internalTrafficLocal && svcInfo.localTrafficDSR && !ep.IsLocal() {
 				// No need to use or create remote endpoint when internal and external traffic policy is remote
 				klog.V(3).InfoS("Skipping the endpoint. Both internalTraffic and external traffic policies are local", "EpIP", ep.ip, " EpPort", ep.port)

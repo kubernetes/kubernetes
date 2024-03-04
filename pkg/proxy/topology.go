@@ -37,7 +37,7 @@ import (
 //
 //   - An indication of whether the service has any endpoints reachable from anywhere in the
 //     cluster. (This may be true even if allReachableEndpoints is empty.)
-func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
+func CategorizeEndpoints[E Endpoint](endpoints []E, svcInfo ServicePort, nodeLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []E, hasAnyEndpoints bool) {
 	var useTopology, useServingTerminatingEndpoints bool
 
 	if svcInfo.UsesClusterEndpoints() {
@@ -122,14 +122,14 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 	// clusterEndpoints may contain remote endpoints that aren't in localEndpoints, while
 	// localEndpoints may contain terminating or topologically-unavailable local endpoints
 	// that aren't in clusterEndpoints. So we have to merge the two lists.
-	endpointsMap := make(map[string]Endpoint, len(clusterEndpoints)+len(localEndpoints))
+	endpointsMap := make(map[string]E, len(clusterEndpoints)+len(localEndpoints))
 	for _, ep := range clusterEndpoints {
 		endpointsMap[ep.String()] = ep
 	}
 	for _, ep := range localEndpoints {
 		endpointsMap[ep.String()] = ep
 	}
-	allReachableEndpoints = make([]Endpoint, 0, len(endpointsMap))
+	allReachableEndpoints = make([]E, 0, len(endpointsMap))
 	for _, ep := range endpointsMap {
 		allReachableEndpoints = append(allReachableEndpoints, ep)
 	}
@@ -144,7 +144,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 // * The node's labels include "topology.kubernetes.io/zone"
 // * All of the endpoints for this Service have a topology hint
 // * At least one endpoint for this Service is hinted for this node's zone.
-func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) bool {
+func canUseTopology[E Endpoint](endpoints []E, svcInfo ServicePort, nodeLabels map[string]string) bool {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 		return false
 	}
@@ -185,14 +185,14 @@ func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[st
 
 // availableForTopology checks if this endpoint is available for use on this node, given
 // topology constraints. (It assumes that canUseTopology() returned true.)
-func availableForTopology(endpoint Endpoint, nodeLabels map[string]string) bool {
+func availableForTopology[E Endpoint](endpoint E, nodeLabels map[string]string) bool {
 	zone := nodeLabels[v1.LabelTopologyZone]
 	return endpoint.ZoneHints().Has(zone)
 }
 
 // filterEndpoints filters endpoints according to predicate
-func filterEndpoints(endpoints []Endpoint, predicate func(Endpoint) bool) []Endpoint {
-	filteredEndpoints := make([]Endpoint, 0, len(endpoints))
+func filterEndpoints[E Endpoint](endpoints []E, predicate func(Endpoint) bool) []E {
+	filteredEndpoints := make([]E, 0, len(endpoints))
 
 	for _, ep := range endpoints {
 		if predicate(ep) {

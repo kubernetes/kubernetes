@@ -102,8 +102,8 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, hostn
 	hnsNetwork := newHnsNetwork(hnsNetworkInfo)
 	hcnMock := fakehcn.NewHcnMock(hnsNetwork)
 	proxier := &Proxier{
-		svcPortMap:          make(proxy.ServicePortMap),
-		endpointsMap:        make(proxy.EndpointsMap),
+		svcPortMap:          make(proxy.ServicePortMap[*serviceInfo]),
+		endpointsMap:        make(proxy.EndpointsMap[*endpointInfo]),
 		hostname:            testHostName,
 		nodeIP:              nodeIP,
 		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
@@ -167,18 +167,13 @@ func TestCreateServiceVip(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.svcPortMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
-	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	svcInfo := proxier.svcPortMap[svcPortName]
 
-	} else {
-		if svcInfo.remoteEndpoint == nil {
-			t.Error()
-		}
-		if svcInfo.remoteEndpoint.ip != svcIP {
-			t.Error()
-		}
+	if svcInfo.remoteEndpoint == nil {
+		t.Error()
+	}
+	if svcInfo.remoteEndpoint.ip != svcIP {
+		t.Error()
 	}
 }
 
@@ -227,15 +222,9 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	ep := proxier.endpointsMap[svcPortName][0]
-	epInfo, ok := ep.(*endpointInfo)
-	if !ok {
-		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
-
-	} else {
-		if epInfo.hnsID != "EPID-3" {
-			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
-		}
+	epInfo := proxier.endpointsMap[svcPortName][0]
+	if epInfo.hnsID != "EPID-3" {
+		t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 	}
 
 	if *proxier.endPointsRefCount["EPID-3"] <= 0 {
@@ -290,15 +279,10 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 	)
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
-	ep := proxier.endpointsMap[svcPortName][0]
-	epInfo, ok := ep.(*endpointInfo)
-	if !ok {
-		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
+	epInfo := proxier.endpointsMap[svcPortName][0]
 
-	} else {
-		if epInfo.hnsID != endpointGuid1 {
-			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
-		}
+	if epInfo.hnsID != endpointGuid1 {
+		t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 	}
 
 	if *proxier.endPointsRefCount[endpointGuid1] <= 0 {
@@ -382,15 +366,10 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	)
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
-	ep := proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok := ep.(*endpointInfo)
-	if !ok {
-		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
+	epInfo := proxier.endpointsMap[svcPortName1][0]
 
-	} else {
-		if epInfo.hnsID != endpointGuid1 {
-			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
-		}
+	if epInfo.hnsID != endpointGuid1 {
+		t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 	}
 
 	if *proxier.endPointsRefCount[endpointGuid1] != 2 {
@@ -432,15 +411,10 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	ep = proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok = ep.(*endpointInfo)
-	if !ok {
-		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
+	epInfo = proxier.endpointsMap[svcPortName1][0]
 
-	} else {
-		if epInfo.hnsID != endpointGuid1 {
-			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
-		}
+	if epInfo.hnsID != endpointGuid1 {
+		t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 	}
 
 	if *epInfo.refCount != 1 {
@@ -526,15 +500,10 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
-	ep := proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok := ep.(*endpointInfo)
-	if !ok {
-		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
+	epInfo := proxier.endpointsMap[svcPortName1][0]
 
-	} else {
-		if epInfo.hnsID != endpointGuid1 {
-			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
-		}
+	if epInfo.hnsID != endpointGuid1 {
+		t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 	}
 
 	if *proxier.endPointsRefCount[endpointGuid1] != 2 {
@@ -605,16 +574,10 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	ep = proxier.endpointsMap[svcPortName1][0]
-	epInfo, ok = ep.(*endpointInfo)
+	epInfo = proxier.endpointsMap[svcPortName1][0]
 
-	if !ok {
-		t.Errorf("Failed to cast endpointInfo %q", svcPortName1.String())
-
-	} else {
-		if epInfo.hnsID != endpointGuid1 {
-			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
-		}
+	if epInfo.hnsID != endpointGuid1 {
+		t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 	}
 
 	if *epInfo.refCount != 2 {
@@ -670,15 +633,10 @@ func TestCreateLoadBalancer(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.svcPortMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
-	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	svcInfo := proxier.svcPortMap[svcPortName]
 
-	} else {
-		if svcInfo.hnsID != loadbalancerGuid1 {
-			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
-		}
+	if svcInfo.hnsID != loadbalancerGuid1 {
+		t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
 	}
 }
 
@@ -737,23 +695,18 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.svcPortMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
-	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	svcInfo := proxier.svcPortMap[svcPortName]
 
-	} else {
-		if svcInfo.hnsID != loadbalancerGuid1 {
-			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
-		}
-		if svcInfo.localTrafficDSR != true {
-			t.Errorf("Failed to create DSR loadbalancer with local traffic policy")
-		}
-		if len(svcInfo.loadBalancerIngressIPs) == 0 {
-			t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
-		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != "LBID-4" {
-			t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, loadbalancerGuid1, svcPortName.String())
-		}
+	if svcInfo.hnsID != loadbalancerGuid1 {
+		t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
+	}
+	if svcInfo.localTrafficDSR != true {
+		t.Errorf("Failed to create DSR loadbalancer with local traffic policy")
+	}
+	if len(svcInfo.loadBalancerIngressIPs) == 0 {
+		t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
+	} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != "LBID-4" {
+		t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, loadbalancerGuid1, svcPortName.String())
 	}
 }
 
@@ -812,31 +765,16 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.svcPortMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
-	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	svcInfo := proxier.svcPortMap[svcPortName]
 
-	} else {
-		// Checking ClusterIP Loadbalancer is created
-		if svcInfo.hnsID != loadbalancerGuid1 {
-			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
-		}
-		// Verifying NodePort Loadbalancer is not created
-		if svcInfo.nodePorthnsID != "" {
-			t.Errorf("NodePortHnsID %v is not empty.", svcInfo.nodePorthnsID)
-		}
-		// Verifying ExternalIP Loadbalancer is not created
-		for _, externalIP := range svcInfo.externalIPs {
-			if externalIP.hnsID != "" {
-				t.Errorf("ExternalLBID %v is not empty.", externalIP.hnsID)
-			}
-		}
-		// Verifying IngressIP Loadbalancer is not created
-		for _, ingressIP := range svcInfo.loadBalancerIngressIPs {
-			if ingressIP.hnsID != "" {
-				t.Errorf("IngressLBID %v is not empty.", ingressIP.hnsID)
-			}
+	// Checking ClusterIP Loadbalancer is created
+	if svcInfo.hnsID != loadbalancerGuid1 {
+		t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
+	}
+	// Verifying IngressIP Loadbalancer is not created
+	for _, ingressIP := range svcInfo.loadBalancerIngressIPs {
+		if ingressIP.hnsID != "" {
+			t.Errorf("IngressLBID %v is not empty.", ingressIP.hnsID)
 		}
 	}
 }
@@ -890,26 +828,15 @@ func TestEndpointSlice(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.svcPortMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
-	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	svcInfo := proxier.svcPortMap[svcPortName]
 
-	} else {
-		if svcInfo.hnsID != loadbalancerGuid1 {
-			t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, loadbalancerGuid1, svcPortName.String())
-		}
+	if svcInfo.hnsID != loadbalancerGuid1 {
+		t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, loadbalancerGuid1, svcPortName.String())
 	}
 
-	ep := proxier.endpointsMap[svcPortName][0]
-	epInfo, ok := ep.(*endpointInfo)
-	if !ok {
-		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
-
-	} else {
-		if epInfo.hnsID != "EPID-3" {
-			t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, endpointGuid1, svcPortName.String())
-		}
+	epInfo := proxier.endpointsMap[svcPortName][0]
+	if epInfo.hnsID != "EPID-3" {
+		t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, endpointGuid1, svcPortName.String())
 	}
 }
 

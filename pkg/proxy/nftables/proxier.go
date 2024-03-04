@@ -147,12 +147,12 @@ type Proxier struct {
 	// services that happened since nftables was synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointsChangeTracker
-	serviceChanges   *proxy.ServiceChangeTracker
+	endpointsChanges *proxy.EndpointsChangeTracker[*endpointInfo]
+	serviceChanges   *proxy.ServiceChangeTracker[*servicePortInfo]
 
 	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
+	svcPortMap   proxy.ServicePortMap[*servicePortInfo]
+	endpointsMap proxy.EndpointsMap[*endpointInfo]
 	nodeLabels   map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
@@ -238,9 +238,9 @@ func NewProxier(ipFamily v1.IPFamily,
 
 	proxier := &Proxier{
 		ipFamily:            ipFamily,
-		svcPortMap:          make(proxy.ServicePortMap),
+		svcPortMap:          make(proxy.ServicePortMap[*servicePortInfo]),
 		serviceChanges:      proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
-		endpointsMap:        make(proxy.EndpointsMap),
+		endpointsMap:        make(proxy.EndpointsMap[*endpointInfo]),
 		endpointsChanges:    proxy.NewEndpointsChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		syncPeriod:          syncPeriod,
 		nftables:            nft,
@@ -277,7 +277,7 @@ type servicePortInfo struct {
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
+func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) *servicePortInfo {
 	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
 
 	// Store the following for performance reasons.
@@ -303,7 +303,7 @@ type endpointInfo struct {
 }
 
 // returns a new proxy.Endpoint which abstracts a endpointInfo
-func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) *endpointInfo {
 	chainNameBase := servicePortEndpointChainNameBase(svcPortName, strings.ToLower(string(svcPortName.Protocol)), baseInfo.String())
 	return &endpointInfo{
 		BaseEndpointInfo: baseInfo,
@@ -1079,12 +1079,7 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceNoLocalEndpointsTotalExternal := 0
 
 	// Build rules for each service-port.
-	for svcName, svc := range proxier.svcPortMap {
-		svcInfo, ok := svc.(*servicePortInfo)
-		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
-			continue
-		}
+	for svcName, svcInfo := range proxier.svcPortMap {
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		svcPortNameString := svcInfo.nameString
 
@@ -1096,10 +1091,8 @@ func (proxier *Proxier) syncProxyRules() {
 		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
 
 		// Note the endpoint chains that will be used
-		for _, ep := range allLocallyReachableEndpoints {
-			if epInfo, ok := ep.(*endpointInfo); ok {
-				ensureChain(epInfo.chainName, tx, activeChains)
-			}
+		for _, epInfo := range allLocallyReachableEndpoints {
+			ensureChain(epInfo.chainName, tx, activeChains)
 		}
 
 		// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
@@ -1474,13 +1467,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 			// Generate the per-endpoint affinity sets
-			for _, ep := range allLocallyReachableEndpoints {
-				epInfo, ok := ep.(*endpointInfo)
-				if !ok {
-					klog.ErrorS(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
-					continue
-				}
-
+			for _, epInfo := range allLocallyReachableEndpoints {
 				// Create a set to store current affinity mappings. As
 				// with the iptables backend, endpoint affinity is
 				// recorded for connections from a particular source IP
@@ -1522,13 +1509,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Generate the per-endpoint chains
-		for _, ep := range allLocallyReachableEndpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				klog.ErrorS(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
-				continue
-			}
-
+		for _, epInfo := range allLocallyReachableEndpoints {
 			endpointChain := epInfo.chainName
 
 			// Handle traffic that loops back to the originator with SNAT.
@@ -1646,7 +1627,7 @@ func (proxier *Proxier) syncProxyRules() {
 	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
-func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcPortNameString string, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
+func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcPortNameString string, svcInfo *servicePortInfo, svcChain string, endpoints []*endpointInfo) {
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 		ipX := "ip"
@@ -1654,12 +1635,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, s
 			ipX = "ip6"
 		}
 
-		for _, ep := range endpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				continue
-			}
-
+		for _, epInfo := range endpoints {
 			tx.Add(&knftables.Rule{
 				Chain: svcChain,
 				Rule: knftables.Concat(
@@ -1672,12 +1648,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, s
 
 	// Now write loadbalancing rule
 	var elements []string
-	for i, ep := range endpoints {
-		epInfo, ok := ep.(*endpointInfo)
-		if !ok {
-			continue
-		}
-
+	for i, epInfo := range endpoints {
 		elements = append(elements,
 			strconv.Itoa(i), ":", "goto", epInfo.chainName,
 		)

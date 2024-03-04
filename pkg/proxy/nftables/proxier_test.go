@@ -114,9 +114,9 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 	}
 	p := &Proxier{
 		ipFamily:            ipFamily,
-		svcPortMap:          make(proxy.ServicePortMap),
+		svcPortMap:          make(proxy.ServicePortMap[*servicePortInfo]),
 		serviceChanges:      proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
-		endpointsMap:        make(proxy.EndpointsMap),
+		endpointsMap:        make(proxy.EndpointsMap[*endpointInfo]),
 		endpointsChanges:    proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipFamily, nil, nil),
 		nftables:            nft,
 		masqueradeMark:      "0x4000",
@@ -1611,7 +1611,7 @@ type endpointExpectation struct {
 	isLocal  bool
 }
 
-func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap, expected map[proxy.ServicePortName][]endpointExpectation) {
+func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap[*endpointInfo], expected map[proxy.ServicePortName][]endpointExpectation) {
 	if len(newMap) != len(expected) {
 		t.Errorf("[%d] expected %d results, got %d: %v", tci, len(expected), len(newMap), newMap)
 	}

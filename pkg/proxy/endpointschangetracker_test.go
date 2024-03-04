@@ -44,25 +44,25 @@ func (proxier *FakeProxier) deleteEndpointSlice(slice *discovery.EndpointSlice) 
 
 func TestGetLocalEndpointIPs(t *testing.T) {
 	testCases := []struct {
-		endpointsMap EndpointsMap
+		endpointsMap EndpointsMap[*BaseEndpointInfo]
 		expected     map[types.NamespacedName]sets.Set[string]
 	}{{
 		// Case[0]: nothing
-		endpointsMap: EndpointsMap{},
+		endpointsMap: EndpointsMap[*BaseEndpointInfo]{},
 		expected:     map[types.NamespacedName]sets.Set[string]{},
 	}, {
 		// Case[1]: unnamed port
-		endpointsMap: EndpointsMap{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
+		endpointsMap: EndpointsMap[*BaseEndpointInfo]{
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
 			},
 		},
 		expected: map[types.NamespacedName]sets.Set[string]{},
 	}, {
 		// Case[2]: unnamed port local
-		endpointsMap: EndpointsMap{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: true, ready: true, serving: true, terminating: false},
+		endpointsMap: EndpointsMap[*BaseEndpointInfo]{
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: true, ready: true, serving: true, terminating: false},
 			},
 		},
 		expected: map[types.NamespacedName]sets.Set[string]{
@@ -70,14 +70,14 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		},
 	}, {
 		// Case[3]: named local and non-local ports for the same IP.
-		endpointsMap: EndpointsMap{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
-				&BaseEndpointInfo{ip: "1.1.1.2", port: 11, endpoint: "1.1.1.2:11", isLocal: true, ready: true, serving: true, terminating: false},
+		endpointsMap: EndpointsMap[*BaseEndpointInfo]{
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
+				{ip: "1.1.1.2", port: 11, endpoint: "1.1.1.2:11", isLocal: true, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "1.1.1.1", port: 12, endpoint: "1.1.1.1:12", isLocal: false, ready: true, serving: true, terminating: false},
-				&BaseEndpointInfo{ip: "1.1.1.2", port: 12, endpoint: "1.1.1.2:12", isLocal: true, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "1.1.1.1", port: 12, endpoint: "1.1.1.1:12", isLocal: false, ready: true, serving: true, terminating: false},
+				{ip: "1.1.1.2", port: 12, endpoint: "1.1.1.2:12", isLocal: true, ready: true, serving: true, terminating: false},
 			},
 		},
 		expected: map[types.NamespacedName]sets.Set[string]{
@@ -85,23 +85,23 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		},
 	}, {
 		// Case[4]: named local and non-local ports for different IPs.
-		endpointsMap: EndpointsMap{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
+		endpointsMap: EndpointsMap[*BaseEndpointInfo]{
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "2.2.2.2", port: 22, endpoint: "2.2.2.2:22", isLocal: true, ready: true, serving: true, terminating: false},
-				&BaseEndpointInfo{ip: "2.2.2.22", port: 22, endpoint: "2.2.2.22:22", isLocal: true, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "2.2.2.2", port: 22, endpoint: "2.2.2.2:22", isLocal: true, ready: true, serving: true, terminating: false},
+				{ip: "2.2.2.22", port: 22, endpoint: "2.2.2.22:22", isLocal: true, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "2.2.2.3", port: 23, endpoint: "2.2.2.3:23", isLocal: true, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "2.2.2.3", port: 23, endpoint: "2.2.2.3:23", isLocal: true, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "4.4.4.4", port: 44, endpoint: "4.4.4.4:44", isLocal: true, ready: true, serving: true, terminating: false},
-				&BaseEndpointInfo{ip: "4.4.4.5", port: 44, endpoint: "4.4.4.5:44", isLocal: false, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "4.4.4.4", port: 44, endpoint: "4.4.4.4:44", isLocal: true, ready: true, serving: true, terminating: false},
+				{ip: "4.4.4.5", port: 44, endpoint: "4.4.4.5:44", isLocal: false, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "4.4.4.6", port: 45, endpoint: "4.4.4.6:45", isLocal: true, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "4.4.4.6", port: 45, endpoint: "4.4.4.6:45", isLocal: true, ready: true, serving: true, terminating: false},
 			},
 		},
 		expected: map[types.NamespacedName]sets.Set[string]{
@@ -110,23 +110,23 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		},
 	}, {
 		// Case[5]: named local and non-local ports for different IPs, some not ready.
-		endpointsMap: EndpointsMap{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
+		endpointsMap: EndpointsMap[*BaseEndpointInfo]{
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "2.2.2.2", port: 22, endpoint: "2.2.2.2:22", isLocal: true, ready: true, serving: true, terminating: false},
-				&BaseEndpointInfo{ip: "2.2.2.22", port: 22, endpoint: "2.2.2.22:22", isLocal: true, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "2.2.2.2", port: 22, endpoint: "2.2.2.2:22", isLocal: true, ready: true, serving: true, terminating: false},
+				{ip: "2.2.2.22", port: 22, endpoint: "2.2.2.22:22", isLocal: true, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "2.2.2.3", port: 23, endpoint: "2.2.2.3:23", isLocal: true, ready: false, serving: true, terminating: true},
+			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "2.2.2.3", port: 23, endpoint: "2.2.2.3:23", isLocal: true, ready: false, serving: true, terminating: true},
 			},
-			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "4.4.4.4", port: 44, endpoint: "4.4.4.4:44", isLocal: true, ready: true, serving: true, terminating: false},
-				&BaseEndpointInfo{ip: "4.4.4.5", port: 44, endpoint: "4.4.4.5:44", isLocal: false, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "4.4.4.4", port: 44, endpoint: "4.4.4.4:44", isLocal: true, ready: true, serving: true, terminating: false},
+				{ip: "4.4.4.5", port: 44, endpoint: "4.4.4.5:44", isLocal: false, ready: true, serving: true, terminating: false},
 			},
-			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "4.4.4.6", port: 45, endpoint: "4.4.4.6:45", isLocal: true, ready: true, serving: true, terminating: false},
+			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "4.4.4.6", port: 45, endpoint: "4.4.4.6:45", isLocal: true, ready: true, serving: true, terminating: false},
 			},
 		},
 		expected: map[types.NamespacedName]sets.Set[string]{
@@ -135,23 +135,23 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		},
 	}, {
 		// Case[6]: all endpoints are terminating,, so getLocalReadyEndpointIPs should return 0 ready endpoints
-		endpointsMap: EndpointsMap{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: false, serving: true, terminating: true},
+		endpointsMap: EndpointsMap[*BaseEndpointInfo]{
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "1.1.1.1", port: 11, endpoint: "1.1.1.1:11", isLocal: false, ready: false, serving: true, terminating: true},
 			},
-			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "2.2.2.2", port: 22, endpoint: "2.2.2.2:22", isLocal: true, ready: false, serving: true, terminating: true},
-				&BaseEndpointInfo{ip: "2.2.2.22", port: 22, endpoint: "2.2.2.22:22", isLocal: true, ready: false, serving: true, terminating: true},
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "2.2.2.2", port: 22, endpoint: "2.2.2.2:22", isLocal: true, ready: false, serving: true, terminating: true},
+				{ip: "2.2.2.22", port: 22, endpoint: "2.2.2.22:22", isLocal: true, ready: false, serving: true, terminating: true},
 			},
-			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "2.2.2.3", port: 23, endpoint: "2.2.2.3:23", isLocal: true, ready: false, serving: true, terminating: true},
+			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "2.2.2.3", port: 23, endpoint: "2.2.2.3:23", isLocal: true, ready: false, serving: true, terminating: true},
 			},
-			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "4.4.4.4", port: 44, endpoint: "4.4.4.4:44", isLocal: true, ready: false, serving: true, terminating: true},
-				&BaseEndpointInfo{ip: "4.4.4.5", port: 44, endpoint: "4.4.4.5:44", isLocal: false, ready: false, serving: true, terminating: true},
+			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "4.4.4.4", port: 44, endpoint: "4.4.4.4:44", isLocal: true, ready: false, serving: true, terminating: true},
+				{ip: "4.4.4.5", port: 44, endpoint: "4.4.4.5:44", isLocal: false, ready: false, serving: true, terminating: true},
 			},
-			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []Endpoint{
-				&BaseEndpointInfo{ip: "4.4.4.6", port: 45, endpoint: "4.4.4.6:45", isLocal: true, ready: false, serving: true, terminating: true},
+			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []*BaseEndpointInfo{
+				{ip: "4.4.4.6", port: 45, endpoint: "4.4.4.6:45", isLocal: true, ready: false, serving: true, terminating: true},
 			},
 		},
 		expected: make(map[types.NamespacedName]sets.Set[string], 0),
@@ -1334,7 +1334,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 
 	testCases := map[string]struct {
 		startingSlices         []*discovery.EndpointSlice
-		endpointsChangeTracker *EndpointsChangeTracker
+		endpointsChangeTracker *EndpointsChangeTracker[*BaseEndpointInfo]
 		namespacedName         types.NamespacedName
 		paramEndpointSlice     *discovery.EndpointSlice
 		paramRemoveSlice       bool
@@ -1344,7 +1344,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// test starting from an empty state
 		"add a simple slice that doesn't already exist": {
 			startingSlices:         []*discovery.EndpointSlice{},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
@@ -1367,7 +1367,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
@@ -1379,7 +1379,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     fqdnSlice,
 			paramRemoveSlice:       false,
@@ -1392,7 +1392,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
@@ -1424,7 +1424,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSliceWithOffset("svc1", "ns1", 3, 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80)}),
 			paramRemoveSlice:       false,
@@ -1454,7 +1454,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       true,
@@ -1476,7 +1476,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 3, 5, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       true,
@@ -1488,7 +1488,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 1, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
@@ -1511,7 +1511,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 2, 1, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 2, 999, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
@@ -1533,7 +1533,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 2, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 2, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 3, 999, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
@@ -1561,7 +1561,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 2, 2, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 2, 2, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
-			endpointsChangeTracker: NewEndpointsChangeTracker("host1", nil, v1.IPv4Protocol, nil, nil),
+			endpointsChangeTracker: NewEndpointsChangeTracker("host1", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
 			namespacedName:         types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:     generateEndpointSlice("svc1", "ns1", 1, 3, 3, 2, []string{"host1"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			paramRemoveSlice:       false,
@@ -1614,27 +1614,27 @@ func TestCheckoutChanges(t *testing.T) {
 	svcPortName1 := ServicePortName{types.NamespacedName{Namespace: "ns1", Name: "svc1"}, "port-1", v1.ProtocolTCP}
 
 	testCases := map[string]struct {
-		endpointsChangeTracker *EndpointsChangeTracker
-		expectedChanges        []*endpointsChange
-		items                  map[types.NamespacedName]*endpointsChange
+		endpointsChangeTracker *EndpointsChangeTracker[*BaseEndpointInfo]
+		expectedChanges        []*endpointsChange[*BaseEndpointInfo]
+		items                  map[types.NamespacedName]*endpointsChange[*BaseEndpointInfo]
 		appliedSlices          []*discovery.EndpointSlice
 		pendingSlices          []*discovery.EndpointSlice
 	}{
 		"empty slices": {
-			endpointsChangeTracker: NewEndpointsChangeTracker("", nil, v1.IPv4Protocol, nil, nil),
-			expectedChanges:        []*endpointsChange{},
+			endpointsChangeTracker: NewEndpointsChangeTracker("", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
+			expectedChanges:        []*endpointsChange[*BaseEndpointInfo]{},
 			appliedSlices:          []*discovery.EndpointSlice{},
 			pendingSlices:          []*discovery.EndpointSlice{},
 		},
 		"adding initial slice": {
-			endpointsChangeTracker: NewEndpointsChangeTracker("", nil, v1.IPv4Protocol, nil, nil),
-			expectedChanges: []*endpointsChange{{
-				previous: EndpointsMap{},
-				current: EndpointsMap{
-					svcPortName0: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: false, serving: true, terminating: true},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
+			endpointsChangeTracker: NewEndpointsChangeTracker("", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
+			expectedChanges: []*endpointsChange[*BaseEndpointInfo]{{
+				previous: EndpointsMap[*BaseEndpointInfo]{},
+				current: EndpointsMap[*BaseEndpointInfo]{
+					svcPortName0: []*BaseEndpointInfo{
+						{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
+						{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: false, serving: true, terminating: true},
+						{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
 					},
 				},
 			}},
@@ -1644,25 +1644,25 @@ func TestCheckoutChanges(t *testing.T) {
 			},
 		},
 		"removing port in update": {
-			endpointsChangeTracker: NewEndpointsChangeTracker("", nil, v1.IPv4Protocol, nil, nil),
-			expectedChanges: []*endpointsChange{{
-				previous: EndpointsMap{
-					svcPortName0: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
+			endpointsChangeTracker: NewEndpointsChangeTracker("", NewBaseEndpointInfo, v1.IPv4Protocol, nil, nil),
+			expectedChanges: []*endpointsChange[*BaseEndpointInfo]{{
+				previous: EndpointsMap[*BaseEndpointInfo]{
+					svcPortName0: []*BaseEndpointInfo{
+						{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
+						{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false},
+						{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
 					},
-					svcPortName1: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 443, endpoint: "10.0.1.1:443", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 443, endpoint: "10.0.1.2:443", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 443, endpoint: "10.0.1.3:443", ready: false, serving: false, terminating: false},
+					svcPortName1: []*BaseEndpointInfo{
+						{ip: "10.0.1.1", port: 443, endpoint: "10.0.1.1:443", ready: true, serving: true, terminating: false},
+						{ip: "10.0.1.2", port: 443, endpoint: "10.0.1.2:443", ready: true, serving: true, terminating: false},
+						{ip: "10.0.1.3", port: 443, endpoint: "10.0.1.3:443", ready: false, serving: false, terminating: false},
 					},
 				},
-				current: EndpointsMap{
-					svcPortName0: []Endpoint{
-						&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false},
-						&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
+				current: EndpointsMap[*BaseEndpointInfo]{
+					svcPortName0: []*BaseEndpointInfo{
+						{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", ready: true, serving: true, terminating: false},
+						{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", ready: true, serving: true, terminating: false},
+						{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", ready: false, serving: false, terminating: false},
 					},
 				},
 			}},
@@ -1709,7 +1709,7 @@ func TestCheckoutChanges(t *testing.T) {
 
 // Test helpers
 
-func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[ServicePortName][]*BaseEndpointInfo) {
+func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap[*BaseEndpointInfo], expected map[ServicePortName][]*BaseEndpointInfo) {
 	t.Helper()
 	if len(newMap) != len(expected) {
 		t.Fatalf("expected %d results, got %d: %v", len(expected), len(newMap), newMap)
@@ -1723,10 +1723,7 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 			t.Fatalf("expected %d endpoints for %v, got %d", len(expected[x]), x, len(newMap[x]))
 		} else {
 			for i := range expected[x] {
-				newEp, ok := newMap[x][i].(*BaseEndpointInfo)
-				if !ok {
-					t.Fatalf("Failed to cast endpointInfo")
-				}
+				newEp := newMap[x][i]
 				if !endpointEqual(newEp, expected[x][i]) {
 					t.Fatalf("expected new[%v][%d] to be %v, got %v"+
 						"(IsLocal expected %v, got %v) (Ready expected %v, got %v) (Serving expected %v, got %v) (Terminating expected %v got %v)",
@@ -1738,7 +1735,7 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 	}
 }
 
-func initializeCache(endpointSliceCache *EndpointSliceCache, endpointSlices []*discovery.EndpointSlice) {
+func initializeCache[E Endpoint](endpointSliceCache *EndpointSliceCache[E], endpointSlices []*discovery.EndpointSlice) {
 	for _, endpointSlice := range endpointSlices {
 		endpointSliceCache.updatePending(endpointSlice, false)
 	}

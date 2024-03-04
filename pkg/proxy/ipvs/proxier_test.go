@@ -136,10 +136,10 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, false, is.comment)
 	}
 	p := &Proxier{
-		svcPortMap:            make(proxy.ServicePortMap),
+		svcPortMap:            make(proxy.ServicePortMap[*servicePortInfo]),
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
-		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointsChangeTracker(testHostname, nil, ipFamily, nil, nil),
+		endpointsMap:          make(proxy.EndpointsMap[*proxy.BaseEndpointInfo]),
+		endpointsChanges:      proxy.NewEndpointsChangeTracker(testHostname, proxy.NewBaseEndpointInfo, ipFamily, nil, nil),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,
@@ -3615,7 +3615,7 @@ type endpointExpectation struct {
 	isLocal  bool
 }
 
-func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap, expected map[proxy.ServicePortName][]endpointExpectation) {
+func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap[*proxy.BaseEndpointInfo], expected map[proxy.ServicePortName][]endpointExpectation) {
 	if len(newMap) != len(expected) {
 		t.Errorf("[%d] expected %d results, got %d: %v", tci, len(expected), len(newMap), newMap)
 	}

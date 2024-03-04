@@ -143,12 +143,12 @@ type Proxier struct {
 	// services that happened since iptables was synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointsChangeTracker
-	serviceChanges   *proxy.ServiceChangeTracker
+	endpointsChanges *proxy.EndpointsChangeTracker[*endpointInfo]
+	serviceChanges   *proxy.ServiceChangeTracker[*servicePortInfo]
 
 	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
+	svcPortMap   proxy.ServicePortMap[*servicePortInfo]
+	endpointsMap proxy.EndpointsMap[*endpointInfo]
 	nodeLabels   map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
@@ -268,10 +268,9 @@ func NewProxier(ipFamily v1.IPFamily,
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	proxier := &Proxier{
-		ipFamily:                 ipFamily,
-		svcPortMap:               make(proxy.ServicePortMap),
+		svcPortMap:               make(proxy.ServicePortMap[*servicePortInfo]),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
-		endpointsMap:             make(proxy.EndpointsMap),
+		endpointsMap:             make(proxy.EndpointsMap[*endpointInfo]),
 		endpointsChanges:         proxy.NewEndpointsChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		needFullSync:             true,
 		syncPeriod:               syncPeriod,
@@ -329,7 +328,7 @@ type servicePortInfo struct {
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
+func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) *servicePortInfo {
 	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
 
 	// Store the following for performance reasons.
@@ -353,7 +352,7 @@ type endpointInfo struct {
 }
 
 // returns a new proxy.Endpoint which abstracts a endpointInfo
-func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) *endpointInfo {
 	return &endpointInfo{
 		BaseEndpointInfo: baseInfo,
 		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.String()),
@@ -949,12 +948,7 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceNoLocalEndpointsTotalExternal := 0
 
 	// Build rules for each service-port.
-	for svcName, svc := range proxier.svcPortMap {
-		svcInfo, ok := svc.(*servicePortInfo)
-		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
-			continue
-		}
+	for svcName, svcInfo := range proxier.svcPortMap {
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		svcPortNameString := svcInfo.nameString
 
@@ -1342,13 +1336,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Generate the per-endpoint chains.
-		for _, ep := range allLocallyReachableEndpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				klog.ErrorS(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
-				continue
-			}
-
+		for _, epInfo := range allLocallyReachableEndpoints {
 			endpointChain := epInfo.ChainName
 
 			// Create the endpoint chain
@@ -1545,14 +1533,10 @@ func (proxier *Proxier) syncProxyRules() {
 	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
-func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffer, svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {
+func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffer, svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []*endpointInfo, args []string) {
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-		for _, ep := range endpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				continue
-			}
+		for _, epInfo := range endpoints {
 			comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
 			args = append(args[:0],
@@ -1570,11 +1554,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 
 	// Now write loadbalancing rules.
 	numEndpoints := len(endpoints)
-	for i, ep := range endpoints {
-		epInfo, ok := ep.(*endpointInfo)
-		if !ok {
-			continue
-		}
+	for i, epInfo := range endpoints {
 		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
 		args = append(args[:0], "-A", string(svcChain))

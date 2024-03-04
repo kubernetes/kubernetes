@@ -36,17 +36,17 @@ var supportedEndpointSliceAddressTypes = sets.New[discovery.AddressType](
 
 // EndpointsChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
-type EndpointsChangeTracker struct {
+type EndpointsChangeTracker[E Endpoint] struct {
 	// lock protects lastChangeTriggerTimes
 	lock sync.Mutex
 
 	// processEndpointsMapChange is invoked by the apply function on every change.
 	// This function should not modify the EndpointsMaps, but just use the changes for
 	// any Proxier-specific cleanup.
-	processEndpointsMapChange processEndpointsMapChangeFunc
+	processEndpointsMapChange processEndpointsMapChangeFunc[E]
 
 	// endpointSliceCache holds a simplified version of endpoint slices.
-	endpointSliceCache *EndpointSliceCache
+	endpointSliceCache *EndpointSliceCache[E]
 
 	// lastChangeTriggerTimes maps from the Service's NamespacedName to the times of
 	// the triggers that caused its EndpointSlice objects to change. Used to calculate
@@ -58,12 +58,12 @@ type EndpointsChangeTracker struct {
 	trackerStartTime time.Time
 }
 
-type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName) Endpoint
-type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
+type makeEndpointFunc[E Endpoint] func(info *BaseEndpointInfo, svcPortName *ServicePortName) E
+type processEndpointsMapChangeFunc[E Endpoint] func(oldEndpointsMap, newEndpointsMap EndpointsMap[E])
 
 // NewEndpointsChangeTracker initializes an EndpointsChangeTracker
-func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
-	return &EndpointsChangeTracker{
+func NewEndpointsChangeTracker[E Endpoint](hostname string, makeEndpointInfo makeEndpointFunc[E], ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc[E]) *EndpointsChangeTracker[E] {
+	return &EndpointsChangeTracker[E]{
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 		trackerStartTime:          time.Now(),
 		processEndpointsMapChange: processEndpointsMapChange,
@@ -71,11 +71,17 @@ func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFun
 	}
 }
 
+// NewBaseEndpointInfo can be used as a makeEndpointFunc for backends that do not need to
+// store backend-specific data
+func NewBaseEndpointInfo(ep *BaseEndpointInfo, _ *ServicePortName) *BaseEndpointInfo {
+	return ep
+}
+
 // EndpointSliceUpdate updates the EndpointsChangeTracker by adding/updating or removing
 // endpointSlice (depending on removeSlice). It returns true if this update contained a
 // change that needs to be synced; note that this is different from the return value of
 // ServiceChangeTracker.Update().
-func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
+func (ect *EndpointsChangeTracker[E]) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
 	if !supportedEndpointSliceAddressTypes.Has(endpointSlice.AddressType) {
 		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "addressType", endpointSlice.AddressType)
 		return false
@@ -120,7 +126,7 @@ func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.
 
 // checkoutChanges returns a map of pending endpointsChanges and marks them as
 // applied.
-func (ect *EndpointsChangeTracker) checkoutChanges() map[types.NamespacedName]*endpointsChange {
+func (ect *EndpointsChangeTracker[E]) checkoutChanges() map[types.NamespacedName]*endpointsChange[E] {
 	metrics.EndpointChangesPending.Set(0)
 
 	return ect.endpointSliceCache.checkoutChanges()
@@ -128,7 +134,7 @@ func (ect *EndpointsChangeTracker) checkoutChanges() map[types.NamespacedName]*e
 
 // checkoutTriggerTimes applies the locally cached trigger times to a map of
 // trigger times that have been passed in and empties the local cache.
-func (ect *EndpointsChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+func (ect *EndpointsChangeTracker[E]) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
 	ect.lock.Lock()
 	defer ect.lock.Unlock()
 
@@ -168,9 +174,9 @@ func getLastChangeTriggerTime(annotations map[string]string) time.Time {
 // rules were synced.  For a single object, changes are accumulated, i.e.
 // previous is state from before applying the changes, current is state after
 // applying the changes.
-type endpointsChange struct {
-	previous EndpointsMap
-	current  EndpointsMap
+type endpointsChange[E Endpoint] struct {
+	previous EndpointsMap[E]
+	current  EndpointsMap[E]
 }
 
 // UpdateEndpointsMapResult is the updated results after applying endpoints changes.
@@ -197,12 +203,12 @@ type UpdateEndpointsMapResult struct {
 }
 
 // EndpointsMap maps a service name to a list of all its Endpoints.
-type EndpointsMap map[ServicePortName][]Endpoint
+type EndpointsMap[E Endpoint] map[ServicePortName][]E
 
 // Update updates em based on the changes in ect, returns information about the diff since
 // the last Update, triggers processEndpointsMapChange on every change, and clears the
 // changes map.
-func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapResult {
+func (em EndpointsMap[E]) Update(ect *EndpointsChangeTracker[E]) UpdateEndpointsMapResult {
 	result := UpdateEndpointsMapResult{
 		UpdatedServices:        sets.New[types.NamespacedName](),
 		DeletedUDPEndpoints:    make([]ServiceEndpoint, 0),
@@ -230,21 +236,21 @@ func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapRes
 }
 
 // Merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.
-func (em EndpointsMap) merge(other EndpointsMap) {
+func (em EndpointsMap[E]) merge(other EndpointsMap[E]) {
 	for svcPortName := range other {
 		em[svcPortName] = other[svcPortName]
 	}
 }
 
 // Unmerge removes the <service, endpoints> pairs from the current EndpointsMap which are contained in the EndpointsMap passed in.
-func (em EndpointsMap) unmerge(other EndpointsMap) {
+func (em EndpointsMap[E]) unmerge(other EndpointsMap[E]) {
 	for svcPortName := range other {
 		delete(em, svcPortName)
 	}
 }
 
 // getLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
-func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.Set[string] {
+func (em EndpointsMap[E]) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.Set[string] {
 	localIPs := make(map[types.NamespacedName]sets.Set[string])
 	for svcPortName, epList := range em {
 		for _, ep := range epList {
@@ -268,7 +274,7 @@ func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.
 
 // LocalReadyEndpoints returns a map of Service names to the number of local ready
 // endpoints for that service.
-func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
+func (em EndpointsMap[E]) LocalReadyEndpoints() map[types.NamespacedName]int {
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
 
@@ -287,7 +293,7 @@ func (em EndpointsMap) LocalReadyEndpoints() map[types.NamespacedName]int {
 
 // detectStaleConntrackEntries detects services that may be associated with stale conntrack entries.
 // (See UpdateEndpointsMapResult.DeletedUDPEndpoints and .NewlyActiveUDPServices.)
-func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, deletedUDPEndpoints *[]ServiceEndpoint, newlyActiveUDPServices *[]ServicePortName) {
+func detectStaleConntrackEntries[E Endpoint](oldEndpointsMap, newEndpointsMap EndpointsMap[E], deletedUDPEndpoints *[]ServiceEndpoint, newlyActiveUDPServices *[]ServicePortName) {
 	// Find the UDP endpoints that we were sending traffic to in oldEndpointsMap, but
 	// are no longer sending to newEndpointsMap. The proxier should make sure that
 	// conntrack does not accidentally route any new connections to them.

@@ -29,8 +29,11 @@ import (
 )
 
 // CleanStaleEntries takes care of flushing stale conntrack entries for services and endpoints.
-func CleanStaleEntries(ct Interface, svcPortMap proxy.ServicePortMap,
-	serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
+func CleanStaleEntries[S proxy.ServicePort](ct Interface,
+	svcPortMap proxy.ServicePortMap[S],
+	serviceUpdateResult proxy.UpdateServiceMapResult,
+	endpointsUpdateResult proxy.UpdateEndpointsMapResult,
+) {
 	deleteStaleServiceConntrackEntries(ct, svcPortMap, serviceUpdateResult, endpointsUpdateResult)
 	deleteStaleEndpointConntrackEntries(ct, svcPortMap, endpointsUpdateResult)
 }
@@ -39,7 +42,7 @@ func CleanStaleEntries(ct Interface, svcPortMap proxy.ServicePortMap,
 // to UDP Service IPs. When a service has no endpoints and we drop traffic to it, conntrack
 // may create "black hole" entries for that IP+port. When the service gets endpoints we
 // need to delete those entries so further traffic doesn't get dropped.
-func deleteStaleServiceConntrackEntries(ct Interface, svcPortMap proxy.ServicePortMap, serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
+func deleteStaleServiceConntrackEntries[S proxy.ServicePort](ct Interface, svcPortMap proxy.ServicePortMap[S], serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
 	conntrackCleanupServiceIPs := serviceUpdateResult.DeletedUDPClusterIPs
 	conntrackCleanupServiceNodePorts := sets.New[int]()
 	isIPv6 := false
@@ -82,7 +85,7 @@ func deleteStaleServiceConntrackEntries(ct Interface, svcPortMap proxy.ServicePo
 // deleteStaleEndpointConntrackEntries takes care of flushing stale conntrack entries related
 // to UDP endpoints. After a UDP endpoint is removed we must flush any conntrack entries
 // for it so that if the same client keeps sending, the packets will get routed to a new endpoint.
-func deleteStaleEndpointConntrackEntries(ct Interface, svcPortMap proxy.ServicePortMap, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
+func deleteStaleEndpointConntrackEntries[S proxy.ServicePort](ct Interface, svcPortMap proxy.ServicePortMap[S], endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
 	for _, epSvcPair := range endpointsUpdateResult.DeletedUDPEndpoints {
 		if svcInfo, ok := svcPortMap[epSvcPair.ServicePortName]; ok {
 			endpointIP := proxyutil.IPPart(epSvcPair.Endpoint)
