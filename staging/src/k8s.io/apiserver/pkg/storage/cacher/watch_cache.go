@@ -440,6 +440,11 @@ func (w *watchCache) List() []interface{} {
 // You HAVE TO explicitly call w.RUnlock() after this function.
 func (w *watchCache) waitUntilFreshAndBlock(ctx context.Context, resourceVersion uint64) error {
 	startTime := w.clock.Now()
+	defer func() {
+		if resourceVersion > 0 {
+			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.String()).Observe(w.clock.Since(startTime).Seconds())
+		}
+	}()
 
 	// In case resourceVersion is 0, we accept arbitrarily stale result.
 	// As a result, the condition in the below for loop will never be
