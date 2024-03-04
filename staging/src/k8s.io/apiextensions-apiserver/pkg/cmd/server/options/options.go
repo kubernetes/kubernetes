@@ -36,6 +36,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
@@ -60,7 +61,7 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(utilfeature.DefaultMutableFeatureGate),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
