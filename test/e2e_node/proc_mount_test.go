@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -48,6 +49,9 @@ var _ = SIGDescribe("ProcMount", framework.WithNodeFeature("ProcMountType"), "[L
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("will unmask proc mounts if requested", func(ctx context.Context) {
+		if !supportsUserNS(ctx, f) {
+			e2eskipper.Skipf("runtime does not support user namespaces")
+		}
 		testProcMount(ctx, f, v1.UnmaskedProcMount, gomega.Equal(1), gomega.BeZero())
 	})
 })
@@ -57,6 +61,9 @@ var _ = SIGDescribe("ProcMount", framework.WithNodeFeature("ProcMountType"), "[L
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("will fail to unmask proc mounts if not privileged", func(ctx context.Context) {
+		if !supportsUserNS(ctx, f) {
+			e2eskipper.Skipf("runtime does not support user namespaces")
+		}
 		pmt := v1.UnmaskedProcMount
 		podClient := e2epod.NewPodClient(f)
 		_, err := podClient.PodInterface.Create(ctx, &v1.Pod{
@@ -109,4 +116,18 @@ func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMount
 	lines := strings.Split(output, "\n")
 	gomega.Expect(len(lines)).To(expectedLines)
 	gomega.Expect(strings.Count(output, "(ro")).To(expectedReadOnly)
+}
+
+func supportsUserNS(ctx context.Context, f *framework.Framework) bool {
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	// Assuming that there is only one node, because this is a node e2e test.
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
+	node := nodeList.Items[0]
+	for _, rc := range node.Status.RuntimeClasses {
+		if rc.Name == "" && rc.Features != nil && *rc.Features.UserNamespaces {
+			return true
+		}
+	}
+	return false
 }
