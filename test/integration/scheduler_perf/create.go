@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -112,6 +113,18 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 				return fmt.Errorf("namespace not set for %q, but %q has scope %q", c.TemplatePath, gk, mapping.Scope.Name())
 			}
 			_, err = resourceClient.Create(tCtx, obj, options)
+		}
+		if err == nil && shouldCleanup(tCtx) {
+			tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+				del := resourceClient.Delete
+				if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+					del = resourceClient.Namespace(c.Namespace).Delete
+				}
+				err := del(tCtx, obj.GetName(), metav1.DeleteOptions{})
+				if !apierrors.IsNotFound(err) {
+					tCtx.ExpectNoError(err, fmt.Sprintf("deleting %s.%s %s", obj.GetKind(), obj.GetAPIVersion(), klog.KObj(obj)))
+				}
+			})
 		}
 		return err
 	}
