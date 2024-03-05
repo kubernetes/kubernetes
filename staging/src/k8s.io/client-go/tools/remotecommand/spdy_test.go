@@ -370,21 +370,17 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 }
 
 func TestStreamRandomData(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var stdin, stdout bytes.Buffer
-		ctx, err := createHTTPStreams(w, req, &StreamOptions{
-			Stdin:  &stdin,
-			Stdout: &stdout,
-		})
+	server := newTestHTTPServer(func(in io.Reader, out, _ io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
+		_, err := io.Copy(out, in)
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
-			return
+			return err
 		}
-		defer ctx.conn.Close()
-
-		io.Copy(ctx.stdoutStream, ctx.stdinStream) //nolint:errcheck
-	}))
-
+		return err
+	}, &StreamOptions{
+		Stdin:  &bytes.Buffer{},
+		Stdout: &bytes.Buffer{},
+	})
 	defer server.Close()
 
 	uri, _ := url.Parse(server.URL)
@@ -412,7 +408,7 @@ func TestStreamRandomData(t *testing.T) {
 		t.Fatalf("expect stream to be closed after connection is closed.")
 	case err := <-errorChan:
 		if err != nil {
-			t.Errorf("unexpected error")
+			t.Errorf("unexpected error: %v", err)
 		}
 	}
 

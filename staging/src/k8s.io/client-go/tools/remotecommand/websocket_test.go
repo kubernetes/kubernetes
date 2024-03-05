@@ -35,6 +35,7 @@ import (
 	"time"
 
 	gwebsocket "github.com/gorilla/websocket"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,18 +54,11 @@ import (
 // if there is any data which would cause problems with the WebSocket streams.
 func TestWebSocketClient_LoopbackStdinToStdout(t *testing.T) {
 	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-		if err != nil {
-			t.Fatalf("error on webSocketServerStreams: %v", err)
-		}
-		defer conns.conn.Close()
-		// Loopback the STDIN stream onto the STDOUT stream.
-		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
-		if err != nil {
-			t.Fatalf("error copying STDIN to STDOUT: %v", err)
-		}
-	}))
+	websocketServer := newTestWSServer(t, func(in io.Reader, out, _ io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
+		_, err := io.Copy(out, in)
+		require.NoError(t, err)
+		return err
+	})
 	defer websocketServer.Close()
 
 	// Now create the WebSocket client (executor), and point it to the "websocketServer".
@@ -127,19 +121,15 @@ func TestWebSocketClient_DifferentBufferSizes(t *testing.T) {
 	bufferSizes := []int{1 * 1024, 4 * 1024, 64 * 1024, 128 * 1024}
 	for _, bufferSize := range bufferSizes {
 		// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
-		websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-			if err != nil {
-				t.Fatalf("error on webSocketServerStreams: %v", err)
-			}
-			defer conns.conn.Close()
+		websocketServer := newTestWSServer(t, func(in io.Reader, out, _ io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
 			// Loopback the STDIN stream onto the STDOUT stream, using buffer with size.
 			buffer := make([]byte, bufferSize)
-			_, err = io.CopyBuffer(conns.stdoutStream, conns.stdinStream, buffer)
+			_, err := io.CopyBuffer(out, in, buffer)
 			if err != nil {
 				t.Fatalf("error copying STDIN to STDOUT: %v", err)
 			}
-		}))
+			return nil
+		})
 		defer websocketServer.Close()
 
 		// Now create the WebSocket client (executor), and point it to the "websocketServer".
@@ -202,18 +192,13 @@ func TestWebSocketClient_DifferentBufferSizes(t *testing.T) {
 // random data initially sent.
 func TestWebSocketClient_LoopbackStdinAsPipe(t *testing.T) {
 	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-		if err != nil {
-			t.Fatalf("error on webSocketServerStreams: %v", err)
-		}
-		defer conns.conn.Close()
-		// Loopback the STDIN stream onto the STDOUT stream.
-		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
+	websocketServer := newTestWSServer(t, func(in io.Reader, out, _ io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
+		_, err := io.Copy(out, in)
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
-	}))
+		return err
+	})
 	defer websocketServer.Close()
 
 	// Now create the WebSocket client (executor), and point it to the "websocketServer".
@@ -283,18 +268,14 @@ func TestWebSocketClient_LoopbackStdinAsPipe(t *testing.T) {
 // if there is any data which would cause problems with the WebSocket streams.
 func TestWebSocketClient_LoopbackStdinToStderr(t *testing.T) {
 	// Create fake WebSocket server. Copy received STDIN data back onto STDERR stream.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-		if err != nil {
-			t.Fatalf("error on webSocketServerStreams: %v", err)
-		}
-		defer conns.conn.Close()
+	websocketServer := newTestWSServer(t, func(stdin io.Reader, _, stderr io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
 		// Loopback the STDIN stream onto the STDERR stream.
-		_, err = io.Copy(conns.stderrStream, conns.stdinStream)
+		_, err := io.Copy(stderr, stdin)
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDERR: %v", err)
 		}
-	}))
+		return err
+	})
 	defer websocketServer.Close()
 
 	// Now create the WebSocket client (executor), and point it to the "websocketServer".
@@ -355,20 +336,16 @@ func TestWebSocketClient_LoopbackStdinToStderr(t *testing.T) {
 func TestWebSocketClient_MultipleReadChannels(t *testing.T) {
 	// Create fake WebSocket server, which uses a TeeReader to copy the same data
 	// onto the STDOUT stream onto the STDERR stream as well.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-		if err != nil {
-			t.Fatalf("error on webSocketServerStreams: %v", err)
-		}
-		defer conns.conn.Close()
+	websocketServer := newTestWSServer(t, func(stdin io.Reader, stdout, stderr io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
 		// TeeReader copies data read on STDIN onto STDERR.
-		stdinReader := io.TeeReader(conns.stdinStream, conns.stderrStream)
+		stdinReader := io.TeeReader(stdin, stderr)
 		// Also copy STDIN to STDOUT.
-		_, err = io.Copy(conns.stdoutStream, stdinReader)
+		_, err := io.Copy(stdout, stdinReader)
 		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
-	}))
+		return err
+	})
 	defer websocketServer.Close()
 	// Now create the WebSocket client (executor), and point it to the "websocketServer".
 	// Must add stdin, stdout, and stderr query param for the WebSocket client request.
@@ -618,6 +595,14 @@ func TestWebSocketClient_MultipleWriteChannels(t *testing.T) {
 			_, err := io.Copy(conns.stdoutStream, conns.stdinStream)
 			if err != nil {
 				t.Errorf("error copying STDIN to STDOUT: %v", err)
+			}
+			err = conns.writeStatus(&apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Status: metav1.StatusSuccess,
+				},
+			})
+			if err != nil {
+				t.Errorf("failed to write success status: %v", err)
 			}
 			wg.Done()
 		}()
@@ -1339,4 +1324,25 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 	}(streams[remotecommand.StreamErr])
 
 	return wsStreams, nil
+}
+
+func newTestWSServer(t *testing.T, f AttachFunc) *httptest.Server {
+	//nolint:errcheck
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
+		if err != nil {
+			t.Fatalf("error on webSocketServerStreams: %v", err)
+		}
+		defer conns.conn.Close()
+		// handle input output
+		err = f(conns.stdinStream, conns.stdoutStream, conns.stderrStream, false, nil)
+		if err != nil {
+			conns.writeStatus(apierrors.NewInternalError(err))
+		} else {
+			conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+				Status: metav1.StatusSuccess,
+			}})
+		}
+	}))
+	return server
 }
