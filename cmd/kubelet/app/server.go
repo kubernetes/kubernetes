@@ -34,6 +34,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/cgroups"
 	"github.com/coreos/go-systemd/v22/daemon"
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
@@ -802,6 +803,27 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		} else if s.TopologyManagerPolicyOptions != nil {
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
+		}
+
+		swapControllerFound := true
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) && isCgroup2UnifiedMode() && !s.FailSwapOn {
+			const warn = "Failed to detect the availability of the swap controller, assuming not available"
+			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
+			if err != nil {
+				klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+				swapControllerFound = false
+			}
+			p := filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+			if _, err := os.Stat(p); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					klog.V(5).ErrorS(err, warn)
+					swapControllerFound = false
+				}
+			}
+			if !swapControllerFound {
+				klog.ErrorS(fmt.Errorf("error detected swap controller"), warn)
+			}
+
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
