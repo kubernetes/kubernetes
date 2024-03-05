@@ -8918,7 +8918,7 @@
           "x-kubernetes-patch-strategy": "merge"
         },
         "hostAliases": {
-          "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
+          "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.HostAlias"
           },

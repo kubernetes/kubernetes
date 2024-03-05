@@ -3255,7 +3255,7 @@ type PodSpec struct {
 	// +optional
 	Tolerations []Toleration
 	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
-	// file if specified. This is only valid for non-hostNetwork pods.
+	// file if specified.
 	// +optional
 	HostAliases []HostAlias
 	// If specified, indicates the pod's priority. "system-node-critical" and
