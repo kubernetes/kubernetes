@@ -8049,6 +8049,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
 	out.InternalTrafficPolicy = (*core.ServiceInternalTrafficPolicy)(unsafe.Pointer(in.InternalTrafficPolicy))
+	out.TrafficDistribution = (*string)(unsafe.Pointer(in.TrafficDistribution))
 	return nil
 }
 
@@ -8077,6 +8078,7 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
 	out.InternalTrafficPolicy = (*v1.ServiceInternalTrafficPolicy)(unsafe.Pointer(in.InternalTrafficPolicy))
+	out.TrafficDistribution = (*string)(unsafe.Pointer(in.TrafficDistribution))
 	return nil
 }
 

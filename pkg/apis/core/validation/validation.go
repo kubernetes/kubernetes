@@ -5534,6 +5534,9 @@ func ValidateService(service *core.Service) field.ErrorList {
 	// internal traffic policy field
 	allErrs = append(allErrs, validateServiceInternalTrafficFieldsValue(service)...)
 
+	// traffic distribution field
+	allErrs = append(allErrs, validateServiceTrafficDistribution(service)...)
+
 	return allErrs
 }
 
@@ -5646,6 +5649,22 @@ func validateServiceInternalTrafficFieldsValue(service *core.Service) field.Erro
 
 	if service.Spec.InternalTrafficPolicy != nil && !supportedServiceInternalTrafficPolicy.Has(*service.Spec.InternalTrafficPolicy) {
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec").Child("internalTrafficPolicy"), *service.Spec.InternalTrafficPolicy, sets.List(supportedServiceInternalTrafficPolicy)))
+	}
+
+	return allErrs
+}
+
+// validateServiceTrafficDistribution validates the values for the
+// trafficDistribution field.
+func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if service.Spec.TrafficDistribution == nil {
+		return allErrs
+	}
+
+	if *service.Spec.TrafficDistribution != v1.ServiceTrafficDistributionPreferClose {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec").Child("trafficDistribution"), *service.Spec.TrafficDistribution, []string{v1.ServiceTrafficDistributionPreferClose}))
 	}
 
 	return allErrs

@@ -85,7 +85,8 @@
     "ipFamilyPolicy": "ipFamilyPolicyValue",
     "allocateLoadBalancerNodePorts": true,
     "loadBalancerClass": "loadBalancerClassValue",
-    "internalTrafficPolicy": "internalTrafficPolicyValue"
+    "internalTrafficPolicy": "internalTrafficPolicyValue",
+    "trafficDistribution": "trafficDistributionValue"
   },
   "status": {
     "loadBalancer": {

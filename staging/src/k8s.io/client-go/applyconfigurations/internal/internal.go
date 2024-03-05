@@ -7546,6 +7546,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: sessionAffinityConfig
       type:
         namedType: io.k8s.api.core.v1.SessionAffinityConfig
+    - name: trafficDistribution
+      type:
+        scalar: string
     - name: type
       type:
         scalar: string

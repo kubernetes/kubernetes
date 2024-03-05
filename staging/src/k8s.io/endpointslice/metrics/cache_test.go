@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	endpointsliceutil "k8s.io/endpointslice/util"
@@ -89,6 +91,96 @@ func expectNumEndpointsAndSlices(t *testing.T, c *Cache, desired int, actual int
 	}
 }
 
+// Tests the mutations to servicesByTrafficDistribution field within Cache
+// object.
+func TestCache_ServicesByTrafficDistribution(t *testing.T) {
+	cache := NewCache(0)
+
+	service1 := types.NamespacedName{Namespace: "ns1", Name: "service1"}
+	service2 := types.NamespacedName{Namespace: "ns1", Name: "service2"}
+	service3 := types.NamespacedName{Namespace: "ns2", Name: "service3"}
+	service4 := types.NamespacedName{Namespace: "ns3", Name: "service4"}
+
+	// Define helper function for assertion
+	mustHaveServicesByTrafficDistribution := func(wantServicesByTrafficDistribution map[string]map[types.NamespacedName]bool, desc string) {
+		t.Helper()
+		gotServicesByTrafficDistribution := cache.servicesByTrafficDistribution
+		if diff := cmp.Diff(wantServicesByTrafficDistribution, gotServicesByTrafficDistribution); diff != "" {
+			t.Fatalf("UpdateTrafficDistributionForService(%v) resulted in unexpected diff for cache.servicesByTrafficDistribution; (-want, +got)\n%v", desc, diff)
+		}
+	}
+
+	// Mutate and make assertions
+
+	desc := "service1 starts using trafficDistribution=PreferClose"
+	cache.UpdateTrafficDistributionForService(service1, ptrTo(corev1.ServiceTrafficDistributionPreferClose))
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true},
+	}, desc)
+
+	desc = "service1 starts using trafficDistribution=PreferClose, retries of similar mutation should be idempotent"
+	cache.UpdateTrafficDistributionForService(service1, ptrTo(corev1.ServiceTrafficDistributionPreferClose))
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{ // No delta
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true},
+	}, desc)
+
+	desc = "service2 starts using trafficDistribution=PreferClose"
+	cache.UpdateTrafficDistributionForService(service2, ptrTo(corev1.ServiceTrafficDistributionPreferClose))
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true, service2: true}, // Delta
+	}, desc)
+
+	desc = "service3 starts using trafficDistribution=InvalidValue"
+	cache.UpdateTrafficDistributionForService(service3, ptrTo("InvalidValue"))
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true, service2: true},
+		trafficDistributionImplementationSpecific:    {service3: true}, // Delta
+	}, desc)
+
+	desc = "service4 starts using trafficDistribution=nil"
+	cache.UpdateTrafficDistributionForService(service4, nil)
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{ // No delta
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true, service2: true},
+		trafficDistributionImplementationSpecific:    {service3: true},
+	}, desc)
+
+	desc = "service2 transitions trafficDistribution: PreferClose -> InvalidValue"
+	cache.UpdateTrafficDistributionForService(service2, ptrTo("InvalidValue"))
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true},                 // Delta
+		trafficDistributionImplementationSpecific:    {service3: true, service2: true}, // Delta
+	}, desc)
+
+	desc = "service3 gets deleted"
+	cache.DeleteService(service3)
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true},
+		trafficDistributionImplementationSpecific:    {service2: true}, // Delta
+	}, desc)
+
+	desc = "service1 transitions trafficDistribution: PreferClose -> empty"
+	cache.UpdateTrafficDistributionForService(service1, ptrTo(""))
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {},                               // Delta
+		trafficDistributionImplementationSpecific:    {service1: true, service2: true}, // Delta
+	}, desc)
+
+	desc = "service1 transitions trafficDistribution: InvalidValue -> nil"
+	cache.UpdateTrafficDistributionForService(service1, nil)
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {},
+		trafficDistributionImplementationSpecific:    {service2: true}, // Delta
+	}, desc)
+
+	desc = "service2 transitions trafficDistribution: InvalidValue -> nil"
+	cache.UpdateTrafficDistributionForService(service2, nil)
+	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
+		corev1.ServiceTrafficDistributionPreferClose: {},
+		trafficDistributionImplementationSpecific:    {}, // Delta
+	}, desc)
+
+}
+
 func benchmarkUpdateServicePortCache(b *testing.B, num int) {
 	c := NewCache(int32(100))
 	ns := "benchmark"
@@ -131,4 +223,8 @@ func BenchmarkUpdateServicePortCache10000(b *testing.B) {
 
 func BenchmarkUpdateServicePortCache100000(b *testing.B) {
 	benchmarkUpdateServicePortCache(b, 100000)
+}
+
+func ptrTo[T any](obj T) *T {
+	return &obj
 }

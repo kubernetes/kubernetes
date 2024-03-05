@@ -4906,6 +4906,18 @@ const (
 	ServiceExternalTrafficPolicyTypeCluster = ServiceExternalTrafficPolicyCluster
 )
 
+// These are valid values for the TrafficDistribution field of a Service.
+const (
+	// Indicates a preference for routing traffic to endpoints that are
+	// topologically proximate to the client. The interpretation of "topologically
+	// proximate" may vary across implementations and could encompass endpoints
+	// within the same node, rack, zone, or even region. Setting this value gives
+	// implementations permission to make different tradeoffs, e.g. optimizing for
+	// proximity rather than equal distribution of load. Users should not set this
+	// value if such tradeoffs are not acceptable.
+	ServiceTrafficDistributionPreferClose = "PreferClose"
+)
+
 // These are the valid conditions of a service.
 const (
 	// LoadBalancerPortsError represents the condition of the requested ports
@@ -5250,6 +5262,15 @@ type ServiceSpec struct {
 	// (possibly modified by topology and other features).
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
+
+	// TrafficDistribution offers a way to express preferences for how traffic is
+	// distributed to Service endpoints. Implementations can use this field as a
+	// hint, but are not required to guarantee strict adherence. If the field is
+	// not set, the implementation will apply its default routing strategy. If set
+	// to "PreferClose", implementations should prioritize endpoints that are
+	// topologically close (e.g., same zone).
+	// +optional
+	TrafficDistribution *string `json:"trafficDistribution,omitempty" protobuf:"bytes,23,opt,name=trafficDistribution"`
 }
 
 // ServicePort contains information on service's port.

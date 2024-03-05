@@ -17121,6 +17121,18 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Annotations[core.AnnotationTopologyMode] = "different"
 			},
 			numErrs: 1,
+		}, {
+			name: "valid: trafficDistribution field set to PreferClose",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = utilpointer.String("PreferClose")
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid: trafficDistribution field set to Random",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = utilpointer.String("Random")
+			},
+			numErrs: 1,
 		},
 	}
 

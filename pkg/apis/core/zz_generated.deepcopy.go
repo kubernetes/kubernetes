@@ -5677,6 +5677,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(ServiceInternalTrafficPolicy)
 		**out = **in
 	}
+	if in.TrafficDistribution != nil {
+		in, out := &in.TrafficDistribution, &out.TrafficDistribution
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

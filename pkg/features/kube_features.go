@@ -738,6 +738,13 @@ const (
 	// Subdivide the NodePort range for dynamic and static port allocation.
 	ServiceNodePortStaticSubrange featuregate.Feature = "ServiceNodePortStaticSubrange"
 
+	// owner: @gauravkghildiyal @robscott
+	// kep: https://kep.k8s.io/4444
+	// alpha: v1.30
+	//
+	// Enables trafficDistribution field on Services.
+	ServiceTrafficDistribution featuregate.Feature = "ServiceTrafficDistribution"
+
 	// owner: @gjkim42 @SergeyKanzhelev @matthyx @tzneal
 	// kep: http://kep.k8s.io/753
 	// alpha: v1.28
@@ -1138,6 +1145,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceAccountTokenNodeBindingValidation: {Default: true, PreRelease: featuregate.Beta},
 
 	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
+
+	ServiceTrafficDistribution: {Default: false, PreRelease: featuregate.Alpha},
 
 	SidecarContainers: {Default: true, PreRelease: featuregate.Beta},
 
