@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	commonutils "k8s.io/kubernetes/test/e2e/common"
@@ -57,21 +58,12 @@ var _ = SIGDescribe("Kubectl delete", func() {
 			e2ekubectl.RunKubectlOrDieInput(ns, deploymentYaml, "apply", "-f", "-")
 
 			ginkgo.By("verifying the deployment is created and running")
-			err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
-				d, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						return false, nil
-					}
-					return false, err
-				}
-				if d != nil && d.Status.AvailableReplicas == 2 {
-					return true, nil
-				}
-
-				return false, nil
-			})
-			framework.ExpectNoError(err, "waiting for the deployment has 2 available replicas")
+			d, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("Failed getting deployment %v", err)
+			}
+			err = e2edeployment.WaitForDeploymentComplete(c, d)
+			framework.ExpectNoError(err, "waiting for the deployment to complete")
 
 			ginkgo.By("check that resource is not deleted when user types no")
 			output := e2ekubectl.RunKubectlOrDieInput(ns, "n", "delete", "--interactive", "deployment", deploymentName)
@@ -83,8 +75,8 @@ var _ = SIGDescribe("Kubectl delete", func() {
 			}
 
 			ginkgo.By("verify that deployment is not deleted")
-			d, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
-			if err != nil {
+			d, err = c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
+			if err != nil || d.DeletionTimestamp != nil {
 				framework.Failf("Failed getting deployment that shouldn't be deleted %v", err)
 			}
 
