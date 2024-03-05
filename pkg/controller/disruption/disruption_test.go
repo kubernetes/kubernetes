@@ -1563,6 +1563,37 @@ func TestStalePodDisruption(t *testing.T) {
 	}
 }
 
+func TestKeepExistingPDBConditionDuringSync(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	dc, ps := newFakeDisruptionController(ctx)
+
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
+	pdb.Spec.Selector = &metav1.LabelSelector{}
+
+	pdb.Status.Conditions = append(pdb.Status.Conditions, metav1.Condition{
+		Type:               "ExistingTestCondition",
+		Status:             metav1.ConditionTrue,
+		Message:            "This is a test condition",
+		Reason:             "Test",
+		LastTransitionTime: metav1.Now(),
+	})
+
+	add(t, dc.pdbStore, pdb)
+	if err := dc.sync(ctx, pdbName); err != nil {
+		t.Fatalf("Failed to sync PDB: %v", err)
+	}
+	ps.VerifyPdbStatus(t, pdbName, 0, 0, 3, 0, map[string]metav1.Time{})
+
+	actualPDB := ps.Get(pdbName)
+	condition := apimeta.FindStatusCondition(actualPDB.Status.Conditions, "ExistingTestCondition")
+	if len(actualPDB.Status.Conditions) != 2 {
+		t.Fatalf("Expected 2 conditions, but got %d", len(actualPDB.Status.Conditions))
+	}
+	if condition == nil {
+		t.Fatalf("Expected ExistingTestCondition condition, but didn't find it")
+	}
+}
+
 // waitForCacheCount blocks until the given cache store has the desired number
 // of items in it. This will return an error if the condition is not met after a
 // 10 second timeout.
