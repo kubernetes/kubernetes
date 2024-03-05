@@ -67,7 +67,6 @@ type PodTopologySpread struct {
 	replicationCtrls                             corelisters.ReplicationControllerLister
 	replicaSets                                  appslisters.ReplicaSetLister
 	statefulSets                                 appslisters.StatefulSetLister
-	enableMinDomainsInPodTopologySpread          bool
 	enableNodeInclusionPolicyInPodTopologySpread bool
 	enableMatchLabelKeysInPodTopologySpread      bool
 }
@@ -99,10 +98,9 @@ func New(_ context.Context, plArgs runtime.Object, h framework.Handle, fts featu
 		return nil, err
 	}
 	pl := &PodTopologySpread{
-		parallelizer:                        h.Parallelizer(),
-		sharedLister:                        h.SnapshotSharedLister(),
-		defaultConstraints:                  args.DefaultConstraints,
-		enableMinDomainsInPodTopologySpread: fts.EnableMinDomainsInPodTopologySpread,
+		parallelizer:       h.Parallelizer(),
+		sharedLister:       h.SnapshotSharedLister(),
+		defaultConstraints: args.DefaultConstraints,
 		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
 		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
 	}

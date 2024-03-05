@@ -51,17 +51,13 @@ type preFilterState struct {
 }
 
 // minMatchNum returns the global minimum for the calculation of skew while taking MinDomains into account.
-func (s *preFilterState) minMatchNum(tpKey string, minDomains int32, enableMinDomainsInPodTopologySpread bool) (int, error) {
+func (s *preFilterState) minMatchNum(tpKey string, minDomains int32) (int, error) {
 	paths, ok := s.TpKeyToCriticalPaths[tpKey]
 	if !ok {
 		return 0, fmt.Errorf("failed to retrieve path by topology key")
 	}
 
 	minMatchNum := paths[0].MatchNum
-	if !enableMinDomainsInPodTopologySpread {
-		return minMatchNum, nil
-	}
-
 	domainsNum, ok := s.TpKeyToDomainsNum[tpKey]
 	if !ok {
 		return 0, fmt.Errorf("failed to retrieve the number of domains by topology key")
@@ -296,11 +292,9 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			s.TpPairToMatchNum[tp] += count
 		}
 	}
-	if pl.enableMinDomainsInPodTopologySpread {
-		s.TpKeyToDomainsNum = make(map[string]int, len(constraints))
-		for tp := range s.TpPairToMatchNum {
-			s.TpKeyToDomainsNum[tp.key]++
-		}
+	s.TpKeyToDomainsNum = make(map[string]int, len(constraints))
+	for tp := range s.TpPairToMatchNum {
+		s.TpKeyToDomainsNum[tp.key]++
 	}
 
 	// calculate min match for each topology pair
@@ -341,7 +335,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global minimum' <= 'maxSkew'
-		minMatchNum, err := s.minMatchNum(tpKey, c.MinDomains, pl.enableMinDomainsInPodTopologySpread)
+		minMatchNum, err := s.minMatchNum(tpKey, c.MinDomains)
 		if err != nil {
 			logger.Error(err, "Internal error occurred while retrieving value precalculated in PreFilter", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
 			continue
