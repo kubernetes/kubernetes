@@ -70,6 +70,26 @@ func GetPodList(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulS
 	return podList
 }
 
+// GetPodReadyList gets the current Pods in ss with all pods in status Ready.
+func GetPodReadyList(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) v1.PodList {
+	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+	framework.ExpectNoError(err)
+    listOptions := metav1.ListOptions{
+        LabelSelector: selector.String(),
+        FieldSelector: "status.phase=Running",
+    }
+	podList, err := c.CoreV1().Pods(ss.Namespace).List(ctx, listOptions)
+    var readyPods []v1.Pod
+    for _, pod := range podList.Items {
+        if podutils.IsPodReady(&pod) {
+            readyPods = append(readyPods, pod)
+        }
+    }
+	framework.ExpectNoError(err)
+
+    return v1.PodList{Items: readyPods}
+}
+
 // DeleteAllStatefulSets deletes all StatefulSet API Objects in Namespace ns.
 func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string) {
 	ssList, err := c.AppsV1().StatefulSets(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})

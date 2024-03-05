@@ -59,6 +59,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -1262,6 +1263,160 @@ var _ = SIGDescribe("StatefulSet", func() {
 		if !strings.Contains(out, "availableReplicas: 2") {
 			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 2, out)
 		}
+	})
+
+    ginkgo.It("MinReadySeconds should be honored when set in a rolling update strategy with MaxUnavailable", func(ctx context.Context) {
+		ssName := "test-minreadyseconds-maxunavailable"
+		headlessSvcName := "test"
+		ssPodLabels := map[string]string{
+			"name": "sample-pod",
+		}
+        replicas := int32(3)
+        maxUnavailable := ptr.To(intstr.FromInt32(2))
+
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, replicas, nil, nil, ssPodLabels)
+        ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+		ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
+
+        selector := ss.Spec.Selector.DeepCopy() // make a copy of the selector, gets lost after updating
+        // set old and new images which will be useful for test assertion
+        oldImage := ss.Spec.Template.Spec.Containers[0].Image
+        newImage := NewWebserverImage
+
+        // update the stateful set with desired settings
+        ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+		    update.Spec.MinReadySeconds = 300
+            update.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+	        update.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy {
+		        MaxUnavailable: maxUnavailable,
+	        }
+		})
+		framework.ExpectNoError(err)
+		e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
+
+        // update the image version so it triggers the update strategy
+        ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+            update.Spec.Template.Spec.Containers[0].Image = newImage
+		})
+		e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
+
+        // the image in all pods should be the old one after 10 seconds because the minReadySeconds should be in process of being honored
+        ss.Spec.Selector = selector // restore the selector
+		time.Sleep(10 * time.Second)
+        pods := e2estatefulset.GetPodList(ctx, c, ss)
+        for i := range pods.Items {
+		    gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage), "Pod %s/%s has image %s, not the old image %s",
+		    	pods.Items[i].Namespace,
+		    	pods.Items[i].Name,
+		    	pods.Items[i].Spec.Containers[0].Image,
+		    	oldImage)
+	    }
+	})
+
+    ginkgo.It("Rolling deployment with Parallel PodManagementPolicy and MaxUnavailable", func(ctx context.Context) {
+		ssName := "test-rolling-update-parallel-max-unavailable"
+		headlessSvcName := "test"
+		ssPodLabels := map[string]string{
+			"name": "sample-pod",
+		}
+        replicas := int32(3)
+        maxUnavailable := ptr.To(intstr.FromInt32(2))
+
+        // create the statefulset with desired settings
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, replicas, nil, nil, ssPodLabels)
+        ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+	    ss.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy {
+		    MaxUnavailable: maxUnavailable,
+	    }
+        setHTTPProbe(ss)
+		ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+        err = e2epod.VerifyPodsRunning(ctx, c, ns, "sample-pod", false, replicas)
+	    framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
+
+        selector := ss.Spec.Selector.DeepCopy() // make a copy of the selector, gets lost after updating
+
+        // update the image so it triggers the update strategy
+        // force readiness probe to fail by using breaking the HTTP probe, so number of maxUnavailable can be checked
+        ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+            update.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
+            breakHTTPProbe(ctx, c, update)
+		})
+
+        podsReadyCount := len(e2estatefulset.GetPodReadyList(ctx, c, ss).Items)
+
+        // expected replicas at this point should be replicas minus maxUnavailable (3 - 2 = 1)
+        gomega.Expect(int32(podsReadyCount)).To(gomega.Equal(replicas - maxUnavailable.IntVal))
+
+        // resume the update
+        restoreHTTPProbe(ctx, c, ss)
+        e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
+		framework.ExpectNoError(err)
+
+        // confirm all pods are in the new image version
+        ss.Spec.Selector = selector // restore the selector to get the pod list
+        pods := e2estatefulset.GetPodList(ctx, c, ss)
+        for i := range pods.Items {
+		    gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(NewWebserverImage), "Pod %s/%s has image %s, not the new image %s",
+		    	pods.Items[i].Namespace,
+		    	pods.Items[i].Name,
+		    	pods.Items[i].Spec.Containers[0].Image,
+		    	NewWebserverImage)
+	    }
+	})
+
+    ginkgo.It("Rolling deployment with OrderedReady PodManagementPolicy and MaxUnavailable", func(ctx context.Context) {
+		ssName := "test-rolling-update-orderedready-max-unavailable"
+		headlessSvcName := "test"
+		ssPodLabels := map[string]string{
+			"name": "sample-pod",
+		}
+        replicas := int32(2)
+        maxUnavailable := ptr.To(intstr.FromInt32(1))
+
+        // create the statefulset with desired settings
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, replicas, nil, nil, ssPodLabels)
+        ss.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+	    ss.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy {
+		    MaxUnavailable: maxUnavailable,
+	    }
+        setHTTPProbe(ss)
+		ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+        err = e2epod.VerifyPodsRunning(ctx, c, ns, "sample-pod", false, replicas)
+	    framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
+
+        // break the HTTP probe so it reflects maxUnavailable after updating
+        breakHTTPProbe(ctx, c, ss)
+        // update the image so it triggers the update strategy
+        ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+            update.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
+		})
+        framework.ExpectNoError(err)
+
+        err = e2epod.VerifyPodsRunning(ctx, c, ns, "sample-pod", false, (replicas - maxUnavailable.IntVal))
+	    framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
+        // update is "paused" since the HTTP probe is broken
+        // at this point, assert the running pod is in the old version and hasn't been updated which implies maxUnavailable has been honored
+        pods := e2estatefulset.GetPodList(ctx, c, ss)
+        pod := pods.Items[0]
+        gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Not(gomega.Equal(NewWebserverImage)))
+
+        // restore the HTTP probe, which will allow the update to carry on
+        // assert all pods are in the new version
+        restoreHTTPProbe(ctx, c, ss)
+        err = e2epod.VerifyPodsRunning(ctx, c, ns, "sample-pod", false, replicas)
+	    framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
+        pods = e2estatefulset.GetPodList(ctx, c, ss)
+        for i := range pods.Items {
+		    gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(NewWebserverImage), "Pod %s/%s has image %s, not the new image %s",
+		    	pods.Items[i].Namespace,
+		    	pods.Items[i].Name,
+		    	pods.Items[i].Spec.Containers[0].Image,
+		    	NewWebserverImage)
+	    }
 	})
 
 	ginkgo.Describe("Non-retain StatefulSetPersistentVolumeClaimPolicy", func() {
