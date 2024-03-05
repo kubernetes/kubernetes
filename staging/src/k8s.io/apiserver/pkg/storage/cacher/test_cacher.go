@@ -115,10 +115,10 @@ func (c *TestCacher) Compact(ctx context.Context, client *clientv3.Client, resou
 	c.watchCache.listResourceVersion = rv
 
 	if _, err = client.KV.Put(ctx, "compact_rev_key", resourceVersion); err != nil {
-		return fmt.Errorf("could not update compact_rev_key: %v", err)
+		return fmt.Errorf("could not update compact_rev_key: %w", err)
 	}
 	if _, err = client.Compact(ctx, int64(rv)); err != nil {
-		return fmt.Errorf("could not compact: %v", err)
+		return fmt.Errorf("could not compact: %w", err)
 	}
 	return nil
 }
