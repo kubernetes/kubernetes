@@ -38,7 +38,7 @@ import (
 
 // writeDeadline defines the time that a client-side write to the websocket
 // connection must complete before an i/o timeout occurs.
-const writeDeadline = 30 * time.Second
+const writeDeadline = 60 * time.Second
 
 var (
 	_ Executor          = &wsStreamExecutor{}
@@ -61,8 +61,8 @@ const (
 	// "pong" message before a timeout error occurs for websocket reading.
 	// This duration must always be greater than the "pingPeriod". By defining
 	// this deadline in terms of the ping period, we are essentially saying
-	// we can drop "X-1" (e.g. 6-1=5) pings before firing the timeout.
-	pingReadDeadline = (pingPeriod * 6) + (1 * time.Second)
+	// we can drop "X" (e.g. 12) pings before firing the timeout.
+	pingReadDeadline = (pingPeriod * 12) + (1 * time.Second)
 )
 
 // wsStreamExecutor handles transporting standard shell streams over an httpstream connection.
