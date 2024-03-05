@@ -17,6 +17,7 @@ limitations under the License.
 package debug
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/client-go/kubernetes/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/utils/pointer"
 )
@@ -43,10 +45,11 @@ func TestGenerateDebugContainer(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name     string
-		opts     *DebugOptions
-		pod      *corev1.Pod
-		expected *corev1.EphemeralContainer
+		name      string
+		opts      *DebugOptions
+		pod       *corev1.Pod
+		namespace *corev1.Namespace
+		expected  *corev1.EphemeralContainer
 	}{
 		{
 			name: "minimum fields",
@@ -335,6 +338,77 @@ func TestGenerateDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "general profile selected by auto profile",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			expected: &corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:                     "debugger-1",
+					Image:                    "busybox",
+					ImagePullPolicy:          corev1.PullIfNotPresent,
+					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					SecurityContext: &corev1.SecurityContext{
+						Capabilities: &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_PTRACE"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "baseline profile selected by auto profile",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"},
+				},
+			},
+			expected: &corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:                     "debugger-1",
+					Image:                    "busybox",
+					ImagePullPolicy:          corev1.PullIfNotPresent,
+					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+				},
+			},
+		},
+		{
+			name: "restricted profile selected by auto profile",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"},
+				},
+			},
+			expected: &corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:                     "debugger-1",
+					Image:                    "busybox",
+					ImagePullPolicy:          corev1.PullIfNotPresent,
+					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					SecurityContext: &corev1.SecurityContext{
+						RunAsNonRoot: pointer.Bool(true),
+						Capabilities: &corev1.Capabilities{
+							Drop: []corev1.Capability{"ALL"},
+						},
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
@@ -350,7 +424,20 @@ func TestGenerateDebugContainer(t *testing.T) {
 			}
 			tc.opts.Applier = applier
 
-			_, debugContainer, err := tc.opts.generateDebugContainer(tc.pod)
+			_, auto := tc.opts.Applier.(*autoProfile)
+			if auto {
+				if tc.pod.Namespace == "" {
+					tc.pod.Namespace = "default"
+				}
+				if tc.namespace == nil {
+					tc.namespace = &corev1.Namespace{}
+				}
+				tc.namespace.Name = tc.pod.Namespace
+				client := fake.NewSimpleClientset(tc.namespace)
+				tc.opts.podClient = client.CoreV1()
+			}
+
+			_, debugContainer, err := tc.opts.generateDebugContainer(context.TODO(), tc.pod)
 			if err != nil {
 				t.Fatalf("fail to generate debug container: %v", err)
 			}
@@ -373,6 +460,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		name             string
 		opts             *DebugOptions
 		havePod, wantPod *corev1.Pod
+		namespace        *corev1.Namespace
 	}{
 		{
 			name: "basic",
@@ -1351,6 +1439,143 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "general profile selected by auto profile",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+					ShareProcessNamespace: pointer.Bool(true),
+				},
+			},
+		},
+		{
+			name: "baseline profile selected by auto profile",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+					ShareProcessNamespace: pointer.Bool(true),
+				},
+			},
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"},
+				},
+			},
+		},
+		{
+			name: "restricted profile selected by auto profile",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot: pointer.Bool(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
+							},
+						},
+					},
+					ShareProcessNamespace: pointer.Bool(true),
+				},
+			},
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
@@ -1364,7 +1589,27 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			if tc.havePod == nil {
 				tc.havePod = &corev1.Pod{}
 			}
-			gotPod, _, _ := tc.opts.generatePodCopyWithDebugContainer(tc.havePod)
+
+			_, auto := tc.opts.Applier.(*autoProfile)
+			if auto {
+				if tc.havePod.Namespace == "" {
+					tc.havePod.Namespace = "default"
+				}
+				if tc.wantPod.Namespace == "" {
+					tc.wantPod.Namespace = "default"
+				}
+				if tc.namespace == nil {
+					tc.namespace = &corev1.Namespace{}
+				}
+				tc.namespace.Name = tc.havePod.Namespace
+				client := fake.NewSimpleClientset(tc.namespace)
+				tc.opts.podClient = client.CoreV1()
+			}
+
+			gotPod, _, err := tc.opts.generatePodCopyWithDebugContainer(context.TODO(), tc.havePod)
+			if err != nil {
+				t.Fatalf("fail to generate pod copy with debug container: %v", err)
+			}
 			if diff := cmp.Diff(tc.wantPod, gotPod); diff != "" {
 				t.Error("TestGeneratePodCopyWithDebugContainer: diff in generated object: (-want +got):\n", diff)
 			}
@@ -1381,10 +1626,11 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name     string
-		node     *corev1.Node
-		opts     *DebugOptions
-		expected *corev1.Pod
+		name      string
+		node      *corev1.Node
+		opts      *DebugOptions
+		namespace *corev1.Namespace
+		expected  *corev1.Pod
 	}{
 		{
 			name: "minimum options",
@@ -1734,6 +1980,156 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "general profile selected by auto profile",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "baseline profile selected by auto profile",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts:             nil,
+						},
+					},
+					HostIPC:       false,
+					HostNetwork:   false,
+					HostPID:       false,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes:       nil,
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "restricted profile selected by auto profile",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileAuto,
+			},
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts:             nil,
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot: pointer.Bool(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
+							},
+						},
+					},
+					HostIPC:       false,
+					HostNetwork:   false,
+					HostPID:       false,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes:       nil,
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
@@ -1744,7 +2140,20 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
 
-			pod, err := tc.opts.generateNodeDebugPod(tc.node)
+			_, auto := tc.opts.Applier.(*autoProfile)
+			if auto {
+				if tc.opts.Namespace == "" {
+					tc.opts.Namespace = "default"
+				}
+				if tc.namespace == nil {
+					tc.namespace = &corev1.Namespace{}
+				}
+				tc.namespace.Name = tc.opts.Namespace
+				client := fake.NewSimpleClientset(tc.namespace)
+				tc.opts.podClient = client.CoreV1()
+			}
+
+			pod, err := tc.opts.generateNodeDebugPod(context.TODO(), tc.node)
 			if err != nil {
 				t.Fatalf("Fail to generate node debug pod: %v", err)
 			}
