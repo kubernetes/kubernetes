@@ -18,12 +18,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -175,6 +178,188 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 
 	if !serviceHasNodePorts(service) {
 		t.Error("node ports were unexpectedly deallocated")
+	}
+}
+
+// Test_ServiceLoadBalancerDisableAllocatedNodePort test that switching a Service
+// to spec.allocateLoadBalancerNodePorts=false can de-allocate existing node ports.
+func Test_ServiceLoadBalancerDisableAllocatedNodePort(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			AllocateLoadBalancerNodePorts: utilpointer.Bool(true),
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if !serviceHasNodePorts(service) {
+		t.Error("expected node ports but found none")
+	}
+
+	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+	service.Spec.Ports[0].NodePort = 0
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error updating test service: %v", err)
+	}
+
+	if serviceHasNodePorts(service) {
+		t.Error("node ports were expected to be deallocated")
+	}
+}
+
+// Test_ServiceLoadBalancerDisableAllocatedNodePorts test that switching a Service
+// to spec.allocateLoadBalancerNodePorts=false can de-allocate one of existing node ports.
+func Test_ServiceLoadBalancerDisableAllocatedNodePorts(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			AllocateLoadBalancerNodePorts: utilpointer.Bool(true),
+			Ports: []corev1.ServicePort{{
+				Name: "np-1",
+				Port: int32(80),
+			}, {
+				Name: "np-2",
+				Port: int32(81),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if !serviceHasNodePorts(service) {
+		t.Error("expected node ports but found none")
+	}
+
+	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+	service.Spec.Ports[0].NodePort = 0
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error updating test service: %v", err)
+	}
+
+	if service.Spec.Ports[0].NodePort != 0 {
+		t.Error("node ports[0] was expected to be deallocated")
+	}
+	if service.Spec.Ports[1].NodePort == 0 {
+		t.Error("node ports was not expected to be deallocated")
+	}
+}
+
+// Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch test that switching a Service
+// to spec.allocateLoadBalancerNodePorts=false with path can de-allocate one of existing node ports.
+func Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			AllocateLoadBalancerNodePorts: utilpointer.Bool(true),
+			Ports: []corev1.ServicePort{{
+				Name: "np-1",
+				Port: int32(80),
+			}, {
+				Name: "np-2",
+				Port: int32(81),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if !serviceHasNodePorts(service) {
+		t.Error("expected node ports but found none")
+	}
+
+	clone := service.DeepCopy()
+	clone.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+	clone.Spec.Ports[0].NodePort = 0
+
+	oldData, err := json.Marshal(service)
+	if err != nil {
+		t.Fatalf("Error marshalling test service: %v", err)
+	}
+	newData, err := json.Marshal(clone)
+	if err != nil {
+		t.Fatalf("Error marshalling test service: %v", err)
+	}
+	patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, corev1.Service{})
+	if err != nil {
+		t.Fatalf("Error creating patch: %v", err)
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Patch(context.TODO(), service.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		t.Fatalf("Error updating test service: %v", err)
+	}
+
+	if service.Spec.Ports[0].NodePort != 0 {
+		t.Error("node ports[0] was expected to be deallocated")
+	}
+	if service.Spec.Ports[1].NodePort == 0 {
+		t.Error("node ports was not expected to be deallocated")
 	}
 }
 
