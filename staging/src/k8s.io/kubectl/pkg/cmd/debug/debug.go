@@ -101,6 +101,8 @@ var (
 		# Create an interactive debugging session on a node and immediately attach to it.
 		# The container will run in the host namespaces and the host's filesystem will be mounted at /host
 		kubectl debug node/mynode -it --image=busybox
+		# Or with imagePullSecrets
+		kubectl debug node/mynode -it --image=busybox --image-pull-secrets=myRegistryKeySecretName1 --image-pull-secrets=myRegistryKeySecretName2
 `))
 )
 
@@ -121,6 +123,7 @@ type DebugOptions struct {
 	Namespace       string
 	TargetNames     []string
 	PullPolicy      corev1.PullPolicy
+	PullSecrets     []corev1.LocalObjectReference
 	Quiet           bool
 	SameNode        bool
 	SetImages       map[string]string
@@ -186,6 +189,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, i18n.T("Container image to use for debug container."))
 	cmd.Flags().StringToStringVar(&o.SetImages, "set-image", o.SetImages, i18n.T("When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works."))
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server."))
+	cmd.Flags().StringArray("image-pull-secrets", []string{}, i18n.T("List of image pull secrets, optional."))
 	cmd.Flags().BoolVarP(&o.Interactive, "stdin", "i", o.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, i18n.T("If true, suppress informational messages."))
 	cmd.Flags().BoolVar(&o.SameNode, "same-node", o.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))
@@ -200,7 +204,13 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 	var err error
 
 	o.PullPolicy = corev1.PullPolicy(cmdutil.GetFlagString(cmd, "image-pull-policy"))
-
+	pullSecrets := make([]corev1.LocalObjectReference, 0, 2)
+	for _, imagePullSecret := range cmdutil.GetFlagStringArray(cmd, "image-pull-secrets") {
+		pullSecrets = append(pullSecrets, corev1.LocalObjectReference{
+			Name: imagePullSecret,
+		})
+	}
+	o.PullSecrets = pullSecrets
 	// Arguments
 	argsLen := cmd.ArgsLenAtDash()
 	o.TargetNames = args
@@ -561,6 +571,7 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 					Operator: corev1.TolerationOpExists,
 				},
 			},
+			ImagePullSecrets: o.PullSecrets,
 		},
 	}
 
