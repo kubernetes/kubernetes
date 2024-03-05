@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+// Package tests contains cacher tests that run embedded etcd. This is to avoid dependency on "testing" in cacher package.
+package tests
 
 import (
 	"context"
@@ -22,6 +23,7 @@ import (
 	"testing"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"k8s.io/apiserver/pkg/storage/cacher"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,9 +42,8 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	codecs   = serializer.NewCodecFactory(scheme)
-	errDummy = fmt.Errorf("dummy error")
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
 )
 
 func init() {
@@ -74,7 +75,7 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func compactStorage(c *TestCacher, client *clientv3.Client) storagetesting.Compaction {
+func compactStorage(c *cacher.TestCacher, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		err := c.Compact(ctx, client, resourceVersion)
 		if err != nil {

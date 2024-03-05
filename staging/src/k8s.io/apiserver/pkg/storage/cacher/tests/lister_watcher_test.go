@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+// Package tests contains cacher tests that run embedded etcd. This is to avoid dependency on "testing" in cacher package.
+package tests
 
 import (
 	"context"
@@ -23,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/storage/cacher"
 )
 
 func TestCacherListerWatcher(t *testing.T) {
@@ -44,7 +46,7 @@ func TestCacherListerWatcher(t *testing.T) {
 		}
 	}
 
-	lw := NewListerWatcher(store, prefix, fn, nil)
+	lw := cacher.NewListerWatcher(store, prefix, fn, nil)
 
 	obj, err := lw.List(metav1.ListOptions{})
 	if err != nil {
@@ -80,7 +82,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 		}
 	}
 
-	lw := NewListerWatcher(store, prefix, fn, nil)
+	lw := cacher.NewListerWatcher(store, prefix, fn, nil)
 
 	obj1, err := lw.List(metav1.ListOptions{Limit: 2})
 	if err != nil {
