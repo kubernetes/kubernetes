@@ -130,6 +130,9 @@ type realImageGCManager struct {
 
 	// tracer for recording spans
 	tracer trace.Tracer
+
+	// lock is the global mutex for the GC to run.
+	lock *sync.RWMutex
 }
 
 // imageCache caches latest result of ListImages.
@@ -181,7 +184,7 @@ type imageRecord struct {
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
-func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider, lock *sync.RWMutex) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -201,6 +204,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 		recorder:      recorder,
 		nodeRef:       nodeRef,
 		tracer:        tracer,
+		lock:          lock,
 	}
 
 	return im, nil
@@ -311,6 +315,9 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.Time) error {
 	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
 	defer otelSpan.End()
+
+	im.lock.Lock()
+	defer im.lock.Unlock()
 
 	freeTime := time.Now()
 	images, err := im.imagesInEvictionOrder(ctx, freeTime)
