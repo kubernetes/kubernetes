@@ -327,12 +327,11 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 // are evictable if there are no corresponding pods.
 func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesReady bool) error {
 	osInterface := cgc.manager.osInterface
-	podLogsDirectory := cgc.manager.podLogsDirectory
 	if allSourcesReady {
 		// Only remove pod logs directories when all sources are ready.
-		dirs, err := osInterface.ReadDir(podLogsDirectory)
+		dirs, err := osInterface.ReadDir(podLogsRootDirectory)
 		if err != nil {
-			return fmt.Errorf("failed to read podLogsDirectory %q: %w", podLogsDirectory, err)
+			return fmt.Errorf("failed to read podLogsRootDirectory %q: %v", podLogsRootDirectory, err)
 		}
 		for _, dir := range dirs {
 			name := dir.Name()
@@ -341,7 +340,7 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 				continue
 			}
 			klog.V(4).InfoS("Removing pod logs", "podUID", podUID)
-			err := osInterface.RemoveAll(filepath.Join(podLogsDirectory, name))
+			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))
 			if err != nil {
 				klog.ErrorS(err, "Failed to remove pod logs directory", "path", name)
 			}

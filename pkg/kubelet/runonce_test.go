@@ -84,7 +84,6 @@ func TestRunOnce(t *testing.T) {
 	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
 		rootDirectory:    filepath.Clean(basePath),
-		podLogsDirectory: filepath.Join(basePath, "pod-logs"),
 		recorder:         &record.FakeRecorder{},
 		cadvisor:         cadvisor,
 		nodeLister:       testNodeLister{},

@@ -46,8 +46,6 @@ const (
 
 	fakeNodeAllocatableMemory = "32Gi"
 	fakeNodeAllocatableCPU    = "16"
-
-	fakePodLogsDirectory = "/var/log/pods"
 )
 
 type fakeHTTP struct {
@@ -117,7 +115,6 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
 		logManager:             logManager,
 		memoryThrottlingFactor: 0.9,
-		podLogsDirectory:       fakePodLogsDirectory,
 	}
 
 	typedVersion, err := runtimeService.Version(ctx, kubeRuntimeAPIVersion)

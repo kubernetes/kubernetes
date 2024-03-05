@@ -206,8 +206,14 @@ func newTestKubeletWithImageList(
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	kubelet.runtimeState.setNetworkState(nil)
-	kubelet.rootDirectory = t.TempDir()
-	kubelet.podLogsDirectory = t.TempDir()
+	if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
+		t.Fatalf("can't make a temp rootdir: %v", err)
+	} else {
+		kubelet.rootDirectory = tempDir
+	}
+	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
+	}
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
@@ -3106,7 +3112,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		"external",
 		"/tmp/cert",
 		"/tmp/rootdir",
-		tempDir,
 		"",
 		"",
 		false,
@@ -3201,7 +3206,6 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.readinessManager,
 		kubelet.startupManager,
 		kubelet.rootDirectory,
-		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
 		kubelet.podWorkers,
 		kubelet.os,
