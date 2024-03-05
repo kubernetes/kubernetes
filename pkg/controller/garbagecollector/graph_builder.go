@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
-
+	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
@@ -133,6 +133,39 @@ func (m *monitor) Run() {
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
+
+func NewDependencyGraphBuilder(
+	ctx context.Context,
+	metadataClient metadata.Interface,
+	mapper meta.ResettableRESTMapper,
+	ignoredResources map[schema.GroupResource]struct{},
+	sharedInformers informerfactory.InformerFactory,
+	informersStarted <-chan struct{},
+) *GraphBuilder {
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
+
+	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
+	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
+	absentOwnerCache := NewReferenceCache(500)
+	graphBuilder := &GraphBuilder{
+		eventRecorder:    eventRecorder,
+		metadataClient:   metadataClient,
+		informersStarted: informersStarted,
+		restMapper:       mapper,
+		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		uidToNode: &concurrentUIDToNode{
+			uidToNode: make(map[types.UID]*node),
+		},
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
+		absentOwnerCache: absentOwnerCache,
+		sharedInformers:  sharedInformers,
+		ignoredResources: ignoredResources,
+	}
+
+	return graphBuilder
+}
 
 func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -934,4 +967,28 @@ func getAlternateOwnerIdentity(deps []*node, verifiedAbsentIdentity objectRefere
 	}
 	// otherwise return the first alternate identity
 	return first
+}
+
+func (gb *GraphBuilder) GetGraphResources() (
+	attemptToDelete workqueue.RateLimitingInterface,
+	attemptToOrphan workqueue.RateLimitingInterface,
+	absentOwnerCache *ReferenceCache,
+) {
+	return gb.attemptToDelete, gb.attemptToOrphan, gb.absentOwnerCache
+}
+
+func (gb *GraphBuilder) GetMonitorStore(resource schema.GroupVersionResource) cache.Store {
+	gb.monitorLock.RLock()
+	defer gb.monitorLock.RUnlock()
+	return gb.monitors[resource].store
+}
+
+func (gb *GraphBuilder) GetMonitorController(resource schema.GroupVersionResource) cache.Controller {
+	gb.monitorLock.RLock()
+	defer gb.monitorLock.RUnlock()
+	return gb.monitors[resource].controller
+}
+
+func (gb *GraphBuilder) Name() string {
+	return "dependencygraphbuilder"
 }
