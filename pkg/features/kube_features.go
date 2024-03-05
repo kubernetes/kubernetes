@@ -666,7 +666,8 @@ const (
 	// owner: @mikedanese
 	// alpha: v1.7
 	// beta: v1.12
-	//
+	// ga: v1.30
+
 	// Gets a server certificate for the kubelet from the Certificate Signing
 	// Request API instead of generating one self signed and auto rotates the
 	// certificate as expiration approaches.
@@ -1135,7 +1136,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RecoverVolumeExpansionFailure: {Default: false, PreRelease: featuregate.Alpha},
 
-	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
+	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30, remove in 1.32
 
 	RuntimeClassInImageCriAPI: {Default: false, PreRelease: featuregate.Alpha},
 
