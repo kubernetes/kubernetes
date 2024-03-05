@@ -162,6 +162,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, sp
 				JWTAuthenticator:     jwtAuthenticator,
 				CAContentProvider:    oidcCAContent,
 				SupportedSigningAlgs: config.OIDCSigningAlgs,
+				DisallowedIssuers:    config.ServiceAccountIssuers,
 			})
 			if err != nil {
 				return nil, nil, nil, err

@@ -41,7 +41,7 @@ import (
 )
 
 // ValidateAuthenticationConfiguration validates a given AuthenticationConfiguration.
-func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration) field.ErrorList {
+func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, disallowedIssuers []string) field.ErrorList {
 	root := field.NewPath("jwt")
 	var allErrs field.ErrorList
 
@@ -69,7 +69,7 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration) fie
 	// check and add validation for duplicate issuers.
 	for i, a := range c.JWT {
 		fldPath := root.Index(i)
-		_, errs := validateJWTAuthenticator(a, fldPath, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
+		_, errs := validateJWTAuthenticator(a, fldPath, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
 		allErrs = append(allErrs, errs...)
 	}
 
@@ -79,17 +79,17 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration) fie
 // CompileAndValidateJWTAuthenticator validates a given JWTAuthenticator and returns a CELMapper with the compiled
 // CEL expressions for claim mappings and validation rules.
 // This is exported for use in oidc package.
-func CompileAndValidateJWTAuthenticator(authenticator api.JWTAuthenticator) (authenticationcel.CELMapper, field.ErrorList) {
-	return validateJWTAuthenticator(authenticator, nil, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
+func CompileAndValidateJWTAuthenticator(authenticator api.JWTAuthenticator, disallowedIssuers []string) (authenticationcel.CELMapper, field.ErrorList) {
+	return validateJWTAuthenticator(authenticator, nil, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
 }
 
-func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field.Path, structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
+func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field.Path, disallowedIssuers sets.Set[string], structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
 	var allErrs field.ErrorList
 
 	compiler := authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	mapper := &authenticationcel.CELMapper{}
 
-	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, fldPath.Child("issuer"))...)
+	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, disallowedIssuers, fldPath.Child("issuer"))...)
 	allErrs = append(allErrs, validateClaimValidationRules(compiler, mapper, authenticator.ClaimValidationRules, fldPath.Child("claimValidationRules"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateClaimMappings(compiler, mapper, authenticator.ClaimMappings, fldPath.Child("claimMappings"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateUserValidationRules(compiler, mapper, authenticator.UserValidationRules, fldPath.Child("userValidationRules"), structuredAuthnFeatureEnabled)...)
@@ -97,10 +97,10 @@ func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field
 	return *mapper, allErrs
 }
 
-func validateIssuer(issuer api.Issuer, fldPath *field.Path) field.ErrorList {
+func validateIssuer(issuer api.Issuer, disallowedIssuers sets.Set[string], fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validateIssuerURL(issuer.URL, fldPath.Child("url"))...)
+	allErrs = append(allErrs, validateIssuerURL(issuer.URL, disallowedIssuers, fldPath.Child("url"))...)
 	allErrs = append(allErrs, validateIssuerDiscoveryURL(issuer.URL, issuer.DiscoveryURL, fldPath.Child("discoveryURL"))...)
 	allErrs = append(allErrs, validateAudiences(issuer.Audiences, issuer.AudienceMatchPolicy, fldPath.Child("audiences"), fldPath.Child("audienceMatchPolicy"))...)
 	allErrs = append(allErrs, validateCertificateAuthority(issuer.CertificateAuthority, fldPath.Child("certificateAuthority"))...)
@@ -108,12 +108,12 @@ func validateIssuer(issuer api.Issuer, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func validateIssuerURL(issuerURL string, fldPath *field.Path) field.ErrorList {
+func validateIssuerURL(issuerURL string, disallowedIssuers sets.Set[string], fldPath *field.Path) field.ErrorList {
 	if len(issuerURL) == 0 {
 		return field.ErrorList{field.Required(fldPath, "URL is required")}
 	}
 
-	return validateURL(issuerURL, fldPath)
+	return validateURL(issuerURL, disallowedIssuers, fldPath)
 }
 
 func validateIssuerDiscoveryURL(issuerURL, issuerDiscoveryURL string, fldPath *field.Path) field.ErrorList {
@@ -127,12 +127,17 @@ func validateIssuerDiscoveryURL(issuerURL, issuerDiscoveryURL string, fldPath *f
 		allErrs = append(allErrs, field.Invalid(fldPath, issuerDiscoveryURL, "discoveryURL must be different from URL"))
 	}
 
-	allErrs = append(allErrs, validateURL(issuerDiscoveryURL, fldPath)...)
+	// issuerDiscoveryURL is not an issuer URL and does not need to validated against any set of disallowed issuers
+	allErrs = append(allErrs, validateURL(issuerDiscoveryURL, nil, fldPath)...)
 	return allErrs
 }
 
-func validateURL(issuerURL string, fldPath *field.Path) field.ErrorList {
+func validateURL(issuerURL string, disallowedIssuers sets.Set[string], fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
+
+	if disallowedIssuers.Has(issuerURL) {
+		allErrs = append(allErrs, field.Invalid(fldPath, issuerURL, fmt.Sprintf("URL must not overlap with disallowed issuers: %s", sets.List(disallowedIssuers))))
+	}
 
 	u, err := url.Parse(issuerURL)
 	if err != nil {
