@@ -15129,6 +15129,387 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"ResourceClaimStatuses okay",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name: "init",
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "init",
+					Ready:       true,
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name: "init",
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+				RestartPolicy: core.RestartPolicyNever,
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "init",
+					Ready:       false,
+					State: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ContainerID: "docker://numbers",
+							Reason:      "Completed",
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		`status.initContainerStatuses[0].state: Forbidden: may not be transitioned to non-terminated state`,
+		"init container cannot restart if RestartPolicyNever",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+				RestartPolicy: core.RestartPolicyNever,
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "restartable-init",
+					Ready:       true,
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+				RestartPolicy: core.RestartPolicyNever,
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "restartable-init",
+					Ready:       false,
+					State: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ContainerID: "docker://numbers",
+							Reason:      "Completed",
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		"",
+		"restartable init container can restart if RestartPolicyNever",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+				RestartPolicy: core.RestartPolicyOnFailure,
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "restartable-init",
+					Ready:       true,
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+				RestartPolicy: core.RestartPolicyOnFailure,
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "restartable-init",
+					Ready:       false,
+					State: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ContainerID: "docker://numbers",
+							Reason:      "Completed",
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		"",
+		"restartable init container can restart if RestartPolicyOnFailure",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "restartable-init",
+					Ready:       true,
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []core.Container{
+					{
+						Name: "nginx",
+					},
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "restartable-init",
+					Ready:       false,
+					State: core.ContainerState{
+						Terminated: &core.ContainerStateTerminated{
+							ContainerID: "docker://numbers",
+							Reason:      "Completed",
+						},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+					Name:        "nginx",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			},
+		},
+		"",
+		"restartable init container can restart if RestartPolicyAlways",
 	},
 	}
 
