@@ -35,11 +35,11 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
-func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
-	return makeTestPodDetails(name, resourceVersion, "some-node", map[string]string{"k8s-app": "my-app"})
+func MakeTestPod(name string, resourceVersion uint64) *v1.Pod {
+	return MakeTestPodDetails(name, resourceVersion, "some-node", map[string]string{"k8s-app": "my-app"})
 }
 
-func makeTestPodDetails(name string, resourceVersion uint64, nodeName string, labels map[string]string) *v1.Pod {
+func MakeTestPodDetails(name string, resourceVersion uint64, nodeName string, labels map[string]string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "ns",
@@ -62,14 +62,14 @@ func makeTestStoreElement(pod *v1.Pod) *storeElement {
 	}
 }
 
-type testWatchCache struct {
+type TestWatchCache struct {
 	*watchCache
 
-	bookmarkRevision chan int64
+	BookmarkRevision chan int64
 	stopCh           chan struct{}
 }
 
-func (w *testWatchCache) getAllEventsSince(resourceVersion uint64, opts storage.ListOptions) ([]*watchCacheEvent, error) {
+func (w *TestWatchCache) getAllEventsSince(resourceVersion uint64, opts storage.ListOptions) ([]*watchCacheEvent, error) {
 	cacheInterval, err := w.getCacheIntervalForEvents(resourceVersion, opts)
 	if err != nil {
 		return nil, err
@@ -90,15 +90,19 @@ func (w *testWatchCache) getAllEventsSince(resourceVersion uint64, opts storage.
 	return result, nil
 }
 
-func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts storage.ListOptions) (*watchCacheInterval, error) {
+func (w *TestWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts storage.ListOptions) (*watchCacheInterval, error) {
 	w.RLock()
 	defer w.RUnlock()
 
 	return w.getAllEventsSinceLocked(resourceVersion, opts)
 }
 
+func (w *TestWatchCache) FakeClock() *testingclock.FakeClock {
+	return w.clock.(*testingclock.FakeClock)
+}
+
 // newTestWatchCache just adds a fake clock.
-func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
+func NewTestWatchCache(capacity int, indexers *cache.Indexers) *TestWatchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return storage.NamespaceKeyFunc("prefix", obj)
 	}
@@ -111,8 +115,8 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	}
 	versioner := storage.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := &testWatchCache{}
-	wc.bookmarkRevision = make(chan int64, 1)
+	wc := &TestWatchCache{}
+	wc.BookmarkRevision = make(chan int64, 1)
 	wc.stopCh = make(chan struct{})
 	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
@@ -155,10 +159,10 @@ func (t *immediateTicker) Stop() {
 	close(t.stopCh)
 }
 
-func (w *testWatchCache) RequestWatchProgress(ctx context.Context) error {
+func (w *TestWatchCache) RequestWatchProgress(ctx context.Context) error {
 	go func() {
 		select {
-		case rev := <-w.bookmarkRevision:
+		case rev := <-w.BookmarkRevision:
 			w.UpdateResourceVersion(fmt.Sprintf("%d", rev))
 		case <-ctx.Done():
 			return
@@ -167,7 +171,7 @@ func (w *testWatchCache) RequestWatchProgress(ctx context.Context) error {
 	return nil
 }
 
-func (w *testWatchCache) Stop() {
+func (w *TestWatchCache) Stop() {
 	close(w.stopCh)
 }
 
@@ -183,7 +187,7 @@ func (t *testLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options)
 }
 
-func loadEventWithDuration(cache *testWatchCache, count int, interval time.Duration) {
+func loadEventWithDuration(cache *TestWatchCache, count int, interval time.Duration) {
 	for i := 0; i < count; i++ {
 		event := &watchCacheEvent{
 			Key:        fmt.Sprintf("event-%d", i+cache.startIndex),
@@ -194,7 +198,7 @@ func loadEventWithDuration(cache *testWatchCache, count int, interval time.Durat
 	cache.endIndex = cache.startIndex + count
 }
 
-func checkCacheElements(cache *testWatchCache) bool {
+func checkCacheElements(cache *TestWatchCache) bool {
 	for i := cache.startIndex; i < cache.endIndex; i++ {
 		location := i % cache.capacity
 		if cache.cache[location].Key != fmt.Sprintf("event-%d", i) {

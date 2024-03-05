@@ -57,7 +57,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 		}
 	}
 
-	cacher, err := newTestCacher(etcdStorage)
+	cacher, err := NewTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)()
-			_, cacher, _, terminate := testSetupWithEtcdServer(t)
+			_, cacher, _, terminate := TestSetupWithEtcdServer(t)
 			t.Cleanup(terminate)
 			if err := cacher.WaitReady(context.TODO()); err != nil {
 				t.Fatalf("unexpected error waiting for the cache to be ready")

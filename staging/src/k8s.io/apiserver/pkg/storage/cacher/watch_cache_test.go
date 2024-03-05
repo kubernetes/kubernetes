@@ -30,47 +30,43 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestWatchCacheBasic(t *testing.T) {
-	store := newTestWatchCache(2, &cache.Indexers{})
+	store := NewTestWatchCache(2, &cache.Indexers{})
 	defer store.Stop()
 
 	// Test Add/Update/Delete.
-	pod1 := makeTestPod("pod", 1)
+	pod1 := MakeTestPod("pod", 1)
 	if err := store.Add(pod1); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if item, ok, _ := store.Get(pod1); !ok {
 		t.Errorf("didn't find pod")
 	} else {
-		expected := makeTestStoreElement(makeTestPod("pod", 1))
+		expected := makeTestStoreElement(MakeTestPod("pod", 1))
 		if !apiequality.Semantic.DeepEqual(expected, item) {
 			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
-	pod2 := makeTestPod("pod", 2)
+	pod2 := MakeTestPod("pod", 2)
 	if err := store.Update(pod2); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if item, ok, _ := store.Get(pod2); !ok {
 		t.Errorf("didn't find pod")
 	} else {
-		expected := makeTestStoreElement(makeTestPod("pod", 2))
+		expected := makeTestStoreElement(MakeTestPod("pod", 2))
 		if !apiequality.Semantic.DeepEqual(expected, item) {
 			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
-	pod3 := makeTestPod("pod", 3)
+	pod3 := MakeTestPod("pod", 3)
 	if err := store.Delete(pod3); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -79,14 +75,14 @@ func TestWatchCacheBasic(t *testing.T) {
 	}
 
 	// Test List.
-	store.Add(makeTestPod("pod1", 4))
-	store.Add(makeTestPod("pod2", 5))
-	store.Add(makeTestPod("pod3", 6))
+	store.Add(MakeTestPod("pod1", 4))
+	store.Add(MakeTestPod("pod2", 5))
+	store.Add(MakeTestPod("pod3", 6))
 	{
 		expected := map[string]storeElement{
-			"prefix/ns/pod1": *makeTestStoreElement(makeTestPod("pod1", 4)),
-			"prefix/ns/pod2": *makeTestStoreElement(makeTestPod("pod2", 5)),
-			"prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
+			"prefix/ns/pod1": *makeTestStoreElement(MakeTestPod("pod1", 4)),
+			"prefix/ns/pod2": *makeTestStoreElement(MakeTestPod("pod2", 5)),
+			"prefix/ns/pod3": *makeTestStoreElement(MakeTestPod("pod3", 6)),
 		}
 		items := make(map[string]storeElement)
 		for _, item := range store.List() {
@@ -100,13 +96,13 @@ func TestWatchCacheBasic(t *testing.T) {
 
 	// Test Replace.
 	store.Replace([]interface{}{
-		makeTestPod("pod4", 7),
-		makeTestPod("pod5", 8),
+		MakeTestPod("pod4", 7),
+		MakeTestPod("pod5", 8),
 	}, "8")
 	{
 		expected := map[string]storeElement{
-			"prefix/ns/pod4": *makeTestStoreElement(makeTestPod("pod4", 7)),
-			"prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
+			"prefix/ns/pod4": *makeTestStoreElement(MakeTestPod("pod4", 7)),
+			"prefix/ns/pod5": *makeTestStoreElement(MakeTestPod("pod5", 8)),
 		}
 		items := make(map[string]storeElement)
 		for _, item := range store.List() {
@@ -120,14 +116,14 @@ func TestWatchCacheBasic(t *testing.T) {
 }
 
 func TestEvents(t *testing.T) {
-	store := newTestWatchCache(5, &cache.Indexers{})
+	store := NewTestWatchCache(5, &cache.Indexers{})
 	defer store.Stop()
 
 	// no dynamic-size cache to fit old tests.
 	store.lowerBoundCapacity = 5
 	store.upperBoundCapacity = 5
 
-	store.Add(makeTestPod("pod", 3))
+	store.Add(MakeTestPod("pod", 3))
 
 	// Test for Added event.
 	{
@@ -150,7 +146,7 @@ func TestEvents(t *testing.T) {
 		if result[0].Type != watch.Added {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
-		pod := makeTestPod("pod", uint64(3))
+		pod := MakeTestPod("pod", uint64(3))
 		if !apiequality.Semantic.DeepEqual(pod, result[0].Object) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
@@ -159,8 +155,8 @@ func TestEvents(t *testing.T) {
 		}
 	}
 
-	store.Update(makeTestPod("pod", 4))
-	store.Update(makeTestPod("pod", 5))
+	store.Update(MakeTestPod("pod", 4))
+	store.Update(MakeTestPod("pod", 5))
 
 	// Test with not full cache.
 	{
@@ -181,11 +177,11 @@ func TestEvents(t *testing.T) {
 			if result[i].Type != watch.Modified {
 				t.Errorf("unexpected event type: %v", result[i].Type)
 			}
-			pod := makeTestPod("pod", uint64(i+4))
+			pod := MakeTestPod("pod", uint64(i+4))
 			if !apiequality.Semantic.DeepEqual(pod, result[i].Object) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
-			prevPod := makeTestPod("pod", uint64(i+3))
+			prevPod := MakeTestPod("pod", uint64(i+3))
 			if !apiequality.Semantic.DeepEqual(prevPod, result[i].PrevObject) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].PrevObject, prevPod)
 			}
@@ -193,7 +189,7 @@ func TestEvents(t *testing.T) {
 	}
 
 	for i := 6; i < 10; i++ {
-		store.Update(makeTestPod("pod", uint64(i)))
+		store.Update(MakeTestPod("pod", uint64(i)))
 	}
 
 	// Test with full cache - there should be elements from 5 to 9.
@@ -212,7 +208,7 @@ func TestEvents(t *testing.T) {
 			t.Fatalf("unexpected events: %v", result)
 		}
 		for i := 0; i < 5; i++ {
-			pod := makeTestPod("pod", uint64(i+5))
+			pod := MakeTestPod("pod", uint64(i+5))
 			if !apiequality.Semantic.DeepEqual(pod, result[i].Object) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
@@ -220,7 +216,7 @@ func TestEvents(t *testing.T) {
 	}
 
 	// Test for delete event.
-	store.Delete(makeTestPod("pod", uint64(10)))
+	store.Delete(MakeTestPod("pod", uint64(10)))
 
 	{
 		result, err := store.getAllEventsSince(9, storage.ListOptions{})
@@ -233,11 +229,11 @@ func TestEvents(t *testing.T) {
 		if result[0].Type != watch.Deleted {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
-		pod := makeTestPod("pod", uint64(10))
+		pod := MakeTestPod("pod", uint64(10))
 		if !apiequality.Semantic.DeepEqual(pod, result[0].Object) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
-		prevPod := makeTestPod("pod", uint64(9))
+		prevPod := MakeTestPod("pod", uint64(9))
 		if !apiequality.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
@@ -245,13 +241,13 @@ func TestEvents(t *testing.T) {
 }
 
 func TestMarker(t *testing.T) {
-	store := newTestWatchCache(3, &cache.Indexers{})
+	store := NewTestWatchCache(3, &cache.Indexers{})
 	defer store.Stop()
 
 	// First thing that is called when propagated from storage is Replace.
 	store.Replace([]interface{}{
-		makeTestPod("pod1", 5),
-		makeTestPod("pod2", 9),
+		MakeTestPod("pod1", 5),
+		MakeTestPod("pod2", 9),
 	}, "9")
 
 	_, err := store.getAllEventsSince(8, storage.ListOptions{})
@@ -268,7 +264,7 @@ func TestMarker(t *testing.T) {
 		t.Errorf("unexpected result: %#v, expected no events", result)
 	}
 
-	pod := makeTestPod("pods", 12)
+	pod := MakeTestPod("pods", 12)
 	store.Add(pod)
 	// Getting events from 8 should still work and return one event.
 	result, err = store.getAllEventsSince(9, storage.ListOptions{})
@@ -282,7 +278,7 @@ func TestMarker(t *testing.T) {
 
 func TestWaitUntilFreshAndList(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(3, &cache.Indexers{
+	store := NewTestWatchCache(3, &cache.Indexers{
 		"l:label": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -304,9 +300,9 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	defer store.Stop()
 	// In background, update the store.
 	go func() {
-		store.Add(makeTestPodDetails("pod1", 2, "node1", map[string]string{"label": "value1"}))
-		store.Add(makeTestPodDetails("pod2", 3, "node1", map[string]string{"label": "value1"}))
-		store.Add(makeTestPodDetails("pod3", 5, "node2", map[string]string{"label": "value2"}))
+		store.Add(MakeTestPodDetails("pod1", 2, "node1", map[string]string{"label": "value1"}))
+		store.Add(MakeTestPodDetails("pod2", 3, "node1", map[string]string{"label": "value1"}))
+		store.Add(MakeTestPodDetails("pod3", 5, "node2", map[string]string{"label": "value2"}))
 	}()
 
 	// list by empty MatchValues.
@@ -381,42 +377,15 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 }
 
-func TestWaitUntilFreshAndListFromCache(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
-	ctx := context.Background()
-	store := newTestWatchCache(3, &cache.Indexers{})
-	defer store.Stop()
-	// In background, update the store.
-	go func() {
-		store.Add(makeTestPod("pod1", 2))
-		store.bookmarkRevision <- 3
-	}()
-
-	// list from future revision. Requires watch cache to request bookmark to get it.
-	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resourceVersion != 3 {
-		t.Errorf("unexpected resourceVersion: %v, expected: 6", resourceVersion)
-	}
-	if len(list) != 1 {
-		t.Errorf("unexpected list returned: %#v", list)
-	}
-	if indexUsed != "" {
-		t.Errorf("Used index %q but expected none to be used", indexUsed)
-	}
-}
-
 func TestWaitUntilFreshAndGet(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(3, &cache.Indexers{})
+	store := NewTestWatchCache(3, &cache.Indexers{})
 	defer store.Stop()
 
 	// In background, update the store.
 	go func() {
-		store.Add(makeTestPod("foo", 2))
-		store.Add(makeTestPod("bar", 5))
+		store.Add(MakeTestPod("foo", 2))
+		store.Add(MakeTestPod("bar", 5))
 	}()
 
 	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "prefix/ns/bar")
@@ -429,64 +398,15 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 	if !exists {
 		t.Fatalf("no results returned: %#v", obj)
 	}
-	expected := makeTestStoreElement(makeTestPod("bar", 5))
+	expected := makeTestStoreElement(MakeTestPod("bar", 5))
 	if !apiequality.Semantic.DeepEqual(expected, obj) {
 		t.Errorf("expected %v, got %v", expected, obj)
 	}
 }
 
-func TestWaitUntilFreshAndListTimeout(t *testing.T) {
-	tcs := []struct {
-		name                    string
-		ConsistentListFromCache bool
-	}{
-		{
-			name:                    "FromStorage",
-			ConsistentListFromCache: false,
-		},
-		{
-			name:                    "FromCache",
-			ConsistentListFromCache: true,
-		},
-	}
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)()
-			ctx := context.Background()
-			store := newTestWatchCache(3, &cache.Indexers{})
-			defer store.Stop()
-			fc := store.clock.(*testingclock.FakeClock)
-
-			// In background, step clock after the below call starts the timer.
-			go func() {
-				for !fc.HasWaiters() {
-					time.Sleep(time.Millisecond)
-				}
-				store.Add(makeTestPod("foo", 2))
-				store.bookmarkRevision <- 3
-				fc.Step(blockTimeout)
-
-				// Add an object to make sure the test would
-				// eventually fail instead of just waiting
-				// forever.
-				time.Sleep(30 * time.Second)
-				store.Add(makeTestPod("bar", 4))
-			}()
-
-			_, _, _, err := store.WaitUntilFreshAndList(ctx, 4, nil)
-			if !errors.IsTimeout(err) {
-				t.Errorf("expected timeout error but got: %v", err)
-			}
-			if !storage.IsTooLargeResourceVersion(err) {
-				t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
-			}
-		})
-	}
-}
-
 func TestReflectorForWatchCache(t *testing.T) {
 	ctx := context.Background()
-	store := newTestWatchCache(5, &cache.Indexers{})
+	store := NewTestWatchCache(5, &cache.Indexers{})
 	defer store.Stop()
 
 	{
@@ -750,7 +670,7 @@ func TestDynamicCache(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			store := newTestWatchCache(test.cacheCapacity, &cache.Indexers{})
+			store := NewTestWatchCache(test.cacheCapacity, &cache.Indexers{})
 			defer store.Stop()
 			store.cache = make([]*watchCacheEvent, test.cacheCapacity)
 			store.startIndex = test.startIndex
@@ -778,7 +698,7 @@ func TestDynamicCache(t *testing.T) {
 }
 
 func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
-	store := newTestWatchCache(2, &cache.Indexers{})
+	store := NewTestWatchCache(2, &cache.Indexers{})
 	defer store.Stop()
 
 	now := store.clock.Now()
@@ -927,7 +847,7 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			store := newTestWatchCache(test.capacity, &cache.Indexers{})
+			store := NewTestWatchCache(test.capacity, &cache.Indexers{})
 			defer store.Stop()
 			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed)
 			if got != test.expected {
@@ -938,7 +858,7 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 }
 
 func BenchmarkWatchCache_updateCache(b *testing.B) {
-	store := newTestWatchCache(defaultUpperBoundCapacity, &cache.Indexers{})
+	store := NewTestWatchCache(defaultUpperBoundCapacity, &cache.Indexers{})
 	defer store.Stop()
 	store.cache = store.cache[:0]
 	store.upperBoundCapacity = defaultUpperBoundCapacity
@@ -960,15 +880,15 @@ func TestHistogramCacheReadWait(t *testing.T) {
 	}
 	ctx := context.Background()
 	testedMetrics := "apiserver_watch_cache_read_wait_seconds"
-	store := newTestWatchCache(2, &cache.Indexers{})
+	store := NewTestWatchCache(2, &cache.Indexers{})
 	defer store.Stop()
 
 	// In background, update the store.
 	go func() {
-		if err := store.Add(makeTestPod("foo", 2)); err != nil {
+		if err := store.Add(MakeTestPod("foo", 2)); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := store.Add(makeTestPod("bar", 5)); err != nil {
+		if err := store.Add(MakeTestPod("bar", 5)); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	}()

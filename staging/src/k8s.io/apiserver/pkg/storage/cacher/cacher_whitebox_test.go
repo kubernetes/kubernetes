@@ -22,17 +22,15 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	goruntime "runtime"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	testing2 "k8s.io/apiserver/pkg/storage/testing"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,93 +57,8 @@ func init() {
 	InitTestSchema()
 }
 
-func TestGetListCacheBypass(t *testing.T) {
-	type testCase struct {
-		opts         storage.ListOptions
-		expectBypass bool
-	}
-	commonTestCases := []testCase{
-		{opts: storage.ListOptions{ResourceVersion: "0"}, expectBypass: false},
-		{opts: storage.ListOptions{ResourceVersion: "1"}, expectBypass: false},
-
-		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-
-		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: false},
-		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
-
-		{opts: storage.ListOptions{ResourceVersion: "", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
-	}
-
-	t.Run("ConsistentListFromStorage", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
-		testCases := append(commonTestCases,
-			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
-		)
-		for _, tc := range testCases {
-			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
-		}
-
-	})
-	t.Run("ConsistentListFromCache", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
-		testCases := append(commonTestCases,
-			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
-		)
-		for _, tc := range testCases {
-			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
-		}
-	})
-}
-
-func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	result := &example.PodList{}
-
-	// Wait until cacher is initialized.
-	if err := cacher.ready.wait(context.Background()); err != nil {
-		t.Fatalf("unexpected error waiting for the cache to be ready")
-	}
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-		currentResourceVersion := "42"
-		switch {
-		// request made by getCurrentResourceVersionFromStorage by checking Limit
-		case key == cacher.resourcePrefix:
-			podList := listObj.(*example.PodList)
-			podList.ResourceVersion = currentResourceVersion
-			return nil
-		// request made by storage.GetList with revision from original request or
-		// returned by getCurrentResourceVersionFromStorage
-		case opts.ResourceVersion == options.ResourceVersion || opts.ResourceVersion == currentResourceVersion:
-			return errDummy
-		default:
-			t.Fatalf("Unexpected request %+v", opts)
-			return nil
-		}
-	}
-	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
-	if err != nil && err != errDummy {
-		t.Fatalf("Unexpected error for List request with options: %v, err: %v", options, err)
-	}
-	gotBypass := err == errDummy
-	if gotBypass != expectBypass {
-		t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", options, expectBypass, gotBypass)
-	}
-}
-
 func TestGetListNonRecursiveCacheBypass(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -182,7 +95,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 }
 
 func TestGetCacheBypass(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -216,7 +129,7 @@ func TestGetCacheBypass(t *testing.T) {
 }
 
 func TestWatchCacheBypass(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -251,7 +164,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// Configure cacher so that it can't initialize, because of
 	// constantly failing lists to the underlying storage.
 	dummyErr := fmt.Errorf("dummy")
-	backingStorage := &dummyStorage{err: dummyErr}
+	backingStorage := &DummyStorage{Err: dummyErr}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -276,7 +189,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 }
 
 func TestWatcherNotGoingBackInTime(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, v, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -363,7 +276,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 }
 
 func TestCacherDontAcceptRequestsStopped(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -436,8 +349,8 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 	}
 
 	listCalls, watchCalls := 0, 0
-	backingStorage := &dummyStorage{
-		getListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+	backingStorage := &DummyStorage{
+		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
 			podList := listObj.(*example.PodList)
 			var err error
 			switch listCalls {
@@ -451,7 +364,7 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 			listCalls++
 			return err
 		},
-		watchFn: func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
+		WatchFn: func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
 			var w *watch.FakeWatcher
 			var err error
 			switch watchCalls {
@@ -536,7 +449,7 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 }
 
 func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -615,7 +528,7 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 }
 
 func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBookmarks bool) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -711,7 +624,7 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 }
 
 func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -785,7 +698,7 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 }
 
 func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -860,7 +773,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 }
 
 func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -941,7 +854,7 @@ func (f *fakeTimeBudget) takeAvailable() time.Duration {
 func (f *fakeTimeBudget) returnUnused(_ time.Duration) {}
 
 func TestStartingResourceVersion(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -1021,7 +934,7 @@ func TestStartingResourceVersion(t *testing.T) {
 }
 
 func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -1107,63 +1020,8 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	}
 }
 
-func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictOrder bool) {
-	_, _, line, _ := goruntime.Caller(1)
-	actualEvents := make([]watch.Event, len(events))
-	for idx := range events {
-		select {
-		case event := <-w.ResultChan():
-			actualEvents[idx] = event
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Logf("(called from line %d)", line)
-			t.Errorf("Timed out waiting for an event")
-		}
-	}
-	validateEvents := func(expected, actual watch.Event) (bool, []string) {
-		errors := []string{}
-		if e, a := expected.Type, actual.Type; e != a {
-			errors = append(errors, fmt.Sprintf("Expected: %s, got: %s", e, a))
-		}
-		actualObject := actual.Object
-		if co, ok := actualObject.(runtime.CacheableObject); ok {
-			actualObject = co.GetObject()
-		}
-		if e, a := expected.Object, actualObject; !apiequality.Semantic.DeepEqual(e, a) {
-			errors = append(errors, fmt.Sprintf("Expected: %#v, got: %#v", e, a))
-		}
-		return len(errors) == 0, errors
-	}
-
-	if len(events) != len(actualEvents) {
-		t.Fatalf("unexpected number of events: %d, expected: %d, acutalEvents: %#v, expectedEvents:%#v", len(actualEvents), len(events), actualEvents, events)
-	}
-
-	if strictOrder {
-		for idx, expectedEvent := range events {
-			valid, errors := validateEvents(expectedEvent, actualEvents[idx])
-			if !valid {
-				t.Logf("(called from line %d)", line)
-				for _, err := range errors {
-					t.Errorf(err)
-				}
-			}
-		}
-	}
-	for _, expectedEvent := range events {
-		validated := false
-		for _, actualEvent := range actualEvents {
-			if validated, _ = validateEvents(expectedEvent, actualEvent); validated {
-				break
-			}
-		}
-		if !validated {
-			t.Fatalf("Expected: %#v but didn't find", expectedEvent)
-		}
-	}
-}
-
 func TestCachingDeleteEvents(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -1239,13 +1097,13 @@ func TestCachingDeleteEvents(t *testing.T) {
 	cacher.watchCache.Update(pod3)
 	cacher.watchCache.Delete(pod4)
 
-	verifyEvents(t, allEventsWatcher, allEvents, true)
-	verifyEvents(t, fooEventsWatcher, fooEvents, true)
-	verifyEvents(t, barEventsWatcher, barEvents, true)
+	testing2.VerifyEvents(t, allEventsWatcher, allEvents, true)
+	testing2.VerifyEvents(t, fooEventsWatcher, fooEvents, true)
+	testing2.VerifyEvents(t, barEventsWatcher, barEvents, true)
 }
 
 func testCachingObjects(t *testing.T, watchersCount int) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -1341,7 +1199,7 @@ func TestCachingObjects(t *testing.T) {
 }
 
 func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -1421,160 +1279,6 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	// we should have processed exactly bufferSize number of elements.
 	if received != bufferSize {
 		t.Errorf("unexpected number of events received, expected: %d, got: %d", bufferSize+1, received)
-	}
-}
-
-func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
-
-	scenarios := []struct {
-		name               string
-		opts               storage.ListOptions
-		backingStorage     *dummyStorage
-		verifyBackingStore func(t *testing.T, s *dummyStorage)
-	}{
-		{
-			name: "allowWatchBookmarks=true, sendInitialEvents=true, RV=105",
-			opts: storage.ListOptions{
-				Predicate: func() storage.SelectionPredicate {
-					p := storage.Everything
-					p.AllowWatchBookmarks = true
-					return p
-				}(),
-				SendInitialEvents: pointer.Bool(true),
-				ResourceVersion:   "105",
-			},
-			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.requestWatchProgressCounter, "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
-			},
-		},
-
-		{
-			name: "legacy: allowWatchBookmarks=false, sendInitialEvents=true, RV=unset",
-			opts: storage.ListOptions{
-				Predicate: func() storage.SelectionPredicate {
-					p := storage.Everything
-					p.AllowWatchBookmarks = false
-					return p
-				}(),
-				SendInitialEvents: pointer.Bool(true),
-			},
-			backingStorage: func() *dummyStorage {
-				hasBeenPrimed := false
-				s := &dummyStorage{}
-				s.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-					listAccessor, err := meta.ListAccessor(listObj)
-					if err != nil {
-						return err
-					}
-					// the first call to this function
-					// primes the cacher
-					if !hasBeenPrimed {
-						listAccessor.SetResourceVersion("100")
-						hasBeenPrimed = true
-						return nil
-					}
-					listAccessor.SetResourceVersion("105")
-					return nil
-				}
-				return s
-			}(),
-			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
-			},
-		},
-
-		{
-			name: "allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
-			opts: storage.ListOptions{
-				Predicate: func() storage.SelectionPredicate {
-					p := storage.Everything
-					p.AllowWatchBookmarks = true
-					return p
-				}(),
-				SendInitialEvents: pointer.Bool(true),
-			},
-			backingStorage: func() *dummyStorage {
-				hasBeenPrimed := false
-				s := &dummyStorage{}
-				s.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-					listAccessor, err := meta.ListAccessor(listObj)
-					if err != nil {
-						return err
-					}
-					// the first call to this function
-					// primes the cacher
-					if !hasBeenPrimed {
-						listAccessor.SetResourceVersion("100")
-						hasBeenPrimed = true
-						return nil
-					}
-					listAccessor.SetResourceVersion("105")
-					return nil
-				}
-				return s
-			}(),
-			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
-			},
-		},
-	}
-
-	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
-			var backingStorage *dummyStorage
-			if scenario.backingStorage != nil {
-				backingStorage = scenario.backingStorage
-			} else {
-				backingStorage = &dummyStorage{}
-			}
-			cacher, _, err := newTestCacher(backingStorage)
-			if err != nil {
-				t.Fatalf("Couldn't create cacher: %v", err)
-			}
-			defer cacher.Stop()
-			if err := cacher.ready.wait(context.Background()); err != nil {
-				t.Fatalf("unexpected error waiting for the cache to be ready")
-			}
-
-			w, err := cacher.Watch(context.Background(), "pods/ns", scenario.opts)
-			require.NoError(t, err, "failed to create watch: %v")
-			defer w.Stop()
-			var expectedErr *apierrors.StatusError
-			if !errors.As(storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds), &expectedErr) {
-				t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
-			}
-			verifyEvents(t, w, []watch.Event{
-				{
-					Type: watch.Error,
-					Object: &metav1.Status{
-						Status:  metav1.StatusFailure,
-						Message: expectedErr.Error(),
-						Details: expectedErr.ErrStatus.Details,
-						Reason:  metav1.StatusReasonTimeout,
-						Code:    504,
-					},
-				},
-			}, true)
-
-			go func(t *testing.T) {
-				err := cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
-				require.NoError(t, err, "failed adding a pod to the watchCache")
-			}(t)
-			w, err = cacher.Watch(context.Background(), "pods/ns", scenario.opts)
-			require.NoError(t, err, "failed to create watch: %v")
-			defer w.Stop()
-			verifyEvents(t, w, []watch.Event{
-				{
-					Type:   watch.Added,
-					Object: makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}),
-				},
-			}, true)
-			if scenario.verifyBackingStore != nil {
-				scenario.verifyBackingStore(t, backingStorage)
-			}
-		})
 	}
 }
 
@@ -1687,7 +1391,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 // Previously the watchers have been removed from the "want bookmark" queue.
 func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -1727,7 +1431,7 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 	err = cacher.watchCache.Add(makePod(102))
 	require.NoError(t, err)
 
-	verifyEvents(t, w, []watch.Event{
+	testing2.VerifyEvents(t, w, []watch.Event{
 		{Type: watch.Added, Object: makePod(102)},
 		{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1739,7 +1443,7 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 }
 
 func TestForgetWatcher(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	require.NoError(t, err)
 	defer cacher.Stop()
@@ -1933,7 +1637,7 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			backingStorage := &dummyStorage{}
+			backingStorage := &DummyStorage{}
 			cacher, _, err := newTestCacher(backingStorage)
 			require.NoError(t, err, "couldn't create cacher")
 			defer cacher.Stop()
@@ -2127,7 +1831,7 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			backingStorage := &dummyStorage{}
+			backingStorage := &DummyStorage{}
 			cacher, _, err := newTestCacher(backingStorage)
 			require.NoError(t, err, "couldn't create cacher")
 

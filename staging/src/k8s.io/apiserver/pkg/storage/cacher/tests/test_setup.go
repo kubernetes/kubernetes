@@ -128,12 +128,12 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 	}
 }
 
-func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacher.TestCacher, tearDownFunc) {
-	ctx, c, _, tearDown := testSetupWithEtcdServer(t, opts...)
+func TestSetup(t *testing.T, opts ...setupOption) (context.Context, *cacher.TestCacher, tearDownFunc) {
+	ctx, c, _, tearDown := TestSetupWithEtcdServer(t, opts...)
 	return ctx, c, tearDown
 }
 
-func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *cacher.TestCacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
+func TestSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *cacher.TestCacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	// Inject one list error to make sure we test the relist case.
 	wrappedStorage := &storagetesting.StorageInjectingListErrors{
@@ -141,7 +141,7 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		Errors:    1,
 	}
 
-	c, err := newTestCacher(wrappedStorage, opts...)
+	c, err := NewTestCacher(wrappedStorage, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 	return ctx, c, server, terminate
 }
 
-func newTestCacher(s storage.Interface, opts ...setupOption) (*cacher.TestCacher, error) {
+func NewTestCacher(s storage.Interface, opts ...setupOption) (*cacher.TestCacher, error) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -187,7 +187,7 @@ func newTestCacher(s storage.Interface, opts ...setupOption) (*cacher.TestCacher
 }
 
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
-	_, c, _, tearDown := testSetupWithEtcdServer(t, opts...)
+	_, c, _, tearDown := TestSetupWithEtcdServer(t, opts...)
 
 	if err := c.WaitReady(context.TODO()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
@@ -241,7 +241,7 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func compactStorage(c *cacher.TestCacher, client *clientv3.Client) storagetesting.Compaction {
+func CompactStorage(c *cacher.TestCacher, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		err := c.Compact(ctx, client, resourceVersion)
 		if err != nil {

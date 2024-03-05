@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	goruntime "runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -355,4 +357,59 @@ func (s sortablePodList) Less(i, j int) bool {
 
 func (s sortablePodList) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
+}
+
+func VerifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictOrder bool) {
+	_, _, line, _ := goruntime.Caller(1)
+	actualEvents := make([]watch.Event, len(events))
+	for idx := range events {
+		select {
+		case event := <-w.ResultChan():
+			actualEvents[idx] = event
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Logf("(called from line %d)", line)
+			t.Errorf("Timed out waiting for an event")
+		}
+	}
+	validateEvents := func(expected, actual watch.Event) (bool, []string) {
+		errors := []string{}
+		if e, a := expected.Type, actual.Type; e != a {
+			errors = append(errors, fmt.Sprintf("Expected: %s, got: %s", e, a))
+		}
+		actualObject := actual.Object
+		if co, ok := actualObject.(runtime.CacheableObject); ok {
+			actualObject = co.GetObject()
+		}
+		if e, a := expected.Object, actualObject; !equality.Semantic.DeepEqual(e, a) {
+			errors = append(errors, fmt.Sprintf("Expected: %#v, got: %#v", e, a))
+		}
+		return len(errors) == 0, errors
+	}
+
+	if len(events) != len(actualEvents) {
+		t.Fatalf("unexpected number of events: %d, expected: %d, acutalEvents: %#v, expectedEvents:%#v", len(actualEvents), len(events), actualEvents, events)
+	}
+
+	if strictOrder {
+		for idx, expectedEvent := range events {
+			valid, errors := validateEvents(expectedEvent, actualEvents[idx])
+			if !valid {
+				t.Logf("(called from line %d)", line)
+				for _, err := range errors {
+					t.Errorf(err)
+				}
+			}
+		}
+	}
+	for _, expectedEvent := range events {
+		validated := false
+		for _, actualEvent := range actualEvents {
+			if validated, _ = validateEvents(expectedEvent, actualEvent); validated {
+				break
+			}
+		}
+		if !validated {
+			t.Fatalf("Expected: %#v but didn't find", expectedEvent)
+		}
+	}
 }

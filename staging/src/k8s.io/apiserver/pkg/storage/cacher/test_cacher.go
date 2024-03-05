@@ -36,6 +36,14 @@ func (c *TestCacher) NewFunc() runtime.Object {
 	return c.newFunc()
 }
 
+func (c *TestCacher) ResourcePrefix() string {
+	return c.resourcePrefix
+}
+
+func (c *TestCacher) AddObject(obj runtime.Object) error {
+	return c.watchCache.Add(obj)
+}
+
 func (c *TestCacher) WaitForEtcdBookmark(ctx context.Context) func() (uint64, error) {
 	opts := storage.ListOptions{ResourceVersion: "", Predicate: storage.Everything, Recursive: true}
 	opts.Predicate.AllowWatchBookmarks = true

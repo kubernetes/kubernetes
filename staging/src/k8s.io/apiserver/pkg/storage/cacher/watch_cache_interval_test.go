@@ -61,7 +61,7 @@ func generateEvents(start, end int) []*watchCacheEvent {
 	for i := 0; i < n; i++ {
 		events[i] = &watchCacheEvent{
 			Type:   watch.Added,
-			Object: makeTestPod(fmt.Sprintf("pod%d", start+i), uint64(start+i)),
+			Object: MakeTestPod(fmt.Sprintf("pod%d", start+i), uint64(start+i)),
 		}
 	}
 	return events
@@ -144,9 +144,9 @@ func TestIntervalBufferNext(t *testing.T) {
 		{
 			name: "buffer has elements",
 			events: []*watchCacheEvent{
-				{Type: watch.Added, Object: makeTestPod("pod1", 1)},
-				{Type: watch.Added, Object: makeTestPod("pod2", 2)},
-				{Type: watch.Modified, Object: makeTestPod("pod3", 3)},
+				{Type: watch.Added, Object: MakeTestPod("pod1", 1)},
+				{Type: watch.Added, Object: MakeTestPod("pod2", 2)},
+				{Type: watch.Modified, Object: MakeTestPod("pod3", 3)},
 			},
 		},
 		{
@@ -286,10 +286,10 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			wc := newTestWatchCache(capacity, &cache.Indexers{})
+			wc := NewTestWatchCache(capacity, &cache.Indexers{})
 			defer wc.Stop()
 			for i := 0; i < c.eventsAddedToWatchcache; i++ {
-				wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
+				wc.Add(MakeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
 			}
 			indexerFunc := func(i int) *watchCacheEvent {
 				return wc.cache[i%wc.capacity]
@@ -375,7 +375,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
 	for i := 0; i < numEvents; i++ {
-		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
+		elem := makeTestStoreElement(MakeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
 		objLabels, objFields, err := getAttrsFunc(elem.Object)
 		if err != nil {
 			t.Fatal(err)

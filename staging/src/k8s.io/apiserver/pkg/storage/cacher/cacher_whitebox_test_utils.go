@@ -76,28 +76,28 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 	return cacher, storage.APIObjectVersioner{}, err
 }
 
-type dummyStorage struct {
+type DummyStorage struct {
 	sync.RWMutex
-	err       error
-	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
-	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+	Err       error
+	GetListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
+	WatchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 
-	// use getRequestWatchProgressCounter when reading
+	// use GetRequestWatchProgressCounter when reading
 	// the value of the counter
-	requestWatchProgressCounter int
+	RequestWatchProgressCounter int
 }
 
-func (d *dummyStorage) RequestWatchProgress(ctx context.Context) error {
+func (d *DummyStorage) RequestWatchProgress(ctx context.Context) error {
 	d.Lock()
 	defer d.Unlock()
-	d.requestWatchProgressCounter++
+	d.RequestWatchProgressCounter++
 	return nil
 }
 
-func (d *dummyStorage) getRequestWatchProgressCounter() int {
+func (d *DummyStorage) GetRequestWatchProgressCounter() int {
 	d.RLock()
 	defer d.RUnlock()
-	return d.requestWatchProgressCounter
+	return d.RequestWatchProgressCounter
 }
 
 type dummyWatch struct {
@@ -118,47 +118,47 @@ func newDummyWatch() watch.Interface {
 	}
 }
 
-func (d *dummyStorage) Versioner() storage.Versioner { return nil }
-func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
+func (d *DummyStorage) Versioner() storage.Versioner { return nil }
+func (d *DummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object) error {
+func (d *DummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
-	if d.watchFn != nil {
-		return d.watchFn(ctx, key, opts)
+func (d *DummyStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if d.WatchFn != nil {
+		return d.WatchFn(ctx, key, opts)
 	}
 	d.RLock()
 	defer d.RUnlock()
 
-	return newDummyWatch(), d.err
+	return newDummyWatch(), d.Err
 }
-func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
+func (d *DummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
 	d.RLock()
 	defer d.RUnlock()
 
-	return d.err
+	return d.Err
 }
-func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
-	if d.getListFn != nil {
-		return d.getListFn(ctx, resPrefix, opts, listObj)
+func (d *DummyStorage) GetList(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
+	if d.GetListFn != nil {
+		return d.GetListFn(ctx, resPrefix, opts, listObj)
 	}
 	d.RLock()
 	defer d.RUnlock()
 	podList := listObj.(*example.PodList)
 	podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
-	return d.err
+	return d.Err
 }
-func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
+func (d *DummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Count(_ string) (int64, error) {
+func (d *DummyStorage) Count(_ string) (int64, error) {
 	return 0, fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) injectError(err error) {
+func (d *DummyStorage) injectError(err error) {
 	d.Lock()
 	defer d.Unlock()
 
-	d.err = err
+	d.Err = err
 }

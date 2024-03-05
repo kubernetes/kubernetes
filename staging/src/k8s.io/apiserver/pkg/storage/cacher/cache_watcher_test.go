@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	testing2 "k8s.io/apiserver/pkg/storage/testing"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
@@ -247,7 +248,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 }
 
 func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
-	backingStorage := &dummyStorage{}
+	backingStorage := &DummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -296,7 +297,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 	store := cache.NewIndexer(storeElementKey, storeElementIndexers(nil))
 
 	for i := 0; i < numObjects; i++ {
-		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))
+		elem := makeTestStoreElement(MakeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))
 		store.Add(elem)
 	}
 
@@ -315,7 +316,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 	// via channel again.
 	event := &watchCacheEvent{
 		Type:            watch.Added,
-		Object:          makeTestPod(fmt.Sprintf("pod-%d", numObjects-1), uint64(numObjects-1)),
+		Object:          MakeTestPod(fmt.Sprintf("pod-%d", numObjects-1), uint64(numObjects-1)),
 		ResourceVersion: uint64(numObjects - 1),
 	}
 	if !w.add(event, time.NewTimer(time.Second)) {
@@ -572,7 +573,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if !w.stopped {
 		t.Fatal("expected the watcher to be stopped but it wasn't")
 	}
-	verifyEvents(t, w, []watch.Event{
+	testing2.VerifyEvents(t, w, []watch.Event{
 		{Type: watch.Added, Object: makePod(1)},
 		{Type: watch.Added, Object: makePod(2)},
 		{Type: watch.Added, Object: makePod(5)},

@@ -41,15 +41,15 @@ import (
 )
 
 const (
-	// blockTimeout determines how long we're willing to block the request
+	// BlockTimeout determines how long we're willing to block the request
 	// to wait for a given resource version to be propagated to cache,
 	// before terminating request and returning Timeout error with retry
 	// after suggestion.
-	blockTimeout = 3 * time.Second
+	BlockTimeout = 3 * time.Second
 
-	// resourceVersionTooHighRetrySeconds is the seconds before a operation should be retried by the client
+	// ResourceVersionTooHighRetrySeconds is the seconds before a operation should be retried by the client
 	// after receiving a 'too high resource version' error.
-	resourceVersionTooHighRetrySeconds = 1
+	ResourceVersionTooHighRetrySeconds = 1
 
 	// eventFreshDuration is time duration of events we want to keep.
 	// We set it to `defaultBookmarkFrequency` plus epsilon to maximize
@@ -462,7 +462,7 @@ func (w *watchCache) waitUntilFreshAndBlock(ctx context.Context, resourceVersion
 			// it will wake up the loop below sometime after the broadcast,
 			// we don't need to worry about waking it up before the time
 			// has expired accidentally.
-			<-w.clock.After(blockTimeout)
+			<-w.clock.After(BlockTimeout)
 			w.cond.Broadcast()
 		}()
 	}
@@ -471,9 +471,9 @@ func (w *watchCache) waitUntilFreshAndBlock(ctx context.Context, resourceVersion
 	span := tracing.SpanFromContext(ctx)
 	span.AddEvent("watchCache locked acquired")
 	for w.resourceVersion < resourceVersion {
-		if w.clock.Since(startTime) >= blockTimeout {
-			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
-			return storage.NewTooLargeResourceVersionError(resourceVersion, w.resourceVersion, resourceVersionTooHighRetrySeconds)
+		if w.clock.Since(startTime) >= BlockTimeout {
+			// Request that the client retry after 'ResourceVersionTooHighRetrySeconds' seconds.
+			return storage.NewTooLargeResourceVersionError(resourceVersion, w.resourceVersion, ResourceVersionTooHighRetrySeconds)
 		}
 		w.cond.Wait()
 	}
