@@ -1342,7 +1342,8 @@ var _ = SIGDescribe("StatefulSet", func() {
         // force readiness probe to fail by using breaking the HTTP probe, so number of maxUnavailable can be checked
         ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
             update.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
-            breakHTTPProbe(ctx, c, update)
+            err := breakHTTPProbe(ctx, c, update)
+	        framework.ExpectNoError(err)
 		})
 
         podsReadyCount := len(e2estatefulset.GetPodReadyList(ctx, c, ss).Items)
@@ -1351,7 +1352,8 @@ var _ = SIGDescribe("StatefulSet", func() {
         gomega.Expect(int32(podsReadyCount)).To(gomega.Equal(replicas - maxUnavailable.IntVal))
 
         // resume the update
-        restoreHTTPProbe(ctx, c, ss)
+        err = restoreHTTPProbe(ctx, c, ss)
+	    framework.ExpectNoError(err)
         e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
 		framework.ExpectNoError(err)
 
@@ -1389,7 +1391,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 	    framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
 
         // break the HTTP probe so it reflects maxUnavailable after updating
-        breakHTTPProbe(ctx, c, ss)
+        err = breakHTTPProbe(ctx, c, ss)
+	    framework.ExpectNoError(err)
         // update the image so it triggers the update strategy
         ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
             update.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
@@ -1406,7 +1409,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 
         // restore the HTTP probe, which will allow the update to carry on
         // assert all pods are in the new version
-        restoreHTTPProbe(ctx, c, ss)
+        err = restoreHTTPProbe(ctx, c, ss)
+	    framework.ExpectNoError(err)
         err = e2epod.VerifyPodsRunning(ctx, c, ns, "sample-pod", false, replicas)
 	    framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
         pods = e2estatefulset.GetPodList(ctx, c, ss)
