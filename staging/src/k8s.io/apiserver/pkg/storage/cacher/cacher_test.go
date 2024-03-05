@@ -393,12 +393,12 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 	}
 }
 
-func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *TestCacher, tearDownFunc) {
 	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 	return ctx, cacher, tearDown
 }
 
-func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
+func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *TestCacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -441,20 +441,20 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
-	return ctx, cacher, server, terminate
+	return ctx, &TestCacher{Cacher: cacher}, server, terminate
 }
 
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
 	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 
-	if err := cacher.ready.wait(context.TODO()); err != nil {
+	if err := cacher.WaitReady(context.TODO()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
-	return &createWrapper{Cacher: cacher}, tearDown
+	return &createWrapper{TestCacher: cacher}, tearDown
 }
 
 type createWrapper struct {
-	*Cacher
+	*TestCacher
 }
 
 func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
@@ -462,7 +462,7 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 		return err
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		currentObj := c.Cacher.newFunc()
+		currentObj := c.NewFunc()
 		err := c.Cacher.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
 		if err != nil {
 			if storage.IsNotFound(err) {
