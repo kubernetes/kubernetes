@@ -27,6 +27,12 @@ const ContentTypeOpenAPIV3PB = "application/com.github.proto-openapi.spec.v3@v1.
 
 type GroupVersion interface {
 	Schema(contentType string) ([]byte, error)
+
+	// ServerRelativeURL. Returns the path and parameters used to fetch the schema.
+	// You should use the Schema method to fetch it, but this value can be used
+	// to key the current version of the schema in a cache since it contains a
+	// hash string which changes upon schema update.
+	ServerRelativeURL() string
 }
 
 type groupversion struct {
@@ -67,4 +73,10 @@ func (g *groupversion) Schema(contentType string) ([]byte, error) {
 	}
 
 	return path.Do(context.TODO()).Raw()
+}
+
+// URL used for fetching the schema. The URL includes a hash and can be used
+// to key the current version of the schema in a cache.
+func (g *groupversion) ServerRelativeURL() string {
+	return g.item.ServerRelativeURL
 }

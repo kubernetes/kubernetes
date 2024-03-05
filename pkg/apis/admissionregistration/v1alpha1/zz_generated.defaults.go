@@ -31,6 +31,18 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&v1alpha1.MutatingAdmissionPolicy{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingAdmissionPolicy(obj.(*v1alpha1.MutatingAdmissionPolicy))
+	})
+	scheme.AddTypeDefaultingFunc(&v1alpha1.MutatingAdmissionPolicyBinding{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingAdmissionPolicyBinding(obj.(*v1alpha1.MutatingAdmissionPolicyBinding))
+	})
+	scheme.AddTypeDefaultingFunc(&v1alpha1.MutatingAdmissionPolicyBindingList{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingAdmissionPolicyBindingList(obj.(*v1alpha1.MutatingAdmissionPolicyBindingList))
+	})
+	scheme.AddTypeDefaultingFunc(&v1alpha1.MutatingAdmissionPolicyList{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingAdmissionPolicyList(obj.(*v1alpha1.MutatingAdmissionPolicyList))
+	})
 	scheme.AddTypeDefaultingFunc(&v1alpha1.ValidatingAdmissionPolicy{}, func(obj interface{}) {
 		SetObjectDefaults_ValidatingAdmissionPolicy(obj.(*v1alpha1.ValidatingAdmissionPolicy))
 	})
@@ -44,6 +56,56 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 		SetObjectDefaults_ValidatingAdmissionPolicyList(obj.(*v1alpha1.ValidatingAdmissionPolicyList))
 	})
 	return nil
+}
+
+func SetObjectDefaults_MutatingAdmissionPolicy(in *v1alpha1.MutatingAdmissionPolicy) {
+	SetDefaults_MutatingAdmissionPolicySpec(&in.Spec)
+	if in.Spec.MatchConstraints != nil {
+		SetDefaults_MatchResources(in.Spec.MatchConstraints)
+		for i := range in.Spec.MatchConstraints.ResourceRules {
+			a := &in.Spec.MatchConstraints.ResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+		for i := range in.Spec.MatchConstraints.ExcludeResourceRules {
+			a := &in.Spec.MatchConstraints.ExcludeResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+	}
+	for i := range in.Spec.Mutations {
+		a := &in.Spec.Mutations[i]
+		SetDefaults_Mutation(a)
+	}
+}
+
+func SetObjectDefaults_MutatingAdmissionPolicyBinding(in *v1alpha1.MutatingAdmissionPolicyBinding) {
+	if in.Spec.ParamRef != nil {
+		SetDefaults_ParamRef(in.Spec.ParamRef)
+	}
+	if in.Spec.MatchResources != nil {
+		SetDefaults_MatchResources(in.Spec.MatchResources)
+		for i := range in.Spec.MatchResources.ResourceRules {
+			a := &in.Spec.MatchResources.ResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+		for i := range in.Spec.MatchResources.ExcludeResourceRules {
+			a := &in.Spec.MatchResources.ExcludeResourceRules[i]
+			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+		}
+	}
+}
+
+func SetObjectDefaults_MutatingAdmissionPolicyBindingList(in *v1alpha1.MutatingAdmissionPolicyBindingList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_MutatingAdmissionPolicyBinding(a)
+	}
+}
+
+func SetObjectDefaults_MutatingAdmissionPolicyList(in *v1alpha1.MutatingAdmissionPolicyList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_MutatingAdmissionPolicy(a)
+	}
 }
 
 func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1alpha1.ValidatingAdmissionPolicy) {

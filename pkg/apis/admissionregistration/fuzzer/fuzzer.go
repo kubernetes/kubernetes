@@ -107,5 +107,19 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.ParameterNotFoundAction = &v
 			}
 		},
+		func(obj *admissionregistration.MutatingAdmissionPolicySpec, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.FailurePolicy == nil {
+				p := admissionregistration.FailurePolicyType("Fail")
+				obj.FailurePolicy = &p
+			}
+		},
+		func(obj *admissionregistration.Mutation, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.ReinvocationPolicy == nil {
+				r := admissionregistration.NeverReinvocationPolicy
+				obj.ReinvocationPolicy = &r
+			}
+		},
 	}
 }

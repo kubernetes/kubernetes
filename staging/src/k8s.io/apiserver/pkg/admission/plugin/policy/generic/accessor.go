@@ -26,6 +26,7 @@ type PolicyAccessor interface {
 	GetNamespace() string
 	GetParamKind() *v1beta1.ParamKind
 	GetMatchConstraints() *v1beta1.MatchResources
+	GetFailurePolicy() *v1beta1.FailurePolicyType
 }
 
 type BindingAccessor interface {
