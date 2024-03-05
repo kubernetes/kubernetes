@@ -649,9 +649,9 @@ func (jm *Controller) syncOrphanPod(ctx context.Context, key string) error {
 	if controllerRef := metav1.GetControllerOf(sharedPod); controllerRef != nil {
 		job := jm.resolveControllerRef(sharedPod.Namespace, controllerRef)
 		if job != nil {
-			// Skip cleanup of finalizers for pods owned by a job managed by an external controller/
+			// Skip cleanup of finalizers for pods owned by a job managed by an external controller
 			if controllerName := managedByExternalController(job); controllerName != nil {
-				logger.V(2).Info("Skip cleanup of the job finalizer for job owned by an external controller", "key", key, "uid", job.UID, "controllerName", controllerName)
+				logger.V(2).Info("Skip cleanup of the job finalizer for a pod owned by a job that is managed by an external controller", "key", key, "podUID", sharedPod.UID, "jobUID", job.UID, "controllerName", controllerName)
 				return nil
 			}
 		}
