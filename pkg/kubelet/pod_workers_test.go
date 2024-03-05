@@ -220,10 +220,10 @@ func (q *fakeQueue) Items() []FakeQueueItem {
 	return append(make([]FakeQueueItem, 0, len(q.queue)), q.queue...)
 }
 
-func (q *fakeQueue) Set() sets.String {
+func (q *fakeQueue) Set() sets.Set[string] {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	work := sets.NewString()
+	work := sets.New[string]()
 	for _, item := range q.queue[q.currentStart:] {
 		work.Insert(string(item.UID))
 	}
@@ -476,7 +476,7 @@ func drainWorkers(podWorkers *podWorkers, numPods int) {
 }
 
 func drainWorkersExcept(podWorkers *podWorkers, uids ...types.UID) {
-	set := sets.NewString()
+	set := sets.New[string]()
 	for _, uid := range uids {
 		set.Insert(string(uid))
 	}
@@ -982,8 +982,8 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	}
 }
 
-func newUIDSet(uids ...types.UID) sets.String {
-	set := sets.NewString()
+func newUIDSet(uids ...types.UID) sets.Set[string] {
+	set := sets.New[string]()
 	for _, uid := range uids {
 		set.Insert(string(uid))
 	}
@@ -993,7 +993,7 @@ func newUIDSet(uids ...types.UID) sets.String {
 type terminalPhaseSync struct {
 	lock     sync.Mutex
 	fn       syncPodFnType
-	terminal sets.String
+	terminal sets.Set[string]
 }
 
 func (s *terminalPhaseSync) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
@@ -1018,7 +1018,7 @@ func (s *terminalPhaseSync) SetTerminal(uid types.UID) {
 func newTerminalPhaseSync(fn syncPodFnType) *terminalPhaseSync {
 	return &terminalPhaseSync{
 		fn:       fn,
-		terminal: sets.NewString(),
+		terminal: sets.New[string](),
 	}
 }
 
@@ -1171,7 +1171,7 @@ func TestStaticPodExclusion(t *testing.T) {
 		t.Fatalf("unexpected waiting static pods: %s", cmp.Diff(e, a))
 	}
 	// verify all are enqueued
-	if e, a := sets.NewString("1-normal", "2-static", "4-static", "3-static"), podWorkers.workQueue.(*fakeQueue).Set(); !e.Equal(a) {
+	if e, a := sets.New("1-normal", "2-static", "4-static", "3-static"), podWorkers.workQueue.(*fakeQueue).Set(); !e.Equal(a) {
 		t.Fatalf("unexpected queued items: %s", cmp.Diff(e, a))
 	}
 
@@ -1191,7 +1191,7 @@ func TestStaticPodExclusion(t *testing.T) {
 		t.Fatalf("unexpected waiting static pods: %s", cmp.Diff(e, a))
 	}
 	// the queue should include a single item for 3-static (indicating we need to retry later)
-	if e, a := sets.NewString("3-static"), newUIDSet(podWorkers.workQueue.GetWork()...); !reflect.DeepEqual(e, a) {
+	if e, a := sets.New("3-static"), newUIDSet(podWorkers.workQueue.GetWork()...); !reflect.DeepEqual(e, a) {
 		t.Fatalf("unexpected queued items: %s", cmp.Diff(e, a))
 	}
 
@@ -1209,7 +1209,7 @@ func TestStaticPodExclusion(t *testing.T) {
 		t.Fatalf("unexpected pod state: %#v", pod3)
 	}
 	// the queue should be empty because the worker is now done
-	if e, a := sets.NewString(), newUIDSet(podWorkers.workQueue.GetWork()...); !reflect.DeepEqual(e, a) {
+	if e, a := sets.New[string](), newUIDSet(podWorkers.workQueue.GetWork()...); !reflect.DeepEqual(e, a) {
 		t.Fatalf("unexpected queued items: %s", cmp.Diff(e, a))
 	}
 	// 2-static is still running

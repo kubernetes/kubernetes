@@ -455,7 +455,7 @@ func TestPodConfigRace(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
 	config := NewPodConfig(PodConfigNotificationIncremental, eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
-	seenSources := sets.NewString(TestSource)
+	seenSources := sets.New(TestSource)
 	var wg sync.WaitGroup
 	const iterations = 100
 	wg.Add(2)

@@ -246,8 +246,8 @@ func verifyPods(a, b []*kubecontainer.Pod) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.String) (sets.String, bool) {
-	actual := sets.NewString()
+func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.Set[string]) (sets.Set[string], bool) {
+	actual := sets.New[string]()
 	for _, c := range fakeRuntime.Containers {
 		actual.Insert(c.Id)
 	}
@@ -741,7 +741,7 @@ func TestPruneInitContainers(t *testing.T) {
 	assert.NoError(t, err)
 
 	m.pruneInitContainersBeforeStart(ctx, pod, podStatus)
-	expectedContainers := sets.NewString(fakes[0].Id, fakes[2].Id)
+	expectedContainers := sets.New(fakes[0].Id, fakes[2].Id)
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %v, got %v", expectedContainers, actual)
 	}
