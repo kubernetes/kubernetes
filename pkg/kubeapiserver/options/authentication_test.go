@@ -214,9 +214,9 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "number of webhook retry attempts must be greater than 0, but is: 0",
 		},
 		{
-			name:                         "test when authentication config file is set without feature gate",
+			name:                         "test when authentication config file is set (feature gate enabled by default)",
 			testAuthenticationConfigFile: "configfile",
-			expectErr:                    "set --feature-gates=StructuredAuthenticationConfiguration=true to use authentication-config file",
+			expectErr:                    "",
 		},
 		{
 			name:                         "test when authentication config file and oidc-* flags are set",

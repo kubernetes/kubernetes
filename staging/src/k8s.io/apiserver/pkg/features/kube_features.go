@@ -234,6 +234,7 @@ const (
 	// owner: @aramase, @enj, @nabokihms
 	// kep: https://kep.k8s.io/3331
 	// alpha: v1.29
+	// beta: v1.30
 	//
 	// Enables Structured Authentication Configuration
 	StructuredAuthenticationConfiguration featuregate.Feature = "StructuredAuthenticationConfiguration"
@@ -337,7 +338,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
 
-	StructuredAuthenticationConfiguration: {Default: false, PreRelease: featuregate.Alpha},
+	StructuredAuthenticationConfiguration: {Default: true, PreRelease: featuregate.Beta},
 
 	StructuredAuthorizationConfiguration: {Default: true, PreRelease: featuregate.Beta},
 
