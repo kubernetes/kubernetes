@@ -214,10 +214,6 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 			// Merge the kubelet configurations if --config-dir is set
 			if len(kubeletFlags.KubeletDropinConfigDirectory) > 0 {
-				_, ok := os.LookupEnv("KUBELET_CONFIG_DROPIN_DIR_ALPHA")
-				if !ok {
-					return fmt.Errorf("flag %s specified but environment variable KUBELET_CONFIG_DROPIN_DIR_ALPHA not set, cannot start kubelet", kubeletFlags.KubeletDropinConfigDirectory)
-				}
 				if err := mergeKubeletConfigurations(kubeletConfig, kubeletFlags.KubeletDropinConfigDirectory); err != nil {
 					return fmt.Errorf("failed to merge kubelet configs: %w", err)
 				}
