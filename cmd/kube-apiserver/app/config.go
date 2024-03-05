@@ -18,6 +18,9 @@ package app
 
 import (
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/webhook"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -36,6 +39,7 @@ type Config struct {
 }
 
 type ExtraConfig struct {
+	GroupVersionResourceStorageMap map[schema.GroupVersionResource]rest.Storage
 }
 
 type completedConfig struct {
@@ -66,29 +70,29 @@ func (c *Config) Complete() (CompletedConfig, error) {
 }
 
 // NewConfig creates all the resources for running kube-apiserver, but runs none of them.
-func NewConfig(opts options.CompletedOptions) (*Config, error) {
+func NewConfig(opts options.CompletedOptions) (*Config, []admission.PluginInitializer, error) {
 	c := &Config{
 		Options: opts,
 	}
 
 	controlPlane, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(opts)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	c.ControlPlane = controlPlane
 
 	apiExtensions, err := apiserver.CreateAPIExtensionsConfig(*controlPlane.GenericConfig, controlPlane.ExtraConfig.VersionedInformers, pluginInitializer, opts.CompletedOptions, opts.MasterCount,
 		serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(controlPlane.ExtraConfig.ProxyTransport, controlPlane.GenericConfig.EgressSelector, controlPlane.GenericConfig.LoopbackClientConfig, controlPlane.GenericConfig.TracerProvider))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	c.ApiExtensions = apiExtensions
 
 	aggregator, err := createAggregatorConfig(*controlPlane.GenericConfig, opts.CompletedOptions, controlPlane.ExtraConfig.VersionedInformers, serviceResolver, controlPlane.ExtraConfig.ProxyTransport, controlPlane.ExtraConfig.PeerProxy, pluginInitializer)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	c.Aggregator = aggregator
 
-	return c, nil
+	return c, pluginInitializer, nil
 }
