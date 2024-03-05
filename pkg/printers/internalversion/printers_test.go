@@ -2527,8 +2527,8 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job1", "1/2", "", "0s"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job1", "Running", "1/2", "", "0s"}}},
 		},
 		// Generate table rows for Job with generate options "Wide".
 		{
@@ -2560,10 +2560,10 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Completions, Duration, Age, Containers, Images, Selectors
+			// Columns: Name, Status, Completions, Duration, Age, Containers, Images, Selectors
 			expected: []metav1.TableRow{
 				{
-					Cells: []interface{}{"job1", "1/2", "", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "job-label=job-label-value"},
+					Cells: []interface{}{"job1", "Running", "1/2", "", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "job-label=job-label-value"},
 				},
 			},
 		},
@@ -2582,8 +2582,8 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job2", "0/1", "", "10y"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job2", "Running", "0/1", "", "10y"}}},
 		},
 		// Job with duration.
 		{
@@ -2602,8 +2602,8 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job3", "0/1", "30m", "10y"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job3", "Running", "0/1", "30m", "10y"}}},
 		},
 		{
 			job: batch.Job{
@@ -2620,8 +2620,115 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "0/1", "20m", "10y"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "Running", "0/1", "20m", "10y"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job5",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job5", "Complete", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job6",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job6", "Failed", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job7",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job7", "Suspended", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job8",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job8", "FailureTarget", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job9",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					DeletionTimestamp: &metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job9", "Terminating", "0/1", "", "0s"}}},
 		},
 	}
 
@@ -2701,10 +2808,10 @@ func TestPrintJobList(t *testing.T) {
 		},
 	}
 
-	// Columns: Name, Completions, Duration, Age
+	// Columns: Name, Status, Completions, Duration, Age
 	expectedRows := []metav1.TableRow{
-		{Cells: []interface{}{"job1", "1/2", "", "0s"}},
-		{Cells: []interface{}{"job2", "2/2", "20m", "0s"}},
+		{Cells: []interface{}{"job1", "Running", "1/2", "", "0s"}},
+		{Cells: []interface{}{"job2", "Running", "2/2", "20m", "0s"}},
 	}
 
 	rows, err := printJobList(&jobList, printers.GenerateOptions{})
