@@ -241,6 +241,7 @@ const (
 	// owner: @palnabarun
 	// kep: https://kep.k8s.io/3221
 	// alpha: v1.29
+	// beta: v1.30
 	//
 	// Enables Structured Authorization Configuration
 	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
@@ -338,7 +339,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StructuredAuthenticationConfiguration: {Default: false, PreRelease: featuregate.Alpha},
 
-	StructuredAuthorizationConfiguration: {Default: false, PreRelease: featuregate.Alpha},
+	StructuredAuthorizationConfiguration: {Default: true, PreRelease: featuregate.Beta},
 
 	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
 
