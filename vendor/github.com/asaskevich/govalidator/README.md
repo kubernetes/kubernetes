@@ -1,7 +1,8 @@
 govalidator
 ===========
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/asaskevich/govalidator?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge) [![GoDoc](https://godoc.org/github.com/asaskevich/govalidator?status.png)](https://godoc.org/github.com/asaskevich/govalidator) [![Coverage Status](https://img.shields.io/coveralls/asaskevich/govalidator.svg)](https://coveralls.io/r/asaskevich/govalidator?branch=master) [![wercker status](https://app.wercker.com/status/1ec990b09ea86c910d5f08b0e02c6043/s "wercker status")](https://app.wercker.com/project/bykey/1ec990b09ea86c910d5f08b0e02c6043)
-[![Build Status](https://travis-ci.org/asaskevich/govalidator.svg?branch=master)](https://travis-ci.org/asaskevich/govalidator) [![Go Report Card](https://goreportcard.com/badge/github.com/asaskevich/govalidator)](https://goreportcard.com/report/github.com/asaskevich/govalidator) [![GoSearch](http://go-search.org/badge?id=github.com%2Fasaskevich%2Fgovalidator)](http://go-search.org/view?id=github.com%2Fasaskevich%2Fgovalidator) [![Backers on Open Collective](https://opencollective.com/govalidator/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/govalidator/sponsors/badge.svg)](#sponsors) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fasaskevich%2Fgovalidator.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fasaskevich%2Fgovalidator?ref=badge_shield)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/asaskevich/govalidator?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge) [![GoDoc](https://godoc.org/github.com/asaskevich/govalidator?status.png)](https://godoc.org/github.com/asaskevich/govalidator)
+[![Build Status](https://travis-ci.org/asaskevich/govalidator.svg?branch=master)](https://travis-ci.org/asaskevich/govalidator)
+[![Coverage](https://codecov.io/gh/asaskevich/govalidator/branch/master/graph/badge.svg)](https://codecov.io/gh/asaskevich/govalidator) [![Go Report Card](https://goreportcard.com/badge/github.com/asaskevich/govalidator)](https://goreportcard.com/report/github.com/asaskevich/govalidator) [![GoSearch](http://go-search.org/badge?id=github.com%2Fasaskevich%2Fgovalidator)](http://go-search.org/view?id=github.com%2Fasaskevich%2Fgovalidator) [![Backers on Open Collective](https://opencollective.com/govalidator/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/govalidator/sponsors/badge.svg)](#sponsors) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fasaskevich%2Fgovalidator.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fasaskevich%2Fgovalidator?ref=badge_shield)
 
 A package of validators and sanitizers for strings, structs and collections. Based on [validator.js](https://github.com/chriso/validator.js).
 
@@ -13,7 +14,7 @@ Type the following command in your terminal:
 
 or you can get specified release of the package with `gopkg.in`:
 
-	go get gopkg.in/asaskevich/govalidator.v4
+	go get gopkg.in/asaskevich/govalidator.v10
 
 After it the package is ready to use.
 
@@ -83,14 +84,14 @@ This was changed to prevent data races when accessing custom validators.
 import "github.com/asaskevich/govalidator"
 
 // before
-govalidator.CustomTypeTagMap["customByteArrayValidator"] = CustomTypeValidator(func(i interface{}, o interface{}) bool {
+govalidator.CustomTypeTagMap["customByteArrayValidator"] = func(i interface{}, o interface{}) bool {
   // ...
-})
+}
 
 // after
-govalidator.CustomTypeTagMap.Set("customByteArrayValidator", CustomTypeValidator(func(i interface{}, o interface{}) bool {
+govalidator.CustomTypeTagMap.Set("customByteArrayValidator", func(i interface{}, o interface{}) bool {
   // ...
-}))
+})
 ```
 
 #### List of functions:
@@ -108,23 +109,34 @@ func Filter(array []interface{}, iterator ConditionIterator) []interface{}
 func Find(array []interface{}, iterator ConditionIterator) interface{}
 func GetLine(s string, index int) (string, error)
 func GetLines(s string) []string
-func InRange(value, left, right float64) bool
+func HasLowerCase(str string) bool
+func HasUpperCase(str string) bool
+func HasWhitespace(str string) bool
+func HasWhitespaceOnly(str string) bool
+func InRange(value interface{}, left interface{}, right interface{}) bool
+func InRangeFloat32(value, left, right float32) bool
+func InRangeFloat64(value, left, right float64) bool
+func InRangeInt(value, left, right interface{}) bool
 func IsASCII(str string) bool
 func IsAlpha(str string) bool
 func IsAlphanumeric(str string) bool
 func IsBase64(str string) bool
 func IsByteLength(str string, min, max int) bool
 func IsCIDR(str string) bool
+func IsCRC32(str string) bool
+func IsCRC32b(str string) bool
 func IsCreditCard(str string) bool
 func IsDNSName(str string) bool
 func IsDataURI(str string) bool
 func IsDialString(str string) bool
 func IsDivisibleBy(str, num string) bool
 func IsEmail(str string) bool
+func IsExistingEmail(email string) bool
 func IsFilePath(str string) (bool, int)
 func IsFloat(str string) bool
 func IsFullWidth(str string) bool
 func IsHalfWidth(str string) bool
+func IsHash(str string, algorithm string) bool
 func IsHexadecimal(str string) bool
 func IsHexcolor(str string) bool
 func IsHost(str string) bool
@@ -136,22 +148,27 @@ func IsISBN10(str string) bool
 func IsISBN13(str string) bool
 func IsISO3166Alpha2(str string) bool
 func IsISO3166Alpha3(str string) bool
+func IsISO4217(str string) bool
 func IsISO693Alpha2(str string) bool
 func IsISO693Alpha3b(str string) bool
-func IsISO4217(str string) bool
 func IsIn(str string, params ...string) bool
+func IsInRaw(str string, params ...string) bool
 func IsInt(str string) bool
 func IsJSON(str string) bool
 func IsLatitude(str string) bool
 func IsLongitude(str string) bool
 func IsLowerCase(str string) bool
 func IsMAC(str string) bool
+func IsMD4(str string) bool
+func IsMD5(str string) bool
+func IsMagnetURI(str string) bool
 func IsMongoID(str string) bool
 func IsMultibyte(str string) bool
 func IsNatural(value float64) bool
 func IsNegative(value float64) bool
 func IsNonNegative(value float64) bool
 func IsNonPositive(value float64) bool
+func IsNotNull(str string) bool
 func IsNull(str string) bool
 func IsNumeric(str string) bool
 func IsPort(str string) bool
@@ -160,11 +177,24 @@ func IsPrintableASCII(str string) bool
 func IsRFC3339(str string) bool
 func IsRFC3339WithoutZone(str string) bool
 func IsRGBcolor(str string) bool
+func IsRegex(str string) bool
 func IsRequestURI(rawurl string) bool
 func IsRequestURL(rawurl string) bool
+func IsRipeMD128(str string) bool
+func IsRipeMD160(str string) bool
+func IsRsaPub(str string, params ...string) bool
+func IsRsaPublicKey(str string, keylen int) bool
+func IsSHA1(str string) bool
+func IsSHA256(str string) bool
+func IsSHA384(str string) bool
+func IsSHA512(str string) bool
 func IsSSN(str string) bool
 func IsSemver(str string) bool
+func IsTiger128(str string) bool
+func IsTiger160(str string) bool
+func IsTiger192(str string) bool
 func IsTime(str string, format string) bool
+func IsType(v interface{}, params ...string) bool
 func IsURL(str string) bool
 func IsUTFDigit(str string) bool
 func IsUTFLetter(str string) bool
@@ -174,16 +204,21 @@ func IsUUID(str string) bool
 func IsUUIDv3(str string) bool
 func IsUUIDv4(str string) bool
 func IsUUIDv5(str string) bool
+func IsULID(str string) bool
+func IsUnixTime(str string) bool
 func IsUpperCase(str string) bool
 func IsVariableWidth(str string) bool
 func IsWhole(value float64) bool
 func LeftTrim(str, chars string) string
 func Map(array []interface{}, iterator ResultIterator) []interface{}
 func Matches(str, pattern string) bool
+func MaxStringLength(str string, params ...string) bool
+func MinStringLength(str string, params ...string) bool
 func NormalizeEmail(str string) (string, error)
 func PadBoth(str string, padStr string, padLen int) string
 func PadLeft(str string, padStr string, padLen int) string
 func PadRight(str string, padStr string, padLen int) string
+func PrependPathToErrors(err error, path string) error
 func Range(str string, params ...string) bool
 func RemoveTags(s string) string
 func ReplacePattern(str, pattern, replace string) string
@@ -192,18 +227,21 @@ func RightTrim(str, chars string) string
 func RuneLength(str string, params ...string) bool
 func SafeFileName(str string) string
 func SetFieldsRequiredByDefault(value bool)
+func SetNilPtrAllowedByRequired(value bool)
 func Sign(value float64) float64
 func StringLength(str string, params ...string) bool
 func StringMatches(s string, params ...string) bool
 func StripLow(str string, keepNewLines bool) string
 func ToBoolean(str string) (bool, error)
 func ToFloat(str string) (float64, error)
-func ToInt(str string) (int64, error)
+func ToInt(value interface{}) (res int64, err error)
 func ToJSON(obj interface{}) (string, error)
 func ToString(obj interface{}) string
 func Trim(str, chars string) string
 func Truncate(str string, length int, ending string) string
+func TruncatingErrorf(str string, args ...interface{}) error
 func UnderscoreToCamelCase(s string) string
+func ValidateMap(inputMap map[string]interface{}, validationMap map[string]interface{}) (bool, error)
 func ValidateStruct(s interface{}) (bool, error)
 func WhiteList(str, chars string) string
 type ConditionIterator
@@ -214,6 +252,8 @@ type Errors
 func (es Errors) Error() string
 func (es Errors) Errors() []error
 type ISO3166Entry
+type ISO693Entry
+type InterfaceParamValidator
 type Iterator
 type ParamValidator
 type ResultIterator
@@ -226,6 +266,27 @@ type Validator
 ###### IsURL
 ```go
 println(govalidator.IsURL(`http://user@pass:domain.com/path/page`))
+```
+###### IsType
+```go
+println(govalidator.IsType("Bob", "string"))
+println(govalidator.IsType(1, "int"))
+i := 1
+println(govalidator.IsType(&i, "*int"))
+```
+
+IsType can be used through the tag `type` which is essential for map validation:
+```go
+type User	struct {
+  Name string      `valid:"type(string)"`
+  Age  int         `valid:"type(int)"`
+  Meta interface{} `valid:"type(string)"`
+}
+result, err := govalidator.ValidateStruct(User{"Bob", 20, "meta"})
+if err != nil {
+	println("error: " + err.Error())
+}
+println(result)
 ```
 ###### ToString
 ```go
@@ -323,6 +384,7 @@ Here is a list of available validators for struct fields (validator - used funct
 "rfc3339WithoutZone": IsRFC3339WithoutZone,
 "ISO3166Alpha2":      IsISO3166Alpha2,
 "ISO3166Alpha3":      IsISO3166Alpha3,
+"ulid":               IsULID,
 ```
 Validators with parameters
 
@@ -334,6 +396,13 @@ Validators with parameters
 "matches(pattern)": StringMatches,
 "in(string1|string2|...|stringN)": IsIn,
 "rsapub(keylength)" : IsRsaPub,
+"minstringlength(int): MinStringLength,
+"maxstringlength(int): MaxStringLength,
+```
+Validators with parameters for any type
+
+```go
+"type(type)": IsType,
 ```
 
 And here is small example of usage:
@@ -370,6 +439,41 @@ if err != nil {
 }
 println(result)
 ```
+###### ValidateMap [#2](https://github.com/asaskevich/govalidator/pull/338)
+If you want to validate maps, you can use the map to be validated and a validation map that contain the same tags used in ValidateStruct, both maps have to be in the form `map[string]interface{}`
+
+So here is small example of usage:
+```go
+var mapTemplate = map[string]interface{}{
+	"name":"required,alpha",
+	"family":"required,alpha",
+	"email":"required,email",
+	"cell-phone":"numeric",
+	"address":map[string]interface{}{
+		"line1":"required,alphanum",
+		"line2":"alphanum",
+		"postal-code":"numeric",
+	},
+}
+
+var inputMap = map[string]interface{}{
+	"name":"Bob",
+	"family":"Smith",
+	"email":"foo@bar.baz",
+	"address":map[string]interface{}{
+		"line1":"",
+		"line2":"",
+		"postal-code":"",
+	},
+}
+
+result, err := govalidator.ValidateMap(inputMap, mapTemplate)
+if err != nil {
+	println("error: " + err.Error())
+}
+println(result)
+```
+
 ###### WhiteList
 ```go
 // Remove all characters from string ignoring characters between "a" and "z"
@@ -389,7 +493,7 @@ type StructWithCustomByteArray struct {
   CustomMinLength int             `valid:"-"`
 }
 
-govalidator.CustomTypeTagMap.Set("customByteArrayValidator", CustomTypeValidator(func(i interface{}, context interface{}) bool {
+govalidator.CustomTypeTagMap.Set("customByteArrayValidator", func(i interface{}, context interface{}) bool {
   switch v := context.(type) { // you can type switch on the context interface being validated
   case StructWithCustomByteArray:
     // you can check and validate against some other field in the context,
@@ -409,14 +513,25 @@ govalidator.CustomTypeTagMap.Set("customByteArrayValidator", CustomTypeValidator
     }
   }
   return false
-}))
-govalidator.CustomTypeTagMap.Set("customMinLengthValidator", CustomTypeValidator(func(i interface{}, context interface{}) bool {
+})
+govalidator.CustomTypeTagMap.Set("customMinLengthValidator", func(i interface{}, context interface{}) bool {
   switch v := context.(type) { // this validates a field against the value in another field, i.e. dependent validation
   case StructWithCustomByteArray:
     return len(v.ID) >= v.CustomMinLength
   }
   return false
-}))
+})
+```
+
+###### Loop over Error()
+By default .Error() returns all errors in a single String. To access each error you can do this:
+```go
+  if err != nil {
+    errs := err.(govalidator.Errors).Errors()
+    for _, e := range errs {
+      fmt.Println(e.Error())
+    }
+  }
 ```
 
 ###### Custom error messages
@@ -445,7 +560,7 @@ If you don't know what to do, there are some features and functions that need to
 - [ ] Update actual [list of functions](https://github.com/asaskevich/govalidator#list-of-functions)
 - [ ] Update [list of validators](https://github.com/asaskevich/govalidator#validatestruct-2) that available for `ValidateStruct` and add new
 - [ ] Implement new validators: `IsFQDN`, `IsIMEI`, `IsPostalCode`, `IsISIN`, `IsISRC` etc
-- [ ] Implement [validation by maps](https://github.com/asaskevich/govalidator/issues/224)
+- [x] Implement [validation by maps](https://github.com/asaskevich/govalidator/issues/224)
 - [ ] Implement fuzzing testing
 - [ ] Implement some struct/map/array utilities
 - [ ] Implement map/array validation
@@ -475,7 +590,7 @@ This project exists thanks to all the people who contribute. [[Contribute](CONTR
 * [Matt Sanford](https://github.com/mzsanford)
 * [Simon ccl1115](https://github.com/ccl1115)
 
-<a href="graphs/contributors"><img src="https://opencollective.com/govalidator/contributors.svg?width=890" /></a>
+<a href="https://github.com/asaskevich/govalidator/graphs/contributors"><img src="https://opencollective.com/govalidator/contributors.svg?width=890" /></a>
 
 
 ### Backers

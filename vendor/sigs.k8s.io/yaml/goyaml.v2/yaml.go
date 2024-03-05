@@ -1,18 +1,3 @@
-//
-// Copyright (c) 2011-2019 Canonical Ltd
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 // Package yaml implements YAML support for the Go language.
 //
 // Source code and other details for the project are available at GitHub:
@@ -28,16 +13,23 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"unicode/utf8"
 )
 
-// The Unmarshaler interface may be implemented by types to customize their
-// behavior when being unmarshaled from a YAML document.
-type Unmarshaler interface {
-	UnmarshalYAML(value *Node) error
+// MapSlice encodes and decodes as a YAML map.
+// The order of keys is preserved when encoding and decoding.
+type MapSlice []MapItem
+
+// MapItem is an item in a MapSlice.
+type MapItem struct {
+	Key, Value interface{}
 }
 
-type obsoleteUnmarshaler interface {
+// The Unmarshaler interface may be implemented by types to customize their
+// behavior when being unmarshaled from a YAML document. The UnmarshalYAML
+// method receives a function that may be called to unmarshal the original
+// YAML value into a field or variable. It is safe to call the unmarshal
+// function parameter more than once if necessary.
+type Unmarshaler interface {
 	UnmarshalYAML(unmarshal func(interface{}) error) error
 }
 
@@ -89,10 +81,18 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 	return unmarshal(in, out, false)
 }
 
+// UnmarshalStrict is like Unmarshal except that any fields that are found
+// in the data that do not have corresponding struct members, or mapping
+// keys that are duplicates, will result in
+// an error.
+func UnmarshalStrict(in []byte, out interface{}) (err error) {
+	return unmarshal(in, out, true)
+}
+
 // A Decoder reads and decodes YAML values from an input stream.
 type Decoder struct {
-	parser      *parser
-	knownFields bool
+	strict bool
+	parser *parser
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -105,10 +105,10 @@ func NewDecoder(r io.Reader) *Decoder {
 	}
 }
 
-// KnownFields ensures that the keys in decoded mappings to
-// exist as fields in the struct being decoded into.
-func (dec *Decoder) KnownFields(enable bool) {
-	dec.knownFields = enable
+// SetStrict sets whether strict decoding behaviour is enabled when
+// decoding items in the data (see UnmarshalStrict). By default, decoding is not strict.
+func (dec *Decoder) SetStrict(strict bool) {
+	dec.strict = strict
 }
 
 // Decode reads the next YAML-encoded value from its input
@@ -117,8 +117,7 @@ func (dec *Decoder) KnownFields(enable bool) {
 // See the documentation for Unmarshal for details about the
 // conversion of YAML into a Go value.
 func (dec *Decoder) Decode(v interface{}) (err error) {
-	d := newDecoder()
-	d.knownFields = dec.knownFields
+	d := newDecoder(dec.strict)
 	defer handleErr(&err)
 	node := dec.parser.parse()
 	if node == nil {
@@ -135,27 +134,9 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 	return nil
 }
 
-// Decode decodes the node and stores its data into the value pointed to by v.
-//
-// See the documentation for Unmarshal for details about the
-// conversion of YAML into a Go value.
-func (n *Node) Decode(v interface{}) (err error) {
-	d := newDecoder()
-	defer handleErr(&err)
-	out := reflect.ValueOf(v)
-	if out.Kind() == reflect.Ptr && !out.IsNil() {
-		out = out.Elem()
-	}
-	d.unmarshal(n, out)
-	if len(d.terrors) > 0 {
-		return &TypeError{d.terrors}
-	}
-	return nil
-}
-
 func unmarshal(in []byte, out interface{}, strict bool) (err error) {
 	defer handleErr(&err)
-	d := newDecoder()
+	d := newDecoder(strict)
 	p := newParser(in)
 	defer p.destroy()
 	node := p.parse()
@@ -252,42 +233,6 @@ func (e *Encoder) Encode(v interface{}) (err error) {
 	return nil
 }
 
-// Encode encodes value v and stores its representation in n.
-//
-// See the documentation for Marshal for details about the
-// conversion of Go values into YAML.
-func (n *Node) Encode(v interface{}) (err error) {
-	defer handleErr(&err)
-	e := newEncoder()
-	defer e.destroy()
-	e.marshalDoc("", reflect.ValueOf(v))
-	e.finish()
-	p := newParser(e.out)
-	p.textless = true
-	defer p.destroy()
-	doc := p.parse()
-	*n = *doc.Content[0]
-	return nil
-}
-
-// SetIndent changes the used indentation used when encoding.
-func (e *Encoder) SetIndent(spaces int) {
-	if spaces < 0 {
-		panic("yaml: cannot indent to a negative number of spaces")
-	}
-	e.encoder.indent = spaces
-}
-
-// CompactSeqIndent makes it so that '- ' is considered part of the indentation.
-func (e *Encoder) CompactSeqIndent() {
-	e.encoder.emitter.compact_sequence_indent = true
-}
-
-// DefaultSeqIndent makes it so that '- ' is not considered part of the indentation.
-func (e *Encoder) DefaultSeqIndent() {
-	e.encoder.emitter.compact_sequence_indent = false
-}
-
 // Close closes the encoder by writing any remaining data.
 // It does not write a stream terminating string "...".
 func (e *Encoder) Close() (err error) {
@@ -330,168 +275,6 @@ func (e *TypeError) Error() string {
 	return fmt.Sprintf("yaml: unmarshal errors:\n  %s", strings.Join(e.Errors, "\n  "))
 }
 
-type Kind uint32
-
-const (
-	DocumentNode Kind = 1 << iota
-	SequenceNode
-	MappingNode
-	ScalarNode
-	AliasNode
-)
-
-type Style uint32
-
-const (
-	TaggedStyle Style = 1 << iota
-	DoubleQuotedStyle
-	SingleQuotedStyle
-	LiteralStyle
-	FoldedStyle
-	FlowStyle
-)
-
-// Node represents an element in the YAML document hierarchy. While documents
-// are typically encoded and decoded into higher level types, such as structs
-// and maps, Node is an intermediate representation that allows detailed
-// control over the content being decoded or encoded.
-//
-// It's worth noting that although Node offers access into details such as
-// line numbers, colums, and comments, the content when re-encoded will not
-// have its original textual representation preserved. An effort is made to
-// render the data plesantly, and to preserve comments near the data they
-// describe, though.
-//
-// Values that make use of the Node type interact with the yaml package in the
-// same way any other type would do, by encoding and decoding yaml data
-// directly or indirectly into them.
-//
-// For example:
-//
-//     var person struct {
-//             Name    string
-//             Address yaml.Node
-//     }
-//     err := yaml.Unmarshal(data, &person)
-// 
-// Or by itself:
-//
-//     var person Node
-//     err := yaml.Unmarshal(data, &person)
-//
-type Node struct {
-	// Kind defines whether the node is a document, a mapping, a sequence,
-	// a scalar value, or an alias to another node. The specific data type of
-	// scalar nodes may be obtained via the ShortTag and LongTag methods.
-	Kind  Kind
-
-	// Style allows customizing the apperance of the node in the tree.
-	Style Style
-
-	// Tag holds the YAML tag defining the data type for the value.
-	// When decoding, this field will always be set to the resolved tag,
-	// even when it wasn't explicitly provided in the YAML content.
-	// When encoding, if this field is unset the value type will be
-	// implied from the node properties, and if it is set, it will only
-	// be serialized into the representation if TaggedStyle is used or
-	// the implicit tag diverges from the provided one.
-	Tag string
-
-	// Value holds the unescaped and unquoted represenation of the value.
-	Value string
-
-	// Anchor holds the anchor name for this node, which allows aliases to point to it.
-	Anchor string
-
-	// Alias holds the node that this alias points to. Only valid when Kind is AliasNode.
-	Alias *Node
-
-	// Content holds contained nodes for documents, mappings, and sequences.
-	Content []*Node
-
-	// HeadComment holds any comments in the lines preceding the node and
-	// not separated by an empty line.
-	HeadComment string
-
-	// LineComment holds any comments at the end of the line where the node is in.
-	LineComment string
-
-	// FootComment holds any comments following the node and before empty lines.
-	FootComment string
-
-	// Line and Column hold the node position in the decoded YAML text.
-	// These fields are not respected when encoding the node.
-	Line   int
-	Column int
-}
-
-// IsZero returns whether the node has all of its fields unset.
-func (n *Node) IsZero() bool {
-	return n.Kind == 0 && n.Style == 0 && n.Tag == "" && n.Value == "" && n.Anchor == "" && n.Alias == nil && n.Content == nil &&
-		n.HeadComment == "" && n.LineComment == "" && n.FootComment == "" && n.Line == 0 && n.Column == 0
-}
-
-
-// LongTag returns the long form of the tag that indicates the data type for
-// the node. If the Tag field isn't explicitly defined, one will be computed
-// based on the node properties.
-func (n *Node) LongTag() string {
-	return longTag(n.ShortTag())
-}
-
-// ShortTag returns the short form of the YAML tag that indicates data type for
-// the node. If the Tag field isn't explicitly defined, one will be computed
-// based on the node properties.
-func (n *Node) ShortTag() string {
-	if n.indicatedString() {
-		return strTag
-	}
-	if n.Tag == "" || n.Tag == "!" {
-		switch n.Kind {
-		case MappingNode:
-			return mapTag
-		case SequenceNode:
-			return seqTag
-		case AliasNode:
-			if n.Alias != nil {
-				return n.Alias.ShortTag()
-			}
-		case ScalarNode:
-			tag, _ := resolve("", n.Value)
-			return tag
-		case 0:
-			// Special case to make the zero value convenient.
-			if n.IsZero() {
-				return nullTag
-			}
-		}
-		return ""
-	}
-	return shortTag(n.Tag)
-}
-
-func (n *Node) indicatedString() bool {
-	return n.Kind == ScalarNode &&
-		(shortTag(n.Tag) == strTag ||
-			(n.Tag == "" || n.Tag == "!") && n.Style&(SingleQuotedStyle|DoubleQuotedStyle|LiteralStyle|FoldedStyle) != 0)
-}
-
-// SetString is a convenience function that sets the node to a string value
-// and defines its style in a pleasant way depending on its content.
-func (n *Node) SetString(s string) {
-	n.Kind = ScalarNode
-	if utf8.ValidString(s) {
-		n.Value = s
-		n.Tag = strTag
-	} else {
-		n.Value = encodeBase64(s)
-		n.Tag = binaryTag
-	}
-	if strings.Contains(n.Value, "\n") {
-		n.Style = LiteralStyle
-	}
-}
-
 // --------------------------------------------------------------------------
 // Maintain a mapping of keys to structure field indexes
 
@@ -506,10 +289,6 @@ type structInfo struct {
 	// InlineMap is the number of the field in the struct that
 	// contains an ,inline map, or -1 if there's none.
 	InlineMap int
-
-	// InlineUnmarshalers holds indexes to inlined fields that
-	// contain unmarshaler values.
-	InlineUnmarshalers [][]int
 }
 
 type fieldInfo struct {
@@ -527,12 +306,6 @@ type fieldInfo struct {
 
 var structMap = make(map[reflect.Type]*structInfo)
 var fieldMapMutex sync.RWMutex
-var unmarshalerType reflect.Type
-
-func init() {
-	var v Unmarshaler
-	unmarshalerType = reflect.ValueOf(&v).Elem().Type()
-}
 
 func getStructInfo(st reflect.Type) (*structInfo, error) {
 	fieldMapMutex.RLock()
@@ -546,7 +319,6 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 	fieldsMap := make(map[string]fieldInfo)
 	fieldsList := make([]fieldInfo, 0, n)
 	inlineMap := -1
-	inlineUnmarshalers := [][]int(nil)
 	for i := 0; i != n; i++ {
 		field := st.Field(i)
 		if field.PkgPath != "" && !field.Anonymous {
@@ -575,7 +347,7 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 				case "inline":
 					inline = true
 				default:
-					return nil, errors.New(fmt.Sprintf("unsupported flag %q in tag %q of type %s", flag, tag, st))
+					return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
 				}
 			}
 			tag = fields[0]
@@ -585,47 +357,34 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 			switch field.Type.Kind() {
 			case reflect.Map:
 				if inlineMap >= 0 {
-					return nil, errors.New("multiple ,inline maps in struct " + st.String())
+					return nil, errors.New("Multiple ,inline maps in struct " + st.String())
 				}
 				if field.Type.Key() != reflect.TypeOf("") {
-					return nil, errors.New("option ,inline needs a map with string keys in struct " + st.String())
+					return nil, errors.New("Option ,inline needs a map with string keys in struct " + st.String())
 				}
 				inlineMap = info.Num
-			case reflect.Struct, reflect.Ptr:
-				ftype := field.Type
-				for ftype.Kind() == reflect.Ptr {
-					ftype = ftype.Elem()
+			case reflect.Struct:
+				sinfo, err := getStructInfo(field.Type)
+				if err != nil {
+					return nil, err
 				}
-				if ftype.Kind() != reflect.Struct {
-					return nil, errors.New("option ,inline may only be used on a struct or map field")
-				}
-				if reflect.PtrTo(ftype).Implements(unmarshalerType) {
-					inlineUnmarshalers = append(inlineUnmarshalers, []int{i})
-				} else {
-					sinfo, err := getStructInfo(ftype)
-					if err != nil {
-						return nil, err
+				for _, finfo := range sinfo.FieldsList {
+					if _, found := fieldsMap[finfo.Key]; found {
+						msg := "Duplicated key '" + finfo.Key + "' in struct " + st.String()
+						return nil, errors.New(msg)
 					}
-					for _, index := range sinfo.InlineUnmarshalers {
-						inlineUnmarshalers = append(inlineUnmarshalers, append([]int{i}, index...))
+					if finfo.Inline == nil {
+						finfo.Inline = []int{i, finfo.Num}
+					} else {
+						finfo.Inline = append([]int{i}, finfo.Inline...)
 					}
-					for _, finfo := range sinfo.FieldsList {
-						if _, found := fieldsMap[finfo.Key]; found {
-							msg := "duplicated key '" + finfo.Key + "' in struct " + st.String()
-							return nil, errors.New(msg)
-						}
-						if finfo.Inline == nil {
-							finfo.Inline = []int{i, finfo.Num}
-						} else {
-							finfo.Inline = append([]int{i}, finfo.Inline...)
-						}
-						finfo.Id = len(fieldsList)
-						fieldsMap[finfo.Key] = finfo
-						fieldsList = append(fieldsList, finfo)
-					}
+					finfo.Id = len(fieldsList)
+					fieldsMap[finfo.Key] = finfo
+					fieldsList = append(fieldsList, finfo)
 				}
 			default:
-				return nil, errors.New("option ,inline may only be used on a struct or map field")
+				//return nil, errors.New("Option ,inline needs a struct value or map field")
+				return nil, errors.New("Option ,inline needs a struct value field")
 			}
 			continue
 		}
@@ -637,7 +396,7 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 		}
 
 		if _, found = fieldsMap[info.Key]; found {
-			msg := "duplicated key '" + info.Key + "' in struct " + st.String()
+			msg := "Duplicated key '" + info.Key + "' in struct " + st.String()
 			return nil, errors.New(msg)
 		}
 
@@ -647,10 +406,9 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 	}
 
 	sinfo = &structInfo{
-		FieldsMap:          fieldsMap,
-		FieldsList:         fieldsList,
-		InlineMap:          inlineMap,
-		InlineUnmarshalers: inlineUnmarshalers,
+		FieldsMap:  fieldsMap,
+		FieldsList: fieldsList,
+		InlineMap:  inlineMap,
 	}
 
 	fieldMapMutex.Lock()
@@ -705,4 +463,16 @@ func isZero(v reflect.Value) bool {
 		return true
 	}
 	return false
+}
+
+// FutureLineWrap globally disables line wrapping when encoding long strings.
+// This is a temporary and thus deprecated method introduced to faciliate
+// migration towards v3, which offers more control of line lengths on
+// individual encodings, and has a default matching the behavior introduced
+// by this function.
+//
+// The default formatting of v2 was erroneously changed in v2.3.0 and reverted
+// in v2.4.0, at which point this function was introduced to help migration.
+func FutureLineWrap() {
+	disableLineWrapping = true
 }

@@ -44,6 +44,16 @@ var (
 	customSchema []byte //nolint:gochecknoglobals
 )
 
+// schemaParseStatus is used in cases when a schema should be parsed, but the
+// parsing may be delayed to a later time.
+type schemaParseStatus uint32
+
+const (
+	schemaNotParsed schemaParseStatus = iota
+	schemaParseDelayed
+	schemaParsed
+)
+
 // openapiData contains the parsed openapi state.  this is in a struct rather than
 // a list of vars so that it can be reset from tests.
 type openapiData struct {
@@ -57,13 +67,17 @@ type openapiData struct {
 	// is namespaceable or not
 	namespaceabilityByResourceType map[yaml.TypeMeta]bool
 
-	// noUseBuiltInSchema stores whether we want to prevent using the built-n
+	// noUseBuiltInSchema stores whether we want to prevent using the built-in
 	// Kubernetes schema as part of the global schema
 	noUseBuiltInSchema bool
 
 	// schemaInit stores whether or not we've parsed the schema already,
 	// so that we only reparse the when necessary (to speed up performance)
 	schemaInit bool
+
+	// defaultBuiltInSchemaParseStatus stores the parse status of the default
+	// built-in schema.
+	defaultBuiltInSchemaParseStatus schemaParseStatus
 }
 
 type format string
@@ -387,16 +401,43 @@ func GetSchema(s string, schema *spec.Schema) (*ResourceSchema, error) {
 // be true if the resource is namespace-scoped, and false if the type is
 // cluster-scoped.
 func IsNamespaceScoped(typeMeta yaml.TypeMeta) (bool, bool) {
-	if res, f := precomputedIsNamespaceScoped[typeMeta]; f {
-		return res, true
+	if isNamespaceScoped, found := precomputedIsNamespaceScoped[typeMeta]; found {
+		return isNamespaceScoped, found
 	}
-	return isNamespaceScopedFromSchema(typeMeta)
-}
-
-func isNamespaceScopedFromSchema(typeMeta yaml.TypeMeta) (bool, bool) {
-	initSchema()
+	if isInitSchemaNeededForNamespaceScopeCheck() {
+		initSchema()
+	}
 	isNamespaceScoped, found := globalSchema.namespaceabilityByResourceType[typeMeta]
 	return isNamespaceScoped, found
+}
+
+// isInitSchemaNeededForNamespaceScopeCheck returns true if initSchema is needed
+// to ensure globalSchema.namespaceabilityByResourceType is fully populated for
+// cases where a custom or non-default built-in schema is in use.
+func isInitSchemaNeededForNamespaceScopeCheck() bool {
+	schemaLock.Lock()
+	defer schemaLock.Unlock()
+
+	if globalSchema.schemaInit {
+		return false // globalSchema already is initialized.
+	}
+	if customSchema != nil {
+		return true // initSchema is needed.
+	}
+	if kubernetesOpenAPIVersion == "" || kubernetesOpenAPIVersion == kubernetesOpenAPIDefaultVersion {
+		// The default built-in schema is in use. Since
+		// precomputedIsNamespaceScoped aligns with the default built-in schema
+		// (verified by TestIsNamespaceScopedPrecompute), there is no need to
+		// call initSchema.
+		if globalSchema.defaultBuiltInSchemaParseStatus == schemaNotParsed {
+			// The schema may be needed for purposes other than namespace scope
+			// checks. Flag it to be parsed when that need arises.
+			globalSchema.defaultBuiltInSchemaParseStatus = schemaParseDelayed
+		}
+		return false
+	}
+	// A non-default built-in schema is in use. initSchema is needed.
+	return true
 }
 
 // IsCertainlyClusterScoped returns true for Node, Namespace, etc. and
@@ -638,11 +679,17 @@ func initSchema() {
 			panic(fmt.Errorf("invalid schema file: %w", err))
 		}
 	} else {
-		if kubernetesOpenAPIVersion == "" {
+		if kubernetesOpenAPIVersion == "" || kubernetesOpenAPIVersion == kubernetesOpenAPIDefaultVersion {
 			parseBuiltinSchema(kubernetesOpenAPIDefaultVersion)
+			globalSchema.defaultBuiltInSchemaParseStatus = schemaParsed
 		} else {
 			parseBuiltinSchema(kubernetesOpenAPIVersion)
 		}
+	}
+
+	if globalSchema.defaultBuiltInSchemaParseStatus == schemaParseDelayed {
+		parseBuiltinSchema(kubernetesOpenAPIDefaultVersion)
+		globalSchema.defaultBuiltInSchemaParseStatus = schemaParsed
 	}
 
 	if err := parse(kustomizationapi.MustAsset(kustomizationAPIAssetName), JsonOrYaml); err != nil {

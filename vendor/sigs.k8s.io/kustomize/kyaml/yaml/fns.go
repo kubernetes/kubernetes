@@ -11,7 +11,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"sigs.k8s.io/kustomize/kyaml/errors"
-	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
+	yaml "sigs.k8s.io/yaml/goyaml.v3"
 )
 
 // Append creates an ElementAppender
@@ -690,6 +690,10 @@ type FieldSetter struct {
 	// when setting it.  Otherwise, if an existing node is found, the style is
 	// retained.
 	OverrideStyle bool `yaml:"overrideStyle,omitempty"`
+
+	// AppendKeyStyle defines the style of the key when no existing node is
+	// found, and a new node is appended.
+	AppendKeyStyle Style `yaml:"appendKeyStyle,omitempty"`
 }
 
 func (s FieldSetter) Filter(rn *RNode) (*RNode, error) {
@@ -747,6 +751,7 @@ func (s FieldSetter) Filter(rn *RNode) (*RNode, error) {
 		&yaml.Node{
 			Kind:        yaml.ScalarNode,
 			Value:       s.Name,
+			Style:       s.AppendKeyStyle,
 			HeadComment: s.Comments.HeadComment,
 			LineComment: s.Comments.LineComment,
 			FootComment: s.Comments.FootComment,

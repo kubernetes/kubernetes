@@ -21,4 +21,14 @@ func AddFlagEnableHelm(set *pflag.FlagSet) {
 		"helm-command",
 		"helm", // default
 		"helm command (path to executable)")
+	set.StringArrayVar(
+		&theFlags.helmApiVersions,
+		"helm-api-versions",
+		[]string{}, // default
+		"Kubernetes api versions used by Helm for Capabilities.APIVersions")
+	set.StringVar(
+		&theFlags.helmKubeVersion,
+		"helm-kube-version",
+		"", // default
+		"Kubernetes version used by Helm for Capabilities.KubeVersion")
 }

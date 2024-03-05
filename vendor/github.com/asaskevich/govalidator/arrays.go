@@ -9,6 +9,35 @@ type ResultIterator func(interface{}, int) interface{}
 // ConditionIterator is the function that accepts element of slice/array and its index and returns boolean
 type ConditionIterator func(interface{}, int) bool
 
+// ReduceIterator is the function that accepts two element of slice/array and returns result of merging those values
+type ReduceIterator func(interface{}, interface{}) interface{}
+
+// Some validates that any item of array corresponds to ConditionIterator. Returns boolean.
+func Some(array []interface{}, iterator ConditionIterator) bool {
+	res := false
+	for index, data := range array {
+		res = res || iterator(data, index)
+	}
+	return res
+}
+
+// Every validates that every item of array corresponds to ConditionIterator. Returns boolean.
+func Every(array []interface{}, iterator ConditionIterator) bool {
+	res := true
+	for index, data := range array {
+		res = res && iterator(data, index)
+	}
+	return res
+}
+
+// Reduce boils down a list of values into a single value by ReduceIterator
+func Reduce(array []interface{}, iterator ReduceIterator, initialValue interface{}) interface{} {
+	for _, data := range array {
+		initialValue = iterator(initialValue, data)
+	}
+	return initialValue
+}
+
 // Each iterates over the slice and apply Iterator to every item
 func Each(array []interface{}, iterator Iterator) {
 	for index, data := range array {

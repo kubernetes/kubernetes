@@ -12,20 +12,20 @@ import (
 	"unicode/utf8"
 )
 
-// Contains check if the string contains the substring.
+// Contains checks if the string contains the substring.
 func Contains(str, substring string) bool {
 	return strings.Contains(str, substring)
 }
 
-// Matches check if string matches the pattern (pattern is regular expression)
+// Matches checks if string matches the pattern (pattern is regular expression)
 // In case of error return false
 func Matches(str, pattern string) bool {
 	match, _ := regexp.MatchString(pattern, str)
 	return match
 }
 
-// LeftTrim trim characters from the left-side of the input.
-// If second argument is empty, it's will be remove leading spaces.
+// LeftTrim trims characters from the left side of the input.
+// If second argument is empty, it will remove leading spaces.
 func LeftTrim(str, chars string) string {
 	if chars == "" {
 		return strings.TrimLeftFunc(str, unicode.IsSpace)
@@ -34,8 +34,8 @@ func LeftTrim(str, chars string) string {
 	return r.ReplaceAllString(str, "")
 }
 
-// RightTrim trim characters from the right-side of the input.
-// If second argument is empty, it's will be remove spaces.
+// RightTrim trims characters from the right side of the input.
+// If second argument is empty, it will remove trailing spaces.
 func RightTrim(str, chars string) string {
 	if chars == "" {
 		return strings.TrimRightFunc(str, unicode.IsSpace)
@@ -44,27 +44,27 @@ func RightTrim(str, chars string) string {
 	return r.ReplaceAllString(str, "")
 }
 
-// Trim trim characters from both sides of the input.
-// If second argument is empty, it's will be remove spaces.
+// Trim trims characters from both sides of the input.
+// If second argument is empty, it will remove spaces.
 func Trim(str, chars string) string {
 	return LeftTrim(RightTrim(str, chars), chars)
 }
 
-// WhiteList remove characters that do not appear in the whitelist.
+// WhiteList removes characters that do not appear in the whitelist.
 func WhiteList(str, chars string) string {
 	pattern := "[^" + chars + "]+"
 	r, _ := regexp.Compile(pattern)
 	return r.ReplaceAllString(str, "")
 }
 
-// BlackList remove characters that appear in the blacklist.
+// BlackList removes characters that appear in the blacklist.
 func BlackList(str, chars string) string {
 	pattern := "[" + chars + "]+"
 	r, _ := regexp.Compile(pattern)
 	return r.ReplaceAllString(str, "")
 }
 
-// StripLow remove characters with a numerical value < 32 and 127, mostly control characters.
+// StripLow removes characters with a numerical value < 32 and 127, mostly control characters.
 // If keep_new_lines is true, newline characters are preserved (\n and \r, hex 0xA and 0xD).
 func StripLow(str string, keepNewLines bool) string {
 	chars := ""
@@ -76,13 +76,13 @@ func StripLow(str string, keepNewLines bool) string {
 	return BlackList(str, chars)
 }
 
-// ReplacePattern replace regular expression pattern in string
+// ReplacePattern replaces regular expression pattern in string
 func ReplacePattern(str, pattern, replace string) string {
 	r, _ := regexp.Compile(pattern)
 	return r.ReplaceAllString(str, replace)
 }
 
-// Escape replace <, >, & and " with HTML entities.
+// Escape replaces <, >, & and " with HTML entities.
 var Escape = html.EscapeString
 
 func addSegment(inrune, segment []rune) []rune {
@@ -120,7 +120,7 @@ func CamelCaseToUnderscore(str string) string {
 	return string(output)
 }
 
-// Reverse return reversed string
+// Reverse returns reversed string
 func Reverse(s string) string {
 	r := []rune(s)
 	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
@@ -129,12 +129,12 @@ func Reverse(s string) string {
 	return string(r)
 }
 
-// GetLines split string by "\n" and return array of lines
+// GetLines splits string by "\n" and return array of lines
 func GetLines(s string) []string {
 	return strings.Split(s, "\n")
 }
 
-// GetLine return specified line of multiline string
+// GetLine returns specified line of multiline string
 func GetLine(s string, index int) (string, error) {
 	lines := GetLines(s)
 	if index < 0 || index >= len(lines) {
@@ -143,12 +143,12 @@ func GetLine(s string, index int) (string, error) {
 	return lines[index], nil
 }
 
-// RemoveTags remove all tags from HTML string
+// RemoveTags removes all tags from HTML string
 func RemoveTags(s string) string {
 	return ReplacePattern(s, "<[^>]*>", "")
 }
 
-// SafeFileName return safe string that can be used in file names
+// SafeFileName returns safe string that can be used in file names
 func SafeFileName(str string) string {
 	name := strings.ToLower(str)
 	name = path.Clean(path.Base(name))
@@ -210,23 +210,23 @@ func Truncate(str string, length int, ending string) string {
 	return str
 }
 
-// PadLeft pad left side of string if size of string is less then indicated pad length
+// PadLeft pads left side of a string if size of string is less then indicated pad length
 func PadLeft(str string, padStr string, padLen int) string {
 	return buildPadStr(str, padStr, padLen, true, false)
 }
 
-// PadRight pad right side of string if size of string is less then indicated pad length
+// PadRight pads right side of a string if size of string is less then indicated pad length
 func PadRight(str string, padStr string, padLen int) string {
 	return buildPadStr(str, padStr, padLen, false, true)
 }
 
-// PadBoth pad sides of string if size of string is less then indicated pad length
+// PadBoth pads both sides of a string if size of string is less then indicated pad length
 func PadBoth(str string, padStr string, padLen int) string {
 	return buildPadStr(str, padStr, padLen, true, true)
 }
 
-// PadString either left, right or both sides, not the padding string can be unicode and more then one
-// character
+// PadString either left, right or both sides.
+// Note that padding string can be unicode and more then one character
 func buildPadStr(str string, padStr string, padLen int, padLeft bool, padRight bool) string {
 
 	// When padded length is less then the current string size
