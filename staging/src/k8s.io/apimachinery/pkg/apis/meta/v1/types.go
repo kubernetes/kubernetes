@@ -432,6 +432,15 @@ type ListOptions struct {
 	SendInitialEvents *bool `json:"sendInitialEvents,omitempty" protobuf:"varint,11,opt,name=sendInitialEvents"`
 }
 
+const (
+	// InitialEventsAnnotationKey the name of the key
+	// under which an annotation marking the end of
+	// a watchlist stream is stored.
+	//
+	// The annotation is added to a "Bookmark" event.
+	InitialEventsAnnotationKey = "k8s.io/initial-events-end"
+)
+
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
 // may only be set if resourceVersion is also set.
 //
