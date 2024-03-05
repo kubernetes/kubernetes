@@ -36,17 +36,12 @@ import (
 
 func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
 	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-		if err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-		defer conns.conn.Close()
+	websocketServer := newTestWSServer(t, func(stdin io.Reader, stdout, stderr io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
 		// Loopback the STDIN stream onto the STDOUT stream.
-		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
+		_, err := io.Copy(stdout, stdin)
 		require.NoError(t, err)
-	}))
+		return err
+	})
 	defer websocketServer.Close()
 
 	// Now create the fallback client (executor), and point it to the "websocketServer".
@@ -101,22 +96,16 @@ func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
 
 func TestFallbackClient_SPDYSecondarySucceeds(t *testing.T) {
 	// Create fake SPDY server. Copy received STDIN data back onto STDOUT stream.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var stdin, stdout bytes.Buffer
-		ctx, err := createHTTPStreams(w, req, &StreamOptions{
-			Stdin:  &stdin,
-			Stdout: &stdout,
-		})
-		if err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-		defer ctx.conn.Close()
-		_, err = io.Copy(ctx.stdoutStream, ctx.stdinStream)
+	spdyServer := newTestHTTPServer(func(stdin io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan TerminalSize) error {
+		_, err := io.Copy(stdout, stdin)
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
-	}))
+		return err
+	}, &StreamOptions{
+		Stdin:  &bytes.Buffer{},
+		Stdout: &bytes.Buffer{},
+	})
 	defer spdyServer.Close()
 
 	spdyLocation, err := url.Parse(spdyServer.URL)
