@@ -335,16 +335,17 @@ var swapControllerAvailable = func() bool {
 	// See https://github.com/containerd/containerd/pull/7838/
 	swapControllerAvailabilityOnce.Do(func() {
 		const warn = "Failed to detect the availability of the swap controller, assuming not available"
-		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
-		if isCgroup2UnifiedMode() {
-			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
-			if err != nil {
-				klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
-				return
-			}
-			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+		if !isCgroup2UnifiedMode() {
+			// swap is not supported for cgroupv1
+			return
 		}
+		// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
+		_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
+		if err != nil {
+			klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+			return
+		}
+		p := filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
 		if _, err := os.Stat(p); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				klog.V(5).ErrorS(err, warn)
