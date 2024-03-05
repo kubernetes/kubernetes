@@ -69,7 +69,6 @@ func New() *Args {
 		ClientsetAPIPath:          "/apis",
 		ClientsetOnly:             false,
 		FakeClient:                true,
-		PluralExceptions:          []string{"Endpoints:Endpoints"},
 		ApplyConfigurationPackage: "",
 	}
 }

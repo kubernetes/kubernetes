@@ -37,6 +37,7 @@ API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR:-"${KUBE_ROOT}/api/api-rule
 OUT_DIR="_output"
 BOILERPLATE_FILENAME="hack/boilerplate/boilerplate.generatego.txt"
 APPLYCONFIG_PKG="k8s.io/client-go/applyconfigurations"
+PLURAL_EXCEPTIONS="Endpoints:Endpoints"
 
 # Any time we call sort, we want it in the same locale.
 export LC_ALL="C"
@@ -642,6 +643,7 @@ function codegen::clients() {
         --output-pkg="k8s.io/client-go" \
         --clientset-name="kubernetes" \
         --input-base="k8s.io/api" \
+        --plural-exceptions "${PLURAL_EXCEPTIONS}" \
         --apply-configuration-package "${APPLYCONFIG_PKG}" \
         $(printf -- " --input %s" "${gv_dirs[@]}") \
         "$@"
@@ -682,6 +684,7 @@ function codegen::listers() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/k8s.io/client-go/listers" \
         --output-pkg "k8s.io/client-go/listers" \
+        --plural-exceptions "${PLURAL_EXCEPTIONS}" \
         "${ext_apis[@]}" \
         "$@"
 
@@ -724,6 +727,7 @@ function codegen::informers() {
         --single-directory \
         --versioned-clientset-package "k8s.io/client-go/kubernetes" \
         --listers-package "k8s.io/client-go/listers" \
+        --plural-exceptions "${PLURAL_EXCEPTIONS}" \
         "${ext_apis[@]}" \
         "$@"
 
