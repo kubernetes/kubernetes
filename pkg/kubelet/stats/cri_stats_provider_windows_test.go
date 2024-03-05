@@ -455,7 +455,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		InodesUsed: resource.NewQuantity(int64(logStatsInodesUsed), resource.BinarySI),
 	}
 	fakeStats := map[string]*volume.Metrics{
-		kuberuntime.BuildContainerLogsDirectory("sb0-ns", "sb0-name", types.UID("sb0-uid"), "c0"): c0LogStats,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sb0-ns", "sb0-name", types.UID("sb0-uid"), "c0"): c0LogStats,
 	}
 	fakeOS := &kubecontainertest.FakeOS{}
 	fakeHostStatsProvider := NewFakeHostStatsProviderWithData(fakeStats, fakeOS)

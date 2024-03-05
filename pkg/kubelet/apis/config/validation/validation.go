@@ -18,7 +18,9 @@ package validation
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
+	"unicode"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -286,5 +288,26 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ContainerLogMonitorInterval.Duration.Seconds() < 3 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s"))
 	}
+
+	if kc.PodLogsDir == "" {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podLogsDir was not specified"))
+	}
+
+	if !filepath.IsAbs(kc.PodLogsDir) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be absolute path", kc.PodLogsDir))
+	}
+
+	if filepath.Clean(kc.PodLogsDir) != kc.PodLogsDir {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be normalized", kc.PodLogsDir))
+	}
+
+	// Since pod logs path is used in metrics, make sure it contains only ASCII characters.
+	for _, c := range kc.PodLogsDir {
+		if c > unicode.MaxASCII {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q mut contains ASCII characters only", kc.PodLogsDir))
+			break
+		}
+	}
+
 	return utilerrors.NewAggregate(allErrors)
 }

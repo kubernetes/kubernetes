@@ -36,6 +36,9 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pods")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getPodLogsDir()
+	assert.Equal(t, kubelet.podLogsDirectory, got)
+
 	got = kubelet.getPluginsDir()
 	exp = filepath.Join(root, "plugins")
 	assert.Equal(t, exp, got)
