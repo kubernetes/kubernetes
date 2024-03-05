@@ -34,7 +34,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -210,7 +209,6 @@ func CreateProxyTransport() *http.Transport {
 func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	*controlplane.Config,
 	aggregatorapiserver.ServiceResolver,
-	[]admission.PluginInitializer,
 	error,
 ) {
 	proxyTransport := CreateProxyTransport()
@@ -221,7 +219,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
@@ -262,27 +260,27 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		config.ExtraConfig.PeerEndpointLeaseReconciler, err = controlplaneapiserver.CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		// build peer proxy config only if peer ca file exists
 		if opts.PeerCAFile != "" {
 			config.ExtraConfig.PeerProxy, err = controlplaneapiserver.BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
 				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.ExtraConfig.PeerEndpointLeaseReconciler, config.GenericConfig.Serializer)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, err
 			}
 		}
 	}
 
 	clientCAProvider, err := opts.Authentication.ClientCert.GetClientCAContentProvider()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	config.ExtraConfig.ClusterAuthenticationInfo.ClientCA = clientCAProvider
 
 	requestHeaderConfig, err := opts.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	if requestHeaderConfig != nil {
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderCA = requestHeaderConfig.CAContentProvider
@@ -301,15 +299,15 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
 	pluginInitializers, admissionPostStartHook, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
+		return nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
 	}
 	clientgoExternalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
+		return nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
 	}
 	dynamicExternalClient, err := dynamic.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
+		return nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
 	}
 	err = opts.Admission.ApplyTo(
 		genericConfig,
@@ -319,10 +317,10 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		utilfeature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)
+		return nil, nil, fmt.Errorf("failed to apply admission: %w", err)
 	}
 	if err := config.GenericConfig.AddPostStartHook("start-kube-apiserver-admission-initializer", admissionPostStartHook); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	if config.GenericConfig.EgressSelector != nil {
@@ -333,7 +331,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		networkContext := egressselector.Cluster.AsNetworkContext()
 		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		c := proxyTransport.Clone()
 		c.DialContext = dialer
@@ -345,7 +343,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
 		keys, err := keyutil.PublicKeysFromFile(f)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse key file %q: %v", f, err)
+			return nil, nil, fmt.Errorf("failed to parse key file %q: %v", f, err)
 		}
 		pubKeys = append(pubKeys, keys...)
 	}
@@ -353,7 +351,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	config.ExtraConfig.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
 	config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
 
-	return config, serviceResolver, pluginInitializers, nil
+	return config, serviceResolver, nil
 }
 
 var testServiceResolver webhook.ServiceResolver

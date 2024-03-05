@@ -23,7 +23,6 @@ import (
 	apiextensionsoptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
@@ -34,7 +33,6 @@ import (
 func CreateAPIExtensionsConfig(
 	kubeAPIServerConfig server.Config,
 	kubeInformers informers.SharedInformerFactory,
-	pluginInitializers []admission.PluginInitializer,
 	commandOptions controlplaneapiserver.CompletedOptions,
 	masterCount int,
 	serviceResolver webhook.ServiceResolver,
