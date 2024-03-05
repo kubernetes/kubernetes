@@ -50,6 +50,7 @@ func Test_syncNode(t *testing.T) {
 		fakeCloud    *fakecloud.Cloud
 		existingNode *v1.Node
 		updatedNode  *v1.Node
+		expectedErr  bool
 	}{
 		{
 			name: "node initialized with provider ID",
@@ -545,7 +546,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "provided node IP address is not valid",
+			name:        "provided node IP address is not valid",
+			expectedErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				Addresses: []v1.NodeAddress{
@@ -643,7 +645,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "provided node IP address is not present",
+			name:        "provided node IP address is not present",
+			expectedErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				Addresses: []v1.NodeAddress{
@@ -835,8 +838,10 @@ func Test_syncNode(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "provider ID not implemented",
+		{ // for backward compatibility the cloud providers that does not implement
+			// providerID does not block the node initialization
+			name:        "provider ID not implemented",
+			expectedErr: false,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				InstanceTypes:     map[types.NodeName]string{},
@@ -1641,7 +1646,8 @@ func Test_syncNode(t *testing.T) {
 			},
 		},
 		{
-			name: "[instanceV2] provider ID not implemented",
+			name:        "[instanceV2] provider ID not implemented",
+			expectedErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: true,
 				InstanceTypes:     map[types.NodeName]string{},
@@ -1693,12 +1699,19 @@ func Test_syncNode(t *testing.T) {
 					},
 				},
 				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
 				},
 			},
 		},
 		{
-			name: "[instanceV2] error getting InstanceMetadata",
+			name:        "[instanceV2] error getting InstanceMetadata",
+			expectedErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: true,
 				InstanceTypes:     map[types.NodeName]string{},
@@ -1786,7 +1799,10 @@ func Test_syncNode(t *testing.T) {
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
 
-			cloudNodeController.syncNode(context.TODO(), test.existingNode.Name)
+			err := cloudNodeController.syncNode(context.TODO(), test.existingNode.Name)
+			if (err != nil) != test.expectedErr {
+				t.Fatalf("error got: %v expected: %v", err, test.expectedErr)
+			}
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), test.existingNode.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1832,6 +1848,9 @@ func TestGCEConditionV2(t *testing.T) {
 		EnableInstancesV2: true,
 		InstanceTypes: map[types.NodeName]string{
 			types.NodeName("node0"): "t1.micro",
+		},
+		ProviderID: map[types.NodeName]string{
+			types.NodeName("node0"): "fake://12334",
 		},
 		Addresses: []v1.NodeAddress{
 			{
@@ -2376,15 +2395,16 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 	}
 }
 
-func TestGetProviderID(t *testing.T) {
+func TestGetInstanceMetadata(t *testing.T) {
 	tests := []struct {
-		name               string
-		fakeCloud          *fakecloud.Cloud
-		existingNode       *v1.Node
-		expectedProviderID string
+		name             string
+		fakeCloud        *fakecloud.Cloud
+		existingNode     *v1.Node
+		expectedMetadata *cloudprovider.InstanceMetadata
+		expectErr        bool
 	}{
 		{
-			name: "node initialized with provider ID",
+			name: "cloud implemented with Instances and provider ID",
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				InstanceTypes: map[types.NodeName]string{
@@ -2392,6 +2412,9 @@ func TestGetProviderID(t *testing.T) {
 				},
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "12345",
+				},
+				ProviderID: map[types.NodeName]string{
+					types.NodeName("node0"): "fake://12345",
 				},
 				Addresses: []v1.NodeAddress{
 					{
@@ -2423,21 +2446,27 @@ func TestGetProviderID(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
-					ProviderID: "fake://12345",
 				},
 			},
-			expectedProviderID: "fake://12345",
+			expectedMetadata: &cloudprovider.InstanceMetadata{
+				ProviderID: "fake://12345",
+				NodeAddresses: []v1.NodeAddress{
+					{Type: "Hostname", Address: "node0.cloud.internal"},
+					{Type: "InternalIP", Address: "10.0.0.1"},
+					{Type: "ExternalIP", Address: "132.143.154.163"},
+				},
+			},
 		},
 		{
-			name: "cloud implemented with Instances (without providerID)",
+			name: "cloud implemented with Instances (providerID not implemented)",
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				InstanceTypes: map[types.NodeName]string{
 					types.NodeName("node0"):        "t1.micro",
 					types.NodeName("fake://12345"): "t1.micro",
 				},
-				ExtID: map[types.NodeName]string{
-					types.NodeName("node0"): "12345",
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.NotImplemented,
 				},
 				Addresses: []v1.NodeAddress{
 					{
@@ -2461,7 +2490,58 @@ func TestGetProviderID(t *testing.T) {
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			expectedProviderID: "fake://12345",
+			expectedMetadata: &cloudprovider.InstanceMetadata{
+				NodeAddresses: []v1.NodeAddress{
+					{Type: "Hostname", Address: "node0.cloud.internal"},
+					{Type: "InternalIP", Address: "10.0.0.1"},
+					{Type: "ExternalIP", Address: "132.143.154.163"},
+				},
+			},
+		},
+		{
+			name: "cloud implemented with Instances (providerID not implemented) and node with providerID",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"):        "t1.micro",
+					types.NodeName("fake://12345"): "t1.micro",
+				},
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.NotImplemented,
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://asdasd",
+				},
+			},
+			expectedMetadata: &cloudprovider.InstanceMetadata{
+				ProviderID: "fake://asdasd",
+				NodeAddresses: []v1.NodeAddress{
+					{Type: "Hostname", Address: "node0.cloud.internal"},
+					{Type: "InternalIP", Address: "10.0.0.1"},
+					{Type: "ExternalIP", Address: "132.143.154.163"},
+				},
+			},
 		},
 		{
 			name: "cloud implemented with InstancesV2 (with providerID)",
@@ -2474,6 +2554,9 @@ func TestGetProviderID(t *testing.T) {
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "12345",
 				},
+				ProviderID: map[types.NodeName]string{
+					types.NodeName("node0"): "fake://12345",
+				},
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeHostName,
@@ -2503,13 +2586,20 @@ func TestGetProviderID(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
-					ProviderID: "fake://12345",
 				},
 			},
-			expectedProviderID: "fake://12345",
+			expectedMetadata: &cloudprovider.InstanceMetadata{
+				ProviderID: "fake://12345",
+				NodeAddresses: []v1.NodeAddress{
+					{Type: "Hostname", Address: "node0.cloud.internal"},
+					{Type: "InternalIP", Address: "10.0.0.1"},
+					{Type: "ExternalIP", Address: "132.143.154.163"},
+				},
+			},
 		},
-		{
-			name: "cloud implemented with InstancesV2 (without providerID)",
+		{ // it will be requeueud later
+			name:      "cloud implemented with InstancesV2 (without providerID)",
+			expectErr: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2: true,
 				InstanceTypes: map[types.NodeName]string{
@@ -2550,7 +2640,59 @@ func TestGetProviderID(t *testing.T) {
 					},
 				},
 			},
-			expectedProviderID: "",
+			expectedMetadata: &cloudprovider.InstanceMetadata{
+				NodeAddresses: []v1.NodeAddress{
+					{Type: "Hostname", Address: "node0.cloud.internal"},
+					{Type: "InternalIP", Address: "10.0.0.1"},
+					{Type: "ExternalIP", Address: "132.143.154.163"},
+				},
+			},
+		},
+		{
+			name: "cloud implemented with InstancesV2 (without providerID) and node with providerID",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"):        "t1.micro",
+					types.NodeName("fake://12345"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
+			},
+			expectedMetadata: &cloudprovider.InstanceMetadata{
+				ProviderID:   "fake://12345",
+				InstanceType: "t1.micro",
+				NodeAddresses: []v1.NodeAddress{
+					{Type: "Hostname", Address: "node0.cloud.internal"},
+					{Type: "InternalIP", Address: "10.0.0.1"},
+					{Type: "ExternalIP", Address: "132.143.154.163"},
+				},
+			},
 		},
 	}
 
@@ -2560,13 +2702,13 @@ func TestGetProviderID(t *testing.T) {
 				cloud: test.fakeCloud,
 			}
 
-			providerID, err := cloudNodeController.getProviderID(context.TODO(), test.existingNode)
-			if err != nil {
-				t.Fatalf("error getting provider ID: %v", err)
+			metadata, err := cloudNodeController.getInstanceMetadata(context.TODO(), test.existingNode)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("error expected %v got: %v", test.expectErr, err)
 			}
 
-			if !cmp.Equal(providerID, test.expectedProviderID) {
-				t.Errorf("unexpected providerID %s", cmp.Diff(providerID, test.expectedProviderID))
+			if !cmp.Equal(metadata, test.expectedMetadata) {
+				t.Errorf("unexpected metadata %s", cmp.Diff(metadata, test.expectedMetadata))
 			}
 		})
 	}
