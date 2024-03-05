@@ -2913,7 +2913,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 
 	kl.runtimeState.setRuntimeState(nil)
-	kl.runtimeState.setRuntimeHandlers(s.Handlers)
+	kl.runtimeState.setRuntimeClasses(s.RuntimeClasses)
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }

@@ -480,6 +480,14 @@ func GoRuntime() Setter {
 	}
 }
 
+// RuntimeClasses returns a Setter that sets RuntimeClasses on the node.
+func RuntimeClasses(fn func() []v1.RuntimeClass) Setter {
+	return func(ctx context.Context, node *v1.Node) error {
+		node.Status.RuntimeClasses = fn()
+		return nil
+	}
+}
+
 // ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
 func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now

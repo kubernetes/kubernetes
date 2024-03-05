@@ -119,15 +119,19 @@ func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
 // HandlerSupportsUserNamespaces checks whether the specified handler supports
 // user namespaces.
 func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error) {
-	rtHandlers := kl.runtimeState.runtimeHandlers()
-	if rtHandlers == nil {
+	rtClasses := kl.runtimeState.runtimeClasses()
+	if rtClasses == nil {
 		return false, fmt.Errorf("runtime handlers are not set")
 	}
-	h, found := rtHandlers[rtHandler]
-	if !found {
-		return false, fmt.Errorf("the handler %q is not known", rtHandler)
+	for _, h := range rtClasses {
+		if h.Name == rtHandler {
+			if h.Features == nil || h.Features.UserNamespaces == nil {
+				return false, nil
+			}
+			return *h.Features.UserNamespaces, nil
+		}
 	}
-	return h.SupportsUserNamespaces, nil
+	return false, fmt.Errorf("the handler %q is not known", rtHandler)
 }
 
 // GetKubeletMappings gets the additional IDs allocated for the Kubelet.

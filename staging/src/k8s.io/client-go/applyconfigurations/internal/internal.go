@@ -4781,6 +4781,14 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ContainerState
       default: {}
+    - name: volumeMounts
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.VolumeMountStatus
+          elementRelationship: associative
+          keys:
+          - mountPath
 - name: io.k8s.api.core.v1.DaemonEndpoint
   map:
     fields:
@@ -5888,6 +5896,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: phase
       type:
         scalar: string
+    - name: runtimeClasses
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.RuntimeClass
+          elementRelationship: atomic
     - name: volumesAttached
       type:
         list:
@@ -7123,6 +7137,25 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.core.v1.RuntimeClass
+  map:
+    fields:
+    - name: features
+      type:
+        namedType: io.k8s.api.core.v1.RuntimeClassFeatures
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.core.v1.RuntimeClassFeatures
+  map:
+    fields:
+    - name: recursiveReadOnlyMounts
+      type:
+        scalar: boolean
+    - name: userNamespaces
+      type:
+        scalar: boolean
 - name: io.k8s.api.core.v1.SELinuxOptions
   map:
     fields:
@@ -7881,10 +7914,30 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: readOnly
       type:
         scalar: boolean
+    - name: recursiveReadOnly
+      type:
+        scalar: string
     - name: subPath
       type:
         scalar: string
     - name: subPathExpr
+      type:
+        scalar: string
+- name: io.k8s.api.core.v1.VolumeMountStatus
+  map:
+    fields:
+    - name: mountPath
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: readOnly
+      type:
+        scalar: boolean
+    - name: recursiveReadOnly
       type:
         scalar: string
 - name: io.k8s.api.core.v1.VolumeNodeAffinity

@@ -108,6 +108,11 @@ status:
     osImage: osImageValue
     systemUUID: systemUUIDValue
   phase: phaseValue
+  runtimeClasses:
+  - features:
+      recursiveReadOnlyMounts: true
+      userNamespaces: true
+    name: nameValue
   volumesAttached:
   - devicePath: devicePathValue
     name: nameValue

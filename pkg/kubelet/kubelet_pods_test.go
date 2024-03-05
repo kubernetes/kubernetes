@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
@@ -6086,5 +6087,174 @@ func TestParseGetSubIdsOutput(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResolveRecursiveReadOnly(t *testing.T) {
+	testCases := []struct {
+		m                  v1.VolumeMount
+		runtimeSupportsRRO bool
+		featureGateEnabled bool
+		expected           bool
+		expectedErr        string
+	}{
+		{
+			m:                  v1.VolumeMount{Name: "rw"},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rw"},
+			runtimeSupportsRRO: false,
+			featureGateEnabled: false,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "ro", ReadOnly: true},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "ro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyDisabled)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "ro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyDisabled)},
+			runtimeSupportsRRO: false,
+			featureGateEnabled: false,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible),
+				MountPropagation: ptr.To(v1.MountPropagationNone)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible),
+				MountPropagation: ptr.To(v1.MountPropagationHostToContainer)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible),
+				MountPropagation: ptr.To(v1.MountPropagationBidirectional)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro-if-possible", RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible)},
+			runtimeSupportsRRO: false,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: false,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled),
+				MountPropagation: ptr.To(v1.MountPropagationNone)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled),
+				MountPropagation: ptr.To(v1.MountPropagationHostToContainer)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           true,
+			expectedErr:        "not compatible with propagation",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled),
+				MountPropagation: ptr.To(v1.MountPropagationBidirectional)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           true,
+			expectedErr:        "not compatible with propagation",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro", RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "not read-only",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled)},
+			runtimeSupportsRRO: false,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "not supported by the runtime",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled)},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: false,
+			expected:           false,
+			expectedErr:        "not enabled by kubelet feature gate",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "invalid", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyMode("foo"))},
+			runtimeSupportsRRO: true,
+			featureGateEnabled: true,
+			expected:           false,
+			expectedErr:        "unknown recursive read-only mode",
+		},
+	}
+
+	for _, tc := range testCases {
+		got, err := resolveRecursiveReadOnly(tc.m, tc.runtimeSupportsRRO, tc.featureGateEnabled)
+		t.Logf("resolveRecursiveReadOnly(%+v, %v, %v) = (%v, %v)", tc.m, tc.runtimeSupportsRRO, tc.featureGateEnabled,
+			got, err)
+		if tc.expectedErr == "" {
+			assert.Equal(t, tc.expected, got)
+			assert.NoError(t, err)
+		} else {
+			assert.ErrorContains(t, err, tc.expectedErr)
+		}
 	}
 }

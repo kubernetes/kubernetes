@@ -337,6 +337,8 @@ type ContainerResources struct {
 }
 
 // Status represents the status of a container.
+//
+// Status does not contain VolumeMap because CRI API is unaware of volume names.
 type Status struct {
 	// ID of the container.
 	ID ContainerID
@@ -438,6 +440,9 @@ type Mount struct {
 	HostPath string
 	// Whether the mount is read-only.
 	ReadOnly bool
+	// Whether the mount is recursive read-only.
+	// Must not be true if ReadOnly is false.
+	RecursiveReadOnly bool
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
 	// Requested propagation mode
@@ -530,8 +535,8 @@ const (
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
 	Conditions []RuntimeCondition
-	// Handlers is a map of current available handlers
-	Handlers map[string]RuntimeHandler
+	// RuntimeClasses is an array of current available runtime classes.
+	RuntimeClasses []v1.RuntimeClass
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
@@ -548,28 +553,14 @@ func (r *RuntimeStatus) GetRuntimeCondition(t RuntimeConditionType) *RuntimeCond
 // String formats the runtime status into human readable string.
 func (r *RuntimeStatus) String() string {
 	var ss []string
-	var sh []string
+	var ssClasses []string
 	for _, c := range r.Conditions {
 		ss = append(ss, c.String())
 	}
-	for _, h := range r.Handlers {
-		sh = append(sh, h.String())
+	for _, h := range r.RuntimeClasses {
+		ssClasses = append(ssClasses, h.String())
 	}
-	return fmt.Sprintf("Runtime Conditions: %s; Handlers: %s", strings.Join(ss, ", "), strings.Join(sh, ", "))
-}
-
-// RuntimeHandler contains condition information for the runtime handler.
-type RuntimeHandler struct {
-	// Name is the handler name.
-	Name string
-	// SupportsUserNamespaces is true if the handler has support for
-	// user namespaces.
-	SupportsUserNamespaces bool
-}
-
-// String formats the runtime handler into human readable string.
-func (h *RuntimeHandler) String() string {
-	return fmt.Sprintf("Name=%s SupportsUserNamespaces: %v", h.Name, h.SupportsUserNamespaces)
+	return fmt.Sprintf("Runtime Conditions: %s; Runtime Classes: %s", strings.Join(ss, ", "), strings.Join(ssClasses, ", "))
 }
 
 // RuntimeCondition contains condition information for the runtime.
