@@ -210,6 +210,7 @@ func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
 	expectPath(t, swagger, "/apis/apiservicegroup/v1")
 	expectPath(t, swagger, "/apis/apiservicegroup/v2")
 	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectNoPath(t, swagger, "/apis/a")
 
 	t.Logf("Remove APIService %s", apiService.Name)
 	s.RemoveAPIService(apiService.Name)
@@ -221,6 +222,7 @@ func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
 	// Ensure that the if the APIService is added then removed, the OpenAPI disappears from the aggregated OpenAPI as well.
 	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
 	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectNoPath(t, swagger, "/apis/a")
 }
 
 func TestAddRemoveAPIService(t *testing.T) {
