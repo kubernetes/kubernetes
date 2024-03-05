@@ -19,6 +19,8 @@ package cacher
 import (
 	"context"
 
+	"google.golang.org/grpc/metadata"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,17 +32,19 @@ import (
 
 // listerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type listerWatcher struct {
-	storage        storage.Interface
-	resourcePrefix string
-	newListFunc    func() runtime.Object
+	storage         storage.Interface
+	resourcePrefix  string
+	newListFunc     func() runtime.Object
+	contextMetadata metadata.MD
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
-func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object) cache.ListerWatcher {
+func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
 	return &listerWatcher{
-		storage:        storage,
-		resourcePrefix: resourcePrefix,
-		newListFunc:    newListFunc,
+		storage:         storage,
+		resourcePrefix:  resourcePrefix,
+		newListFunc:     newListFunc,
+		contextMetadata: contextMetadata,
 	}
 }
 
@@ -59,7 +63,11 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 		Predicate:            pred,
 		Recursive:            true,
 	}
-	if err := lw.storage.GetList(context.TODO(), lw.resourcePrefix, storageOpts, list); err != nil {
+	ctx := context.Background()
+	if lw.contextMetadata != nil {
+		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
+	}
+	if err := lw.storage.GetList(ctx, lw.resourcePrefix, storageOpts, list); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -73,5 +81,9 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 		Recursive:       true,
 		ProgressNotify:  true,
 	}
-	return lw.storage.Watch(context.TODO(), lw.resourcePrefix, opts)
+	ctx := context.Background()
+	if lw.contextMetadata != nil {
+		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
+	}
+	return lw.storage.Watch(ctx, lw.resourcePrefix, opts)
 }

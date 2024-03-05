@@ -170,6 +170,13 @@ const (
 	// to a chunking list request.
 	RemainingItemCount featuregate.Feature = "RemainingItemCount"
 
+	// owner: @serathius
+	// beta: v1.30
+	//
+	// Allow watch cache to create a watch on a dedicated RPC.
+	// This prevents watch cache from being starved by other watches.
+	SeparateCacheWatchRPC featuregate.Feature = "SeparateCacheWatchRPC"
+
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.14
 	// beta: v1.16
@@ -318,6 +325,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	RetryGenerateName: {Default: false, PreRelease: featuregate.Alpha},
+
+	SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
 
 	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
