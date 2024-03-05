@@ -769,7 +769,13 @@ func (a *Authenticator) getUsername(ctx context.Context, c claims, claimsUnstruc
 			return "", fmt.Errorf("oidc: error evaluating username claim expression: %w", fmt.Errorf("username claim expression must return a string"))
 		}
 
-		return evalResult.EvalResult.Value().(string), nil
+		username := evalResult.EvalResult.Value().(string)
+
+		if len(username) == 0 {
+			return "", fmt.Errorf("oidc: empty username via CEL expression is not allowed")
+		}
+
+		return username, nil
 	}
 
 	var username string

@@ -2982,7 +2982,7 @@ func TestToken(t *testing.T) {
 		// test to ensure omitempty fields not included in user info
 		// are set and accessible for CEL evaluation.
 		{
-			name: "test user validation rule doesn't fail when user info is empty",
+			name: "test user validation rule doesn't fail when user info is empty except username",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
 					Issuer: apiserver.Issuer{
@@ -2992,6 +2992,58 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username == " "`,
+							Message:    "username must be single space",
+						},
+						{
+							Expression: `user.uid == ""`,
+							Message:    "uid must be empty string",
+						},
+						{
+							Expression: `!('bar' in user.groups)`,
+							Message:    "groups must not contain bar",
+						},
+						{
+							Expression: `!('bar' in user.extra)`,
+							Message:    "extra must not contain bar",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": " ",
+				"groups": null,
+				"exp": %d,
+				"baz": "qux"
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{Name: " "},
+		},
+		{
+			name: "empty username is allowed via claim",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Expression: "claims.groups",
