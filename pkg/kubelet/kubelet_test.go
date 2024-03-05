@@ -3214,6 +3214,7 @@ func TestSyncPodSpans(t *testing.T) {
 		int(kubeCfg.RegistryBurst),
 		"",
 		"",
+		false,
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
 		runtimeSvc,

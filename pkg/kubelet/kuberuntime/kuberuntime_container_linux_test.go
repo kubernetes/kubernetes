@@ -247,12 +247,13 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		cpuReq        *resource.Quantity
-		cpuLim        *resource.Quantity
-		memLim        *resource.Quantity
-		expected      *runtimeapi.LinuxContainerResources
-		cgroupVersion CgroupVersion
+		name                 string
+		cpuReq               *resource.Quantity
+		cpuLim               *resource.Quantity
+		memLim               *resource.Quantity
+		expected             *runtimeapi.LinuxContainerResources
+		cgroupVersion        CgroupVersion
+		singleProcessOOMKill bool
 	}{
 		{
 			name:   "Request128MBLimit256MB",
@@ -320,6 +321,20 @@ func TestCalculateLinuxResources(t *testing.T) {
 			cgroupVersion: cgroupV2,
 		},
 		{
+			name:   "Request128MBLimit256MBSingleProcess",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion:        cgroupV2,
+			singleProcessOOMKill: true,
+		},
+		{
 			name:   "RequestNoMemory",
 			cpuReq: generateResourceQuantity("2"),
 			cpuLim: generateResourceQuantity("8"),
@@ -363,6 +378,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
+		m.singleProcessOOMKill = test.singleProcessOOMKill
 		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
