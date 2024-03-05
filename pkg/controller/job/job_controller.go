@@ -169,7 +169,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 
 	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			jm.enqueueSyncJobImmediately(logger, obj)
+			jm.addJob(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			jm.updateJob(logger, oldObj, newObj)
@@ -448,6 +448,17 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 	jm.enqueueSyncJobBatched(logger, job)
 }
 
+func (jm *Controller) addJob(logger klog.Logger, obj interface{}) {
+	jm.enqueueSyncJobImmediately(logger, obj)
+	jobObj, ok := obj.(*batch.Job)
+	if !ok {
+		return
+	}
+	if controllerName := managedByExternalController(jobObj); controllerName != nil {
+		metrics.JobByExternalControllerTotal.WithLabelValues(*controllerName).Inc()
+	}
+}
+
 func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 	oldJob := old.(*batch.Job)
 	curJob := cur.(*batch.Job)
@@ -545,6 +556,7 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
+
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
 	// deterministically avoid syncing controllers that fight over pods. Currently, we only
 	// ensure that the same controller is synced for a given pod. When we periodically relist
@@ -636,6 +648,13 @@ func (jm *Controller) syncOrphanPod(ctx context.Context, key string) error {
 	// Make sure the pod is still orphaned.
 	if controllerRef := metav1.GetControllerOf(sharedPod); controllerRef != nil {
 		job := jm.resolveControllerRef(sharedPod.Namespace, controllerRef)
+		if job != nil {
+			// Skip cleanup of finalizers for pods owned by a job managed by an external controller
+			if controllerName := managedByExternalController(job); controllerName != nil {
+				logger.V(2).Info("Skip cleanup of the job finalizer for a pod owned by a job that is managed by an external controller", "key", key, "podUID", sharedPod.UID, "jobUID", job.UID, "controllerName", controllerName)
+				return nil
+			}
+		}
 		if job != nil && !IsJobFinished(job) {
 			// The pod was adopted. Do not remove finalizer.
 			return nil
@@ -732,6 +751,17 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 		return err
 	}
+
+	// Skip syncing of the job it is managed by another controller.
+	// We cannot rely solely on skipping of queueing such jobs for synchronization,
+	// because it is possible a synchronization task is queued for a job, without
+	// the managedBy field, but the job is quickly replaced by another job with
+	// the field. Then, the syncJob might be invoked for a job with the field.
+	if controllerName := managedByExternalController(sharedJob); controllerName != nil {
+		logger.V(2).Info("Skip syncing the job as it is managed by an external controller", "key", key, "uid", sharedJob.UID, "controllerName", controllerName)
+		return nil
+	}
+
 	// make a copy so we don't mutate the shared cache
 	job := *sharedJob.DeepCopy()
 
@@ -1933,4 +1963,13 @@ func recordJobPodsCreationTotal(job *batch.Job, jobCtx *syncJobCtx, succeeded, f
 	if failed > 0 {
 		metrics.JobPodsCreationTotal.WithLabelValues(reason, metrics.Failed).Add(float64(failed))
 	}
+}
+
+func managedByExternalController(jobObj *batch.Job) *string {
+	if feature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
+		if controllerName := jobObj.Spec.ManagedBy; controllerName != nil && *controllerName != batch.JobControllerName {
+			return controllerName
+		}
+	}
+	return nil
 }

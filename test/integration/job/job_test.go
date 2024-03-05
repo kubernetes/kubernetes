@@ -1174,6 +1174,335 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 	}
 }
 
+// TestManagedBy verifies the Job controller correctly makes a decision to
+// reconcile or skip reconciliation of the Job depending on the Job's managedBy
+// field, and the enablement of the JobManagedBy feature gate.
+func TestManagedBy(t *testing.T) {
+	customControllerName := "example.com/custom-job-controller"
+	podTemplateSpec := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "main-container",
+					Image: "foo",
+				},
+			},
+		},
+	}
+	testCases := map[string]struct {
+		enableJobManagedBy                     bool
+		job                                    batchv1.Job
+		wantReconciledByBuiltInController      bool
+		wantJobByExternalControllerTotalMetric metricLabelsWithValue
+	}{
+		"the Job controller reconciles jobs without the managedBy": {
+			enableJobManagedBy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: podTemplateSpec,
+				},
+			},
+			wantReconciledByBuiltInController: true,
+			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
+				// There is no good label value choice to check here, since the
+				// values wasn't specified. Let's go with checking for the reserved
+				// value just so that all test cases verify the metric.
+				Labels: []string{batchv1.JobControllerName},
+				Value:  0,
+			},
+		},
+		"the Job controller reconciles jobs with the well known value of the managedBy field": {
+			enableJobManagedBy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To(batchv1.JobControllerName),
+				},
+			},
+			wantReconciledByBuiltInController: true,
+			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
+				Labels: []string{batchv1.JobControllerName},
+				Value:  0,
+			},
+		},
+		"the Job controller reconciles an unsuspended with the custom value of managedBy; feature disabled": {
+			enableJobManagedBy: false,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To(customControllerName),
+				},
+			},
+			wantReconciledByBuiltInController: true,
+			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
+				Labels: []string{customControllerName},
+				Value:  0,
+			},
+		},
+		"the Job controller does not reconcile an unsuspended with the custom value of managedBy": {
+			enableJobManagedBy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Suspend:   ptr.To(false),
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To(customControllerName),
+				},
+			},
+			wantReconciledByBuiltInController: false,
+			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
+				Labels: []string{customControllerName},
+				Value:  1,
+			},
+		},
+		"the Job controller does not reconcile a suspended with the custom value of managedBy": {
+			enableJobManagedBy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Suspend:   ptr.To(true),
+					Template:  podTemplateSpec,
+					ManagedBy: ptr.To(customControllerName),
+				},
+			},
+			wantReconciledByBuiltInController: false,
+			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
+				Labels: []string{customControllerName},
+				Value:  1,
+			},
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			resetMetrics()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)()
+
+			closeFn, restConfig, clientSet, ns := setup(t, "managed-by")
+			defer closeFn()
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			defer cancel()
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &test.job)
+			if err != nil {
+				t.Fatalf("Error %v while creating the job %q", err, klog.KObj(jobObj))
+			}
+
+			if test.wantReconciledByBuiltInController {
+				validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+					Active:      int(*jobObj.Spec.Parallelism),
+					Ready:       ptr.To[int32](0),
+					Terminating: ptr.To[int32](0),
+				})
+				validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, test.wantJobByExternalControllerTotalMetric)
+			} else {
+				validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, test.wantJobByExternalControllerTotalMetric)
+
+				// Await for a little bit to verify the reconciliation does not
+				// happen. We wait 100ms for the sync itself, because we already
+				// checked the metric is incremented so the sync would start
+				// immediately if it was queued.
+				time.Sleep(100 * time.Millisecond)
+				jobObj, err = clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Error %v when getting the latest job %v", err, klog.KObj(jobObj))
+				}
+				if diff := cmp.Diff(batchv1.JobStatus{}, jobObj.Status); diff != "" {
+					t.Fatalf("Unexpected status (-want/+got): %s", diff)
+				}
+			}
+		})
+	}
+}
+
+// TestManagedBy_Reenabling verifies handling a Job with a custom value of the
+// managedBy field by the Job controller, as the JobManagedBy feature gate is
+// disabled and reenabled again. First, when the feature gate is enabled, the
+// synchronization is skipped, when it is disabled the synchronization is starts,
+// and is disabled again with re-enabling of the feature gate.
+func TestManagedBy_Reenabling(t *testing.T) {
+	customControllerName := "example.com/custom-job-controller"
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)()
+
+	closeFn, restConfig, clientSet, ns := setup(t, "managed-by-reenabling")
+	defer closeFn()
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	defer func() {
+		cancel()
+	}()
+	resetMetrics()
+
+	baseJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "custom-job-test",
+			Namespace: ns.Name,
+		},
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](1),
+			Parallelism: ptr.To[int32](1),
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "main-container",
+							Image: "foo",
+						},
+					},
+				},
+			},
+			ManagedBy: &customControllerName,
+		},
+	}
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &baseJob)
+	if err != nil {
+		t.Fatalf("Error %v when creating the job %q", err, klog.KObj(jobObj))
+	}
+	jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+
+	validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, metricLabelsWithValue{
+		Labels: []string{customControllerName},
+		Value:  1,
+	})
+
+	// Await for a little bit to verify the reconciliation does not happen.
+	// We wait 1s to account for queued sync delay plus 100ms for the sync itself.
+	time.Sleep(time.Second + 100*time.Millisecond)
+	jobObj, err = jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error %v when getting the latest job %v", err, klog.KObj(jobObj))
+	}
+	if diff := cmp.Diff(batchv1.JobStatus{}, jobObj.Status); diff != "" {
+		t.Fatalf("Unexpected status (-want/+got): %s", diff)
+	}
+
+	// Disable the feature gate and restart the controller
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, false)()
+	cancel()
+	resetMetrics()
+	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
+
+	// Verify the built-in controller reconciles the Job
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, metricLabelsWithValue{
+		Labels: []string{customControllerName},
+		Value:  0,
+	})
+
+	// Reenable the feature gate and restart the controller
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)()
+	cancel()
+	resetMetrics()
+	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
+
+	// Marking the pod as finished, but
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+		t.Fatalf("Error %v when setting phase %s on the pod of job %v", err, v1.PodSucceeded, klog.KObj(jobObj))
+	}
+
+	// Await for a little bit to verify the reconciliation does not happen.
+	// We wait 1s to account for queued sync delay plus 100ms for the sync itself.
+	time.Sleep(time.Second + 100*time.Millisecond)
+
+	validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, metricLabelsWithValue{
+		Labels: []string{customControllerName},
+		Value:  1,
+	})
+
+	// Verify the built-in controller does not reconcile the Job. It is up to
+	// the external controller to update the status.
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+}
+
+// TestManagedBy_RecreatedJob verifies that the Job controller skips
+// reconciliation of a job with managedBy field, when this is a recreated job,
+// and there is still a pending sync queued for the previous job.
+// In this scenario we first create a job without managedBy field, and we mark
+// its pod as succeeded. This queues the Job object sync with 1s delay. Then,
+// without waiting for the Job status update we delete and recreate the job under
+// the same name, but with managedBy field. The queued update starts to execute
+// on the new job, but is skipped.
+func TestManagedBy_RecreatedJob(t *testing.T) {
+	customControllerName := "example.com/custom-job-controller"
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)()
+
+	closeFn, restConfig, clientSet, ns := setup(t, "managed-by-recreate-job")
+	defer closeFn()
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	defer cancel()
+	resetMetrics()
+
+	baseJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "custom-job-test",
+			Namespace: ns.Name,
+		},
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](1),
+			Parallelism: ptr.To[int32](1),
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "main-container",
+							Image: "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &baseJob)
+	if err != nil {
+		t.Fatalf("Error %v when creating the job %q", err, klog.KObj(jobObj))
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	// Marking the pod as complete queues the job reconciliation
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+		t.Fatalf("Error %v when setting phase %s on the pod of job %v", err, v1.PodSucceeded, klog.KObj(jobObj))
+	}
+
+	jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+	if err = jobClient.Delete(ctx, jobObj.Name, metav1.DeleteOptions{
+		// Use propagationPolicy=background so that we don't need to wait for the job object to be gone.
+		PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+	}); err != nil {
+		t.Fatalf("Error %v when deleting the job %v", err, klog.KObj(jobObj))
+	}
+
+	jobWithManagedBy := baseJob.DeepCopy()
+	jobWithManagedBy.Spec.ManagedBy = ptr.To(customControllerName)
+	jobObj, err = createJobWithDefaults(ctx, clientSet, ns.Name, jobWithManagedBy)
+	if err != nil {
+		t.Fatalf("Error %q while creating the job %q", err, klog.KObj(jobObj))
+	}
+
+	validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, metricLabelsWithValue{
+		Labels: []string{customControllerName},
+		Value:  1,
+	})
+
+	// Await for a little bit to verify the reconciliation does not happen.
+	// We wait 1s to account for queued sync delay plus 100ms for the sync itself.
+	time.Sleep(time.Second + 100*time.Millisecond)
+	jobObj, err = jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error %v when getting the latest job %v", err, klog.KObj(jobObj))
+	}
+	if diff := cmp.Diff(batchv1.JobStatus{}, jobObj.Status); diff != "" {
+		t.Fatalf("Unexpected status (-want/+got): %s", diff)
+	}
+}
+
 func getIndexFailureCount(p *v1.Pod) (int, error) {
 	if p.Annotations == nil {
 		return 0, errors.New("no annotations found")
@@ -3155,6 +3484,7 @@ func resetMetrics() {
 	metrics.PodFailuresHandledByFailurePolicy.Reset()
 	metrics.JobFinishedIndexesTotal.Reset()
 	metrics.JobPodsCreationTotal.Reset()
+	metrics.JobByExternalControllerTotal.Reset()
 }
 
 func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclient.Config, informerSet informers.SharedInformerFactory) (*jobcontroller.Controller, context.Context, context.CancelFunc) {

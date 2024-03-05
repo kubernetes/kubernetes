@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"errors"
 	_ "time/tzdata"
 
 	"fmt"
@@ -33,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -380,6 +382,17 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
+		"valid managedBy field": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("example.com/foo"),
+				},
+			},
+		},
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
@@ -394,6 +407,28 @@ func TestValidateJob(t *testing.T) {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
+		`spec.managedBy: Too long: may not be longer than 63`: {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("example.com/" + strings.Repeat("x", 60)),
+				},
+			},
+		},
+		`spec.managedBy: Invalid value: "invalid custom controller name": must be a domain-prefixed path (such as "acme.io/foo")`: {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("invalid custom controller name"),
+				},
+			},
+		},
 		`spec.podFailurePolicy.rules[0]: Invalid value: specifying one of OnExitCodes and OnPodConditions is required`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
@@ -1349,6 +1384,39 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.ManualSelector = pointer.Bool(true)
 			},
 		},
+		"invalid attempt to set managedBy field": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.ManagedBy = ptr.To("example.com/custom-controller")
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.managedBy",
+			},
+		},
+		"invalid update of the managedBy field": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:  validGeneratedSelector,
+					Template:  validPodTemplateSpecForGenerated,
+					ManagedBy: ptr.To("example.com/custom-controller1"),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.ManagedBy = ptr.To("example.com/custom-controller2")
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.managedBy",
+			},
+		},
 		"immutable completions for non-indexed jobs": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -2014,6 +2082,8 @@ func TestValidateJobUpdate(t *testing.T) {
 
 func TestValidateJobUpdateStatus(t *testing.T) {
 	cases := map[string]struct {
+		opts JobStatusValidationOptions
+
 		old      batch.Job
 		update   batch.Job
 		wantErrs field.ErrorList
@@ -2141,7 +2211,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateJobUpdateStatus(&tc.update, &tc.old)
+			errs := ValidateJobUpdateStatus(&tc.update, &tc.old, tc.opts)
 			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
@@ -3585,5 +3655,163 @@ func TestTimeZones(t *testing.T) {
 		if len(errs) > 0 {
 			t.Errorf("%s failed: %v", tz, errs)
 		}
+	}
+}
+
+func TestValidateIndexesString(t *testing.T) {
+	testCases := map[string]struct {
+		indexesString string
+		completions   int32
+		wantError     error
+	}{
+		"empty is valid": {
+			indexesString: "",
+			completions:   6,
+		},
+		"single number is valid": {
+			indexesString: "1",
+			completions:   6,
+		},
+		"single interval is valid": {
+			indexesString: "1-3",
+			completions:   6,
+		},
+		"mixed intervals valid": {
+			indexesString: "0,1-3,5,7-10",
+			completions:   12,
+		},
+		"invalid due to extra space": {
+			indexesString: "0,1-3, 5",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: " 5"`),
+		},
+		"invalid due to too large index": {
+			indexesString: "0,1-3,5",
+			completions:   5,
+			wantError:     errors.New(`too large index: "5"`),
+		},
+		"invalid due to non-increasing order of intervals": {
+			indexesString: "1-3,0,5",
+			completions:   6,
+			wantError:     errors.New(`non-increasing order, previous: 3, current: 0`),
+		},
+		"invalid due to non-increasing order between intervals": {
+			indexesString: "0,0,5",
+			completions:   6,
+			wantError:     errors.New(`non-increasing order, previous: 0, current: 0`),
+		},
+		"invalid due to non-increasing order within interval": {
+			indexesString: "0,1-1,5",
+			completions:   6,
+			wantError:     errors.New(`non-increasing order, previous: 1, current: 1`),
+		},
+		"invalid due to starting with '-'": {
+			indexesString: "-1,0",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: ""`),
+		},
+		"invalid due to ending with '-'": {
+			indexesString: "0,1-",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: ""`),
+		},
+		"invalid due to repeated '-'": {
+			indexesString: "0,1--3",
+			completions:   6,
+			wantError:     errors.New(`the fragment "1--3" violates the requirement that an index interval can have at most two parts separated by '-'`),
+		},
+		"invalid due to repeated ','": {
+			indexesString: "0,,1,3",
+			completions:   6,
+			wantError:     errors.New(`cannot convert string to integer for index: ""`),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validateIndexesFormat(tc.indexesString, tc.completions)
+			if tc.wantError == nil && gotErr != nil {
+				t.Errorf("unexpected error: %s", gotErr)
+			} else if tc.wantError != nil && gotErr == nil {
+				t.Errorf("missing error: %s", tc.wantError)
+			} else if tc.wantError != nil && gotErr != nil {
+				if diff := cmp.Diff(tc.wantError.Error(), gotErr.Error()); diff != "" {
+					t.Errorf("unexpected error, diff: %s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateFailedIndexesNotOverlapCompleted(t *testing.T) {
+	testCases := map[string]struct {
+		completedIndexesStr string
+		failedIndexesStr    string
+		completions         int32
+		wantError           error
+	}{
+		"empty intervals": {
+			completedIndexesStr: "",
+			failedIndexesStr:    "",
+			completions:         6,
+		},
+		"empty completed intervals": {
+			completedIndexesStr: "",
+			failedIndexesStr:    "1-3",
+			completions:         6,
+		},
+		"empty failed intervals": {
+			completedIndexesStr: "1-2",
+			failedIndexesStr:    "",
+			completions:         6,
+		},
+		"non-overlapping intervals": {
+			completedIndexesStr: "0,2-4,6-8,12-19",
+			failedIndexesStr:    "1,9-10",
+			completions:         20,
+		},
+		"overlapping intervals": {
+			completedIndexesStr: "0,2-4,6-8,12-19",
+			failedIndexesStr:    "1,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"overlapping intervals, corrupted completed interval skipped": {
+			completedIndexesStr: "0,2-4,x,6-8,12-19",
+			failedIndexesStr:    "1,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"overlapping intervals, corrupted failed interval skipped": {
+			completedIndexesStr: "0,2-4,6-8,12-19",
+			failedIndexesStr:    "1,y,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"overlapping intervals, first corrupted intervals skipped": {
+			completedIndexesStr: "x,0,2-4,6-8,12-19",
+			failedIndexesStr:    "y,1,8,9-10",
+			completions:         20,
+			wantError:           errors.New("failedIndexes and completedIndexes overlap at index: 8"),
+		},
+		"non-overlapping intervals, last intervals corrupted": {
+			completedIndexesStr: "0,2-4,6-8,12-19,x",
+			failedIndexesStr:    "1,9-10,y",
+			completions:         20,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			gotErr := validateFailedIndexesNotOverlapCompleted(tc.completedIndexesStr, tc.failedIndexesStr, tc.completions)
+			if tc.wantError == nil && gotErr != nil {
+				t.Errorf("unexpected error: %s", gotErr)
+			} else if tc.wantError != nil && gotErr == nil {
+				t.Errorf("missing error: %s", tc.wantError)
+			} else if tc.wantError != nil && gotErr != nil {
+				if diff := cmp.Diff(tc.wantError.Error(), gotErr.Error()); diff != "" {
+					t.Errorf("unexpected error, diff: %s", diff)
+				}
+			}
+		})
 	}
 }

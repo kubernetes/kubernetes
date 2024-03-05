@@ -2292,6 +2292,126 @@ func TestSyncJobDeleted(t *testing.T) {
 	}
 }
 
+func TestSyncJobWhenManagedBy(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	now := metav1.Now()
+	baseJob := batch.Job{
+		TypeMeta: metav1.TypeMeta{Kind: "Job"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foobar",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: batch.JobSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Image: "foo/bar"},
+					},
+				},
+			},
+			Parallelism:  ptr.To[int32](2),
+			Completions:  ptr.To[int32](2),
+			BackoffLimit: ptr.To[int32](6),
+		},
+		Status: batch.JobStatus{
+			Active:    1,
+			Ready:     ptr.To[int32](1),
+			StartTime: &now,
+		},
+	}
+
+	testCases := map[string]struct {
+		enableJobManagedBy bool
+		job                batch.Job
+		wantStatus         batch.JobStatus
+	}{
+		"job with custom value of managedBy; feature enabled; the status is unchanged": {
+			enableJobManagedBy: true,
+			job: func() batch.Job {
+				job := baseJob.DeepCopy()
+				job.Spec.ManagedBy = ptr.To("custom-managed-by")
+				return *job
+			}(),
+			wantStatus: baseJob.Status,
+		},
+		"job with well known value of the managedBy; feature enabled; the status is updated": {
+			enableJobManagedBy: true,
+			job: func() batch.Job {
+				job := baseJob.DeepCopy()
+				job.Spec.ManagedBy = ptr.To(batch.JobControllerName)
+				return *job
+			}(),
+			wantStatus: batch.JobStatus{
+				Active:                  2,
+				Ready:                   ptr.To[int32](0),
+				StartTime:               &now,
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+			},
+		},
+		"job with custom value of managedBy; feature disabled; the status is updated": {
+			job: func() batch.Job {
+				job := baseJob.DeepCopy()
+				job.Spec.ManagedBy = ptr.To("custom-managed-by")
+				return *job
+			}(),
+			wantStatus: batch.JobStatus{
+				Active:                  2,
+				Ready:                   ptr.To[int32](0),
+				StartTime:               &now,
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+			},
+		},
+		"job without the managedBy; feature enabled; the status is updated": {
+			enableJobManagedBy: true,
+			job:                baseJob,
+			wantStatus: batch.JobStatus{
+				Active:                  2,
+				Ready:                   ptr.To[int32](0),
+				StartTime:               &now,
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)()
+
+			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			job := &tc.job
+
+			actual := job
+			manager.updateStatusHandler = func(_ context.Context, job *batch.Job) (*batch.Job, error) {
+				actual = job
+				return job, nil
+			}
+			if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
+				t.Fatalf("error %v while adding the %v job to the index", err, klog.KObj(job))
+			}
+
+			if err := manager.syncJob(ctx, testutil.GetKey(job, t)); err != nil {
+				t.Fatalf("error %v while reconciling the job %v", err, testutil.GetKey(job, t))
+			}
+
+			if diff := cmp.Diff(tc.wantStatus, actual.Status); diff != "" {
+				t.Errorf("Unexpected job status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	now := metav1.Now()
