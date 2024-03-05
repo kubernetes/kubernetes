@@ -114,12 +114,12 @@ func TestReconstructVolumes(t *testing.T) {
 				t.Errorf("Expected expectedVolumesNeedDevicePath:\n%v\n got:\n%v", expectedVolumes, rcInstance.volumesNeedUpdateFromNodeStatus)
 			}
 
-			volumesFailedReconstruction := sets.NewString()
+			volumesFailedReconstruction := sets.New[string]()
 			for _, vol := range rcInstance.volumesFailedReconstruction {
 				volumesFailedReconstruction.Insert(vol.volumeSpecName)
 			}
-			if !reflect.DeepEqual(volumesFailedReconstruction.List(), tc.expectedVolumesFailedReconstruction) {
-				t.Errorf("Expected volumesFailedReconstruction:\n%v\n got:\n%v", tc.expectedVolumesFailedReconstruction, volumesFailedReconstruction.List())
+			if !reflect.DeepEqual(sets.List(volumesFailedReconstruction), tc.expectedVolumesFailedReconstruction) {
+				t.Errorf("Expected volumesFailedReconstruction:\n%v\n got:\n%v", tc.expectedVolumesFailedReconstruction, sets.List(volumesFailedReconstruction))
 			}
 
 			if tc.verifyFunc != nil {
