@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 )
 
@@ -89,26 +91,53 @@ func NewGarbageCollector(
 	mapper meta.ResettableRESTMapper,
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informerfactory.InformerFactory,
-	dependencyGraphBuilder *GraphBuilder,
-	attemptToDelete workqueue.RateLimitingInterface,
-	attemptToOrphan workqueue.RateLimitingInterface,
-	absentOwnerCache *ReferenceCache,
-	eventBroadcaster record.EventBroadcaster,
+	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
+
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
+
+	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
+	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
+	absentOwnerCache := NewReferenceCache(500)
 	gc := &GarbageCollector{
-		metadataClient:         metadataClient,
-		restMapper:             mapper,
-		attemptToDelete:        attemptToDelete,
-		attemptToOrphan:        attemptToOrphan,
-		absentOwnerCache:       absentOwnerCache,
-		kubeClient:             kubeClient,
-		eventBroadcaster:       eventBroadcaster,
-		dependencyGraphBuilder: dependencyGraphBuilder,
+		metadataClient:   metadataClient,
+		restMapper:       mapper,
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
+		absentOwnerCache: absentOwnerCache,
+		kubeClient:       kubeClient,
+		eventBroadcaster: eventBroadcaster,
+	}
+	gc.dependencyGraphBuilder = &GraphBuilder{
+		eventRecorder:    eventRecorder,
+		metadataClient:   metadataClient,
+		informersStarted: informersStarted,
+		restMapper:       mapper,
+		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		uidToNode: &concurrentUIDToNode{
+			uidToNode: make(map[types.UID]*node),
+		},
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
+		absentOwnerCache: absentOwnerCache,
+		sharedInformers:  sharedInformers,
+		ignoredResources: ignoredResources,
 	}
 
 	metrics.Register()
 
 	return gc, nil
+}
+
+// resyncMonitors starts or stops resource monitors as needed to ensure that all
+// (and only) those resources present in the map are monitored.
+func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResources map[schema.GroupVersionResource]struct{}) error {
+	if err := gc.dependencyGraphBuilder.syncMonitors(logger, deletableResources); err != nil {
+		return err
+	}
+	gc.dependencyGraphBuilder.startMonitors(logger)
+	return nil
 }
 
 // Run starts garbage collector workers.
@@ -231,7 +260,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 			// discovery call if the resources appeared in-between the calls. In that
 			// case, the restMapper will fail to map some of newResources until the next
 			// attempt.
-			if err := gc.dependencyGraphBuilder.resyncMonitors(logger, newResources); err != nil {
+			if err := gc.resyncMonitors(logger, newResources); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
 				metrics.GarbageCollectorResourcesSyncError.Inc()
 				return false, nil

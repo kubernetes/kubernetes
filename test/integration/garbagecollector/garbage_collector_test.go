@@ -252,15 +252,6 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	logger := tCtx.Logger()
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-
-	dependencyGraphBuilder := garbagecollector.NewDependencyGraphBuilder(
-		tCtx,
-		metadataClient,
-		alwaysStarted,
-		restMapper,
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-	)
-	attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster := dependencyGraphBuilder.GetGraphResources()
 	gc, err := garbagecollector.NewGarbageCollector(
 		tCtx,
 		clientSet,
@@ -268,11 +259,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		restMapper,
 		garbagecollector.DefaultIgnoredResources(),
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-		dependencyGraphBuilder,
-		attemptToDelete,
-		attemptToOrphan,
-		absentOwnerCache,
-		eventBroadcaster,
+		alwaysStarted,
 	)
 	if err != nil {
 		t.Fatalf("failed to create garbage collector: %v", err)

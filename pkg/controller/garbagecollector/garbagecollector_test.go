@@ -99,18 +99,8 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	logger, tCtx := ktesting.NewTestContext(t)
-	dependencyGraphBuilder := NewDependencyGraphBuilder(
-		tCtx,
-		metadataClient,
-		alwaysStarted,
-		rm,
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-	)
-	attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster := dependencyGraphBuilder.GetGraphResources()
-
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), dependencyGraphBuilder,
-		attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster)
+		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,13 +108,13 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 
 	// Make sure resource monitor syncing creates and stops resource monitors.
 	tweakableRM.Add(schema.GroupVersionKind{Group: "tpr.io", Version: "v1", Kind: "unknown"}, nil)
-	err = gc.dependencyGraphBuilder.resyncMonitors(logger, twoResources)
+	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
 	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
 
-	err = gc.dependencyGraphBuilder.resyncMonitors(logger, podResource)
+	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
@@ -132,13 +122,13 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 
 	go gc.Run(tCtx, 1)
 
-	err = gc.dependencyGraphBuilder.resyncMonitors(logger, twoResources)
+	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
 	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
 
-	err = gc.dependencyGraphBuilder.resyncMonitors(logger, podResource)
+	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
@@ -223,27 +213,12 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tweakableRM := meta.NewDefaultRESTMapper(nil)
-	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
 
 	client := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-
-	dependencyGraphBuilder := NewDependencyGraphBuilder(
-		ctx,
-		metadataClient,
-		alwaysStarted,
-		rm,
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-	)
-	attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster := dependencyGraphBuilder.GetGraphResources()
-
-	gc, err := NewGarbageCollector(ctx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), dependencyGraphBuilder,
-		attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster)
+	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -908,25 +883,12 @@ func TestGarbageCollectorSync(t *testing.T) {
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
 
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-
-	dependencyGraphBuilder := NewDependencyGraphBuilder(
-		tCtx,
-		metadataClient,
-		alwaysStarted,
-		rm,
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-	)
-	attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster := dependencyGraphBuilder.GetGraphResources()
-
-	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), dependencyGraphBuilder,
-		attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}

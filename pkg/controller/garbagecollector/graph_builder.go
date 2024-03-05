@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
-	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
+
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
@@ -63,7 +63,6 @@ const (
 	addEvent eventType = iota
 	updateEvent
 	deleteEvent
-	SyncPeriod = 30 * time.Second
 )
 
 type event struct {
@@ -98,8 +97,7 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
-	eventRecorder    record.EventRecorder
-	eventBroadcaster record.EventBroadcaster
+	eventRecorder record.EventRecorder
 
 	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
@@ -135,60 +133,6 @@ func (m *monitor) Run() {
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
-
-func NewDependencyGraphBuilder(
-	ctx context.Context,
-	metadataClient metadata.Interface,
-	informersStarted <-chan struct{},
-	mapper meta.ResettableRESTMapper,
-	sharedInformers informerfactory.InformerFactory,
-) *GraphBuilder {
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-
-	graphBuilder := &GraphBuilder{
-		restMapper:       mapper,
-		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"}),
-		eventBroadcaster: eventBroadcaster,
-		metadataClient:   metadataClient,
-		informersStarted: informersStarted,
-		attemptToDelete:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete"),
-		attemptToOrphan:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan"),
-		absentOwnerCache: NewReferenceCache(500),
-		sharedInformers:  sharedInformers,
-		ignoredResources: ignoredResources,
-		uidToNode: &concurrentUIDToNode{
-			uidToNode: make(map[types.UID]*node),
-		},
-		graphChanges: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
-	}
-
-	return graphBuilder
-}
-
-func (gb *GraphBuilder) GetGraphResources() (
-	attemptToDelete workqueue.RateLimitingInterface,
-	attemptToOrphan workqueue.RateLimitingInterface,
-	absentOwnerCache *ReferenceCache,
-	eventBroadcaster record.EventBroadcaster,
-) {
-	return gb.attemptToDelete, gb.attemptToOrphan, gb.absentOwnerCache, gb.eventBroadcaster
-}
-
-func (gb *GraphBuilder) GetMonitorStore(resource schema.GroupVersionResource) cache.Store {
-	gb.monitorLock.RLock()
-	defer gb.monitorLock.RUnlock()
-	return gb.monitors[resource].store
-}
-
-func (gb *GraphBuilder) GetMonitorController(resource schema.GroupVersionResource) cache.Controller {
-	gb.monitorLock.RLock()
-	defer gb.monitorLock.RUnlock()
-	return gb.monitors[resource].controller
-}
-
-func (gb *GraphBuilder) Name() string {
-	return "dependencygraphbuilder"
-}
 
 func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -235,16 +179,6 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 	// need to clone because it's from a shared cache
 	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
 	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
-}
-
-// resyncMonitors starts or stops resource monitors as needed to ensure that all
-// (and only) those resources present in the map are monitored.
-func (gb *GraphBuilder) resyncMonitors(logger klog.Logger, deletableResources map[schema.GroupVersionResource]struct{}) error {
-	if err := gb.syncMonitors(logger, deletableResources); err != nil {
-		return err
-	}
-	gb.startMonitors(logger)
-	return nil
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,

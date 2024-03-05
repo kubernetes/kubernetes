@@ -200,19 +200,8 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cacheddiscovery.NewMemCacheClient(clientSet.Discovery()))
 	restMapper.Reset()
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
-	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-
-	dependencyGraphBuilder := garbagecollector.NewDependencyGraphBuilder(
-		ctx,
-		metadataClient,
-		alwaysStarted,
-		restMapper,
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-	)
-
-	attemptToDelete, attemptToOrphan, absentOwnerCache, eventBroadcaster := dependencyGraphBuilder.GetGraphResources()
 	gc, err := garbagecollector.NewGarbageCollector(
 		ctx,
 		clientSet,
@@ -220,11 +209,7 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 		restMapper,
 		garbagecollector.DefaultIgnoredResources(),
 		informerfactory.NewInformerFactory(informerSet, metadataInformers),
-		dependencyGraphBuilder,
-		attemptToDelete,
-		attemptToOrphan,
-		absentOwnerCache,
-		eventBroadcaster,
+		alwaysStarted,
 	)
 	if err != nil {
 		tb.Fatalf("Failed creating garbage collector")
