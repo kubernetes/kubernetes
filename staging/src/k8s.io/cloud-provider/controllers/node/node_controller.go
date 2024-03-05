@@ -226,6 +226,7 @@ func (cnc *CloudNodeController) processNextWorkItem() bool {
 		if err := cnc.syncHandler(key); err != nil {
 			// Put the item back on the workqueue to handle any transient errors.
 			cnc.workqueue.AddRateLimited(key)
+			klog.Infof("error syncing '%s': %v, requeuing", key, err)
 			return fmt.Errorf("error syncing '%s': %s, requeuing", key, err.Error())
 		}
 
@@ -424,12 +425,8 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 	klog.Infof("Initializing node %s with cloud provider", nodeName)
 
 	copyNode := curNode.DeepCopy()
-	providerID, err := cnc.getProviderID(ctx, copyNode)
-	if err != nil {
-		return fmt.Errorf("failed to get provider ID for node %s at cloudprovider: %v", nodeName, err)
-	}
 
-	instanceMetadata, err := cnc.getInstanceMetadata(ctx, providerID, copyNode)
+	instanceMetadata, err := cnc.getInstanceMetadata(ctx, copyNode)
 	if err != nil {
 		return fmt.Errorf("failed to get instance metadata for node %s: %v", nodeName, err)
 	}
@@ -439,7 +436,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 		return nil
 	}
 
-	nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(ctx, providerID, copyNode, instanceMetadata)
+	nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(ctx, copyNode, instanceMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to get node modifiers from cloud provider: %v", err)
 	}
@@ -510,16 +507,13 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 // loop, meaning they could get called multiple times.
 func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 	ctx context.Context,
-	providerID string,
 	node *v1.Node,
 	instanceMeta *cloudprovider.InstanceMetadata,
 ) ([]nodeModifier, error) {
 
 	var nodeModifiers []nodeModifier
 	if node.Spec.ProviderID == "" {
-		if providerID != "" {
-			nodeModifiers = append(nodeModifiers, func(n *v1.Node) { n.Spec.ProviderID = providerID })
-		} else if instanceMeta.ProviderID != "" {
+		if instanceMeta.ProviderID != "" {
 			nodeModifiers = append(nodeModifiers, func(n *v1.Node) { n.Spec.ProviderID = instanceMeta.ProviderID })
 		}
 	}
@@ -594,35 +588,33 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 	return nodeModifiers, nil
 }
 
-func (cnc *CloudNodeController) getProviderID(ctx context.Context, node *v1.Node) (string, error) {
-	if node.Spec.ProviderID != "" {
-		return node.Spec.ProviderID, nil
-	}
-
-	if _, ok := cnc.cloud.InstancesV2(); ok {
-		// We don't need providerID when we call InstanceMetadata for InstancesV2
-		return "", nil
-	}
-
-	providerID, err := cloudprovider.GetInstanceProviderID(ctx, cnc.cloud, types.NodeName(node.Name))
-	if err == cloudprovider.NotImplemented {
-		// if the cloud provider being used does not support provider IDs,
-		// we can safely continue since we will attempt to set node
-		// addresses given the node name in getNodeAddressesByProviderIDOrName
-		klog.Warningf("cloud provider does not set node provider ID, using node name to discover node %s", node.Name)
-		return "", nil
-	}
-
-	// if the cloud provider being used supports provider IDs, we want
-	// to propagate the error so that we re-try in the future; if we
-	// do not, the taint will be removed, and this will not be retried
-	return providerID, err
-}
-
-// getInstanceMetadata get instance type and nodeAddresses, use Instances if InstancesV2 is off.
-func (cnc *CloudNodeController) getInstanceMetadata(ctx context.Context, providerID string, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+// getInstanceMetadata get providerdID, instance type and nodeAddresses, use Instances if InstancesV2 is off.
+// ProviderID is expected to be available, but to keep backward compatibility,
+// we should handle some scenarios where it can be missing. It returns an error
+// if providerID is missing, except when is not implemented by GetInstanceProviderID.
+func (cnc *CloudNodeController) getInstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	// kubelet can set the provider ID using the flag and is inmutable
+	providerID := node.Spec.ProviderID
+	// InstancesV2 require ProviderID to be present
 	if instancesV2, ok := cnc.cloud.InstancesV2(); instancesV2 != nil && ok {
-		return instancesV2.InstanceMetadata(ctx, node)
+		metadata, err := instancesV2.InstanceMetadata(ctx, node)
+		if err != nil {
+			return nil, err
+		}
+		// spec.ProviderID is required for multiple controllers, like loadbalancers, so we should not
+		// untaint the node until is set. Once it is set, the field is immutable, so no need to reconcile.
+		// We only set this value during initialization and is never reconciled, so if for some reason
+		// we are not able to set it, the instance will never be able to acquire it.
+		// Before external cloud providers were enabled by default, the field was set by the kubelet, and the
+		// node was created with the value.
+		// xref: https://issues.k8s.io/123024
+		if metadata != nil && metadata.ProviderID == "" {
+			if providerID == "" {
+				return metadata, fmt.Errorf("cloud provider does not set node provider ID for node %s", node.Name)
+			}
+			metadata.ProviderID = providerID
+		}
+		return metadata, nil
 	}
 
 	// If InstancesV2 not implement, use Instances.
@@ -630,6 +622,26 @@ func (cnc *CloudNodeController) getInstanceMetadata(ctx context.Context, provide
 	if !ok {
 		return nil, fmt.Errorf("failed to get instances from cloud provider")
 	}
+
+	var err error
+	if providerID == "" {
+		providerID, err = cloudprovider.GetInstanceProviderID(ctx, cnc.cloud, types.NodeName(node.Name))
+		if err != nil {
+			// This is the only case where ProviderID can be skipped
+			if errors.Is(err, cloudprovider.NotImplemented) {
+				// if the cloud provider being used does not support provider IDs,
+				// we can safely continue since we will attempt to set node
+				// addresses given the node name in getNodeAddressesByProviderIDOrName
+				klog.Warningf("cloud provider does not set node provider ID, using node name to discover node %s", node.Name)
+			} else {
+				// if the cloud provider being used supports provider IDs, we want
+				// to propagate the error so that we re-try in the future; if we
+				// do not, the taint will be removed, and this will not be retried
+				return nil, err
+			}
+		}
+	}
+
 	nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, providerID, node.Name)
 	if err != nil {
 		return nil, err
@@ -640,6 +652,7 @@ func (cnc *CloudNodeController) getInstanceMetadata(ctx context.Context, provide
 	}
 
 	instanceMetadata := &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
 		InstanceType:  instanceType,
 		NodeAddresses: nodeAddresses,
 	}
