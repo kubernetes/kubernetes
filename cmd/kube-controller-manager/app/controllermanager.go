@@ -22,6 +22,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"os"
@@ -625,12 +626,18 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	}
 
 	if controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
+		ignoredResources := make(map[schema.GroupResource]struct{})
+		for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
+			ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
+		}
+
 		controllerContext.GraphBuilder = garbagecollector.NewDependencyGraphBuilder(
 			ctx,
 			metadataClient,
-			controllerContext.InformersStarted,
-			restMapper,
+			controllerContext.RESTMapper,
+			ignoredResources,
 			controllerContext.ObjectOrMetadataInformerFactory,
+			controllerContext.InformersStarted,
 		)
 	}
 
