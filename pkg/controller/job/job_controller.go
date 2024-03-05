@@ -557,15 +557,6 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 		return
 	}
 
-	// This is a performance optimization. When the Job object is managed by
-	// an external controller we don't need to queue the synchronization tasks.
-	if jobObj, ok := obj.(*batch.Job); ok {
-		if controllerName := managedByExternalController(jobObj); controllerName != nil {
-			logger.V(2).Info("Skip enqueueing the job as it is managed by an external controller", "key", key, "uid", jobObj.UID, "controllerName", controllerName)
-			return
-		}
-	}
-
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
 	// deterministically avoid syncing controllers that fight over pods. Currently, we only
 	// ensure that the same controller is synced for a given pod. When we periodically relist

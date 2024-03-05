@@ -4083,7 +4083,6 @@ func TestUpdateJobRequeue(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	cases := map[string]struct {
-		enableJobManagedBy      bool
 		oldJob                  *batch.Job
 		updateFn                func(job *batch.Job)
 		wantRequeuedImmediately bool
@@ -4096,19 +4095,6 @@ func TestUpdateJobRequeue(t *testing.T) {
 			},
 			wantRequeuedImmediately: true,
 		},
-		"spec update; managedBy used": {
-			enableJobManagedBy: true,
-			oldJob: func() *batch.Job {
-				job := newJob(1, 1, 1, batch.IndexedCompletion)
-				job.Spec.ManagedBy = ptr.To("custom-job-controller")
-				return job
-			}(),
-			updateFn: func(job *batch.Job) {
-				job.Spec.Suspend = ptr.To(false)
-				job.Generation++
-			},
-			wantRequeuedImmediately: false,
-		},
 		"status update": {
 			oldJob: newJob(1, 1, 1, batch.IndexedCompletion),
 			updateFn: func(job *batch.Job) {
@@ -4119,7 +4105,6 @@ func TestUpdateJobRequeue(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)()
 			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
