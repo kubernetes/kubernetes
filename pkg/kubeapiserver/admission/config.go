@@ -29,13 +29,14 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	egressselector "k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	externalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -69,6 +70,7 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 		cloudConfig,
 		discoveryRESTMapper,
 		quotainstall.NewQuotaConfigurationForAdmission(),
+		exclusion.Excluded(),
 	)
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {

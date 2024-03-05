@@ -21,8 +21,11 @@ import (
 	"errors"
 	"fmt"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
@@ -36,6 +39,15 @@ import (
 type sourceFactory[H any] func(informers.SharedInformerFactory, kubernetes.Interface, dynamic.Interface, meta.RESTMapper) Source[H]
 type dispatcherFactory[H any] func(authorizer.Authorizer, *matching.Matcher) Dispatcher[H]
 
+// admissionResources is the list of resources related to CEL-based admission
+// features.
+var admissionResources = []schema.GroupResource{
+	{Group: admissionregistrationv1.GroupName, Resource: "validatingadmissionpolicies"},
+	{Group: admissionregistrationv1.GroupName, Resource: "validatingadmissionpolicybindings"},
+	{Group: admissionregistrationv1.GroupName, Resource: "mutatingadmissionpolicies"},
+	{Group: admissionregistrationv1.GroupName, Resource: "mutatingadmissionpolicybindings"},
+}
+
 // AdmissionPolicyManager is an abstract admission plugin with all the
 // infrastructure to define Admit or Validate on-top.
 type Plugin[H any] struct {
@@ -48,13 +60,14 @@ type Plugin[H any] struct {
 	dispatcher Dispatcher[H]
 	matcher    *matching.Matcher
 
-	informerFactory informers.SharedInformerFactory
-	client          kubernetes.Interface
-	restMapper      meta.RESTMapper
-	dynamicClient   dynamic.Interface
-	stopCh          <-chan struct{}
-	authorizer      authorizer.Authorizer
-	enabled         bool
+	informerFactory   informers.SharedInformerFactory
+	client            kubernetes.Interface
+	restMapper        meta.RESTMapper
+	dynamicClient     dynamic.Interface
+	excludedResources sets.Set[schema.GroupResource]
+	stopCh            <-chan struct{}
+	authorizer        authorizer.Authorizer
+	enabled           bool
 }
 
 var (
@@ -64,6 +77,7 @@ var (
 	_ initializer.WantsDynamicClient               = &Plugin[any]{}
 	_ initializer.WantsDrainedNotification         = &Plugin[any]{}
 	_ initializer.WantsAuthorizer                  = &Plugin[any]{}
+	_ initializer.WantsExcludedAdmissionResources  = &Plugin[any]{}
 	_ admission.InitializationValidator            = &Plugin[any]{}
 )
 
@@ -76,6 +90,9 @@ func NewPlugin[H any](
 		Handler:           handler,
 		sourceFactory:     sourceFactory,
 		dispatcherFactory: dispatcherFactory,
+
+		// always exclude admission/mutating policies and bindings
+		excludedResources: sets.New(admissionResources...),
 	}
 }
 
@@ -109,6 +126,10 @@ func (c *Plugin[H]) SetMatcher(matcher *matching.Matcher) {
 
 func (c *Plugin[H]) SetEnabled(enabled bool) {
 	c.enabled = enabled
+}
+
+func (c *Plugin[H]) SetExcludedAdmissionResources(excludedResources []schema.GroupResource) {
+	c.excludedResources.Insert(excludedResources...)
 }
 
 // ValidateInitialization - once clientset and informer factory are provided, creates and starts the admission controller
@@ -177,7 +198,7 @@ func (c *Plugin[H]) Dispatch(
 ) (err error) {
 	if !c.enabled {
 		return nil
-	} else if isPolicyResource(a) {
+	} else if c.shouldIgnoreResource(a) {
 		return nil
 	} else if !c.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
@@ -186,14 +207,9 @@ func (c *Plugin[H]) Dispatch(
 	return c.dispatcher.Dispatch(ctx, a, o, c.source.Hooks())
 }
 
-func isPolicyResource(attr admission.Attributes) bool {
-	gvk := attr.GetResource()
-	if gvk.Group == "admissionregistration.k8s.io" {
-		if gvk.Resource == "validatingadmissionpolicies" || gvk.Resource == "validatingadmissionpolicybindings" {
-			return true
-		} else if gvk.Resource == "mutatingadmissionpolicies" || gvk.Resource == "mutatingadmissionpolicybindings" {
-			return true
-		}
-	}
-	return false
+func (c *Plugin[H]) shouldIgnoreResource(attr admission.Attributes) bool {
+	gvr := attr.GetResource()
+	// exclusion decision ignores the version.
+	gr := gvr.GroupResource()
+	return c.excludedResources.Has(gr)
 }

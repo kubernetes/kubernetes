@@ -74,6 +74,7 @@ type Plugin struct {
 var _ admission.Interface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
 var _ initializer.WantsFeatures = &Plugin{}
+var _ initializer.WantsExcludedAdmissionResources = &Plugin{}
 
 func NewPlugin(_ io.Reader) *Plugin {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)

@@ -30,6 +30,7 @@ import (
 	"text/template"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -39,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -1698,6 +1700,71 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
 	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(context.TODO(), v2Resource, metav1.CreateOptions{})
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func Test_ValidatingAdmissionPolicy_MatchExcludedResource(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1beta1.Validation{
+		{
+			Expression: "false",
+			Message:    "try to deny SelfSubjectReview",
+		},
+	}, withFailurePolicy(admissionregistrationv1beta1.Fail, makePolicy("match-excluded-resources")))
+	policy.Spec.MatchConstraints = &admissionregistrationv1beta1.MatchResources{
+		MatchPolicy: ptr.To(admissionregistrationv1beta1.Exact),
+		ResourceRules: []admissionregistrationv1beta1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: admissionregistrationv1beta1.RuleWithOperations{
+					Operations: []admissionregistrationv1.OperationType{
+						"*",
+					},
+					Rule: admissionregistrationv1.Rule{
+						APIGroups: []string{
+							"authentication.k8s.io",
+						},
+						APIVersions: []string{
+							"v1",
+						},
+						Resources: []string{
+							"selfsubjectreviews",
+						},
+					},
+				},
+			},
+		},
+	}
+	policy = withWaitReadyConstraintAndExpression(policy)
+	if _, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(context.Background(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("fail to create policy: %v", err)
+	}
+
+	policyBinding := makeBinding("match-by-match-policy-exact-binding", "match-excluded-resources", "")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatalf("fail to create and wait for binding: %v", err)
+	}
+	r, err := client.AuthenticationV1().SelfSubjectReviews().Create(context.Background(), &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected denied SelfSubjectReview: %v", err)
+	}
+	// confidence check the returned user info.
+	if len(r.Status.UserInfo.UID) == 0 {
+		t.Errorf("unexpected invalid user info: %v", r.Status.UserInfo)
 	}
 }
 
