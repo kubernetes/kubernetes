@@ -18,9 +18,9 @@ package admission
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/admission/resourcefilter"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
@@ -33,10 +33,10 @@ type WantsCloudConfig interface {
 
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
-	cloudConfig        []byte
-	restMapper         meta.RESTMapper
-	quotaConfiguration quota.Configuration
-	resourceFilter     resourcefilter.Interface
+	cloudConfig                []byte
+	restMapper                 meta.RESTMapper
+	quotaConfiguration         quota.Configuration
+	excludedAdmissionResources []schema.GroupResource
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -48,13 +48,13 @@ func NewPluginInitializer(
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
 	quotaConfiguration quota.Configuration,
-	resourceFilter resourcefilter.Interface,
+	excludedAdmissionResources []schema.GroupResource,
 ) *PluginInitializer {
 	return &PluginInitializer{
-		cloudConfig:        cloudConfig,
-		restMapper:         restMapper,
-		quotaConfiguration: quotaConfiguration,
-		resourceFilter:     resourceFilter,
+		cloudConfig:                cloudConfig,
+		restMapper:                 restMapper,
+		quotaConfiguration:         quotaConfiguration,
+		excludedAdmissionResources: excludedAdmissionResources,
 	}
 }
 
@@ -73,7 +73,7 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetQuotaConfiguration(i.quotaConfiguration)
 	}
 
-	if wants, ok := plugin.(initializer.WantsResourceFilter); ok {
-		wants.SetResourceFilter(i.resourceFilter)
+	if wants, ok := plugin.(initializer.WantsExcludedAdmissionResources); ok {
+		wants.SetExcludedAdmissionResources(i.excludedAdmissionResources)
 	}
 }

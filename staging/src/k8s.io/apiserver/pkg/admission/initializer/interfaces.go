@@ -18,8 +18,8 @@ package initializer
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/resourcefilter"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	quota "k8s.io/apiserver/pkg/quota/v1"
@@ -91,9 +91,9 @@ type WantsSchemaResolver interface {
 	admission.InitializationValidator
 }
 
-// WantsResourceFilter defines a function which sets the ResourceFilter for
-// an admission plugin that needs it.
-type WantsResourceFilter interface {
-	SetResourceFilter(filter resourcefilter.Interface)
+// WantsExcludedAdmissionResources defines a function which sets the ExcludedAdmissionResources
+// for an admission plugin that needs it.
+type WantsExcludedAdmissionResources interface {
+	SetExcludedAdmissionResources(excludedAdmissionResources []schema.GroupResource)
 	admission.InitializationValidator
 }
