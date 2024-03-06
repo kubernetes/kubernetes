@@ -62,34 +62,40 @@ var (
 
 func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 	podName := testPodNamePrefix + string(uuid.NewUUID())
+	testContainers := []v1.Container{
+		{
+			Name:  "vector-addition-cuda8",
+			Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
+			Resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+			},
+		},
+		{
+			Name:  "vector-addition-cuda10",
+			Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd2),
+			Resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+			},
+		},
+	}
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,
-			Containers: []v1.Container{
-				{
-					Name:  "vector-addition-cuda8",
-					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
-						},
-					},
-				},
-				{
-					Name:  "vector-addition-cuda10",
-					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd2),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
-						},
-					},
-				},
-			},
 		},
 	}
+
+	testPod.Spec.Containers = testContainers
+	if os.Getenv("TEST_MAX_GPU_COUNT") == "1" {
+		testPod.Spec.Containers = []v1.Container{testContainers[0]}
+	}
+	framework.Logf("testPod.Spec.Containers {%#v}", testPod.Spec.Containers)
 	return testPod
 }
 
@@ -107,6 +113,10 @@ func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, f *framework.Fra
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
 		if node.Spec.Unschedulable {
+			continue
+		}
+		_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
+		if isControlPlane {
 			continue
 		}
 		framework.Logf("gpuResourceName %s", gpuResourceName)
@@ -137,12 +147,14 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework, setupResour
 
 	var err error
 	var ds *appsv1.DaemonSet
+	dsNamespace := f.Namespace.Name
 	dsYamlURLFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
 	if dsYamlURLFromEnv != "" {
 		// Using DaemonSet from remote URL
 		framework.Logf("Using remote nvidia-driver-installer daemonset manifest from %v", dsYamlURLFromEnv)
 		ds, err = e2emanifest.DaemonSetFromURL(ctx, dsYamlURLFromEnv)
 		framework.ExpectNoError(err, "failed get remote")
+		dsNamespace = ds.Namespace
 	} else {
 		// Using default local DaemonSet
 		framework.Logf("Using default local nvidia-driver-installer daemonset manifest.")
@@ -152,12 +164,11 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework, setupResour
 		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
 	}
 	gpuResourceName = e2egpu.NVIDIAGPUResourceName
-	ds.Namespace = f.Namespace.Name
-	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, ds, metav1.CreateOptions{})
+	_, err = f.ClientSet.AppsV1().DaemonSets(dsNamespace).Create(ctx, ds, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 
-	pods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, ds.Namespace, ds.Name, extensionsinternal.Kind("DaemonSet"))
+	pods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, dsNamespace, ds.Name, extensionsinternal.Kind("DaemonSet"))
 	framework.ExpectNoError(err, "failed to get pods controlled by the nvidia-driver-installer daemonset")
 
 	devicepluginPods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, "kube-system", "nvidia-gpu-device-plugin", extensionsinternal.Kind("DaemonSet"))
