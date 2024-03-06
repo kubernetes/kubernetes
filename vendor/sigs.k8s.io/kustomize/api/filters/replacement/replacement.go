@@ -126,8 +126,8 @@ func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targetSelectors []
 			}
 
 			// filter targets by matching resource IDs
-			for i, id := range ids {
-				if id.IsSelectedBy(selector.Select.ResId) && !rejectId(selector.Reject, &ids[i]) {
+			for _, id := range ids {
+				if id.IsSelectedBy(selector.Select.ResId) && !containsRejectId(selector.Reject, ids) {
 					err := copyValueToTarget(possibleTarget, value, selector)
 					if err != nil {
 						return nil, err
@@ -168,10 +168,15 @@ func matchesAnnoAndLabelSelector(n *yaml.RNode, selector *types.Selector) (bool,
 	return annoMatch && labelMatch, nil
 }
 
-func rejectId(rejects []*types.Selector, id *resid.ResId) bool {
+func containsRejectId(rejects []*types.Selector, ids []resid.ResId) bool {
 	for _, r := range rejects {
-		if !r.ResId.IsEmpty() && id.IsSelectedBy(r.ResId) {
-			return true
+		if r.ResId.IsEmpty() {
+			continue
+		}
+		for _, id := range ids {
+			if id.IsSelectedBy(r.ResId) {
+				return true
+			}
 		}
 	}
 	return false

@@ -27,10 +27,12 @@ var theFlags struct {
 		managedByLabel bool
 		helm           bool
 	}
-	helmCommand    string
-	loadRestrictor string
-	reorderOutput  string
-	fnOptions      types.FnPluginLoadingOptions
+	helmCommand     string
+	helmApiVersions []string
+	helmKubeVersion string
+	loadRestrictor  string
+	reorderOutput   string
+	fnOptions       types.FnPluginLoadingOptions
 }
 
 type Help struct {
@@ -153,6 +155,8 @@ func HonorKustomizeFlags(kOpts *krusty.Options, flags *flag.FlagSet) *krusty.Opt
 		kOpts.PluginConfig.HelmConfig.Enabled = theFlags.enable.helm
 	}
 	kOpts.PluginConfig.HelmConfig.Command = theFlags.helmCommand
+	kOpts.PluginConfig.HelmConfig.ApiVersions = theFlags.helmApiVersions
+	kOpts.PluginConfig.HelmConfig.KubeVersion = theFlags.helmKubeVersion
 	kOpts.AddManagedbyLabel = isManagedByLabelEnabled()
 	return kOpts
 }

@@ -6,28 +6,28 @@
 
 package slices
 
-// insertionSortLessFunc sorts data[a:b] using insertion sort.
-func insertionSortLessFunc[E any](data []E, a, b int, less func(a, b E) bool) {
+// insertionSortCmpFunc sorts data[a:b] using insertion sort.
+func insertionSortCmpFunc[E any](data []E, a, b int, cmp func(a, b E) int) {
 	for i := a + 1; i < b; i++ {
-		for j := i; j > a && less(data[j], data[j-1]); j-- {
+		for j := i; j > a && (cmp(data[j], data[j-1]) < 0); j-- {
 			data[j], data[j-1] = data[j-1], data[j]
 		}
 	}
 }
 
-// siftDownLessFunc implements the heap property on data[lo:hi].
+// siftDownCmpFunc implements the heap property on data[lo:hi].
 // first is an offset into the array where the root of the heap lies.
-func siftDownLessFunc[E any](data []E, lo, hi, first int, less func(a, b E) bool) {
+func siftDownCmpFunc[E any](data []E, lo, hi, first int, cmp func(a, b E) int) {
 	root := lo
 	for {
 		child := 2*root + 1
 		if child >= hi {
 			break
 		}
-		if child+1 < hi && less(data[first+child], data[first+child+1]) {
+		if child+1 < hi && (cmp(data[first+child], data[first+child+1]) < 0) {
 			child++
 		}
-		if !less(data[first+root], data[first+child]) {
+		if !(cmp(data[first+root], data[first+child]) < 0) {
 			return
 		}
 		data[first+root], data[first+child] = data[first+child], data[first+root]
@@ -35,30 +35,30 @@ func siftDownLessFunc[E any](data []E, lo, hi, first int, less func(a, b E) bool
 	}
 }
 
-func heapSortLessFunc[E any](data []E, a, b int, less func(a, b E) bool) {
+func heapSortCmpFunc[E any](data []E, a, b int, cmp func(a, b E) int) {
 	first := a
 	lo := 0
 	hi := b - a
 
 	// Build heap with greatest element at top.
 	for i := (hi - 1) / 2; i >= 0; i-- {
-		siftDownLessFunc(data, i, hi, first, less)
+		siftDownCmpFunc(data, i, hi, first, cmp)
 	}
 
 	// Pop elements, largest first, into end of data.
 	for i := hi - 1; i >= 0; i-- {
 		data[first], data[first+i] = data[first+i], data[first]
-		siftDownLessFunc(data, lo, i, first, less)
+		siftDownCmpFunc(data, lo, i, first, cmp)
 	}
 }
 
-// pdqsortLessFunc sorts data[a:b].
+// pdqsortCmpFunc sorts data[a:b].
 // The algorithm based on pattern-defeating quicksort(pdqsort), but without the optimizations from BlockQuicksort.
 // pdqsort paper: https://arxiv.org/pdf/2106.05123.pdf
 // C++ implementation: https://github.com/orlp/pdqsort
 // Rust implementation: https://docs.rs/pdqsort/latest/pdqsort/
 // limit is the number of allowed bad (very unbalanced) pivots before falling back to heapsort.
-func pdqsortLessFunc[E any](data []E, a, b, limit int, less func(a, b E) bool) {
+func pdqsortCmpFunc[E any](data []E, a, b, limit int, cmp func(a, b E) int) {
 	const maxInsertion = 12
 
 	var (
@@ -70,25 +70,25 @@ func pdqsortLessFunc[E any](data []E, a, b, limit int, less func(a, b E) bool) {
 		length := b - a
 
 		if length <= maxInsertion {
-			insertionSortLessFunc(data, a, b, less)
+			insertionSortCmpFunc(data, a, b, cmp)
 			return
 		}
 
 		// Fall back to heapsort if too many bad choices were made.
 		if limit == 0 {
-			heapSortLessFunc(data, a, b, less)
+			heapSortCmpFunc(data, a, b, cmp)
 			return
 		}
 
 		// If the last partitioning was imbalanced, we need to breaking patterns.
 		if !wasBalanced {
-			breakPatternsLessFunc(data, a, b, less)
+			breakPatternsCmpFunc(data, a, b, cmp)
 			limit--
 		}
 
-		pivot, hint := choosePivotLessFunc(data, a, b, less)
+		pivot, hint := choosePivotCmpFunc(data, a, b, cmp)
 		if hint == decreasingHint {
-			reverseRangeLessFunc(data, a, b, less)
+			reverseRangeCmpFunc(data, a, b, cmp)
 			// The chosen pivot was pivot-a elements after the start of the array.
 			// After reversing it is pivot-a elements before the end of the array.
 			// The idea came from Rust's implementation.
@@ -98,48 +98,48 @@ func pdqsortLessFunc[E any](data []E, a, b, limit int, less func(a, b E) bool) {
 
 		// The slice is likely already sorted.
 		if wasBalanced && wasPartitioned && hint == increasingHint {
-			if partialInsertionSortLessFunc(data, a, b, less) {
+			if partialInsertionSortCmpFunc(data, a, b, cmp) {
 				return
 			}
 		}
 
 		// Probably the slice contains many duplicate elements, partition the slice into
 		// elements equal to and elements greater than the pivot.
-		if a > 0 && !less(data[a-1], data[pivot]) {
-			mid := partitionEqualLessFunc(data, a, b, pivot, less)
+		if a > 0 && !(cmp(data[a-1], data[pivot]) < 0) {
+			mid := partitionEqualCmpFunc(data, a, b, pivot, cmp)
 			a = mid
 			continue
 		}
 
-		mid, alreadyPartitioned := partitionLessFunc(data, a, b, pivot, less)
+		mid, alreadyPartitioned := partitionCmpFunc(data, a, b, pivot, cmp)
 		wasPartitioned = alreadyPartitioned
 
 		leftLen, rightLen := mid-a, b-mid
 		balanceThreshold := length / 8
 		if leftLen < rightLen {
 			wasBalanced = leftLen >= balanceThreshold
-			pdqsortLessFunc(data, a, mid, limit, less)
+			pdqsortCmpFunc(data, a, mid, limit, cmp)
 			a = mid + 1
 		} else {
 			wasBalanced = rightLen >= balanceThreshold
-			pdqsortLessFunc(data, mid+1, b, limit, less)
+			pdqsortCmpFunc(data, mid+1, b, limit, cmp)
 			b = mid
 		}
 	}
 }
 
-// partitionLessFunc does one quicksort partition.
+// partitionCmpFunc does one quicksort partition.
 // Let p = data[pivot]
 // Moves elements in data[a:b] around, so that data[i]<p and data[j]>=p for i<newpivot and j>newpivot.
 // On return, data[newpivot] = p
-func partitionLessFunc[E any](data []E, a, b, pivot int, less func(a, b E) bool) (newpivot int, alreadyPartitioned bool) {
+func partitionCmpFunc[E any](data []E, a, b, pivot int, cmp func(a, b E) int) (newpivot int, alreadyPartitioned bool) {
 	data[a], data[pivot] = data[pivot], data[a]
 	i, j := a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
 
-	for i <= j && less(data[i], data[a]) {
+	for i <= j && (cmp(data[i], data[a]) < 0) {
 		i++
 	}
-	for i <= j && !less(data[j], data[a]) {
+	for i <= j && !(cmp(data[j], data[a]) < 0) {
 		j--
 	}
 	if i > j {
@@ -151,10 +151,10 @@ func partitionLessFunc[E any](data []E, a, b, pivot int, less func(a, b E) bool)
 	j--
 
 	for {
-		for i <= j && less(data[i], data[a]) {
+		for i <= j && (cmp(data[i], data[a]) < 0) {
 			i++
 		}
-		for i <= j && !less(data[j], data[a]) {
+		for i <= j && !(cmp(data[j], data[a]) < 0) {
 			j--
 		}
 		if i > j {
@@ -168,17 +168,17 @@ func partitionLessFunc[E any](data []E, a, b, pivot int, less func(a, b E) bool)
 	return j, false
 }
 
-// partitionEqualLessFunc partitions data[a:b] into elements equal to data[pivot] followed by elements greater than data[pivot].
+// partitionEqualCmpFunc partitions data[a:b] into elements equal to data[pivot] followed by elements greater than data[pivot].
 // It assumed that data[a:b] does not contain elements smaller than the data[pivot].
-func partitionEqualLessFunc[E any](data []E, a, b, pivot int, less func(a, b E) bool) (newpivot int) {
+func partitionEqualCmpFunc[E any](data []E, a, b, pivot int, cmp func(a, b E) int) (newpivot int) {
 	data[a], data[pivot] = data[pivot], data[a]
 	i, j := a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
 
 	for {
-		for i <= j && !less(data[a], data[i]) {
+		for i <= j && !(cmp(data[a], data[i]) < 0) {
 			i++
 		}
-		for i <= j && less(data[a], data[j]) {
+		for i <= j && (cmp(data[a], data[j]) < 0) {
 			j--
 		}
 		if i > j {
@@ -191,15 +191,15 @@ func partitionEqualLessFunc[E any](data []E, a, b, pivot int, less func(a, b E) 
 	return i
 }
 
-// partialInsertionSortLessFunc partially sorts a slice, returns true if the slice is sorted at the end.
-func partialInsertionSortLessFunc[E any](data []E, a, b int, less func(a, b E) bool) bool {
+// partialInsertionSortCmpFunc partially sorts a slice, returns true if the slice is sorted at the end.
+func partialInsertionSortCmpFunc[E any](data []E, a, b int, cmp func(a, b E) int) bool {
 	const (
 		maxSteps         = 5  // maximum number of adjacent out-of-order pairs that will get shifted
 		shortestShifting = 50 // don't shift any elements on short arrays
 	)
 	i := a + 1
 	for j := 0; j < maxSteps; j++ {
-		for i < b && !less(data[i], data[i-1]) {
+		for i < b && !(cmp(data[i], data[i-1]) < 0) {
 			i++
 		}
 
@@ -216,7 +216,7 @@ func partialInsertionSortLessFunc[E any](data []E, a, b int, less func(a, b E) b
 		// Shift the smaller one to the left.
 		if i-a >= 2 {
 			for j := i - 1; j >= 1; j-- {
-				if !less(data[j], data[j-1]) {
+				if !(cmp(data[j], data[j-1]) < 0) {
 					break
 				}
 				data[j], data[j-1] = data[j-1], data[j]
@@ -225,7 +225,7 @@ func partialInsertionSortLessFunc[E any](data []E, a, b int, less func(a, b E) b
 		// Shift the greater one to the right.
 		if b-i >= 2 {
 			for j := i + 1; j < b; j++ {
-				if !less(data[j], data[j-1]) {
+				if !(cmp(data[j], data[j-1]) < 0) {
 					break
 				}
 				data[j], data[j-1] = data[j-1], data[j]
@@ -235,9 +235,9 @@ func partialInsertionSortLessFunc[E any](data []E, a, b int, less func(a, b E) b
 	return false
 }
 
-// breakPatternsLessFunc scatters some elements around in an attempt to break some patterns
+// breakPatternsCmpFunc scatters some elements around in an attempt to break some patterns
 // that might cause imbalanced partitions in quicksort.
-func breakPatternsLessFunc[E any](data []E, a, b int, less func(a, b E) bool) {
+func breakPatternsCmpFunc[E any](data []E, a, b int, cmp func(a, b E) int) {
 	length := b - a
 	if length >= 8 {
 		random := xorshift(length)
@@ -253,12 +253,12 @@ func breakPatternsLessFunc[E any](data []E, a, b int, less func(a, b E) bool) {
 	}
 }
 
-// choosePivotLessFunc chooses a pivot in data[a:b].
+// choosePivotCmpFunc chooses a pivot in data[a:b].
 //
 // [0,8): chooses a static pivot.
 // [8,shortestNinther): uses the simple median-of-three method.
 // [shortestNinther,∞): uses the Tukey ninther method.
-func choosePivotLessFunc[E any](data []E, a, b int, less func(a, b E) bool) (pivot int, hint sortedHint) {
+func choosePivotCmpFunc[E any](data []E, a, b int, cmp func(a, b E) int) (pivot int, hint sortedHint) {
 	const (
 		shortestNinther = 50
 		maxSwaps        = 4 * 3
@@ -276,12 +276,12 @@ func choosePivotLessFunc[E any](data []E, a, b int, less func(a, b E) bool) (piv
 	if l >= 8 {
 		if l >= shortestNinther {
 			// Tukey ninther method, the idea came from Rust's implementation.
-			i = medianAdjacentLessFunc(data, i, &swaps, less)
-			j = medianAdjacentLessFunc(data, j, &swaps, less)
-			k = medianAdjacentLessFunc(data, k, &swaps, less)
+			i = medianAdjacentCmpFunc(data, i, &swaps, cmp)
+			j = medianAdjacentCmpFunc(data, j, &swaps, cmp)
+			k = medianAdjacentCmpFunc(data, k, &swaps, cmp)
 		}
 		// Find the median among i, j, k and stores it into j.
-		j = medianLessFunc(data, i, j, k, &swaps, less)
+		j = medianCmpFunc(data, i, j, k, &swaps, cmp)
 	}
 
 	switch swaps {
@@ -294,29 +294,29 @@ func choosePivotLessFunc[E any](data []E, a, b int, less func(a, b E) bool) (piv
 	}
 }
 
-// order2LessFunc returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
-func order2LessFunc[E any](data []E, a, b int, swaps *int, less func(a, b E) bool) (int, int) {
-	if less(data[b], data[a]) {
+// order2CmpFunc returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
+func order2CmpFunc[E any](data []E, a, b int, swaps *int, cmp func(a, b E) int) (int, int) {
+	if cmp(data[b], data[a]) < 0 {
 		*swaps++
 		return b, a
 	}
 	return a, b
 }
 
-// medianLessFunc returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
-func medianLessFunc[E any](data []E, a, b, c int, swaps *int, less func(a, b E) bool) int {
-	a, b = order2LessFunc(data, a, b, swaps, less)
-	b, c = order2LessFunc(data, b, c, swaps, less)
-	a, b = order2LessFunc(data, a, b, swaps, less)
+// medianCmpFunc returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
+func medianCmpFunc[E any](data []E, a, b, c int, swaps *int, cmp func(a, b E) int) int {
+	a, b = order2CmpFunc(data, a, b, swaps, cmp)
+	b, c = order2CmpFunc(data, b, c, swaps, cmp)
+	a, b = order2CmpFunc(data, a, b, swaps, cmp)
 	return b
 }
 
-// medianAdjacentLessFunc finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
-func medianAdjacentLessFunc[E any](data []E, a int, swaps *int, less func(a, b E) bool) int {
-	return medianLessFunc(data, a-1, a, a+1, swaps, less)
+// medianAdjacentCmpFunc finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
+func medianAdjacentCmpFunc[E any](data []E, a int, swaps *int, cmp func(a, b E) int) int {
+	return medianCmpFunc(data, a-1, a, a+1, swaps, cmp)
 }
 
-func reverseRangeLessFunc[E any](data []E, a, b int, less func(a, b E) bool) {
+func reverseRangeCmpFunc[E any](data []E, a, b int, cmp func(a, b E) int) {
 	i := a
 	j := b - 1
 	for i < j {
@@ -326,37 +326,37 @@ func reverseRangeLessFunc[E any](data []E, a, b int, less func(a, b E) bool) {
 	}
 }
 
-func swapRangeLessFunc[E any](data []E, a, b, n int, less func(a, b E) bool) {
+func swapRangeCmpFunc[E any](data []E, a, b, n int, cmp func(a, b E) int) {
 	for i := 0; i < n; i++ {
 		data[a+i], data[b+i] = data[b+i], data[a+i]
 	}
 }
 
-func stableLessFunc[E any](data []E, n int, less func(a, b E) bool) {
+func stableCmpFunc[E any](data []E, n int, cmp func(a, b E) int) {
 	blockSize := 20 // must be > 0
 	a, b := 0, blockSize
 	for b <= n {
-		insertionSortLessFunc(data, a, b, less)
+		insertionSortCmpFunc(data, a, b, cmp)
 		a = b
 		b += blockSize
 	}
-	insertionSortLessFunc(data, a, n, less)
+	insertionSortCmpFunc(data, a, n, cmp)
 
 	for blockSize < n {
 		a, b = 0, 2*blockSize
 		for b <= n {
-			symMergeLessFunc(data, a, a+blockSize, b, less)
+			symMergeCmpFunc(data, a, a+blockSize, b, cmp)
 			a = b
 			b += 2 * blockSize
 		}
 		if m := a + blockSize; m < n {
-			symMergeLessFunc(data, a, m, n, less)
+			symMergeCmpFunc(data, a, m, n, cmp)
 		}
 		blockSize *= 2
 	}
 }
 
-// symMergeLessFunc merges the two sorted subsequences data[a:m] and data[m:b] using
+// symMergeCmpFunc merges the two sorted subsequences data[a:m] and data[m:b] using
 // the SymMerge algorithm from Pok-Son Kim and Arne Kutzner, "Stable Minimum
 // Storage Merging by Symmetric Comparisons", in Susanne Albers and Tomasz
 // Radzik, editors, Algorithms - ESA 2004, volume 3221 of Lecture Notes in
@@ -375,7 +375,7 @@ func stableLessFunc[E any](data []E, n int, less func(a, b E) bool) {
 // symMerge assumes non-degenerate arguments: a < m && m < b.
 // Having the caller check this condition eliminates many leaf recursion calls,
 // which improves performance.
-func symMergeLessFunc[E any](data []E, a, m, b int, less func(a, b E) bool) {
+func symMergeCmpFunc[E any](data []E, a, m, b int, cmp func(a, b E) int) {
 	// Avoid unnecessary recursions of symMerge
 	// by direct insertion of data[a] into data[m:b]
 	// if data[a:m] only contains one element.
@@ -387,7 +387,7 @@ func symMergeLessFunc[E any](data []E, a, m, b int, less func(a, b E) bool) {
 		j := b
 		for i < j {
 			h := int(uint(i+j) >> 1)
-			if less(data[h], data[a]) {
+			if cmp(data[h], data[a]) < 0 {
 				i = h + 1
 			} else {
 				j = h
@@ -411,7 +411,7 @@ func symMergeLessFunc[E any](data []E, a, m, b int, less func(a, b E) bool) {
 		j := m
 		for i < j {
 			h := int(uint(i+j) >> 1)
-			if !less(data[m], data[h]) {
+			if !(cmp(data[m], data[h]) < 0) {
 				i = h + 1
 			} else {
 				j = h
@@ -438,7 +438,7 @@ func symMergeLessFunc[E any](data []E, a, m, b int, less func(a, b E) bool) {
 
 	for start < r {
 		c := int(uint(start+r) >> 1)
-		if !less(data[p-c], data[c]) {
+		if !(cmp(data[p-c], data[c]) < 0) {
 			start = c + 1
 		} else {
 			r = c
@@ -447,33 +447,33 @@ func symMergeLessFunc[E any](data []E, a, m, b int, less func(a, b E) bool) {
 
 	end := n - start
 	if start < m && m < end {
-		rotateLessFunc(data, start, m, end, less)
+		rotateCmpFunc(data, start, m, end, cmp)
 	}
 	if a < start && start < mid {
-		symMergeLessFunc(data, a, start, mid, less)
+		symMergeCmpFunc(data, a, start, mid, cmp)
 	}
 	if mid < end && end < b {
-		symMergeLessFunc(data, mid, end, b, less)
+		symMergeCmpFunc(data, mid, end, b, cmp)
 	}
 }
 
-// rotateLessFunc rotates two consecutive blocks u = data[a:m] and v = data[m:b] in data:
+// rotateCmpFunc rotates two consecutive blocks u = data[a:m] and v = data[m:b] in data:
 // Data of the form 'x u v y' is changed to 'x v u y'.
 // rotate performs at most b-a many calls to data.Swap,
 // and it assumes non-degenerate arguments: a < m && m < b.
-func rotateLessFunc[E any](data []E, a, m, b int, less func(a, b E) bool) {
+func rotateCmpFunc[E any](data []E, a, m, b int, cmp func(a, b E) int) {
 	i := m - a
 	j := b - m
 
 	for i != j {
 		if i > j {
-			swapRangeLessFunc(data, m-i, m, j, less)
+			swapRangeCmpFunc(data, m-i, m, j, cmp)
 			i -= j
 		} else {
-			swapRangeLessFunc(data, m-i, m+j-i, i, less)
+			swapRangeCmpFunc(data, m-i, m+j-i, i, cmp)
 			j -= i
 		}
 	}
 	// i == j
-	swapRangeLessFunc(data, m-i, m, i, less)
+	swapRangeCmpFunc(data, m-i, m, i, cmp)
 }
