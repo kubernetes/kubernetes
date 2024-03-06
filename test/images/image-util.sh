@@ -127,8 +127,7 @@ build() {
 
     # Create a temporary directory for every architecture and copy the image content
     # and build the image from temporary directory
-    mkdir -p "${KUBE_ROOT}"/_tmp
-    temp_dir=$(mktemp -d "${KUBE_ROOT}"/_tmp/test-images-build.XXXXXX)
+    temp_dir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
     kube::util::trap_add "rm -rf ${temp_dir}" EXIT
 
     cp -r "${img_folder}"/* "${temp_dir}"
