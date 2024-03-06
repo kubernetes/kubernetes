@@ -1510,6 +1510,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
@@ -1554,6 +1557,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
     - name: replicas
+      type:
+        scalar: numeric
+    - name: terminatingReplicas
       type:
         scalar: numeric
     - name: unavailableReplicas
@@ -1655,6 +1661,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+    - name: terminatingReplicas
+      type:
+        scalar: numeric
 - name: io.k8s.api.apps.v1.RollingUpdateDaemonSet
   map:
     fields:
@@ -1903,6 +1912,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
@@ -1950,6 +1962,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
     - name: replicas
+      type:
+        scalar: numeric
+    - name: terminatingReplicas
       type:
         scalar: numeric
     - name: unavailableReplicas
@@ -2324,6 +2339,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
@@ -2368,6 +2386,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
     - name: replicas
+      type:
+        scalar: numeric
+    - name: terminatingReplicas
       type:
         scalar: numeric
     - name: unavailableReplicas
@@ -2469,6 +2490,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+    - name: terminatingReplicas
+      type:
+        scalar: numeric
 - name: io.k8s.api.apps.v1beta2.RollingUpdateDaemonSet
   map:
     fields:
@@ -8739,6 +8763,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
@@ -8786,6 +8813,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
     - name: replicas
+      type:
+        scalar: numeric
+    - name: terminatingReplicas
       type:
         scalar: numeric
     - name: unavailableReplicas
@@ -9138,6 +9168,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+    - name: terminatingReplicas
+      type:
+        scalar: numeric
 - name: io.k8s.api.extensions.v1beta1.RollbackConfig
   map:
     fields:

@@ -199,6 +199,14 @@ const (
 	// (e.g. in a Deployment), which is the historical default.
 	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
 
+	// owner: @atiratree
+	// kep: http://kep.k8s.io/3973
+	// alpha: v1.30
+	//
+	// A new deployment field, .spec.podReplacementPolicy, can be used to determine whether to replace
+	// terminating or terminated pods in deployments with new pods.
+	DeploymentPodReplacementPolicy featuregate.Feature = "DeploymentPodReplacementPolicy"
+
 	// owner: @elezar
 	// kep: http://kep.k8s.io/4009
 	// alpha: v1.28
@@ -1019,6 +1027,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CronJobsScheduledAnnotation: {Default: true, PreRelease: featuregate.Beta},
 
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
+
+	DeploymentPodReplacementPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 

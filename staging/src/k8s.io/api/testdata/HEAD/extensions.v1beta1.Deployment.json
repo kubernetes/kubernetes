@@ -1757,7 +1757,8 @@
     "rollbackTo": {
       "revision": 1
     },
-    "progressDeadlineSeconds": 9
+    "progressDeadlineSeconds": 9,
+    "podReplacementPolicy": "podReplacementPolicyValue"
   },
   "status": {
     "observedGeneration": 1,
@@ -1766,6 +1767,7 @@
     "readyReplicas": 7,
     "availableReplicas": 4,
     "unavailableReplicas": 5,
+    "terminatingReplicas": 9,
     "conditions": [
       {
         "type": "typeValue",

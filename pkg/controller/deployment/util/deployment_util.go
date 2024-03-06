@@ -35,10 +35,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/utils/integer"
 )
@@ -56,6 +58,10 @@ const (
 	// is deployment.spec.replicas + maxSurge. Used by the underlying replica sets to estimate their
 	// proportions in case the deployment has surge replicas.
 	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
+	// ReplicaSetReplicasBeforeScale is the number of replicas a replica set had before scaling began.
+	// Used by the underlying replica sets to estimate their proportions in case the deployment has surge replicas
+	// if the replica set is partially scaled due to the deployment's .spec.podReplacementPolicy.
+	ReplicaSetReplicasBeforeScale = "deployment.kubernetes.io/replicaset-replicas-before-scale"
 
 	// RollbackRevisionNotFound is not found rollback event reason
 	RollbackRevisionNotFound = "DeploymentRollbackRevisionNotFound"
@@ -286,8 +292,11 @@ func SetNewReplicaSetAnnotations(ctx context.Context, deployment *apps.Deploymen
 		}
 	}
 	// If the new replica set is about to be created, we need to add replica annotations to it.
-	if !exists && SetReplicasAnnotations(newRS, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+MaxSurge(*deployment)) {
-		annotationChanged = true
+	if !exists {
+		if annotationsUpdate, annotationsNeedUpdate := ComputeReplicaSetScaleAnnotations(newRS, deployment, false); annotationsNeedUpdate {
+			SetReplicaSetScaleAnnotations(newRS, annotationsUpdate)
+			annotationChanged = true
+		}
 	}
 	return annotationChanged
 }
@@ -298,6 +307,7 @@ var annotationsToSkip = map[string]bool{
 	RevisionHistoryAnnotation:      true,
 	DesiredReplicasAnnotation:      true,
 	MaxReplicasAnnotation:          true,
+	ReplicaSetReplicasBeforeScale:  true,
 	apps.DeprecatedRollbackTo:      true,
 }
 
@@ -378,59 +388,102 @@ func FindActiveOrLatest(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) *apps
 
 // GetDesiredReplicasAnnotation returns the number of desired replicas
 func GetDesiredReplicasAnnotation(logger klog.Logger, rs *apps.ReplicaSet) (int32, bool) {
-	return getIntFromAnnotation(logger, rs, DesiredReplicasAnnotation)
+	return getNonNegativeIntFromAnnotationVerbose(logger, rs, DesiredReplicasAnnotation)
 }
 
 func getMaxReplicasAnnotation(logger klog.Logger, rs *apps.ReplicaSet) (int32, bool) {
-	return getIntFromAnnotation(logger, rs, MaxReplicasAnnotation)
+	return getNonNegativeIntFromAnnotationVerbose(logger, rs, MaxReplicasAnnotation)
 }
 
-func getIntFromAnnotation(logger klog.Logger, rs *apps.ReplicaSet, annotationKey string) (int32, bool) {
+func getRSReplicasBeforeScaleAnnotation(logger klog.Logger, rs *apps.ReplicaSet) (int32, bool) {
+	return getNonNegativeIntFromAnnotationVerbose(logger, rs, ReplicaSetReplicasBeforeScale)
+}
+
+func getNonNegativeIntFromAnnotationVerbose(logger klog.Logger, rs *apps.ReplicaSet, annotationKey string) (int32, bool) {
+	value, ok, err := getNonNegativeIntFromAnnotation(rs, annotationKey)
+	if err != nil {
+		logger.V(2).Info("Could not convert the value with annotation key for the replica set", "annotationValue", rs.Annotations[annotationKey], "annotationKey", annotationKey, "replicaSet", klog.KObj(rs))
+	}
+	return value, ok
+}
+
+func getNonNegativeIntFromAnnotation(rs *apps.ReplicaSet, annotationKey string) (int32, bool, error) {
 	annotationValue, ok := rs.Annotations[annotationKey]
 	if !ok {
-		return int32(0), false
+		return int32(0), false, nil
 	}
-	intValue, err := strconv.Atoi(annotationValue)
+	intValue, err := strconv.ParseUint(annotationValue, 10, 32)
 	if err != nil {
-		logger.V(2).Info("Could not convert the value with annotation key for the replica set", "annotationValue", annotationValue, "annotationKey", annotationKey, "replicaSet", klog.KObj(rs))
-		return int32(0), false
+		return int32(0), false, err
 	}
-	return int32(intValue), true
+	return int32(intValue), true, nil
 }
 
-// SetReplicasAnnotations sets the desiredReplicas and maxReplicas into the annotations
-func SetReplicasAnnotations(rs *apps.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
-	updated := false
+// SetReplicaSetScaleAnnotations sets relevant scale annotations from annotations into rs.Annotations.
+func SetReplicaSetScaleAnnotations(rs *apps.ReplicaSet, annotations map[string]string) {
 	if rs.Annotations == nil {
 		rs.Annotations = make(map[string]string)
 	}
-	desiredString := fmt.Sprintf("%d", desiredReplicas)
-	if hasString := rs.Annotations[DesiredReplicasAnnotation]; hasString != desiredString {
-		rs.Annotations[DesiredReplicasAnnotation] = desiredString
-		updated = true
+	rs.Annotations[DesiredReplicasAnnotation] = annotations[DesiredReplicasAnnotation]
+	rs.Annotations[MaxReplicasAnnotation] = annotations[MaxReplicasAnnotation]
+	if replicasBeforeScale, hasReplicasBeforeScale := annotations[ReplicaSetReplicasBeforeScale]; hasReplicasBeforeScale {
+		rs.Annotations[ReplicaSetReplicasBeforeScale] = replicasBeforeScale
+	} else {
+		delete(rs.Annotations, ReplicaSetReplicasBeforeScale)
 	}
-	maxString := fmt.Sprintf("%d", maxReplicas)
-	if hasString := rs.Annotations[MaxReplicasAnnotation]; hasString != maxString {
-		rs.Annotations[MaxReplicasAnnotation] = maxString
-		updated = true
-	}
-	return updated
 }
 
-// ReplicasAnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
-func ReplicasAnnotationsNeedUpdate(rs *apps.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
-	if rs.Annotations == nil {
-		return true
+// ComputeReplicaSetScaleAnnotations computes relevant scale annotations, given the constraints passed. And returns true if a change was detected.
+// The constraints:
+//   - rs: rs.Spec.Replicas, "deployment.kubernetes.io/desired-replicas", "deployment.kubernetes.io/max-replicas" and
+//     "deployment.kubernetes.io/replicaset-replicas-before-scale" annotations
+//   - deployment: deployment.Spec.Replicas, deployment.Spec.Strategy.RollingUpdate.MaxSurge,
+//   - partialScaling (true if the rs is being partially scaled, which affects the annotations)
+func ComputeReplicaSetScaleAnnotations(rs *apps.ReplicaSet, deployment *apps.Deployment, partialScaling bool) (map[string]string, bool) {
+	updated := false
+	result := map[string]string{
+		DesiredReplicasAnnotation: rs.Annotations[DesiredReplicasAnnotation],
+		MaxReplicasAnnotation:     rs.Annotations[MaxReplicasAnnotation],
 	}
+	if replicasBeforeScale, ok := rs.Annotations[ReplicaSetReplicasBeforeScale]; ok {
+		result[ReplicaSetReplicasBeforeScale] = replicasBeforeScale
+	}
+
+	desiredReplicas := *(deployment.Spec.Replicas)
+	maxReplicas := *(deployment.Spec.Replicas) + MaxSurge(*deployment)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) && partialScaling {
+		if _, scalingInProgress, _ := getNonNegativeIntFromAnnotation(rs, ReplicaSetReplicasBeforeScale); !scalingInProgress {
+			// Start partial scaling.
+			currentReplicasString := fmt.Sprintf("%d", *(rs.Spec.Replicas))
+			result[ReplicaSetReplicasBeforeScale] = currentReplicasString
+			updated = true
+		}
+		// Do not update desired and max replicas until we have finished the scaling of the replica set.
+		// The old values are needed for correctly computing the next partial scale.
+		if beforeScaleDesiredReplicas, ok, _ := getNonNegativeIntFromAnnotation(rs, DesiredReplicasAnnotation); ok {
+			desiredReplicas = beforeScaleDesiredReplicas
+		}
+		if beforeScaleMaxReplicas, ok, _ := getNonNegativeIntFromAnnotation(rs, MaxReplicasAnnotation); ok {
+			maxReplicas = beforeScaleMaxReplicas
+		}
+	} else if _, scalingInProgress := rs.Annotations[ReplicaSetReplicasBeforeScale]; scalingInProgress {
+		// Finish partial scaling.
+		delete(result, ReplicaSetReplicasBeforeScale)
+		updated = true
+	}
+
 	desiredString := fmt.Sprintf("%d", desiredReplicas)
 	if hasString := rs.Annotations[DesiredReplicasAnnotation]; hasString != desiredString {
-		return true
+		result[DesiredReplicasAnnotation] = desiredString
+		updated = true
 	}
 	maxString := fmt.Sprintf("%d", maxReplicas)
 	if hasString := rs.Annotations[MaxReplicasAnnotation]; hasString != maxString {
-		return true
+		result[MaxReplicasAnnotation] = maxString
+		updated = true
 	}
-	return false
+	return result, updated
 }
 
 // MaxUnavailable returns the maximum unavailable pods a rolling deployment can take.
@@ -464,10 +517,50 @@ func MaxSurge(deployment apps.Deployment) int32 {
 	return maxSurge
 }
 
-// GetProportion will estimate the proportion for the provided replica set using 1. the current size
+// PrepareProportionalScalePlan returns a mapping of replica set name to an appropriate number of replica it should have, given the constraints passed.
+// The constraints:
+// - deploymentReplicasToAdd
+// - deployment: d.Spec.Replicas, deployment.Spec.Strategy.RollingUpdate.MaxSurge, d.Status.Replicas (used as a fallback)
+// - allActiveRSs (order dependent):
+//   - each rs: rs.Spec.Replicas, "deployment.kubernetes.io/max-replicas" and "deployment.kubernetes.io/replicaset-replicas-before-scale" annotations
+func PrepareProportionalScalePlan(logger klog.Logger, allActiveRSs []*apps.ReplicaSet, deployment *apps.Deployment, deploymentReplicasToAdd int32) map[string]int32 {
+	// Iterate over all active replica sets and estimate proportions for each of them.
+	// The absolute value of deploymentReplicasAdded should never exceed the absolute
+	// value of deploymentReplicasToAdd.
+	deploymentReplicasAdded := int32(0)
+	nameToSize := make(map[string]int32)
+	for i := range allActiveRSs {
+		rs := allActiveRSs[i]
+
+		// Estimate proportions if we have replicas to add, otherwise simply populate
+		// nameToSize with the current sizes for each replica set.
+		if deploymentReplicasToAdd != 0 {
+			proportion := getProportion(logger, rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
+
+			nameToSize[rs.Name] = *(rs.Spec.Replicas) + proportion
+			deploymentReplicasAdded += proportion
+		} else {
+			nameToSize[rs.Name] = *(rs.Spec.Replicas)
+		}
+	}
+
+	// Add/remove any leftovers to the largest replica set.
+	if deploymentReplicasToAdd != 0 {
+		rs := allActiveRSs[0]
+		if leftover := deploymentReplicasToAdd - deploymentReplicasAdded; leftover != 0 {
+			nameToSize[rs.Name] = nameToSize[rs.Name] + leftover
+			if nameToSize[rs.Name] < 0 {
+				nameToSize[rs.Name] = 0
+			}
+		}
+	}
+	return nameToSize
+}
+
+// getProportion will estimate the proportion for the provided replica set using 1. the current size
 // of the parent deployment, 2. the replica count that needs be added on the replica sets of the
 // deployment, and 3. the total replicas added in the replica sets of the deployment so far.
-func GetProportion(logger klog.Logger, rs *apps.ReplicaSet, d apps.Deployment, deploymentReplicasToAdd, deploymentReplicasAdded int32) int32 {
+func getProportion(logger klog.Logger, rs *apps.ReplicaSet, d apps.Deployment, deploymentReplicasToAdd, deploymentReplicasAdded int32) int32 {
 	if rs == nil || *(rs.Spec.Replicas) == 0 || deploymentReplicasToAdd == 0 || deploymentReplicasToAdd == deploymentReplicasAdded {
 		return int32(0)
 	}
@@ -496,18 +589,33 @@ func getReplicaSetFraction(logger klog.Logger, rs apps.ReplicaSet, d apps.Deploy
 	}
 
 	deploymentReplicas := *(d.Spec.Replicas) + MaxSurge(d)
-	annotatedReplicas, ok := getMaxReplicasAnnotation(logger, &rs)
-	if !ok {
+	deploymentMaxReplicas, ok := getMaxReplicasAnnotation(logger, &rs)
+	if !ok || deploymentMaxReplicas == 0 {
 		// If we cannot find the annotation then fallback to the current deployment size. Note that this
 		// will not be an accurate proportion estimation in case other replica sets have different values
 		// which means that the deployment was scaled at some point but we at least will stay in limits
 		// due to the min-max comparisons in getProportion.
-		annotatedReplicas = d.Status.Replicas
+		deploymentMaxReplicas = d.Status.Replicas
+		if deploymentMaxReplicas == 0 {
+			// Rare situation: missing annotation and pods are failing to be created.
+			return 0
+		}
 	}
 
-	// We should never proportionally scale up from zero which means rs.spec.replicas and annotatedReplicas
-	// will never be zero here.
-	newRSsize := (float64(*(rs.Spec.Replicas) * deploymentReplicas)) / float64(annotatedReplicas)
+	// We should never proportionally scale up from zero which means rs.spec.replicas will never be zero here.
+	scaleBase := *(rs.Spec.Replicas)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		// If we are partially scaling, we need to use the same base in each scaling iteration (deployment sync).
+		// 1. In the first iteration we can just use rs.Spec.Replicas.
+		// 2. In the second one we can use the value of the "deployment.kubernetes.io/replicaset-replicas-before-scale"
+		//    annotation that is initialized during the first iteration.
+		if rsReplicasBeforeScale, ok := getRSReplicasBeforeScaleAnnotation(logger, &rs); ok && rsReplicasBeforeScale != 0 {
+			scaleBase = rsReplicasBeforeScale
+		}
+	}
+
+	// deploymentMaxReplicas should normally be a positive value, and we have made sure that it is not a zero.
+	newRSsize := (float64(scaleBase * deploymentReplicas)) / float64(deploymentMaxReplicas)
 	return integer.RoundToInt32(newRSsize) - *(rs.Spec.Replicas)
 }
 
@@ -676,6 +784,20 @@ func GetActualReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
 	return totalActualReplicas
 }
 
+// GetReplicaSurgeCapacityCountForReplicaSets returns the replica surge capacity of the given replica sets.
+// Minimum is the sum of all rs.Spec.Replicas even if no pod is running.
+// Maximum is the sum of all rs.Spec.Replicas and extra non-terminating pods that may be running above the baseline.
+// This can happen if the replica set controller did not have a time to sync during a scale down.
+func GetReplicaSurgeCapacityCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
+	totalReplicas := int32(0)
+	for _, rs := range replicaSets {
+		if rs != nil {
+			totalReplicas += max(*rs.Spec.Replicas, rs.Status.Replicas)
+		}
+	}
+	return totalReplicas
+}
+
 // GetReadyReplicaCountForReplicaSets returns the number of ready pods corresponding to the given replica sets.
 func GetReadyReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
 	totalReadyReplicas := int32(0)
@@ -696,6 +818,17 @@ func GetAvailableReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int3
 		}
 	}
 	return totalAvailableReplicas
+}
+
+// GetTerminatingReplicaCountForReplicaSets returns the number of terminating pods for all replica sets.
+func GetTerminatingReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int32 {
+	terminatingReplicas := int32(0)
+	for _, rs := range replicaSets {
+		if rs != nil {
+			terminatingReplicas += rs.Status.TerminatingReplicas
+		}
+	}
+	return terminatingReplicas
 }
 
 // IsRollingUpdate returns true if the strategy type is a rolling update.
@@ -782,6 +915,9 @@ func DeploymentTimedOut(ctx context.Context, deployment *apps.Deployment, newSta
 // 1) The new RS is saturated: newRS's replicas == deployment's replicas
 // 2) Max number of pods allowed is reached: deployment's replicas + maxSurge == all RSs' replicas
 func NewRSNewReplicas(deployment *apps.Deployment, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) (int32, error) {
+	if *deployment.Spec.Replicas == 0 {
+		return 0, nil
+	}
 	switch deployment.Spec.Strategy.Type {
 	case apps.RollingUpdateDeploymentStrategyType:
 		// Check if we can scale up.
@@ -789,19 +925,42 @@ func NewRSNewReplicas(deployment *apps.Deployment, allRSs []*apps.ReplicaSet, ne
 		if err != nil {
 			return 0, err
 		}
-		// Find the total number of pods
-		currentPodCount := GetReplicaCountForReplicaSets(allRSs)
+		// Find the total number of pods. By default, ignore surge and terminating pods.
+		maxTransientPodCount := GetReplicaCountForReplicaSets(allRSs)
 		maxTotalPods := *(deployment.Spec.Replicas) + int32(maxSurge)
-		if currentPodCount >= maxTotalPods {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) && HasTerminationCompletePodReplacement(deployment) {
+			// Find the highest number of pods that the current replica sets can transiently reach. Include surge and terminating pods.
+			rsSurgeCapacityCount := GetReplicaSurgeCapacityCountForReplicaSets(allRSs)
+			rsTerminatingPodCount := GetTerminatingReplicaCountForReplicaSets(allRSs)
+			maxTransientPodCount = rsSurgeCapacityCount + rsTerminatingPodCount
+		}
+		if maxTransientPodCount >= maxTotalPods {
 			// Cannot scale up.
 			return *(newRS.Spec.Replicas), nil
 		}
 		// Scale up.
-		scaleUpCount := maxTotalPods - currentPodCount
+		scaleUpCount := maxTotalPods - maxTransientPodCount
 		// Do not exceed the number of desired replicas.
 		scaleUpCount = min(scaleUpCount, *(deployment.Spec.Replicas)-*(newRS.Spec.Replicas))
 		return *(newRS.Spec.Replicas) + scaleUpCount, nil
 	case apps.RecreateDeploymentStrategyType:
+		if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) && HasTerminationCompletePodReplacement(deployment) {
+			maxTotalPods := *(deployment.Spec.Replicas)
+			// Find the highest number of pods that the current replica sets can transiently reach.
+			rsSurgeCapacityCount := GetReplicaSurgeCapacityCountForReplicaSets(allRSs)
+			rsTerminatingPodCount := GetTerminatingReplicaCountForReplicaSets(allRSs)
+			maxTransientPodCount := rsSurgeCapacityCount + rsTerminatingPodCount
+			if maxTransientPodCount >= maxTotalPods {
+				// Cannot scale up.
+				return *(newRS.Spec.Replicas), nil
+			}
+			// Scale up.
+			scaleUpCount := maxTotalPods - maxTransientPodCount
+			// Do not exceed the number of desired replicas.
+			scaleUpCount = min(scaleUpCount, *(deployment.Spec.Replicas)-*(newRS.Spec.Replicas))
+			return *(newRS.Spec.Replicas) + scaleUpCount, nil
+		}
+		// The default behaviour and TerminationStarted podReplacementPolicy ignores surge and terminating pods.
 		return *(deployment.Spec.Replicas), nil
 	default:
 		return 0, fmt.Errorf("deployment type %v isn't supported", deployment.Spec.Strategy.Type)
@@ -881,6 +1040,16 @@ func HasProgressDeadline(d *apps.Deployment) bool {
 // the Deployment will keep all revisions.
 func HasRevisionHistoryLimit(d *apps.Deployment) bool {
 	return d.Spec.RevisionHistoryLimit != nil && *d.Spec.RevisionHistoryLimit != math.MaxInt32
+}
+
+// HasTerminationStartedPodReplacement checks if the Deployment d has a TerminationStarted PodReplacementPolicy.
+func HasTerminationStartedPodReplacement(d *apps.Deployment) bool {
+	return d.Spec.PodReplacementPolicy != nil && *d.Spec.PodReplacementPolicy == apps.TerminationStarted
+}
+
+// HasTerminationCompletePodReplacement checks if the Deployment d has a TerminationComplete PodReplacementPolicy.
+func HasTerminationCompletePodReplacement(d *apps.Deployment) bool {
+	return d.Spec.PodReplacementPolicy != nil && *d.Spec.PodReplacementPolicy == apps.TerminationComplete
 }
 
 // GetDeploymentsForReplicaSet returns a list of Deployments that potentially
