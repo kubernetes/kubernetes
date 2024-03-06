@@ -23,8 +23,8 @@ package oidc
 import (
 	reflect "reflect"
 
+	v3 "github.com/go-jose/go-jose/v3"
 	gomock "github.com/golang/mock/gomock"
-	go_jose_v2 "gopkg.in/square/go-jose.v2"
 )
 
 // MockTokenHandler is a mock of TokenHandler interface.
@@ -89,10 +89,10 @@ func (m *MockJWKsHandler) EXPECT() *MockJWKsHandlerMockRecorder {
 }
 
 // KeySet mocks base method.
-func (m *MockJWKsHandler) KeySet() go_jose_v2.JSONWebKeySet {
+func (m *MockJWKsHandler) KeySet() v3.JSONWebKeySet {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "KeySet")
-	ret0, _ := ret[0].(go_jose_v2.JSONWebKeySet)
+	ret0, _ := ret[0].(v3.JSONWebKeySet)
 	return ret0
 }
 
