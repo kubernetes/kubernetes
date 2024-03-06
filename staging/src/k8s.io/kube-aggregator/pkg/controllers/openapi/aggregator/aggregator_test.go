@@ -39,7 +39,7 @@ func TestBasicPathsMerged(t *testing.T) {
 				SwaggerProps: spec.SwaggerProps{
 					Paths: &spec.Paths{
 						Paths: map[string]spec.PathItem{
-							"/apis/foo/v1": {},
+							"/apis/foo/v1/": {},
 						},
 					},
 				},
@@ -52,8 +52,8 @@ func TestBasicPathsMerged(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/foo/v1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectPath(t, swagger, "/apis/foo/v1/")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
 }
 
 func TestAddUpdateAPIService(t *testing.T) {
@@ -103,7 +103,7 @@ func TestAddUpdateAPIService(t *testing.T) {
 	}
 
 	expectPath(t, swagger, "/apis/apiservicegroup/v1/path1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
 
 	t.Log("Update APIService OpenAPI")
 	handler.openapi = &spec.Swagger{
@@ -127,7 +127,7 @@ func TestAddUpdateAPIService(t *testing.T) {
 	// aggregated OpenAPI is also updated.
 	expectPath(t, swagger, "/apis/apiservicegroup/v1/path2")
 	expectNoPath(t, swagger, "/apis/apiservicegroup/v1/path1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
 }
 
 // Tests that an APIService that registers OpenAPI will only have the OpenAPI
@@ -140,7 +140,7 @@ func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/foo/v1": {},
+					"/apis/foo/v1/": {},
 				},
 			},
 		},
@@ -171,7 +171,8 @@ func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/apiservicegroup/v1": {},
+					"/apis/apiservicegroup/v1/":      {},
+					"/apis/apiservicegroup/v1beta1/": {},
 				},
 			},
 		},
@@ -181,9 +182,9 @@ func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/a":                  {},
-					"/apis/apiservicegroup/v1": {},
-					"/apis/apiservicegroup/v2": {},
+					"/apis/a/":                  {},
+					"/apis/apiservicegroup/v1/": {},
+					"/apis/apiservicegroup/v2/": {},
 				},
 			},
 		},
@@ -207,9 +208,11 @@ func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/apiservicegroup/v1")
-	expectPath(t, swagger, "/apis/apiservicegroup/v2")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectPath(t, swagger, "/apis/apiservicegroup/v1/")
+	expectPath(t, swagger, "/apis/apiservicegroup/v2/")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
+	expectNoPath(t, swagger, "/apis/a/")
+	expectNoPath(t, swagger, "/apis/apiservicegroup/v1beta1/")
 
 	t.Logf("Remove APIService %s", apiService.Name)
 	s.RemoveAPIService(apiService.Name)
@@ -220,7 +223,8 @@ func TestAPIServiceOpenAPIServiceMismatch(t *testing.T) {
 	}
 	// Ensure that the if the APIService is added then removed, the OpenAPI disappears from the aggregated OpenAPI as well.
 	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
+	expectNoPath(t, swagger, "/apis/a")
 }
 
 func TestAddRemoveAPIService(t *testing.T) {
@@ -230,7 +234,7 @@ func TestAddRemoveAPIService(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/foo/v1": {},
+					"/apis/foo/v1/": {},
 				},
 			},
 		},
@@ -252,7 +256,7 @@ func TestAddRemoveAPIService(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/apiservicegroup/v1": {},
+					"/apis/apiservicegroup/v1/": {},
 				},
 			},
 		},
@@ -269,8 +273,8 @@ func TestAddRemoveAPIService(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/apiservicegroup/v1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectPath(t, swagger, "/apis/apiservicegroup/v1/")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
 
 	t.Logf("Remove APIService %s", apiService.Name)
 	s.RemoveAPIService(apiService.Name)
@@ -280,8 +284,8 @@ func TestAddRemoveAPIService(t *testing.T) {
 		t.Error(err)
 	}
 	// Ensure that the if the APIService is added then removed, the OpenAPI disappears from the aggregated OpenAPI as well.
-	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectNoPath(t, swagger, "/apis/apiservicegroup/v1/")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
 }
 
 func TestUpdateAPIService(t *testing.T) {
@@ -291,7 +295,7 @@ func TestUpdateAPIService(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/foo/v1": {},
+					"/apis/foo/v1/": {},
 				},
 			},
 		},
@@ -313,7 +317,7 @@ func TestUpdateAPIService(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/apiservicegroup/v1": {},
+					"/apis/apiservicegroup/v1/": {},
 				},
 			},
 		},
@@ -338,8 +342,8 @@ func TestUpdateAPIService(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/apiservicegroup/v1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectPath(t, swagger, "/apis/apiservicegroup/v1/")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
 
 	t.Logf("Updating APIService %s", apiService.Name)
 	if err := s.AddUpdateAPIService(apiService, handler2); err != nil {
@@ -354,8 +358,8 @@ func TestUpdateAPIService(t *testing.T) {
 		t.Error(err)
 	}
 	// Ensure that the if the APIService is added and then handler is modified, the new data is reflected in the aggregated OpenAPI.
-	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
-	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1")
+	expectNoPath(t, swagger, "/apis/apiservicegroup/v1/")
+	expectPath(t, swagger, "/apis/apiregistration.k8s.io/v1/")
 }
 
 func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
@@ -365,7 +369,7 @@ func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/foo/v1": {},
+					"/apis/foo/v1/": {},
 				},
 			},
 		},
@@ -389,7 +393,7 @@ func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
 			SwaggerProps: spec.SwaggerProps{
 				Paths: &spec.Paths{
 					Paths: map[string]spec.PathItem{
-						"/apis/failed/v1": {},
+						"/apis/failed/v1/": {},
 					},
 				},
 			},
@@ -410,7 +414,7 @@ func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
 			SwaggerProps: spec.SwaggerProps{
 				Paths: &spec.Paths{
 					Paths: map[string]spec.PathItem{
-						"/apis/success/v1": {},
+						"/apis/success/v1/": {},
 					},
 				},
 			},
@@ -435,9 +439,9 @@ func TestFailingAPIServiceSkippedAggregation(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/foo/v1")
-	expectNoPath(t, swagger, "/apis/failed/v1")
-	expectPath(t, swagger, "/apis/success/v1")
+	expectPath(t, swagger, "/apis/foo/v1/")
+	expectNoPath(t, swagger, "/apis/failed/v1/")
+	expectPath(t, swagger, "/apis/success/v1/")
 }
 
 func TestAPIServiceFailSuccessTransition(t *testing.T) {
@@ -447,7 +451,7 @@ func TestAPIServiceFailSuccessTransition(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/foo/v1": {},
+					"/apis/foo/v1/": {},
 				},
 			},
 		},
@@ -471,7 +475,7 @@ func TestAPIServiceFailSuccessTransition(t *testing.T) {
 			SwaggerProps: spec.SwaggerProps{
 				Paths: &spec.Paths{
 					Paths: map[string]spec.PathItem{
-						"/apis/apiservicegroup/v1": {},
+						"/apis/apiservicegroup/v1/": {},
 					},
 				},
 			},
@@ -489,8 +493,8 @@ func TestAPIServiceFailSuccessTransition(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/foo/v1")
-	expectNoPath(t, swagger, "/apis/apiservicegroup/v1")
+	expectPath(t, swagger, "/apis/foo/v1/")
+	expectNoPath(t, swagger, "/apis/apiservicegroup/v1/")
 
 	t.Log("Transition APIService to not return error")
 	handler.returnErr = false
@@ -502,8 +506,8 @@ func TestAPIServiceFailSuccessTransition(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/foo/v1")
-	expectPath(t, swagger, "/apis/apiservicegroup/v1")
+	expectPath(t, swagger, "/apis/foo/v1/")
+	expectPath(t, swagger, "/apis/apiservicegroup/v1/")
 }
 
 func TestFailingAPIServiceDoesNotBlockAdd(t *testing.T) {
@@ -513,7 +517,7 @@ func TestFailingAPIServiceDoesNotBlockAdd(t *testing.T) {
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/foo/v1": {},
+					"/apis/foo/v1/": {},
 				},
 			},
 		},
@@ -540,7 +544,7 @@ func TestFailingAPIServiceDoesNotBlockAdd(t *testing.T) {
 			SwaggerProps: spec.SwaggerProps{
 				Paths: &spec.Paths{
 					Paths: map[string]spec.PathItem{
-						"/apis/failed/v1": {},
+						"/apis/failed/v1/": {},
 					},
 				},
 			},
@@ -565,8 +569,8 @@ func TestFailingAPIServiceDoesNotBlockAdd(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectPath(t, swagger, "/apis/foo/v1")
-	expectNoPath(t, swagger, "/apis/failed/v1")
+	expectPath(t, swagger, "/apis/foo/v1/")
+	expectNoPath(t, swagger, "/apis/failed/v1/")
 }
 
 type openAPIHandler struct {
@@ -617,7 +621,7 @@ func buildAndRegisterSpecAggregator(delegationHandlers []http.Handler, mux commo
 		SwaggerProps: spec.SwaggerProps{
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/apis/apiregistration.k8s.io/v1": {},
+					"/apis/apiregistration.k8s.io/v1/": {},
 				},
 			},
 		},
