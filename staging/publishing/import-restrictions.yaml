@@ -222,6 +222,7 @@
   - k8s.io/apiserver
   - k8s.io/client-go
   - k8s.io/cri-api
+  - k8s.io/cri-client
   - k8s.io/klog
   - k8s.io/component-base
   - k8s.io/kubelet
@@ -317,3 +318,7 @@
   - k8s.io/endpointslice
   - k8s.io/klog
   - k8s.io/utils
+
+# TODO: enable when source code got transferred
+# - baseImportPath: "./staging/src/k8s.io/cri-client"
+#   allowedImports: []
