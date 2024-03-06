@@ -52,6 +52,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&EgressSelectorConfiguration{},
 	)
 	scheme.AddKnownTypes(ConfigSchemeGroupVersion,
+		&AuthenticationConfiguration{},
 		&AuthorizationConfiguration{},
 		&TracingConfiguration{},
 	)

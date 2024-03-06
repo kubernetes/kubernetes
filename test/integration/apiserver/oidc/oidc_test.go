@@ -145,7 +145,7 @@ func runTests(t *testing.T, useAuthenticationConfig bool) {
 
 				if useAuthenticationConfig {
 					authenticationConfig := fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1beta1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:

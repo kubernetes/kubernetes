@@ -1030,6 +1030,64 @@ jwt:
 			},
 			expectedConfig: &apiserver.AuthenticationConfiguration{},
 		},
+		{
+			name: "v1beta1 - json",
+			file: func() string {
+				return writeTempFile(t, `{
+							"apiVersion":"apiserver.config.k8s.io/v1beta1",
+							"kind":"AuthenticationConfiguration",
+							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{
+				JWT: []apiserver.JWTAuthenticator{
+					{
+						Issuer: apiserver.Issuer{
+							URL: "https://test-issuer",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "v1beta1 - yaml",
+			file: func() string {
+				return writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1beta1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{
+				JWT: []apiserver.JWTAuthenticator{
+					{
+						Issuer: apiserver.Issuer{
+							URL: "https://test-issuer",
+						},
+						ClaimMappings: apiserver.ClaimMappings{
+							Username: apiserver.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String(""),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "v1beta1 - no jwt",
+			file: func() string {
+				return writeTempFile(t, `{
+							"apiVersion":"apiserver.config.k8s.io/v1beta1",
+							"kind":"AuthenticationConfiguration"}`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{},
+		},
 	}
 
 	for _, tc := range testCases {
