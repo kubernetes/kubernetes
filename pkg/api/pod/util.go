@@ -539,12 +539,14 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations, oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorAnnotationsInUse(oldPodAnnotations) {
 		for k := range podAnnotations {
 			if strings.HasPrefix(k, api.DeprecatedAppArmorAnnotationKeyPrefix) {
 				delete(podAnnotations, k)
 			}
 		}
+	}
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) || !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields)) && !appArmorFieldsInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.AppArmorProfile = nil
 		}
@@ -947,16 +949,20 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
-// appArmorInUse returns true if the pod has apparmor related information
-func appArmorInUse(podAnnotations map[string]string, podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
+// appArmorAnnotationsInUse returns true if the pod has apparmor annotations
+func appArmorAnnotationsInUse(podAnnotations map[string]string) bool {
 	for k := range podAnnotations {
 		if strings.HasPrefix(k, api.DeprecatedAppArmorAnnotationKeyPrefix) {
 			return true
 		}
+	}
+	return false
+}
+
+// appArmorFieldsInUse returns true if the pod has apparmor fields set
+func appArmorFieldsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
 	}
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil {
 		return true

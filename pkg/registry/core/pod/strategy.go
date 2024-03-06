@@ -764,6 +764,10 @@ func applySchedulingGatedCondition(pod *api.Pod) {
 // applyAppArmorVersionSkew implements the version skew behavior described in:
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/24-apparmor#version-skew-strategy
 func applyAppArmorVersionSkew(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields) {
+		return
+	}
+
 	if pod.Spec.OS != nil && pod.Spec.OS.Name == api.Windows {
 		return
 	}
