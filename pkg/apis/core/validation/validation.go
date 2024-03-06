@@ -2557,8 +2557,14 @@ func ValidateEnv(vars []core.EnvVar, fldPath *field.Path, opts PodValidationOpti
 		if len(ev.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
 		} else {
-			for _, msg := range validation.IsEnvVarName(ev.Name) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
+			if opts.AllowRelaxedEnvironmentVariableValidation {
+				for _, msg := range validation.IsRelaxedEnvVarName(ev.Name) {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
+				}
+			} else {
+				for _, msg := range validation.IsEnvVarName(ev.Name) {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
+				}
 			}
 		}
 		allErrs = append(allErrs, validateEnvVarValueFrom(ev, idxPath.Child("valueFrom"), opts)...)
@@ -2703,13 +2709,19 @@ func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expr
 	return allErrs
 }
 
-func ValidateEnvFrom(vars []core.EnvFromSource, fldPath *field.Path) field.ErrorList {
+func ValidateEnvFrom(vars []core.EnvFromSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, ev := range vars {
 		idxPath := fldPath.Index(i)
 		if len(ev.Prefix) > 0 {
-			for _, msg := range validation.IsEnvVarName(ev.Prefix) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
+			if opts.AllowRelaxedEnvironmentVariableValidation {
+				for _, msg := range validation.IsRelaxedEnvVarName(ev.Prefix) {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
+				}
+			} else {
+				for _, msg := range validation.IsEnvVarName(ev.Prefix) {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
+				}
 			}
 		}
 
@@ -3532,7 +3544,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	volDevices := GetVolumeDeviceMap(ctr.VolumeDevices)
 	allErrs = append(allErrs, validateContainerPorts(ctr.Ports, path.Child("ports"))...)
 	allErrs = append(allErrs, ValidateEnv(ctr.Env, path.Child("env"), opts)...)
-	allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"))...)
+	allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"), opts)...)
 	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"))...)
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
@@ -3981,6 +3993,8 @@ type PodValidationOptions struct {
 	// The top-level resource being validated is a Pod, not just a PodSpec
 	// embedded in some other resource.
 	ResourceIsPod bool
+	// Allow relaxed validation of environment variable names
+	AllowRelaxedEnvironmentVariableValidation bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

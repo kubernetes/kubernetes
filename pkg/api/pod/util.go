@@ -23,6 +23,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -386,6 +388,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowNonLocalProjectedTokenPath:                   false,
 	}
 
+	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
+	// we must allow it
+	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
+
 	if oldPodSpec != nil {
 		// if old spec has status.hostIPs downwardAPI set, we must allow it
 		opts.AllowHostIPsField = opts.AllowHostIPsField || hasUsedDownwardAPIFieldPathWithPodSpec(oldPodSpec, "status.hostIPs")
@@ -417,6 +423,84 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	}
 
 	return opts
+}
+
+func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) bool {
+	var oldPodEnvVarNames, podEnvVarNames sets.Set[string]
+	if oldPodSpec != nil {
+		oldPodEnvVarNames = gatherPodEnvVarNames(oldPodSpec)
+	}
+
+	if podSpec != nil {
+		podEnvVarNames = gatherPodEnvVarNames(podSpec)
+	}
+
+	for env := range podEnvVarNames {
+		if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedEnvironmentVariableValidation) || relaxedEnvVarUsed(env, oldPodEnvVarNames) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func gatherPodEnvVarNames(podSpec *api.PodSpec) sets.Set[string] {
+	podEnvVarNames := sets.Set[string]{}
+
+	for _, c := range podSpec.Containers {
+		for _, env := range c.Env {
+			podEnvVarNames.Insert(env.Name)
+		}
+
+		for _, env := range c.EnvFrom {
+			podEnvVarNames.Insert(env.Prefix)
+		}
+	}
+
+	for _, c := range podSpec.InitContainers {
+		for _, env := range c.Env {
+			podEnvVarNames.Insert(env.Name)
+		}
+
+		for _, env := range c.EnvFrom {
+			podEnvVarNames.Insert(env.Prefix)
+		}
+	}
+
+	for _, c := range podSpec.EphemeralContainers {
+		for _, env := range c.Env {
+			podEnvVarNames.Insert(env.Name)
+		}
+
+		for _, env := range c.EnvFrom {
+			podEnvVarNames.Insert(env.Prefix)
+		}
+	}
+
+	return podEnvVarNames
+}
+
+func relaxedEnvVarUsed(name string, oldPodEnvVarNames sets.Set[string]) bool {
+	// A length of 0 means this is not an update request,
+	// or the old pod does not exist in the env.
+	// We will let the feature gate decide whether to use relaxed rules.
+	if oldPodEnvVarNames.Len() == 0 {
+		return false
+	}
+
+	if len(validation.IsEnvVarName(name)) == 0 || len(validation.IsRelaxedEnvVarName(name)) != 0 {
+		// It's either a valid name by strict rules or an invalid name under relaxed rules.
+		// Either way, we'll use strict rules to validate.
+		return false
+	}
+
+	// The name in question failed strict rules but passed relaxed rules.
+	if oldPodEnvVarNames.Has(name) {
+		// This relaxed-rules name was already in use.
+		return true
+	}
+
+	return false
 }
 
 func hasUsedDownwardAPIFieldPathWithPodSpec(podSpec *api.PodSpec, fieldPath string) bool {
