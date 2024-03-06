@@ -28,8 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 # create a nice clean place to put our new vendor tree
-mkdir -p "${KUBE_ROOT}/_tmp"
-_tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendor.XXXXXX")"
+_tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
 
 if [[ -z ${KEEP_TMP:-} ]]; then
     KEEP_TMP=false
