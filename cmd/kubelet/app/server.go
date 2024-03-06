@@ -802,9 +802,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
 			if !isCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == kubelettypes.LimitedSwap {
-				klog.InfoS("Swap feature is enabled and LimitedSwap but it is only supported with cgroupv2", "CGroupV2", isCgroup2UnifiedMode(), "SwapBehavior", s.MemorySwap.SwapBehavior)
+				// This feature is not supported for cgroupv1 so we are failing early.
+				return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
 			}
 			if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
+				// This is just a log because we are using a default of NoSwap.
 				klog.InfoS("NoSwap is set due to memorySwapBehavior not specified", "memorySwapBehavior", s.MemorySwap.SwapBehavior, "FailSwapOn", s.FailSwapOn)
 			}
 		}
