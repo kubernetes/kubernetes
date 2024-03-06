@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,38 +14,57 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remote
+package cri
 
 import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/kubelet/util"
+	apitest "k8s.io/cri-api/pkg/apis/testing"
+	fakeremote "k8s.io/cri/pkg/fake"
+	"k8s.io/cri/pkg/util"
 )
 
-func createRemoteImageServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp)
+const defaultConnectionTimeout = 15 * time.Second
+
+// createAndStartFakeRemoteRuntime creates and starts fakeremote.RemoteRuntime.
+// It returns the RemoteRuntime, endpoint on success.
+// Users should call fakeRuntime.Stop() to cleanup the server.
+func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, string) {
+	endpoint, err := fakeremote.GenerateEndpoint()
+	require.NoError(t, err)
+
+	fakeRuntime := fakeremote.NewFakeRemoteRuntime()
+	fakeRuntime.Start(endpoint)
+
+	return fakeRuntime, endpoint
+}
+
+func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.RuntimeService {
+	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, oteltrace.NewNoopTracerProvider())
+
 	require.NoError(t, err)
 
 	return runtimeService
 }
 
-func createRemoteImageServiceWithoutTracerProvider(endpoint string, t *testing.T) internalapi.ImageManagerService {
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, oteltrace.NewNoopTracerProvider())
+func createRemoteRuntimeServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.RuntimeService {
+	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, tp)
 	require.NoError(t, err)
 
 	return runtimeService
 }
 
-func TestImageServiceSpansWithTP(t *testing.T) {
+func TestGetSpans(t *testing.T) {
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
 		fakeRuntime.Stop()
@@ -61,17 +80,15 @@ func TestImageServiceSpansWithTP(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithTracerProvider(endpoint, tp, t)
-	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, "busybox", imgRef)
+	rtSvc := createRemoteRuntimeServiceWithTracerProvider(endpoint, tp, t)
+	_, err := rtSvc.Version(ctx, apitest.FakeVersion)
 	require.NoError(t, err)
 	err = tp.ForceFlush(ctx)
 	require.NoError(t, err)
 	assert.NotEmpty(t, exp.GetSpans())
 }
 
-func TestImageServiceSpansWithoutTP(t *testing.T) {
+func TestVersion(t *testing.T) {
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
 		fakeRuntime.Stop()
@@ -82,17 +99,11 @@ func TestImageServiceSpansWithoutTP(t *testing.T) {
 			}
 		}
 	}()
-	exp := tracetest.NewInMemoryExporter()
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
-	)
+
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithoutTracerProvider(endpoint, t)
-	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, "busybox", imgRef)
+	rtSvc := createRemoteRuntimeService(endpoint, t)
+	version, err := rtSvc.Version(ctx, apitest.FakeVersion)
 	require.NoError(t, err)
-	err = tp.ForceFlush(ctx)
-	require.NoError(t, err)
-	assert.Empty(t, exp.GetSpans())
+	assert.Equal(t, apitest.FakeVersion, version.Version)
+	assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)
 }

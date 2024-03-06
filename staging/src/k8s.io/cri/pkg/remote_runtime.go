@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remote
+package cri
 
 import (
 	"context"
@@ -35,9 +35,9 @@ import (
 	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri/pkg/errors"
+	"k8s.io/cri/pkg/util"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/probe/exec"
 
 	utilexec "k8s.io/utils/exec"
 )
@@ -494,7 +494,7 @@ func (r *remoteRuntimeService) execSyncV1(ctx context.Context, containerID strin
 
 		// interpret DeadlineExceeded gRPC errors as timedout probes
 		if status.Code(err) == codes.DeadlineExceeded {
-			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
+			err = crierrors.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
 		}
 
 		return nil, nil, err

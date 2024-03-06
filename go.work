@@ -16,6 +16,7 @@ use (
 	./staging/src/k8s.io/component-base
 	./staging/src/k8s.io/component-helpers
 	./staging/src/k8s.io/controller-manager
+	./staging/src/k8s.io/cri
 	./staging/src/k8s.io/cri-api
 	./staging/src/k8s.io/csi-translation-lib
 	./staging/src/k8s.io/dynamic-resource-allocation
