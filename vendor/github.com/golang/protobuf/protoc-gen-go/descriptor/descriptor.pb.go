@@ -12,6 +12,31 @@ import (
 
 // Symbols defined in public import of google/protobuf/descriptor.proto.
 
+type Edition = descriptorpb.Edition
+
+const Edition_EDITION_UNKNOWN = descriptorpb.Edition_EDITION_UNKNOWN
+const Edition_EDITION_PROTO2 = descriptorpb.Edition_EDITION_PROTO2
+const Edition_EDITION_PROTO3 = descriptorpb.Edition_EDITION_PROTO3
+const Edition_EDITION_2023 = descriptorpb.Edition_EDITION_2023
+const Edition_EDITION_2024 = descriptorpb.Edition_EDITION_2024
+const Edition_EDITION_1_TEST_ONLY = descriptorpb.Edition_EDITION_1_TEST_ONLY
+const Edition_EDITION_2_TEST_ONLY = descriptorpb.Edition_EDITION_2_TEST_ONLY
+const Edition_EDITION_99997_TEST_ONLY = descriptorpb.Edition_EDITION_99997_TEST_ONLY
+const Edition_EDITION_99998_TEST_ONLY = descriptorpb.Edition_EDITION_99998_TEST_ONLY
+const Edition_EDITION_99999_TEST_ONLY = descriptorpb.Edition_EDITION_99999_TEST_ONLY
+const Edition_EDITION_MAX = descriptorpb.Edition_EDITION_MAX
+
+var Edition_name = descriptorpb.Edition_name
+var Edition_value = descriptorpb.Edition_value
+
+type ExtensionRangeOptions_VerificationState = descriptorpb.ExtensionRangeOptions_VerificationState
+
+const ExtensionRangeOptions_DECLARATION = descriptorpb.ExtensionRangeOptions_DECLARATION
+const ExtensionRangeOptions_UNVERIFIED = descriptorpb.ExtensionRangeOptions_UNVERIFIED
+
+var ExtensionRangeOptions_VerificationState_name = descriptorpb.ExtensionRangeOptions_VerificationState_name
+var ExtensionRangeOptions_VerificationState_value = descriptorpb.ExtensionRangeOptions_VerificationState_value
+
 type FieldDescriptorProto_Type = descriptorpb.FieldDescriptorProto_Type
 
 const FieldDescriptorProto_TYPE_DOUBLE = descriptorpb.FieldDescriptorProto_TYPE_DOUBLE
@@ -39,8 +64,8 @@ var FieldDescriptorProto_Type_value = descriptorpb.FieldDescriptorProto_Type_val
 type FieldDescriptorProto_Label = descriptorpb.FieldDescriptorProto_Label
 
 const FieldDescriptorProto_LABEL_OPTIONAL = descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
-const FieldDescriptorProto_LABEL_REQUIRED = descriptorpb.FieldDescriptorProto_LABEL_REQUIRED
 const FieldDescriptorProto_LABEL_REPEATED = descriptorpb.FieldDescriptorProto_LABEL_REPEATED
+const FieldDescriptorProto_LABEL_REQUIRED = descriptorpb.FieldDescriptorProto_LABEL_REQUIRED
 
 var FieldDescriptorProto_Label_name = descriptorpb.FieldDescriptorProto_Label_name
 var FieldDescriptorProto_Label_value = descriptorpb.FieldDescriptorProto_Label_value
@@ -72,6 +97,31 @@ const FieldOptions_JS_NUMBER = descriptorpb.FieldOptions_JS_NUMBER
 var FieldOptions_JSType_name = descriptorpb.FieldOptions_JSType_name
 var FieldOptions_JSType_value = descriptorpb.FieldOptions_JSType_value
 
+type FieldOptions_OptionRetention = descriptorpb.FieldOptions_OptionRetention
+
+const FieldOptions_RETENTION_UNKNOWN = descriptorpb.FieldOptions_RETENTION_UNKNOWN
+const FieldOptions_RETENTION_RUNTIME = descriptorpb.FieldOptions_RETENTION_RUNTIME
+const FieldOptions_RETENTION_SOURCE = descriptorpb.FieldOptions_RETENTION_SOURCE
+
+var FieldOptions_OptionRetention_name = descriptorpb.FieldOptions_OptionRetention_name
+var FieldOptions_OptionRetention_value = descriptorpb.FieldOptions_OptionRetention_value
+
+type FieldOptions_OptionTargetType = descriptorpb.FieldOptions_OptionTargetType
+
+const FieldOptions_TARGET_TYPE_UNKNOWN = descriptorpb.FieldOptions_TARGET_TYPE_UNKNOWN
+const FieldOptions_TARGET_TYPE_FILE = descriptorpb.FieldOptions_TARGET_TYPE_FILE
+const FieldOptions_TARGET_TYPE_EXTENSION_RANGE = descriptorpb.FieldOptions_TARGET_TYPE_EXTENSION_RANGE
+const FieldOptions_TARGET_TYPE_MESSAGE = descriptorpb.FieldOptions_TARGET_TYPE_MESSAGE
+const FieldOptions_TARGET_TYPE_FIELD = descriptorpb.FieldOptions_TARGET_TYPE_FIELD
+const FieldOptions_TARGET_TYPE_ONEOF = descriptorpb.FieldOptions_TARGET_TYPE_ONEOF
+const FieldOptions_TARGET_TYPE_ENUM = descriptorpb.FieldOptions_TARGET_TYPE_ENUM
+const FieldOptions_TARGET_TYPE_ENUM_ENTRY = descriptorpb.FieldOptions_TARGET_TYPE_ENUM_ENTRY
+const FieldOptions_TARGET_TYPE_SERVICE = descriptorpb.FieldOptions_TARGET_TYPE_SERVICE
+const FieldOptions_TARGET_TYPE_METHOD = descriptorpb.FieldOptions_TARGET_TYPE_METHOD
+
+var FieldOptions_OptionTargetType_name = descriptorpb.FieldOptions_OptionTargetType_name
+var FieldOptions_OptionTargetType_value = descriptorpb.FieldOptions_OptionTargetType_value
+
 type MethodOptions_IdempotencyLevel = descriptorpb.MethodOptions_IdempotencyLevel
 
 const MethodOptions_IDEMPOTENCY_UNKNOWN = descriptorpb.MethodOptions_IDEMPOTENCY_UNKNOWN
@@ -81,10 +131,77 @@ const MethodOptions_IDEMPOTENT = descriptorpb.MethodOptions_IDEMPOTENT
 var MethodOptions_IdempotencyLevel_name = descriptorpb.MethodOptions_IdempotencyLevel_name
 var MethodOptions_IdempotencyLevel_value = descriptorpb.MethodOptions_IdempotencyLevel_value
 
+type FeatureSet_FieldPresence = descriptorpb.FeatureSet_FieldPresence
+
+const FeatureSet_FIELD_PRESENCE_UNKNOWN = descriptorpb.FeatureSet_FIELD_PRESENCE_UNKNOWN
+const FeatureSet_EXPLICIT = descriptorpb.FeatureSet_EXPLICIT
+const FeatureSet_IMPLICIT = descriptorpb.FeatureSet_IMPLICIT
+const FeatureSet_LEGACY_REQUIRED = descriptorpb.FeatureSet_LEGACY_REQUIRED
+
+var FeatureSet_FieldPresence_name = descriptorpb.FeatureSet_FieldPresence_name
+var FeatureSet_FieldPresence_value = descriptorpb.FeatureSet_FieldPresence_value
+
+type FeatureSet_EnumType = descriptorpb.FeatureSet_EnumType
+
+const FeatureSet_ENUM_TYPE_UNKNOWN = descriptorpb.FeatureSet_ENUM_TYPE_UNKNOWN
+const FeatureSet_OPEN = descriptorpb.FeatureSet_OPEN
+const FeatureSet_CLOSED = descriptorpb.FeatureSet_CLOSED
+
+var FeatureSet_EnumType_name = descriptorpb.FeatureSet_EnumType_name
+var FeatureSet_EnumType_value = descriptorpb.FeatureSet_EnumType_value
+
+type FeatureSet_RepeatedFieldEncoding = descriptorpb.FeatureSet_RepeatedFieldEncoding
+
+const FeatureSet_REPEATED_FIELD_ENCODING_UNKNOWN = descriptorpb.FeatureSet_REPEATED_FIELD_ENCODING_UNKNOWN
+const FeatureSet_PACKED = descriptorpb.FeatureSet_PACKED
+const FeatureSet_EXPANDED = descriptorpb.FeatureSet_EXPANDED
+
+var FeatureSet_RepeatedFieldEncoding_name = descriptorpb.FeatureSet_RepeatedFieldEncoding_name
+var FeatureSet_RepeatedFieldEncoding_value = descriptorpb.FeatureSet_RepeatedFieldEncoding_value
+
+type FeatureSet_Utf8Validation = descriptorpb.FeatureSet_Utf8Validation
+
+const FeatureSet_UTF8_VALIDATION_UNKNOWN = descriptorpb.FeatureSet_UTF8_VALIDATION_UNKNOWN
+const FeatureSet_VERIFY = descriptorpb.FeatureSet_VERIFY
+const FeatureSet_NONE = descriptorpb.FeatureSet_NONE
+
+var FeatureSet_Utf8Validation_name = descriptorpb.FeatureSet_Utf8Validation_name
+var FeatureSet_Utf8Validation_value = descriptorpb.FeatureSet_Utf8Validation_value
+
+type FeatureSet_MessageEncoding = descriptorpb.FeatureSet_MessageEncoding
+
+const FeatureSet_MESSAGE_ENCODING_UNKNOWN = descriptorpb.FeatureSet_MESSAGE_ENCODING_UNKNOWN
+const FeatureSet_LENGTH_PREFIXED = descriptorpb.FeatureSet_LENGTH_PREFIXED
+const FeatureSet_DELIMITED = descriptorpb.FeatureSet_DELIMITED
+
+var FeatureSet_MessageEncoding_name = descriptorpb.FeatureSet_MessageEncoding_name
+var FeatureSet_MessageEncoding_value = descriptorpb.FeatureSet_MessageEncoding_value
+
+type FeatureSet_JsonFormat = descriptorpb.FeatureSet_JsonFormat
+
+const FeatureSet_JSON_FORMAT_UNKNOWN = descriptorpb.FeatureSet_JSON_FORMAT_UNKNOWN
+const FeatureSet_ALLOW = descriptorpb.FeatureSet_ALLOW
+const FeatureSet_LEGACY_BEST_EFFORT = descriptorpb.FeatureSet_LEGACY_BEST_EFFORT
+
+var FeatureSet_JsonFormat_name = descriptorpb.FeatureSet_JsonFormat_name
+var FeatureSet_JsonFormat_value = descriptorpb.FeatureSet_JsonFormat_value
+
+type GeneratedCodeInfo_Annotation_Semantic = descriptorpb.GeneratedCodeInfo_Annotation_Semantic
+
+const GeneratedCodeInfo_Annotation_NONE = descriptorpb.GeneratedCodeInfo_Annotation_NONE
+const GeneratedCodeInfo_Annotation_SET = descriptorpb.GeneratedCodeInfo_Annotation_SET
+const GeneratedCodeInfo_Annotation_ALIAS = descriptorpb.GeneratedCodeInfo_Annotation_ALIAS
+
+var GeneratedCodeInfo_Annotation_Semantic_name = descriptorpb.GeneratedCodeInfo_Annotation_Semantic_name
+var GeneratedCodeInfo_Annotation_Semantic_value = descriptorpb.GeneratedCodeInfo_Annotation_Semantic_value
+
 type FileDescriptorSet = descriptorpb.FileDescriptorSet
 type FileDescriptorProto = descriptorpb.FileDescriptorProto
 type DescriptorProto = descriptorpb.DescriptorProto
 type ExtensionRangeOptions = descriptorpb.ExtensionRangeOptions
+
+const Default_ExtensionRangeOptions_Verification = descriptorpb.Default_ExtensionRangeOptions_Verification
+
 type FieldDescriptorProto = descriptorpb.FieldDescriptorProto
 type OneofDescriptorProto = descriptorpb.OneofDescriptorProto
 type EnumDescriptorProto = descriptorpb.EnumDescriptorProto
@@ -103,7 +220,6 @@ const Default_FileOptions_OptimizeFor = descriptorpb.Default_FileOptions_Optimiz
 const Default_FileOptions_CcGenericServices = descriptorpb.Default_FileOptions_CcGenericServices
 const Default_FileOptions_JavaGenericServices = descriptorpb.Default_FileOptions_JavaGenericServices
 const Default_FileOptions_PyGenericServices = descriptorpb.Default_FileOptions_PyGenericServices
-const Default_FileOptions_PhpGenericServices = descriptorpb.Default_FileOptions_PhpGenericServices
 const Default_FileOptions_Deprecated = descriptorpb.Default_FileOptions_Deprecated
 const Default_FileOptions_CcEnableArenas = descriptorpb.Default_FileOptions_CcEnableArenas
 
@@ -118,8 +234,10 @@ type FieldOptions = descriptorpb.FieldOptions
 const Default_FieldOptions_Ctype = descriptorpb.Default_FieldOptions_Ctype
 const Default_FieldOptions_Jstype = descriptorpb.Default_FieldOptions_Jstype
 const Default_FieldOptions_Lazy = descriptorpb.Default_FieldOptions_Lazy
+const Default_FieldOptions_UnverifiedLazy = descriptorpb.Default_FieldOptions_UnverifiedLazy
 const Default_FieldOptions_Deprecated = descriptorpb.Default_FieldOptions_Deprecated
 const Default_FieldOptions_Weak = descriptorpb.Default_FieldOptions_Weak
+const Default_FieldOptions_DebugRedact = descriptorpb.Default_FieldOptions_DebugRedact
 
 type OneofOptions = descriptorpb.OneofOptions
 type EnumOptions = descriptorpb.EnumOptions
@@ -129,6 +247,7 @@ const Default_EnumOptions_Deprecated = descriptorpb.Default_EnumOptions_Deprecat
 type EnumValueOptions = descriptorpb.EnumValueOptions
 
 const Default_EnumValueOptions_Deprecated = descriptorpb.Default_EnumValueOptions_Deprecated
+const Default_EnumValueOptions_DebugRedact = descriptorpb.Default_EnumValueOptions_DebugRedact
 
 type ServiceOptions = descriptorpb.ServiceOptions
 
@@ -140,12 +259,17 @@ const Default_MethodOptions_Deprecated = descriptorpb.Default_MethodOptions_Depr
 const Default_MethodOptions_IdempotencyLevel = descriptorpb.Default_MethodOptions_IdempotencyLevel
 
 type UninterpretedOption = descriptorpb.UninterpretedOption
+type FeatureSet = descriptorpb.FeatureSet
+type FeatureSetDefaults = descriptorpb.FeatureSetDefaults
 type SourceCodeInfo = descriptorpb.SourceCodeInfo
 type GeneratedCodeInfo = descriptorpb.GeneratedCodeInfo
 type DescriptorProto_ExtensionRange = descriptorpb.DescriptorProto_ExtensionRange
 type DescriptorProto_ReservedRange = descriptorpb.DescriptorProto_ReservedRange
+type ExtensionRangeOptions_Declaration = descriptorpb.ExtensionRangeOptions_Declaration
 type EnumDescriptorProto_EnumReservedRange = descriptorpb.EnumDescriptorProto_EnumReservedRange
+type FieldOptions_EditionDefault = descriptorpb.FieldOptions_EditionDefault
 type UninterpretedOption_NamePart = descriptorpb.UninterpretedOption_NamePart
+type FeatureSetDefaults_FeatureSetEditionDefault = descriptorpb.FeatureSetDefaults_FeatureSetEditionDefault
 type SourceCodeInfo_Location = descriptorpb.SourceCodeInfo_Location
 type GeneratedCodeInfo_Annotation = descriptorpb.GeneratedCodeInfo_Annotation
 

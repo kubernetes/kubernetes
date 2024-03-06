@@ -69,7 +69,7 @@ func (o UnmarshalOptions) Unmarshal(b []byte, m Message) error {
 // UnmarshalState parses a wire-format message and places the result in m.
 //
 // This method permits fine-grained control over the unmarshaler.
-// Most users should use Unmarshal instead.
+// Most users should use [Unmarshal] instead.
 func (o UnmarshalOptions) UnmarshalState(in protoiface.UnmarshalInput) (protoiface.UnmarshalOutput, error) {
 	if o.RecursionLimit == 0 {
 		o.RecursionLimit = protowire.DefaultRecursionLimit
