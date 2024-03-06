@@ -37,9 +37,11 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	} else {
 		proxyMode = kubeproxyconfig.ProxyModeIPVS
 	}
+	newPath := field.NewPath("KubeProxyConfiguration")
 
-	successCases := map[string]struct {
-		config kubeproxyconfig.KubeProxyConfiguration
+	for name, testCase := range map[string]struct {
+		config       kubeproxyconfig.KubeProxyConfiguration
+		expectedErrs field.ErrorList
 	}{
 		"Mode specified, extra mode-specific configs": {
 			config: kubeproxyconfig.KubeProxyConfiguration{
@@ -261,19 +263,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				},
 			},
 		},
-	}
-
-	for _, successCase := range successCases {
-		if errs := Validate(&successCase.config); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	newPath := field.NewPath("KubeProxyConfiguration")
-	testCases := map[string]struct {
-		config       kubeproxyconfig.KubeProxyConfiguration
-		expectedErrs field.ErrorList
-	}{
 		"invalid BindAddress": {
 			config: kubeproxyconfig.KubeProxyConfiguration{
 				BindAddress:        "10.10.12.11:2000",
@@ -549,9 +538,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("logging.format"), "unsupported format", "Unsupported log format")},
 		},
-	}
-
-	for name, testCase := range testCases {
+	} {
 		if runtime.GOOS == "windows" && testCase.config.Mode == kubeproxyconfig.ProxyModeIPVS {
 			// IPVS is not supported on Windows.
 			t.Log("Skipping test on Windows: ", name)
@@ -574,7 +561,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 
-	testCases := map[string]struct {
+	for _, testCase := range map[string]struct {
 		config       kubeproxyconfig.KubeProxyIPTablesConfiguration
 		expectedErrs field.ErrorList
 	}{
@@ -631,9 +618,7 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPTablesConfiguration.SyncPeriod"), metav1.Duration{Duration: 5 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.KubeIPTablesConfiguration.MinSyncPeriod")},
 		},
-	}
-
-	for _, testCase := range testCases {
+	} {
 		errs := validateKubeProxyIPTablesConfiguration(testCase.config, newPath.Child("KubeIPTablesConfiguration"))
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
@@ -648,7 +633,7 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 
 func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-	testCases := map[string]struct {
+	for _, testCase := range map[string]struct {
 		config       kubeproxyconfig.KubeProxyIPVSConfiguration
 		expectedErrs field.ErrorList
 	}{
@@ -732,8 +717,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 				field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPFinTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
 				field.Invalid(newPath.Child("KubeIPVSConfiguration.UDPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0")},
 		},
-	}
-	for _, testCase := range testCases {
+	} {
 		errs := validateKubeProxyIPVSConfiguration(testCase.config, newPath.Child("KubeIPVSConfiguration"))
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
@@ -748,7 +732,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 
 func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-	testCases := map[string]struct {
+	for _, testCase := range map[string]struct {
 		config       kubeproxyconfig.KubeProxyConntrackConfiguration
 		expectedErrs field.ErrorList
 	}{
@@ -840,9 +824,7 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeConntrackConfiguration.UDPStreamTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
-	}
-
-	for _, testCase := range testCases {
+	} {
 		errs := validateKubeProxyConntrackConfiguration(testCase.config, newPath.Child("KubeConntrackConfiguration"))
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
@@ -865,7 +847,7 @@ func TestValidateProxyMode(t *testing.T) {
 
 func testValidateProxyModeLinux(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-	testCases := map[string]struct {
+	for _, testCase := range map[string]struct {
 		mode         kubeproxyconfig.ProxyMode
 		expectedErrs field.ErrorList
 	}{
@@ -889,8 +871,7 @@ func testValidateProxyModeLinux(t *testing.T) {
 			mode:         kubeproxyconfig.ProxyMode("non-existing"),
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "non-existing", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
 		},
-	}
-	for _, testCase := range testCases {
+	} {
 		errs := validateProxyMode(testCase.mode, newPath)
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
@@ -905,7 +886,7 @@ func testValidateProxyModeLinux(t *testing.T) {
 
 func testValidateProxyModeWindows(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-	testCases := map[string]struct {
+	for _, testCase := range map[string]struct {
 		mode         kubeproxyconfig.ProxyMode
 		expectedErrs field.ErrorList
 	}{
@@ -931,8 +912,7 @@ func testValidateProxyModeWindows(t *testing.T) {
 			mode:         kubeproxyconfig.ProxyMode("non-existing"),
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "non-existing", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
 		},
-	}
-	for _, testCase := range testCases {
+	} {
 		errs := validateProxyMode(testCase.mode, newPath)
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
@@ -947,8 +927,7 @@ func testValidateProxyModeWindows(t *testing.T) {
 
 func TestValidateClientConnectionConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-
-	testCases := map[string]struct {
+	for _, testCase := range map[string]struct {
 		ccc          componentbaseconfig.ClientConnectionConfiguration
 		expectedErrs field.ErrorList
 	}{
@@ -964,9 +943,7 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 			ccc:          componentbaseconfig.ClientConnectionConfiguration{Burst: -5},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("Burst"), -5, "must be greater than or equal to 0")},
 		},
-	}
-
-	for _, testCase := range testCases {
+	} {
 		errs := validateClientConnectionConfiguration(testCase.ccc, newPath)
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
@@ -981,9 +958,9 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 
 func TestValidateHostPort(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-
-	successCases := map[string]struct {
-		ip string
+	for _, testCase := range map[string]struct {
+		ip           string
+		expectedErrs field.ErrorList
 	}{
 		"all IPs": {
 			ip: "0.0.0.0:10256",
@@ -994,18 +971,6 @@ func TestValidateHostPort(t *testing.T) {
 		"specific IP": {
 			ip: "10.10.10.10:10256",
 		},
-	}
-
-	for _, successCase := range successCases {
-		if errs := validateHostPort(successCase.ip, newPath.Child("HealthzBindAddress")); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := map[string]struct {
-		ip           string
-		expectedErrs field.ErrorList
-	}{
 		"missing port": {
 			ip:           "10.10.10.10",
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "10.10.10.10", "must be IP:port")},
@@ -1026,16 +991,14 @@ func TestValidateHostPort(t *testing.T) {
 			ip:           "10.10.10.10:65536",
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "65536", "must be a valid port")},
 		},
-	}
-
-	for _, errorCase := range errorCases {
-		errs := validateHostPort(errorCase.ip, newPath.Child("HealthzBindAddress"))
-		if len(errorCase.expectedErrs) != len(errs) {
-			t.Fatalf("Expected %d errors, got %d errors: %v", len(errorCase.expectedErrs), len(errs), errs)
+	} {
+		errs := validateHostPort(testCase.ip, newPath.Child("HealthzBindAddress"))
+		if len(testCase.expectedErrs) != len(errs) {
+			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
 		}
 		for i, err := range errs {
-			if err.Error() != errorCase.expectedErrs[i].Error() {
-				t.Errorf("Expected error: %s, got %s", errorCase.expectedErrs[i], err.Error())
+			if err.Error() != testCase.expectedErrs[i].Error() {
+				t.Errorf("Expected error: %s, got %s", testCase.expectedErrs[i], err.Error())
 			}
 		}
 	}
@@ -1043,9 +1006,9 @@ func TestValidateHostPort(t *testing.T) {
 
 func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-
-	successCases := map[string]struct {
-		addresses []string
+	for _, testCase := range map[string]struct {
+		addresses    []string
+		expectedErrs field.ErrorList
 	}{
 		"no addresses": {
 			addresses: []string{},
@@ -1086,18 +1049,6 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		"primary": {
 			addresses: []string{kubeproxyconfig.NodePortAddressesPrimary},
 		},
-	}
-
-	for _, successCase := range successCases {
-		if errs := validateKubeProxyNodePortAddress(successCase.addresses, newPath.Child("NodePortAddresses")); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	testCases := map[string]struct {
-		addresses    []string
-		expectedErrs field.ErrorList
-	}{
 		"invalid foo address": {
 			addresses:    []string{"foo"},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "foo", "must be a valid CIDR")},
@@ -1131,9 +1082,7 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 			addresses:    []string{"127.0.0.1/32", "primary"},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "primary", "can't use both 'primary' and CIDRs")},
 		},
-	}
-
-	for _, testCase := range testCases {
+	} {
 		errs := validateKubeProxyNodePortAddress(testCase.addresses, newPath.Child("NodePortAddresses"))
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Errorf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
@@ -1148,9 +1097,9 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 
 func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
-
-	successCases := map[string]struct {
-		addresses []string
+	for _, testCase := range map[string]struct {
+		addresses    []string
+		expectedErrs field.ErrorList
 	}{
 		"no cidrs": {
 			addresses: []string{},
@@ -1188,18 +1137,6 @@ func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 		"valid 11": {
 			addresses: []string{"2001:db8::/32"},
 		},
-	}
-
-	for _, successCase := range successCases {
-		if errs := validateIPVSExcludeCIDRs(successCase.addresses, newPath.Child("ExcludeCIDRs")); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	testCases := map[string]struct {
-		addresses    []string
-		expectedErrs field.ErrorList
-	}{
 		"invalid foo address": {
 			addresses:    []string{"foo"},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[0]"), "foo", "must be a valid CIDR")},
@@ -1225,9 +1162,7 @@ func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[2]"), "2001:db8:xyz/64", "must be a valid CIDR")},
 		},
-	}
-
-	for _, testCase := range testCases {
+	} {
 		errs := validateIPVSExcludeCIDRs(testCase.addresses, newPath.Child("ExcludeCIDRS"))
 		if len(testCase.expectedErrs) != len(errs) {
 			t.Errorf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
