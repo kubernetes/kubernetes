@@ -69,15 +69,6 @@ if [[ -z "${dep}" || -z "${replacement}" || -z "${sha}" ]]; then
   exit 1
 fi
 
-_tmp="${KUBE_ROOT}/_tmp"
-cleanup() {
-  rm -rf "${_tmp}"
-}
-trap "cleanup" EXIT SIGINT
-cleanup
-mkdir -p "${_tmp}"
-
-
 # Find the resolved version before trying to use it.
 echo "Running: go mod download ${replacement}@${sha}"
 if meta=$(go mod download -json "${replacement}@${sha}"); then
