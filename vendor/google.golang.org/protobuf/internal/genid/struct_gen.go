@@ -18,6 +18,11 @@ const (
 	NullValue_enum_name     = "NullValue"
 )
 
+// Enum values for google.protobuf.NullValue.
+const (
+	NullValue_NULL_VALUE_enum_value = 0
+)
+
 // Names for google.protobuf.Struct.
 const (
 	Struct_message_name     protoreflect.Name     = "Struct"
