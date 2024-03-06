@@ -33,6 +33,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -47,7 +48,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -817,12 +817,8 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 	// Obtain the primary IP family of the Cluster based on the first ClusterIP
 	// TODO: Eventually we should just be getting these from Spec.IPFamilies
 	// but for now that would only if the feature gate is enabled.
-	family := v1.IPv4Protocol
-	secondaryFamily := v1.IPv6Protocol
-	if netutils.IsIPv6String(config.ClusterIP) {
-		family = v1.IPv6Protocol
-		secondaryFamily = v1.IPv4Protocol
-	}
+	family := utilip.IPFamilyOf(config.ClusterIP)
+	secondaryFamily := utilip.OtherIPFamily(family)
 	if config.PreferExternalAddresses {
 		// Get Node IPs from the cluster, ExternalIPs take precedence
 		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)

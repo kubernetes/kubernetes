@@ -39,6 +39,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -136,8 +137,8 @@ func NewDualStackProxier(
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, ipset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(v1.IPv4Protocol, excludeCIDRs),
+		strictARP, tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol], recorder,
 		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
@@ -145,8 +146,8 @@ func NewDualStackProxier(
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, ipset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(v1.IPv6Protocol, excludeCIDRs),
+		strictARP, tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol], recorder,
 		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
@@ -412,10 +413,10 @@ func NewProxier(ipFamily v1.IPFamily,
 	return proxier, nil
 }
 
-func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
+func filterCIDRs(family v1.IPFamily, cidrs []string) []string {
 	var filteredCIDRs []string
 	for _, cidr := range cidrs {
-		if netutils.IsIPv6CIDRString(cidr) == wantIPv6 {
+		if utilip.IPFamilyOfCIDR(cidr) == family {
 			filteredCIDRs = append(filteredCIDRs, cidr)
 		}
 	}
@@ -1959,7 +1960,7 @@ func (proxier *Proxier) cleanLegacyService(activeServices sets.Set[string], curr
 		if proxier.isIPInExcludeCIDRs(svc.Address) {
 			continue
 		}
-		if getIPFamily(svc.Address) != proxier.ipFamily {
+		if utilip.IPFamilyOf(svc.Address) != proxier.ipFamily {
 			// Not our family
 			continue
 		}
@@ -1980,13 +1981,6 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 		}
 	}
 	return false
-}
-
-func getIPFamily(ip net.IP) v1.IPFamily {
-	if netutils.IsIPv4(ip) {
-		return v1.IPv4Protocol
-	}
-	return v1.IPv6Protocol
 }
 
 // ipvs Proxier fall back on iptables when it needs to do SNAT for engress packets

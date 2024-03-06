@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	restclient "k8s.io/client-go/rest"
 	netutils "k8s.io/utils/net"
 )
@@ -88,8 +89,8 @@ func getLoopbackAddress(wantIPv6 bool) string {
 	addrs, err := net.InterfaceAddrs()
 	if err == nil {
 		for _, address := range addrs {
-			if ipnet, ok := address.(*net.IPNet); ok && ipnet.IP.IsLoopback() && wantIPv6 == netutils.IsIPv6(ipnet.IP) {
-				return ipnet.IP.String()
+			if ip := utilip.IPFromInterfaceAddr(address); ip != nil && ip.IsLoopback() && wantIPv6 == netutils.IsIPv6(ip) {
+				return ip.String()
 			}
 		}
 	}

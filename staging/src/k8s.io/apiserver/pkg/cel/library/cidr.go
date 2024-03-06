@@ -24,6 +24,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
@@ -274,14 +275,9 @@ func masked(arg ref.Val) ref.Val {
 // so that we can share the common logic of rejecting strings
 // that IPv4-mapped IPv6 addresses or contain non-zero bits after the mask.
 func parseCIDR(raw string) (netip.Prefix, error) {
-	net, err := netip.ParsePrefix(raw)
+	net, err := utilip.ParseValidCIDR(raw)
 	if err != nil {
 		return netip.Prefix{}, fmt.Errorf("network address parse error during conversion from string: %v", err)
 	}
-
-	if net.Addr().Is4In6() {
-		return netip.Prefix{}, fmt.Errorf("IPv4-mapped IPv6 address %q is not allowed", raw)
-	}
-
 	return net, nil
 }

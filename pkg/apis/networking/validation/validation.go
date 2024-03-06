@@ -25,6 +25,7 @@ import (
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -734,17 +735,9 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 		return allErrs
 	}
 
-	if len(cidrConfig.Spec.CIDRs) > 2 {
-		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may only hold up to 2 values"))
+	if len(cidrConfig.Spec.CIDRs) > 1 && !utilip.IsDualStackCIDRPair(cidrConfig.Spec.CIDRs) {
+		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
 		return allErrs
-	}
-	// validate cidrs are dual stack, one of each IP family
-	if len(cidrConfig.Spec.CIDRs) == 2 {
-		isDual, err := netutils.IsDualStackCIDRStrings(cidrConfig.Spec.CIDRs)
-		if err != nil || !isDual {
-			allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
-			return allErrs
-		}
 	}
 
 	for i, cidr := range cidrConfig.Spec.CIDRs {

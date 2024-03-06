@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -17299,30 +17300,30 @@ func TestValidateServiceCreate(t *testing.T) {
 		{
 			name: "invalid, service with invalid ipFamilies",
 			tweakSvc: func(s *core.Service) {
-				invalidServiceIPFamily := core.IPFamily("not-a-valid-ip-family")
-				s.Spec.IPFamilies = []core.IPFamily{invalidServiceIPFamily}
+				invalidServiceIPFamily := utilip.IPFamily("not-a-valid-ip-family")
+				s.Spec.IPFamilies = []utilip.IPFamily{invalidServiceIPFamily}
 			},
 			numErrs: 1,
 		}, {
 			name: "invalid, service with invalid ipFamilies (2nd)",
 			tweakSvc: func(s *core.Service) {
-				invalidServiceIPFamily := core.IPFamily("not-a-valid-ip-family")
+				invalidServiceIPFamily := utilip.IPFamily("not-a-valid-ip-family")
 				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, invalidServiceIPFamily}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, invalidServiceIPFamily}
 			},
 			numErrs: 1,
 		}, {
 			name: "IPFamilyPolicy(singleStack) is set for two families",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &singleStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0, // this validated in alloc code.
 		}, {
 			name: "valid, IPFamilyPolicy(preferDualStack) is set for two families (note: alloc sets families)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &preferDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
@@ -17331,14 +17332,14 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid, service with 2+ ipFamilies",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol, core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol, utilip.IPv4Protocol}
 			},
 			numErrs: 1,
 		}, {
 			name: "invalid, service with same ip families",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 1,
 		}, {
@@ -17350,34 +17351,34 @@ func TestValidateServiceCreate(t *testing.T) {
 		}, {
 			name: "valid, service with valid ipFamilies (v4)",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
 			name: "valid, service with valid ipFamilies (v6)",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
 			name: "valid, service with valid ipFamilies(v4,v6)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
 			name: "valid, service with valid ipFamilies(v6,v4)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol, utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
 			name: "valid, service preferred dual stack with single family",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &preferDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
@@ -17451,7 +17452,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "2001::1"
 				s.Spec.ClusterIPs = []string{"2001::1", "2001::4"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 2,
 		}, {
@@ -17460,7 +17461,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "10.0.0.10"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 			},
 			numErrs: 2,
@@ -17470,16 +17471,16 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1", "10.0.0.10"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
-			numErrs: 1,
+			numErrs: 2,
 		}, {
 			name: " multi ip, dualstack not set (request for downgrade)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &singleStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -17488,7 +17489,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "None"
 				s.Spec.ClusterIPs = []string{"None"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 				s.Spec.Selector = nil
 			},
 			numErrs: 0,
@@ -17498,7 +17499,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &preferDualStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
@@ -17509,7 +17510,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -17517,7 +17518,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 			},
 			numErrs: 1,
 		}, {
@@ -17525,7 +17526,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.ClusterIP = "2001::1"
 				s.Spec.ClusterIPs = []string{"2001::1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 1,
 		}, {
@@ -17547,7 +17548,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid, single family",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &singleStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 
 			},
 			numErrs: 0,
@@ -17557,7 +17558,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &singleStack
 				s.Spec.ClusterIP = "2001::1"
 				s.Spec.ClusterIPs = []string{"2001::1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 
 			},
 			numErrs: 0,
@@ -17567,7 +17568,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &preferDualStack
 				s.Spec.ClusterIP = "2001::1"
 				s.Spec.ClusterIPs = []string{"2001::1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 
 			},
 			numErrs: 0,
@@ -17577,7 +17578,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -17586,7 +17587,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -17595,7 +17596,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
 				s.Spec.ClusterIP = "2001::1"
 				s.Spec.ClusterIPs = []string{"2001::1", "10.0.0.1"}
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol, utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -17610,7 +17611,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid, multi ipfamilies (6,4)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol, utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -17625,7 +17626,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid,  multi ipfamilies (4,6)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &requireDualStack
-				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19749,7 +19750,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.ClusterIP = "10.0.0.10"
 				oldSvc.Spec.ClusterIPs = []string{"10.0.0.10"}
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
 
 				newSvc.Spec.Type = core.ServiceTypeExternalName
@@ -19761,7 +19762,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				*/
 				newSvc.Spec.ClusterIP = "10.0.0.10"
 				newSvc.Spec.ClusterIPs = []string{"10.0.0.10"}
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 				newSvc.Spec.IPFamilyPolicy = &singleStack
 
 			},
@@ -19773,7 +19774,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.ClusterIP = "10.0.0.10"
 				oldSvc.Spec.ClusterIPs = []string{"10.0.0.10"}
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
 
 				newSvc.Spec.Type = core.ServiceTypeExternalName
@@ -19786,10 +19787,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "same ServiceIPFamily",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19797,11 +19798,11 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = nil
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.IPFamilyPolicy = &singleStack
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19809,11 +19810,11 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
@@ -19823,11 +19824,11 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
@@ -19848,7 +19849,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.IPFamilies = nil
 
 				newSvc.Spec.ExternalName = "somename"
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19857,7 +19858,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.IPFamilies = nil
 
 				newSvc.Spec.ExternalName = "somename"
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19866,12 +19867,12 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 			},
 			numErrs: 2,
 		},
@@ -19883,13 +19884,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19899,13 +19900,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				newSvc.Spec.IPFamilyPolicy = &preferDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
@@ -19918,13 +19919,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
 
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19934,13 +19935,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19950,13 +19951,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				newSvc.Spec.IPFamilyPolicy = &singleStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19966,13 +19967,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"None"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "None"
 				newSvc.Spec.ClusterIPs = []string{"None"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol, utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19982,13 +19983,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"None"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "None"
 				newSvc.Spec.ClusterIPs = []string{"None"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol, utilip.IPv4Protocol}
 			},
 			numErrs: 0,
 		}, {
@@ -19998,13 +19999,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"None"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "None"
 				newSvc.Spec.ClusterIPs = []string{"None"}
 				newSvc.Spec.IPFamilyPolicy = &singleStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
@@ -20016,13 +20017,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "2001::1"
 				newSvc.Spec.ClusterIPs = []string{"2001::1", "1.2.3.5"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv6Protocol, utilip.IPv4Protocol}
 			},
 			numErrs: 4,
 		}, {
@@ -20032,13 +20033,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.5"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.5", "2001::1"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 1,
 		}, {
@@ -20048,13 +20049,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2002::1"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 1,
 		}, {
@@ -20064,13 +20065,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				newSvc.Spec.IPFamilyPolicy = &singleStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 0, // families and ips are trimmed in strategy
 		}, {
@@ -20080,13 +20081,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.4"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 2,
 		}, {
@@ -20096,13 +20097,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.5"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 				newSvc.Spec.IPFamilyPolicy = &singleStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 			},
 			numErrs: 1,
 		}, {
@@ -20113,13 +20114,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
 
-				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.ClusterIP = "1.2.3.5"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 				newSvc.Spec.IPFamilyPolicy = &requireDualStack
-				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				newSvc.Spec.IPFamilies = []utilip.IPFamily{utilip.IPv4Protocol, utilip.IPv6Protocol}
 			},
 			numErrs: 1,
 		}, {

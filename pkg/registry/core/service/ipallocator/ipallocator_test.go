@@ -27,12 +27,12 @@ import (
 
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-base/metrics/testutil"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	netutils "k8s.io/utils/net"
 )
 
@@ -76,7 +76,7 @@ func TestAllocateIPAllocator(t *testing.T) {
 	testCases := []struct {
 		name             string
 		cidr             string
-		family           api.IPFamily
+		family           utilip.IPFamily
 		free             int
 		released         string
 		outOfRange       []string

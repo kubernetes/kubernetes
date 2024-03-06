@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -37,8 +38,8 @@ import (
 // Allocators encapsulates the various allocators (IPs, ports) used in
 // Services.
 type Allocators struct {
-	serviceIPAllocatorsByFamily map[api.IPFamily]ipallocator.Interface
-	defaultServiceIPFamily      api.IPFamily // --service-cluster-ip-range[0]
+	serviceIPAllocatorsByFamily map[utilip.IPFamily]ipallocator.Interface
+	defaultServiceIPFamily      utilip.IPFamily // --service-cluster-ip-range[0]
 	serviceNodePorts            portallocator.Interface
 }
 
@@ -53,7 +54,7 @@ type ServiceNodePort struct {
 }
 
 // This is a trasitionary function to facilitate service REST flattening.
-func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) Allocators {
+func makeAlloc(defaultFamily utilip.IPFamily, ipAllocs map[utilip.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) Allocators {
 	return Allocators{
 		defaultServiceIPFamily:      defaultFamily,
 		serviceIPAllocatorsByFamily: ipAllocs,
@@ -208,7 +209,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 
 		// We previously validated that IPs are well-formed and that if an
 		// ipFamilies[] entry exists it matches the IP.
-		fam := familyOf(ip)
+		fam := utilip.IPFamilyOf(ip)
 
 		// If the corresponding family is not specified, add it.
 		if i >= len(service.Spec.IPFamilies) {
@@ -237,7 +238,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 		// If IPFamilies was not set by the user, start with the default
 		// family.
 		if len(service.Spec.IPFamilies) == 0 {
-			service.Spec.IPFamilies = []api.IPFamily{al.defaultServiceIPFamily}
+			service.Spec.IPFamilies = []utilip.IPFamily{al.defaultServiceIPFamily}
 		}
 
 		// this follows headful services. With one exception on a single stack
@@ -246,11 +247,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 		if len(service.Spec.IPFamilies) < 2 {
 			if *(service.Spec.IPFamilyPolicy) != api.IPFamilyPolicySingleStack {
 				// add the alt ipfamily
-				if service.Spec.IPFamilies[0] == api.IPv4Protocol {
-					service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
-				} else {
-					service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv4Protocol)
-				}
+				service.Spec.IPFamilies = append(service.Spec.IPFamilies, utilip.OtherIPFamily(service.Spec.IPFamilies[0]))
 			}
 		}
 
@@ -284,7 +281,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 
 	// nil families, gets cluster default
 	if len(service.Spec.IPFamilies) == 0 {
-		service.Spec.IPFamilies = []api.IPFamily{al.defaultServiceIPFamily}
+		service.Spec.IPFamilies = []utilip.IPFamily{al.defaultServiceIPFamily}
 	}
 
 	// If this service is looking for dual-stack and this cluster does have two
@@ -293,11 +290,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 		len(service.Spec.IPFamilies) == 1 &&
 		len(al.serviceIPAllocatorsByFamily) == 2 {
 
-		if service.Spec.IPFamilies[0] == api.IPv4Protocol {
-			service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
-		} else if service.Spec.IPFamilies[0] == api.IPv6Protocol {
-			service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv4Protocol)
-		}
+		service.Spec.IPFamilies = append(service.Spec.IPFamilies, utilip.OtherIPFamily(service.Spec.IPFamilies[0]))
 	}
 
 	return nil
@@ -338,7 +331,7 @@ func (al *Allocators) txnAllocClusterIPs(service *api.Service, dryRun bool) (tra
 }
 
 // allocates ClusterIPs for a service
-func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
+func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[utilip.IPFamily]string, error) {
 	// external name don't get ClusterIPs
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil, nil
@@ -349,7 +342,7 @@ func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[ap
 		return nil, nil
 	}
 
-	toAlloc := make(map[api.IPFamily]string)
+	toAlloc := make(map[utilip.IPFamily]string)
 	// at this stage, the only fact we know is that service has correct ip families
 	// assigned to it. It may have partial assigned ClusterIPs (Upgrade to dual stack)
 	// may have no ips at all. The below loop is meant to fix this
@@ -393,8 +386,8 @@ func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[ap
 	return allocated, err
 }
 
-func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]string, dryRun bool) (map[api.IPFamily]string, error) {
-	allocated := make(map[api.IPFamily]string)
+func (al *Allocators) allocIPs(service *api.Service, toAlloc map[utilip.IPFamily]string, dryRun bool) (map[utilip.IPFamily]string, error) {
+	allocated := make(map[utilip.IPFamily]string)
 
 	for family, ip := range toAlloc {
 		allocator := al.serviceIPAllocatorsByFamily[family] // should always be there, as we pre validate
@@ -447,12 +440,12 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 }
 
 // releases clusterIPs per family
-func (al *Allocators) releaseIPs(toRelease map[api.IPFamily]string) (map[api.IPFamily]string, error) {
+func (al *Allocators) releaseIPs(toRelease map[utilip.IPFamily]string) (map[utilip.IPFamily]string, error) {
 	if toRelease == nil {
 		return nil, nil
 	}
 
-	released := make(map[api.IPFamily]string)
+	released := make(map[utilip.IPFamily]string)
 	for family, ip := range toRelease {
 		allocator, ok := al.serviceIPAllocatorsByFamily[family]
 		if !ok {
@@ -671,7 +664,7 @@ func (al *Allocators) txnUpdateClusterIPs(after After, before Before, dryRun boo
 // this func does not perform actual release of clusterIPs. it returns
 // a map[family]ip for the caller to release when everything else has
 // executed successfully
-func (al *Allocators) updateClusterIPs(after After, before Before, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
+func (al *Allocators) updateClusterIPs(after After, before Before, dryRun bool) (allocated map[utilip.IPFamily]string, toRelease map[utilip.IPFamily]string, err error) {
 	oldService, service := before.Service, after.Service
 
 	// We don't want to auto-upgrade (add an IP) or downgrade (remove an IP)
@@ -707,7 +700,7 @@ func (al *Allocators) updateClusterIPs(after After, before Before, dryRun bool) 
 	// CASE B:
 	// Update service from non-ExternalName to ExternalName, should release ClusterIP if exists.
 	if oldService.Spec.Type != api.ServiceTypeExternalName && service.Spec.Type == api.ServiceTypeExternalName {
-		toRelease = make(map[api.IPFamily]string)
+		toRelease = make(map[utilip.IPFamily]string)
 		for i, family := range oldService.Spec.IPFamilies {
 			toRelease[family] = oldService.Spec.ClusterIPs[i]
 		}
@@ -719,7 +712,7 @@ func (al *Allocators) updateClusterIPs(after After, before Before, dryRun bool) 
 
 	// CASE C:
 	if upgraded {
-		toAllocate := make(map[api.IPFamily]string)
+		toAllocate := make(map[utilip.IPFamily]string)
 		// if secondary ip was named, just get it. if not add a marker
 		if len(service.Spec.ClusterIPs) < 2 {
 			service.Spec.ClusterIPs = append(service.Spec.ClusterIPs, "" /* marker */)
@@ -739,7 +732,7 @@ func (al *Allocators) updateClusterIPs(after After, before Before, dryRun bool) 
 
 	// CASE D:
 	if downgraded {
-		toRelease = make(map[api.IPFamily]string)
+		toRelease = make(map[utilip.IPFamily]string)
 		toRelease[oldService.Spec.IPFamilies[1]] = oldService.Spec.ClusterIPs[1]
 		// note: we don't release clusterIP, this is left to clean up in the action itself
 		return nil, toRelease, err
@@ -904,7 +897,7 @@ func (al *Allocators) releaseAllocatedResources(svc *api.Service) {
 }
 
 // releases allocated ClusterIPs for service that is about to be deleted
-func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.IPFamily]string, err error) {
+func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[utilip.IPFamily]string, err error) {
 	// external name don't get ClusterIPs
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil, nil
@@ -915,13 +908,9 @@ func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.
 		return nil, nil
 	}
 
-	toRelease := make(map[api.IPFamily]string)
+	toRelease := make(map[utilip.IPFamily]string)
 	for _, ip := range service.Spec.ClusterIPs {
-		if netutils.IsIPv6String(ip) {
-			toRelease[api.IPv6Protocol] = ip
-		} else {
-			toRelease[api.IPv4Protocol] = ip
-		}
+		toRelease[utilip.IPFamilyOf(ip)] = ip
 	}
 	return al.releaseIPs(toRelease)
 }
@@ -1090,15 +1079,4 @@ func reducedIPFamilies(after After, before Before) bool {
 		return false
 	}
 	return len(newSvc.Spec.IPFamilies) < len(oldSvc.Spec.IPFamilies)
-}
-
-// Helper to get the IP family of a given IP.
-func familyOf(ip string) api.IPFamily {
-	if netutils.IsIPv4String(ip) {
-		return api.IPv4Protocol
-	}
-	if netutils.IsIPv6String(ip) {
-		return api.IPv6Protocol
-	}
-	return api.IPFamily("unknown")
 }

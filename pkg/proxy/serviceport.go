@@ -21,6 +21,7 @@ import (
 	"net"
 
 	v1 "k8s.io/api/core/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -215,7 +216,7 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 	info.externalIPs = ipFamilyMap[ipFamily]
 
 	// Log the IPs not matching the ipFamily
-	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
+	if ips, ok := ipFamilyMap[utilip.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
 			"ipFamily", ipFamily, "externalIPs", ips, "service", klog.KObj(service))
 	}
@@ -223,7 +224,7 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(service.Spec.LoadBalancerSourceRanges)
 	info.loadBalancerSourceRanges = cidrFamilyMap[ipFamily]
 	// Log the CIDRs not matching the ipFamily
-	if cidrs, ok := cidrFamilyMap[proxyutil.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
+	if cidrs, ok := cidrFamilyMap[utilip.OtherIPFamily(ipFamily)]; ok && len(cidrs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
 			"ipFamily", ipFamily, "loadBalancerSourceRanges", cidrs, "service", klog.KObj(service))
 	}
@@ -247,7 +248,7 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 		// kube-proxy does not implement IP family translation, skip addresses with
 		// different IP family
 		ip := netutils.ParseIPSloppy(ing.IP) // (already verified as an IP-address)
-		if ingFamily := proxyutil.GetIPFamilyFromIP(ip); ingFamily == ipFamily {
+		if ingFamily := utilip.IPFamilyOf(ip); ingFamily == ipFamily {
 			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ip)
 		} else {
 			invalidIPs = append(invalidIPs, ip)

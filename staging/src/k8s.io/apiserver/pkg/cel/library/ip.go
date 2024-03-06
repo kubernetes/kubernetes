@@ -24,6 +24,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
@@ -312,18 +313,9 @@ func isGlobalUnicast(arg ref.Val) ref.Val {
 // so that we can share the common logic of rejecting IP addresses
 // that contain zones or are IPv4-mapped IPv6 addresses.
 func parseIPAddr(raw string) (netip.Addr, error) {
-	addr, err := netip.ParseAddr(raw)
+	addr, err := utilip.ParseValidIP(raw)
 	if err != nil {
 		return netip.Addr{}, fmt.Errorf("IP Address %q parse error during conversion from string: %v", raw, err)
 	}
-
-	if addr.Zone() != "" {
-		return netip.Addr{}, fmt.Errorf("IP address %q with zone value is not allowed", raw)
-	}
-
-	if addr.Is4In6() {
-		return netip.Addr{}, fmt.Errorf("IPv4-mapped IPv6 address %q is not allowed", raw)
-	}
-
 	return addr, nil
 }

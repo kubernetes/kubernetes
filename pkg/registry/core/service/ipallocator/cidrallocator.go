@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -64,7 +65,7 @@ type MetaAllocator struct {
 	muTree sync.Mutex
 	tree   *iptree.Tree[*Allocator]
 
-	ipFamily api.IPFamily
+	ipFamily utilip.IPFamily
 }
 
 var _ Interface = &MetaAllocator{}
@@ -80,9 +81,9 @@ func NewMetaAllocator(
 ) (*MetaAllocator, error) {
 
 	// TODO: make the NewMetaAllocator agnostic of the IP family
-	family := api.IPv4Protocol
+	family := utilip.IPv4Protocol
 	if isIPv6 {
-		family = api.IPv6Protocol
+		family = utilip.IPv6Protocol
 	}
 
 	c := &MetaAllocator{
@@ -195,7 +196,7 @@ func (c *MetaAllocator) syncTree() error {
 		}
 
 		for _, cidr := range serviceCIDR.Spec.CIDRs {
-			if c.ipFamily == api.IPFamily(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))) {
+			if c.ipFamily == utilip.IPFamilyOfCIDR(cidr) {
 				cidrsSet.Insert(cidr)
 				cidrReady[cidr] = ready
 			}
@@ -205,7 +206,7 @@ func (c *MetaAllocator) syncTree() error {
 	// obtain the existing allocators and set the existing state
 	treeSet := sets.New[string]()
 	c.muTree.Lock()
-	c.tree.DepthFirstWalk(c.ipFamily == api.IPv6Protocol, func(k netip.Prefix, v *Allocator) bool {
+	c.tree.DepthFirstWalk(c.ipFamily == utilip.IPv6Protocol, func(k netip.Prefix, v *Allocator) bool {
 		v.ready.Store(cidrReady[k.String()])
 		treeSet.Insert(k.String())
 		return false
@@ -251,7 +252,7 @@ func (c *MetaAllocator) getAllocator(ip net.IP) (*Allocator, error) {
 	c.muTree.Lock()
 	defer c.muTree.Unlock()
 
-	address := ipToAddr(ip)
+	address := utilip.AddrFromIP(ip)
 	prefix := netip.PrefixFrom(address, address.BitLen())
 	// Use the largest subnet to allocate addresses because
 	// all the other subnets will be contained.
@@ -304,7 +305,7 @@ func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error
 	// addresses each, the chances to get B has to be 4 times the chances to
 	// get A so we can spread the load of IPs randomly.
 	// However, we need to validate the best strategy before going to Beta.
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		ip, err := allocator.AllocateNextService(service)
 		if err == nil {
@@ -324,7 +325,7 @@ func (c *MetaAllocator) AllocateNext() (net.IP, error) {
 	// addresses each, the chances to get B has to be 4 times the chances to
 	// get A so we can spread the load of IPs randomly.
 	// However, we need to validate the best strategy before going to Beta.
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		ip, err := allocator.AllocateNext()
 		if err == nil {
@@ -360,7 +361,7 @@ func (c *MetaAllocator) CIDR() net.IPNet {
 	return net.IPNet{}
 
 }
-func (c *MetaAllocator) IPFamily() api.IPFamily {
+func (c *MetaAllocator) IPFamily() utilip.IPFamily {
 	return c.ipFamily
 }
 func (c *MetaAllocator) Has(ip net.IP) bool {
@@ -397,7 +398,7 @@ func (c *MetaAllocator) Free() int {
 	defer c.muTree.Unlock()
 
 	size := 0
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		size += int(allocator.size)
 	}
@@ -410,7 +411,7 @@ func (c *MetaAllocator) EnableMetrics() {}
 func (c *MetaAllocator) DryRun() Interface {
 	c.muTree.Lock()
 	defer c.muTree.Unlock()
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
+	isIPv6 := c.ipFamily == utilip.IPFamily(v1.IPv6Protocol)
 	for _, allocator := range c.tree.TopLevelPrefixes(isIPv6) {
 		return allocator.DryRun()
 	}
@@ -429,34 +430,4 @@ func isReady(serviceCIDR *networkingv1alpha1.ServiceCIDR) bool {
 	}
 	// assume the ServiceCIDR is Ready, in order to handle scenarios where kcm is not running
 	return true
-}
-
-// ipToAddr converts a net.IP to a netip.Addr
-// if the net.IP is not valid it returns an empty netip.Addr{}
-func ipToAddr(ip net.IP) netip.Addr {
-	// https://pkg.go.dev/net/netip#AddrFromSlice can return an IPv4 in IPv6 format
-	// so we have to check the IP family to return exactly the format that we want
-	// address, _ := netip.AddrFromSlice(net.ParseIPSloppy(192.168.0.1)) returns
-	// an address like ::ffff:192.168.0.1/32
-	bytes := ip.To4()
-	if bytes == nil {
-		bytes = ip.To16()
-	}
-	// AddrFromSlice returns Addr{}, false if the input is invalid.
-	address, _ := netip.AddrFromSlice(bytes)
-	return address
-}
-
-// Convert netutils.IPFamily to v1.IPFamily
-// TODO: consolidate helpers
-// copied from pkg/proxy/util/utils.go
-func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
-	switch ipFamily {
-	case netutils.IPv4:
-		return v1.IPv4Protocol
-	case netutils.IPv6:
-		return v1.IPv6Protocol
-	}
-
-	return v1.IPFamilyUnknown
 }
