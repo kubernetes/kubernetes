@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remote
+package cri
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"testing"
 )
 
 func makePodSandboxMetadata(name, namespace, uid string) *runtimeapi.PodSandboxMetadata {

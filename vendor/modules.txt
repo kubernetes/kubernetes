@@ -1105,6 +1105,8 @@ gopkg.in/yaml.v3
 ## explicit; go 1.22.0
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 ## explicit; go 1.22.0
+# k8s.io/cri-client v0.0.0 => ./staging/src/k8s.io/cri-client
+## explicit; go 1.22.0
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
 ## explicit; go 1.22.0
 # k8s.io/dynamic-resource-allocation v0.0.0 => ./staging/src/k8s.io/dynamic-resource-allocation

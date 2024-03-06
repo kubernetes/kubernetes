@@ -1497,6 +1497,17 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/cri-client
+    dependencies:
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master
+    - repository: cri-api
+      branch: master
   library: true
 - destination: kubelet
   branches:
