@@ -778,6 +778,10 @@
               "seccompProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "appArmorProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
               }
             },
             "stdin": true,
@@ -1066,6 +1070,10 @@
               "allowPrivilegeEscalation": true,
               "procMount": "procMountValue",
               "seccompProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              },
+              "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
               }
@@ -1358,6 +1366,10 @@
               "seccompProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "appArmorProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
               }
             },
             "stdin": true,
@@ -1409,6 +1421,10 @@
           ],
           "fsGroupChangePolicy": "fsGroupChangePolicyValue",
           "seccompProfile": {
+            "type": "typeValue",
+            "localhostProfile": "localhostProfileValue"
+          },
+          "appArmorProfile": {
             "type": "typeValue",
             "localhostProfile": "localhostProfileValue"
           }

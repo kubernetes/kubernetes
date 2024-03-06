@@ -77,6 +77,25 @@ message Affinity {
   optional PodAntiAffinity podAntiAffinity = 3;
 }
 
+// AppArmorProfile defines a pod or container's AppArmor settings.
+// +union
+message AppArmorProfile {
+  // type indicates which kind of AppArmor profile will be applied.
+  // Valid options are:
+  //   Localhost - a profile pre-loaded on the node.
+  //   RuntimeDefault - the container runtime's default profile.
+  //   Unconfined - no AppArmor enforcement.
+  // +unionDiscriminator
+  optional string type = 1;
+
+  // localhostProfile indicates a profile loaded on the node that should be used.
+  // The profile must be preconfigured on the node to work.
+  // Must match the loaded name of the profile.
+  // Must be set if and only if type is "Localhost".
+  // +optional
+  optional string localhostProfile = 2;
+}
+
 // AttachedVolume describes a volume attached to a node
 message AttachedVolume {
   // Name of the attached volume
@@ -3866,6 +3885,11 @@ message PodSecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 10;
+
+  // appArmorProfile is the AppArmor options to use by the containers in this pod.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 11;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -4154,6 +4178,7 @@ message PodSpec {
   // - spec.hostPID
   // - spec.hostIPC
   // - spec.hostUsers
+  // - spec.securityContext.appArmorProfile
   // - spec.securityContext.seLinuxOptions
   // - spec.securityContext.seccompProfile
   // - spec.securityContext.fsGroup
@@ -4163,6 +4188,7 @@ message PodSpec {
   // - spec.securityContext.runAsUser
   // - spec.securityContext.runAsGroup
   // - spec.securityContext.supplementalGroups
+  // - spec.containers[*].securityContext.appArmorProfile
   // - spec.containers[*].securityContext.seLinuxOptions
   // - spec.containers[*].securityContext.seccompProfile
   // - spec.containers[*].securityContext.capabilities
@@ -5343,6 +5369,12 @@ message SecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 11;
+
+  // appArmorProfile is the AppArmor options to use by this container. If set, this profile
+  // overrides the pod's appArmorProfile.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 12;
 }
 
 // SerializedReference is a reference to serialized object.

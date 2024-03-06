@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 type podsByID []*kubecontainer.Pod
@@ -284,4 +286,36 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
 	}, nil
+}
+
+func getAppArmorProfile(pod *v1.Pod, container *v1.Container) (*runtimeapi.SecurityProfile, error) {
+	profile := apparmor.GetProfile(pod, container)
+	if profile == nil {
+		return nil, nil
+	}
+
+	switch profile.Type {
+	case v1.AppArmorProfileTypeRuntimeDefault:
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}, nil
+
+	case v1.AppArmorProfileTypeUnconfined:
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}, nil
+
+	case v1.AppArmorProfileTypeLocalhost:
+		if profile.LocalhostProfile == nil {
+			return nil, errors.New("missing localhost apparmor profile name")
+		}
+		return &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: *profile.LocalhostProfile,
+		}, nil
+
+	default:
+		// Shouldn't happen.
+		return nil, fmt.Errorf("unknown apparmor profile type: %q", profile.Type)
+	}
 }

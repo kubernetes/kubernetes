@@ -301,6 +301,9 @@ spec:
     restartPolicy: restartPolicyValue
     securityContext:
       allowPrivilegeEscalation: true
+      appArmorProfile:
+        localhostProfile: localhostProfileValue
+        type: typeValue
       capabilities:
         add:
         - addValue
@@ -512,6 +515,9 @@ spec:
     restartPolicy: restartPolicyValue
     securityContext:
       allowPrivilegeEscalation: true
+      appArmorProfile:
+        localhostProfile: localhostProfileValue
+        type: typeValue
       capabilities:
         add:
         - addValue
@@ -725,6 +731,9 @@ spec:
     restartPolicy: restartPolicyValue
     securityContext:
       allowPrivilegeEscalation: true
+      appArmorProfile:
+        localhostProfile: localhostProfileValue
+        type: typeValue
       capabilities:
         add:
         - addValue
@@ -812,6 +821,9 @@ spec:
   schedulingGates:
   - name: nameValue
   securityContext:
+    appArmorProfile:
+      localhostProfile: localhostProfileValue
+      type: typeValue
     fsGroup: 5
     fsGroupChangePolicy: fsGroupChangePolicyValue
     runAsGroup: 6
