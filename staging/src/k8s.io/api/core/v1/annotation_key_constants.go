@@ -23,7 +23,7 @@ const (
 	// webhook backend fails.
 	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
 
-	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
+	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods.
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
@@ -54,7 +54,7 @@ const (
 	// SeccompLocalhostProfileNamePrefix is the prefix for specifying profiles loaded from the node's disk.
 	SeccompLocalhostProfileNamePrefix = "localhost/"
 
-	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's AppArmor profile.
 	AppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 	// AppArmorBetaDefaultProfileAnnotationKey is the annotation key specifying the default AppArmor profile.
 	AppArmorBetaDefaultProfileAnnotationKey = "apparmor.security.beta.kubernetes.io/defaultProfileName"
@@ -67,7 +67,7 @@ const (
 	// AppArmorBetaProfileNamePrefix is the prefix for specifying profiles loaded on the node.
 	AppArmorBetaProfileNamePrefix = "localhost/"
 
-	// AppArmorBetaProfileNameUnconfined is the Unconfined AppArmor profile
+	// AppArmorBetaProfileNameUnconfined is the unconfined AppArmor profile.
 	AppArmorBetaProfileNameUnconfined = "unconfined"
 
 	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
@@ -79,7 +79,7 @@ const (
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
 
 	// ObjectTTLAnnotationKey represents a suggestion for kubelet for how long it can cache
-	// an object (e.g. secret, config map) before fetching it again from apiserver.
+	// an object (e.g. secret, configmap) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
@@ -92,7 +92,7 @@ const (
 	// configuration of a resource for use in a three way diff by UpdateApplyAnnotation.
 	LastAppliedConfigAnnotation = kubectlPrefix + "last-applied-configuration"
 
-	// AnnotationLoadBalancerSourceRangesKey is the key of the annotation on a service to set allowed ingress ranges on their LoadBalancers
+	// AnnotationLoadBalancerSourceRangesKey is the key of the annotation on a service to set allowed ingress ranges on their LoadBalancers.
 	//
 	// It should be a comma-separated list of CIDRs, e.g. `0.0.0.0/0` to
 	// allow full access (the default) or `18.0.0.0/8,56.0.0.0/8` to allow
@@ -134,7 +134,7 @@ const (
 	// CSI Backend for a volume plugin on a specific node.
 	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
 
-	// PodDeletionCost can be used to set to an int32 that represent the cost of deleting
+	// PodDeletionCost can be used to set to an int32 that represents the cost of deleting
 	// a pod compared to other pods belonging to the same ReplicaSet. Pods with lower
 	// deletion cost are preferred to be deleted before pods with higher deletion cost.
 	// Note that this is honored on a best-effort basis, and so it does not offer guarantees on
