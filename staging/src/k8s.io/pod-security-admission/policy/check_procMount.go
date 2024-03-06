@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -51,16 +52,16 @@ func CheckProcMount() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       procMount_1_0,
+				CheckPod:       withOptions(procMountV1Dot0),
 			},
 		},
 	}
 }
 
-func procMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var badContainers []string
+func procMountV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
+	badContainers := NewViolations(opts.withFieldErrors)
 	forbiddenProcMountTypes := sets.NewString()
-	visitContainers(podSpec, func(container *corev1.Container) {
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
 		// allow if the security context is nil.
 		if container.SecurityContext == nil {
 			return
@@ -71,20 +72,25 @@ func procMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) Chec
 		}
 		// check if the value of the proc mount type is valid.
 		if *container.SecurityContext.ProcMount != corev1.DefaultProcMount {
-			badContainers = append(badContainers, container.Name)
+			if opts.withFieldErrors {
+				badContainers.Add(container.Name, withBadValue(forbidden(path.Child("securityContext", "procMount")), string(*container.SecurityContext.ProcMount)))
+			} else {
+				badContainers.Add(container.Name)
+			}
 			forbiddenProcMountTypes.Insert(string(*container.SecurityContext.ProcMount))
 		}
 	})
-	if len(badContainers) > 0 {
+	if !badContainers.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "procMount",
 			ForbiddenDetail: fmt.Sprintf(
 				"%s %s must not set securityContext.procMount to %s",
-				pluralize("container", "containers", len(badContainers)),
-				joinQuote(badContainers),
+				pluralize("container", "containers", badContainers.Len()),
+				joinQuote(badContainers.Data()),
 				joinQuote(forbiddenProcMountTypes.List()),
 			),
+			ErrList: badContainers.Errs(),
 		}
 	}
 	return CheckResult{Allowed: true}

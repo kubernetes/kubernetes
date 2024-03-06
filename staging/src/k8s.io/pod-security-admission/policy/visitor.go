@@ -18,20 +18,34 @@ package policy
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// ContainerVisitor is called with each container and the field.Path to that container
-type ContainerVisitor func(container *corev1.Container)
+// ContainerVisitor is called with each container and the field.Path to that container.
+type ContainerVisitor func(container *corev1.Container, path *field.Path)
 
-// visitContainers invokes the visitor function for every container in the given pod spec
-func visitContainers(podSpec *corev1.PodSpec, visitor ContainerVisitor) {
+// visitContainers invokes the visitor function with a pointer to the spec
+// of every container in the given pod spec.
+func visitContainers(podSpec *corev1.PodSpec, opts options, visitor ContainerVisitor) {
 	for i := range podSpec.InitContainers {
-		visitor(&podSpec.InitContainers[i])
+		var fldPath *field.Path
+		if opts.withFieldErrors {
+			fldPath = initContainersFldPath.Index(i)
+		}
+		visitor(&podSpec.InitContainers[i], fldPath)
 	}
 	for i := range podSpec.Containers {
-		visitor(&podSpec.Containers[i])
+		var fldPath *field.Path
+		if opts.withFieldErrors {
+			fldPath = containersFldPath.Index(i)
+		}
+		visitor(&podSpec.Containers[i], fldPath)
 	}
 	for i := range podSpec.EphemeralContainers {
-		visitor((*corev1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon))
+		var fldPath *field.Path
+		if opts.withFieldErrors {
+			fldPath = ephemeralContainersFldPath.Index(i)
+		}
+		visitor((*corev1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), fldPath)
 	}
 }
