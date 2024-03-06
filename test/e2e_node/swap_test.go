@@ -61,31 +61,34 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 	f := framework.NewDefaultFramework("swap-qos")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
+	ginkgo.BeforeEach(func() {
+		gomega.Expect(isSwapFeatureGateEnabled()).To(gomega.BeTrueBecause("NodeSwap feature should be on"))
+	})
+
 	f.Context(framework.WithNodeConformance(), func() {
+
 		ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
 			ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
 			pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
 			pod = runPodAndWaitUntilScheduled(f, pod)
 
-			isCgroupV2 := isPodCgroupV2(f, pod)
-			isLimitedSwap := isLimitedSwap(f, pod)
-			isNoSwap := isNoSwap(f, pod)
+			gomega.Expect(isPodCgroupV2(f, pod)).To(gomega.BeTrueBecause("cgroup v2 is required for swap"))
 
-			if !isSwapFeatureGateEnabled() || !isCgroupV2 || isNoSwap || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
-				ginkgo.By(fmt.Sprintf("Expecting no swap. isNoSwap? %t, feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isNoSwap, isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
+			switch swapBehavior := getSwapBehavior(); swapBehavior {
+			case types.LimitedSwap:
+				if qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit {
+					expectNoSwap(pod)
+				} else {
+					expectedSwapLimit := calcSwapForBurstablePod(f, pod)
+					expectLimitedSwap(pod, expectedSwapLimit)
+				}
+
+			case types.NoSwap, "":
 				expectNoSwap(pod)
-				return
-			}
 
-			if !isLimitedSwap {
-				ginkgo.By("expecting no swap")
-				expectNoSwap(pod)
-				return
+			default:
+				gomega.Expect(swapBehavior).To(gomega.Or(gomega.Equal(types.LimitedSwap), gomega.Equal(types.NoSwap)), "unknown swap behavior")
 			}
-
-			ginkgo.By("expecting limited swap")
-			expectedSwapLimit := calcSwapForBurstablePod(f, pod)
-			expectLimitedSwap(pod, expectedSwapLimit)
 		},
 			ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
 			ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
@@ -432,18 +435,13 @@ func calcSwapForBurstablePod(f *framework.Framework, pod *v1.Pod) int64 {
 	return int64(swapAllocation)
 }
 
-func isLimitedSwap(f *framework.Framework, pod *v1.Pod) bool {
+func getSwapBehavior() string {
 	kubeletCfg, err := getCurrentKubeletConfig(context.Background())
 	framework.ExpectNoError(err, "cannot get kubelet config")
 
-	return kubeletCfg.MemorySwap.SwapBehavior == types.LimitedSwap
-}
-
-func isNoSwap(f *framework.Framework, pod *v1.Pod) bool {
-	kubeletCfg, err := getCurrentKubeletConfig(context.Background())
-	framework.ExpectNoError(err, "cannot get kubelet config")
-
-	return kubeletCfg.MemorySwap.SwapBehavior == types.NoSwap || kubeletCfg.MemorySwap.SwapBehavior == ""
+	swapBehavior := kubeletCfg.MemorySwap.SwapBehavior
+	ginkgo.By("Figuring out swap behavior: " + swapBehavior)
+	return swapBehavior
 }
 
 func cloneQuantity(resource *resource.Quantity) *resource.Quantity {
