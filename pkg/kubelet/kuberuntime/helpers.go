@@ -285,3 +285,9 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
 	}, nil
 }
+
+func removeContainerSensitiveInformation(container *v1.Container) *v1.Container {
+	c := container.DeepCopy()
+	c.Env = nil
+	return c
+}
