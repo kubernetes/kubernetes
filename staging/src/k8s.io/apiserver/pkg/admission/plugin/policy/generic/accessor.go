@@ -17,15 +17,15 @@ limitations under the License.
 package generic
 
 import (
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 type PolicyAccessor interface {
 	GetName() string
 	GetNamespace() string
-	GetParamKind() *v1beta1.ParamKind
-	GetMatchConstraints() *v1beta1.MatchResources
+	GetParamKind() *v1.ParamKind
+	GetMatchConstraints() *v1.MatchResources
 }
 
 type BindingAccessor interface {
@@ -36,7 +36,7 @@ type BindingAccessor interface {
 	// which is cluster-scoped, so namespace is usually left blank.
 	// But we leave the door open to add a namespaced vesion in the future
 	GetPolicyName() types.NamespacedName
-	GetParamRef() *v1beta1.ParamRef
+	GetParamRef() *v1.ParamRef
 
-	GetMatchResources() *v1beta1.MatchResources
+	GetMatchResources() *v1.MatchResources
 }
