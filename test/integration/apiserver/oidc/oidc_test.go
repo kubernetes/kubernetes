@@ -1057,6 +1057,113 @@ jwt:
 	}
 }
 
+func TestMultipleJWTAuthenticators(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+
+	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
+	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)
+	oidcServer1 := utilsoidc.BuildAndRunTestServer(t, caFilePath1, caKeyFilePath1, "")
+
+	caCertContent2, _, caFilePath2, caKeyFilePath2 := generateCert(t)
+	signingPrivateKey2, publicKey2 := rsaGenerateKey(t)
+	oidcServer2 := utilsoidc.BuildAndRunTestServer(t, caFilePath2, caKeyFilePath2, "https://example.com")
+
+	authenticationConfig := fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - foo
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+  claimValidationRules:
+  - expression: 'claims.hd == "example.com"'
+    message: "the hd claim must be set to example.com"
+- issuer:
+    url: "https://example.com"
+    discoveryURL: %s/.well-known/openid-configuration
+    audiences:
+    - bar
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+    groups:
+      expression: '(claims.roles.split(",") + claims.other_roles.split(",")).map(role, "system:" + role)'
+    uid:
+      expression: "claims.uid"
+`, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
+
+	oidcServer1.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1))
+	oidcServer2.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2))
+
+	apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey1)
+
+	idTokenLifetime := time.Second * 1200
+	oidcServer1.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+		t,
+		signingPrivateKey1,
+		map[string]interface{}{
+			"iss": oidcServer1.URL(),
+			"sub": defaultOIDCClaimedUsername,
+			"aud": "foo",
+			"exp": time.Now().Add(idTokenLifetime).Unix(),
+			"hd":  "example.com",
+		},
+		defaultStubAccessToken,
+		defaultStubRefreshToken,
+	))
+
+	oidcServer2.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+		t,
+		signingPrivateKey2,
+		map[string]interface{}{
+			"iss":         "https://example.com",
+			"sub":         "not_john_doe",
+			"aud":         "bar",
+			"roles":       "role1,role2",
+			"other_roles": "role3,role4",
+			"exp":         time.Now().Add(idTokenLifetime).Unix(),
+			"uid":         "1234",
+		},
+		defaultStubAccessToken,
+		defaultStubRefreshToken,
+	))
+
+	tokenURL1, err := oidcServer1.TokenURL()
+	require.NoError(t, err)
+
+	tokenURL2, err := oidcServer2.TokenURL()
+	require.NoError(t, err)
+
+	client1 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent1, caFilePath1, oidcServer1.URL(), tokenURL1)
+	client2 := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCertContent2, caFilePath2, oidcServer2.URL(), tokenURL2)
+
+	ctx := testContext(t)
+	res, err := client1.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, authenticationv1.UserInfo{
+		Username: "k8s-john_doe",
+		Groups:   []string{"system:authenticated"},
+	}, res.Status.UserInfo)
+
+	res, err = client2.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, authenticationv1.UserInfo{
+		Username: "k8s-not_john_doe",
+		Groups:   []string{"system:role1", "system:role2", "system:role3", "system:role4", "system:authenticated"},
+		UID:      "1234",
+	}, res.Status.UserInfo)
+}
+
 func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 	t.Helper()
 

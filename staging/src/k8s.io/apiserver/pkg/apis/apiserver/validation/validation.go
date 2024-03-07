@@ -45,32 +45,33 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, dis
 	root := field.NewPath("jwt")
 	var allErrs field.ErrorList
 
-	// This stricter validation is solely based on what the current implementation supports.
-	// TODO(aramase): when StructuredAuthenticationConfiguration feature gate is added and wired up,
-	// relax this check to allow 0 authenticators. This will allow us to support the case where
-	// API server is initially configured with no authenticators and then authenticators are added
-	// later via dynamic config.
-	if len(c.JWT) == 0 {
-		allErrs = append(allErrs, field.Required(root, fmt.Sprintf(atLeastOneRequiredErrFmt, root)))
+	// We allow 0 authenticators in the authentication configuration.
+	// This allows us to support scenarios where the API server is initially set up without
+	// any authenticators and then authenticators are added later via dynamic config.
+
+	if len(c.JWT) > 64 {
+		allErrs = append(allErrs, field.TooMany(root, len(c.JWT), 64))
 		return allErrs
 	}
 
-	// This stricter validation is because the --oidc-* flag option is singular.
-	// TODO(aramase): when StructuredAuthenticationConfiguration feature gate is added and wired up,
-	// remove the 1 authenticator limit check and add set the limit to 64.
-	if len(c.JWT) > 1 {
-		allErrs = append(allErrs, field.TooMany(root, len(c.JWT), 1))
-		return allErrs
-	}
-
-	// TODO(aramase): right now we only support a single JWT authenticator as
-	// this is wired to the --oidc-* flags. When StructuredAuthenticationConfiguration
-	// feature gate is added and wired up, we will remove the 1 authenticator limit
-	// check and add validation for duplicate issuers.
+	seenIssuers := sets.New[string]()
+	seenDiscoveryURLs := sets.New[string]()
 	for i, a := range c.JWT {
 		fldPath := root.Index(i)
 		_, errs := validateJWTAuthenticator(a, fldPath, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
 		allErrs = append(allErrs, errs...)
+
+		if seenIssuers.Has(a.Issuer.URL) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("issuer").Child("url"), a.Issuer.URL))
+		}
+		seenIssuers.Insert(a.Issuer.URL)
+
+		if len(a.Issuer.DiscoveryURL) > 0 {
+			if seenDiscoveryURLs.Has(a.Issuer.DiscoveryURL) {
+				allErrs = append(allErrs, field.Duplicate(fldPath.Child("issuer").Child("discoveryURL"), a.Issuer.DiscoveryURL))
+			}
+			seenDiscoveryURLs.Insert(a.Issuer.DiscoveryURL)
+		}
 	}
 
 	return allErrs
