@@ -36,6 +36,55 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 )
 
+func GetPodList(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*corev1.Pod) sort.Interface) (*corev1.PodList, error) {
+	options := metav1.ListOptions{LabelSelector: selector}
+
+	podList, err := client.Pods(namespace).List(context.TODO(), options)
+	if err != nil {
+		return nil, err
+	}
+
+	pods := []*corev1.Pod{}
+	for i := range podList.Items {
+		pod := podList.Items[i]
+		pods = append(pods, &pod)
+	}
+	if len(pods) > 0 {
+		sort.Sort(sortBy(pods))
+		for i, pod := range pods {
+			if pod != nil { // Check if the pod is not nil to avoid dereferencing nil pointers
+				podList.Items[i] = *pod
+			}
+		}
+		return podList, nil
+	}
+
+	// Watch until we observe a pod
+	options.ResourceVersion = podList.ResourceVersion
+	w, err := client.Pods(namespace).Watch(context.TODO(), options)
+	if err != nil {
+		return nil, err
+	}
+	defer w.Stop()
+
+	condition := func(event watch.Event) (bool, error) {
+		return event.Type == watch.Added || event.Type == watch.Modified, nil
+	}
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	event, err := watchtools.UntilWithoutRetry(ctx, w, condition)
+	if err != nil {
+		return nil, err
+	}
+
+	_, ok := event.Object.(*corev1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("%#v is not a pod event", event)
+	}
+	return podList, nil
+}
+
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
 func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*corev1.Pod) sort.Interface) (*corev1.Pod, int, error) {
@@ -45,6 +94,7 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	if err != nil {
 		return nil, 0, err
 	}
+
 	pods := []*corev1.Pod{}
 	for i := range podList.Items {
 		pod := podList.Items[i]

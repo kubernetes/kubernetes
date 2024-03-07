@@ -99,6 +99,7 @@ type LogsOptions struct {
 	Namespace     string
 	ResourceArg   string
 	AllContainers bool
+	AllPods       bool
 	Options       runtime.Object
 	Resources     []string
 
@@ -134,10 +135,11 @@ type LogsOptions struct {
 	containerNameFromRefSpecRegexp *regexp.Regexp
 }
 
-func NewLogsOptions(streams genericiooptions.IOStreams, allContainers bool) *LogsOptions {
+func NewLogsOptions(streams genericiooptions.IOStreams, allContainers bool, allPods bool) *LogsOptions {
 	return &LogsOptions{
 		IOStreams:            streams,
 		AllContainers:        allContainers,
+		AllPods:              allPods,
 		Tail:                 -1,
 		MaxFollowConcurrency: 5,
 
@@ -147,7 +149,7 @@ func NewLogsOptions(streams genericiooptions.IOStreams, allContainers bool) *Log
 
 // NewCmdLogs creates a new pod logs command
 func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := NewLogsOptions(streams, false)
+	o := NewLogsOptions(streams, false, false)
 
 	cmd := &cobra.Command{
 		Use:                   logsUsageStr,
@@ -167,6 +169,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 }
 
 func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&o.AllPods, "all-pods", o.AllPods, "Get logs from all pod(s).")
 	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers' logs in the pod(s).")
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
 	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
@@ -328,7 +331,7 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() error {
-	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
+	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.AllPods)
 	if err != nil {
 		return err
 	}
