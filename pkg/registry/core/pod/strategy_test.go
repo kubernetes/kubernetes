@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilpointer "k8s.io/utils/pointer"
@@ -2113,9 +2114,10 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 	testProfile := "test"
 
 	tests := []struct {
-		description string
-		pod         *api.Pod
-		validation  func(*testing.T, *api.Pod)
+		description   string
+		pod           *api.Pod
+		validation    func(*testing.T, *api.Pod)
+		expectWarning bool
 	}{{
 		description: "Security context nil",
 		pod: &api.Pod{
@@ -2361,6 +2363,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.LocalhostProfile)
 			assert.Nil(t, pod.Spec.SecurityContext)
 		},
+		expectWarning: true,
 	}, {
 		description: "Annotation for non-existent container",
 		pod: &api.Pod{
@@ -2408,6 +2411,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.LocalhostProfile)
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.SecurityContext.AppArmorProfile.Type)
 		},
+		expectWarning: true,
 	}, {
 		description: "Multiple containers by annotations",
 		pod: &api.Pod{
@@ -2446,6 +2450,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Nil(t, pod.Spec.Containers[2].SecurityContext)
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 		},
+		expectWarning: true,
 	}, {
 		description: "Conflicting field and annotations",
 		pod: &api.Pod{
@@ -2526,6 +2531,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, api.AppArmorProfileTypeRuntimeDefault, pod.Spec.SecurityContext.AppArmorProfile.Type)
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.AppArmorProfile.Type)
 		},
+		expectWarning: true,
 	}, {
 		description: "Mixed annotations and fields",
 		pod: &api.Pod{
@@ -2565,12 +2571,13 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Equal(t, api.AppArmorProfileTypeUnconfined, pod.Spec.Containers[1].SecurityContext.AppArmorProfile.Type)
 			assert.Nil(t, pod.Spec.Containers[2].SecurityContext)
 		},
+		expectWarning: true,
 	}, {
 		description: "Invalid annotation value",
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": "not-a-real-type",
+					api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": "localhost/",
 				},
 			},
 			Spec: api.PodSpec{
@@ -2579,11 +2586,12 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
 			assert.Equal(t, map[string]string{
-				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": "not-a-real-type",
+				api.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": "localhost/",
 			}, pod.Annotations)
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
 			assert.Nil(t, pod.Spec.SecurityContext)
 		},
+		expectWarning: true,
 	}, {
 		description: "Invalid localhost annotation",
 		pod: &api.Pod{
@@ -2601,6 +2609,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			assert.Nil(t, pod.Spec.Containers[0].SecurityContext)
 			assert.Nil(t, pod.Spec.SecurityContext)
 		},
+		expectWarning: true,
 	}, {
 		description: "Invalid field type",
 		pod: &api.Pod{
@@ -2640,8 +2649,28 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			applyAppArmorVersionSkew(test.pod)
+			warnings := &warningRecorder{}
+			ctx := warning.WithWarningRecorder(context.Background(), warnings)
+			applyAppArmorVersionSkew(ctx, test.pod)
 			test.validation(t, test.pod)
+
+			if test.expectWarning {
+				if assert.NotEmpty(t, warnings.warnings, "expect warnings") {
+					assert.Contains(t, warnings.warnings[0], `deprecated since v1.30; use the "appArmorProfile" field instead`)
+				}
+			} else {
+				assert.Empty(t, warnings.warnings, "shouldn't emit a warning")
+			}
 		})
 	}
+}
+
+type warningRecorder struct {
+	warnings []string
+}
+
+var _ warning.Recorder = &warningRecorder{}
+
+func (w *warningRecorder) AddWarning(_, text string) {
+	w.warnings = append(w.warnings, text)
 }
