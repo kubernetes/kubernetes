@@ -425,6 +425,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 }
 
 func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedEnvironmentVariableValidation) {
+		return true
+	}
+
 	var oldPodEnvVarNames, podEnvVarNames sets.Set[string]
 	if oldPodSpec != nil {
 		oldPodEnvVarNames = gatherPodEnvVarNames(oldPodSpec)
@@ -435,7 +439,7 @@ func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) b
 	}
 
 	for env := range podEnvVarNames {
-		if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedEnvironmentVariableValidation) || relaxedEnvVarUsed(env, oldPodEnvVarNames) {
+		if relaxedEnvVarUsed(env, oldPodEnvVarNames) {
 			return true
 		}
 	}
