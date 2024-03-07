@@ -420,7 +420,7 @@ const envVarNameFmt = "[-._a-zA-Z][-._a-zA-Z0-9]*"
 const envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
 
 // TODO(hirazawaui): Rename this when the RelaxedEnvironmentVariableValidation gate is removed.
-const relaxedEnvVarNameFmtErrMsg string = "a valid environment variable names must be printable ASCII characters other than '=' character"
+const relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
 
 var envVarNameRegexp = regexp.MustCompile("^" + envVarNameFmt + "$")
 
@@ -440,7 +440,7 @@ func IsRelaxedEnvVarName(value string) []string {
 	var errs []string
 
 	if len(value) == 0 {
-		errs = append(errs, "environment variable name"+EmptyError())
+		errs = append(errs, "environment variable name "+EmptyError())
 	}
 
 	for _, r := range value {
