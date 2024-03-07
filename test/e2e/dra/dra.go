@@ -203,47 +203,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			driver := NewDriver(f, nodes, perNode(1, nodes))
 			driver.parameterMode = parameterModeStructured
 
-			f.It("must manage ResourceSlice", f.WithSlow(), func(ctx context.Context) {
-				nodeName := nodes.NodeNames[0]
-				driverName := driver.Name
-				m := MethodInstance{nodeName, NodeListAndWatchResourcesMethod}
-				ginkgo.By("wait for NodeListAndWatchResources call")
-				gomega.Eventually(ctx, func() int64 {
-					return driver.CallCount(m)
-				}).WithTimeout(podStartTimeout).Should(gomega.BeNumerically(">", int64(0)), "NodeListAndWatchResources call count")
-
-				ginkgo.By("check if ResourceSlice object exists on the API server")
-				resourceClient := f.ClientSet.ResourceV1alpha2().ResourceSlices()
-				matchSlices := gomega.And(
-					gomega.HaveLen(1),
-					gomega.ContainElement(gstruct.MatchAllFields(gstruct.Fields{
-						"TypeMeta":   gstruct.Ignore(),
-						"ObjectMeta": gstruct.Ignore(), // TODO (https://github.com/kubernetes/kubernetes/issues/123692): validate ownerref
-						"NodeName":   gomega.Equal(nodes.NodeNames[0]),
-						"DriverName": gomega.Equal(driver.Name),
-						"NodeResourceModel": gomega.Equal(resourcev1alpha2.NodeResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{
-							Instances: []resourcev1alpha2.NamedResourcesInstance{{Name: "instance-0"}},
-						}}),
-					})),
-				)
-				getSlices := func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
-					slices, err := resourceClient.List(ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("nodeName=%s,driverName=%s", nodeName, driverName)})
-					if err != nil {
-						return nil, err
-					}
-					return slices.Items, nil
-				}
-				gomega.Eventually(ctx, getSlices).WithTimeout(20 * time.Second).Should(matchSlices)
-				gomega.Consistently(ctx, getSlices).WithTimeout(20 * time.Second).Should(matchSlices)
-
-				// Removal of node resource slice is tested by the general driver removal code.
-			})
-
-			// TODO (https://github.com/kubernetes/kubernetes/issues/123699): more test scenarios:
-			// - driver returns "unimplemented" as method response
-			// - driver returns "Unimplemented" as part of stream
-			// - driver returns EOF
-			// - driver changes resources
 		})
 	})
 
@@ -669,6 +628,63 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 4)
+
+		ginkgo.Context("with structured parameters", func() {
+			driver := NewDriver(f, nodes, perNode(1, nodes))
+			driver.parameterMode = parameterModeStructured
+
+			f.It("must manage ResourceSlices", f.WithSlow(), func(ctx context.Context) {
+				nodeName := nodes.NodeNames[0]
+				driverName := driver.Name
+
+				// Check for gRPC call on one node. If that already fails, then
+				// we have a fundamental problem.
+				m := MethodInstance{nodeName, NodeListAndWatchResourcesMethod}
+				ginkgo.By("wait for NodeListAndWatchResources call")
+				gomega.Eventually(ctx, func() int64 {
+					return driver.CallCount(m)
+				}).WithTimeout(podStartTimeout).Should(gomega.BeNumerically(">", int64(0)), "NodeListAndWatchResources call count")
+
+				// Now check for exactly the right set of objects for all nodes.
+				ginkgo.By("check if ResourceSlice object(s) exist on the API server")
+				resourceClient := f.ClientSet.ResourceV1alpha2().ResourceSlices()
+				var expectedObjects []any
+				for _, nodeName := range nodes.NodeNames {
+					expectedObjects = append(expectedObjects,
+						gstruct.MatchAllFields(gstruct.Fields{
+							"TypeMeta":   gstruct.Ignore(),
+							"ObjectMeta": gstruct.Ignore(), // TODO (https://github.com/kubernetes/kubernetes/issues/123692): validate ownerref
+							"NodeName":   gomega.Equal(nodeName),
+							"DriverName": gomega.Equal(driver.Name),
+							"NodeResourceModel": gomega.Equal(resourcev1alpha2.NodeResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{
+								Instances: []resourcev1alpha2.NamedResourcesInstance{{Name: "instance-0"}},
+							}}),
+						}),
+					)
+				}
+				matchSlices := gomega.ContainElements(expectedObjects...)
+				getSlices := func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
+					slices, err := resourceClient.List(ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("driverName=%s", driverName)})
+					if err != nil {
+						return nil, err
+					}
+					return slices.Items, nil
+				}
+				gomega.Eventually(ctx, getSlices).WithTimeout(20 * time.Second).Should(matchSlices)
+				gomega.Consistently(ctx, getSlices).WithTimeout(20 * time.Second).Should(matchSlices)
+
+				// Removal of node resource slice is tested by the general driver removal code.
+			})
+
+			// TODO (https://github.com/kubernetes/kubernetes/issues/123699): more test scenarios:
+			// - driver returns "unimplemented" as method response
+			// - driver returns "Unimplemented" as part of stream
+			// - driver returns EOF
+			// - driver changes resources
+			//
+			// None of those matter if the publishing gets moved into the driver itself,
+			// which is the goal for 1.31 to support version skew for kubelet.
+		})
 
 		ginkgo.Context("with local unshared resources", func() {
 			driver := NewDriver(f, nodes, func() app.Resources {
