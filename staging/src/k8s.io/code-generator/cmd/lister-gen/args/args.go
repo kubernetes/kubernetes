@@ -35,9 +35,7 @@ type Args struct {
 
 // New returns default arguments for the generator.
 func New() *Args {
-	return &Args{
-		PluralExceptions: []string{"Endpoints:Endpoints"},
-	}
+	return &Args{}
 }
 
 // AddFlags add the generator flags to the flag set.
