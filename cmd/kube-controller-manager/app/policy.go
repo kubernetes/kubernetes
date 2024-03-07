@@ -22,7 +22,6 @@ package app
 import (
 	"context"
 
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -41,7 +40,7 @@ func startDisruptionController(ctx context.Context, controllerContext Controller
 	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
 	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
-	scaleClient, err := scale.NewForConfig(config, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(config, controllerContext.RESTMapper, scale.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		return nil, false, err
 	}

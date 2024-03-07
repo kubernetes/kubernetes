@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -41,6 +40,17 @@ func init() {
 	metav1.AddToGroupVersion(parameterScheme, versionV1)
 }
 
+// APIPathResolverFunc knows how to convert a groupVersion to its API path. The Kind field is optional.
+type APIPathResolverFunc func(kind schema.GroupVersionKind) string
+
+// LegacyAPIPathResolverFunc can resolve paths properly with the legacy API.
+func LegacyAPIPathResolverFunc(kind schema.GroupVersionKind) string {
+	if len(kind.Group) == 0 {
+		return "/api"
+	}
+	return "/apis"
+}
+
 // scaleClient is an implementation of ScalesGetter
 // which makes use of a RESTMapper and a generic REST
 // client to support an discoverable resource.
@@ -49,7 +59,7 @@ func init() {
 type scaleClient struct {
 	mapper PreferredResourceMapper
 
-	apiPathResolverFunc dynamic.APIPathResolverFunc
+	apiPathResolverFunc APIPathResolverFunc
 	scaleKindResolver   ScaleKindResolver
 	clientBase          restclient.Interface
 }
@@ -57,7 +67,7 @@ type scaleClient struct {
 // NewForConfig creates a new ScalesGetter which resolves kinds
 // to resources using the given RESTMapper, and API paths using
 // the given dynamic.APIPathResolverFunc.
-func NewForConfig(cfg *restclient.Config, mapper PreferredResourceMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver ScaleKindResolver) (ScalesGetter, error) {
+func NewForConfig(cfg *restclient.Config, mapper PreferredResourceMapper, resolver APIPathResolverFunc, scaleKindResolver ScaleKindResolver) (ScalesGetter, error) {
 	// so that the RESTClientFor doesn't complain
 	cfg.GroupVersion = &schema.GroupVersion{}
 
@@ -76,7 +86,7 @@ func NewForConfig(cfg *restclient.Config, mapper PreferredResourceMapper, resolv
 
 // New creates a new ScalesGetter using the given client to make requests.
 // The GroupVersion on the client is ignored.
-func New(baseClient restclient.Interface, mapper PreferredResourceMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver ScaleKindResolver) ScalesGetter {
+func New(baseClient restclient.Interface, mapper PreferredResourceMapper, resolver APIPathResolverFunc, scaleKindResolver ScaleKindResolver) ScalesGetter {
 	return &scaleClient{
 		mapper: mapper,
 

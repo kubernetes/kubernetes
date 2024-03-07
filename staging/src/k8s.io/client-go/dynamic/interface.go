@@ -48,16 +48,3 @@ type NamespaceableResourceInterface interface {
 	Namespace(string) ResourceInterface
 	ResourceInterface
 }
-
-// APIPathResolverFunc knows how to convert a groupVersion to its API path. The Kind field is optional.
-// TODO find a better place to move this for existing callers
-type APIPathResolverFunc func(kind schema.GroupVersionKind) string
-
-// LegacyAPIPathResolverFunc can resolve paths properly with the legacy API.
-// TODO find a better place to move this for existing callers
-func LegacyAPIPathResolverFunc(kind schema.GroupVersionKind) string {
-	if len(kind.Group) == 0 {
-		return "/api"
-	}
-	return "/apis"
-}

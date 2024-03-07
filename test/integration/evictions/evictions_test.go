@@ -704,7 +704,7 @@ func rmSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
-	scaleClient, err := scale.NewForConfig(config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(config, mapper, scale.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		t.Fatalf("Error in create scaleClient: %v", err)
 	}
