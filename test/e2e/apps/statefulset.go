@@ -1672,7 +1672,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 	})
 })
 
-var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", feature.MaxUnavailableStatefulSet, framework.WithFeatureGate(features.MaxUnavailableStatefulSet), func() {
+var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", framework.WithFeatureGate(features.MaxUnavailableStatefulSet), func() {
 	f := framework.NewDefaultFramework("statefulset")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ns string
@@ -1712,7 +1712,7 @@ var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", feature.MaxUn
 			newImage := NewWebserverImage
 
 			// update the stateful set with desired settings
-			minReadySeconds := int32(20)
+            minReadySeconds := int32(20)
 			maxUnavailable := ptr.To(intstr.FromInt32(1))
 			ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.MinReadySeconds = minReadySeconds
@@ -1731,7 +1731,7 @@ var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", feature.MaxUn
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
 
 			// check the image in all pods immediately after update
-			// it should still be the old one while minReadySeconds is being honored
+            // it should still be the old one while minReadySeconds is being honored
 			ss.Spec.Selector = selector // restore the selector
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
 			for i := range pods.Items {
@@ -1742,10 +1742,10 @@ var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", feature.MaxUn
 					oldImage)
 			}
 
-			// sleep to allow minReadySeconds to occur
-			sleep := time.Duration(replicas*minReadySeconds*2) * time.Second
-			time.Sleep(sleep)
-			// then assert the pods have successfully updated to a new version
+            // sleep to allow minReadySeconds to occur
+            sleep := time.Duration(replicas * minReadySeconds * 2) * time.Second
+		    time.Sleep(sleep)
+            // then assert the pods have successfully updated to a new version
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
 			pods = e2estatefulset.GetPodList(ctx, c, ss)
 			for i := range pods.Items {
