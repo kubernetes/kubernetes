@@ -41,7 +41,7 @@ func AddGraphEventHandlers(
 	pods corev1informers.PodInformer,
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
-	slices resourcev1alpha2informers.NodeResourceSliceInformer,
+	slices resourcev1alpha2informers.ResourceSliceInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
@@ -71,9 +71,9 @@ func AddGraphEventHandlers(
 
 	if slices != nil {
 		sliceHandler, _ := slices.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc:    g.addNodeResourceSlice,
+			AddFunc:    g.addResourceSlice,
 			UpdateFunc: nil, // Not needed, NodeName is immutable.
-			DeleteFunc: g.deleteNodeResourceSlice,
+			DeleteFunc: g.deleteResourceSlice,
 		})
 		synced = append(synced, sliceHandler.HasSynced)
 	}
@@ -200,23 +200,23 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 	g.graph.DeleteVolumeAttachment(attachment.Name)
 }
 
-func (g *graphPopulator) addNodeResourceSlice(obj interface{}) {
-	slice, ok := obj.(*resourcev1alpha2.NodeResourceSlice)
+func (g *graphPopulator) addResourceSlice(obj interface{}) {
+	slice, ok := obj.(*resourcev1alpha2.ResourceSlice)
 	if !ok {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.AddNodeResourceSlice(slice.Name, slice.NodeName)
+	g.graph.AddResourceSlice(slice.Name, slice.NodeName)
 }
 
-func (g *graphPopulator) deleteNodeResourceSlice(obj interface{}) {
+func (g *graphPopulator) deleteResourceSlice(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	slice, ok := obj.(*resourcev1alpha2.NodeResourceSlice)
+	slice, ok := obj.(*resourcev1alpha2.ResourceSlice)
 	if !ok {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.DeleteNodeResourceSlice(slice.Name)
+	g.graph.DeleteResourceSlice(slice.Name)
 }

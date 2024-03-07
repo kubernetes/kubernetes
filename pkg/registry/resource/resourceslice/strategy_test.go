@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package noderesourceslice
+package resourceslice
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
-var slice = &resource.NodeResourceSlice{
+var slice = &resource.ResourceSlice{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "valid-class",
 	},
@@ -37,10 +37,10 @@ var slice = &resource.NodeResourceSlice{
 
 func TestClassStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
-		t.Errorf("NodeResourceSlice must not be namespace scoped")
+		t.Errorf("ResourceSlice must not be namespace scoped")
 	}
 	if Strategy.AllowCreateOnUpdate() {
-		t.Errorf("NodeResourceSlice should not allow create on update")
+		t.Errorf("ResourceSlice should not allow create on update")
 	}
 }
 

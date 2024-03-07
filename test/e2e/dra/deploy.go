@@ -362,8 +362,8 @@ func (d *Driver) TearDown() {
 }
 
 func (d *Driver) IsGone(ctx context.Context) {
-	gomega.Eventually(ctx, func(ctx context.Context) ([]resourcev1alpha2.NodeResourceSlice, error) {
-		slices, err := d.f.ClientSet.ResourceV1alpha2().NodeResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: "driverName=" + d.Name})
+	gomega.Eventually(ctx, func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
+		slices, err := d.f.ClientSet.ResourceV1alpha2().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: "driverName=" + d.Name})
 		if err != nil {
 			return nil, err
 		}

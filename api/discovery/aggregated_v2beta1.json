@@ -1892,26 +1892,6 @@
           "freshness": "Current",
           "resources": [
             {
-              "resource": "noderesourceslices",
-              "responseKind": {
-                "group": "",
-                "kind": "NodeResourceSlice",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "noderesourceslice",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
               "resource": "podschedulingcontexts",
               "responseKind": {
                 "group": "",
@@ -2050,6 +2030,26 @@
               },
               "scope": "Namespaced",
               "singularResource": "resourceclassparameters",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceslices",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceSlice",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourceslice",
               "verbs": [
                 "create",
                 "delete",

@@ -128,7 +128,7 @@ type createResourceDriverOp struct {
 	Nodes string
 	// StructuredParameters is true if the controller that is built into the scheduler
 	// is used and the control-plane controller is not needed.
-	// Because we don't run the kubelet plugin, NodeResourceSlices must
+	// Because we don't run the kubelet plugin, ResourceSlices must
 	// get created for all nodes.
 	StructuredParameters bool
 }
@@ -195,12 +195,12 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 
 	if op.StructuredParameters {
 		for _, nodeName := range resources.Nodes {
-			slice := nodeResourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-			_, err := tCtx.Client().ResourceV1alpha2().NodeResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+			slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
+			_, err := tCtx.Client().ResourceV1alpha2().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 			tCtx.ExpectNoError(err, "create node resource slice")
 		}
 		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-			err := tCtx.Client().ResourceV1alpha2().NodeResourceSlices().DeleteCollection(tCtx,
+			err := tCtx.Client().ResourceV1alpha2().ResourceSlices().DeleteCollection(tCtx,
 				metav1.DeleteOptions{},
 				metav1.ListOptions{FieldSelector: "driverName=" + op.DriverName},
 			)
@@ -228,8 +228,8 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 	})
 }
 
-func nodeResourceSlice(driverName, nodeName string, capacity int) *resourcev1alpha2.NodeResourceSlice {
-	slice := &resourcev1alpha2.NodeResourceSlice{
+func resourceSlice(driverName, nodeName string, capacity int) *resourcev1alpha2.ResourceSlice {
+	slice := &resourcev1alpha2.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 		},

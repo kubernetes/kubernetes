@@ -1603,19 +1603,19 @@ func createPodAttributes(pod *api.Pod, user user.Info) admission.Attributes {
 	return admission.NewAttributesRecord(pod, nil, podKind, pod.Namespace, pod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
 }
 
-func TestAdmitNodeResourceSlice(t *testing.T) {
-	apiResource := resourceapi.SchemeGroupVersion.WithResource("noderesourceslices")
+func TestAdmitResourceSlice(t *testing.T) {
+	apiResource := resourceapi.SchemeGroupVersion.WithResource("resourceslices")
 	nodename := "mynode"
 	mynode := &user.DefaultInfo{Name: "system:node:" + nodename, Groups: []string{"system:nodes"}}
-	err := "can only create NodeResourceSlice with the same NodeName as the requesting node"
+	err := "can only create ResourceSlice with the same NodeName as the requesting node"
 
-	sliceNode := &resourceapi.NodeResourceSlice{
+	sliceNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},
 		NodeName: nodename,
 	}
-	sliceOtherNode := &resourceapi.NodeResourceSlice{
+	sliceOtherNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},

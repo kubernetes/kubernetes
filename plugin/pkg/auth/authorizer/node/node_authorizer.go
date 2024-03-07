@@ -50,7 +50,7 @@ import (
 //     node <- pod <- pvc <- pv
 //     node <- pod <- pvc <- pv <- secret
 //     node <- pod <- ResourceClaim
-//  4. If a request is for a noderesourceslice, then authorize access if there is an
+//  4. If a request is for a resourceslice, then authorize access if there is an
 //     edge from the existing slice object to the node, which is the case if the
 //     existing object has the node in its NodeName field. For create, the access gets
 //     granted because the noderestriction admission plugin checks that the NodeName
@@ -81,7 +81,7 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 var (
 	configMapResource     = api.Resource("configmaps")
 	secretResource        = api.Resource("secrets")
-	nodeResourceSlice     = resourceapi.Resource("noderesourceslices")
+	resourceSlice         = resourceapi.Resource("resourceslices")
 	pvcResource           = api.Resource("persistentvolumeclaims")
 	pvResource            = api.Resource("persistentvolumes")
 	resourceClaimResource = resourceapi.Resource("resourceclaims")
@@ -136,8 +136,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			return r.authorizeLease(nodeName, attrs)
 		case csiNodeResource:
 			return r.authorizeCSINode(nodeName, attrs)
-		case nodeResourceSlice:
-			return r.authorizeNodeResourceSlice(nodeName, attrs)
+		case resourceSlice:
+			return r.authorizeResourceSlice(nodeName, attrs)
 		}
 
 	}
@@ -302,11 +302,11 @@ func (r *NodeAuthorizer) authorizeCSINode(nodeName string, attrs authorizer.Attr
 	return authorizer.DecisionAllow, "", nil
 }
 
-// authorizeNodeResourceSlice authorizes node requests to NodeResourceSlice resource.k8s.io/noderesourceslices
-func (r *NodeAuthorizer) authorizeNodeResourceSlice(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+// authorizeResourceSlice authorizes node requests to ResourceSlice resource.k8s.io/resourceslices
+func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if len(attrs.GetSubresource()) > 0 {
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "cannot authorize NodeResourceSlice subresources", nil
+		return authorizer.DecisionNoOpinion, "cannot authorize ResourceSlice subresources", nil
 	}
 
 	// allowed verbs: get, create, update, patch, delete
@@ -319,10 +319,10 @@ func (r *NodeAuthorizer) authorizeNodeResourceSlice(nodeName string, attrs autho
 		return authorizer.DecisionAllow, "", nil
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a NodeResourceSlice", nil
+		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a ResourceSlice", nil
 	}
 
-	// The request must come from a node with the same name as the NodeResourceSlice.NodeName field.
+	// The request must come from a node with the same name as the ResourceSlice.NodeName field.
 	//
 	// For create, the noderestriction admission plugin is performing this check.
 	// Here we don't have access to the content of the new object.

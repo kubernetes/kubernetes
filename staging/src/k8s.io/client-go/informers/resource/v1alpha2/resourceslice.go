@@ -32,58 +32,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// NodeResourceSliceInformer provides access to a shared informer and lister for
-// NodeResourceSlices.
-type NodeResourceSliceInformer interface {
+// ResourceSliceInformer provides access to a shared informer and lister for
+// ResourceSlices.
+type ResourceSliceInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha2.NodeResourceSliceLister
+	Lister() v1alpha2.ResourceSliceLister
 }
 
-type nodeResourceSliceInformer struct {
+type resourceSliceInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewNodeResourceSliceInformer constructs a new informer for NodeResourceSlice type.
+// NewResourceSliceInformer constructs a new informer for ResourceSlice type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewNodeResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredNodeResourceSliceInformer(client, resyncPeriod, indexers, nil)
+func NewResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredResourceSliceInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredNodeResourceSliceInformer constructs a new informer for NodeResourceSlice type.
+// NewFilteredResourceSliceInformer constructs a new informer for ResourceSlice type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredNodeResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ResourceV1alpha2().NodeResourceSlices().List(context.TODO(), options)
+				return client.ResourceV1alpha2().ResourceSlices().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ResourceV1alpha2().NodeResourceSlices().Watch(context.TODO(), options)
+				return client.ResourceV1alpha2().ResourceSlices().Watch(context.TODO(), options)
 			},
 		},
-		&resourcev1alpha2.NodeResourceSlice{},
+		&resourcev1alpha2.ResourceSlice{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *nodeResourceSliceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNodeResourceSliceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *resourceSliceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredResourceSliceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *nodeResourceSliceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&resourcev1alpha2.NodeResourceSlice{}, f.defaultInformer)
+func (f *resourceSliceInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&resourcev1alpha2.ResourceSlice{}, f.defaultInformer)
 }
 
-func (f *nodeResourceSliceInformer) Lister() v1alpha2.NodeResourceSliceLister {
-	return v1alpha2.NewNodeResourceSliceLister(f.Informer().GetIndexer())
+func (f *resourceSliceInformer) Lister() v1alpha2.ResourceSliceLister {
+	return v1alpha2.NewResourceSliceLister(f.Informer().GetIndexer())
 }

@@ -44,10 +44,10 @@ type resourceModels struct {
 // with an unknown structured parameter model silently ignored. An error gets
 // logged later when parameters required for a pod depend on such an unknown
 // model.
-func newResourceModel(logger klog.Logger, nodeResourceSliceLister resourcev1alpha2listers.NodeResourceSliceLister, claimAssumeCache volumebinding.AssumeCache) (resources, error) {
+func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2listers.ResourceSliceLister, claimAssumeCache volumebinding.AssumeCache) (resources, error) {
 	model := make(resources)
 
-	slices, err := nodeResourceSliceLister.List(labels.Everything())
+	slices, err := resourceSliceLister.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("list node resource slices: %w", err)
 	}

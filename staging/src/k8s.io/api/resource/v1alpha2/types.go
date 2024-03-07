@@ -224,8 +224,11 @@ type StructuredResourceHandle struct {
 	// +optional
 	VendorClaimParameters runtime.RawExtension `json:"vendorClaimParameters,omitempty" protobuf:"bytes,2,opt,name=vendorClaimParameters"`
 
-	// NodeName is the name of the node providing the necessary resources.
-	NodeName string `json:"nodeName" protobuf:"bytes,4,name=nodeName"`
+	// NodeName is the name of the node providing the necessary resources
+	// if the resources are local to a node.
+	//
+	// +optional
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,4,name=nodeName"`
 
 	// Results lists all allocated driver resources.
 	//
@@ -529,21 +532,25 @@ type ResourceClaimTemplateList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
 
-// NodeResourceSlice provides information about available
+// ResourceSlice provides information about available
 // resources on individual nodes.
-type NodeResourceSlice struct {
+type ResourceSlice struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// NodeName identifies the node where the capacity is available.
-	// A field selector can be used to list only NodeResourceSlice
+	// NodeName identifies the node which provides the resources
+	// if they are local to a node.
+	//
+	// A field selector can be used to list only ResourceSlice
 	// objects with a certain node name.
-	NodeName string `json:"nodeName" protobuf:"bytes,2,name=nodeName"`
+	//
+	// +optional
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,2,opt,name=nodeName"`
 
 	// DriverName identifies the DRA driver providing the capacity information.
-	// A field selector can be used to list only NodeResourceSlice
+	// A field selector can be used to list only ResourceSlice
 	// objects with a certain driver name.
 	DriverName string `json:"driverName" protobuf:"bytes,3,name=driverName"`
 
@@ -561,15 +568,15 @@ type NodeResourceModel struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
 
-// NodeResourceSliceList is a collection of NodeResourceSlices.
-type NodeResourceSliceList struct {
+// ResourceSliceList is a collection of ResourceSlices.
+type ResourceSliceList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of node resource capacity objects.
-	Items []NodeResourceSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []ResourceSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +genclient

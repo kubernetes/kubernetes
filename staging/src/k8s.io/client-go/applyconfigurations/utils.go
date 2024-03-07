@@ -1549,8 +1549,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.NamedResourcesStringSliceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceModel"):
 		return &resourcev1alpha2.NodeResourceModelApplyConfiguration{}
-	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceSlice"):
-		return &resourcev1alpha2.NodeResourceSliceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContext"):
 		return &resourcev1alpha2.PodSchedulingContextApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContextSpec"):
@@ -1591,6 +1589,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.ResourceRequestApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceRequestModel"):
 		return &resourcev1alpha2.ResourceRequestModelApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceSlice"):
+		return &resourcev1alpha2.ResourceSliceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("StructuredResourceHandle"):
 		return &resourcev1alpha2.StructuredResourceHandleApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("VendorParameters"):

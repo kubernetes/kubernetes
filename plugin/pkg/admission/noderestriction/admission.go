@@ -110,13 +110,13 @@ func (p *Plugin) ValidateInitialization() error {
 }
 
 var (
-	podResource               = api.Resource("pods")
-	nodeResource              = api.Resource("nodes")
-	pvcResource               = api.Resource("persistentvolumeclaims")
-	svcacctResource           = api.Resource("serviceaccounts")
-	leaseResource             = coordapi.Resource("leases")
-	csiNodeResource           = storage.Resource("csinodes")
-	nodeResourceSliceResource = resource.Resource("noderesourceslices")
+	podResource           = api.Resource("pods")
+	nodeResource          = api.Resource("nodes")
+	pvcResource           = api.Resource("persistentvolumeclaims")
+	svcacctResource       = api.Resource("serviceaccounts")
+	leaseResource         = coordapi.Resource("leases")
+	csiNodeResource       = storage.Resource("csinodes")
+	resourceSliceResource = resource.Resource("resourceslices")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
@@ -168,8 +168,8 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	case csiNodeResource:
 		return p.admitCSINode(nodeName, a)
 
-	case nodeResourceSliceResource:
-		return p.admitNodeResourceSlice(nodeName, a)
+	case resourceSliceResource:
+		return p.admitResourceSlice(nodeName, a)
 
 	default:
 		return nil
@@ -639,17 +639,17 @@ func (p *Plugin) admitCSINode(nodeName string, a admission.Attributes) error {
 	return nil
 }
 
-func (p *Plugin) admitNodeResourceSlice(nodeName string, a admission.Attributes) error {
+func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) error {
 	// The create request must come from a node with the same name as the NodeName field.
 	// Other requests gets checked by the node authorizer.
 	if a.GetOperation() == admission.Create {
-		slice, ok := a.GetObject().(*resource.NodeResourceSlice)
+		slice, ok := a.GetObject().(*resource.ResourceSlice)
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
 		}
 
 		if slice.NodeName != nodeName {
-			return admission.NewForbidden(a, errors.New("can only create NodeResourceSlice with the same NodeName as the requesting node"))
+			return admission.NewForbidden(a, errors.New("can only create ResourceSlice with the same NodeName as the requesting node"))
 		}
 	}
 

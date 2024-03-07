@@ -1,5 +1,5 @@
 {
-  "kind": "NodeResourceSlice",
+  "kind": "ResourceSlice",
   "apiVersion": "resource.k8s.io/v1alpha2",
   "metadata": {
     "name": "nameValue",

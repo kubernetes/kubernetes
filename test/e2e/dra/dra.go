@@ -203,7 +203,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			driver := NewDriver(f, nodes, perNode(1, nodes))
 			driver.parameterMode = parameterModeStructured
 
-			f.It("must manage NodeResourceSlice", f.WithSlow(), func(ctx context.Context) {
+			f.It("must manage ResourceSlice", f.WithSlow(), func(ctx context.Context) {
 				nodeName := nodes.NodeNames[0]
 				driverName := driver.Name
 				m := MethodInstance{nodeName, NodeListAndWatchResourcesMethod}
@@ -212,8 +212,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					return driver.CallCount(m)
 				}).WithTimeout(podStartTimeout).Should(gomega.BeNumerically(">", int64(0)), "NodeListAndWatchResources call count")
 
-				ginkgo.By("check if NodeResourceSlice object exists on the API server")
-				resourceClient := f.ClientSet.ResourceV1alpha2().NodeResourceSlices()
+				ginkgo.By("check if ResourceSlice object exists on the API server")
+				resourceClient := f.ClientSet.ResourceV1alpha2().ResourceSlices()
 				matchSlices := gomega.And(
 					gomega.HaveLen(1),
 					gomega.ContainElement(gstruct.MatchAllFields(gstruct.Fields{
@@ -226,7 +226,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 						}}),
 					})),
 				)
-				getSlices := func(ctx context.Context) ([]resourcev1alpha2.NodeResourceSlice, error) {
+				getSlices := func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
 					slices, err := resourceClient.List(ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("nodeName=%s,driverName=%s", nodeName, driverName)})
 					if err != nil {
 						return nil, err
@@ -1463,10 +1463,10 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClassParameters(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourcev1alpha2.ResourceClaimParameters:
 			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimParameters(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-		case *resourcev1alpha2.NodeResourceSlice:
-			createdObj, err = b.f.ClientSet.ResourceV1alpha2().NodeResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1alpha2.ResourceSlice:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.f.ClientSet.ResourceV1alpha2().NodeResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				err := b.f.ClientSet.ResourceV1alpha2().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete node resource slice")
 			})
 		default:

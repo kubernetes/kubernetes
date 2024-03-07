@@ -220,7 +220,9 @@ func validateResourceHandles(resourceHandles []resource.ResourceHandle, maxSize 
 
 func validateStructuredResourceHandle(handle *resource.StructuredResourceHandle, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateNodeName(handle.NodeName, fldPath.Child("nodeName"))...)
+	if handle.NodeName != "" {
+		allErrs = append(allErrs, validateNodeName(handle.NodeName, fldPath.Child("nodeName"))...)
+	}
 	allErrs = append(allErrs, validateDriverAllocationResults(handle.Results, fldPath.Child("results"))...)
 	return allErrs
 }
@@ -388,12 +390,14 @@ func validateNodeName(name string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// ValidateNodeResourceSlice tests if a NodeResourceSlice object is valid.
-func ValidateNodeResourceSlice(nodeResourceSlice *resource.NodeResourceSlice) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&nodeResourceSlice.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateNodeName(nodeResourceSlice.NodeName, field.NewPath("nodeName"))...)
-	allErrs = append(allErrs, validateResourceDriverName(nodeResourceSlice.DriverName, field.NewPath("driverName"))...)
-	allErrs = append(allErrs, validateNodeResourceModel(&nodeResourceSlice.NodeResourceModel, nil)...)
+// ValidateResourceSlice tests if a ResourceSlice object is valid.
+func ValidateResourceSlice(resourceSlice *resource.ResourceSlice) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&resourceSlice.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	if resourceSlice.NodeName != "" {
+		allErrs = append(allErrs, validateNodeName(resourceSlice.NodeName, field.NewPath("nodeName"))...)
+	}
+	allErrs = append(allErrs, validateResourceDriverName(resourceSlice.DriverName, field.NewPath("driverName"))...)
+	allErrs = append(allErrs, validateNodeResourceModel(&resourceSlice.NodeResourceModel, nil)...)
 	return allErrs
 }
 
@@ -415,12 +419,12 @@ func validateNodeResourceModel(model *resource.NodeResourceModel, fldPath *field
 	return allErrs
 }
 
-// ValidateNodeResourceSlice tests if a NodeResourceSlice update is valid.
-func ValidateNodeResourceSliceUpdate(nodeResourceSlice, oldNodeResourceSlice *resource.NodeResourceSlice) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&nodeResourceSlice.ObjectMeta, &oldNodeResourceSlice.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateNodeResourceSlice(nodeResourceSlice)...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(nodeResourceSlice.NodeName, oldNodeResourceSlice.NodeName, field.NewPath("nodeName"))...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(nodeResourceSlice.DriverName, oldNodeResourceSlice.DriverName, field.NewPath("driverName"))...)
+// ValidateResourceSlice tests if a ResourceSlice update is valid.
+func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.ResourceSlice) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceSlice.ObjectMeta, &oldResourceSlice.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateResourceSlice(resourceSlice)...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceSlice.NodeName, oldResourceSlice.NodeName, field.NewPath("nodeName"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceSlice.DriverName, oldResourceSlice.DriverName, field.NewPath("driverName"))...)
 	return allErrs
 }
 

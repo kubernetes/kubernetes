@@ -881,8 +881,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha2.NamedResourcesResources":                                                  schema_k8sio_api_resource_v1alpha2_NamedResourcesResources(ref),
 		"k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice":                                                schema_k8sio_api_resource_v1alpha2_NamedResourcesStringSlice(ref),
 		"k8s.io/api/resource/v1alpha2.NodeResourceModel":                                                        schema_k8sio_api_resource_v1alpha2_NodeResourceModel(ref),
-		"k8s.io/api/resource/v1alpha2.NodeResourceSlice":                                                        schema_k8sio_api_resource_v1alpha2_NodeResourceSlice(ref),
-		"k8s.io/api/resource/v1alpha2.NodeResourceSliceList":                                                    schema_k8sio_api_resource_v1alpha2_NodeResourceSliceList(ref),
 		"k8s.io/api/resource/v1alpha2.PodSchedulingContext":                                                     schema_k8sio_api_resource_v1alpha2_PodSchedulingContext(ref),
 		"k8s.io/api/resource/v1alpha2.PodSchedulingContextList":                                                 schema_k8sio_api_resource_v1alpha2_PodSchedulingContextList(ref),
 		"k8s.io/api/resource/v1alpha2.PodSchedulingContextSpec":                                                 schema_k8sio_api_resource_v1alpha2_PodSchedulingContextSpec(ref),
@@ -909,6 +907,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha2.ResourceHandle":                                                           schema_k8sio_api_resource_v1alpha2_ResourceHandle(ref),
 		"k8s.io/api/resource/v1alpha2.ResourceRequest":                                                          schema_k8sio_api_resource_v1alpha2_ResourceRequest(ref),
 		"k8s.io/api/resource/v1alpha2.ResourceRequestModel":                                                     schema_k8sio_api_resource_v1alpha2_ResourceRequestModel(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceSlice":                                                            schema_k8sio_api_resource_v1alpha2_ResourceSlice(ref),
+		"k8s.io/api/resource/v1alpha2.ResourceSliceList":                                                        schema_k8sio_api_resource_v1alpha2_ResourceSliceList(ref),
 		"k8s.io/api/resource/v1alpha2.StructuredResourceHandle":                                                 schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref),
 		"k8s.io/api/resource/v1alpha2.VendorParameters":                                                         schema_k8sio_api_resource_v1alpha2_VendorParameters(ref),
 		"k8s.io/api/scheduling/v1.PriorityClass":                                                                schema_k8sio_api_scheduling_v1_PriorityClass(ref),
@@ -45195,116 +45195,6 @@ func schema_k8sio_api_resource_v1alpha2_NodeResourceModel(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NodeResourceSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeResourceSlice provides information about available resources on individual nodes.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"nodeName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceSlice objects with a certain node name.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"driverName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only NodeResourceSlice objects with a certain driver name.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"namedResources": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NamedResources describes available resources using the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesResources"),
-						},
-					},
-				},
-				Required: []string{"nodeName", "driverName"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesResources", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha2_NodeResourceSliceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeResourceSliceList is a collection of NodeResourceSlices.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of node resource capacity objects.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.NodeResourceSlice"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NodeResourceSlice", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
-	}
-}
-
 func schema_k8sio_api_resource_v1alpha2_PodSchedulingContext(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -46470,6 +46360,115 @@ func schema_k8sio_api_resource_v1alpha2_ResourceRequestModel(ref common.Referenc
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha2_ResourceSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSlice provides information about available resources on individual nodes.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName identifies the node which provides the resources if they are local to a node.\n\nA field selector can be used to list only ResourceSlice objects with a certain node name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"driverName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namedResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NamedResources describes available resources using the named resources model.",
+							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesResources"),
+						},
+					},
+				},
+				Required: []string{"driverName"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.NamedResourcesResources", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_ResourceSliceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSliceList is a collection of ResourceSlices.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of node resource capacity objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceSlice"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha2.ResourceSlice", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -46491,8 +46490,7 @@ func schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref common.Refe
 					},
 					"nodeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeName is the name of the node providing the necessary resources.",
-							Default:     "",
+							Description: "NodeName is the name of the node providing the necessary resources if the resources are local to a node.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -46517,7 +46515,7 @@ func schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"nodeName", "results"},
+				Required: []string{"results"},
 			},
 		},
 		Dependencies: []string{

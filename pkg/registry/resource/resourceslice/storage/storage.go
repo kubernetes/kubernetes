@@ -24,35 +24,35 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/resource/noderesourceslice"
+	"k8s.io/kubernetes/pkg/registry/resource/resourceslice"
 )
 
-// REST implements a RESTStorage for NodeResourceSlice.
+// REST implements a RESTStorage for ResourceSlice.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against NodeResourceSlice.
+// NewREST returns a RESTStorage object that will work against ResourceSlice.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &resource.NodeResourceSlice{} },
-		NewListFunc:               func() runtime.Object { return &resource.NodeResourceSliceList{} },
-		PredicateFunc:             noderesourceslice.Match,
-		DefaultQualifiedResource:  resource.Resource("noderesourceslices"),
-		SingularQualifiedResource: resource.Resource("noderesourceslice"),
+		NewFunc:                   func() runtime.Object { return &resource.ResourceSlice{} },
+		NewListFunc:               func() runtime.Object { return &resource.ResourceSliceList{} },
+		PredicateFunc:             resourceslice.Match,
+		DefaultQualifiedResource:  resource.Resource("resourceslices"),
+		SingularQualifiedResource: resource.Resource("resourceslice"),
 
-		CreateStrategy:      noderesourceslice.Strategy,
-		UpdateStrategy:      noderesourceslice.Strategy,
-		DeleteStrategy:      noderesourceslice.Strategy,
+		CreateStrategy:      resourceslice.Strategy,
+		UpdateStrategy:      resourceslice.Strategy,
+		DeleteStrategy:      resourceslice.Strategy,
 		ReturnDeletedObject: true,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
-		AttrFunc:    noderesourceslice.GetAttrs,
-		TriggerFunc: noderesourceslice.TriggerFunc,
-		Indexers:    noderesourceslice.Indexers(),
+		AttrFunc:    resourceslice.GetAttrs,
+		TriggerFunc: resourceslice.TriggerFunc,
+		Indexers:    resourceslice.Indexers(),
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err

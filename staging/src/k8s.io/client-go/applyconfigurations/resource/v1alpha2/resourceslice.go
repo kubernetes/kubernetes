@@ -27,9 +27,9 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NodeResourceSliceApplyConfiguration represents an declarative configuration of the NodeResourceSlice type for use
+// ResourceSliceApplyConfiguration represents an declarative configuration of the ResourceSlice type for use
 // with apply.
-type NodeResourceSliceApplyConfiguration struct {
+type ResourceSliceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration       `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration    `json:"metadata,omitempty"`
 	NodeName                            *string `json:"nodeName,omitempty"`
@@ -37,47 +37,47 @@ type NodeResourceSliceApplyConfiguration struct {
 	NodeResourceModelApplyConfiguration `json:",inline"`
 }
 
-// NodeResourceSlice constructs an declarative configuration of the NodeResourceSlice type for use with
+// ResourceSlice constructs an declarative configuration of the ResourceSlice type for use with
 // apply.
-func NodeResourceSlice(name string) *NodeResourceSliceApplyConfiguration {
-	b := &NodeResourceSliceApplyConfiguration{}
+func ResourceSlice(name string) *ResourceSliceApplyConfiguration {
+	b := &ResourceSliceApplyConfiguration{}
 	b.WithName(name)
-	b.WithKind("NodeResourceSlice")
+	b.WithKind("ResourceSlice")
 	b.WithAPIVersion("resource.k8s.io/v1alpha2")
 	return b
 }
 
-// ExtractNodeResourceSlice extracts the applied configuration owned by fieldManager from
-// nodeResourceSlice. If no managedFields are found in nodeResourceSlice for fieldManager, a
-// NodeResourceSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// ExtractResourceSlice extracts the applied configuration owned by fieldManager from
+// resourceSlice. If no managedFields are found in resourceSlice for fieldManager, a
+// ResourceSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
 // APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
-// nodeResourceSlice must be a unmodified NodeResourceSlice API object that was retrieved from the Kubernetes API.
-// ExtractNodeResourceSlice provides a way to perform a extract/modify-in-place/apply workflow.
+// resourceSlice must be a unmodified ResourceSlice API object that was retrieved from the Kubernetes API.
+// ExtractResourceSlice provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNodeResourceSlice(nodeResourceSlice *resourcev1alpha2.NodeResourceSlice, fieldManager string) (*NodeResourceSliceApplyConfiguration, error) {
-	return extractNodeResourceSlice(nodeResourceSlice, fieldManager, "")
+func ExtractResourceSlice(resourceSlice *resourcev1alpha2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
+	return extractResourceSlice(resourceSlice, fieldManager, "")
 }
 
-// ExtractNodeResourceSliceStatus is the same as ExtractNodeResourceSlice except
+// ExtractResourceSliceStatus is the same as ExtractResourceSlice except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractNodeResourceSliceStatus(nodeResourceSlice *resourcev1alpha2.NodeResourceSlice, fieldManager string) (*NodeResourceSliceApplyConfiguration, error) {
-	return extractNodeResourceSlice(nodeResourceSlice, fieldManager, "status")
+func ExtractResourceSliceStatus(resourceSlice *resourcev1alpha2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
+	return extractResourceSlice(resourceSlice, fieldManager, "status")
 }
 
-func extractNodeResourceSlice(nodeResourceSlice *resourcev1alpha2.NodeResourceSlice, fieldManager string, subresource string) (*NodeResourceSliceApplyConfiguration, error) {
-	b := &NodeResourceSliceApplyConfiguration{}
-	err := managedfields.ExtractInto(nodeResourceSlice, internal.Parser().Type("io.k8s.api.resource.v1alpha2.NodeResourceSlice"), fieldManager, b, subresource)
+func extractResourceSlice(resourceSlice *resourcev1alpha2.ResourceSlice, fieldManager string, subresource string) (*ResourceSliceApplyConfiguration, error) {
+	b := &ResourceSliceApplyConfiguration{}
+	err := managedfields.ExtractInto(resourceSlice, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceSlice"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}
-	b.WithName(nodeResourceSlice.Name)
+	b.WithName(resourceSlice.Name)
 
-	b.WithKind("NodeResourceSlice")
+	b.WithKind("ResourceSlice")
 	b.WithAPIVersion("resource.k8s.io/v1alpha2")
 	return b, nil
 }
@@ -85,7 +85,7 @@ func extractNodeResourceSlice(nodeResourceSlice *resourcev1alpha2.NodeResourceSl
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithKind(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithKind(value string) *ResourceSliceApplyConfiguration {
 	b.Kind = &value
 	return b
 }
@@ -93,7 +93,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithKind(value string) *NodeResour
 // WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithAPIVersion(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithAPIVersion(value string) *ResourceSliceApplyConfiguration {
 	b.APIVersion = &value
 	return b
 }
@@ -101,7 +101,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithAPIVersion(value string) *Node
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithName(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithName(value string) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.Name = &value
 	return b
@@ -110,7 +110,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithName(value string) *NodeResour
 // WithGenerateName sets the GenerateName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the GenerateName field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithGenerateName(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithGenerateName(value string) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.GenerateName = &value
 	return b
@@ -119,7 +119,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithGenerateName(value string) *No
 // WithNamespace sets the Namespace field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Namespace field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithNamespace(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithNamespace(value string) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.Namespace = &value
 	return b
@@ -128,7 +128,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithNamespace(value string) *NodeR
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UID field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithUID(value types.UID) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithUID(value types.UID) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.UID = &value
 	return b
@@ -137,7 +137,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithUID(value types.UID) *NodeReso
 // WithResourceVersion sets the ResourceVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithResourceVersion(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithResourceVersion(value string) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ResourceVersion = &value
 	return b
@@ -146,7 +146,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithResourceVersion(value string) 
 // WithGeneration sets the Generation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Generation field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithGeneration(value int64) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithGeneration(value int64) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.Generation = &value
 	return b
@@ -155,7 +155,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithGeneration(value int64) *NodeR
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithCreationTimestamp(value metav1.Time) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.CreationTimestamp = &value
 	return b
@@ -164,7 +164,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithCreationTimestamp(value metav1
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.DeletionTimestamp = &value
 	return b
@@ -173,7 +173,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithDeletionTimestamp(value metav1
 // WithDeletionGracePeriodSeconds sets the DeletionGracePeriodSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.DeletionGracePeriodSeconds = &value
 	return b
@@ -183,7 +183,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithDeletionGracePeriodSeconds(val
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Labels field,
 // overwriting an existing map entries in Labels field with the same key.
-func (b *NodeResourceSliceApplyConfiguration) WithLabels(entries map[string]string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithLabels(entries map[string]string) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.Labels == nil && len(entries) > 0 {
 		b.Labels = make(map[string]string, len(entries))
@@ -198,7 +198,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithLabels(entries map[string]stri
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Annotations field,
 // overwriting an existing map entries in Annotations field with the same key.
-func (b *NodeResourceSliceApplyConfiguration) WithAnnotations(entries map[string]string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithAnnotations(entries map[string]string) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.Annotations == nil && len(entries) > 0 {
 		b.Annotations = make(map[string]string, len(entries))
@@ -212,7 +212,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithAnnotations(entries map[string
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *NodeResourceSliceApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -226,7 +226,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithOwnerReferences(values ...*v1.
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
-func (b *NodeResourceSliceApplyConfiguration) WithFinalizers(values ...string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithFinalizers(values ...string) *ResourceSliceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
@@ -234,7 +234,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithFinalizers(values ...string) *
 	return b
 }
 
-func (b *NodeResourceSliceApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
+func (b *ResourceSliceApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
 		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
 	}
@@ -243,7 +243,7 @@ func (b *NodeResourceSliceApplyConfiguration) ensureObjectMetaApplyConfiguration
 // WithNodeName sets the NodeName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeName field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithNodeName(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithNodeName(value string) *ResourceSliceApplyConfiguration {
 	b.NodeName = &value
 	return b
 }
@@ -251,7 +251,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithNodeName(value string) *NodeRe
 // WithDriverName sets the DriverName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DriverName field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithDriverName(value string) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithDriverName(value string) *ResourceSliceApplyConfiguration {
 	b.DriverName = &value
 	return b
 }
@@ -259,7 +259,7 @@ func (b *NodeResourceSliceApplyConfiguration) WithDriverName(value string) *Node
 // WithNamedResources sets the NamedResources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NamedResources field is set to the value of the last call.
-func (b *NodeResourceSliceApplyConfiguration) WithNamedResources(value *NamedResourcesResourcesApplyConfiguration) *NodeResourceSliceApplyConfiguration {
+func (b *ResourceSliceApplyConfiguration) WithNamedResources(value *NamedResourcesResourcesApplyConfiguration) *ResourceSliceApplyConfiguration {
 	b.NamedResources = value
 	return b
 }

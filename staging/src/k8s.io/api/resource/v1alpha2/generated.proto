@@ -216,36 +216,6 @@ message NodeResourceModel {
   optional NamedResourcesResources namedResources = 1;
 }
 
-// NodeResourceSlice provides information about available
-// resources on individual nodes.
-message NodeResourceSlice {
-  // Standard object metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // NodeName identifies the node where the capacity is available.
-  // A field selector can be used to list only NodeResourceSlice
-  // objects with a certain node name.
-  optional string nodeName = 2;
-
-  // DriverName identifies the DRA driver providing the capacity information.
-  // A field selector can be used to list only NodeResourceSlice
-  // objects with a certain driver name.
-  optional string driverName = 3;
-
-  optional NodeResourceModel nodeResourceModel = 4;
-}
-
-// NodeResourceSliceList is a collection of NodeResourceSlices.
-message NodeResourceSliceList {
-  // Standard list metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of node resource capacity objects.
-  repeated NodeResourceSlice items = 2;
-}
-
 // PodSchedulingContext objects hold information that is needed to schedule
 // a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
 // mode.
@@ -704,6 +674,40 @@ message ResourceRequestModel {
   optional NamedResourcesRequest namedResources = 1;
 }
 
+// ResourceSlice provides information about available
+// resources on individual nodes.
+message ResourceSlice {
+  // Standard object metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // NodeName identifies the node which provides the resources
+  // if they are local to a node.
+  //
+  // A field selector can be used to list only ResourceSlice
+  // objects with a certain node name.
+  //
+  // +optional
+  optional string nodeName = 2;
+
+  // DriverName identifies the DRA driver providing the capacity information.
+  // A field selector can be used to list only ResourceSlice
+  // objects with a certain driver name.
+  optional string driverName = 3;
+
+  optional NodeResourceModel nodeResourceModel = 4;
+}
+
+// ResourceSliceList is a collection of ResourceSlices.
+message ResourceSliceList {
+  // Standard list metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of node resource capacity objects.
+  repeated ResourceSlice items = 2;
+}
+
 // StructuredResourceHandle is the in-tree representation of the allocation result.
 message StructuredResourceHandle {
   // VendorClassParameters are the per-claim configuration parameters
@@ -719,7 +723,10 @@ message StructuredResourceHandle {
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.RawExtension vendorClaimParameters = 2;
 
-  // NodeName is the name of the node providing the necessary resources.
+  // NodeName is the name of the node providing the necessary resources
+  // if the resources are local to a node.
+  //
+  // +optional
   optional string nodeName = 4;
 
   // Results lists all allocated driver resources.

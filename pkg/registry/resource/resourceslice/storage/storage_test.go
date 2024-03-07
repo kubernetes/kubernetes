@@ -37,7 +37,7 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "noderesourceslices",
+		ResourcePrefix:          "resourceslices",
 	}
 	resourceClassStorage, err := NewREST(restOptions)
 	if err != nil {
@@ -46,8 +46,8 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 	return resourceClassStorage, server
 }
 
-func validNewNodeResourceSlice(name string) *resource.NodeResourceSlice {
-	return &resource.NodeResourceSlice{
+func validNewResourceSlice(name string) *resource.ResourceSlice {
+	return &resource.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -64,13 +64,13 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	resourceClass := validNewNodeResourceSlice("foo")
+	resourceClass := validNewResourceSlice("foo")
 	resourceClass.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		resourceClass,
 		// invalid
-		&resource.NodeResourceSlice{
+		&resource.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
 		},
 	)
@@ -83,16 +83,16 @@ func TestUpdate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestUpdate(
 		// valid
-		validNewNodeResourceSlice("foo"),
+		validNewResourceSlice("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*resource.NodeResourceSlice)
+			object := obj.(*resource.ResourceSlice)
 			object.Labels = map[string]string{"foo": "bar"}
 			return object
 		},
 		// invalid update
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*resource.NodeResourceSlice)
+			object := obj.(*resource.ResourceSlice)
 			object.DriverName = ""
 			return object
 		},
@@ -105,7 +105,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
-	test.TestDelete(validNewNodeResourceSlice("foo"))
+	test.TestDelete(validNewResourceSlice("foo"))
 }
 
 func TestGet(t *testing.T) {
@@ -113,7 +113,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestGet(validNewNodeResourceSlice("foo"))
+	test.TestGet(validNewResourceSlice("foo"))
 }
 
 func TestList(t *testing.T) {
@@ -121,7 +121,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestList(validNewNodeResourceSlice("foo"))
+	test.TestList(validNewResourceSlice("foo"))
 }
 
 func TestWatch(t *testing.T) {
@@ -130,7 +130,7 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestWatch(
-		validNewNodeResourceSlice("foo"),
+		validNewResourceSlice("foo"),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels

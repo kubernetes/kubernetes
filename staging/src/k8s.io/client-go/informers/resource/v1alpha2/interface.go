@@ -24,8 +24,6 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// NodeResourceSlices returns a NodeResourceSliceInformer.
-	NodeResourceSlices() NodeResourceSliceInformer
 	// PodSchedulingContexts returns a PodSchedulingContextInformer.
 	PodSchedulingContexts() PodSchedulingContextInformer
 	// ResourceClaims returns a ResourceClaimInformer.
@@ -38,6 +36,8 @@ type Interface interface {
 	ResourceClasses() ResourceClassInformer
 	// ResourceClassParameters returns a ResourceClassParametersInformer.
 	ResourceClassParameters() ResourceClassParametersInformer
+	// ResourceSlices returns a ResourceSliceInformer.
+	ResourceSlices() ResourceSliceInformer
 }
 
 type version struct {
@@ -49,11 +49,6 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
-}
-
-// NodeResourceSlices returns a NodeResourceSliceInformer.
-func (v *version) NodeResourceSlices() NodeResourceSliceInformer {
-	return &nodeResourceSliceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // PodSchedulingContexts returns a PodSchedulingContextInformer.
@@ -84,4 +79,9 @@ func (v *version) ResourceClasses() ResourceClassInformer {
 // ResourceClassParameters returns a ResourceClassParametersInformer.
 func (v *version) ResourceClassParameters() ResourceClassParametersInformer {
 	return &resourceClassParametersInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceSlices returns a ResourceSliceInformer.
+func (v *version) ResourceSlices() ResourceSliceInformer {
+	return &resourceSliceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

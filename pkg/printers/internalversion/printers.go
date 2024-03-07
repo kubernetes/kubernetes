@@ -674,12 +674,12 @@ func AddHandlers(h printers.PrintHandler) {
 
 	nodeResourceCapacityColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Node", Type: "string", Description: resourcev1alpha2.NodeResourceSlice{}.SwaggerDoc()["nodeName"]},
-		{Name: "Driver", Type: "string", Description: resourcev1alpha2.NodeResourceSlice{}.SwaggerDoc()["driverName"]},
+		{Name: "Node", Type: "string", Description: resourcev1alpha2.ResourceSlice{}.SwaggerDoc()["nodeName"]},
+		{Name: "Driver", Type: "string", Description: resourcev1alpha2.ResourceSlice{}.SwaggerDoc()["driverName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printNodeResourceSlice)
-	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printNodeResourceSliceList)
+	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printResourceSlice)
+	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printResourceSliceList)
 
 	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -3121,7 +3121,7 @@ func printResourceClassParametersList(list *resource.ResourceClassParametersList
 	return rows, nil
 }
 
-func printNodeResourceSlice(obj *resource.NodeResourceSlice, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printResourceSlice(obj *resource.ResourceSlice, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -3130,10 +3130,10 @@ func printNodeResourceSlice(obj *resource.NodeResourceSlice, options printers.Ge
 	return []metav1.TableRow{row}, nil
 }
 
-func printNodeResourceSliceList(list *resource.NodeResourceSliceList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printResourceSliceList(list *resource.ResourceSliceList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		r, err := printNodeResourceSlice(&list.Items[i], options)
+		r, err := printResourceSlice(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1alpha2
 
-// NodeResourceSliceListerExpansion allows custom methods to be added to
-// NodeResourceSliceLister.
-type NodeResourceSliceListerExpansion interface{}
-
 // PodSchedulingContextListerExpansion allows custom methods to be added to
 // PodSchedulingContextLister.
 type PodSchedulingContextListerExpansion interface{}
@@ -65,3 +61,7 @@ type ResourceClassParametersListerExpansion interface{}
 // ResourceClassParametersNamespaceListerExpansion allows custom methods to be added to
 // ResourceClassParametersNamespaceLister.
 type ResourceClassParametersNamespaceListerExpansion interface{}
+
+// ResourceSliceListerExpansion allows custom methods to be added to
+// ResourceSliceLister.
+type ResourceSliceListerExpansion interface{}

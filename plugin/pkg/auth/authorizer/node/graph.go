@@ -127,7 +127,7 @@ const (
 
 var vertexTypes = map[vertexType]string{
 	configMapVertexType:      "configmap",
-	sliceVertexType:          "noderesourceslice",
+	sliceVertexType:          "resourceslice",
 	nodeVertexType:           "node",
 	podVertexType:            "pod",
 	pvcVertexType:            "pvc",
@@ -495,13 +495,13 @@ func (g *Graph) DeleteVolumeAttachment(name string) {
 	g.deleteVertex_locked(vaVertexType, "", name)
 }
 
-// AddNodeResourceSlice sets up edges for the following relationships:
+// AddResourceSlice sets up edges for the following relationships:
 //
 //	node resource slice -> node
-func (g *Graph) AddNodeResourceSlice(sliceName, nodeName string) {
+func (g *Graph) AddResourceSlice(sliceName, nodeName string) {
 	start := time.Now()
 	defer func() {
-		graphActionsDuration.WithLabelValues("AddNodeResourceSlice").Observe(time.Since(start).Seconds())
+		graphActionsDuration.WithLabelValues("AddResourceSlice").Observe(time.Since(start).Seconds())
 	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()
@@ -516,10 +516,10 @@ func (g *Graph) AddNodeResourceSlice(sliceName, nodeName string) {
 		g.graph.SetEdge(newDestinationEdge(sliceVertex, nodeVertex, nodeVertex))
 	}
 }
-func (g *Graph) DeleteNodeResourceSlice(sliceName string) {
+func (g *Graph) DeleteResourceSlice(sliceName string) {
 	start := time.Now()
 	defer func() {
-		graphActionsDuration.WithLabelValues("DeleteNodeResourceSlice").Observe(time.Since(start).Seconds())
+		graphActionsDuration.WithLabelValues("DeleteResourceSlice").Observe(time.Since(start).Seconds())
 	}()
 	g.lock.Lock()
 	defer g.lock.Unlock()

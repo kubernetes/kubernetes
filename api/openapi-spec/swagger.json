@@ -15010,82 +15010,6 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NodeResourceSlice": {
-      "description": "NodeResourceSlice provides information about available resources on individual nodes.",
-      "properties": {
-        "apiVersion": {
-          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type": "string"
-        },
-        "driverName": {
-          "description": "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only NodeResourceSlice objects with a certain driver name.",
-          "type": "string"
-        },
-        "kind": {
-          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        },
-        "metadata": {
-          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object metadata"
-        },
-        "namedResources": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesResources",
-          "description": "NamedResources describes available resources using the named resources model."
-        },
-        "nodeName": {
-          "description": "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceSlice objects with a certain node name.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "nodeName",
-        "driverName"
-      ],
-      "type": "object",
-      "x-kubernetes-group-version-kind": [
-        {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      ]
-    },
-    "io.k8s.api.resource.v1alpha2.NodeResourceSliceList": {
-      "description": "NodeResourceSliceList is a collection of NodeResourceSlices.",
-      "properties": {
-        "apiVersion": {
-          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type": "string"
-        },
-        "items": {
-          "description": "Items is the list of node resource capacity objects.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-          },
-          "type": "array"
-        },
-        "kind": {
-          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        },
-        "metadata": {
-          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
-          "description": "Standard list metadata"
-        }
-      },
-      "required": [
-        "items"
-      ],
-      "type": "object",
-      "x-kubernetes-group-version-kind": [
-        {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSliceList",
-          "version": "v1alpha2"
-        }
-      ]
-    },
     "io.k8s.api.resource.v1alpha2.PodSchedulingContext": {
       "description": "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
       "properties": {
@@ -15773,11 +15697,86 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1alpha2.ResourceSlice": {
+      "description": "ResourceSlice provides information about available resources on individual nodes.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "driverName": {
+          "description": "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+          "description": "Standard object metadata"
+        },
+        "namedResources": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesResources",
+          "description": "NamedResources describes available resources using the named resources model."
+        },
+        "nodeName": {
+          "description": "NodeName identifies the node which provides the resources if they are local to a node.\n\nA field selector can be used to list only ResourceSlice objects with a certain node name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "driverName"
+      ],
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      ]
+    },
+    "io.k8s.api.resource.v1alpha2.ResourceSliceList": {
+      "description": "ResourceSliceList is a collection of ResourceSlices.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "description": "Items is the list of node resource capacity objects.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+          "description": "Standard list metadata"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSliceList",
+          "version": "v1alpha2"
+        }
+      ]
+    },
     "io.k8s.api.resource.v1alpha2.StructuredResourceHandle": {
       "description": "StructuredResourceHandle is the in-tree representation of the allocation result.",
       "properties": {
         "nodeName": {
-          "description": "NodeName is the name of the node providing the necessary resources.",
+          "description": "NodeName is the name of the node providing the necessary resources if the resources are local to a node.",
           "type": "string"
         },
         "results": {
@@ -15798,7 +15797,6 @@
         }
       },
       "required": [
-        "nodeName",
         "results"
       ],
       "type": "object"
@@ -72938,485 +72936,6 @@
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/noderesourceslices": {
-      "delete": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "delete collection of NodeResourceSlice",
-        "operationId": "deleteResourceV1alpha2CollectionNodeResourceSlice",
-        "parameters": [
-          {
-            "$ref": "#/parameters/body-2Y1dVQaQ"
-          },
-          {
-            "$ref": "#/parameters/continue-QfD61s0i"
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "type": "string",
-            "uniqueItems": true
-          },
-          {
-            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
-          },
-          {
-            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
-          },
-          {
-            "$ref": "#/parameters/labelSelector-5Zw57w4C"
-          },
-          {
-            "$ref": "#/parameters/limit-1NfNmdNH"
-          },
-          {
-            "$ref": "#/parameters/orphanDependents-uRB25kX5"
-          },
-          {
-            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
-          },
-          {
-            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
-          },
-          {
-            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
-          },
-          {
-            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
-          },
-          {
-            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
-          }
-        ],
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "deletecollection",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      },
-      "get": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "list or watch objects of kind NodeResourceSlice",
-        "operationId": "listResourceV1alpha2NodeResourceSlice",
-        "parameters": [
-          {
-            "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
-          },
-          {
-            "$ref": "#/parameters/continue-QfD61s0i"
-          },
-          {
-            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
-          },
-          {
-            "$ref": "#/parameters/labelSelector-5Zw57w4C"
-          },
-          {
-            "$ref": "#/parameters/limit-1NfNmdNH"
-          },
-          {
-            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
-          },
-          {
-            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
-          },
-          {
-            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
-          },
-          {
-            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
-          },
-          {
-            "$ref": "#/parameters/watch-XNNPZGbK"
-          }
-        ],
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf",
-          "application/json;stream=watch",
-          "application/vnd.kubernetes.protobuf;stream=watch"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSliceList"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "list",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      },
-      "parameters": [
-        {
-          "$ref": "#/parameters/pretty-tJGM1-ng"
-        }
-      ],
-      "post": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "create a NodeResourceSlice",
-        "operationId": "createResourceV1alpha2NodeResourceSlice",
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "type": "string",
-            "uniqueItems": true
-          },
-          {
-            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
-          },
-          {
-            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
-            "in": "query",
-            "name": "fieldValidation",
-            "type": "string",
-            "uniqueItems": true
-          }
-        ],
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "201": {
-            "description": "Created",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "202": {
-            "description": "Accepted",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "post",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      }
-    },
-    "/apis/resource.k8s.io/v1alpha2/noderesourceslices/{name}": {
-      "delete": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "delete a NodeResourceSlice",
-        "operationId": "deleteResourceV1alpha2NodeResourceSlice",
-        "parameters": [
-          {
-            "$ref": "#/parameters/body-2Y1dVQaQ"
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "type": "string",
-            "uniqueItems": true
-          },
-          {
-            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
-          },
-          {
-            "$ref": "#/parameters/orphanDependents-uRB25kX5"
-          },
-          {
-            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
-          }
-        ],
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "202": {
-            "description": "Accepted",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "delete",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      },
-      "get": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "read the specified NodeResourceSlice",
-        "operationId": "readResourceV1alpha2NodeResourceSlice",
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "get",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      },
-      "parameters": [
-        {
-          "description": "name of the NodeResourceSlice",
-          "in": "path",
-          "name": "name",
-          "required": true,
-          "type": "string",
-          "uniqueItems": true
-        },
-        {
-          "$ref": "#/parameters/pretty-tJGM1-ng"
-        }
-      ],
-      "patch": {
-        "consumes": [
-          "application/json-patch+json",
-          "application/merge-patch+json",
-          "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
-        ],
-        "description": "partially update the specified NodeResourceSlice",
-        "operationId": "patchResourceV1alpha2NodeResourceSlice",
-        "parameters": [
-          {
-            "$ref": "#/parameters/body-78PwaGsr"
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "type": "string",
-            "uniqueItems": true
-          },
-          {
-            "$ref": "#/parameters/fieldManager-7c6nTn1T"
-          },
-          {
-            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
-            "in": "query",
-            "name": "fieldValidation",
-            "type": "string",
-            "uniqueItems": true
-          },
-          {
-            "$ref": "#/parameters/force-tOGGb0Yi"
-          }
-        ],
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "201": {
-            "description": "Created",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "patch",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      },
-      "put": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "replace the specified NodeResourceSlice",
-        "operationId": "replaceResourceV1alpha2NodeResourceSlice",
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "type": "string",
-            "uniqueItems": true
-          },
-          {
-            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
-          },
-          {
-            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
-            "in": "query",
-            "name": "fieldValidation",
-            "type": "string",
-            "uniqueItems": true
-          }
-        ],
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "201": {
-            "description": "Created",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NodeResourceSlice"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "put",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      }
-    },
     "/apis/resource.k8s.io/v1alpha2/podschedulingcontexts": {
       "get": {
         "consumes": [
@@ -74266,6 +73785,485 @@
         }
       ]
     },
+    "/apis/resource.k8s.io/v1alpha2/resourceslices": {
+      "delete": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "delete collection of ResourceSlice",
+        "operationId": "deleteResourceV1alpha2CollectionResourceSlice",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-2Y1dVQaQ"
+          },
+          {
+            "$ref": "#/parameters/continue-QfD61s0i"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+          },
+          {
+            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
+          },
+          {
+            "$ref": "#/parameters/labelSelector-5Zw57w4C"
+          },
+          {
+            "$ref": "#/parameters/limit-1NfNmdNH"
+          },
+          {
+            "$ref": "#/parameters/orphanDependents-uRB25kX5"
+          },
+          {
+            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
+          },
+          {
+            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+          },
+          {
+            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+          },
+          {
+            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+          },
+          {
+            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "deletecollection",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      },
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "list or watch objects of kind ResourceSlice",
+        "operationId": "listResourceV1alpha2ResourceSlice",
+        "parameters": [
+          {
+            "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+          },
+          {
+            "$ref": "#/parameters/continue-QfD61s0i"
+          },
+          {
+            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+          },
+          {
+            "$ref": "#/parameters/labelSelector-5Zw57w4C"
+          },
+          {
+            "$ref": "#/parameters/limit-1NfNmdNH"
+          },
+          {
+            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+          },
+          {
+            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+          },
+          {
+            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+          },
+          {
+            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+          },
+          {
+            "$ref": "#/parameters/watch-XNNPZGbK"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSliceList"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "post": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "create a ResourceSlice",
+        "operationId": "createResourceV1alpha2ResourceSlice",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      }
+    },
+    "/apis/resource.k8s.io/v1alpha2/resourceslices/{name}": {
+      "delete": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "delete a ResourceSlice",
+        "operationId": "deleteResourceV1alpha2ResourceSlice",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-2Y1dVQaQ"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
+          },
+          {
+            "$ref": "#/parameters/orphanDependents-uRB25kX5"
+          },
+          {
+            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "delete",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      },
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read the specified ResourceSlice",
+        "operationId": "readResourceV1alpha2ResourceSlice",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the ResourceSlice",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "patch": {
+        "consumes": [
+          "application/json-patch+json",
+          "application/merge-patch+json",
+          "application/strategic-merge-patch+json",
+          "application/apply-patch+yaml"
+        ],
+        "description": "partially update the specified ResourceSlice",
+        "operationId": "patchResourceV1alpha2ResourceSlice",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-78PwaGsr"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-7c6nTn1T"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/force-tOGGb0Yi"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      },
+      "put": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "replace the specified ResourceSlice",
+        "operationId": "replaceResourceV1alpha2ResourceSlice",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      }
+    },
     "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/podschedulingcontexts": {
       "get": {
         "consumes": [
@@ -75076,162 +75074,6 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/noderesourceslices": {
-      "get": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "watch individual changes to a list of NodeResourceSlice. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NodeResourceSliceList",
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf",
-          "application/json;stream=watch",
-          "application/vnd.kubernetes.protobuf;stream=watch"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "watchlist",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      },
-      "parameters": [
-        {
-          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
-        },
-        {
-          "$ref": "#/parameters/continue-QfD61s0i"
-        },
-        {
-          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
-        },
-        {
-          "$ref": "#/parameters/labelSelector-5Zw57w4C"
-        },
-        {
-          "$ref": "#/parameters/limit-1NfNmdNH"
-        },
-        {
-          "$ref": "#/parameters/pretty-tJGM1-ng"
-        },
-        {
-          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
-        },
-        {
-          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
-        },
-        {
-          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
-        },
-        {
-          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
-        },
-        {
-          "$ref": "#/parameters/watch-XNNPZGbK"
-        }
-      ]
-    },
-    "/apis/resource.k8s.io/v1alpha2/watch/noderesourceslices/{name}": {
-      "get": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "watch changes to an object of kind NodeResourceSlice. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NodeResourceSlice",
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf",
-          "application/json;stream=watch",
-          "application/vnd.kubernetes.protobuf;stream=watch"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "resource_v1alpha2"
-        ],
-        "x-kubernetes-action": "watch",
-        "x-kubernetes-group-version-kind": {
-          "group": "resource.k8s.io",
-          "kind": "NodeResourceSlice",
-          "version": "v1alpha2"
-        }
-      },
-      "parameters": [
-        {
-          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
-        },
-        {
-          "$ref": "#/parameters/continue-QfD61s0i"
-        },
-        {
-          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
-        },
-        {
-          "$ref": "#/parameters/labelSelector-5Zw57w4C"
-        },
-        {
-          "$ref": "#/parameters/limit-1NfNmdNH"
-        },
-        {
-          "description": "name of the NodeResourceSlice",
-          "in": "path",
-          "name": "name",
-          "required": true,
-          "type": "string",
-          "uniqueItems": true
-        },
-        {
-          "$ref": "#/parameters/pretty-tJGM1-ng"
-        },
-        {
-          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
-        },
-        {
-          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
-        },
-        {
-          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
-        },
-        {
-          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
-        },
-        {
-          "$ref": "#/parameters/watch-XNNPZGbK"
-        }
-      ]
-    },
     "/apis/resource.k8s.io/v1alpha2/watch/podschedulingcontexts": {
       "get": {
         "consumes": [
@@ -75737,6 +75579,162 @@
         },
         {
           "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/resource.k8s.io/v1alpha2/watch/resourceslices": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "watch individual changes to a list of ResourceSlice. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchResourceV1alpha2ResourceSliceList",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/resource.k8s.io/v1alpha2/watch/resourceslices/{name}": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "watch changes to an object of kind ResourceSlice. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
+        "operationId": "watchResourceV1alpha2ResourceSlice",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "resource_v1alpha2"
+        ],
+        "x-kubernetes-action": "watch",
+        "x-kubernetes-group-version-kind": {
+          "group": "resource.k8s.io",
+          "kind": "ResourceSlice",
+          "version": "v1alpha2"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "description": "name of the ResourceSlice",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
         },
         {
           "$ref": "#/parameters/pretty-tJGM1-ng"

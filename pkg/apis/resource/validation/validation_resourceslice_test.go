@@ -27,8 +27,8 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func testNodeResourceSlice(name, nodeName, driverName string) *resource.NodeResourceSlice {
-	return &resource.NodeResourceSlice{
+func testResourceSlice(name, nodeName, driverName string) *resource.ResourceSlice {
+	return &resource.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -40,7 +40,7 @@ func testNodeResourceSlice(name, nodeName, driverName string) *resource.NodeReso
 	}
 }
 
-func TestValidateNodeResourceSlice(t *testing.T) {
+func TestValidateResourceSlice(t *testing.T) {
 	goodName := "foo"
 	badName := "!@#$%^"
 	driverName := "test.example.com"
@@ -48,65 +48,65 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 	badValue := "spaces not allowed"
 
 	scenarios := map[string]struct {
-		slice        *resource.NodeResourceSlice
+		slice        *resource.ResourceSlice
 		wantFailures field.ErrorList
 	}{
 		"good": {
-			slice: testNodeResourceSlice(goodName, goodName, driverName),
+			slice: testResourceSlice(goodName, goodName, driverName),
 		},
 		"missing-name": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("metadata", "name"), "name or generateName is required")},
-			slice:        testNodeResourceSlice("", goodName, driverName),
+			slice:        testResourceSlice("", goodName, driverName),
 		},
 		"bad-name": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			slice:        testNodeResourceSlice(badName, goodName, driverName),
+			slice:        testResourceSlice(badName, goodName, driverName),
 		},
 		"generate-name": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.GenerateName = "prefix-"
 				return slice
 			}(),
 		},
 		"uid": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.UID = "ac051fac-2ead-46d9-b8b4-4e0fbeb7455d"
 				return slice
 			}(),
 		},
 		"resource-version": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.ResourceVersion = "1"
 				return slice
 			}(),
 		},
 		"generation": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.Generation = 100
 				return slice
 			}(),
 		},
 		"creation-timestamp": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.CreationTimestamp = now
 				return slice
 			}(),
 		},
 		"deletion-grace-period-seconds": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.DeletionGracePeriodSeconds = ptr.To[int64](10)
 				return slice
 			}(),
 		},
 		"owner-references": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.OwnerReferences = []metav1.OwnerReference{
 					{
 						APIVersion: "v1",
@@ -119,8 +119,8 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 			}(),
 		},
 		"finalizers": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.Finalizers = []string{
 					"example.com/foo",
 				}
@@ -128,8 +128,8 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 			}(),
 		},
 		"managed-fields": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.ManagedFields = []metav1.ManagedFieldsEntry{
 					{
 						FieldsType: "FieldsV1",
@@ -142,8 +142,8 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 			}(),
 		},
 		"good-labels": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.Labels = map[string]string{
 					"apps.kubernetes.io/name": "test",
 				}
@@ -152,8 +152,8 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 		},
 		"bad-labels": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.Labels = map[string]string{
 					"hello-world": badValue,
 				}
@@ -161,8 +161,8 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 			}(),
 		},
 		"good-annotations": {
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.Annotations = map[string]string{
 					"foo": "bar",
 				}
@@ -171,8 +171,8 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 		},
 		"bad-annotations": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.Annotations = map[string]string{
 					badName: "hello world",
 				}
@@ -181,17 +181,17 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 		},
 		"bad-nodename": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("nodeName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			slice:        testNodeResourceSlice(goodName, badName, driverName),
+			slice:        testResourceSlice(goodName, badName, driverName),
 		},
 		"bad-drivername": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("driverName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			slice:        testNodeResourceSlice(goodName, goodName, badName),
+			slice:        testResourceSlice(goodName, goodName, badName),
 		},
 
 		"empty-model": {
 			wantFailures: field.ErrorList{field.Required(nil, "exactly one structured model field must be set")},
-			slice: func() *resource.NodeResourceSlice {
-				slice := testNodeResourceSlice(goodName, goodName, driverName)
+			slice: func() *resource.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName)
 				slice.NodeResourceModel = resource.NodeResourceModel{}
 				return slice
 			}(),
@@ -200,45 +200,45 @@ func TestValidateNodeResourceSlice(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateNodeResourceSlice(scenario.slice)
+			errs := ValidateResourceSlice(scenario.slice)
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}
 }
 
-func TestValidateNodeResourceSliceUpdate(t *testing.T) {
+func TestValidateResourceSliceUpdate(t *testing.T) {
 	name := "valid"
-	validNodeResourceSlice := testNodeResourceSlice(name, name, name)
+	validResourceSlice := testResourceSlice(name, name, name)
 
 	scenarios := map[string]struct {
-		oldNodeResourceSlice *resource.NodeResourceSlice
-		update               func(slice *resource.NodeResourceSlice) *resource.NodeResourceSlice
-		wantFailures         field.ErrorList
+		oldResourceSlice *resource.ResourceSlice
+		update           func(slice *resource.ResourceSlice) *resource.ResourceSlice
+		wantFailures     field.ErrorList
 	}{
 		"valid-no-op-update": {
-			oldNodeResourceSlice: validNodeResourceSlice,
-			update:               func(slice *resource.NodeResourceSlice) *resource.NodeResourceSlice { return slice },
+			oldResourceSlice: validResourceSlice,
+			update:           func(slice *resource.ResourceSlice) *resource.ResourceSlice { return slice },
 		},
 		"invalid-name-update": {
-			oldNodeResourceSlice: validNodeResourceSlice,
-			update: func(slice *resource.NodeResourceSlice) *resource.NodeResourceSlice {
+			oldResourceSlice: validResourceSlice,
+			update: func(slice *resource.ResourceSlice) *resource.ResourceSlice {
 				slice.Name += "-update"
 				return slice
 			},
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), name+"-update", "field is immutable")},
 		},
 		"invalid-update-nodename": {
-			wantFailures:         field.ErrorList{field.Invalid(field.NewPath("nodeName"), name+"-updated", "field is immutable")},
-			oldNodeResourceSlice: validNodeResourceSlice,
-			update: func(slice *resource.NodeResourceSlice) *resource.NodeResourceSlice {
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("nodeName"), name+"-updated", "field is immutable")},
+			oldResourceSlice: validResourceSlice,
+			update: func(slice *resource.ResourceSlice) *resource.ResourceSlice {
 				slice.NodeName += "-updated"
 				return slice
 			},
 		},
 		"invalid-update-drivername": {
-			wantFailures:         field.ErrorList{field.Invalid(field.NewPath("driverName"), name+"-updated", "field is immutable")},
-			oldNodeResourceSlice: validNodeResourceSlice,
-			update: func(slice *resource.NodeResourceSlice) *resource.NodeResourceSlice {
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("driverName"), name+"-updated", "field is immutable")},
+			oldResourceSlice: validResourceSlice,
+			update: func(slice *resource.ResourceSlice) *resource.ResourceSlice {
 				slice.DriverName += "-updated"
 				return slice
 			},
@@ -247,8 +247,8 @@ func TestValidateNodeResourceSliceUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			scenario.oldNodeResourceSlice.ResourceVersion = "1"
-			errs := ValidateNodeResourceSliceUpdate(scenario.update(scenario.oldNodeResourceSlice.DeepCopy()), scenario.oldNodeResourceSlice)
+			scenario.oldResourceSlice.ResourceVersion = "1"
+			errs := ValidateResourceSliceUpdate(scenario.update(scenario.oldResourceSlice.DeepCopy()), scenario.oldResourceSlice)
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}

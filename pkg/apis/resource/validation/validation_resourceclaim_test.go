@@ -387,42 +387,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				claim.Status.Allocation = &resource.AllocationResult{
 					ResourceHandles: []resource.ResourceHandle{
 						{
-							DriverName: "valid",
-							StructuredData: &resource.StructuredResourceHandle{
-								NodeName: "worker",
-							},
-						},
-					},
-				}
-				return claim
-			},
-		},
-		"invalid-add-allocation-structured": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "resourceHandles").Index(0).Child("structuredData", "nodeName"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
-				field.Required(field.NewPath("status", "allocation", "resourceHandles").Index(0).Child("structuredData", "results").Index(1), "exactly one structured model field must be set"),
-			},
-			oldClaim: validClaim,
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DriverName = "valid"
-				claim.Status.Allocation = &resource.AllocationResult{
-					ResourceHandles: []resource.ResourceHandle{
-						{
-							DriverName: "valid",
-							StructuredData: &resource.StructuredResourceHandle{
-								Results: []resource.DriverAllocationResult{
-									{
-										AllocationResultModel: resource.AllocationResultModel{
-											NamedResources: &resource.NamedResourcesAllocationResult{
-												Name: "some-resource-instance",
-											},
-										},
-									},
-									{
-										AllocationResultModel: resource.AllocationResultModel{}, // invalid
-									},
-								},
-							},
+							DriverName:     "valid",
+							StructuredData: &resource.StructuredResourceHandle{},
 						},
 					},
 				}
@@ -439,6 +405,39 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 							DriverName: "valid",
 							StructuredData: &resource.StructuredResourceHandle{
 								NodeName: "worker",
+							},
+						},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-add-allocation-structured": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "resourceHandles").Index(0).Child("structuredData", "nodeName"), "&^!", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Required(field.NewPath("status", "allocation", "resourceHandles").Index(0).Child("structuredData", "results").Index(1), "exactly one structured model field must be set"),
+			},
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.DriverName = "valid"
+				claim.Status.Allocation = &resource.AllocationResult{
+					ResourceHandles: []resource.ResourceHandle{
+						{
+							DriverName: "valid",
+							StructuredData: &resource.StructuredResourceHandle{
+								NodeName: "&^!",
+								Results: []resource.DriverAllocationResult{
+									{
+										AllocationResultModel: resource.AllocationResultModel{
+											NamedResources: &resource.NamedResourcesAllocationResult{
+												Name: "some-resource-instance",
+											},
+										},
+									},
+									{
+										AllocationResultModel: resource.AllocationResultModel{}, // invalid
+									},
+								},
 							},
 						},
 					},

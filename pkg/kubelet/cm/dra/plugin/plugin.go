@@ -102,7 +102,7 @@ type RegistrationHandler struct {
 // NewPluginHandler returns new registration handler.
 //
 // Must only be called once per process because it manages global state.
-// If a kubeClient is provided, then it synchronizes NodeResourceSlices
+// If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
 func NewRegistrationHandler(kubeClient kubernetes.Interface, nodeName string) *RegistrationHandler {
 	handler := &RegistrationHandler{}

@@ -76,27 +76,6 @@ func (NodeResourceModel) SwaggerDoc() map[string]string {
 	return map_NodeResourceModel
 }
 
-var map_NodeResourceSlice = map[string]string{
-	"":           "NodeResourceSlice provides information about available resources on individual nodes.",
-	"metadata":   "Standard object metadata",
-	"nodeName":   "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceSlice objects with a certain node name.",
-	"driverName": "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only NodeResourceSlice objects with a certain driver name.",
-}
-
-func (NodeResourceSlice) SwaggerDoc() map[string]string {
-	return map_NodeResourceSlice
-}
-
-var map_NodeResourceSliceList = map[string]string{
-	"":         "NodeResourceSliceList is a collection of NodeResourceSlices.",
-	"metadata": "Standard list metadata",
-	"items":    "Items is the list of node resource capacity objects.",
-}
-
-func (NodeResourceSliceList) SwaggerDoc() map[string]string {
-	return map_NodeResourceSliceList
-}
-
 var map_PodSchedulingContext = map[string]string{
 	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
@@ -370,11 +349,32 @@ func (ResourceRequestModel) SwaggerDoc() map[string]string {
 	return map_ResourceRequestModel
 }
 
+var map_ResourceSlice = map[string]string{
+	"":           "ResourceSlice provides information about available resources on individual nodes.",
+	"metadata":   "Standard object metadata",
+	"nodeName":   "NodeName identifies the node which provides the resources if they are local to a node.\n\nA field selector can be used to list only ResourceSlice objects with a certain node name.",
+	"driverName": "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.",
+}
+
+func (ResourceSlice) SwaggerDoc() map[string]string {
+	return map_ResourceSlice
+}
+
+var map_ResourceSliceList = map[string]string{
+	"":         "ResourceSliceList is a collection of ResourceSlices.",
+	"metadata": "Standard list metadata",
+	"items":    "Items is the list of node resource capacity objects.",
+}
+
+func (ResourceSliceList) SwaggerDoc() map[string]string {
+	return map_ResourceSliceList
+}
+
 var map_StructuredResourceHandle = map[string]string{
 	"":                      "StructuredResourceHandle is the in-tree representation of the allocation result.",
 	"vendorClassParameters": "VendorClassParameters are the per-claim configuration parameters from the resource class at the time that the claim was allocated.",
 	"vendorClaimParameters": "VendorClaimParameters are the per-claim configuration parameters from the resource claim parameters at the time that the claim was allocated.",
-	"nodeName":              "NodeName is the name of the node providing the necessary resources.",
+	"nodeName":              "NodeName is the name of the node providing the necessary resources if the resources are local to a node.",
 	"results":               "Results lists all allocated driver resources.",
 }
 

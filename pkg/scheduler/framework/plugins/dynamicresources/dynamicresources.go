@@ -277,7 +277,7 @@ type dynamicResources struct {
 	podSchedulingContextLister resourcev1alpha2listers.PodSchedulingContextLister
 	claimParametersLister      resourcev1alpha2listers.ResourceClaimParametersLister
 	classParametersLister      resourcev1alpha2listers.ResourceClassParametersLister
-	nodeResourceSliceLister    resourcev1alpha2listers.NodeResourceSliceLister
+	resourceSliceLister        resourcev1alpha2listers.ResourceSliceLister
 	claimNameLookup            *resourceclaim.Lookup
 
 	// claimAssumeCache enables temporarily storing a newer claim object
@@ -295,7 +295,7 @@ type dynamicResources struct {
 	// assigned to such a claim. Alternatively, claim allocation state
 	// could also get tracked across pod scheduling cycles, but that
 	// - adds complexity (need to carefully sync state with informer events
-	//   for claims and NodeResourceSlices)
+	//   for claims and ResourceSlices)
 	// - would make integration with cluster autoscaler harder because it would need
 	//   to trigger informer callbacks.
 	//
@@ -353,7 +353,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingContexts().Lister(),
 		claimParametersLister:      fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaimParameters().Lister(),
 		classParametersLister:      fh.SharedInformerFactory().Resource().V1alpha2().ResourceClassParameters().Lister(),
-		nodeResourceSliceLister:    fh.SharedInformerFactory().Resource().V1alpha2().NodeResourceSlices().Lister(),
+		resourceSliceLister:        fh.SharedInformerFactory().Resource().V1alpha2().ResourceSlices().Lister(),
 		claimNameLookup:            resourceclaim.NewNameLookup(fh.ClientSet()),
 		claimAssumeCache:           volumebinding.NewAssumeCache(logger, fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Informer(), "claim", "", nil),
 	}
@@ -943,7 +943,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// problems for using the plugin in the Cluster Autoscaler. If
 		// this step here turns out to be expensive, we may have to
 		// maintain and update state more persistently.
-		resources, err := newResourceModel(logger, pl.nodeResourceSliceLister, pl.claimAssumeCache)
+		resources, err := newResourceModel(logger, pl.resourceSliceLister, pl.claimAssumeCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}

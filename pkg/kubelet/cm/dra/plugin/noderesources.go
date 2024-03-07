@@ -48,7 +48,7 @@ const (
 )
 
 // nodeResourcesController collects resource information from all registered
-// plugins and synchronizes that information with NodeResourceSlice objects.
+// plugins and synchronizes that information with ResourceSlice objects.
 type nodeResourcesController struct {
 	ctx        context.Context
 	kubeClient kubernetes.Interface
@@ -79,11 +79,11 @@ type activePlugin struct {
 
 // startNodeResourcesController constructs a new controller and starts it.
 //
-// If a kubeClient is provided, then it synchronizes NodeResourceSlices
+// If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins. Without it,
 // the controller is inactive. This can happen when kubelet is run stand-alone
 // without an apiserver. In that case we can't and don't need to publish
-// NodeResourceSlices.
+// ResourceSlices.
 func startNodeResourcesController(ctx context.Context, kubeClient kubernetes.Interface, nodeName string) *nodeResourcesController {
 	if kubeClient == nil {
 		return nil
@@ -243,49 +243,49 @@ func (c *nodeResourcesController) run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 
 	// When kubelet starts, we have two choices:
-	// - Sync immediately, which in practice will delete all NodeResourceSlices
+	// - Sync immediately, which in practice will delete all ResourceSlices
 	//   because no plugin has registered yet. We could do a DeleteCollection
 	//   to speed this up.
 	// - Wait a bit, then sync. If all plugins have re-registered in the meantime,
-	//   we might not need to change any NodeResourceSlice.
+	//   we might not need to change any ResourceSlice.
 	//
 	// For now syncing starts immediately, with no DeleteCollection. This
 	// can be reconsidered later.
 
 	// While kubelet starts up, there are errors:
-	//      E0226 13:41:19.880621  126334 reflector.go:150] k8s.io/client-go@v0.0.0/tools/cache/reflector.go:232: Failed to watch *v1alpha2.NodeResourceSlice: failed to list *v1alpha2.NodeResourceSlice: noderesourceslices.resource.k8s.io is forbidden: User "system:anonymous" cannot list resource "noderesourceslices" in API group "resource.k8s.io" at the cluster scope
+	//      E0226 13:41:19.880621  126334 reflector.go:150] k8s.io/client-go@v0.0.0/tools/cache/reflector.go:232: Failed to watch *v1alpha2.ResourceSlice: failed to list *v1alpha2.ResourceSlice: resourceslices.resource.k8s.io is forbidden: User "system:anonymous" cannot list resource "resourceslices" in API group "resource.k8s.io" at the cluster scope
 	//
 	// The credentials used by kubeClient seem to get swapped out later,
 	// because eventually these list calls succeed.
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123691): can we avoid these error log entries? Perhaps wait here?
 
 	// We could use an indexer on driver name, but that seems overkill.
-	informer := resourceinformers.NewFilteredNodeResourceSliceInformer(c.kubeClient, resyncPeriod, nil, func(options *metav1.ListOptions) {
+	informer := resourceinformers.NewFilteredResourceSliceInformer(c.kubeClient, resyncPeriod, nil, func(options *metav1.ListOptions) {
 		options.FieldSelector = "nodeName=" + c.nodeName
 	})
 	c.sliceStore = informer.GetStore()
 	handler, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
-			slice, ok := obj.(*resourceapi.NodeResourceSlice)
+			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
 				return
 			}
-			logger.V(5).Info("NodeResourceSlice add", "slice", klog.KObj(slice))
+			logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
 			c.queue.Add(slice.DriverName)
 		},
 		UpdateFunc: func(old, new any) {
-			oldSlice, ok := old.(*resourceapi.NodeResourceSlice)
+			oldSlice, ok := old.(*resourceapi.ResourceSlice)
 			if !ok {
 				return
 			}
-			newSlice, ok := new.(*resourceapi.NodeResourceSlice)
+			newSlice, ok := new.(*resourceapi.ResourceSlice)
 			if !ok {
 				return
 			}
 			if loggerV := logger.V(6); loggerV.Enabled() {
-				loggerV.Info("NodeResourceSlice update", "slice", klog.KObj(newSlice), "diff", cmp.Diff(oldSlice, newSlice))
+				loggerV.Info("ResourceSlice update", "slice", klog.KObj(newSlice), "diff", cmp.Diff(oldSlice, newSlice))
 			} else {
-				logger.V(5).Info("NodeResourceSlice update", "slice", klog.KObj(newSlice))
+				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}
 			c.queue.Add(newSlice.DriverName)
 		},
@@ -293,16 +293,16 @@ func (c *nodeResourcesController) run(ctx context.Context) {
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 				obj = tombstone.Obj
 			}
-			slice, ok := obj.(*resourceapi.NodeResourceSlice)
+			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
 				return
 			}
-			logger.V(5).Info("NodeResourceSlice delete", "slice", klog.KObj(slice))
+			logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
 			c.queue.Add(slice.DriverName)
 		},
 	})
 	if err != nil {
-		logger.Error(err, "Registering event handler on the NodeResourceSlice informer failed, disabling resource monitoring")
+		logger.Error(err, "Registering event handler on the ResourceSlice informer failed, disabling resource monitoring")
 		return
 	}
 
@@ -319,7 +319,7 @@ func (c *nodeResourcesController) run(ctx context.Context) {
 			return
 		}
 	}
-	logger.Info("NodeResourceSlice informer has synced")
+	logger.Info("ResourceSlice informer has synced")
 
 	for c.processNextWorkItem(ctx) {
 	}
@@ -378,11 +378,11 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 
 	// Slices that don't match any driver resource can either be updated (if there
 	// are new driver resources that need to be stored) or they need to be deleted.
-	obsoleteSlices := make([]*resourceapi.NodeResourceSlice, 0, len(slices))
+	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
 
 	// Match slices with resource information.
 	for _, obj := range slices {
-		slice := obj.(*resourceapi.NodeResourceSlice)
+		slice := obj.(*resourceapi.ResourceSlice)
 		if slice.DriverName != driverName {
 			continue
 		}
@@ -414,7 +414,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 	// where we publish it.
 	//
 	// The long-term goal is to move the handling of
-	// NodeResourceSlice objects into the driver, with kubelet
+	// ResourceSlice objects into the driver, with kubelet
 	// just acting as a REST proxy. The advantage of that will
 	// be that kubelet won't need to support the same
 	// resource API version as the driver and the control plane.
@@ -435,14 +435,14 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 			slice = slice.DeepCopy()
 			slice.NodeResourceModel = *resource
 			logger.V(5).Info("Reusing existing node resource slice", "slice", klog.KObj(slice))
-			if _, err := c.kubeClient.ResourceV1alpha2().NodeResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
+			if _, err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("update node resource slice: %w", err)
 			}
 			continue
 		}
 
 		// Create a new slice.
-		slice := &resourceapi.NodeResourceSlice{
+		slice := &resourceapi.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: c.nodeName + "-" + driverName + "-",
 				// TODO (https://github.com/kubernetes/kubernetes/issues/123692): node object as owner
@@ -452,7 +452,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 			NodeResourceModel: *resource,
 		}
 		logger.V(5).Info("Creating new node resource slice", "slice", klog.KObj(slice))
-		if _, err := c.kubeClient.ResourceV1alpha2().NodeResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
+		if _, err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("create node resource slice: %w", err)
 		}
 	}
@@ -461,7 +461,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 	for i := 0; i < numObsoleteSlices; i++ {
 		slice := obsoleteSlices[i]
 		logger.V(5).Info("Deleting obsolete node resource slice", "slice", klog.KObj(slice))
-		if err := c.kubeClient.ResourceV1alpha2().NodeResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil {
+		if err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("delete node resource slice: %w", err)
 		}
 	}

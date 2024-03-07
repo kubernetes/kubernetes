@@ -93,9 +93,9 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
-			var slices resourcev1alpha2informers.NodeResourceSliceInformer
+			var slices resourcev1alpha2informers.ResourceSliceInformer
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				slices = config.VersionedInformerFactory.Resource().V1alpha2().NodeResourceSlices()
+				slices = config.VersionedInformerFactory.Resource().V1alpha2().ResourceSlices()
 			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package noderesourceslice
+package resourceslice
 
 import (
 	"context"
@@ -33,49 +33,49 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 )
 
-// nodeResourceSliceStrategy implements behavior for NodeResourceSlice objects
-type nodeResourceSliceStrategy struct {
+// resourceSliceStrategy implements behavior for ResourceSlice objects
+type resourceSliceStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
-var Strategy = nodeResourceSliceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = resourceSliceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-func (nodeResourceSliceStrategy) NamespaceScoped() bool {
+func (resourceSliceStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (nodeResourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
-func (nodeResourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	slice := obj.(*resource.NodeResourceSlice)
-	return validation.ValidateNodeResourceSlice(slice)
+func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	slice := obj.(*resource.ResourceSlice)
+	return validation.ValidateResourceSlice(slice)
 }
 
-func (nodeResourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+func (resourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
 
-func (nodeResourceSliceStrategy) Canonicalize(obj runtime.Object) {
+func (resourceSliceStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (nodeResourceSliceStrategy) AllowCreateOnUpdate() bool {
+func (resourceSliceStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (nodeResourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
-func (nodeResourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateNodeResourceSliceUpdate(obj.(*resource.NodeResourceSlice), old.(*resource.NodeResourceSlice))
+func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
 }
 
-func (nodeResourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+func (resourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
-func (nodeResourceSliceStrategy) AllowUnconditionalUpdate() bool {
+func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
@@ -86,10 +86,10 @@ var TriggerFunc = map[string]storage.IndexerFunc{
 }
 
 func nodeNameTriggerFunc(obj runtime.Object) string {
-	return obj.(*resource.NodeResourceSlice).NodeName
+	return obj.(*resource.ResourceSlice).NodeName
 }
 
-// Indexers returns the indexers for NodeResourceSlice.
+// Indexers returns the indexers for ResourceSlice.
 func Indexers() *cache.Indexers {
 	return &cache.Indexers{
 		storage.FieldIndex("nodeName"): nodeNameIndexFunc,
@@ -97,18 +97,18 @@ func Indexers() *cache.Indexers {
 }
 
 func nodeNameIndexFunc(obj interface{}) ([]string, error) {
-	slice, ok := obj.(*resource.NodeResourceSlice)
+	slice, ok := obj.(*resource.ResourceSlice)
 	if !ok {
-		return nil, fmt.Errorf("not a NodeResourceSlice")
+		return nil, fmt.Errorf("not a ResourceSlice")
 	}
 	return []string{slice.NodeName}, nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	slice, ok := obj.(*resource.NodeResourceSlice)
+	slice, ok := obj.(*resource.ResourceSlice)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a NodeResourceSlice")
+		return nil, nil, fmt.Errorf("not a ResourceSlice")
 	}
 	return labels.Set(slice.ObjectMeta.Labels), toSelectableFields(slice), nil
 }
@@ -125,7 +125,7 @@ func Match(label labels.Selector, field fields.Selector) storage.SelectionPredic
 
 // toSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
-func toSelectableFields(slice *resource.NodeResourceSlice) fields.Set {
+func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// The purpose of allocation with a given number of elements is to reduce
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should

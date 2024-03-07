@@ -12058,30 +12058,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
-- name: io.k8s.api.resource.v1alpha2.NodeResourceSlice
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: driverName
-      type:
-        scalar: string
-      default: ""
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: namedResources
-      type:
-        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesResources
-    - name: nodeName
-      type:
-        scalar: string
-      default: ""
 - name: io.k8s.api.resource.v1alpha2.PodSchedulingContext
   map:
     fields:
@@ -12378,13 +12354,35 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: vendorParameters
       type:
         namedType: __untyped_atomic_
+- name: io.k8s.api.resource.v1alpha2.ResourceSlice
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: driverName
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: namedResources
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesResources
+    - name: nodeName
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1alpha2.StructuredResourceHandle
   map:
     fields:
     - name: nodeName
       type:
         scalar: string
-      default: ""
     - name: results
       type:
         list:

@@ -205,7 +205,8 @@ type StructuredResourceHandle struct {
 	// allocated.
 	VendorClaimParameters runtime.Object
 
-	// NodeName is the name of the node providing the necessary resources.
+	// NodeName is the name of the node providing the necessary resources
+	// if the resources are local to a node.
 	NodeName string
 
 	// Results lists all allocated driver resources.
@@ -479,20 +480,22 @@ type ResourceClaimTemplateList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeResourceSlice provides information about available
+// ResourceSlice provides information about available
 // resources on individual nodes.
-type NodeResourceSlice struct {
+type ResourceSlice struct {
 	metav1.TypeMeta
 	// Standard object metadata
 	metav1.ObjectMeta
 
-	// NodeName identifies the node where the capacity is available.
-	// A field selector can be used to list only NodeResourceSlice
+	// NodeName identifies the node which provides the resources
+	// if they are local to a node.
+	//
+	// A field selector can be used to list only ResourceSlice
 	// objects with a certain node name.
 	NodeName string
 
 	// DriverName identifies the DRA driver providing the capacity information.
-	// A field selector can be used to list only NodeResourceSlice
+	// A field selector can be used to list only ResourceSlice
 	// objects with a certain driver name.
 	DriverName string
 
@@ -507,14 +510,14 @@ type NodeResourceModel struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeResourceSliceList is a collection of NodeResourceSlices.
-type NodeResourceSliceList struct {
+// ResourceSliceList is a collection of ResourceSlices.
+type ResourceSliceList struct {
 	metav1.TypeMeta
 	// Standard list metadata
 	metav1.ListMeta
 
 	// Items is the list of node resource capacity objects.
-	Items []NodeResourceSlice
+	Items []ResourceSlice
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

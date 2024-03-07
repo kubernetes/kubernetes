@@ -582,7 +582,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulingcontexts").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulingcontexts/status").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
-			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("noderesourceslices", "resourceclassparameters", "resourceclaimparameters").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceslices", "resourceclassparameters", "resourceclaimparameters").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{
