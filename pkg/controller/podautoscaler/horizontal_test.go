@@ -157,8 +157,6 @@ type testCase struct {
 
 	recommendations []timestampedRecommendation
 	hpaSelectors    *selectors.BiMultimap
-
-	containerResourceMetricsEnabled bool
 }
 
 // Needs to be called under a lock.
@@ -783,7 +781,6 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
-		tc.containerResourceMetricsEnabled,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -932,10 +929,9 @@ func TestScaleUpContainer(t *testing.T) {
 				Container: "container1",
 			},
 		}},
-		reportedLevels:                            []uint64{300, 500, 700},
-		reportedCPURequests:                       []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:                             true,
-		containerResourceMetricsEnabled:           true,
+		reportedLevels:      []uint64{300, 500, 700},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
 		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
@@ -945,46 +941,6 @@ func TestScaleUpContainer(t *testing.T) {
 			autoscalingv2.ContainerResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
 	}
-	tc.runTest(t)
-}
-
-func TestContainerMetricWithTheFeatureGateDisabled(t *testing.T) {
-	// In this test case, the container metrics will be ignored
-	// and only the CPUTarget will be taken into consideration.
-
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 4,
-		CPUTarget:               30,
-		verifyCPUCurrent:        true,
-		metricsTarget: []autoscalingv2.MetricSpec{{
-			Type: autoscalingv2.ContainerResourceMetricSourceType,
-			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
-				Name: v1.ResourceCPU,
-				Target: autoscalingv2.MetricTarget{
-					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: pointer.Int32(10),
-				},
-				Container: "container1",
-			},
-		}},
-		reportedLevels:      []uint64{300, 400, 500},
-		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType:          monitor.ActionLabelScaleUp,
-			autoscalingv2.ContainerResourceMetricSourceType: monitor.ActionLabelNone,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType:          monitor.ErrorLabelNone,
-			autoscalingv2.ContainerResourceMetricSourceType: monitor.ErrorLabelInternal,
-		},
-	}
-
 	tc.runTest(t)
 }
 
@@ -1666,9 +1622,8 @@ func TestScaleDownContainerResource(t *testing.T) {
 				},
 			},
 		}},
-		useMetricsAPI:                             true,
-		containerResourceMetricsEnabled:           true,
-		recommendations:                           []timestampedRecommendation{},
+		useMetricsAPI:   true,
+		recommendations: []timestampedRecommendation{},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
 		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
@@ -5310,7 +5265,6 @@ func TestMultipleHPAs(t *testing.T) {
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
-		false,
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
