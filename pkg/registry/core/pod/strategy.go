@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -92,7 +93,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
-	applyAppArmorVersionSkew(pod)
+	applyAppArmorVersionSkew(ctx, pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -763,7 +764,7 @@ func applySchedulingGatedCondition(pod *api.Pod) {
 
 // applyAppArmorVersionSkew implements the version skew behavior described in:
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/24-apparmor#version-skew-strategy
-func applyAppArmorVersionSkew(pod *api.Pod) {
+func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields) {
 		return
 	}
@@ -811,12 +812,25 @@ func applyAppArmorVersionSkew(pod *api.Pod) {
 					newField = nil
 				}
 
+				// warn if we had an annotation that we couldn't derive a valid field from
+				deprecationWarning := newField == nil
+
 				// Only copy the annotation to the field if it is different from the pod-level profile.
 				if newField != nil && !apiequality.Semantic.DeepEqual(newField, podProfile) {
 					if ctr.SecurityContext == nil {
 						ctr.SecurityContext = &api.SecurityContext{}
 					}
 					ctr.SecurityContext.AppArmorProfile = newField
+					// warn if there was an annotation without a corresponding field
+					deprecationWarning = true
+				}
+
+				if deprecationWarning {
+					// Note: annotation deprecation warning must be added here rather than the
+					// typical WarningsOnCreate path to emit the warning before syncing the
+					// annotations & fields.
+					fldPath := field.NewPath("metadata", "annotations").Key(key)
+					warning.AddWarning(ctx, "", fmt.Sprintf(`%s: deprecated since v1.30; use the "appArmorProfile" field instead`, fldPath))
 				}
 			}
 
