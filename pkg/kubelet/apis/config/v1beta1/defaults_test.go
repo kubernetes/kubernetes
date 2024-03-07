@@ -131,7 +131,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{Duration: DefaultImagePullRecheckPeriod},
+				PullImageSecretRecheckPeriod:  &metav1.Duration{},
 			},
 		},
 		{
@@ -366,7 +366,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(false),
 				LocalStorageCapacityIsolation: utilpointer.Bool(false),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{Duration: DefaultImagePullRecheckPeriod},
+				PullImageSecretRecheckPeriod:  &metav1.Duration{},
 			},
 		},
 		{
@@ -765,7 +765,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{Duration: DefaultImagePullRecheckPeriod},
+				PullImageSecretRecheckPeriod:  &metav1.Duration{},
 			},
 		},
 		{
@@ -859,7 +859,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{Duration: DefaultImagePullRecheckPeriod},
+				PullImageSecretRecheckPeriod:  &metav1.Duration{},
 			},
 		},
 		{
@@ -953,7 +953,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{Duration: DefaultImagePullRecheckPeriod},
+				PullImageSecretRecheckPeriod:  &metav1.Duration{},
 			},
 		},
 	}

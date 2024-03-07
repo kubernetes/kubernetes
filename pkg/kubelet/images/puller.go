@@ -60,7 +60,7 @@ func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontaine
 			defer func() { <-pip.tokens }()
 		}
 		startTime := time.Now()
-		imageRef, hash, err := pip.imageService.PullImage(ctx, spec, pullSecrets, podSandboxConfig)
+		imageRef, pullCredentialsHash, err := pip.imageService.PullImage(ctx, spec, pullSecrets, podSandboxConfig)
 		var size uint64
 		if err == nil && imageRef != "" {
 			// Getting the image size with best effort, ignoring the error.
@@ -71,7 +71,7 @@ func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontaine
 			imageSize:           size,
 			err:                 err,
 			pullDuration:        time.Since(startTime),
-			pullCredentialsHash: hash,
+			pullCredentialsHash: pullCredentialsHash,
 		}
 	}()
 }
@@ -111,7 +111,7 @@ func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
 		startTime := time.Now()
-		imageRef, hash, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
+		imageRef, pullCredentialsHash, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
 		var size uint64
 		if err == nil && imageRef != "" {
 			// Getting the image size with best effort, ignoring the error.
@@ -123,7 +123,7 @@ func (sip *serialImagePuller) processImagePullRequests() {
 			err:       err,
 			// Note: pullDuration includes credential resolution and getting the image size.
 			pullDuration:        time.Since(startTime),
-			pullCredentialsHash: hash,
+			pullCredentialsHash: pullCredentialsHash,
 		}
 	}
 }
