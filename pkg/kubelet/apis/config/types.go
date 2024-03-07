@@ -496,7 +496,8 @@ type KubeletConfiguration struct {
 	ImageServiceEndpoint string
 
 	// PullImageSecretRecheckPeriod defines the duration to recheck the pull image secret.
-	// By default, the kubelet will recheck the pull image secret every 24 hours(1d).
+	// By default, the kubelet will not recheck the pull image secret.
+	// For security reasons, we recommend rechecking the pull image secret, ideally every 24 hours (1d).
 	PullImageSecretRecheckPeriod metav1.Duration
 }
 
