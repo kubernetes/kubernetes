@@ -848,12 +848,19 @@ done`}
 		err = e2ejob.WaitForJobPodsRunning(ctx, f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 
+		customConditionType := batchv1.JobConditionType("CustomConditionType")
 		// /status subresource operations
 		ginkgo.By("patching /status")
 		// we need to use RFC3339 version since conversion over the wire cuts nanoseconds
 		now1 := metav1.Now().Rfc3339Copy()
 		jStatus := batchv1.JobStatus{
-			StartTime: &now1,
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:               customConditionType,
+					Status:             v1.ConditionTrue,
+					LastTransitionTime: now1,
+				},
+			},
 		}
 
 		jStatusJSON, err := json.Marshal(jStatus)
@@ -862,8 +869,12 @@ done`}
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(jStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		if !patchedStatus.Status.StartTime.Equal(&now1) {
-			framework.Failf("patched object should have the applied StartTime %#v, got %#v instead", jStatus.StartTime, patchedStatus.Status.StartTime)
+		if condition := findConditionByType(patchedStatus.Status.Conditions, customConditionType); condition != nil {
+			if !condition.LastTransitionTime.Equal(&now1) {
+				framework.Failf("patched object should have the applied condition with LastTransitionTime %#v, got %#v instead", now1, condition.LastTransitionTime)
+			}
+		} else {
+			framework.Failf("patched object does not have the required condition %v", customConditionType)
 		}
 		gomega.Expect(patchedStatus.Annotations).To(gomega.HaveKeyWithValue("patchedstatus", "true"), "patched object should have the applied annotation")
 
@@ -876,13 +887,21 @@ done`}
 			if err != nil {
 				return err
 			}
-			statusToUpdate.Status.StartTime = &now2
+			if condition := findConditionByType(patchedStatus.Status.Conditions, customConditionType); condition != nil {
+				condition.LastTransitionTime = now2
+			} else {
+				framework.Failf("patched object does not have the required condition %v", customConditionType)
+			}
 			updatedStatus, err = jClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
 			return err
 		})
 		framework.ExpectNoError(err)
-		if !updatedStatus.Status.StartTime.Equal(&now2) {
-			framework.Failf("updated object status expected to have updated StartTime %#v, got %#v", statusToUpdate.Status.StartTime, updatedStatus.Status.StartTime)
+		if condition := findConditionByType(updatedStatus.Status.Conditions, customConditionType); condition != nil {
+			if !condition.LastTransitionTime.Equal(&now2) {
+				framework.Failf("patched object should have the applied condition with LastTransitionTime %#v, got %#v instead", now2, condition.LastTransitionTime)
+			}
+		} else {
+			framework.Failf("patched object does not have the required condition %v", customConditionType)
 		}
 
 		ginkgo.By("get /status")
@@ -1118,4 +1137,13 @@ func waitForJobFailure(ctx context.Context, c clientset.Interface, ns, jobName s
 		}
 		return false, nil
 	})
+}
+
+func findConditionByType(list []batchv1.JobCondition, cType batchv1.JobConditionType) *batchv1.JobCondition {
+	for i := range list {
+		if list[i].Type == cType {
+			return &list[i]
+		}
+	}
+	return nil
 }
