@@ -27,13 +27,16 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured/namedresources/cel"
 )
 
+// These types and fields are all exported to allow logging them with
+// pretty-printed JSON.
+
 type Model struct {
-	instances []instanceAllocation
+	Instances []InstanceAllocation
 }
 
-type instanceAllocation struct {
-	allocated bool
-	instance  *resourceapi.NamedResourcesInstance
+type InstanceAllocation struct {
+	Allocated bool
+	Instance  *resourceapi.NamedResourcesInstance
 }
 
 // AddResources must be called first to create entries for all existing
@@ -44,7 +47,7 @@ func AddResources(m *Model, resources *resourceapi.NamedResourcesResources) {
 	}
 
 	for i := range resources.Instances {
-		m.instances = append(m.instances, instanceAllocation{instance: &resources.Instances[i]})
+		m.Instances = append(m.Instances, InstanceAllocation{Instance: &resources.Instances[i]})
 	}
 }
 
@@ -54,9 +57,9 @@ func AddAllocation(m *Model, result *resourceapi.NamedResourcesAllocationResult)
 	if result == nil {
 		return
 	}
-	for i := range m.instances {
-		if m.instances[i].instance.Name == result.Name {
-			m.instances[i].allocated = true
+	for i := range m.Instances {
+		if m.Instances[i].Instance.Name == result.Name {
+			m.Instances[i].Allocated = true
 			break
 		}
 	}
@@ -103,23 +106,23 @@ func (c *Controller) Allocate(ctx context.Context, model Model) ([]*resourceapi.
 	}
 	results := make([]*resourceapi.NamedResourcesAllocationResult, len(c.requests))
 	for i := range c.requests {
-		results[i] = &resourceapi.NamedResourcesAllocationResult{Name: model.instances[indices[i]].instance.Name}
+		results[i] = &resourceapi.NamedResourcesAllocationResult{Name: model.Instances[indices[i]].Instance.Name}
 	}
 	return results, nil
 }
 
 func (c *Controller) allocate(ctx context.Context, model Model) ([]int, error) {
 	// Shallow copy, we need to modify the allocated boolean.
-	instances := slices.Clone(model.instances)
+	instances := slices.Clone(model.Instances)
 	indices := make([]int, 0, len(c.requests))
 
 	for _, request := range c.requests {
 		for i, instance := range instances {
-			if instance.allocated {
+			if instance.Allocated {
 				continue
 			}
 			if c.filter != nil {
-				okay, err := c.filter.Evaluate(ctx, instance.instance.Attributes)
+				okay, err := c.filter.Evaluate(ctx, instance.Instance.Attributes)
 				if err != nil {
 					return nil, fmt.Errorf("evaluate filter CEL expression: %w", err)
 				}
@@ -127,7 +130,7 @@ func (c *Controller) allocate(ctx context.Context, model Model) ([]int, error) {
 					continue
 				}
 			}
-			okay, err := request.Evaluate(ctx, instance.instance.Attributes)
+			okay, err := request.Evaluate(ctx, instance.Instance.Attributes)
 			if err != nil {
 				return nil, fmt.Errorf("evaluate request CEL expression: %w", err)
 			}
@@ -140,7 +143,7 @@ func (c *Controller) allocate(ctx context.Context, model Model) ([]int, error) {
 			// allocating one "large" instances for a "small" request may
 			// make a following "large" request impossible to satisfy when
 			// only "small" instances are left.
-			instances[i].allocated = true
+			instances[i].Allocated = true
 			indices = append(indices, i)
 			break
 		}

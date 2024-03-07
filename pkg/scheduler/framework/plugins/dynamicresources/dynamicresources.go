@@ -283,9 +283,9 @@ type dynamicResources struct {
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
 	// update from the apiserver has not been processed by the claim
-	// informer callbacks. Claims get added here in Reserve and removed by
+	// informer callbacks. Claims get added here in PreBind and removed by
 	// the informer callback (based on the "newer than" comparison in the
-	// assume cache) or when the API call in PreBind fails.
+	// assume cache).
 	//
 	// It uses cache.MetaNamespaceKeyFunc to generate object names, which
 	// therefore are "<namespace>/<name>".
@@ -304,7 +304,7 @@ type dynamicResources struct {
 	// might have to be managed by the cluster autoscaler.
 	claimAssumeCache volumebinding.AssumeCache
 
-	// inFlightAllocations is map from claim UUIDs to true for those claims
+	// inFlightAllocations is map from claim UUIDs to claim objects for those claims
 	// for which allocation was triggered during a scheduling cycle and the
 	// corresponding claim status update call in PreBind has not been done
 	// yet. If another pod needs the claim, the pod is treated as "not
@@ -943,7 +943,11 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// problems for using the plugin in the Cluster Autoscaler. If
 		// this step here turns out to be expensive, we may have to
 		// maintain and update state more persistently.
-		resources, err := newResourceModel(logger, pl.resourceSliceLister, pl.claimAssumeCache)
+		//
+		// Claims are treated as "allocated" if they are in the assume cache
+		// or currently their allocation is in-flight.
+		resources, err := newResourceModel(logger, pl.resourceSliceLister, pl.claimAssumeCache, &pl.inFlightAllocations)
+		logger.V(5).Info("Resource usage", "resources", klog.Format(resources))
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
@@ -1382,14 +1386,11 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		}
 		state.informationsForClaim[index].allocation = allocation
 		state.informationsForClaim[index].allocationDriverName = driverName
-		pl.inFlightAllocations.Store(claim.UID, true)
 		claim = claim.DeepCopy()
 		claim.Status.DriverName = driverName
 		claim.Status.Allocation = allocation
-		if err := pl.claimAssumeCache.Assume(claim); err != nil {
-			return statusError(logger, fmt.Errorf("update claim assume cache: %v", err))
-		}
-		logger.V(5).Info("Reserved resource in allocation result", "claim", klog.KObj(claim), "driver", driverName, "allocation", allocation)
+		pl.inFlightAllocations.Store(claim.UID, claim)
+		logger.V(5).Info("Reserved resource in allocation result", "claim", klog.KObj(claim), "driver", driverName, "allocation", klog.Format(allocation))
 	}
 
 	// When there is only one pending resource, we can go ahead with
@@ -1557,7 +1558,7 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	allocationPatch := ""
 
 	allocation := state.informationsForClaim[index].allocation
-	logger.V(5).Info("preparing claim status patch", "claim", klog.KObj(state.claims[index]), "allocation", allocation)
+	logger.V(5).Info("preparing claim status patch", "claim", klog.KObj(state.claims[index]), "allocation", klog.Format(allocation))
 
 	// Do we need to store an allocation result from Reserve?
 	if allocation != nil {
@@ -1609,8 +1610,12 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	if allocationPatch != "" {
 		// The scheduler was handling allocation. Now that has
 		// completed, either successfully or with a failure.
-		if err != nil {
-			pl.claimAssumeCache.Restore(claim.Namespace + "/" + claim.Name)
+		if err == nil {
+			// This can fail, but only for reasons that are okay (concurrent delete or update).
+			// Shouldn't happen in this case.
+			if err := pl.claimAssumeCache.Assume(claim); err != nil {
+				logger.V(5).Info("Claim not stored in assume cache", "err", err)
+			}
 		}
 		pl.inFlightAllocations.Delete(claim.UID)
 	}

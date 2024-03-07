@@ -19,6 +19,7 @@ package dynamicresources
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -32,19 +33,19 @@ import (
 
 // resources is a map "node name" -> "driver name" -> available and
 // allocated resources per structured parameter model.
-type resources map[string]map[string]resourceModels
+type resources map[string]map[string]ResourceModels
 
-// resourceModels may have more than one entry because it is valid for a driver to
+// ResourceModels may have more than one entry because it is valid for a driver to
 // use more than one structured parameter model.
-type resourceModels struct {
-	namedresources namedresourcesmodel.Model
+type ResourceModels struct {
+	NamedResources namedresourcesmodel.Model
 }
 
 // newResourceModel parses the available information about resources. Objects
 // with an unknown structured parameter model silently ignored. An error gets
 // logged later when parameters required for a pod depend on such an unknown
 // model.
-func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2listers.ResourceSliceLister, claimAssumeCache volumebinding.AssumeCache) (resources, error) {
+func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2listers.ResourceSliceLister, claimAssumeCache volumebinding.AssumeCache, inFlightAllocations *sync.Map) (resources, error) {
 	model := make(resources)
 
 	slices, err := resourceSliceLister.List(labels.Everything())
@@ -53,10 +54,10 @@ func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2li
 	}
 	for _, slice := range slices {
 		if model[slice.NodeName] == nil {
-			model[slice.NodeName] = make(map[string]resourceModels)
+			model[slice.NodeName] = make(map[string]ResourceModels)
 		}
 		resource := model[slice.NodeName][slice.DriverName]
-		namedresourcesmodel.AddResources(&resource.namedresources, slice.NamedResources)
+		namedresourcesmodel.AddResources(&resource.NamedResources, slice.NamedResources)
 		model[slice.NodeName][slice.DriverName] = resource
 	}
 
@@ -65,6 +66,11 @@ func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2li
 		claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
 		if !ok {
 			return nil, fmt.Errorf("got unexpected object of type %T from claim assume cache", obj)
+		}
+		if obj, ok := inFlightAllocations.Load(claim.UID); ok {
+			// If the allocation is in-flight, then we have to use the allocation
+			// from that claim.
+			claim = obj.(*resourcev1alpha2.ResourceClaim)
 		}
 		if claim.Status.Allocation == nil {
 			continue
@@ -75,12 +81,12 @@ func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2li
 				continue
 			}
 			if model[structured.NodeName] == nil {
-				model[structured.NodeName] = make(map[string]resourceModels)
+				model[structured.NodeName] = make(map[string]ResourceModels)
 			}
 			resource := model[structured.NodeName][handle.DriverName]
 			for _, result := range structured.Results {
 				// Call AddAllocation for each known model. Each call itself needs to check for nil.
-				namedresourcesmodel.AddAllocation(&resource.namedresources, result.NamedResources)
+				namedresourcesmodel.AddAllocation(&resource.NamedResources, result.NamedResources)
 			}
 		}
 	}
@@ -159,7 +165,7 @@ type perDriverController struct {
 func (c claimController) nodeIsSuitable(ctx context.Context, nodeName string, resources resources) (bool, error) {
 	nodeResources := resources[nodeName]
 	for driverName, perDriver := range c.namedresources {
-		okay, err := perDriver.controller.NodeIsSuitable(ctx, nodeResources[driverName].namedresources)
+		okay, err := perDriver.controller.NodeIsSuitable(ctx, nodeResources[driverName].NamedResources)
 		if err != nil {
 			// This is an error in the CEL expression which needs
 			// to be fixed. Better fail very visibly instead of
@@ -191,7 +197,7 @@ func (c claimController) allocate(ctx context.Context, nodeName string, resource
 	for driverName, perDriver := range c.namedresources {
 		// Must return one entry for each request. The entry may be nil. This way,
 		// the result can be correlated with the per-request parameters.
-		results, err := perDriver.controller.Allocate(ctx, nodeResources[driverName].namedresources)
+		results, err := perDriver.controller.Allocate(ctx, nodeResources[driverName].NamedResources)
 		if err != nil {
 			return "", nil, fmt.Errorf("allocating via named resources structured model: %w", err)
 		}
