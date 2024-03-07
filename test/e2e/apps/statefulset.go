@@ -1698,8 +1698,7 @@ var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", feature.MaxUn
 			ssPodLabels := map[string]string{
 				"name": "sample-pod",
 			}
-			replicas := int32(3)
-			maxUnavailable := ptr.To(intstr.FromInt32(2))
+			replicas := int32(2)
 
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, replicas, nil, nil, ssPodLabels)
 			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
@@ -1713,8 +1712,10 @@ var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", feature.MaxUn
 			newImage := NewWebserverImage
 
 			// update the stateful set with desired settings
+            minReadySeconds := int32(20)
+			maxUnavailable := ptr.To(intstr.FromInt32(1))
 			ss, _ = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
-				update.Spec.MinReadySeconds = 300
+				update.Spec.MinReadySeconds = minReadySeconds
 				update.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 				update.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{
 					MaxUnavailable: maxUnavailable,
@@ -1729,16 +1730,30 @@ var _ = SIGDescribe("Rolling update strategy with MaxUnavailable", feature.MaxUn
 			})
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
 
-			// the image in all pods should be the old one after 10 seconds because the minReadySeconds should be in process of being honored
+			// check the image in all pods immediately after update
+            // it should still be the old one while minReadySeconds is being honored
 			ss.Spec.Selector = selector // restore the selector
-			time.Sleep(10 * time.Second)
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
 			for i := range pods.Items {
-				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage), "Pod %s/%s has image %s, not the old image %s",
+				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(oldImage), "Pod %s/%s has image %s, not the old image %s. MinReadySeconds was not honored.",
 					pods.Items[i].Namespace,
 					pods.Items[i].Name,
 					pods.Items[i].Spec.Containers[0].Image,
 					oldImage)
+			}
+
+            // sleep to allow minReadySeconds to occur
+            sleep := time.Duration(replicas * minReadySeconds * 2) * time.Second
+		    time.Sleep(sleep)
+            // then assert the pods have successfully updated to a new version
+			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, replicas)
+			pods = e2estatefulset.GetPodList(ctx, c, ss)
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage), "Pod %s/%s has image %s, not the new image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					newImage)
 			}
 		})
 
