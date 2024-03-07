@@ -6,7 +6,7 @@
 
 ----
 
-Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
+Kubernetes, also known as K8s, is an open-source system for managing [containerized applications]
 across multiple hosts. It provides basic mechanisms for the deployment, maintenance,
 and scaling of applications.
 
@@ -93,7 +93,7 @@ Kubernetes project is governed by a framework of principles, values, policies an
 
 The [Kubernetes Community](https://github.com/kubernetes/community/blob/master/governance.md) is the launching point for learning about how we organize ourselves.
 
-The [Kubernetes Steering community repo](https://github.com/kubernetes/steering) is used by the Kubernetes Steering Committee, which oversees governance of the Kubernetes project.
+The [Kubernetes Steering community repo](https://github.com/kubernetes/steering) is used by the Kubernetes Steering Committee, which oversees the governance of the Kubernetes project.
 
 ## Roadmap 
 
