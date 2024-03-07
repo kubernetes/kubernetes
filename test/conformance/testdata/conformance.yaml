@@ -778,6 +778,32 @@
     code of 406.
   release: v1.16
   file: test/e2e/apimachinery/table_conversion.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should allow expressions to refer variables. [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should allow expressions to refer variables.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should type check a CRD [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should type check a CRD.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should type check validation expressions [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should type check the expressions defined
+    inside policy.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should validate against a Deployment [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should validate a deployment as the
+    expression defined inside the policy.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
 - testname: watch-configmaps-closed-and-restarted
   codename: '[sig-api-machinery] Watchers should be able to restart watching from
     the last resource version observed by the previous watch [Conformance]'

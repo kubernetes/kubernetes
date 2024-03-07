@@ -32,14 +32,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/features"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/openapi3"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", framework.WithFeatureGate(features.ValidatingAdmissionPolicy), func() {
+var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("validating-admission-policy")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -62,7 +61,13 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", frame
 		labelNamespace(ctx, f, f.Namespace.Name)
 	})
 
-	ginkgo.It("should validate against a Deployment", func(ctx context.Context) {
+	/*
+	   Release: v1.30
+	   Testname: ValidatingAdmissionPolicy
+	   Description:
+	   The ValidatingAdmissionPolicy should validate a deployment as the expression defined inside the policy.
+	*/
+	framework.ConformanceIt("should validate against a Deployment", func(ctx context.Context) {
 		ginkgo.By("creating the policy", func() {
 			policy := newValidatingAdmissionPolicyBuilder(f.UniqueName+".policy.example.com").
 				MatchUniqueNamespace(f.UniqueName).
@@ -119,7 +124,13 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", frame
 		})
 	})
 
-	ginkgo.It("should type check validation expressions", func(ctx context.Context) {
+	/*
+	   Release: v1.30
+	   Testname: ValidatingAdmissionPolicy
+	   Description:
+	   The ValidatingAdmissionPolicy should type check the expressions defined inside policy.
+	*/
+	framework.ConformanceIt("should type check validation expressions", func(ctx context.Context) {
 		var policy *admissionregistrationv1.ValidatingAdmissionPolicy
 		ginkgo.By("creating the policy with correct types", func() {
 			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".correct-policy.example.com").
@@ -194,7 +205,13 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", frame
 		})
 	})
 
-	ginkgo.It("should allow expressions to refer variables.", func(ctx context.Context) {
+	/*
+	   Release: v1.30
+	   Testname: ValidatingAdmissionPolicy
+	   Description:
+	   The ValidatingAdmissionPolicy should allow expressions to refer variables.
+	*/
+	framework.ConformanceIt("should allow expressions to refer variables.", func(ctx context.Context) {
 		ginkgo.By("creating a policy with variables", func() {
 			policy := newValidatingAdmissionPolicyBuilder(f.UniqueName+".policy.example.com").
 				MatchUniqueNamespace(f.UniqueName).
@@ -257,7 +274,13 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", frame
 		})
 	})
 
-	ginkgo.It("should type check a CRD", func(ctx context.Context) {
+	/*
+	   Release: v1.30
+	   Testname: ValidatingAdmissionPolicy
+	   Description:
+	   The ValidatingAdmissionPolicy should type check a CRD.
+	*/
+	framework.ConformanceIt("should type check a CRD", func(ctx context.Context) {
 		crd := crontabExampleCRD()
 		crd.Spec.Group = "stable." + f.UniqueName
 		crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
