@@ -524,11 +524,6 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("active"), status.Active, "active>0 is invalid for finished job"))
 		}
 	}
-	if opts.RejectFinishedJobWithTerminatingPods {
-		if status.Terminating != nil && *status.Terminating > 0 && isJobFinished {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("terminating"), status.Terminating, "terminating>0 is invalid for finished job"))
-		}
-	}
 	if opts.RejectFinishedJobWithoutStartTime {
 		if status.StartTime == nil && isJobFinished {
 			allErrs = append(allErrs, field.Required(fldPath.Child("startTime"), "startTime is required for finished job"))
@@ -564,11 +559,6 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 		// regular (non-indexed) jobs, because regular jobs have backoffLimitPerIndex = nil.
 		if job.Spec.BackoffLimitPerIndex == nil && status.FailedIndexes != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("failedIndexes"), *status.FailedIndexes, "cannot set non-null failedIndexes when backoffLimitPerIndex is null"))
-		}
-	}
-	if opts.RejectMoreReadyThanActivePods {
-		if status.Ready != nil && *status.Ready > status.Active {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ready"), *status.Ready, "cannot set more ready pods than active"))
 		}
 	}
 	if opts.RejectFailedIndexesOverlappingCompleted {
@@ -1023,9 +1013,7 @@ type JobStatusValidationOptions struct {
 	RejectFailedIndexesOverlappingCompleted      bool
 	RejectCompletedIndexesForNonIndexedJob       bool
 	RejectFailedIndexesForNoBackoffLimitPerIndex bool
-	RejectMoreReadyThanActivePods                bool
 	RejectFinishedJobWithActivePods              bool
-	RejectFinishedJobWithTerminatingPods         bool
 	RejectFinishedJobWithoutStartTime            bool
 	RejectFinishedJobWithUncountedTerminatedPods bool
 	RejectStartTimeUpdateForUnsuspendedJob       bool
