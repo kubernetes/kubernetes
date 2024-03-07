@@ -187,7 +187,12 @@ func mustBuildEnv() *environment.EnvSet {
 	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	versioned := []environment.VersionedOptions{
 		{
-			IntroducedVersion: version.MajorMinor(1, 30),
+			// Feature epoch was actually 1.30, but we artificially set it to 1.0 because these
+			// options should always be present.
+			//
+			// TODO (https://github.com/kubernetes/kubernetes/issues/123687): set this
+			// version properly before going to beta.
+			IntroducedVersion: version.MajorMinor(1, 0),
 			EnvOptions: append(buildVersionedAttributes(),
 				SemverLib(),
 			),

@@ -149,16 +149,10 @@ func validateSelector(opts Options, selector string, fldPath *field.Path) field.
 	if selector == "" {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else {
-		// TODO (https://github.com/kubernetes/kubernetes/issues/123687):
-		// when this API gets promoted to beta, we have to
-		// validate new and stored expressions differently.
-		// While it is alpha, new expressions are allowed to
-		// use everything that is currently available.
-		// envType := environment.NewExpressions
-		// if opts.StoredExpressions {
-		//    envType = environment.StoredExpressions
-		// }
-		envType := environment.StoredExpressions
+		envType := environment.NewExpressions
+		if opts.StoredExpressions {
+			envType = environment.StoredExpressions
+		}
 		result := namedresourcescel.Compiler.CompileCELExpression(selector, envType)
 		if result.Error != nil {
 			allErrs = append(allErrs, convertCELErrorToValidationError(fldPath, selector, result.Error))
