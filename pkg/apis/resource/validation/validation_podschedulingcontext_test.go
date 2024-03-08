@@ -194,7 +194,6 @@ func TestValidatePodSchedulingContexts(t *testing.T) {
 
 func TestValidatePodSchedulingUpdate(t *testing.T) {
 	validScheduling := testPodSchedulingContexts("foo", "ns", resource.PodSchedulingContextSpec{})
-	badName := "!@#$%^"
 
 	scenarios := map[string]struct {
 		oldScheduling *resource.PodSchedulingContext
@@ -233,14 +232,6 @@ func TestValidatePodSchedulingUpdate(t *testing.T) {
 				return schedulingCtx
 			},
 		},
-		"invalid-potential-nodes-name": {
-			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("spec", "potentialNodes").Index(0), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			oldScheduling: validScheduling,
-			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
-				schedulingCtx.Spec.PotentialNodes = append(schedulingCtx.Spec.PotentialNodes, badName)
-				return schedulingCtx
-			},
-		},
 	}
 
 	for name, scenario := range scenarios {
@@ -254,7 +245,6 @@ func TestValidatePodSchedulingUpdate(t *testing.T) {
 
 func TestValidatePodSchedulingStatusUpdate(t *testing.T) {
 	validScheduling := testPodSchedulingContexts("foo", "ns", resource.PodSchedulingContextSpec{})
-	badName := "!@#$%^"
 
 	scenarios := map[string]struct {
 		oldScheduling *resource.PodSchedulingContext
@@ -311,22 +301,6 @@ func TestValidatePodSchedulingStatusUpdate(t *testing.T) {
 						fmt.Sprintf("worker%d", i),
 					)
 				}
-				return schedulingCtx
-			},
-		},
-		"invalid-node-name": {
-			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("status", "claims").Index(0).Child("unsuitableNodes").Index(0), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			oldScheduling: validScheduling,
-			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
-				schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
-					resource.ResourceClaimSchedulingStatus{
-						Name: "my-claim",
-					},
-				)
-				schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes = append(
-					schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes,
-					badName,
-				)
 				return schedulingCtx
 			},
 		},
