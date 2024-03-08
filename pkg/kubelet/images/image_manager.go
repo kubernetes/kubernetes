@@ -183,7 +183,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 
 	present := imageRef != ""
 	var pulledBySecret, ensuredBySecret bool
-	if present && utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+	if present && utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && m.pullImageSecretRecheckPeriod.Duration > 0 {
 		pulledBySecret, ensuredBySecret, err = m.isEnsuredBySecret(imageRef, spec, pullSecrets)
 		if err != nil {
 			return "", "Error get ensured check by secret", err
@@ -235,25 +235,18 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && m.pullImageSecretRecheckPeriod.Duration > 0 {
 		func() {
 			m.lock.Lock()
 			defer m.lock.Unlock()
-			if imagePullResult.pullCredentialsHash == "" {
-				// successful pull no auth hash returned, auth was not required so we should reset the hashmap for this
-				// imageref since auth is no longer required for the local image cache, allowing use of the ImageRef
-				// by other pods if it remains cached and pull policy is PullIfNotPresent
-				delete(m.ensureSecretPulledImages, imageRef)
-			} else {
-				// store/create hashMatch map entry for auth config hash key used to pull the image
-				// for this imageref (digest)
-				digest := m.ensureSecretPulledImages[imageRef]
-				if digest == nil {
-					digest = &imagePullInfo{Auths: make(map[string]*ensuredInfo)}
-					m.ensureSecretPulledImages[imageRef] = digest
-				}
-				digest.Auths[imagePullResult.pullCredentialsHash] = &ensuredInfo{true, time.Now()}
+			// store/create hashMatch map entry for auth config hash key used to pull the image
+			// for this imageref (digest)
+			digest := m.ensureSecretPulledImages[imageRef]
+			if digest == nil {
+				digest = &imagePullInfo{Auths: make(map[string]*ensuredInfo)}
+				m.ensureSecretPulledImages[imageRef] = digest
 			}
+			digest.Auths[imagePullResult.pullCredentialsHash] = &ensuredInfo{true, time.Now()}
 		}()
 	}
 
@@ -349,7 +342,7 @@ func (m *imageManager) isEnsuredBySecret(imageRef string, image kubecontainer.Im
 		return pulledBySecret, true, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && m.pullImageSecretRecheckPeriod.Duration > 0 {
 		for _, currentCreds := range creds {
 			auth := &runtimeapi.AuthConfig{
 				Username:      currentCreds.Username,
