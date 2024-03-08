@@ -60242,6 +60242,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"warningInvalidKernelDefaults": {
+						SchemaProps: spec.SchemaProps{
+							Description: "warningInvalidKernelDefaults, if protectKernelDefaults is set to true, this flag will be ignored. It only takes effects if protectKernelDefaults is false or not set. If true, kubelet will not override sysctls and only logs warning for those sysctls. Please note that there is a risk to run with unexpected kernel defaults. Mostly, it should only be enabled for test/triage environments. Default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"makeIPTablesUtilChains": {
 						SchemaProps: spec.SchemaProps{
 							Description: "makeIPTablesUtilChains, if true, causes the Kubelet to create the KUBE-IPTABLES-HINT chain in iptables as a hint to other components about the configuration of iptables on the system. Default: true",
