@@ -1334,3 +1334,126 @@ func jsonPtr(x interface{}) *apiextensionsv1.JSON {
 	ret := apiextensionsv1.JSON{Raw: bs}
 	return &ret
 }
+
+func TestWebhookConverterMisconfiguration(t *testing.T) {
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	validUrl := "https://localhost"
+	nonExistantServiceNs := "default"
+	nonExistantServiceName := "no-such-service"
+	validPath := "/mypath"
+	var validPort int32 = 8080
+	var invalidPort int32 = -1
+	insecureUrl := "http://localhost"
+	tests := []struct {
+		name                       string
+		config                     *apiextensionsv1.WebhookClientConfig
+		expectCRDValidationFailure string
+	}{
+		{
+			name: "invalid CABundle",
+			config: &apiextensionsv1.WebhookClientConfig{
+				CABundle: []byte("Cg=="),
+				URL:      &validUrl,
+			},
+			// Expect the CRD to successfully be created and for requests for resources that
+			// can be served by the storage version to succeed.
+		},
+		{
+			name: "non-existant service name",
+			config: &apiextensionsv1.WebhookClientConfig{
+				CABundle: localhostCert,
+				Service: &apiextensionsv1.ServiceReference{
+					Namespace: nonExistantServiceNs,
+					Name:      nonExistantServiceName,
+					Path:      &validPath,
+					Port:      &validPort,
+				},
+			},
+			// Expect the CRD to successfully be created and for requests for resources that
+			// can be served by the storage version to succeed.
+		},
+		// Sanity check validation
+		{
+			name: "invalid port",
+			config: &apiextensionsv1.WebhookClientConfig{
+				CABundle: localhostCert,
+				Service: &apiextensionsv1.ServiceReference{
+					Namespace: nonExistantServiceNs,
+					Name:      nonExistantServiceName,
+					Path:      &validPath,
+					Port:      &invalidPort,
+				},
+			},
+			expectCRDValidationFailure: "Invalid value: -1: port is not valid: must be between 1 and 65535, inclusive",
+		},
+		{
+			name: "insecure URL",
+			config: &apiextensionsv1.WebhookClientConfig{
+				CABundle: localhostCert,
+				URL:      &insecureUrl,
+			},
+			expectCRDValidationFailure: "Invalid value: \"http\": 'https' is the only allowed URL scheme",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+
+			// Create a CRD with an invalid CABundle
+			crd := fixtures.NewRandomNameMultipleVersionCustomResourceDefinition(apiextensionsv1.ClusterScoped)
+			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+				Strategy: apiextensionsv1.WebhookConverter,
+				Webhook: &apiextensionsv1.WebhookConversion{
+					ClientConfig:             tc.config,
+					ConversionReviewVersions: []string{"v1"},
+				},
+			}
+
+			storageVersion := "v1beta1"
+			for i, v := range crd.Spec.Versions {
+				crd.Spec.Versions[i].Storage = v.Name == storageVersion
+			}
+			_, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+			if len(tc.expectCRDValidationFailure) > 0 {
+				if err == nil {
+					t.Fatalf("Expected CRD validation error but got none")
+				}
+				if !strings.Contains(err.Error(), tc.expectCRDValidationFailure) {
+					t.Fatalf("expected error to contain '%s' but got: %s", tc.expectCRDValidationFailure, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Verify that reads and writes are supported at the storage version
+			gvk := schema.GroupVersionKind{Group: crd.Spec.Group, Version: storageVersion, Kind: crd.Spec.Names.Kind}
+			gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: storageVersion, Resource: crd.Spec.Names.Plural}
+			client := dynamicClient.Resource(gvr)
+
+			u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			u.SetGroupVersionKind(gvk)
+			u.SetName("test")
+			err = unstructured.SetNestedField(u.Object, int64(1), "spec", "num")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.Create(context.TODO(), u, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.Get(context.TODO(), u.GetName(), metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

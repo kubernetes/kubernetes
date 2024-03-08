@@ -336,9 +336,15 @@ func (c *Cacher) RequestWatchProgress(ctx context.Context) error {
 func NewCacherFromConfig(config Config) (*Cacher, error) {
 	stopCh := make(chan struct{})
 	obj := config.NewFunc()
+
+	var internalType runtime.Object
+	v := obj.GetObjectKind().GroupVersionKind().Version
+	if len(v) == 0 { // Don't treat the preferred version of CRDs as an internal type.
+		internalType = obj
+	}
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
-	if err := runtime.CheckCodec(config.Codec, obj); err != nil {
+	if err := runtime.CheckCodec(config.Codec, internalType); err != nil {
 		return nil, fmt.Errorf("storage codec doesn't seem to match given type: %v", err)
 	}
 

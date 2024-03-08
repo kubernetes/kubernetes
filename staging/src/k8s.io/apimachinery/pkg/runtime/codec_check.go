@@ -27,11 +27,15 @@ import (
 // CheckCodec makes sure that the codec can encode objects like internalType,
 // decode all of the external types listed, and also decode them into the given
 // object. (Will modify internalObject.) (Assumes JSON serialization.)
+// internalType may be nil for CRDs, which have no internal type.
 // TODO: verify that the correct external version is chosen on encode...
 func CheckCodec(c Codec, internalType Object, externalTypes ...schema.GroupVersionKind) error {
-	if _, err := Encode(c, internalType); err != nil {
-		return fmt.Errorf("internal type not encodable: %v", err)
+	if internalType != nil {
+		if _, err := Encode(c, internalType); err != nil {
+			return fmt.Errorf("internal type not encodable: %v", err)
+		}
 	}
+
 	for _, et := range externalTypes {
 		typeMeta := TypeMeta{
 			Kind:       et.Kind,

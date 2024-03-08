@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -30,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	typedscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/transport"
 )
 
 // CRConverterFactory is the factory for all CR converters.
@@ -54,6 +56,8 @@ func NewCRConverterFactory(serviceResolver webhook.ServiceResolver, authResolver
 	return converterFactory, nil
 }
 
+var caParseErr = &transport.CAParseError{}
+
 // NewConverter returns a new CR converter based on the conversion settings in crd object.
 func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDefinition) (safe, unsafe runtime.ObjectConvertor, err error) {
 	validVersions := map[schema.GroupVersion]bool{}
@@ -67,12 +71,15 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDef
 		converter = &nopConverter{}
 	case apiextensionsv1.WebhookConverter:
 		converter, err = m.webhookConverterFactory.NewWebhookConverter(crd)
-		if err != nil {
+		if errors.As(err, caParseErr) {
+			converter = misconfiguredConverter{err} // don't wrap this with latency metrics
+		} else if err != nil {
 			return nil, nil, err
-		}
-		converter, err = converterMetricFactorySingleton.addMetrics(crd.Name, converter)
-		if err != nil {
-			return nil, nil, err
+		} else {
+			converter, err = converterMetricFactorySingleton.addMetrics(crd.Name, converter)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	default:
 		return nil, nil, fmt.Errorf("unknown conversion strategy %q for CRD %s", crd.Spec.Conversion.Strategy, crd.Name)
@@ -237,4 +244,20 @@ func (c *safeConverterWrapper) Convert(in, out, context interface{}) error {
 // ConvertToVersion makes a copy of in object and then delegate the call to the unsafe converter.
 func (c *safeConverterWrapper) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
 	return c.unsafe.ConvertToVersion(in.DeepCopyObject(), target)
+}
+
+// misconfiguredConverter represents a misconfigured conversion webhook.
+type misconfiguredConverter struct {
+	configurationError error
+}
+
+func (c misconfiguredConverter) Convert(in runtime.Object, targetGVK schema.GroupVersion) (runtime.Object, error) {
+	fromGVK := in.GetObjectKind().GroupVersionKind()
+	fromVersion := in.GetObjectKind().GroupVersionKind().Version
+	toVersion := targetGVK.Version
+
+	if fromVersion == toVersion {
+		return in, nil
+	}
+	return nil, fmt.Errorf("unable to convert from %v to %v due to CRD WebhookConverter configuration error: %v", fromGVK, targetGVK, c.configurationError)
 }

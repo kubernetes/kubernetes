@@ -265,6 +265,15 @@ func rootCertPool(caData []byte) (*x509.CertPool, error) {
 	return certPool, nil
 }
 
+// CAParseError identifies an error parsing certificate authority data.
+type CAParseError struct {
+	err error
+}
+
+func (e CAParseError) Error() string {
+	return e.err.Error()
+}
+
 // createErrorParsingCAData ALWAYS returns an error.  We call it because know we failed to AppendCertsFromPEM
 // but we don't know the specific error because that API is just true/false
 func createErrorParsingCAData(pemCerts []byte) error {
@@ -272,7 +281,7 @@ func createErrorParsingCAData(pemCerts []byte) error {
 		var block *pem.Block
 		block, pemCerts = pem.Decode(pemCerts)
 		if block == nil {
-			return fmt.Errorf("unable to parse bytes as PEM block")
+			return CAParseError{fmt.Errorf("unable to parse bytes as PEM block")}
 		}
 
 		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
@@ -280,10 +289,10 @@ func createErrorParsingCAData(pemCerts []byte) error {
 		}
 
 		if _, err := x509.ParseCertificate(block.Bytes); err != nil {
-			return fmt.Errorf("failed to parse certificate: %w", err)
+			return CAParseError{fmt.Errorf("failed to parse certificate: %w", err)}
 		}
 	}
-	return fmt.Errorf("no valid certificate authority data seen")
+	return CAParseError{fmt.Errorf("no valid certificate authority data seen")}
 }
 
 // WrapperFunc wraps an http.RoundTripper when a new transport
