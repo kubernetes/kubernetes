@@ -147,14 +147,12 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework, setupResour
 
 	var err error
 	var ds *appsv1.DaemonSet
-	dsNamespace := f.Namespace.Name
 	dsYamlURLFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
 	if dsYamlURLFromEnv != "" {
 		// Using DaemonSet from remote URL
 		framework.Logf("Using remote nvidia-driver-installer daemonset manifest from %v", dsYamlURLFromEnv)
 		ds, err = e2emanifest.DaemonSetFromURL(ctx, dsYamlURLFromEnv)
 		framework.ExpectNoError(err, "failed get remote")
-		dsNamespace = ds.Namespace
 	} else {
 		// Using default local DaemonSet
 		framework.Logf("Using default local nvidia-driver-installer daemonset manifest.")
@@ -164,11 +162,13 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework, setupResour
 		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
 	}
 	gpuResourceName = e2egpu.NVIDIAGPUResourceName
-	_, err = f.ClientSet.AppsV1().DaemonSets(dsNamespace).Create(ctx, ds, metav1.CreateOptions{})
+	ds.Namespace = f.Namespace.Name
+
+	_, err = f.ClientSet.AppsV1().DaemonSets(ds.Namespace).Create(ctx, ds, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 
-	pods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, dsNamespace, ds.Name, extensionsinternal.Kind("DaemonSet"))
+	pods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, ds.Namespace, ds.Name, extensionsinternal.Kind("DaemonSet"))
 	framework.ExpectNoError(err, "failed to get pods controlled by the nvidia-driver-installer daemonset")
 
 	devicepluginPods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, "kube-system", "nvidia-gpu-device-plugin", extensionsinternal.Kind("DaemonSet"))
