@@ -23,6 +23,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	tracing "k8s.io/component-base/tracing"
 )
@@ -31,7 +32,7 @@ import (
 func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 	opts := []otelhttp.Option{
 		otelhttp.WithPropagators(tracing.Propagators()),
-		otelhttp.WithPublicEndpointFn(reqHasAnonymousUser),
+		otelhttp.WithPublicEndpointFn(notSystemPrivilegedGroup),
 		otelhttp.WithTracerProvider(tp),
 	}
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -47,10 +48,13 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 	return otelhttp.NewHandler(wrappedHandler, "KubernetesAPI", opts...)
 }
 
-func reqHasAnonymousUser(req *http.Request) bool {
-	user, ok := genericapirequest.UserFrom(req.Context())
-	if !ok {
-		return true
+func notSystemPrivilegedGroup(req *http.Request) bool {
+	if u, ok := genericapirequest.UserFrom(req.Context()); ok {
+		for _, group := range u.GetGroups() {
+			if group == user.SystemPrivilegedGroup {
+				return false
+			}
+		}
 	}
-	return isAnonymousUser(user)
+	return true
 }
