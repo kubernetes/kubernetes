@@ -312,8 +312,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 
 	availableController, err := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().V1().APIServices(),
-		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
-		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.ApiregistrationV1(),
 		proxyTransportDial,
 		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),

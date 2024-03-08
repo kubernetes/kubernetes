@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -34,8 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	v1informers "k8s.io/client-go/informers/core/v1"
-	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
@@ -66,13 +65,6 @@ type AvailableConditionController struct {
 	apiServiceLister listers.APIServiceLister
 	apiServiceSynced cache.InformerSynced
 
-	// serviceLister is used to get the IP to create the transport for
-	serviceLister  v1listers.ServiceLister
-	servicesSynced cache.InformerSynced
-
-	endpointsLister v1listers.EndpointsLister
-	endpointsSynced cache.InformerSynced
-
 	// proxyTransportDial specifies the dial function for creating unencrypted TCP connections.
 	proxyTransportDial         *transport.DialHolder
 	proxyCurrentCertKeyContent certKeyFunc
@@ -94,8 +86,6 @@ type AvailableConditionController struct {
 // NewAvailableConditionController returns a new AvailableConditionController.
 func NewAvailableConditionController(
 	apiServiceInformer informers.APIServiceInformer,
-	serviceInformer v1informers.ServiceInformer,
-	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
 	proxyTransportDial *transport.DialHolder,
 	proxyCurrentCertKeyContent certKeyFunc,
@@ -104,8 +94,6 @@ func NewAvailableConditionController(
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
 		apiServiceLister: apiServiceInformer.Lister(),
-		serviceLister:    serviceInformer.Lister(),
-		endpointsLister:  endpointsInformer.Lister(),
 		serviceResolver:  serviceResolver,
 		queue: workqueue.NewNamedRateLimitingQueue(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
@@ -130,20 +118,6 @@ func NewAvailableConditionController(
 		},
 		30*time.Second)
 	c.apiServiceSynced = apiServiceHandler.HasSynced
-
-	serviceHandler, _ := serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addService,
-		UpdateFunc: c.updateService,
-		DeleteFunc: c.deleteService,
-	})
-	c.servicesSynced = serviceHandler.HasSynced
-
-	endpointsHandler, _ := endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addEndpoints,
-		UpdateFunc: c.updateEndpoints,
-		DeleteFunc: c.deleteEndpoints,
-	})
-	c.endpointsSynced = endpointsHandler.HasSynced
 
 	c.syncFn = c.sync
 
@@ -213,7 +187,16 @@ func (c *AvailableConditionController) sync(key string) error {
 		return err
 	}
 
-	service, err := c.serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
+	if c.serviceResolver == nil {
+		availableCondition.Status = apiregistrationv1.ConditionUnknown
+		availableCondition.Reason = "ServiceAccessError"
+		availableCondition.Message = "no service resolver configured"
+		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
+		_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
+		return err
+	}
+
+	resolvedURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
 	if apierrors.IsNotFound(err) {
 		availableCondition.Status = apiregistrationv1.ConditionFalse
 		availableCondition.Reason = "ServiceNotFound"
@@ -230,67 +213,28 @@ func (c *AvailableConditionController) sync(key string) error {
 		return err
 	}
 
-	if service.Spec.Type == v1.ServiceTypeClusterIP {
-		// if we have a cluster IP service, it must be listening on configured port and we can check that
-		servicePort := apiService.Spec.Service.Port
-		portName := ""
-		foundPort := false
-		for _, port := range service.Spec.Ports {
-			if port.Port == *servicePort {
-				foundPort = true
-				portName = port.Name
-				break
-			}
-		}
-		if !foundPort {
-			availableCondition.Status = apiregistrationv1.ConditionFalse
-			availableCondition.Reason = "ServicePortError"
-			availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port %d", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, *apiService.Spec.Service.Port)
-			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
-			return err
-		}
-
-		endpoints, err := c.endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
-		if apierrors.IsNotFound(err) {
-			availableCondition.Status = apiregistrationv1.ConditionFalse
-			availableCondition.Reason = "EndpointsNotFound"
-			availableCondition.Message = fmt.Sprintf("cannot find endpoints for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
-			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
-			return err
-		} else if err != nil {
-			availableCondition.Status = apiregistrationv1.ConditionUnknown
-			availableCondition.Reason = "EndpointsAccessError"
-			availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
-			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
-			return err
-		}
-		hasActiveEndpoints := false
-	outer:
-		for _, subset := range endpoints.Subsets {
-			if len(subset.Addresses) == 0 {
-				continue
-			}
-			for _, endpointPort := range subset.Ports {
-				if endpointPort.Name == portName {
-					hasActiveEndpoints = true
-					break outer
-				}
-			}
-		}
-		if !hasActiveEndpoints {
-			availableCondition.Status = apiregistrationv1.ConditionFalse
-			availableCondition.Reason = "MissingEndpoints"
-			availableCondition.Message = fmt.Sprintf("endpoints for service/%s in %q have no addresses with port name %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, portName)
-			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
-			return err
-		}
+	servicePort := apiService.Spec.Service.Port
+	urlPort, err := strconv.Atoi(resolvedURL.Port())
+	if err != nil {
+		availableCondition.Status = apiregistrationv1.ConditionFalse
+		availableCondition.Reason = "ServicePortError"
+		availableCondition.Message = fmt.Sprintf("unable to parse port returned by resolver for service/%s in %q with port %d", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, *apiService.Spec.Service.Port)
+		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
+		_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
+		return err
 	}
+
+	if servicePort != nil && int32(urlPort) != *servicePort {
+		availableCondition.Status = apiregistrationv1.ConditionFalse
+		availableCondition.Reason = "ServicePortError"
+		availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port %d", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, *apiService.Spec.Service.Port)
+		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
+		_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
+		return err
+	}
+
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
-	if apiService.Spec.Service != nil && c.serviceResolver != nil {
+	if apiService.Spec.Service != nil {
 		attempts := 5
 		results := make(chan error, attempts)
 		for i := 0; i < attempts; i++ {
@@ -427,7 +371,7 @@ func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) 
 	// to be called; since the handlers are three different ways of
 	// enqueueing the same thing, waiting for this permits the queue to
 	// maximally de-duplicate the entries.
-	if !controllers.WaitForCacheSync("AvailableConditionController", stopCh, c.apiServiceSynced, c.servicesSynced, c.endpointsSynced) {
+	if !controllers.WaitForCacheSync("AvailableConditionController", stopCh, c.apiServiceSynced) {
 		return
 	}
 

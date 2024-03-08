@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
-	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -108,8 +107,6 @@ func newRemoteAPIService(name string) *apiregistration.APIService {
 func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableConditionController, *fake.Clientset) {
 	fakeClient := fake.NewSimpleClientset()
 	apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -123,8 +120,6 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 	c := AvailableConditionController{
 		apiServiceClient: fakeClient.ApiregistrationV1(),
 		apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
-		serviceLister:    v1listers.NewServiceLister(serviceIndexer),
-		endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
 		serviceResolver:  &fakeServiceResolver{url: testServer.URL},
 		queue: workqueue.NewNamedRateLimitingQueue(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
@@ -390,8 +385,6 @@ func TestSync(t *testing.T) {
 			c := AvailableConditionController{
 				apiServiceClient:           fakeClient.ApiregistrationV1(),
 				apiServiceLister:           listers.NewAPIServiceLister(apiServiceIndexer),
-				serviceLister:              v1listers.NewServiceLister(serviceIndexer),
-				endpointsLister:            v1listers.NewEndpointsLister(endpointsIndexer),
 				serviceResolver:            &fakeServiceResolver{url: testServer.URL},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 				metrics:                    newAvailabilityMetrics(),
