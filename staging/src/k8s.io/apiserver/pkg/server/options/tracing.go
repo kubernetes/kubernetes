@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -88,7 +88,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		return fmt.Errorf("failed to read tracing config: %v", err)
 	}
 
-	errs := tracingapi.ValidateTracingConfiguration(traceConfig, feature.DefaultFeatureGate, nil)
+	errs := tracingapi.ValidateTracingConfiguration(&traceConfig.TracingConfiguration, feature.DefaultFeatureGate, nil)
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to validate tracing configuration: %v", errs.ToAggregate())
 	}
@@ -115,7 +115,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 			semconv.ServiceInstanceIDKey.String(c.APIServerID),
 		),
 	}
-	tp, err := tracing.NewProvider(context.Background(), traceConfig, opts, resourceOpts)
+	tp, err := tracing.NewProvider(context.Background(), &traceConfig.TracingConfiguration, opts, resourceOpts)
 	if err != nil {
 		return err
 	}
@@ -123,6 +123,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	if c.LoopbackClientConfig != nil {
 		c.LoopbackClientConfig.Wrap(tracing.WrapperFor(c.TracerProvider))
 	}
+	c.PrivateEndpoint = traceConfig.PrivateEndpoint
 	return nil
 }
 
@@ -141,7 +142,7 @@ func (o *TracingOptions) Validate() (errs []error) {
 }
 
 // ReadTracingConfiguration reads the tracing configuration from a file
-func ReadTracingConfiguration(configFilePath string) (*tracingapi.TracingConfiguration, error) {
+func ReadTracingConfiguration(configFilePath string) (*apiserver.TracingConfiguration, error) {
 	if configFilePath == "" {
 		return nil, fmt.Errorf("tracing config file was empty")
 	}
@@ -154,5 +155,5 @@ func ReadTracingConfiguration(configFilePath string) (*tracingapi.TracingConfigu
 	if err := runtime.DecodeInto(codecs.UniversalDecoder(), data, internalConfig); err != nil {
 		return nil, fmt.Errorf("unable to decode tracing configuration data: %v", err)
 	}
-	return &internalConfig.TracingConfiguration, nil
+	return internalConfig, nil
 }

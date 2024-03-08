@@ -27,11 +27,13 @@ import (
 )
 
 // WithTracing adds tracing to requests if the incoming request is sampled
-func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
+func WithTracing(handler http.Handler, tp trace.TracerProvider, privateEndpoint bool) http.Handler {
 	opts := []otelhttp.Option{
 		otelhttp.WithPropagators(tracing.Propagators()),
-		otelhttp.WithPublicEndpoint(),
 		otelhttp.WithTracerProvider(tp),
+	}
+	if !privateEndpoint {
+		opts = append(opts, otelhttp.WithPublicEndpoint())
 	}
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Add the http.target attribute to the otelhttp span

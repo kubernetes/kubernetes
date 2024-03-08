@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
@@ -81,14 +82,14 @@ func TestReadTracingConfiguration(t *testing.T) {
 		name           string
 		contents       string
 		createFile     bool
-		expectedResult *tracingapi.TracingConfiguration
+		expectedResult *apiserverapi.TracingConfiguration
 		expectedError  *string
 	}{
 		{
 			name:           "empty",
 			createFile:     true,
 			contents:       ``,
-			expectedResult: &tracingapi.TracingConfiguration{},
+			expectedResult: &apiserverapi.TracingConfiguration{},
 			expectedError:  nil,
 		},
 		{
@@ -105,11 +106,34 @@ func TestReadTracingConfiguration(t *testing.T) {
 apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: TracingConfiguration
 endpoint: localhost:4317
+privateEndpoint: true
 samplingRatePerMillion: 12345
 `,
-			expectedResult: &tracingapi.TracingConfiguration{
-				Endpoint:               &localhost,
-				SamplingRatePerMillion: &samplingRate,
+			expectedResult: &apiserverapi.TracingConfiguration{
+				PrivateEndpoint: true,
+				TracingConfiguration: tracingapi.TracingConfiguration{
+					Endpoint:               &localhost,
+					SamplingRatePerMillion: &samplingRate,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:       "v1beta1",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.config.k8s.io/v1beta1
+kind: TracingConfiguration
+endpoint: localhost:4317
+privateEndpoint: true
+samplingRatePerMillion: 12345
+`,
+			expectedResult: &apiserverapi.TracingConfiguration{
+				PrivateEndpoint: true,
+				TracingConfiguration: tracingapi.TracingConfiguration{
+					Endpoint:               &localhost,
+					SamplingRatePerMillion: &samplingRate,
+				},
 			},
 			expectedError: nil,
 		},
@@ -121,8 +145,23 @@ apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: TracingConfiguration
 endpoint: 127.0.0.1:4317
 `,
-			expectedResult: &tracingapi.TracingConfiguration{
-				Endpoint: &ipAddress,
+			expectedResult: &apiserverapi.TracingConfiguration{
+				TracingConfiguration: tracingapi.TracingConfiguration{
+					Endpoint: &ipAddress,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:       "privateEndpoint",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: TracingConfiguration
+privateEndpoint: true
+`,
+			expectedResult: &apiserverapi.TracingConfiguration{
+				PrivateEndpoint: true,
 			},
 			expectedError: nil,
 		},
