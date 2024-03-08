@@ -1274,9 +1274,12 @@ func TestGetNewFinshedPods(t *testing.T) {
 
 func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	completedCond := newCondition(batch.JobComplete, v1.ConditionTrue, "", "", realClock.Now())
-	succeededCond := newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, "", "", realClock.Now())
-	failedCond := newCondition(batch.JobFailed, v1.ConditionTrue, "", "", realClock.Now())
+	fakeClock := clocktesting.NewFakeClock(time.Now())
+	now := fakeClock.Now()
+	minuteAgo := now.Add(-time.Minute)
+	completedCond := newCondition(batch.JobComplete, v1.ConditionTrue, "", "", now)
+	succeededCond := newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, "", "", minuteAgo)
+	failedCond := newCondition(batch.JobFailed, v1.ConditionTrue, "", "", now)
 	indexedCompletion := batch.IndexedCompletion
 	mockErr := errors.New("mock error")
 	cases := map[string]struct {
@@ -1443,7 +1446,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Succeeded:               1,
 					Failed:                  1,
 					Conditions:              []batch.JobCondition{*succeededCond, *completedCond},
-					CompletionTime:          &succeededCond.LastTransitionTime,
+					CompletionTime:          ptr.To(metav1.NewTime(now)),
 				},
 			},
 			wantSucceededPodsMetric: 1,
@@ -1933,7 +1936,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)()
 
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-			manager, _ := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)
+			manager, _ := newControllerFromClientWithClock(ctx, t, clientSet, controller.NoResyncPeriodFunc, fakeClock)
 			fakePodControl := controller.FakePodControl{Err: tc.podControlErr}
 			metrics.JobPodsFinished.Reset()
 			manager.podControl = &fakePodControl
@@ -1966,23 +1969,9 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			if !errors.Is(err, tc.wantErr) {
 				t.Errorf("Got error %v, want %v", err, tc.wantErr)
 			}
-			cmpOpts := []cmp.Option{cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")}
-			if tc.finishedCond != nil && tc.finishedCond.Type == batch.JobSuccessCriteriaMet {
-				cmpOpts = append(cmpOpts, cmpopts.IgnoreFields(batch.JobStatus{}, "CompletionTime"))
-			}
-			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates, cmpOpts...); diff != "" {
+			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates,
+				cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected status updates (-want,+got):\n%s", diff)
-			}
-			// If we set successCondition with the SuccessCriteriaMet, the job-controller adds the Complete condition to the Job while reconciling,
-			// then the added Complete condition LastTransitionTime is used as a CompletionTime.
-			// So, we verify if the CompletionTime is after the SuccessCriteriaMet LastTransitionTime.
-			if tc.finishedCond != nil && tc.finishedCond.Type == batch.JobSuccessCriteriaMet && len(tc.wantStatusUpdates) != 0 {
-				for i := range tc.wantStatusUpdates {
-					if tc.wantStatusUpdates[i].CompletionTime != nil && !tc.wantStatusUpdates[i].CompletionTime.Before(statusUpdates[i].CompletionTime) {
-						t.Errorf("Unexpected completionTime; completionTime %v must be after %v",
-							tc.wantStatusUpdates[i].CompletionTime, statusUpdates[i].CompletionTime)
-					}
-				}
 			}
 			rmFinalizers := len(fakePodControl.Patches)
 			if rmFinalizers != tc.wantRmFinalizers {
