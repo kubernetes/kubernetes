@@ -825,10 +825,10 @@ done`}
 		Release: v1.24
 		Testname: Jobs, apply changes to status
 		Description: Attempt to create a running Job which MUST succeed.
-		Attempt to patch the Job status to include a new start time which
-		MUST succeed. An annotation for the job that was patched MUST be found.
-		Attempt to replace the job status with a new start time which MUST
-		succeed. Attempt to read its status sub-resource which MUST succeed
+		Attempt to patch the Job status which MUST succeed.
+		An annotation for the job that was patched MUST be found.
+		Attempt to replace the job status with update which MUST succeed.
+		Attempt to read its status sub-resource which MUST succeed
 	*/
 	framework.ConformanceIt("should apply changes to a job status", func(ctx context.Context) {
 
@@ -887,7 +887,7 @@ done`}
 			if err != nil {
 				return err
 			}
-			if condition := findConditionByType(patchedStatus.Status.Conditions, customConditionType); condition != nil {
+			if condition := findConditionByType(statusToUpdate.Status.Conditions, customConditionType); condition != nil {
 				condition.LastTransitionTime = now2
 			} else {
 				framework.Failf("patched object does not have the required condition %v", customConditionType)
