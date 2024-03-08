@@ -963,13 +963,15 @@ func (pl *dynamicResources) lookupParameters(logger klog.Logger, class *resource
 	if status != nil {
 		return
 	}
-	claimParameters, status = pl.lookupClaimParameters(logger, claim)
+	claimParameters, status = pl.lookupClaimParameters(logger, class, claim)
 	return
 }
 
 func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass) (*resourcev1alpha2.ResourceClassParameters, *framework.Status) {
+	defaultClassParameters := resourcev1alpha2.ResourceClassParameters{}
+
 	if class.ParametersRef == nil {
-		return nil, nil
+		return &defaultClassParameters, nil
 	}
 
 	if class.ParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
@@ -1004,9 +1006,31 @@ func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *res
 	return nil, statusUnschedulable(logger, fmt.Sprintf("generated class parameters for %s.%s %s not found", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.Namespace, class.ParametersRef.Name)))
 }
 
-func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
+func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
+	defaultClaimParameters := resourcev1alpha2.ResourceClaimParameters{
+		Shareable: true,
+		DriverRequests: []resourcev1alpha2.DriverRequests{
+			{
+				DriverName: class.DriverName,
+				Requests: []resourcev1alpha2.ResourceRequest{
+					{
+						ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
+							// TODO: This only works because NamedResources is
+							// the only model currently implemented. We need to
+							// match the default to how the resources of this
+							// class are being advertized in a ResourceSlice.
+							NamedResources: &resourcev1alpha2.NamedResourcesRequest{
+								Selector: "true",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	if claim.Spec.ParametersRef == nil {
-		return nil, nil
+		return &defaultClaimParameters, nil
 	}
 	if claim.Spec.ParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
 		claim.Spec.ParametersRef.Kind == "ResourceClaimParameters" {

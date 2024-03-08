@@ -128,12 +128,10 @@ func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClas
 	}
 	for driverName, perDriver := range namedresourcesRequests {
 		var filter *resourcev1alpha2.NamedResourcesFilter
-		if classParameters != nil {
-			for _, f := range classParameters.Filters {
-				if f.DriverName == driverName && f.ResourceFilterModel.NamedResources != nil {
-					filter = f.ResourceFilterModel.NamedResources
-					break
-				}
+		for _, f := range classParameters.Filters {
+			if f.DriverName == driverName && f.ResourceFilterModel.NamedResources != nil {
+				filter = f.ResourceFilterModel.NamedResources
+				break
 			}
 		}
 		controller, err := namedresourcesmodel.NewClaimController(filter, perDriver.requests)
