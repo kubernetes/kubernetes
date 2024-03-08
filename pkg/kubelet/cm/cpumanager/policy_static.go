@@ -622,10 +622,9 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 		numMatching := 0
 		for _, c := range reusableCPUs.List() {
 			// Disregard this mask if its NUMANode isn't part of it.
-			if !mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
-				return
+			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
+				numMatching++
 			}
-			numMatching++
 		}
 
 		// Finally, check to see if enough available CPUs remain on the current
