@@ -125,7 +125,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 			}
 			zones := allZonesSet.UnsortedList()[:3]
 
-			ginkgo.By(fmt.Sprintf("finding a node in each of the choosen 3 zones %v", zones))
+			ginkgo.By(fmt.Sprintf("finding a node in each of the chosen 3 zones %v", zones))
 			nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
 			framework.ExpectNoError(err)
 			nodeForZone := make(map[string]string)
