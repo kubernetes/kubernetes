@@ -367,10 +367,11 @@ func TestToKubeContainerState(t *testing.T) {
 
 func TestGetAppArmorProfile(t *testing.T) {
 	tests := []struct {
-		name            string
-		podProfile      *v1.AppArmorProfile
-		expectedProfile *runtimeapi.SecurityProfile
-		expectError     bool
+		name               string
+		podProfile         *v1.AppArmorProfile
+		expectedProfile    *runtimeapi.SecurityProfile
+		expectedOldProfile string
+		expectError        bool
 	}{{
 		name:            "no appArmor",
 		expectedProfile: nil,
@@ -380,12 +381,14 @@ func TestGetAppArmorProfile(t *testing.T) {
 		expectedProfile: &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
 		},
+		expectedOldProfile: "runtime/default",
 	}, {
 		name:       "unconfined",
 		podProfile: &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeUnconfined},
 		expectedProfile: &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_Unconfined,
 		},
+		expectedOldProfile: "unconfined",
 	}, {
 		name: "localhost",
 		podProfile: &v1.AppArmorProfile{
@@ -396,6 +399,7 @@ func TestGetAppArmorProfile(t *testing.T) {
 			ProfileType:  runtimeapi.SecurityProfile_Localhost,
 			LocalhostRef: "test",
 		},
+		expectedOldProfile: "localhost/test",
 	}, {
 		name: "invalid localhost",
 		podProfile: &v1.AppArmorProfile{
@@ -424,7 +428,7 @@ func TestGetAppArmorProfile(t *testing.T) {
 				},
 			}
 
-			actual, err := getAppArmorProfile(&pod, &pod.Spec.Containers[0])
+			actual, actualOld, err := getAppArmorProfile(&pod, &pod.Spec.Containers[0])
 
 			if test.expectError {
 				assert.Error(t, err)
@@ -432,7 +436,8 @@ func TestGetAppArmorProfile(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, test.expectedProfile, actual)
+			assert.Equal(t, test.expectedProfile, actual, "AppArmor profile")
+			assert.Equal(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
 		})
 	}
 }

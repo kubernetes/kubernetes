@@ -288,34 +288,44 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	}, nil
 }
 
-func getAppArmorProfile(pod *v1.Pod, container *v1.Container) (*runtimeapi.SecurityProfile, error) {
+func getAppArmorProfile(pod *v1.Pod, container *v1.Container) (*runtimeapi.SecurityProfile, string, error) {
 	profile := apparmor.GetProfile(pod, container)
 	if profile == nil {
-		return nil, nil
+		return nil, "", nil
 	}
+
+	var (
+		securityProfile   *runtimeapi.SecurityProfile
+		deprecatedProfile string // Deprecated apparmor profile format, still provided for backwards compatibility with older runtimes.
+	)
 
 	switch profile.Type {
 	case v1.AppArmorProfileTypeRuntimeDefault:
-		return &runtimeapi.SecurityProfile{
+		securityProfile = &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
-		}, nil
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileRuntimeDefault
 
 	case v1.AppArmorProfileTypeUnconfined:
-		return &runtimeapi.SecurityProfile{
+		securityProfile = &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_Unconfined,
-		}, nil
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNameUnconfined
 
 	case v1.AppArmorProfileTypeLocalhost:
 		if profile.LocalhostProfile == nil {
-			return nil, errors.New("missing localhost apparmor profile name")
+			return nil, "", errors.New("missing localhost apparmor profile name")
 		}
-		return &runtimeapi.SecurityProfile{
+		securityProfile = &runtimeapi.SecurityProfile{
 			ProfileType:  runtimeapi.SecurityProfile_Localhost,
 			LocalhostRef: *profile.LocalhostProfile,
-		}, nil
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNamePrefix + *profile.LocalhostProfile
 
 	default:
 		// Shouldn't happen.
-		return nil, fmt.Errorf("unknown apparmor profile type: %q", profile.Type)
+		return nil, "", fmt.Errorf("unknown apparmor profile type: %q", profile.Type)
 	}
+
+	return securityProfile, deprecatedProfile, nil
 }

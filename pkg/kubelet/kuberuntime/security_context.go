@@ -41,7 +41,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	// set ApparmorProfile.
-	synthesized.Apparmor, err = getAppArmorProfile(pod, container)
+	synthesized.Apparmor, synthesized.ApparmorProfile, err = getAppArmorProfile(pod, container)
 	if err != nil {
 		return nil, err
 	}
