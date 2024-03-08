@@ -224,6 +224,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/storagemigration/v1alpha1
+		gvr("storagemigration.k8s.io", "v1alpha1", "storageversionmigrations"): {
+			Stub:             `{"metadata": {"name": "test-migration"}, "spec":{"resource": {"group": "test-group", "resource": "test-resource", "version": "test-version"}}}`,
+			ExpectedEtcdPath: "/registry/storageversionmigrations/test-migration",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"): {
 			Stub:             `{"metadata": {"name": "va2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,

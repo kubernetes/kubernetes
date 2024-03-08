@@ -2065,6 +2065,55 @@
           "version": "v1alpha2"
         }
       ]
+    },
+    {
+      "metadata": {
+        "creationTimestamp": null,
+        "name": "storagemigration.k8s.io"
+      },
+      "versions": [
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "storageversionmigrations",
+              "responseKind": {
+                "group": "",
+                "kind": "StorageVersionMigration",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "storageversionmigration",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "StorageVersionMigration",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
+        }
+      ]
     }
   ],
   "kind": "APIGroupDiscoveryList",

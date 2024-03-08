@@ -815,6 +815,13 @@ const (
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
 
+	// owner: @nilekhc
+	// kep: https://kep.k8s.io/4192
+	// alpha: v1.30
+
+	// Enables support for the StorageVersionMigrator controller.
+	StorageVersionMigrator featuregate.Feature = "StorageVersionMigrator"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	// alpha: v1.21
@@ -1195,6 +1202,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetAutoDeletePVC: {Default: true, PreRelease: featuregate.Beta},
 
 	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.Beta},
+
+	StorageVersionMigrator: {Default: false, PreRelease: featuregate.Alpha},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 

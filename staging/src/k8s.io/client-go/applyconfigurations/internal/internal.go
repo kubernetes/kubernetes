@@ -13133,6 +13133,83 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
+- name: io.k8s.api.storagemigration.v1alpha1.GroupVersionResource
+  map:
+    fields:
+    - name: group
+      type:
+        scalar: string
+    - name: resource
+      type:
+        scalar: string
+    - name: version
+      type:
+        scalar: string
+- name: io.k8s.api.storagemigration.v1alpha1.MigrationCondition
+  map:
+    fields:
+    - name: lastUpdateTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        scalar: string
+      default: ""
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigration
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationStatus
+      default: {}
+- name: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationSpec
+  map:
+    fields:
+    - name: continueToken
+      type:
+        scalar: string
+    - name: resource
+      type:
+        namedType: io.k8s.api.storagemigration.v1alpha1.GroupVersionResource
+      default: {}
+- name: io.k8s.api.storagemigration.v1alpha1.StorageVersionMigrationStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.storagemigration.v1alpha1.MigrationCondition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: resourceVersion
+      type:
+        scalar: string
 - name: io.k8s.apimachinery.pkg.api.resource.Quantity
   scalar: untyped
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.Condition

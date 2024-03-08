@@ -688,17 +688,16 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 	for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
-	garbageCollector, err := garbagecollector.NewGarbageCollector(
+
+	garbageCollector, err := garbagecollector.NewComposedGarbageCollector(
 		ctx,
 		gcClientset,
 		metadataClient,
 		controllerContext.RESTMapper,
-		ignoredResources,
-		controllerContext.ObjectOrMetadataInformerFactory,
-		controllerContext.InformersStarted,
+		controllerContext.GraphBuilder,
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %v", err)
+		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %w", err)
 	}
 
 	// Start the garbage collector.
