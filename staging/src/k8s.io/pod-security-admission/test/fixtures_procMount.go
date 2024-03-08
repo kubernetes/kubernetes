@@ -23,6 +23,7 @@ import (
 )
 
 func init() {
+	hostUsers := false
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "procMount",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
@@ -33,6 +34,7 @@ func init() {
 					validProcMountType := corev1.DefaultProcMount
 					copy.Spec.Containers[0].SecurityContext.ProcMount = &validProcMountType
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &validProcMountType
+					copy.Spec.HostUsers = &hostUsers
 				}),
 			}
 		},
@@ -44,11 +46,13 @@ func init() {
 				tweak(p, func(copy *corev1.Pod) {
 					unmaskedProcMountType := corev1.UnmaskedProcMount
 					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.HostUsers = &hostUsers
 				}),
 				// set proc mount of init container to a forbidden value
 				tweak(p, func(copy *corev1.Pod) {
 					unmaskedProcMountType := corev1.UnmaskedProcMount
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.HostUsers = &hostUsers
 				}),
 			}
 		},

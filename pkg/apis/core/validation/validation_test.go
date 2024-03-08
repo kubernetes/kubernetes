@@ -55,6 +55,7 @@ const (
 	envVarNameErrMsg                  = "a valid environment variable name must consist of"
 	relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
 	defaultGracePeriod                = int64(30)
+	noUserNamespace                   = false
 )
 
 var (
@@ -7895,17 +7896,17 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	} {
 		var PodRestartPolicy core.RestartPolicy
 		PodRestartPolicy = "Never"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "Always"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "OnFailure"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -8230,19 +8231,19 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
 
 			PodRestartPolicy = "Never"
-			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
+			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "Always"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "OnFailure"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8542,7 +8543,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9156,7 +9157,7 @@ func TestValidateContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy)
+			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -9245,7 +9246,7 @@ func TestValidateInitContainers(t *testing.T) {
 	},
 	}
 	var PodRestartPolicy core.RestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9624,7 +9625,7 @@ func TestValidateInitContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy)
+			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -23002,17 +23003,28 @@ func TestValidateSecurityContext(t *testing.T) {
 	noRunAsUser := fullValidSC()
 	noRunAsUser.RunAsUser = nil
 
+	procMountSet := fullValidSC()
+	defPmt := core.DefaultProcMount
+	procMountSet.ProcMount = &defPmt
+
+	umPmt := core.UnmaskedProcMount
+	procMountUnmasked := fullValidSC()
+	procMountUnmasked.ProcMount = &umPmt
+
 	successCases := map[string]struct {
-		sc *core.SecurityContext
+		sc        *core.SecurityContext
+		hostUsers bool
 	}{
-		"all settings":    {allSettings},
-		"no capabilities": {noCaps},
-		"no selinux":      {noSELinux},
-		"no priv request": {noPrivRequest},
-		"no run as user":  {noRunAsUser},
+		"all settings":        {allSettings, false},
+		"no capabilities":     {noCaps, false},
+		"no selinux":          {noSELinux, false},
+		"no priv request":     {noPrivRequest, false},
+		"no run as user":      {noRunAsUser, false},
+		"proc mount set":      {procMountSet, true},
+		"proc mount unmasked": {procMountUnmasked, false},
 	}
 	for k, v := range successCases {
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) != 0 {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers); len(errs) != 0 {
 			t.Errorf("[%s] Expected success, got %v", k, errs)
 		}
 	}
@@ -23059,12 +23071,19 @@ func TestValidateSecurityContext(t *testing.T) {
 			errorDetail:  "cannot set `allowPrivilegeEscalation` to false and `privileged` to true",
 			capAllowPriv: true,
 		},
+		"with unmasked proc mount type and no user namespace": {
+			sc:          procMountUnmasked,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "`hostUsers` must be false to use `Unmasked`",
+		},
 	}
 	for k, v := range errorCases {
 		capabilities.SetForTests(capabilities.Capabilities{
 			AllowPrivileged: v.capAllowPriv,
 		})
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+		// note the unconditional `true` here for hostUsers. The failure case to test for ProcMount only includes it being true,
+		// and the field is ignored if ProcMount isn't set. Thus, we can unconditionally set to `true` and simplify the test matrix setup.
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
 	}
