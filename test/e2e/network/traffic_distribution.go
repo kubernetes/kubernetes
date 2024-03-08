@@ -305,7 +305,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 			gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveNoHints)
 
 			ginkgo.By(fmt.Sprintf("updating service=%q by removing the service.kubernetes.io/topology-mode=Auto annotation", svc.GetName()))
-			e2eservice.UpdateService(ctx, c, svc.GetNamespace(), svc.GetName(), func(s *corev1.Service) {
+			_, err = e2eservice.UpdateService(ctx, c, svc.GetNamespace(), svc.GetName(), func(s *corev1.Service) {
 				s.SetAnnotations(map[string]string{})
 			})
 			framework.ExpectNoError(err)
