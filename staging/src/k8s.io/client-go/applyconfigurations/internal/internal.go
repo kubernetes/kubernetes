@@ -11966,6 +11966,119 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareable
       type:
         scalar: boolean
+- name: io.k8s.api.resource.v1alpha2.DriverAllocationResult
+  map:
+    fields:
+    - name: namedResources
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult
+    - name: vendorRequestParameters
+      type:
+        namedType: __untyped_atomic_
+- name: io.k8s.api.resource.v1alpha2.DriverRequests
+  map:
+    fields:
+    - name: driverName
+      type:
+        scalar: string
+    - name: requests
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.ResourceRequest
+          elementRelationship: atomic
+    - name: vendorParameters
+      type:
+        namedType: __untyped_atomic_
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesAttribute
+  map:
+    fields:
+    - name: bool
+      type:
+        scalar: boolean
+    - name: int
+      type:
+        scalar: numeric
+    - name: intSlice
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: quantity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: string
+      type:
+        scalar: string
+    - name: stringSlice
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice
+    - name: version
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesFilter
+  map:
+    fields:
+    - name: selector
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesInstance
+  map:
+    fields:
+    - name: attributes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.NamedResourcesAttribute
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice
+  map:
+    fields:
+    - name: ints
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesRequest
+  map:
+    fields:
+    - name: selector
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesResources
+  map:
+    fields:
+    - name: instances
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.NamedResourcesInstance
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice
+  map:
+    fields:
+    - name: strings
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha2.PodSchedulingContext
   map:
     fields:
@@ -12049,6 +12162,31 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.resource.v1alpha2.ResourceClaimParameters
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: driverRequests
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.DriverRequests
+          elementRelationship: atomic
+    - name: generatedFrom
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: shareable
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference
   map:
     fields:
@@ -12156,9 +12294,40 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: parametersRef
       type:
         namedType: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
+    - name: structuredParameters
+      type:
+        scalar: boolean
     - name: suitableNodes
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1alpha2.ResourceClassParameters
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: filters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.ResourceFilter
+          elementRelationship: atomic
+    - name: generatedFrom
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: vendorParameters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.VendorParameters
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
   map:
     fields:
@@ -12176,6 +12345,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+- name: io.k8s.api.resource.v1alpha2.ResourceFilter
+  map:
+    fields:
+    - name: driverName
+      type:
+        scalar: string
+    - name: namedResources
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesFilter
 - name: io.k8s.api.resource.v1alpha2.ResourceHandle
   map:
     fields:
@@ -12185,6 +12363,68 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: driverName
       type:
         scalar: string
+    - name: structuredData
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.StructuredResourceHandle
+- name: io.k8s.api.resource.v1alpha2.ResourceRequest
+  map:
+    fields:
+    - name: namedResources
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesRequest
+    - name: vendorParameters
+      type:
+        namedType: __untyped_atomic_
+- name: io.k8s.api.resource.v1alpha2.ResourceSlice
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: driverName
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: namedResources
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.NamedResourcesResources
+    - name: nodeName
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha2.StructuredResourceHandle
+  map:
+    fields:
+    - name: nodeName
+      type:
+        scalar: string
+    - name: results
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.DriverAllocationResult
+          elementRelationship: atomic
+    - name: vendorClaimParameters
+      type:
+        namedType: __untyped_atomic_
+    - name: vendorClassParameters
+      type:
+        namedType: __untyped_atomic_
+- name: io.k8s.api.resource.v1alpha2.VendorParameters
+  map:
+    fields:
+    - name: driverName
+      type:
+        scalar: string
+    - name: parameters
+      type:
+        namedType: __untyped_atomic_
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:

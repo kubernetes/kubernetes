@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,7 +45,7 @@ type ManagerImpl struct {
 }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string) (*ManagerImpl, error) {
+func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
 	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
@@ -142,6 +143,9 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 				Uid:            string(resourceClaim.UID),
 				Name:           resourceClaim.Name,
 				ResourceHandle: resourceHandle.Data,
+			}
+			if resourceHandle.StructuredData != nil {
+				claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
 			}
 			batches[pluginName] = append(batches[pluginName], claim)
 		}

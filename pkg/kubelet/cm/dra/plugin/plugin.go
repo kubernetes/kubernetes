@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
@@ -94,11 +95,23 @@ func (p *plugin) setVersion(version string) {
 }
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
-type RegistrationHandler struct{}
+type RegistrationHandler struct {
+	controller *nodeResourcesController
+}
 
 // NewPluginHandler returns new registration handler.
-func NewRegistrationHandler() *RegistrationHandler {
-	return &RegistrationHandler{}
+//
+// Must only be called once per process because it manages global state.
+// If a kubeClient is provided, then it synchronizes ResourceSlices
+// with the resource information provided by plugins.
+func NewRegistrationHandler(kubeClient kubernetes.Interface, nodeName string) *RegistrationHandler {
+	handler := &RegistrationHandler{}
+
+	// If kubelet ever gets an API for stopping registration handlers, then
+	// that would need to be hooked up with stopping the controller.
+	handler.controller = startNodeResourcesController(context.TODO(), kubeClient, nodeName)
+
+	return handler
 }
 
 // RegisterPlugin is called when a plugin can be registered.
@@ -110,15 +123,18 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
-	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	// By default we assume the supported plugin version is v1alpha3
-	draPlugins.add(pluginName, &plugin{
+	pluginInstance := &plugin{
 		conn:                    nil,
 		endpoint:                endpoint,
 		version:                 v1alpha3Version,
 		highestSupportedVersion: highestSupportedVersion,
-	})
+	}
+
+	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
+	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
+	// By default we assume the supported plugin version is v1alpha3
+	draPlugins.add(pluginName, pluginInstance)
+	h.controller.addPlugin(pluginName, pluginInstance)
 
 	return nil
 }
@@ -178,6 +194,7 @@ func deregisterPlugin(pluginName string) {
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	klog.InfoS("DeRegister DRA plugin", "name", pluginName)
 	deregisterPlugin(pluginName)
+	h.controller.removePlugin(pluginName)
 }
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection

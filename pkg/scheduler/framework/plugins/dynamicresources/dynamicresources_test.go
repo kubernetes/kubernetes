@@ -309,8 +309,9 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"waiting-for-immediate-allocation": {
-			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
+			pod:     podWithClaimName,
+			claims:  []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
+			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
@@ -812,7 +813,6 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 	tc.client = fake.NewSimpleClientset()
 	reactor := createReactor(tc.client.Tracker())
 	tc.client.PrependReactor("*", "*", reactor)
-
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 
 	opts := []runtime.Option{

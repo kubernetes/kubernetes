@@ -72,17 +72,19 @@ const (
 	//           - a Pod that is deleted
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
-	Pod                   GVK = "Pod"
-	Node                  GVK = "Node"
-	PersistentVolume      GVK = "PersistentVolume"
-	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
-	CSINode               GVK = "storage.k8s.io/CSINode"
-	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
-	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
-	StorageClass          GVK = "storage.k8s.io/StorageClass"
-	PodSchedulingContext  GVK = "PodSchedulingContext"
-	ResourceClaim         GVK = "ResourceClaim"
-	ResourceClass         GVK = "ResourceClass"
+	Pod                     GVK = "Pod"
+	Node                    GVK = "Node"
+	PersistentVolume        GVK = "PersistentVolume"
+	PersistentVolumeClaim   GVK = "PersistentVolumeClaim"
+	CSINode                 GVK = "storage.k8s.io/CSINode"
+	CSIDriver               GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity      GVK = "storage.k8s.io/CSIStorageCapacity"
+	StorageClass            GVK = "storage.k8s.io/StorageClass"
+	PodSchedulingContext    GVK = "PodSchedulingContext"
+	ResourceClaim           GVK = "ResourceClaim"
+	ResourceClass           GVK = "ResourceClass"
+	ResourceClaimParameters GVK = "ResourceClaimParameters"
+	ResourceClassParameters GVK = "ResourceClassParameters"
 
 	// WildCard is a special GVK to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -176,6 +178,8 @@ func UnrollWildCardResource() []ClusterEventWithHint {
 		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
 		{Event: ClusterEvent{Resource: ResourceClaim, ActionType: All}},
 		{Event: ClusterEvent{Resource: ResourceClass, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClaimParameters, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClassParameters, ActionType: All}},
 	}
 }
 

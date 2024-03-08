@@ -576,11 +576,13 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	// Needed for dynamic resource allocation.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
-			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclasses").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclasses").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulingcontexts").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulingcontexts/status").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceslices", "resourceclassparameters", "resourceclaimparameters").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{

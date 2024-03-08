@@ -1927,6 +1927,26 @@
               ]
             },
             {
+              "resource": "resourceclaimparameters",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaimParameters",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaimparameters",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "resourceclaims",
               "responseKind": {
                 "group": "",
@@ -1990,6 +2010,46 @@
               },
               "scope": "Cluster",
               "singularResource": "resourceclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclassparameters",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClassParameters",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclassparameters",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceslices",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceSlice",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourceslice",
               "verbs": [
                 "create",
                 "delete",

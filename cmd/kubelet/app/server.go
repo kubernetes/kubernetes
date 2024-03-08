@@ -815,6 +815,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
 			cm.NodeConfig{
+				NodeName:              nodeName,
 				RuntimeCgroupsName:    s.RuntimeCgroups,
 				SystemCgroupsName:     s.SystemCgroups,
 				KubeletCgroupsName:    s.KubeletCgroups,
