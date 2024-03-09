@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/pointer"
 )
 
 var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
@@ -2115,6 +2116,7 @@ func runningStateWithStartedAt(cName string, startedAt time.Time) v1.ContainerSt
 		State: v1.ContainerState{
 			Running: &v1.ContainerStateRunning{StartedAt: metav1.Time{Time: startedAt}},
 		},
+		Started: pointer.Bool(true),
 	}
 }
 func stoppedState(cName string) v1.ContainerStatus {
@@ -3635,6 +3637,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingStateWithReason("containerA", "ContainerCreating")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
 				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				InitContainerStatuses:      []v1.ContainerStatus{},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
 				Type:   v1.PodReadyToStartContainers,
@@ -3694,6 +3698,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
 				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				InitContainerStatuses:      []v1.ContainerStatus{},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
 				Type:   v1.PodReadyToStartContainers,
@@ -4621,6 +4627,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					AllocatedResources: CPU1AndMem1G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+					Started:            pointer.Bool(true),
 				},
 			},
 		},
@@ -4644,6 +4651,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					AllocatedResources: CPU1AndMem1G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+					Started:            pointer.Bool(true),
 				},
 			},
 		},
@@ -4667,6 +4675,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					AllocatedResources: CPU1AndMem1GAndStorage2G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+					Started:            pointer.Bool(true),
 				},
 			},
 		},
@@ -4690,6 +4699,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					AllocatedResources: CPU1AndMem1GAndStorage2G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+					Started:            pointer.Bool(true),
 				},
 			},
 		},
@@ -4712,6 +4722,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					AllocatedResources: CPU1AndMem1GAndStorage2G,
 					Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+					Started:            pointer.Bool(true),
 				},
 			},
 		},
@@ -4733,6 +4744,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					ImageID:     "img1234",
 					State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					Resources:   &v1.ResourceRequirements{},
+					Started:     pointer.Bool(true),
 				},
 			},
 		},
