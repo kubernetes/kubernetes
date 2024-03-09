@@ -530,8 +530,8 @@ const (
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
 	Conditions []RuntimeCondition
-	// Handlers is a map of current available handlers
-	Handlers map[string]RuntimeHandler
+	// Handlers is an array of current available handlers
+	Handlers []RuntimeHandler
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
