@@ -562,6 +562,9 @@ func (r *RuntimeStatus) String() string {
 type RuntimeHandler struct {
 	// Name is the handler name.
 	Name string
+	// SupportsRecursiveReadOnlyMounts is true if the handler has support for
+	// recursive read-only mounts.
+	SupportsRecursiveReadOnlyMounts bool
 	// SupportsUserNamespaces is true if the handler has support for
 	// user namespaces.
 	SupportsUserNamespaces bool
@@ -569,7 +572,8 @@ type RuntimeHandler struct {
 
 // String formats the runtime handler into human readable string.
 func (h *RuntimeHandler) String() string {
-	return fmt.Sprintf("Name=%s SupportsUserNamespaces: %v", h.Name, h.SupportsUserNamespaces)
+	return fmt.Sprintf("Name=%s SupportsRecursiveReadOnlyMounts: %v SupportsUserNamespaces: %v",
+		h.Name, h.SupportsRecursiveReadOnlyMounts, h.SupportsUserNamespaces)
 }
 
 // RuntimeCondition contains condition information for the runtime.
