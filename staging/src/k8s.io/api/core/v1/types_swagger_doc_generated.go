@@ -481,6 +481,7 @@ var map_ContainerStatus = map[string]string{
 	"started":            "Started indicates whether the container has finished its postStart lifecycle hook and passed its startup probe. Initialized as false, becomes true after startupProbe is considered successful. Resets to false when the container is restarted, or if kubelet loses state temporarily. In both cases, startup probes will run again. Is always true when no startupProbe is defined and container is running and has passed the postStart lifecycle hook. The null value must be treated the same as false.",
 	"allocatedResources": "AllocatedResources represents the compute resources allocated for this container by the node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission and after successfully admitting desired pod resize.",
 	"resources":          "Resources represents the compute resource requests and limits that have been successfully enacted on the running container after it has been started or has been successfully resized.",
+	"volumeMounts":       "Status of volume mounts.",
 }
 
 func (ContainerStatus) SwaggerDoc() map[string]string {
@@ -1213,6 +1214,25 @@ func (NodeProxyOptions) SwaggerDoc() map[string]string {
 	return map_NodeProxyOptions
 }
 
+var map_NodeRuntimeClass = map[string]string{
+	"":         "NodeRuntimeClass is a set of runtime class information.",
+	"name":     "Runtime class name. Empty for the default runtime class.",
+	"features": "Supported features.",
+}
+
+func (NodeRuntimeClass) SwaggerDoc() map[string]string {
+	return map_NodeRuntimeClass
+}
+
+var map_NodeRuntimeClassFeatures = map[string]string{
+	"":                        "NodeRuntimeClassFeatures is a set of runtime features.",
+	"recursiveReadOnlyMounts": "RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.",
+}
+
+func (NodeRuntimeClassFeatures) SwaggerDoc() map[string]string {
+	return map_NodeRuntimeClassFeatures
+}
+
 var map_NodeSelector = map[string]string{
 	"":                  "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
 	"nodeSelectorTerms": "Required. A list of node selector terms. The terms are ORed.",
@@ -1271,6 +1291,7 @@ var map_NodeStatus = map[string]string{
 	"volumesInUse":    "List of attachable volumes in use (mounted) by the node.",
 	"volumesAttached": "List of volumes that are attached to the node.",
 	"config":          "Status of the config assigned to the node via the dynamic Kubelet config feature.",
+	"runtimeClasses":  "The available runtime classes.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
@@ -2582,17 +2603,30 @@ func (VolumeDevice) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeMount = map[string]string{
-	"":                 "VolumeMount describes a mounting of a Volume within a container.",
-	"name":             "This must match the Name of a Volume.",
-	"readOnly":         "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
-	"mountPath":        "Path within the container at which the volume should be mounted.  Must not contain ':'.",
-	"subPath":          "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
-	"mountPropagation": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.",
-	"subPathExpr":      "Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to \"\" (volume's root). SubPathExpr and SubPath are mutually exclusive.",
+	"":                  "VolumeMount describes a mounting of a Volume within a container.",
+	"name":              "This must match the Name of a Volume.",
+	"readOnly":          "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
+	"recursiveReadOnly": "RecursiveReadOnly specifies whether read-only mounts should be handled recursively.\n\nIf ReadOnly is false, this field has no meaning and must be unspecified.\n\nIf ReadOnly is true, and this field is set to Disabled, the mount is not made recursively read-only.  If this field is set to IfPossible, the mount is made recursively read-only, if it is supported by the container runtime.  If this field is set to Enabled, the mount is made recursively read-only if it is supported by the container runtime, otherwise the pod will not be started and an error will be generated to indicate the reason.\n\nIf this field is set to IfPossible or Enabled, MountPropagation must be set to None (or be unspecified, which defaults to None).\n\nIf this field is not specified, it is treated as an equivalent of Disabled.",
+	"mountPath":         "Path within the container at which the volume should be mounted.  Must not contain ':'.",
+	"subPath":           "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
+	"mountPropagation":  "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10. When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified (which defaults to None).",
+	"subPathExpr":       "Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to \"\" (volume's root). SubPathExpr and SubPath are mutually exclusive.",
 }
 
 func (VolumeMount) SwaggerDoc() map[string]string {
 	return map_VolumeMount
+}
+
+var map_VolumeMountStatus = map[string]string{
+	"":                  "VolumeMountStatus shows status of volume mounts.",
+	"name":              "Name corresponds to the name of the original VolumeMount.",
+	"mountPath":         "MountPath corresponds to the original VolumeMount.",
+	"readOnly":          "ReadOnly corresponds to the original VolumeMount.",
+	"recursiveReadOnly": "RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts). An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled, depending on the mount result.",
+}
+
+func (VolumeMountStatus) SwaggerDoc() map[string]string {
+	return map_VolumeMountStatus
 }
 
 var map_VolumeNodeAffinity = map[string]string{
