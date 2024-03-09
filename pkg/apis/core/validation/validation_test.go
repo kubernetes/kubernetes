@@ -7104,20 +7104,21 @@ func TestValidateVolumeMounts(t *testing.T) {
 	container := core.Container{
 		SecurityContext: nil,
 	}
-	propagation := core.MountPropagationBidirectional
+	propagateNone := core.MountPropagationNone
+	propagateBiDi := core.MountPropagationBidirectional
 
 	successCase := []core.VolumeMount{
-		{Name: "abc", MountPath: "/foo"},
-		{Name: "123", MountPath: "/bar"},
-		{Name: "abc-123", MountPath: "/baz"},
-		{Name: "abc-123", MountPath: "/baa", SubPath: ""},
-		{Name: "abc-123", MountPath: "/bab", SubPath: "baz"},
-		{Name: "abc-123", MountPath: "d:", SubPath: ""},
-		{Name: "abc-123", MountPath: "F:", SubPath: ""},
-		{Name: "abc-123", MountPath: "G:\\mount", SubPath: ""},
-		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
-		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
-		{Name: "ephemeral", MountPath: "/foobar"},
+		{Name: "abc", MountPath: "/foo", MountPropagation: &propagateNone},
+		{Name: "123", MountPath: "/bar", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "/baz", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "/baa", SubPath: "", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "/bab", SubPath: "baz", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "d:", SubPath: "", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "F:", SubPath: "", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "G:\\mount", SubPath: "", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz", MountPropagation: &propagateNone},
+		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz", MountPropagation: &propagateNone},
+		{Name: "ephemeral", MountPath: "/foobar", MountPropagation: &propagateNone},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -7136,7 +7137,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
 		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
 		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
-		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
+		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagateBiDi}},
 		"name exists in volumeDevice":            {{Name: "xyz", MountPath: "/bar"}},
 		"mountpath exists in volumeDevice":       {{Name: "uvw", MountPath: "/mnt/exists"}},
 		"both exist in volumeDevice":             {{Name: "xyz", MountPath: "/mnt/exists"}},
@@ -7173,39 +7174,45 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 		{Name: "uvw", DevicePath: "/foofoo/share/test"},
 	}
 
+	propagateNone := core.MountPropagationNone
+
 	cases := map[string]struct {
 		mounts      []core.VolumeMount
 		expectError bool
 	}{
 		"subpath and subpathexpr not specified": {
 			[]core.VolumeMount{{
-				Name:      "abc-123",
-				MountPath: "/bab",
+				Name:             "abc-123",
+				MountPath:        "/bab",
+				MountPropagation: &propagateNone,
 			}},
 			false,
 		},
 		"subpath expr specified": {
 			[]core.VolumeMount{{
-				Name:        "abc-123",
-				MountPath:   "/bab",
-				SubPathExpr: "$(POD_NAME)",
+				Name:             "abc-123",
+				MountPath:        "/bab",
+				MountPropagation: &propagateNone,
+				SubPathExpr:      "$(POD_NAME)",
 			}},
 			false,
 		},
 		"subpath specified": {
 			[]core.VolumeMount{{
-				Name:      "abc-123",
-				MountPath: "/bab",
-				SubPath:   "baz",
+				Name:             "abc-123",
+				MountPath:        "/bab",
+				MountPropagation: &propagateNone,
+				SubPath:          "baz",
 			}},
 			false,
 		},
 		"subpath and subpathexpr specified": {
 			[]core.VolumeMount{{
-				Name:        "abc-123",
-				MountPath:   "/bab",
-				SubPath:     "baz",
-				SubPathExpr: "$(POD_NAME)",
+				Name:             "abc-123",
+				MountPath:        "/bab",
+				MountPropagation: &propagateNone,
+				SubPath:          "baz",
+				SubPathExpr:      "$(POD_NAME)",
 			}},
 			true,
 		},
@@ -7246,22 +7253,26 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 		{Name: "uvw", DevicePath: "/foofoo/share/test"},
 	}
 
+	propagateNone := core.MountPropagationNone
+
 	cases := map[string]struct {
 		mounts      []core.VolumeMount
 		expectError bool
 	}{
 		"subpath expr not specified": {
 			[]core.VolumeMount{{
-				Name:      "abc-123",
-				MountPath: "/bab",
+				Name:             "abc-123",
+				MountPath:        "/bab",
+				MountPropagation: &propagateNone,
 			}},
 			false,
 		},
 		"subpath expr specified": {
 			[]core.VolumeMount{{
-				Name:        "abc-123",
-				MountPath:   "/bab",
-				SubPathExpr: "$(POD_NAME)",
+				Name:             "abc-123",
+				MountPath:        "/bab",
+				MountPropagation: &propagateNone,
+				SubPathExpr:      "$(POD_NAME)",
 			}},
 			false,
 		},
@@ -7308,19 +7319,19 @@ func TestValidateMountPropagation(t *testing.T) {
 		// implicitly non-privileged container + no propagation
 		core.VolumeMount{Name: "foo", MountPath: "/foo"},
 		defaultContainer,
-		false,
+		true,
 	}, {
 		// implicitly non-privileged container + HostToContainer
 		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
 		defaultContainer,
 		false,
 	}, {
-		// non-privileged container + None
+		// implicitly non-privileged container + None
 		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationNone},
 		defaultContainer,
 		false,
 	}, {
-		// error: implicitly non-privileged container + Bidirectional
+		// implicitly non-privileged container + Bidirectional
 		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
 		defaultContainer,
 		true,
@@ -7328,14 +7339,19 @@ func TestValidateMountPropagation(t *testing.T) {
 		// explicitly non-privileged container + no propagation
 		core.VolumeMount{Name: "foo", MountPath: "/foo"},
 		nonPrivilegedContainer,
-		false,
+		true,
 	}, {
 		// explicitly non-privileged container + HostToContainer
 		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
 		nonPrivilegedContainer,
 		false,
 	}, {
-		// explicitly non-privileged container + HostToContainer
+		// explicitly non-privileged container + None
+		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationNone},
+		nonPrivilegedContainer,
+		false,
+	}, {
+		// explicitly non-privileged container + Bidirectional
 		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
 		nonPrivilegedContainer,
 		true,
@@ -7343,10 +7359,15 @@ func TestValidateMountPropagation(t *testing.T) {
 		// privileged container + no propagation
 		core.VolumeMount{Name: "foo", MountPath: "/foo"},
 		privilegedContainer,
-		false,
+		true,
 	}, {
 		// privileged container + HostToContainer
 		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+		privilegedContainer,
+		false,
+	}, {
+		// privileged container + None
+		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationNone},
 		privilegedContainer,
 		false,
 	}, {
@@ -7364,8 +7385,7 @@ func TestValidateMountPropagation(t *testing.T) {
 		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
 		nil,
 		false,
-	},
-	}
+	}}
 
 	volumes := []core.Volume{
 		{Name: "foo", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
@@ -7842,6 +7862,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		"blk": {PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "pvc"}},
 		"vol": {EmptyDir: &core.EmptyDirVolumeSource{}},
 	}
+	propagateNone := core.MountPropagationNone
 
 	// Success Cases
 	for title, ephemeralContainers := range map[string][]core.EphemeralContainer{
@@ -7875,7 +7896,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					{Name: "TEST", Value: "TRUE"},
 				},
 				VolumeMounts: []core.VolumeMount{
-					{Name: "vol", MountPath: "/vol"},
+					{Name: "vol", MountPath: "/vol", MountPropagation: &propagateNone},
 				},
 				VolumeDevices: []core.VolumeDevice{
 					{Name: "blk", DevicePath: "/dev/block"},
@@ -8103,8 +8124,8 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
 				VolumeMounts: []core.VolumeMount{
-					{Name: "vol", MountPath: "/vol"},
-					{Name: "vol", MountPath: "/volsub", SubPath: "foo"},
+					{Name: "vol", MountPath: "/vol", MountPropagation: &propagateNone},
+					{Name: "vol", MountPath: "/volsub", MountPropagation: &propagateNone, SubPath: "foo"},
 				},
 			},
 		}},
@@ -8119,8 +8140,8 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
 				VolumeMounts: []core.VolumeMount{
-					{Name: "vol", MountPath: "/vol"},
-					{Name: "vol", MountPath: "/volsub", SubPathExpr: "$(POD_NAME)"},
+					{Name: "vol", MountPath: "/vol", MountPropagation: &propagateNone},
+					{Name: "vol", MountPath: "/volsub", MountPropagation: &propagateNone, SubPathExpr: "$(POD_NAME)"},
 				},
 			},
 		}},
@@ -8547,6 +8568,8 @@ func TestValidateContainers(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
+	propagateNone := core.MountPropagationNone // used in test cases
+
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
@@ -8608,7 +8631,7 @@ func TestValidateContainers(t *testing.T) {
 		"unknown volume name",
 		line(),
 		[]core.Container{
-			{Name: "abc", Image: "image", VolumeMounts: []core.VolumeMount{{Name: "anything", MountPath: "/foo"}},
+			{Name: "abc", Image: "image", VolumeMounts: []core.VolumeMount{{Name: "anything", MountPath: "/foo", MountPropagation: &propagateNone}},
 				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		field.ErrorList{{Type: field.ErrorTypeNotFound, Field: "containers[0].volumeMounts[0].name"}},

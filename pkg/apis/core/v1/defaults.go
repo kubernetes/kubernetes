@@ -216,6 +216,27 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultHostNetworkPorts(&obj.Spec.Containers)
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
 	}
+
+	// Iterate over all containers
+	allCtrs := make([]*v1.Container, 0, len(obj.Spec.Containers)+len(obj.Spec.InitContainers)+len(obj.Spec.EphemeralContainers))
+	for i := range obj.Spec.Containers {
+		allCtrs = append(allCtrs, &obj.Spec.Containers[i])
+	}
+	for i := range obj.Spec.InitContainers {
+		allCtrs = append(allCtrs, &obj.Spec.InitContainers[i])
+	}
+	for i := range obj.Spec.EphemeralContainers {
+		allCtrs = append(allCtrs, (*v1.Container)(&obj.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+	}
+	defMountProp := v1.MountPropagationNone
+	for _, ctr := range allCtrs {
+		for i := range ctr.VolumeMounts {
+			vm := &ctr.VolumeMounts[i]
+			if vm.MountPropagation == nil {
+				vm.MountPropagation = &defMountProp
+			}
+		}
+	}
 }
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:

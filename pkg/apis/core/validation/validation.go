@@ -1295,6 +1295,7 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 	allErrs := field.ErrorList{}
 
 	if mountPropagation == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 		return allErrs
 	}
 
@@ -2906,9 +2907,7 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPathExpr, fldPath.Child("subPathExpr"))...)
 		}
 
-		if mnt.MountPropagation != nil {
-			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
-		}
+		allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 	}
 	return allErrs
 }
