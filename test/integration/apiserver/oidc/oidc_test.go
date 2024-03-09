@@ -35,6 +35,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
@@ -44,6 +45,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -54,6 +56,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 	utilsnet "k8s.io/utils/net"
@@ -959,6 +962,419 @@ jwt:
 	}
 }
 
+func TestStructuredAuthenticationConfigReload(t *testing.T) {
+	const hardCodedTokenCacheTTLAndPollInterval = 10 * time.Second
+
+	origUpdateAuthenticationConfigTimeout := options.UpdateAuthenticationConfigTimeout
+	t.Cleanup(func() { options.UpdateAuthenticationConfigTimeout = origUpdateAuthenticationConfigTimeout })
+	options.UpdateAuthenticationConfigTimeout = 2 * hardCodedTokenCacheTTLAndPollInterval // needs to be large enough for polling to run multiple times
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+
+	tests := []struct {
+		name                          string
+		authConfigFn, newAuthConfigFn authenticationConfigFunc
+		assertErrFn, newAssertErrFn   func(t *testing.T, errorToCheck error)
+		wantUser, newWantUser         *authenticationv1.UserInfo
+		ignoreTransitionErrFn         func(error) bool
+		waitAfterConfigSwap           bool
+	}{
+		{
+			name: "old valid config to new valid config",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'panda-' + claims.sub"   # this is the only new part of the config
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				_ = assert.True(t, apierrors.IsForbidden(errorToCheck)) &&
+					assert.Equal(
+						t,
+						`pods is forbidden: User "panda-john_doe" cannot list resource "pods" in API group "" in the namespace "default"`,
+						errorToCheck.Error(),
+					)
+			},
+			newWantUser: &authenticationv1.UserInfo{
+				Username: "panda-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+		},
+		{
+			name: "old empty config to new valid config",
+			authConfigFn: func(t *testing.T, _, _ string) string {
+				return `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+`
+			},
+			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'snorlax-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
+			},
+			wantUser:              nil,
+			ignoreTransitionErrFn: apierrors.IsUnauthorized,
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				_ = assert.True(t, apierrors.IsForbidden(errorToCheck)) &&
+					assert.Equal(
+						t,
+						`pods is forbidden: User "snorlax-john_doe" cannot list resource "pods" in API group "" in the namespace "default"`,
+						errorToCheck.Error(),
+					)
+			},
+			newWantUser: &authenticationv1.UserInfo{
+				Username: "snorlax-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+		},
+		{
+			name: "old invalid config to new valid config",
+			authConfigFn: func(t *testing.T, issuerURL, _ string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: ""  # missing CA
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID)
+			},
+			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    # this is the only new part of the config
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
+			},
+			wantUser:              nil,
+			ignoreTransitionErrFn: apierrors.IsUnauthorized,
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			newWantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+		},
+		{
+			name: "old valid config to new structurally invalid config (should be ignored)",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claimss.sub"  # has typo
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			newWantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			waitAfterConfigSwap: true,
+		},
+		{
+			name: "old valid config to new valid empty config (should cause tokens to stop working)",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			newAuthConfigFn: func(t *testing.T, _, _ string) string {
+				return `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+`
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.True(t, apierrors.IsUnauthorized(errorToCheck))
+			},
+			newWantUser:         nil,
+			waitAfterConfigSwap: true,
+		},
+		{
+			name: "old valid config to new valid config with typo (should be ignored)",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			newAuthConfigFn: func(t *testing.T, issuerURL, _ string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: ""  # missing CA
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID)
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			newWantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			waitAfterConfigSwap: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testContext(t)
+
+			oidcServer, apiServer, caCert, certPath := configureBasicTestInfrastructureWithRandomKeyType(t, tt.authConfigFn)
+
+			tokenURL, err := oidcServer.TokenURL()
+			require.NoError(t, err)
+
+			client := configureClientFetchingOIDCCredentials(t, apiServer.ClientConfig, caCert, certPath, oidcServer.URL(), tokenURL)
+
+			if tt.wantUser != nil {
+				res, err := client.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+				require.NoError(t, err)
+				assert.Equal(t, *tt.wantUser, res.Status.UserInfo)
+			}
+
+			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
+			tt.assertErrFn(t, err)
+
+			err = os.WriteFile(apiServer.ServerOpts.Authentication.AuthenticationConfigFile, []byte(tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))), 0600)
+			require.NoError(t, err)
+
+			if tt.waitAfterConfigSwap {
+				time.Sleep(options.UpdateAuthenticationConfigTimeout + hardCodedTokenCacheTTLAndPollInterval) // has to be longer than UpdateAuthenticationConfigTimeout
+			}
+
+			if tt.newWantUser != nil {
+				start := time.Now()
+				err = wait.PollUntilContextTimeout(ctx, time.Second, 3*hardCodedTokenCacheTTLAndPollInterval, true, func(ctx context.Context) (done bool, err error) {
+					res, err := client.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+					if err != nil {
+						if tt.ignoreTransitionErrFn != nil && tt.ignoreTransitionErrFn(err) {
+							return false, nil
+						}
+						return false, err
+					}
+
+					diff := cmp.Diff(*tt.newWantUser, res.Status.UserInfo)
+					if len(diff) > 0 && time.Since(start) > 2*hardCodedTokenCacheTTLAndPollInterval {
+						t.Logf("%s saw new user diff:\n%s", t.Name(), diff)
+					}
+
+					return len(diff) == 0, nil
+				})
+				require.NoError(t, err, "new authentication config not loaded")
+			}
+
+			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
+			tt.newAssertErrFn(t, err)
+		})
+	}
+}
+
+func configureBasicTestInfrastructureWithRandomKeyType(t *testing.T, fn authenticationConfigFunc) (
+	oidcServer *utilsoidc.TestServer,
+	apiServer *kubeapiserverapptesting.TestServer,
+	caCertContent []byte,
+	caFilePath string,
+) {
+	t.Helper()
+
+	if randomBool() {
+		return configureBasicTestInfrastructure(t, fn, rsaGenerateKey)
+	}
+
+	return configureBasicTestInfrastructure(t, fn, ecdsaGenerateKey)
+}
+
+func configureBasicTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L)) (
+	oidcServer *utilsoidc.TestServer,
+	apiServer *kubeapiserverapptesting.TestServer,
+	caCertContent []byte,
+	caFilePath string,
+) {
+	t.Helper()
+
+	oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath := configureTestInfrastructure(t, fn, keyFunc)
+
+	oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+		t,
+		signingPrivateKey,
+		map[string]interface{}{
+			"iss": oidcServer.URL(),
+			"sub": defaultOIDCClaimedUsername,
+			"aud": defaultOIDCClientID,
+			"exp": time.Now().Add(10 * time.Minute).Unix(),
+		},
+		defaultStubAccessToken,
+		defaultStubRefreshToken,
+	))
+
+	return oidcServer, apiServer, caCertContent, caFilePath
+}
+
 // TestStructuredAuthenticationDiscoveryURL tests that the discovery URL configured in jwt.issuer.discoveryURL is used to
 // fetch the discovery document and the issuer in jwt.issuer.url is used to validate the ID token.
 func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
@@ -1398,7 +1814,7 @@ func indentCertificateAuthority(caCert string) string {
 }
 
 func testContext(t *testing.T) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	t.Cleanup(cancel)
 	return ctx
 }
