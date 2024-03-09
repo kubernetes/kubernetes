@@ -1976,6 +1976,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			ImageID:     cs.ImageRef,
 			ContainerID: cid,
 		}
+		if oldStatus != nil {
+			status.VolumeMounts = oldStatus.VolumeMounts // immutable
+		}
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
@@ -2116,6 +2119,22 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Name:  container.Name,
 			Image: container.Image,
 			State: defaultWaitingState,
+		}
+		// status.VolumeMounts cannot be propagated from kubecontainer.Status
+		// because the CRI API is unaware of the volume names.
+		if utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
+			for _, vol := range container.VolumeMounts {
+				volStatus := v1.VolumeMountStatus{
+					Name:      vol.Name,
+					MountPath: vol.MountPath,
+					ReadOnly:  vol.ReadOnly,
+				}
+				if vol.ReadOnly {
+					rroMode := v1.RecursiveReadOnlyDisabled
+					volStatus.RecursiveReadOnly = &rroMode // Disabled or Enabled
+				}
+				status.VolumeMounts = append(status.VolumeMounts, volStatus)
+			}
 		}
 		oldStatus, found := oldStatuses[container.Name]
 		if found {
