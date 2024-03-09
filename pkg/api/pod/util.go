@@ -685,6 +685,24 @@ func dropDisabledFields(
 		// For other types of containers, validateContainers will handle them.
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
+		for i := range podSpec.Containers {
+			for j := range podSpec.Containers[i].VolumeMounts {
+				podSpec.Containers[i].VolumeMounts[j].RecursiveReadOnly = nil
+			}
+		}
+		for i := range podSpec.InitContainers {
+			for j := range podSpec.InitContainers[i].VolumeMounts {
+				podSpec.InitContainers[i].VolumeMounts[j].RecursiveReadOnly = nil
+			}
+		}
+		for i := range podSpec.EphemeralContainers {
+			for j := range podSpec.EphemeralContainers[i].VolumeMounts {
+				podSpec.EphemeralContainers[i].VolumeMounts[j].RecursiveReadOnly = nil
+			}
+		}
+	}
+
 	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 }
 
@@ -789,6 +807,18 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	// drop HostIPs to empty (disable PodHostIPs).
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
 		podStatus.HostIPs = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
+		for i := range podStatus.ContainerStatuses {
+			podStatus.ContainerStatuses[i].VolumeMounts = nil
+		}
+		for i := range podStatus.InitContainerStatuses {
+			podStatus.InitContainerStatuses[i].VolumeMounts = nil
+		}
+		for i := range podStatus.EphemeralContainerStatuses {
+			podStatus.EphemeralContainerStatuses[i].VolumeMounts = nil
+		}
 	}
 }
 
@@ -1100,6 +1130,23 @@ func clusterTrustBundleProjectionInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return false
+}
+
+func rroInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		for _, f := range c.VolumeMounts {
+			if f.RecursiveReadOnly != nil {
+				inUse = true
+				return false
+			}
+		}
+		return true
+	})
+	return inUse
 }
 
 func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) {

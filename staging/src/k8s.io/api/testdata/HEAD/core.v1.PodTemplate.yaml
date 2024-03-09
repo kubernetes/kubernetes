@@ -398,6 +398,7 @@ template:
         mountPropagation: mountPropagationValue
         name: nameValue
         readOnly: true
+        recursiveReadOnly: recursiveReadOnlyValue
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue
@@ -613,6 +614,7 @@ template:
         mountPropagation: mountPropagationValue
         name: nameValue
         readOnly: true
+        recursiveReadOnly: recursiveReadOnlyValue
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue
@@ -828,6 +830,7 @@ template:
         mountPropagation: mountPropagationValue
         name: nameValue
         readOnly: true
+        recursiveReadOnly: recursiveReadOnlyValue
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue

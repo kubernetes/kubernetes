@@ -2156,6 +2156,26 @@ type VolumeMount struct {
 	// Defaults to false.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+	// RecursiveReadOnly specifies whether read-only mounts should be handled
+	// recursively.
+	//
+	// If ReadOnly is false, this field has no meaning and must be unspecified.
+	//
+	// If ReadOnly is true, and this field is set to Disabled, the mount is not made
+	// recursively read-only.  If this field is set to IfPossible, the mount is made
+	// recursively read-only, if it is supported by the container runtime.  If this
+	// field is set to Enabled, the mount is made recursively read-only if it is
+	// supported by the container runtime, otherwise the pod will not be started and
+	// an error will be generated to indicate the reason.
+	//
+	// If this field is set to IfPossible or Enabled, MountPropagation must be set to
+	// None (or be unspecified, which defaults to None).
+	//
+	// If this field is not specified, it is treated as an equivalent of Disabled.
+	//
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,7,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
 	// Path within the container at which the volume should be mounted.  Must
 	// not contain ':'.
 	MountPath string `json:"mountPath" protobuf:"bytes,3,opt,name=mountPath"`
@@ -2167,6 +2187,8 @@ type VolumeMount struct {
 	// to container and the other way around.
 	// When not set, MountPropagationNone is used.
 	// This field is beta in 1.10.
+	// When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+	// (which defaults to None).
 	// +optional
 	MountPropagation *MountPropagationMode `json:"mountPropagation,omitempty" protobuf:"bytes,5,opt,name=mountPropagation,casttype=MountPropagationMode"`
 	// Expanded path within the volume from which the container's volume should be mounted.
@@ -2201,6 +2223,18 @@ const (
 	// Note that this mode is recursively applied to all mounts in the volume
 	// ("rshared" in Linux terminology).
 	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
+)
+
+// RecursiveReadOnlyMode describes recursive-readonly mode.
+type RecursiveReadOnlyMode string
+
+const (
+	// RecursiveReadOnlyDisabled disables recursive-readonly mode.
+	RecursiveReadOnlyDisabled RecursiveReadOnlyMode = "Disabled"
+	// RecursiveReadOnlyIfPossible enables recursive-readonly mode if possible.
+	RecursiveReadOnlyIfPossible RecursiveReadOnlyMode = "IfPossible"
+	// RecursiveReadOnlyEnabled enables recursive-readonly mode, or raise an error.
+	RecursiveReadOnlyEnabled RecursiveReadOnlyMode = "Enabled"
 )
 
 // volumeDevice describes a mapping of a raw block device within a container.
@@ -2988,6 +3022,14 @@ type ContainerStatus struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,11,opt,name=resources"`
+	// Status of volume mounts.
+	// +optional
+	// +patchMergeKey=mountPath
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=mountPath
+	// +featureGate=RecursiveReadOnlyMounts
+	VolumeMounts []VolumeMountStatus `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,12,rep,name=volumeMounts"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -3096,6 +3138,23 @@ const (
 	// Requested pod resize is not feasible and will not be re-evaluated.
 	PodResizeStatusInfeasible PodResizeStatus = "Infeasible"
 )
+
+// VolumeMountStatus shows status of volume mounts.
+type VolumeMountStatus struct {
+	// Name corresponds to the name of the original VolumeMount.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// MountPath corresponds to the original VolumeMount.
+	MountPath string `json:"mountPath" protobuf:"bytes,2,opt,name=mountPath"`
+	// ReadOnly corresponds to the original VolumeMount.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+	// An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+	// depending on the mount result.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,4,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
+}
 
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
@@ -5710,6 +5769,26 @@ type NodeDaemonEndpoints struct {
 	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty" protobuf:"bytes,1,opt,name=kubeletEndpoint"`
 }
 
+// NodeRuntimeClassFeatures is a set of runtime features.
+type NodeRuntimeClassFeatures struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty" protobuf:"varint,1,opt,name=recursiveReadOnlyMounts"`
+	// Reserved: UserNamespaces *bool (varint 2, for consistency with CRI API)
+}
+
+// NodeRuntimeClass is a set of runtime class information.
+type NodeRuntimeClass struct {
+	// Runtime class name.
+	// Empty for the default runtime class.
+	// +optional
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// Supported features.
+	// +optional
+	Features *NodeRuntimeClassFeatures `json:"features,omitempty" protobuf:"bytes,2,opt,name=features"`
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
 	// MachineID reported by the node. For unique machine identification
@@ -5846,6 +5925,11 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
+	// The available runtime classes.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	// +listType=atomic
+	RuntimeClasses []NodeRuntimeClass `json:"runtimeClasses,omitempty" protobuf:"bytes,12,rep,name=runtimeClasses"`
 }
 
 type UniqueVolumeName string

@@ -1100,6 +1100,15 @@ message ContainerStatus {
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional ResourceRequirements resources = 11;
+
+  // Status of volume mounts.
+  // +optional
+  // +patchMergeKey=mountPath
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
+  // +featureGate=RecursiveReadOnlyMounts
+  repeated VolumeMountStatus volumeMounts = 12;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -2590,6 +2599,26 @@ message NodeProxyOptions {
   optional string path = 1;
 }
 
+// NodeRuntimeClass is a set of runtime class information.
+message NodeRuntimeClass {
+  // Runtime class name.
+  // Empty for the default runtime class.
+  // +optional
+  optional string name = 1;
+
+  // Supported features.
+  // +optional
+  optional NodeRuntimeClassFeatures features = 2;
+}
+
+// NodeRuntimeClassFeatures is a set of runtime features.
+message NodeRuntimeClassFeatures {
+  // RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional bool recursiveReadOnlyMounts = 1;
+}
+
 // A node selector represents the union of the results of one or more label queries
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
@@ -2745,6 +2774,12 @@ message NodeStatus {
   // Status of the config assigned to the node via the dynamic Kubelet config feature.
   // +optional
   optional NodeConfigStatus config = 11;
+
+  // The available runtime classes.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  // +listType=atomic
+  repeated NodeRuntimeClass runtimeClasses = 12;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -6196,6 +6231,27 @@ message VolumeMount {
   // +optional
   optional bool readOnly = 2;
 
+  // RecursiveReadOnly specifies whether read-only mounts should be handled
+  // recursively.
+  //
+  // If ReadOnly is false, this field has no meaning and must be unspecified.
+  //
+  // If ReadOnly is true, and this field is set to Disabled, the mount is not made
+  // recursively read-only.  If this field is set to IfPossible, the mount is made
+  // recursively read-only, if it is supported by the container runtime.  If this
+  // field is set to Enabled, the mount is made recursively read-only if it is
+  // supported by the container runtime, otherwise the pod will not be started and
+  // an error will be generated to indicate the reason.
+  //
+  // If this field is set to IfPossible or Enabled, MountPropagation must be set to
+  // None (or be unspecified, which defaults to None).
+  //
+  // If this field is not specified, it is treated as an equivalent of Disabled.
+  //
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 7;
+
   // Path within the container at which the volume should be mounted.  Must
   // not contain ':'.
   optional string mountPath = 3;
@@ -6209,6 +6265,8 @@ message VolumeMount {
   // to container and the other way around.
   // When not set, MountPropagationNone is used.
   // This field is beta in 1.10.
+  // When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+  // (which defaults to None).
   // +optional
   optional string mountPropagation = 5;
 
@@ -6218,6 +6276,26 @@ message VolumeMount {
   // SubPathExpr and SubPath are mutually exclusive.
   // +optional
   optional string subPathExpr = 6;
+}
+
+// VolumeMountStatus shows status of volume mounts.
+message VolumeMountStatus {
+  // Name corresponds to the name of the original VolumeMount.
+  optional string name = 1;
+
+  // MountPath corresponds to the original VolumeMount.
+  optional string mountPath = 2;
+
+  // ReadOnly corresponds to the original VolumeMount.
+  // +optional
+  optional bool readOnly = 3;
+
+  // RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+  // An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+  // depending on the mount result.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 4;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.

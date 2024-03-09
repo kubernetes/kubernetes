@@ -480,6 +480,26 @@ func GoRuntime() Setter {
 	}
 }
 
+// RuntimeClasses returns a Setter that sets RuntimeClasses on the node.
+func RuntimeClasses(fn func() []kubecontainer.RuntimeHandler) Setter {
+	return func(ctx context.Context, node *v1.Node) error {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
+			return nil
+		}
+		handlers := fn()
+		node.Status.RuntimeClasses = make([]v1.NodeRuntimeClass, len(handlers))
+		for i, h := range handlers {
+			node.Status.RuntimeClasses[i] = v1.NodeRuntimeClass{
+				Name: h.Name,
+				Features: &v1.NodeRuntimeClassFeatures{
+					RecursiveReadOnlyMounts: &h.SupportsRecursiveReadOnlyMounts,
+				},
+			}
+		}
+		return nil
+	}
+}
+
 // ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
 func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now

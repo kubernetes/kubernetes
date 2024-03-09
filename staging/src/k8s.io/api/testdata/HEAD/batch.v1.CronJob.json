@@ -662,6 +662,7 @@
                   {
                     "name": "nameValue",
                     "readOnly": true,
+                    "recursiveReadOnly": "recursiveReadOnlyValue",
                     "mountPath": "mountPathValue",
                     "subPath": "subPathValue",
                     "mountPropagation": "mountPropagationValue",
@@ -956,6 +957,7 @@
                   {
                     "name": "nameValue",
                     "readOnly": true,
+                    "recursiveReadOnly": "recursiveReadOnlyValue",
                     "mountPath": "mountPathValue",
                     "subPath": "subPathValue",
                     "mountPropagation": "mountPropagationValue",
@@ -1250,6 +1252,7 @@
                   {
                     "name": "nameValue",
                     "readOnly": true,
+                    "recursiveReadOnly": "recursiveReadOnlyValue",
                     "mountPath": "mountPathValue",
                     "subPath": "subPathValue",
                     "mountPropagation": "mountPropagationValue",

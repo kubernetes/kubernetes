@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
@@ -6073,5 +6074,128 @@ func TestParseGetSubIdsOutput(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResolveRecursiveReadOnly(t *testing.T) {
+	testCases := []struct {
+		m                  v1.VolumeMount
+		runtimeSupportsRRO bool
+		expected           bool
+		expectedErr        string
+	}{
+		{
+			m:                  v1.VolumeMount{Name: "rw"},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "ro", ReadOnly: true},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "ro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyDisabled)},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible)},
+			runtimeSupportsRRO: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible),
+				MountPropagation: ptr.To(v1.MountPropagationNone)},
+			runtimeSupportsRRO: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible),
+				MountPropagation: ptr.To(v1.MountPropagationHostToContainer)},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "not compatible with propagation",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro-if-possible", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible),
+				MountPropagation: ptr.To(v1.MountPropagationBidirectional)},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "not compatible with propagation",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro-if-possible", ReadOnly: false, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible)},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "not read-only",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro-if-possible", ReadOnly: false, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyIfPossible)},
+			runtimeSupportsRRO: false,
+			expected:           false,
+			expectedErr:        "not read-only",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled)},
+			runtimeSupportsRRO: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled),
+				MountPropagation: ptr.To(v1.MountPropagationNone)},
+			runtimeSupportsRRO: true,
+			expected:           true,
+			expectedErr:        "",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled),
+				MountPropagation: ptr.To(v1.MountPropagationHostToContainer)},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "not compatible with propagation",
+		},
+		{
+			m: v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled),
+				MountPropagation: ptr.To(v1.MountPropagationBidirectional)},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "not compatible with propagation",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro", RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled)},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "not read-only",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "rro", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyEnabled)},
+			runtimeSupportsRRO: false,
+			expected:           false,
+			expectedErr:        "not supported by the runtime",
+		},
+		{
+			m:                  v1.VolumeMount{Name: "invalid", ReadOnly: true, RecursiveReadOnly: ptr.To(v1.RecursiveReadOnlyMode("foo"))},
+			runtimeSupportsRRO: true,
+			expected:           false,
+			expectedErr:        "unknown recursive read-only mode",
+		},
+	}
+
+	for _, tc := range testCases {
+		got, err := resolveRecursiveReadOnly(tc.m, tc.runtimeSupportsRRO)
+		t.Logf("resolveRecursiveReadOnly(%+v, %v) = (%v, %v)", tc.m, tc.runtimeSupportsRRO, got, err)
+		if tc.expectedErr == "" {
+			assert.Equal(t, tc.expected, got)
+			assert.NoError(t, err)
+		} else {
+			assert.ErrorContains(t, err, tc.expectedErr)
+		}
 	}
 }

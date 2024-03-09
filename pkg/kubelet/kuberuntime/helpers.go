@@ -219,15 +219,18 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 			Message: c.Message,
 		})
 	}
-	retHandlers := make(map[string]kubecontainer.RuntimeHandler)
-	for _, h := range handlers {
+	retHandlers := make([]kubecontainer.RuntimeHandler, len(handlers))
+	for i, h := range handlers {
+		supportsRRO := false
 		supportsUserns := false
 		if h.Features != nil {
+			supportsRRO = h.Features.RecursiveReadOnlyMounts
 			supportsUserns = h.Features.UserNamespaces
 		}
-		retHandlers[h.Name] = kubecontainer.RuntimeHandler{
-			Name:                   h.Name,
-			SupportsUserNamespaces: supportsUserns,
+		retHandlers[i] = kubecontainer.RuntimeHandler{
+			Name:                            h.Name,
+			SupportsRecursiveReadOnlyMounts: supportsRRO,
+			SupportsUserNamespaces:          supportsUserns,
 		}
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers}

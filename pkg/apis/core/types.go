@@ -2011,6 +2011,26 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	// +optional
 	ReadOnly bool
+	// RecursiveReadOnly specifies whether read-only mounts should be handled
+	// recursively.
+	//
+	// If ReadOnly is false, this field has no meaning and must be unspecified.
+	//
+	// If ReadOnly is true, and this field is set to Disabled, the mount is not made
+	// recursively read-only.  If this field is set to IfPossible, the mount is made
+	// recursively read-only, if it is supported by the container runtime.  If this
+	// field is set to Enabled, the mount is made recursively read-only if it is
+	// supported by the container runtime, otherwise the pod will not be started and
+	// an error will be generated to indicate the reason.
+	//
+	// If this field is set to IfPossible or Enabled, MountPropagation must be set to
+	// None (or be unspecified, which defaults to None).
+	//
+	// If this field is not specified, it is treated as an equivalent of Disabled.
+	//
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode
 	// Required. If the path is not an absolute path (e.g. some/path) it
 	// will be prepended with the appropriate root prefix for the operating
 	// system.  On Linux this is '/', on Windows this is 'C:\'.
@@ -2023,6 +2043,8 @@ type VolumeMount struct {
 	// to container and the other way around.
 	// When not set, MountPropagationNone is used.
 	// This field is beta in 1.10.
+	// When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+	// (which defaults to None).
 	// +optional
 	MountPropagation *MountPropagationMode
 	// Expanded path within the volume from which the container's volume should be mounted.
@@ -2056,6 +2078,18 @@ const (
 	// Note that this mode is recursively applied to all mounts in the volume
 	// ("rshared" in Linux terminology).
 	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
+)
+
+// RecursiveReadOnlyMode describes recursive-readonly mode.
+type RecursiveReadOnlyMode string
+
+const (
+	// RecursiveReadOnlyDisabled disables recursive-readonly mode.
+	RecursiveReadOnlyDisabled RecursiveReadOnlyMode = "Disabled"
+	// RecursiveReadOnlyIfPossible enables recursive-readonly mode if possible.
+	RecursiveReadOnlyIfPossible RecursiveReadOnlyMode = "IfPossible"
+	// RecursiveReadOnlyEnabled enables recursive-readonly mode, or raise an error.
+	RecursiveReadOnlyEnabled RecursiveReadOnlyMode = "Enabled"
 )
 
 // VolumeDevice describes a mapping of a raw block device within a container.
@@ -2702,6 +2736,11 @@ type ContainerStatus struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements
+	// Status of volume mounts.
+	// +listType=atomic
+	// +optional
+	// +featureGate=RecursiveReadOnlyMounts
+	VolumeMounts []VolumeMountStatus
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -2774,6 +2813,23 @@ const (
 	// Requested pod resize is not feasible and will not be re-evaluated.
 	PodResizeStatusInfeasible PodResizeStatus = "Infeasible"
 )
+
+// VolumeMountStatus shows status of volume mounts.
+type VolumeMountStatus struct {
+	// Name corresponds to the name of the original VolumeMount.
+	Name string
+	// MountPath corresponds to the original VolumeMount.
+	MountPath string
+	// ReadOnly corresponds to the original VolumeMount.
+	// +optional
+	ReadOnly bool
+	// RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+	// An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+	// depending on the mount result.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode
+}
 
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
@@ -4777,6 +4833,26 @@ type NodeDaemonEndpoints struct {
 	KubeletEndpoint DaemonEndpoint
 }
 
+// NodeRuntimeClassFeatures is a set of runtime features.
+type NodeRuntimeClassFeatures struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnlyMounts *bool
+	// Reserved: UserNamespaces *bool
+}
+
+// NodeRuntimeClass is a set of runtime class information.
+type NodeRuntimeClass struct {
+	// Runtime class name.
+	// Empty for the default runtime class.
+	// +optional
+	Name string
+	// Supported features.
+	// +optional
+	Features *NodeRuntimeClassFeatures
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
 	// MachineID reported by the node. For unique machine identification
@@ -4887,6 +4963,10 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus
+	// The available runtime classes.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RuntimeClasses []NodeRuntimeClass
 }
 
 // UniqueVolumeName defines the name of attached volume

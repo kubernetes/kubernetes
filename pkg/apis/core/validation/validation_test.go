@@ -7118,6 +7118,12 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 		{Name: "ephemeral", MountPath: "/foobar"},
+		{Name: "123", MountPath: "/rro-nil", ReadOnly: true, RecursiveReadOnly: nil},
+		{Name: "123", MountPath: "/rro-disabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyDisabled)},
+		{Name: "123", MountPath: "/rro-disabled-2", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyDisabled)},
+		{Name: "123", MountPath: "/rro-ifpossible", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)},
+		{Name: "123", MountPath: "/rro-enabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)},
+		{Name: "123", MountPath: "/rro-enabled-2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationNone)},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -7140,6 +7146,9 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"name exists in volumeDevice":            {{Name: "xyz", MountPath: "/bar"}},
 		"mountpath exists in volumeDevice":       {{Name: "uvw", MountPath: "/mnt/exists"}},
 		"both exist in volumeDevice":             {{Name: "xyz", MountPath: "/mnt/exists"}},
+		"rro but not ro":                         {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
+		"rro with incompatible propagation":      {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
+		"rro-if-possible but not ro":             {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
 	}
 	badVolumeDevice := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/mnt/exists"},
