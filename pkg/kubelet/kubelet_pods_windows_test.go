@@ -90,7 +90,7 @@ func TestMakeMountsWindows(t *testing.T) {
 	podDir, err := os.MkdirTemp("", "test-rotate-logs")
 	require.NoError(t, err)
 	defer os.RemoveAll(podDir)
-	mounts, _, err := makeMounts(&pod, podDir, &container, "fakepodname", "", []string{""}, podVolumes, fhu, fsp, nil)
+	mounts, _, err := makeMounts(&pod, podDir, &container, "fakepodname", "", []string{""}, podVolumes, fhu, fsp, nil, false)
 	require.NoError(t, err)
 
 	expectedMounts := []kubecontainer.Mount{

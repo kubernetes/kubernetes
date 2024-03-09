@@ -440,6 +440,9 @@ type Mount struct {
 	HostPath string
 	// Whether the mount is read-only.
 	ReadOnly bool
+	// Whether the mount is recursive read-only.
+	// Must not be true if ReadOnly is false.
+	RecursiveReadOnly bool
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
 	// Requested propagation mode
