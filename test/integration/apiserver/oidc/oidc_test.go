@@ -31,6 +31,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -47,6 +48,8 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	authenticationconfigmetrics "k8s.io/apiserver/pkg/server/options/authenticationconfig/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
@@ -963,6 +966,7 @@ jwt:
 }
 
 func TestStructuredAuthenticationConfigReload(t *testing.T) {
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	const hardCodedTokenCacheTTLAndPollInterval = 10 * time.Second
 
 	origUpdateAuthenticationConfigTimeout := options.UpdateAuthenticationConfigTimeout
@@ -978,6 +982,7 @@ func TestStructuredAuthenticationConfigReload(t *testing.T) {
 		wantUser, newWantUser         *authenticationv1.UserInfo
 		ignoreTransitionErrFn         func(error) bool
 		waitAfterConfigSwap           bool
+		wantMetricStrings             []string
 	}{
 		{
 			name: "old valid config to new valid config",
@@ -1036,6 +1041,10 @@ jwt:
 				Username: "panda-john_doe",
 				Groups:   []string{"system:authenticated"},
 			},
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+			},
 		},
 		{
 			name: "old empty config to new valid config",
@@ -1079,6 +1088,10 @@ jwt:
 			newWantUser: &authenticationv1.UserInfo{
 				Username: "snorlax-john_doe",
 				Groups:   []string{"system:authenticated"},
+			},
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
 			},
 		},
 		{
@@ -1130,6 +1143,10 @@ jwt:
 			newWantUser: &authenticationv1.UserInfo{
 				Username: "k8s-john_doe",
 				Groups:   []string{"system:authenticated"},
+			},
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
 			},
 		},
 		{
@@ -1185,6 +1202,10 @@ jwt:
 				Groups:   []string{"system:authenticated"},
 			},
 			waitAfterConfigSwap: true,
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} 1`,
+			},
 		},
 		{
 			name: "old valid config to new valid empty config (should cause tokens to stop working)",
@@ -1224,6 +1245,10 @@ kind: AuthenticationConfiguration
 			},
 			newWantUser:         nil,
 			waitAfterConfigSwap: true,
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+			},
 		},
 		{
 			name: "old valid config to new valid config with typo (should be ignored)",
@@ -1277,11 +1302,18 @@ jwt:
 				Groups:   []string{"system:authenticated"},
 			},
 			waitAfterConfigSwap: true,
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} 1`,
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			authenticationconfigmetrics.ResetMetricsForTest()
+			defer authenticationconfigmetrics.ResetMetricsForTest()
+
 			ctx := testContext(t)
 
 			oidcServer, apiServer, caCert, certPath := configureBasicTestInfrastructureWithRandomKeyType(t, tt.authConfigFn)
@@ -1330,6 +1362,23 @@ jwt:
 
 			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			tt.newAssertErrFn(t, err)
+
+			adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
+			body, err := adminClient.RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
+			require.NoError(t, err)
+			var gotMetricStrings []string
+			trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
+			for _, line := range strings.Split(string(body), "\n") {
+				if strings.HasPrefix(line, "apiserver_authentication_config_controller_") {
+					if strings.Contains(line, "_seconds") {
+						line = trimFP.ReplaceAllString(line, `$1`) + "} FP" // ignore floating point metric values
+					}
+					gotMetricStrings = append(gotMetricStrings, line)
+				}
+			}
+			if diff := cmp.Diff(tt.wantMetricStrings, gotMetricStrings); diff != "" {
+				t.Errorf("unexpected metrics diff (-want +got): %s", diff)
+			}
 		})
 	}
 }
