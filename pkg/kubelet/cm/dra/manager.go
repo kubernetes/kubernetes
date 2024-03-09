@@ -351,6 +351,9 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 				Name:           claimInfo.ClaimName,
 				ResourceHandle: resourceHandle.Data,
 			}
+			if resourceHandle.StructuredData != nil {
+				claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
+			}
 			batches[pluginName] = append(batches[pluginName], claim)
 		}
 		claimInfos[claimInfo.ClaimUID] = claimInfo
