@@ -1321,6 +1321,32 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 	return allErrs
 }
 
+// validateMountRecursiveReadOnly validates RecursiveReadOnly mounts.
+func validateMountRecursiveReadOnly(mount core.VolumeMount, fldPath *field.Path) field.ErrorList {
+	if mount.RecursiveReadOnly == nil {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+	switch *mount.RecursiveReadOnly {
+	case core.RecursiveReadOnlyDisabled:
+		// NOP
+	case core.RecursiveReadOnlyEnabled, core.RecursiveReadOnlyIfPossible:
+		if !mount.ReadOnly {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "may only be specified when readOnly is true"))
+		}
+		if mount.MountPropagation != nil && *mount.MountPropagation != core.MountPropagationNone {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "may only be specified when mountPropagation is None or not specified"))
+		}
+	default:
+		supportedRRO := sets.New(
+			core.RecursiveReadOnlyDisabled,
+			core.RecursiveReadOnlyIfPossible,
+			core.RecursiveReadOnlyEnabled)
+		allErrs = append(allErrs, field.NotSupported(fldPath, *mount.RecursiveReadOnly, sets.List(supportedRRO)))
+	}
+	return allErrs
+}
+
 // ValidateLocalNonReservedPath makes sure targetPath:
 // 1. is not abs path
 // 2. does not contain any '..' elements
@@ -2909,6 +2935,7 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 		if mnt.MountPropagation != nil {
 			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 		}
+		allErrs = append(allErrs, validateMountRecursiveReadOnly(mnt, fldPath.Child("recursiveReadOnly"))...)
 	}
 	return allErrs
 }
