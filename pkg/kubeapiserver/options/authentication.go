@@ -41,6 +41,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	authenticationconfigmetrics "k8s.io/apiserver/pkg/server/options/authenticationconfig/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/client-go/informers"
@@ -588,7 +589,16 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 // ApplyTo requires already applied OpenAPIConfig and EgressSelector if present.
 // The input context controls the lifecycle of background goroutines started to reload the authentication config file.
-func (o *BuiltInAuthenticationOptions) ApplyTo(ctx context.Context, authInfo *genericapiserver.AuthenticationInfo, secureServing *genericapiserver.SecureServingInfo, egressSelector *egressselector.EgressSelector, openAPIConfig *openapicommon.Config, openAPIV3Config *openapicommon.OpenAPIV3Config, extclient kubernetes.Interface, versionedInformer informers.SharedInformerFactory) error {
+func (o *BuiltInAuthenticationOptions) ApplyTo(
+	ctx context.Context,
+	authInfo *genericapiserver.AuthenticationInfo,
+	secureServing *genericapiserver.SecureServingInfo,
+	egressSelector *egressselector.EgressSelector,
+	openAPIConfig *openapicommon.Config,
+	openAPIV3Config *openapicommon.OpenAPIV3Config,
+	extclient kubernetes.Interface,
+	versionedInformer informers.SharedInformerFactory,
+	apiServerID string) error {
 	if o == nil {
 		return nil
 	}
@@ -654,6 +664,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(ctx context.Context, authInfo *ge
 	authInfo.Authenticator = authenticator
 
 	if len(o.AuthenticationConfigFile) > 0 {
+		authenticationconfigmetrics.RegisterMetrics()
 		trackedAuthenticationConfigData := authenticatorConfig.AuthenticationConfigData
 		var mu sync.Mutex
 		go filesystem.WatchUntil(
@@ -661,7 +672,6 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(ctx context.Context, authInfo *ge
 			time.Minute,
 			o.AuthenticationConfigFile,
 			func() {
-				// TODO add metrics
 				// TODO collapse onto shared logic with DynamicEncryptionConfigContent controller
 
 				mu.Lock()
@@ -670,6 +680,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(ctx context.Context, authInfo *ge
 				authConfigBytes, err := os.ReadFile(o.AuthenticationConfigFile)
 				if err != nil {
 					klog.ErrorS(err, "failed to read authentication config file")
+					authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadFailure(apiServerID)
 					// we do not update the tracker here because this error could eventually resolve as we keep retrying
 					return
 				}
@@ -683,6 +694,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(ctx context.Context, authInfo *ge
 				authConfig, err := loadAuthenticationConfigFromData(authConfigBytes)
 				if err != nil {
 					klog.ErrorS(err, "failed to load authentication config")
+					authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadFailure(apiServerID)
 					// this config is not structurally valid and never will be, update the tracker so we stop retrying
 					trackedAuthenticationConfigData = authConfigData
 					return
@@ -690,6 +702,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(ctx context.Context, authInfo *ge
 
 				if err := apiservervalidation.ValidateAuthenticationConfiguration(authConfig, authenticatorConfig.ServiceAccountIssuers).ToAggregate(); err != nil {
 					klog.ErrorS(err, "failed to validate authentication config")
+					authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadFailure(apiServerID)
 					// this config is not semantically valid and never will be, update the tracker so we stop retrying
 					trackedAuthenticationConfigData = authConfigData
 					return
@@ -699,11 +712,14 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(ctx context.Context, authInfo *ge
 				defer timeoutCancel()
 				if err := updateAuthenticationConfig(timeoutCtx, authConfig); err != nil {
 					klog.ErrorS(err, "failed to update authentication config")
+					authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadFailure(apiServerID)
 					// we do not update the tracker here because this error could eventually resolve as we keep retrying
 					return
 				}
 
 				trackedAuthenticationConfigData = authConfigData
+				klog.InfoS("reloaded authentication config")
+				authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID)
 			},
 			func(err error) { klog.ErrorS(err, "watching authentication config file") },
 		)
