@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -95,7 +95,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 	// requestsFromClient returns a helper function to be used with
 	// gomega.Eventually(...). It fetches the logs from the clientPod and returns
 	// them in reverse-chronological order.
-	requestsFromClient := func(clientPod *corev1.Pod) any {
+	requestsFromClient := func(clientPod *v1.Pod) any {
 		return func(ctx context.Context) (reverseChronologicalLogLines []string, err error) {
 			logs, err := e2epod.GetPodLogs(ctx, c, f.Namespace.Name, clientPod.Name, clientPod.Spec.Containers[0].Name)
 			if err != nil {
@@ -130,7 +130,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 			for _, zone := range zones {
 				found := false
 				for _, node := range nodeList.Items {
-					if zone == node.Labels[corev1.LabelTopologyZone] {
+					if zone == node.Labels[v1.LabelTopologyZone] {
 						found = true
 						nodeForZone[zone] = node.GetName()
 					}
@@ -142,7 +142,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 
 			ginkgo.By(fmt.Sprintf("creating 1 pod each in 2 zones %v (out of the total 3 zones)", zones[:2]))
 			zoneForServingPod := make(map[string]string)
-			var servingPods []*corev1.Pod
+			var servingPods []*v1.Pod
 			servingPodLabels := map[string]string{"app": f.UniqueName}
 			for _, zone := range zones[:2] {
 				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "serving-pod-in-"+zone, nil, nil, nil, "serve-hostname")
@@ -156,18 +156,18 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 			}
 			e2epod.NewPodClient(f).CreateBatch(ctx, servingPods)
 
-			trafficDist := corev1.ServiceTrafficDistributionPreferClose
-			svc := createServiceReportErr(ctx, c, f.Namespace.Name, &corev1.Service{
+			trafficDist := v1.ServiceTrafficDistributionPreferClose
+			svc := createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "traffic-dist-test-service",
 				},
-				Spec: corev1.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					Selector:            servingPodLabels,
 					TrafficDistribution: &trafficDist,
-					Ports: []corev1.ServicePort{{
+					Ports: []v1.ServicePort{{
 						Port:       80,
 						TargetPort: intstr.FromInt32(9376),
-						Protocol:   corev1.ProtocolTCP,
+						Protocol:   v1.ProtocolTCP,
 					}},
 				},
 			})
@@ -179,8 +179,9 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 
 			ginkgo.By("keeping traffic within the same zone as the client, when serving pods exist in the same zone")
 
-			createClientPod := func(ctx context.Context, zone string) *corev1.Pod {
+			createClientPod := func(ctx context.Context, zone string) *v1.Pod {
 				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "client-pod-in-"+zone, nil, nil, nil)
+				pod.Spec.NodeName = nodeForZone[zone]
 				nodeSelection := e2epod.NodeSelection{Name: nodeForZone[zone]}
 				e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 				cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
