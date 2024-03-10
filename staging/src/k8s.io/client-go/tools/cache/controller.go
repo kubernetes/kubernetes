@@ -86,6 +86,9 @@ type Config struct {
 
 	// Name is the Reflector's name.
 	ReflectorName string
+
+	// EnableMetrics allows to expose controller metrics
+	EnableMetrics bool
 }
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
@@ -151,6 +154,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
 			Clock:           c.clock,
+			EnableMetrics:   c.config.EnableMetrics,
 		},
 	)
 	r.ShouldResync = c.config.ShouldResync

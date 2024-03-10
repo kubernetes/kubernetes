@@ -54,6 +54,8 @@ type sharedInformerFactory struct {
 	// shuttingDown is true when Shutdown has been called. It may still be running
 	// because it needs to wait for goroutines.
 	shuttingDown bool
+	// enableMetrics allows to expose informer metrics.
+	enableMetrics bool
 }
 
 // WithCustomResyncConfig sets a custom resync period for the specified informer types.
@@ -86,6 +88,14 @@ func WithNamespace(namespace string) SharedInformerOption {
 func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+// WithEnableMetrics sets whether to expose informer metrics.
+func WithEnableMetrics(enableMetrics bool) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.enableMetrics = enableMetrics
 		return factory
 	}
 }

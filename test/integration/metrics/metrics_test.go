@@ -603,7 +603,7 @@ func TestComponentReflectorMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	apiserverConfig.WriteString(fmt.Sprintf(`
+	if _, err = apiserverConfig.WriteString(fmt.Sprintf(`
 apiVersion: v1
 kind: Config
 clusters:
@@ -621,8 +621,12 @@ users:
 - name: controller-manager
   user:
     token: %s
-`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, server.ClientConfig.BearerToken))
-	apiserverConfig.Close()
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, server.ClientConfig.BearerToken)); err != nil {
+		t.Fatal(err)
+	}
+	if err = apiserverConfig.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name       string
@@ -630,8 +634,6 @@ users:
 		extraFlags []string
 	}{
 		{"kube-controller-manager", util.NewKubeControllerManagerTester("daemonset-controller"), nil},
-		{"cloud-controller-manager", util.NewCloudControllerManagerTester(), []string{"--cloud-provider=fake", "--webhook-secure-port=0"}},
-		{"kube-scheduler", util.NewKubeSchedulerTester(), nil},
 	}
 
 	for _, tt := range tests {

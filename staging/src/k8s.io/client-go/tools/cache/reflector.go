@@ -208,8 +208,8 @@ type ReflectorOptions struct {
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
 
-	// DisableMetrics will disable reflector metrics
-	DisableMetrics bool
+	// EnableMetrics allows to expose reflector metrics
+	EnableMetrics bool
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -247,12 +247,11 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		expectedType:      reflect.TypeOf(expectedType),
 	}
 
-	if !options.DisableMetrics {
-		r.metrics = newReflectorMetrics(fmt.Sprintf("reflector_" + options.Name))
-	}
-
 	if r.name == "" {
 		r.name = naming.GetNameFromCallsite(internalPackages...)
+	}
+	if options.EnableMetrics {
+		r.metrics = newReflectorMetrics(fmt.Sprintf("reflector_" + options.Name))
 	}
 
 	if r.typeDescription == "" {

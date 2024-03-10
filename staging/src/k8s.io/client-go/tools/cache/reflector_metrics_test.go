@@ -181,8 +181,9 @@ func TestReflectorRunMetrics(t *testing.T) {
 	stopCh := make(chan struct{})
 	store := NewStore(MetaNamespaceKeyFunc)
 	r := NewReflectorWithOptions(&testLW{}, &v1.Pod{}, store, ReflectorOptions{
-		ResyncPeriod: 0,
-		Clock:        fakeClock,
+		ResyncPeriod:  0,
+		Clock:         fakeClock,
+		EnableMetrics: true,
 	})
 	var fw atomic.Value
 	var numberOfWatches atomic.Uint64
@@ -233,7 +234,7 @@ func TestReflectorRunMetrics(t *testing.T) {
 
 	close(stopCh)
 
-	//ensure reflector metrics are deleted
+	// ensure reflector metrics are deleted
 	err = wait.PollUntilContextTimeout(context.TODO(), time.Microsecond, time.Second, true, func(ctx context.Context) (bool, error) {
 		return metricsProvider.numberOfLists.countValue() == 0 &&
 			metricsProvider.listDuration.observationCount() == 0 &&

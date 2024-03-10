@@ -233,8 +233,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 			// Bump default 5m MinWatchTimeout to avoid recreating
 			// watches too often.
 			MinWatchTimeout: 30 * time.Minute,
-			ResyncPeriod:    0,
-			DisableMetrics:  true,
+			EnableMetrics:   false,
 		},
 	)
 	item := &objectCacheItem{
