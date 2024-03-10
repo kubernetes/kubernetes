@@ -51,8 +51,7 @@ const (
 )
 
 var (
-	noRequests *resource.Quantity = nil
-	noLimits   *resource.Quantity = nil
+	noLimits *resource.Quantity = nil
 )
 
 var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
@@ -463,12 +462,6 @@ func multiplyQuantity(quantity *resource.Quantity, multiplier int64) *resource.Q
 	)
 
 	return resource.NewQuantity(product.Int64(), quantity.Format)
-}
-
-func multiplyQuantities(quantity1, quantity2 *resource.Quantity) *resource.Quantity {
-	product := new(big.Int).Mul(quantity1.AsDec().UnscaledBig(), quantity2.AsDec().UnscaledBig())
-
-	return resource.NewQuantity(product.Int64(), quantity1.Format)
 }
 
 func readCgroupFile(f *framework.Framework, pod *v1.Pod, cgroupFile string) (string, error) {
