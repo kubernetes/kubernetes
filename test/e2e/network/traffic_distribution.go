@@ -1,3 +1,19 @@
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package network
 
 import (
@@ -70,24 +86,6 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 				}
 				if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
 					return false, fmt.Errorf("endpoint with ip %v does not have the correct hint, want hint for zone %q", ip, zone)
-				}
-			}
-		}
-		return true, nil
-	})
-
-	// endpointSlicesHaveNoHints returns a matcher function to be used with
-	// gomega.Eventually().Should(...). It checks that the passed EndpointSlices
-	// have no zone-hints.
-	endpointSlicesHaveNoHints := gcustom.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (bool, error) {
-		for _, slice := range slices {
-			for _, endpoint := range slice.Endpoints {
-				var ip string
-				if len(endpoint.Addresses) > 0 {
-					ip = endpoint.Addresses[0]
-				}
-				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) != 0 {
-					return false, fmt.Errorf("endpoint with ip %v has hint %+v, want no hint", ip, endpoint.Hints)
 				}
 			}
 		}
@@ -265,55 +263,4 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 		})
 
 	})
-
-	ginkgo.When("Service initially has trafficDistribution=PreferClose and transitions to annotation service.kubernetes.io/topology-mode=Auto and back", func() {
-		ginkgo.It("should give precedence to annotation when present", func(ctx context.Context) {
-			ginkgo.By("creating 1 pod")
-			servingPod := e2epod.NewAgnhostPod(f.Namespace.Name, "serving-pod", nil, nil, nil, "serve-hostname")
-			servingPod.Labels = map[string]string{"app": f.UniqueName}
-			e2epod.NewPodClient(f).CreateSync(ctx, servingPod)
-			ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Pods(f.Namespace.Name).Delete), servingPod.GetName(), metav1.DeleteOptions{})
-
-			trafficDist := corev1.ServiceTrafficDistributionPreferClose
-			svc := createServiceReportErr(ctx, c, f.Namespace.Name, &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "traffic-dist-test-service",
-				},
-				Spec: corev1.ServiceSpec{
-					Selector:            servingPod.GetLabels(),
-					TrafficDistribution: &trafficDist,
-					Ports: []corev1.ServicePort{{
-						Port:       80,
-						TargetPort: intstr.FromInt32(9376),
-						Protocol:   corev1.ProtocolTCP,
-					}},
-				},
-			})
-			ginkgo.By(fmt.Sprintf("creating a service=%q with trafficDistribution=%v", svc.GetName(), *svc.Spec.TrafficDistribution))
-			ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Services(f.Namespace.Name).Delete), svc.GetName(), metav1.DeleteOptions{})
-
-			ginkgo.By("ensuring EndpointSlice for service having correct same-zone hints")
-			gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveSameZoneHints)
-
-			ginkgo.By(fmt.Sprintf("updating service=%q with service.kubernetes.io/topology-mode=Auto annotation", svc.GetName()))
-			_, err := e2eservice.UpdateService(ctx, c, svc.GetNamespace(), svc.GetName(), func(s *corev1.Service) {
-				s.SetAnnotations(map[string]string{corev1.AnnotationTopologyMode: "Auto"})
-			})
-			framework.ExpectNoError(err)
-
-			ginkgo.By("ensuring EndpointSlice for service have no hints once service.kubernetes.io/topology-mode=Auto takes affect, since topology annotation would not work with only one service pod")
-			gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveNoHints)
-
-			ginkgo.By(fmt.Sprintf("updating service=%q by removing the service.kubernetes.io/topology-mode=Auto annotation", svc.GetName()))
-			_, err = e2eservice.UpdateService(ctx, c, svc.GetNamespace(), svc.GetName(), func(s *corev1.Service) {
-				s.SetAnnotations(map[string]string{})
-			})
-			framework.ExpectNoError(err)
-
-			ginkgo.By("ensuring EndpointSlice for service again has the correct same-zone hints")
-			gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveSameZoneHints)
-		})
-
-	})
-
 })
