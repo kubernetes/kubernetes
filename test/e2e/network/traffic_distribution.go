@@ -146,7 +146,8 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 			servingPodLabels := map[string]string{"app": f.UniqueName}
 			for _, zone := range zones[:2] {
 				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "serving-pod-in-"+zone, nil, nil, nil, "serve-hostname")
-				pod.Spec.NodeName = nodeForZone[zone]
+				nodeSelection := e2epod.NodeSelection{Name: nodeForZone[zone]}
+				e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 				pod.Labels = servingPodLabels
 
 				servingPods = append(servingPods, pod)
@@ -180,7 +181,8 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 
 			createClientPod := func(ctx context.Context, zone string) *corev1.Pod {
 				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "client-pod-in-"+zone, nil, nil, nil)
-				pod.Spec.NodeName = nodeForZone[zone]
+				nodeSelection := e2epod.NodeSelection{Name: nodeForZone[zone]}
+				e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 				cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
 				pod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 				pod.Spec.Containers[0].Name = pod.Name
