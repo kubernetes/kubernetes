@@ -1297,7 +1297,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.StructuredAuthenticationConfiguration: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.StructuredAuthenticationConfiguration: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.StructuredAuthorizationConfiguration: {Default: true, PreRelease: featuregate.Beta},
 
