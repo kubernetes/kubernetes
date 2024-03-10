@@ -58814,7 +58814,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_VolumeConfiguration(re
 				Properties: map[string]spec.Schema{
 					"EnableHostPathProvisioning": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableHostPathProvisioning enables HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features. HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.",
+							Description: "Deprecated: enableHostPathProvisioning enables HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features. HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
