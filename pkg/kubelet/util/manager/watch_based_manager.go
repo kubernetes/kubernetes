@@ -229,9 +229,8 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		c.newObject(),
 		store,
 		cache.ReflectorOptions{
-			Name:           fmt.Sprintf("object-%q/%q", namespace, name),
-			ResyncPeriod:   0,
-			DisableMetrics: true,
+			Name:         fmt.Sprintf("object-%q/%q", namespace, name),
+			ResyncPeriod: 0,
 		},
 	)
 	item := &objectCacheItem{

@@ -215,6 +215,11 @@ type SharedInformer interface {
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
 	IsStopped() bool
+
+	// SetEnableMetrics specifies whether to expose informer metrics.
+	//
+	// This function should be called before informer Run
+	SetEnableMetrics(enableMetrics bool)
 }
 
 // Opaque interface representing the registration of ResourceEventHandler for
@@ -398,6 +403,13 @@ type sharedIndexInformer struct {
 	watchErrorHandler WatchErrorHandler
 
 	transform TransformFunc
+
+	// enableMetrics allows to expose informer metrics
+	enableMetrics bool
+}
+
+func (s *sharedIndexInformer) SetEnableMetrics(enableMetrics bool) {
+	s.enableMetrics = enableMetrics
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -492,6 +504,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 			Process:           s.HandleDeltas,
 			WatchErrorHandler: s.watchErrorHandler,
 			ReflectorName:     s.name,
+			EnableMetrics:     s.enableMetrics,
 		}
 
 		s.controller = New(cfg)
