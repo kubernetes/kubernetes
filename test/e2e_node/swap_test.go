@@ -115,17 +115,17 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 
 				sleepingPod := getSleepingPod(f.Namespace.Name)
 				sleepingPod = runPodAndWaitUntilScheduled(f, sleepingPod)
-				gomega.Expect(isPodCgroupV2(f, sleepingPod)).To(gomega.BeTrue(), "node uses cgroup v1")
+				gomega.Expect(isPodCgroupV2(f, sleepingPod)).To(gomega.BeTrueBecause("node uses cgroup v1"))
 
 				nodeName = sleepingPod.Spec.NodeName
 				gomega.Expect(nodeName).ToNot(gomega.BeEmpty(), "node name is empty")
 
 				nodeTotalMemory, nodeUsedMemory = getMemoryCapacity(f, nodeName)
-				gomega.Expect(nodeTotalMemory.IsZero()).To(gomega.BeFalse(), "node memory capacity is zero")
-				gomega.Expect(nodeUsedMemory.IsZero()).To(gomega.BeFalse(), "node used memory is zero")
+				gomega.Expect(nodeTotalMemory.IsZero()).To(gomega.BeFalseBecause("node memory capacity is zero"))
+				gomega.Expect(nodeUsedMemory.IsZero()).To(gomega.BeFalseBecause("node used memory is zero"))
 
 				swapCapacity = getSwapCapacity(f, sleepingPod)
-				gomega.Expect(swapCapacity.IsZero()).To(gomega.BeFalse(), "node swap capacity is zero")
+				gomega.Expect(swapCapacity.IsZero()).To(gomega.BeFalseBecause("node swap capacity is zero"))
 
 				err := podClient.Delete(context.Background(), sleepingPod.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -346,7 +346,7 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 
 	isReady, err := testutils.PodRunningReady(pod)
 	framework.ExpectNoError(err)
-	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrue(), "pod should be ready")
+	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrueBecause("pod should be ready"))
 
 	return pod
 }
