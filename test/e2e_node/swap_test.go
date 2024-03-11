@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"math/big"
 	"path/filepath"
 	"strconv"
@@ -320,9 +321,9 @@ func getStressPod(f *framework.Framework, stressSize, memAllocSize *resource.Qua
 			Containers: []v1.Container{
 				{
 					Name:            "stress-container",
-					Image:           "registry.k8s.io/stress:v1",
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullAlways,
-					Args:            []string{"-mem-alloc-size", memAllocSize.String(), "-mem-alloc-sleep", "500ms", "-mem-total", strconv.Itoa(int(stressSize.Value()))},
+					Args:            []string{"stress", "--mem-alloc-size", memAllocSize.String(), "--mem-alloc-sleep", "1000ms", "--mem-total", strconv.Itoa(int(stressSize.Value()))},
 				},
 			},
 		},
