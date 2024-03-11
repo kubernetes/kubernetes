@@ -53,7 +53,12 @@ const (
 	// DiskTypeStandard the type for standard persistent storage
 	DiskTypeStandard = "pd-standard"
 
-	diskTypeDefault               = DiskTypeStandard
+	// DiskTypeBalanced the type for balanced persistent storage
+	DiskTypeBalanced = "pd-balanced"
+
+	// ref: https://cloud.google.com/kubernetes-engine/docs/how-to/custom-boot-disks#specify
+	DiskTypeDefault = DiskTypeBalanced
+
 	diskTypeURITemplateSingleZone = "%s/zones/%s/diskTypes/%s"   // {gce.projectID}/zones/{disk.Zone}/diskTypes/{disk.Type}"
 	diskTypeURITemplateRegional   = "%s/regions/%s/diskTypes/%s" // {gce.projectID}/regions/{disk.Region}/diskTypes/{disk.Type}"
 	diskTypePersistent            = "PERSISTENT"
@@ -783,10 +788,10 @@ func (g *Cloud) CreateRegionalDisk(
 
 func getDiskType(diskType string) (string, error) {
 	switch diskType {
-	case DiskTypeSSD, DiskTypeStandard:
+	case DiskTypeSSD, DiskTypeStandard, DiskTypeBalanced:
 		return diskType, nil
 	case "":
-		return diskTypeDefault, nil
+		return DiskTypeDefault, nil
 	default:
 		return "", fmt.Errorf("invalid GCE disk type %q", diskType)
 	}
