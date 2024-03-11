@@ -173,6 +173,8 @@ func TestList(t *testing.T) {
 }
 
 func TestListWithListFromCache(t *testing.T) {
+	// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove skip.
+	t.Skip("This test flakes flakes due to https://github.com/etcd-io/etcd/issues/17507")
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
