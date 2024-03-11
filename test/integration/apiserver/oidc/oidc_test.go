@@ -1332,7 +1332,19 @@ jwt:
 			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			tt.assertErrFn(t, err)
 
-			err = os.WriteFile(apiServer.ServerOpts.Authentication.AuthenticationConfigFile, []byte(tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))), 0600)
+			// Create a temporary file
+			tempFile, err := os.CreateTemp("", "tempfile")
+			require.NoError(t, err)
+			defer func() {
+				_ = tempFile.Close()
+			}()
+
+			// Write the new content to the temporary file
+			_, err = tempFile.Write([]byte(tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))))
+			require.NoError(t, err)
+
+			// Atomically replace the original file with the temporary file
+			err = os.Rename(tempFile.Name(), apiServer.ServerOpts.Authentication.AuthenticationConfigFile)
 			require.NoError(t, err)
 
 			if tt.waitAfterConfigSwap {
