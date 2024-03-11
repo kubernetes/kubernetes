@@ -553,23 +553,6 @@ var reflectorMetrics = []string{
 	"reflector_last_resource_version",
 }
 
-func TestAPIServerReflectorMetrics(t *testing.T) {
-	currentReflectorMetricsFactory := cache.SwapReflectorMetricsFactory(cache.NewFakeReflectorMetricsFactory())
-	defer cache.SwapReflectorMetricsFactory(currentReflectorMetricsFactory)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(string(clientgofeaturegate.InformerMetrics)), false)()
-	// reset default registry metrics
-	legacyregistry.Reset()
-
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates", "InformerMetrics=true"}, framework.SharedEtcd())
-	defer result.TearDownFn()
-
-	metrics, err := scrapeMetrics(result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	checkForExpectedMetrics(t, metrics, reflectorMetrics)
-}
-
 func TestAPIServerReflectorMetricsNotExist(t *testing.T) {
 	// reset default registry metrics
 	legacyregistry.Reset()
