@@ -123,13 +123,8 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithSeria
 							},
 						},
 					}
-					pod = e2epod.NewPodClient(f).Create(ctx, pod)
-					framework.ExpectNoError(e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout))
-					var err error
-					pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
-					gomega.Expect(pod.Status.ContainerStatuses[0].State.Waiting.Message).To(
-						gomega.ContainSubstring("failed to resolve recursive read-only mode: volume \"mnt\" requested recursive read-only mode, but it is not read-only"))
+					_, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+					gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("spec.containers[0].volumeMounts.recursiveReadOnly: Forbidden: may only be specified when readOnly is true")))
 				}) // By
 				// See also the unit test [pkg/kubelet.TestResolveRecursiveReadOnly] for more invalid conditions (e.g., incompatible mount propagation)
 			}) // It
