@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -135,6 +136,7 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithSeria
 		}) // Context
 		ginkgo.Context("when the runtime does not support recursive read-only mounts", func() {
 			f.It("should accept non-recursive read-only mounts", func(ctx context.Context) {
+				e2eskipper.SkipUnlessFeatureGateEnabled(features.RecursiveReadOnlyMounts)
 				ginkgo.By("waiting for the node to be ready", func() {
 					waitForNodeReady(ctx)
 					if supportsRRO(ctx, f) {
@@ -175,6 +177,7 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithSeria
 				}) // By
 			}) // It
 			f.It("should reject recursive read-only mounts", func(ctx context.Context) {
+				e2eskipper.SkipUnlessFeatureGateEnabled(features.RecursiveReadOnlyMounts)
 				ginkgo.By("waiting for the node to be ready", func() {
 					waitForNodeReady(ctx)
 					if supportsRRO(ctx, f) {
