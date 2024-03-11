@@ -26,6 +26,7 @@ import (
 
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,6 +42,7 @@ import (
 )
 
 func TestStorageVersionCustomResource(t *testing.T) {
+	// ktesting.SetDefaultVerbosity(2)
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
 	etcdConfig := framework.SharedEtcd()
@@ -49,10 +51,11 @@ func TestStorageVersionCustomResource(t *testing.T) {
 			"--runtime-config=internal.apiserver.k8s.io/v1alpha1=true",
 		},
 		etcdConfig)
+	defer server.TearDownFn()
+
 	crdClient := apiextensionsclientset.NewForConfigOrDie(server.ClientConfig)
 	crd := etcd.GetCustomResourceDefinitionData()[0]
 	etcd.CreateTestCRDs(t, crdClient, false, crd)
-	defer server.TearDownFn()
 
 	kubeclient := kubernetes.NewForConfigOrDie(server.ClientConfig)
 	gr := crd.Spec.Group + "." + crd.Spec.Names.Plural
@@ -64,7 +67,7 @@ func TestStorageVersionCustomResource(t *testing.T) {
 	var lastErr error
 	var storageVersion apiserverinternalv1alpha1.ServerStorageVersion
 
-	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 1000*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		sv, err := kubeclient.InternalV1alpha1().StorageVersions().Get(context.TODO(), gr, metav1.GetOptions{})
 		if err != nil {
 			lastErr = fmt.Errorf("failed to get storage version: %v", err)
@@ -139,11 +142,12 @@ func TestStorageVersionCustomResource(t *testing.T) {
 	}
 
 	// cleanup
-	if err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
-		t.Errorf("failed to delete crd: %v", err)
+	if err = fixtures.DeleteV1CustomResourceDefinition(crd, crdClient); err != nil {
+		t.Fatalf("failed to delete CRD: %v", err)
 	}
-	if err := kubeclient.InternalV1alpha1().StorageVersions().Delete(context.TODO(), gr, metav1.DeleteOptions{}); err != nil {
-		t.Errorf("failed to delete storage version: %v", err)
+
+	if err = kubeclient.InternalV1alpha1().StorageVersions().Delete(context.TODO(), gr, metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("failed to delete storage version: %v", err)
 	}
 }
 
@@ -156,10 +160,11 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 			"--runtime-config=internal.apiserver.k8s.io/v1alpha1=true",
 		},
 		etcdConfig)
+	defer server.TearDownFn()
+
 	crdClient := apiextensionsclientset.NewForConfigOrDie(server.ClientConfig)
 	crd := etcd.GetCustomResourceDefinitionData()[0]
 	etcd.CreateTestCRDs(t, crdClient, false, crd)
-	defer server.TearDownFn()
 	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)

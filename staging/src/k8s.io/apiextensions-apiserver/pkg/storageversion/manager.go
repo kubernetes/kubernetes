@@ -26,7 +26,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
 )
 
@@ -98,7 +97,6 @@ func (m *manager) UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1
 	}
 
 	if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
-		utilruntime.HandleError(err)
 		if errCh != nil {
 			close(errCh)
 		}
@@ -113,6 +111,9 @@ func (m *manager) UpdateStorageVersion(ctx context.Context, crd *apiextensionsv1
 }
 
 func (m *manager) updateCRDStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
+	if apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating) {
+		return nil
+	}
 	gr := schema.GroupResource{
 		Group:    crd.Spec.Group,
 		Resource: crd.Spec.Names.Plural,
