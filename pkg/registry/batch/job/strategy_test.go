@@ -2271,7 +2271,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.active"},
 			},
 		},
-		"invalid attempt to transition to Complete=True with terminating > 0": {
+		"transition to Failed condition with terminating>0 and ready>0": {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -2279,19 +2279,16 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
-					StartTime:      &now,
-					CompletionTime: &now,
-					Terminating:    ptr.To[int32](1),
+					StartTime: &now,
 					Conditions: []batch.JobCondition{
 						{
-							Type:   batch.JobComplete,
+							Type:   batch.JobFailed,
 							Status: api.ConditionTrue,
 						},
 					},
+					Terminating: ptr.To[int32](1),
+					Ready:       ptr.To[int32](1),
 				},
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "status.terminating"},
 			},
 		},
 		"invalid attempt to transition to Failed=True with uncountedTerminatedPods.Failed>0": {
@@ -2927,28 +2924,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 					FailedIndexes: ptr.To("invalid format"),
 					Active:        1,
 				},
-			},
-		},
-		"invalid attempt to set more ready pods than active": {
-			enableJobManagedBy: true,
-			job: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Completions: ptr.To[int32](5),
-				},
-			},
-			newJob: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Completions: ptr.To[int32](5),
-				},
-				Status: batch.JobStatus{
-					Active: 1,
-					Ready:  ptr.To[int32](2),
-				},
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "status.ready"},
 			},
 		},
 		"more ready pods than active, but allowed": {

@@ -495,8 +495,7 @@ type JobStatus struct {
 	// type "Complete" and status true.
 	//
 	// A job is considered finished when it is in a terminal condition, either
-	// "Complete" or "Failed". At that point, all pods of the job are in terminal
-	// phase. Job cannot be both in the "Complete" and "Failed" conditions.
+	// "Complete" or "Failed". A Job cannot have both the "Complete" and "Failed" conditions.
 	// Additionally, it cannot be in the "Complete" and "FailureTarget" conditions.
 	// The "Complete", "Failed" and "FailureTarget" conditions cannot be disabled.
 	//
@@ -531,7 +530,6 @@ type JobStatus struct {
 
 	// The number of pods which are terminating (in phase Pending or Running
 	// and have a deletionTimestamp).
-	// The value is zero (or null) for finished jobs.
 	//
 	// This field is beta-level. The job controller populates the field when
 	// the feature gate JobPodReplacementPolicy is enabled (enabled by default).
@@ -539,7 +537,6 @@ type JobStatus struct {
 	Terminating *int32
 
 	// The number of active pods which have a Ready condition.
-	// The value is zero (or null) for finished jobs.
 	// +optional
 	Ready *int32
 

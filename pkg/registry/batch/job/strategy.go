@@ -380,8 +380,6 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isCompletedIndexesChanged := oldJob.Status.CompletedIndexes != newJob.Status.CompletedIndexes
 		isFailedIndexesChanged := !ptr.Equal(oldJob.Status.FailedIndexes, newJob.Status.FailedIndexes)
 		isActiveChanged := oldJob.Status.Active != newJob.Status.Active
-		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
-		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
 		isStartTimeChanged := !ptr.Equal(oldJob.Status.StartTime, newJob.Status.StartTime)
 		isCompletionTimeChanged := !ptr.Equal(oldJob.Status.CompletionTime, newJob.Status.CompletionTime)
 		isUncountedTerminatedPodsChanged := !apiequality.Semantic.DeepEqual(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
@@ -397,9 +395,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectCompletedIndexesForNonIndexedJob:       isCompletedIndexesChanged,
 			RejectFailedIndexesForNoBackoffLimitPerIndex: isFailedIndexesChanged,
 			RejectFailedIndexesOverlappingCompleted:      isFailedIndexesChanged || isCompletedIndexesChanged,
-			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
 			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
-			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
 			RejectFinishedJobWithoutStartTime:            isJobFinishedChanged || isStartTimeChanged,
 			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
 			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged,
