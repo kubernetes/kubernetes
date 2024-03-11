@@ -355,7 +355,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 				if err != nil {
 					return false, err
 				}
-				if policy.Status.TypeChecking != nil {
+				if policy.Status.TypeChecking != nil && len(policy.Status.TypeChecking.ExpressionWarnings) > 0 {
 					return true, nil
 				}
 				return false, nil
