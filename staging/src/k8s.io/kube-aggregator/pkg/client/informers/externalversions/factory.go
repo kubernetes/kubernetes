@@ -204,6 +204,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 
 	informer = newFunc(f.client, resyncPeriod)
 	informer.SetTransform(f.transform)
+	informer.SetEnableMetrics(f.enableMetrics)
 	f.informers[informerType] = informer
 
 	return informer
