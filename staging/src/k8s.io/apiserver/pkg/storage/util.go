@@ -46,10 +46,6 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 	}
 }
 
-func EverythingFunc(runtime.Object) bool {
-	return true
-}
-
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
