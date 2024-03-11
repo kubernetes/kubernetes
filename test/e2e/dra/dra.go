@@ -929,7 +929,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 							"NodeName":   gomega.Equal(nodeName),
 							"DriverName": gomega.Equal(driver.Name),
 							"ResourceModel": gomega.Equal(resourcev1alpha2.ResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{
-								Instances: []resourcev1alpha2.NamedResourcesInstance{{Name: "instance-0"}},
+								Instances: []resourcev1alpha2.NamedResourcesInstance{{Name: "instance-00"}},
 							}}),
 						}),
 					)
