@@ -380,7 +380,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 				return fmt.Errorf("NodeUnprepareResources returned result for unknown claim UID %s", claimUID)
 			}
 			if result.Error != "" {
-				return fmt.Errorf("NodeUnprepareResources failed for claim %s/%s: %s", reqClaim.Namespace, reqClaim.Name, err)
+				return fmt.Errorf("NodeUnprepareResources failed for claim %s/%s: %s", reqClaim.Namespace, reqClaim.Name, result.Error)
 			}
 
 			// Delete last pod UID only if unprepare succeeds.
