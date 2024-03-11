@@ -129,7 +129,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 399,
 			},
 			maxSeats:             10,
-			initialSeatsExpected: 8,
+			initialSeatsExpected: 4,
 		},
 		{
 			name:       "request verb is list, no query parameters, count not known",
