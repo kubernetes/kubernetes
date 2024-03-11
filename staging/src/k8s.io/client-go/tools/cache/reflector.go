@@ -780,7 +780,7 @@ loop:
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
-				if meta.GetAnnotations()["k8s.io/initial-events-end"] == "true" {
+				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
 					if exitOnInitialEventsEndBookmark != nil {
 						*exitOnInitialEventsEndBookmark = true
 					}
