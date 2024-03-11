@@ -627,8 +627,8 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 					return true
 				}, time.Minute, 5*time.Second).Should(
 					gomega.BeTrueBecause(
-					"the pod succeeded to start, when it should fail with the admission error",
-				))
+						"the pod succeeded to start, when it should fail with the admission error",
+					))
 			})
 
 			ginkgo.JustAfterEach(func(ctx context.Context) {
