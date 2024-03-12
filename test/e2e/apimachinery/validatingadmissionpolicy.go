@@ -18,6 +18,8 @@ package apimachinery
 
 import (
 	"context"
+	"fmt"
+	"math/rand/v2"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -32,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	applyadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/openapi3"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -130,7 +133,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   Description:
 	   The ValidatingAdmissionPolicy should type check the expressions defined inside policy.
 	*/
-	framework.ConformanceIt("should type check validation expressions", func(ctx context.Context) {
+	framework.It("should type check validation expressions", func(ctx context.Context) {
 		var policy *admissionregistrationv1.ValidatingAdmissionPolicy
 		ginkgo.By("creating the policy with correct types", func() {
 			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".correct-policy.example.com").
@@ -280,7 +283,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   Description:
 	   The ValidatingAdmissionPolicy should type check a CRD.
 	*/
-	framework.ConformanceIt("should type check a CRD", func(ctx context.Context) {
+	framework.It("should type check a CRD", func(ctx context.Context) {
 		crd := crontabExampleCRD()
 		crd.Spec.Group = "stable." + f.UniqueName
 		crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
@@ -356,6 +359,16 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 					return false, err
 				}
 				if policy.Status.TypeChecking != nil {
+					// TODO(#123829) Remove once the schema watcher is merged.
+					// If the warnings are empty, touch the policy to retry type checking
+					if len(policy.Status.TypeChecking.ExpressionWarnings) == 0 {
+						applyConfig := applyadmissionregistrationv1.ValidatingAdmissionPolicy(policy.Name).WithLabels(map[string]string{
+							"touched": time.Now().String(),
+							"random":  fmt.Sprintf("%d", rand.Int()),
+						})
+						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{})
+						return false, err
+					}
 					return true, nil
 				}
 				return false, nil
