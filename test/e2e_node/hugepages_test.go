@@ -264,7 +264,8 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 		ginkgo.By("Verifying that the node now supports huge pages with size 3Mi")
 		value, ok := node.Status.Allocatable["memory"]
 		// if !ok {
-		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, ok)
+		kubeletConfig, _ := getCurrentKubeletConfig(ctx)
+		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, resource.MustParse(kubeletConfig.EvictionHard["memory.available"]), ok)
 		// }
 
 	})
