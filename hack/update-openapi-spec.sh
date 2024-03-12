@@ -71,6 +71,7 @@ fi
 
 # Start kube-apiserver
 # omit enums from static openapi snapshots used to generate clients until #109177 is resolved
+# TODO(aojea) remove ConsistentListFromCache after https://issues.k8s.io/123674
 kube::log::status "Starting kube-apiserver"
 kube-apiserver \
   --bind-address="${API_HOST}" \
@@ -78,7 +79,7 @@ kube-apiserver \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --feature-gates=AllAlpha=true,OpenAPIEnums=false \
+  --feature-gates=AllAlpha=true,OpenAPIEnums=false,ConsistentListFromCache=false \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --authorization-mode=RBAC \
