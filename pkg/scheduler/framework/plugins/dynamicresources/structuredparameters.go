@@ -116,7 +116,7 @@ func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClas
 				p.parameters = append(p.parameters, request.VendorParameters)
 				p.requests = append(p.requests, request.ResourceRequestModel.NamedResources)
 			default:
-				return nil, fmt.Errorf("claim parameters %s: driverRequersts[%d].requests[%d]: no supported structured parameters found", klog.KObj(claimParameters), i, e)
+				return nil, fmt.Errorf("claim parameters %s: driverRequests[%d].requests[%d]: no supported structured parameters found", klog.KObj(claimParameters), i, e)
 			}
 		}
 		if len(p.requests) > 0 {
