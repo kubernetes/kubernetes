@@ -83,7 +83,11 @@ func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2li
 			if model[structured.NodeName] == nil {
 				model[structured.NodeName] = make(map[string]ResourceModels)
 			}
-			resource := model[structured.NodeName][handle.DriverName]
+			driverName := handle.DriverName
+			if driverName == "" {
+				driverName = claim.Status.DriverName
+			}
+			resource := model[structured.NodeName][driverName]
 			for _, result := range structured.Results {
 				// Call AddAllocation for each known model. Each call itself needs to check for nil.
 				namedresourcesmodel.AddAllocation(&resource.NamedResources, result.NamedResources)
