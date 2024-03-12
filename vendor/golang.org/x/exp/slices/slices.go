@@ -104,8 +104,8 @@ func CompareFunc[E1, E2 any](s1 []E1, s2 []E2, cmp func(E1, E2) int) int {
 // Index returns the index of the first occurrence of v in s,
 // or -1 if not present.
 func Index[E comparable](s []E, v E) int {
-	for i, vs := range s {
-		if v == vs {
+	for i := range s {
+		if v == s[i] {
 			return i
 		}
 	}
@@ -115,8 +115,8 @@ func Index[E comparable](s []E, v E) int {
 // IndexFunc returns the first index i satisfying f(s[i]),
 // or -1 if none do.
 func IndexFunc[E any](s []E, f func(E) bool) int {
-	for i, v := range s {
-		if f(v) {
+	for i := range s {
+		if f(s[i]) {
 			return i
 		}
 	}
@@ -126,6 +126,12 @@ func IndexFunc[E any](s []E, f func(E) bool) int {
 // Contains reports whether v is present in s.
 func Contains[E comparable](s []E, v E) bool {
 	return Index(s, v) >= 0
+}
+
+// ContainsFunc reports whether at least one
+// element e of s satisfies f(e).
+func ContainsFunc[E any](s []E, f func(E) bool) bool {
+	return IndexFunc(s, f) >= 0
 }
 
 // Insert inserts the values v... into s at index i,
@@ -151,10 +157,33 @@ func Insert[S ~[]E, E any](s S, i int, v ...E) S {
 // Delete removes the elements s[i:j] from s, returning the modified slice.
 // Delete panics if s[i:j] is not a valid slice of s.
 // Delete modifies the contents of the slice s; it does not create a new slice.
-// Delete is O(len(s)-(j-i)), so if many items must be deleted, it is better to
+// Delete is O(len(s)-j), so if many items must be deleted, it is better to
 // make a single call deleting them all together than to delete one at a time.
+// Delete might not modify the elements s[len(s)-(j-i):len(s)]. If those
+// elements contain pointers you might consider zeroing those elements so that
+// objects they reference can be garbage collected.
 func Delete[S ~[]E, E any](s S, i, j int) S {
+	_ = s[i:j] // bounds check
+
 	return append(s[:i], s[j:]...)
+}
+
+// Replace replaces the elements s[i:j] by the given v, and returns the
+// modified slice. Replace panics if s[i:j] is not a valid slice of s.
+func Replace[S ~[]E, E any](s S, i, j int, v ...E) S {
+	_ = s[i:j] // verify that i:j is a valid subslice
+	tot := len(s[:i]) + len(v) + len(s[j:])
+	if tot <= cap(s) {
+		s2 := s[:tot]
+		copy(s2[i+len(v):], s[j:])
+		copy(s2[i:], v)
+		return s2
+	}
+	s2 := make(S, tot)
+	copy(s2, s[:i])
+	copy(s2[i:], v)
+	copy(s2[i+len(v):], s[j:])
+	return s2
 }
 
 // Clone returns a copy of the slice.
@@ -170,17 +199,20 @@ func Clone[S ~[]E, E any](s S) S {
 // Compact replaces consecutive runs of equal elements with a single copy.
 // This is like the uniq command found on Unix.
 // Compact modifies the contents of the slice s; it does not create a new slice.
+// When Compact discards m elements in total, it might not modify the elements
+// s[len(s)-m:len(s)]. If those elements contain pointers you might consider
+// zeroing those elements so that objects they reference can be garbage collected.
 func Compact[S ~[]E, E comparable](s S) S {
-	if len(s) == 0 {
+	if len(s) < 2 {
 		return s
 	}
 	i := 1
-	last := s[0]
-	for _, v := range s[1:] {
-		if v != last {
-			s[i] = v
+	for k := 1; k < len(s); k++ {
+		if s[k] != s[k-1] {
+			if i != k {
+				s[i] = s[k]
+			}
 			i++
-			last = v
 		}
 	}
 	return s[:i]
@@ -188,16 +220,16 @@ func Compact[S ~[]E, E comparable](s S) S {
 
 // CompactFunc is like Compact but uses a comparison function.
 func CompactFunc[S ~[]E, E any](s S, eq func(E, E) bool) S {
-	if len(s) == 0 {
+	if len(s) < 2 {
 		return s
 	}
 	i := 1
-	last := s[0]
-	for _, v := range s[1:] {
-		if !eq(v, last) {
-			s[i] = v
+	for k := 1; k < len(s); k++ {
+		if !eq(s[k], s[k-1]) {
+			if i != k {
+				s[i] = s[k]
+			}
 			i++
-			last = v
 		}
 	}
 	return s[:i]
@@ -205,11 +237,19 @@ func CompactFunc[S ~[]E, E any](s S, eq func(E, E) bool) S {
 
 // Grow increases the slice's capacity, if necessary, to guarantee space for
 // another n elements. After Grow(n), at least n elements can be appended
-// to the slice without another allocation. Grow may modify elements of the
-// slice between the length and the capacity. If n is negative or too large to
+// to the slice without another allocation. If n is negative or too large to
 // allocate the memory, Grow panics.
 func Grow[S ~[]E, E any](s S, n int) S {
-	return append(s, make(S, n)...)[:len(s)]
+	if n < 0 {
+		panic("cannot be negative")
+	}
+	if n -= cap(s) - len(s); n > 0 {
+		// TODO(https://go.dev/issue/53888): Make using []E instead of S
+		// to workaround a compiler bug where the runtime.growslice optimization
+		// does not take effect. Revert when the compiler is fixed.
+		s = append([]E(s)[:cap(s)], make([]E, n)...)[:len(s)]
+	}
+	return s
 }
 
 // Clip removes unused capacity from the slice, returning s[:len(s):len(s)].
