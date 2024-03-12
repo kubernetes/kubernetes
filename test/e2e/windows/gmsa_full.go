@@ -144,7 +144,7 @@ var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framew
 			gomega.Eventually(ctx, func() error {
 				output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", "/QUERY")
 				if err != nil {
-					return fmt.Errorf("unable to run command in container via exec: %v", err)
+					return fmt.Errorf("unable to run command in container via exec: %w", err)
 				}
 
 				if !isValidOutput(output) {
@@ -152,7 +152,7 @@ var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framew
 					// https://kubernetes.io/docs/tasks/configure-pod-container/configure-gmsa/#troubleshooting
 					output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", fmt.Sprintf("/sc_reset:%s", gmsaDomain))
 					if err != nil {
-						return fmt.Errorf("unable to run command in container via exec: %s", err)
+						return fmt.Errorf("unable to run command in container via exec: %w", err)
 					}
 					return fmt.Errorf("failed to connect to domain; tried resetting the domain, output:\n%v", string(output))
 				}
