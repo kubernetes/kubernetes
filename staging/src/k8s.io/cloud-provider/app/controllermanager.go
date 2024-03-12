@@ -213,20 +213,20 @@ func createOrUpdateWebhookConfiguration(ctx context.Context, webhooks map[string
 		} else {
 			if !apierrors.IsAlreadyExists(err) {
 				klog.ErrorS(err, "Unable to create validating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidatingWebhookConfiguration))
-				return fmt.Errorf("unable to create validating webhook configuration with API server %v", err)
+				return fmt.Errorf("unable to create validating webhook configuration with API server %w", err)
 			}
 
 			currentConfiguration, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, webhooksConfig.ValidatingWebhookConfiguration.Name, metav1.GetOptions{})
 			if err != nil {
 				klog.ErrorS(err, "Unable to create validating webhook configuration with API server, error getting existing webhook configuration", "webhookconfiguration", webhooksConfig.ValidatingWebhookConfiguration.Name)
-				return fmt.Errorf("unable to get validating webhook configuration from API server %v", err)
+				return fmt.Errorf("unable to get validating webhook configuration from API server %w", err)
 			}
 			currentConfiguration.Webhooks = webhooksConfig.ValidatingWebhookConfiguration.Webhooks
 
 			_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, currentConfiguration, metav1.UpdateOptions{})
 			if err != nil {
 				klog.ErrorS(err, "Unable to update validating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidatingWebhookConfiguration))
-				return fmt.Errorf("unable to update validating webhook configuration with API server %v", err)
+				return fmt.Errorf("unable to update validating webhook configuration with API server %w", err)
 			}
 		}
 	}
@@ -238,20 +238,20 @@ func createOrUpdateWebhookConfiguration(ctx context.Context, webhooks map[string
 		} else {
 			if !apierrors.IsAlreadyExists(err) {
 				klog.ErrorS(err, "Unable to create mutating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.MutatingWebhookConfiguration))
-				return fmt.Errorf("unable to create mutating webhook configuration with API server %v", err)
+				return fmt.Errorf("unable to create mutating webhook configuration with API server %w", err)
 			}
 
 			currentConfiguration, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhooksConfig.MutatingWebhookConfiguration.Name, metav1.GetOptions{})
 			if err != nil {
 				klog.ErrorS(err, "Unable to create mutating webhook configuration with API server, error fetching existing webhook configuration", "webhookconfiguration", webhooksConfig.MutatingWebhookConfiguration.Name)
-				return fmt.Errorf("unable to get mutating webhook configuration from API server %v", err)
+				return fmt.Errorf("unable to get mutating webhook configuration from API server %w", err)
 			}
 			currentConfiguration.Webhooks = webhooksConfig.MutatingWebhookConfiguration.Webhooks
 
 			_, err = kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, currentConfiguration, metav1.UpdateOptions{})
 			if err != nil {
 				klog.ErrorS(err, "Unable to update mutating webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.MutatingWebhookConfiguration))
-				return fmt.Errorf("unable to update mutating webhook configuration with API server %v", err)
+				return fmt.Errorf("unable to update mutating webhook configuration with API server %w", err)
 			}
 		}
 	}

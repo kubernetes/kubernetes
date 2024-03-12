@@ -100,7 +100,7 @@ func (o *WebhookOptions) Validate(validatingWebhooks, mutatingWebhooks, disabled
 		if o.ValidatingWebhookConfiguration.Name == "" {
 			allErrors = append(allErrors, errors.New("validating webhook configuration name can't be empty"))
 		}
-		webhookConfigs := sets.NewString()
+		webhookConfigs := sets.New[string]()
 		for _, webhookConfig := range o.ValidatingWebhookConfiguration.Webhooks {
 			webhookConfigs.Insert(webhookConfig.Name)
 		}
@@ -114,7 +114,7 @@ func (o *WebhookOptions) Validate(validatingWebhooks, mutatingWebhooks, disabled
 		if o.MutatingWebhookConfiguration.Name == "" {
 			allErrors = append(allErrors, errors.New("mutating webhook configuration name can't be empty"))
 		}
-		webhookConfigs := sets.NewString()
+		webhookConfigs := sets.New[string]()
 		for _, webhookConfig := range o.MutatingWebhookConfiguration.Webhooks {
 			webhookConfigs.Insert(webhookConfig.Name)
 		}
@@ -134,7 +134,7 @@ func (o *WebhookOptions) getEnabledWebhooks(webhooks, disabledByDefaultWebhooks 
 	return enabledWebhooks
 }
 
-func (o *WebhookOptions) validateWebhookConfiguration(webhookConfigs sets.String, webhooks []string) []error {
+func (o *WebhookOptions) validateWebhookConfiguration(webhookConfigs sets.Set[string], webhooks []string) []error {
 	allErrors := []error{}
 	for _, name := range webhooks {
 		if !webhookConfigs.Has(name) {
@@ -181,7 +181,7 @@ func (o *WebhookOptions) ApplyTo(cfg *config.WebhookConfiguration) error {
 func LoadConfigurationFromFile(path string, config runtime.Object) error {
 	configDef, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read file path %q: %+v", path, err)
+		return fmt.Errorf("failed to read file path %q: %w", path, err)
 	}
 
 	decoder := serializer.NewCodecFactory(runtime.NewScheme()).UniversalDecoder(admissionregistrationv1.SchemeGroupVersion)
@@ -287,7 +287,7 @@ func (o *WebhookServingOptions) ApplyTo(webhookCfg *config.WebhookConfiguration,
 	if webhookCfg.WebhookAddress == "0.0.0.0" {
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
-			return fmt.Errorf("failed to get host ip %v", err)
+			return fmt.Errorf("failed to get host ip %w", err)
 		}
 		webhookCfg.WebhookAddress = ip.String()
 	}
@@ -322,14 +322,14 @@ func (o *WebhookServingOptions) ApplyTo(webhookCfg *config.WebhookConfiguration,
 		webhookCfg.CaBundle = string(caCert)
 	} else {
 		if err := o.MaybeDefaultWithSelfSignedCerts(webhookCfg.WebhookAddress, nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
-			return fmt.Errorf("error creating self-signed certificates for webhook: %v", err)
+			return fmt.Errorf("error creating self-signed certificates for webhook: %w", err)
 		}
 		(*cfg).Cert = o.ServerCert.GeneratedCert
 
 		cert, _ := o.ServerCert.GeneratedCert.CurrentCertKeyContent()
 		certs, err := certutil.ParseCertsPEM(cert)
 		if err != nil {
-			return fmt.Errorf("error parsing the certs %v", err)
+			return fmt.Errorf("error parsing the certs %w", err)
 		}
 		if len(certs) < 2 {
 			return fmt.Errorf("generated cert doesn't have the root cert, has only %v certs", len(certs))
@@ -340,7 +340,7 @@ func (o *WebhookServingOptions) ApplyTo(webhookCfg *config.WebhookConfiguration,
 			Bytes: certs[1].Raw,
 		})
 		if err != nil {
-			return fmt.Errorf("error encoding ca cert %v", err)
+			return fmt.Errorf("error encoding ca cert %w", err)
 		}
 		webhookCfg.CaBundle = caPEM.String()
 	}
