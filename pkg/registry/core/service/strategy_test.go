@@ -845,6 +845,22 @@ func TestMatchService(t *testing.T) {
 			expectMatch:   false,
 		},
 		{
+			name: "match on loadbalancer type service",
+			in: &api.Service{
+				Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			expectMatch:   true,
+		},
+		{
+			name: "no match on nodeport type service",
+			in: &api.Service{
+				Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			expectMatch:   false,
+		},
+		{
 			name: "match on headless service",
 			in: &api.Service{
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
