@@ -217,6 +217,9 @@ var _ = SIGDescribe("Checkpoint Container", nodefeature.CheckpointContainer, fun
 			// or
 			// '(rpc error: code = Unknown desc = checkpoint/restore support not available)'
 			// if the container engine explicitly disabled the checkpoint/restore support
+			// or
+			// '(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container'
+			// if the CRIU binary was not found if it is too old
 			if (int(statusError.ErrStatus.Code)) == http.StatusInternalServerError {
 				if strings.Contains(
 					statusError.ErrStatus.Message,
@@ -237,6 +240,13 @@ var _ = SIGDescribe("Checkpoint Container", nodefeature.CheckpointContainer, fun
 					"(rpc error: code = Unknown desc = checkpoint/restore support not available)",
 				) {
 					ginkgo.Skip("Container engine does not implement 'CheckpointContainer'")
+					return
+				}
+				if strings.Contains(
+					statusError.ErrStatus.Message,
+					"(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container",
+				) {
+					ginkgo.Skip("Container engine reports missing or too old CRIU binary")
 					return
 				}
 			}
