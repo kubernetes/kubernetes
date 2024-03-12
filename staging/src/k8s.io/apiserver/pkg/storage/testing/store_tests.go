@@ -1341,7 +1341,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, [
 	return initialRV, created, nil
 }
 
-func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Compaction, store storage.Interface) {
 	key, prevStoredObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
 
@@ -1354,7 +1354,11 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		}, nil); err != nil {
 		t.Fatalf("update failed: %v", err)
 	}
-	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+	objRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+	// Use compact to increase etcd global revision without changes to any resources.
+	// The increase in resources version comes from Kubernetes compaction updating hidden key.
+	// Used to test consistent List to confirm it returns latest etcd revision.
+	compaction(ctx, t, prevStoredObj.ResourceVersion)
 
 	tests := []struct {
 		name                 string
@@ -1388,13 +1392,13 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{*storedObj},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 	}, {
 		name:        "existing key, resourceVersion=current, resourceVersionMatch=notOlderThan",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{*storedObj},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 	}, {
 		name:                 "existing key, resourceVersion=previous, resourceVersionMatch=notOlderThan",
@@ -1408,7 +1412,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{*storedObj},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 		rvMatch:     metav1.ResourceVersionMatchExact,
 	}, {
 		name:        "existing key, resourceVersion=previous, resourceVersionMatch=exact",
@@ -1453,7 +1457,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 			},
 		},
 		expectedOut: []example.Pod{},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 	}}
 
 	for _, tt := range tests {
