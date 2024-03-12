@@ -187,7 +187,7 @@
         "google.golang.org/api"
       ],
       "golang.org/x/exp": [
-        "github.com/antlr/antlr4/runtime/Go/antlr/v4",
+        "github.com/antlr4-go/antlr/v4",
         "github.com/google/cel-go"
       ],
       "google.golang.org/api": [
