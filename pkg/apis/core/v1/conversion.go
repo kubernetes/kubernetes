@@ -97,6 +97,9 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err := AddFieldLabelConversionsForSecret(scheme); err != nil {
 		return err
 	}
+	if err := AddFieldLabelConversionsForService(scheme); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -481,6 +484,20 @@ func AddFieldLabelConversionsForSecret(scheme *runtime.Scheme) error {
 			case "type",
 				"metadata.namespace",
 				"metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+}
+
+func AddFieldLabelConversionsForService(scheme *runtime.Scheme) error {
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Service"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.namespace",
+				"metadata.name",
+				"spec.clusterIP":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
