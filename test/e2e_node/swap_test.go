@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
 	"math/big"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -77,14 +75,14 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 			switch swapBehavior := getSwapBehavior(); swapBehavior {
 			case types.LimitedSwap:
 				if qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit {
-					expectNoSwap(pod)
+					expectNoSwap(f, pod)
 				} else {
 					expectedSwapLimit := calcSwapForBurstablePod(f, pod)
-					expectLimitedSwap(pod, expectedSwapLimit)
+					expectLimitedSwap(f, pod, expectedSwapLimit)
 				}
 
 			case types.NoSwap, "":
-				expectNoSwap(pod)
+				expectNoSwap(f, pod)
 
 			default:
 				gomega.Expect(swapBehavior).To(gomega.Or(gomega.Equal(types.LimitedSwap), gomega.Equal(types.NoSwap)), "unknown swap behavior")
@@ -189,7 +187,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
 
 						var err error
-						swapUsage, err = getSwapUsage(stressPod)
+						swapUsage, err = getSwapUsage(f, stressPod)
 						if err != nil {
 							return err
 						}
@@ -231,12 +229,12 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
 
 						var err error
-						swapUsage, err = getSwapUsage(stressPod)
+						swapUsage, err = getSwapUsage(f, stressPod)
 						if err != nil {
 							return err
 						}
 
-						memoryUsage, err = getMemoryUsage(stressPod)
+						memoryUsage, err = getMemoryUsage(f, stressPod)
 						if err != nil {
 							return err
 						}
@@ -366,19 +364,19 @@ func isPodCgroupV2(f *framework.Framework, pod *v1.Pod) bool {
 	return output == "true"
 }
 
-func expectNoSwap(pod *v1.Pod) {
+func expectNoSwap(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By("expecting no swap")
 	const offest = 1
 
-	swapLimit, err := readCgroupFile(pod, cgroupV2SwapLimitFile)
+	swapLimit, err := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
 	gomega.ExpectWithOffset(offest, err).ToNot(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(offest, swapLimit).To(gomega.Equal("0"), "max swap allowed should be zero")
 }
 
 // supports v2 only as v1 shouldn't support LimitedSwap
-func expectLimitedSwap(pod *v1.Pod, expectedSwapLimit int64) {
+func expectLimitedSwap(f *framework.Framework, pod *v1.Pod, expectedSwapLimit int64) {
 	ginkgo.By("expecting limited swap")
-	swapLimitStr, err := readCgroupFile(pod, cgroupV2SwapLimitFile)
+	swapLimitStr, err := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
 	framework.ExpectNoError(err)
 
 	swapLimit, err := strconv.Atoi(swapLimitStr)
@@ -473,43 +471,11 @@ func multiplyQuantities(quantity1, quantity2 *resource.Quantity) *resource.Quant
 	return resource.NewQuantity(product.Int64(), quantity1.Format)
 }
 
-func getPodCgroupPath(pod *v1.Pod) string {
-	podQos := qos.GetPodQOS(pod)
-	cgroupQosComponent := ""
+func readCgroupFile(f *framework.Framework, pod *v1.Pod, cgroupFile string) (string, error) {
+	cgroupPath := filepath.Join(cgroupBasePath, cgroupFile)
 
-	switch podQos {
-	case v1.PodQOSBestEffort:
-		cgroupQosComponent = bestEffortCgroup
-	case v1.PodQOSBurstable:
-		cgroupQosComponent = burstableCgroup
-	}
-
-	var rootCgroupName cm.CgroupName
-	if cgroupQosComponent != "" {
-		rootCgroupName = cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, cgroupQosComponent)
-	} else {
-		rootCgroupName = cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)
-	}
-
-	cgroupsToVerify := "pod" + string(pod.UID)
-	cgroupName := cm.NewCgroupName(rootCgroupName, cgroupsToVerify)
-	cgroupFsPath := toCgroupFsName(cgroupName)
-
-	return filepath.Join(cgroupBasePath, cgroupFsPath)
-}
-
-func readCgroupFile(pod *v1.Pod, cgroupFile string) (string, error) {
-	cgroupPath := getPodCgroupPath(pod)
-	cgroupFilePath := filepath.Join(cgroupPath, cgroupFile)
-
-	ginkgo.By("Reading cgroup file: " + cgroupFilePath)
-	cmd := "cat " + cgroupFilePath
-	outputBytes, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("error running cmd %s: %w", cmd, err)
-	}
-
-	outputStr := strings.TrimSpace(string(outputBytes))
+	outputStr := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "sh", "-c", "cat "+cgroupPath)
+	outputStr = strings.TrimSpace(outputStr)
 	ginkgo.By("cgroup found value: " + outputStr)
 
 	return outputStr, nil
@@ -524,8 +490,8 @@ func parseBytesStrToQuantity(bytesStr string) (*resource.Quantity, error) {
 	return resource.NewQuantity(bytesInt, resource.BinarySI), nil
 }
 
-func getSwapUsage(pod *v1.Pod) (*resource.Quantity, error) {
-	outputStr, err := readCgroupFile(pod, cgroupV2swapCurrentUsageFile)
+func getSwapUsage(f *framework.Framework, pod *v1.Pod) (*resource.Quantity, error) {
+	outputStr, err := readCgroupFile(f, pod, cgroupV2swapCurrentUsageFile)
 	if err != nil {
 		return nil, err
 	}
@@ -535,8 +501,8 @@ func getSwapUsage(pod *v1.Pod) (*resource.Quantity, error) {
 	return parseBytesStrToQuantity(outputStr)
 }
 
-func getMemoryUsage(pod *v1.Pod) (*resource.Quantity, error) {
-	outputStr, err := readCgroupFile(pod, cgroupV2MemoryCurrentUsageFile)
+func getMemoryUsage(f *framework.Framework, pod *v1.Pod) (*resource.Quantity, error) {
+	outputStr, err := readCgroupFile(f, pod, cgroupV2MemoryCurrentUsageFile)
 	if err != nil {
 		return nil, err
 	}
