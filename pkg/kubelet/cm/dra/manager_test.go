@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,7 +42,6 @@ import (
 )
 
 const (
-	driverName      = "test-cdi-device"
 	driverClassName = "test"
 )
 
@@ -84,7 +84,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(shouldTimeout bool) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(driverName string, shouldTimeout bool) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -137,7 +137,7 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool) (fakeDRAServerInfo, error)
 }
 
 func TestNewManagerImpl(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
+	t.Parallel()
 	for _, test := range []struct {
 		description        string
 		stateFileDirectory string
@@ -153,7 +153,11 @@ func TestNewManagerImpl(t *testing.T) {
 			stateFileDirectory: t.TempDir(),
 		},
 	} {
+		test := test
 		t.Run(test.description, func(t *testing.T) {
+			t.Parallel()
+
+			kubeClient := fake.NewSimpleClientset()
 			manager, err := NewManagerImpl(kubeClient, test.stateFileDirectory, "worker")
 			if test.wantErr {
 				assert.Error(t, err)
@@ -168,8 +172,9 @@ func TestNewManagerImpl(t *testing.T) {
 }
 
 func TestGetResources(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
+	t.Parallel()
 	resourceClaimName := "test-pod-claim-1"
+	driverName := "test-cdi-device"
 
 	for _, test := range []struct {
 		description string
@@ -286,7 +291,11 @@ func TestGetResources(t *testing.T) {
 			wantErr: true,
 		},
 	} {
+		test := test
 		t.Run(test.description, func(t *testing.T) {
+			t.Parallel()
+
+			kubeClient := fake.NewSimpleClientset()
 			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
 			assert.NoError(t, err)
 
@@ -307,11 +316,11 @@ func TestGetResources(t *testing.T) {
 }
 
 func TestPrepareResources(t *testing.T) {
-	fakeKubeClient := fake.NewSimpleClientset()
+	t.Parallel()
 
 	for _, test := range []struct {
-		description          string
-		driverName           string
+		driverName           string // Must be globally unique and not too long.
+		useDriverName        string // If empty, then the same as driverName.
 		pod                  *v1.Pod
 		claimInfo            *ClaimInfo
 		resourceClaim        *resourcev1alpha2.ResourceClaim
@@ -321,8 +330,7 @@ func TestPrepareResources(t *testing.T) {
 		ExpectedPrepareCalls uint32
 	}{
 		{
-			description: "failed to fetch ResourceClaim",
-			driverName:  driverName,
+			driverName: t.Name() + ".failed.to.fetch.ResourceClaim",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -346,8 +354,8 @@ func TestPrepareResources(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			description: "plugin does not exist",
-			driverName:  "this-plugin-does-not-exist",
+			driverName:    t.Name() + "plugin.does.not.exist",
+			useDriverName: t.Name() + "this-plugin-does-not-exist",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -389,10 +397,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClassName: "test-class",
 				},
 				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
+					DriverName: t.Name() + "plugin.does.not.exist",
 					Allocation: &resourcev1alpha2.AllocationResult{
 						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
+							{Data: "test-data", DriverName: t.Name() + "plugin.does.not.exist"},
 						},
 					},
 					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
@@ -403,8 +411,7 @@ func TestPrepareResources(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			description: "pod is not allowed to use resource claim",
-			driverName:  driverName,
+			driverName: t.Name() + ".pod.is.not.allowed.to.use.resource.claim",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -435,10 +442,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClassName: "test-class",
 				},
 				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
+					DriverName: t.Name() + ".pod.is.not.allowed.to.use.resource.claim",
 					Allocation: &resourcev1alpha2.AllocationResult{
 						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
+							{Data: "test-data", DriverName: t.Name() + ".pod.is.not.allowed.to.use.resource.claim"},
 						},
 					},
 				},
@@ -446,8 +453,7 @@ func TestPrepareResources(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			description: "no container actually uses the claim",
-			driverName:  driverName,
+			driverName: t.Name() + ".no.container.actually.uses.the.claim",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -476,10 +482,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClassName: "test-class",
 				},
 				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
+					DriverName: t.Name() + ".no.container.actually.uses.the.claim",
 					Allocation: &resourcev1alpha2.AllocationResult{
 						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
+							{Data: "test-data", DriverName: t.Name() + ".no.container.actually.uses.the.claim"},
 						},
 					},
 					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
@@ -490,8 +496,7 @@ func TestPrepareResources(t *testing.T) {
 			wantResourceSkipped: true,
 		},
 		{
-			description: "resource already prepared",
-			driverName:  driverName,
+			driverName: t.Name() + ".resource.already.prepared",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -523,7 +528,7 @@ func TestPrepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
+					DriverName: t.Name() + ".resource.already.prepared",
 					ClaimName:  "test-pod-claim-4",
 					Namespace:  "test-namespace",
 					PodUIDs:    sets.Set[string]{"test-another-pod-reserved": sets.Empty{}},
@@ -540,10 +545,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClassName: "test-class",
 				},
 				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
+					DriverName: t.Name() + ".resource.already.prepared",
 					Allocation: &resourcev1alpha2.AllocationResult{
 						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
+							{Data: "test-data", DriverName: t.Name() + ".resource.already.prepared"},
 						},
 					},
 					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
@@ -554,8 +559,7 @@ func TestPrepareResources(t *testing.T) {
 			wantResourceSkipped: true,
 		},
 		{
-			description: "should timeout",
-			driverName:  driverName,
+			driverName: t.Name() + ".should.timeout",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -595,10 +599,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClassName: "test-class",
 				},
 				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
+					DriverName: t.Name() + ".should.timeout",
 					Allocation: &resourcev1alpha2.AllocationResult{
 						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
+							{Data: "test-data", DriverName: t.Name() + ".should.timeout"},
 						},
 					},
 					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
@@ -611,8 +615,8 @@ func TestPrepareResources(t *testing.T) {
 			ExpectedPrepareCalls: 1,
 		},
 		{
-			description: "should prepare resource, claim not in cache",
-			driverName:  driverName,
+			// Should prepare resource, claim not in cache.
+			driverName: t.Name() + ".claim.not.in.cache",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -652,7 +656,7 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClassName: "test-class",
 				},
 				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
+					DriverName: t.Name() + ".claim.not.in.cache",
 					Allocation: &resourcev1alpha2.AllocationResult{
 						ResourceHandles: []resourcev1alpha2.ResourceHandle{
 							{Data: "test-data"},
@@ -666,8 +670,8 @@ func TestPrepareResources(t *testing.T) {
 			ExpectedPrepareCalls: 1,
 		},
 		{
-			description: "should prepare resource. claim in cache, manager did not prepare resource",
-			driverName:  driverName,
+			// Should prepare resource. claim in cache, manager did not prepare resource.
+			driverName: t.Name() + ".claim.in.cache",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -699,14 +703,14 @@ func TestPrepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
+					DriverName: t.Name() + ".claim.in.cache",
 					ClassName:  "test-class",
 					ClaimName:  "test-pod-claim",
 					ClaimUID:   "test-reserved",
 					Namespace:  "test-namespace",
 					PodUIDs:    sets.Set[string]{"test-reserved": sets.Empty{}},
 					CDIDevices: map[string][]string{
-						driverName: {fmt.Sprintf("%s/%s=some-device", driverName, driverClassName)},
+						t.Name() + ".claim.in.cache": {fmt.Sprintf("%s/%s=some-device", t.Name()+".claim.in.cache", driverClassName)},
 					},
 					ResourceHandles: []resourcev1alpha2.ResourceHandle{{Data: "test-data"}},
 				},
@@ -723,7 +727,7 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClassName: "test-class",
 				},
 				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
+					DriverName: t.Name() + ".claim.in.cache",
 					Allocation: &resourcev1alpha2.AllocationResult{
 						ResourceHandles: []resourcev1alpha2.ResourceHandle{
 							{Data: "test-data"},
@@ -737,7 +741,12 @@ func TestPrepareResources(t *testing.T) {
 			ExpectedPrepareCalls: 1,
 		},
 	} {
-		t.Run(test.description, func(t *testing.T) {
+		test := test
+		description, _ := strings.CutPrefix(test.driverName, t.Name()+".")
+		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
+			fakeKubeClient := fake.NewSimpleClientset()
 			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
 			if err != nil {
 				t.Fatalf("failed to newClaimInfoCache, err:%v", err)
@@ -754,17 +763,22 @@ func TestPrepareResources(t *testing.T) {
 				}
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
+			driverName := test.driverName
+			draServerInfo, err := setupFakeDRADriverGRPCServer(test.driverName, test.wantTimeout)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, "worker")
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
-				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+			if test.useDriverName != "" {
+				driverName = test.useDriverName
 			}
-			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
+
+			plg := plugin.NewRegistrationHandler(nil, "worker")
+			if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
+				t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
+			}
+			defer plg.DeRegisterPlugin(driverName) // for sake of next tests
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -810,11 +824,12 @@ func TestPrepareResources(t *testing.T) {
 }
 
 func TestUnprepareResources(t *testing.T) {
+	t.Parallel()
 	fakeKubeClient := fake.NewSimpleClientset()
 
 	for _, test := range []struct {
-		description            string
-		driverName             string
+		driverName             string // Must be globally unique and not too long.
+		useDriverName          string // If empty, then the same as driverName.
 		pod                    *v1.Pod
 		claimInfo              *ClaimInfo
 		wantErr                bool
@@ -823,8 +838,8 @@ func TestUnprepareResources(t *testing.T) {
 		expectedUnprepareCalls uint32
 	}{
 		{
-			description: "plugin does not exist",
-			driverName:  "this-plugin-does-not-exist",
+			driverName:    t.Name() + ".plugin.does.not.exist",
+			useDriverName: t.Name() + "this-plugin-does-not-exist",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -847,12 +862,12 @@ func TestUnprepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
+					DriverName: t.Name() + ".plugin.does.not.exist",
 					ClaimName:  "another-claim-test",
 					Namespace:  "test-namespace",
 					ResourceHandles: []resourcev1alpha2.ResourceHandle{
 						{
-							DriverName: driverName,
+							DriverName: t.Name() + ".plugin.does.not.exist",
 							Data:       "test data",
 						},
 					},
@@ -861,8 +876,7 @@ func TestUnprepareResources(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			description: "resource claim referenced by other pod(s)",
-			driverName:  driverName,
+			driverName: t.Name() + ".resource.claim.referenced.by.other.pod(s)",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -894,7 +908,7 @@ func TestUnprepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
+					DriverName: t.Name() + ".resource.claim.referenced.by.other.pod(s)",
 					ClaimName:  "test-pod-claim-1",
 					Namespace:  "test-namespace",
 					PodUIDs:    sets.Set[string]{"test-reserved": sets.Empty{}, "test-reserved-2": sets.Empty{}},
@@ -903,8 +917,7 @@ func TestUnprepareResources(t *testing.T) {
 			wantResourceSkipped: true,
 		},
 		{
-			description: "should timeout",
-			driverName:  driverName,
+			driverName: t.Name() + ".should.timeout",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -936,12 +949,12 @@ func TestUnprepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
+					DriverName: t.Name() + ".should.timeout",
 					ClaimName:  "test-pod-claim-2",
 					Namespace:  "test-namespace",
 					ResourceHandles: []resourcev1alpha2.ResourceHandle{
 						{
-							DriverName: driverName,
+							DriverName: t.Name() + ".should.timeout",
 							Data:       "test data",
 						},
 					},
@@ -952,8 +965,8 @@ func TestUnprepareResources(t *testing.T) {
 			expectedUnprepareCalls: 1,
 		},
 		{
-			description: "should unprepare resource, claim previously prepared by currently running manager",
-			driverName:  driverName,
+			// Should unprepare resource, claim previously prepared by currently running manager.
+			driverName: t.Name() + ".claim.previously.prepared",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -985,12 +998,12 @@ func TestUnprepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
+					DriverName: t.Name() + ".claim.previously.prepared",
 					ClaimName:  "test-pod-claim-3",
 					Namespace:  "test-namespace",
 					ResourceHandles: []resourcev1alpha2.ResourceHandle{
 						{
-							DriverName: driverName,
+							DriverName: t.Name() + ".claim.previously.prepared",
 							Data:       "test data",
 						},
 					},
@@ -1000,8 +1013,8 @@ func TestUnprepareResources(t *testing.T) {
 			expectedUnprepareCalls: 1,
 		},
 		{
-			description: "should unprepare resource, claim previously was not prepared by currently running manager",
-			driverName:  driverName,
+			// Should unprepare resource, claim previously was not prepared by currently running manager.
+			driverName: t.Name() + ".claim.previously.not.prepared",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
@@ -1033,12 +1046,12 @@ func TestUnprepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
+					DriverName: t.Name() + ".claim.previously.not.prepared",
 					ClaimName:  "test-pod-claim",
 					Namespace:  "test-namespace",
 					ResourceHandles: []resourcev1alpha2.ResourceHandle{
 						{
-							DriverName: driverName,
+							DriverName: t.Name() + ".claim.previously.not.prepared",
 							Data:       "test data",
 						},
 					},
@@ -1048,23 +1061,32 @@ func TestUnprepareResources(t *testing.T) {
 			expectedUnprepareCalls: 1,
 		},
 	} {
-		t.Run(test.description, func(t *testing.T) {
+		test := test
+		description, _ := strings.CutPrefix(test.driverName, t.Name()+".")
+		t.Run(description, func(t *testing.T) {
+			t.Parallel()
+
 			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
 			if err != nil {
 				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
+			driverName := test.driverName
+			draServerInfo, err := setupFakeDRADriverGRPCServer(driverName, test.wantTimeout)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, "worker")
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
-				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+			if test.useDriverName != "" {
+				driverName = test.useDriverName
 			}
-			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
+
+			plg := plugin.NewRegistrationHandler(nil, "worker")
+			if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
+				t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
+			}
+			defer plg.DeRegisterPlugin(driverName) // for sake of next tests
 
 			manager := &ManagerImpl{
 				kubeClient: fakeKubeClient,
@@ -1102,6 +1124,7 @@ func TestUnprepareResources(t *testing.T) {
 }
 
 func TestPodMightNeedToUnprepareResources(t *testing.T) {
+	t.Parallel()
 	fakeKubeClient := fake.NewSimpleClientset()
 
 	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
@@ -1127,13 +1150,7 @@ func TestPodMightNeedToUnprepareResources(t *testing.T) {
 }
 
 func TestGetContainerClaimInfos(t *testing.T) {
-	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-	if err != nil {
-		t.Fatalf("error occur:%v", err)
-	}
-	manager := &ManagerImpl{
-		cache: cache,
-	}
+	t.Parallel()
 
 	resourceClaimName := "test-resource-claim-1"
 	resourceClaimName2 := "test-resource-claim-2"
@@ -1191,7 +1208,18 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			claimInfo: &ClaimInfo{ClaimInfoState: state.ClaimInfoState{ClaimName: resourceClaimName2}},
 		},
 	} {
+		test := test
 		t.Run(fmt.Sprintf("test-%d", i), func(t *testing.T) {
+			t.Parallel()
+
+			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+			if err != nil {
+				t.Fatalf("error occur:%v", err)
+			}
+			manager := &ManagerImpl{
+				cache: cache,
+			}
+
 			manager.cache.add(test.claimInfo)
 
 			fakeClaimInfos, err := manager.GetContainerClaimInfos(test.pod, test.container)
