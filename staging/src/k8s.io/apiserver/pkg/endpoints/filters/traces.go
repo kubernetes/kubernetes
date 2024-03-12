@@ -56,6 +56,10 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 }
 
 func getSpanNameFromRequestInfo(info *request.RequestInfo) string {
+	if !info.IsResourceRequest {
+		return info.Path
+	}
+
 	spanName := "/" + info.APIPrefix
 	if info.APIGroup != "" {
 		spanName += "/" + info.APIGroup
@@ -66,7 +70,7 @@ func getSpanNameFromRequestInfo(info *request.RequestInfo) string {
 	}
 	spanName += "/" + info.Resource
 	if info.Name != "" {
-		spanName += "/" + "{:id}"
+		spanName += "/" + "{:name}"
 	}
 	if info.Subresource != "" {
 		spanName += "/" + info.Subresource
