@@ -71,22 +71,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 			pod = runPodAndWaitUntilScheduled(f, pod)
 
 			gomega.Expect(isPodCgroupV2(f, pod)).To(gomega.BeTrueBecause("cgroup v2 is required for swap"))
+			gomega.Expect(getSwapBehavior()).To(gomega.Or(gomega.Equal(types.NoSwap), gomega.BeEmpty()), "NodeConformance is expected to run with NoSwap")
 
-			switch swapBehavior := getSwapBehavior(); swapBehavior {
-			case types.LimitedSwap:
-				if qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit {
-					expectNoSwap(f, pod)
-				} else {
-					expectedSwapLimit := calcSwapForBurstablePod(f, pod)
-					expectLimitedSwap(f, pod, expectedSwapLimit)
-				}
-
-			case types.NoSwap, "":
-				expectNoSwap(f, pod)
-
-			default:
-				gomega.Expect(swapBehavior).To(gomega.Or(gomega.Equal(types.LimitedSwap), gomega.Equal(types.NoSwap)), "unknown swap behavior")
-			}
+			expectNoSwap(f, pod)
 		},
 			ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
 			ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
@@ -96,6 +83,39 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 	})
 
 	f.Context(framework.WithSerial(), func() {
+
+		enableLimitedSwap := func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+			msg := "swap behavior is already set to LimitedSwap"
+
+			if swapBehavior := initialConfig.MemorySwap.SwapBehavior; swapBehavior != types.LimitedSwap {
+				initialConfig.MemorySwap.SwapBehavior = types.LimitedSwap
+				msg = "setting swap behavior to LimitedSwap"
+			}
+
+			ginkgo.By(msg)
+		}
+
+		f.Context("Basic functionality", func() {
+			tempSetCurrentKubeletConfig(f, enableLimitedSwap)
+
+			ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
+				ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
+				pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
+				pod = runPodAndWaitUntilScheduled(f, pod)
+
+				gomega.Expect(isPodCgroupV2(f, pod)).To(gomega.BeTrueBecause("cgroup v2 is required for swap"))
+				gomega.Expect(getSwapBehavior()).To(gomega.Equal(types.LimitedSwap))
+
+				expectedSwapLimit := calcSwapForBurstablePod(f, pod)
+				expectLimitedSwap(f, pod, expectedSwapLimit)
+			},
+				ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
+				ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
+				ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
+				ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
+			)
+		})
+
 		// These tests assume the following, and will fail otherwise:
 		// - The node is provisioned with swap
 		// - The node is configured with cgroup v2
@@ -138,16 +158,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 			})
 
 			ginkgo.Context("LimitedSwap", func() {
-				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
-					msg := "swap behavior is already set to LimitedSwap"
-
-					if swapBehavior := initialConfig.MemorySwap.SwapBehavior; swapBehavior != types.LimitedSwap {
-						initialConfig.MemorySwap.SwapBehavior = types.LimitedSwap
-						msg = "setting swap behavior to LimitedSwap"
-					}
-
-					ginkgo.By(msg)
-				})
+				tempSetCurrentKubeletConfig(f, enableLimitedSwap)
 
 				getRequestBySwapLimit := func(swapPercentage int64) *resource.Quantity {
 					gomega.ExpectWithOffset(1, swapPercentage).To(gomega.And(
