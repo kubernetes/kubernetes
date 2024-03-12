@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v2"
-	corev1 "k8s.io/api/core/v1"
-	kclientset "k8s.io/client-go/kubernetes"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -26,6 +24,8 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 
+	corev1 "k8s.io/api/core/v1"
+	kclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/version"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e"
