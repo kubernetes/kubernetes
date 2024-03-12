@@ -19,32 +19,82 @@ package version
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	baseversion "k8s.io/component-base/version"
 )
 
-var Effective MutableEffectiveVersions = newEffectiveVersion()
+var DefaultEffectiveVersionRegistry EffectiveVersionRegistry = NewEffectiveVersionRegistry()
 
-type EffectiveVersions interface {
+const (
+	ComponentGenericAPIServer = "k8s.io/apiserver"
+)
+
+type EffectiveVersionRegistry interface {
+	// EffectiveVersionFor returns the EffectiveVersion registered under the component.
+	// Returns nil if the component is not registered.
+	EffectiveVersionFor(component string) MutableEffectiveVersion
+	// EffectiveVersionForOrDefault returns the EffectiveVersion registered under the component.
+	// Returns the default EffectiveVersion if the component is not registered, and registers the default EffectiveVersion under component.
+	EffectiveVersionForOrDefault(component string) MutableEffectiveVersion
+	// RegisterEffectiveVersionFor registers the EffectiveVersion for a component.
+	// Overrides existing EffectiveVersion if it is already in the registry.
+	RegisterEffectiveVersionFor(component string, ver MutableEffectiveVersion)
+}
+
+type effectiveVersionRegistry struct {
+	effectiveVersions map[string]MutableEffectiveVersion
+	mutex             sync.RWMutex
+}
+
+func NewEffectiveVersionRegistry() EffectiveVersionRegistry {
+	return &effectiveVersionRegistry{effectiveVersions: map[string]MutableEffectiveVersion{}}
+}
+
+func (r *effectiveVersionRegistry) EffectiveVersionFor(component string) MutableEffectiveVersion {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.effectiveVersions[component]
+}
+
+func (r *effectiveVersionRegistry) EffectiveVersionForOrDefault(component string) MutableEffectiveVersion {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	ver, ok := r.effectiveVersions[component]
+	if ok {
+		return ver
+	}
+	ver = NewEffectiveVersion(baseversion.Get().String())
+	r.effectiveVersions[component] = ver
+	return ver
+}
+
+func (r *effectiveVersionRegistry) RegisterEffectiveVersionFor(component string, ver MutableEffectiveVersion) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.effectiveVersions[component] = ver
+}
+
+type EffectiveVersion interface {
 	BinaryVersion() *version.Version
 	EmulationVersion() *version.Version
 	MinCompatibilityVersion() *version.Version
 }
 
-type MutableEffectiveVersions interface {
-	EffectiveVersions
+type MutableEffectiveVersion interface {
+	EffectiveVersion
 	// SetBinaryVersionForTests updates the binaryVersion.
 	// Should only be used in tests.
-	SetBinaryVersionForTests(binaryVersion *version.Version) func()
+	SetBinaryVersionForTests(binaryVersion *version.Version, featureGate featuregate.FeatureGate) func()
 	Set(binaryVersion, emulationVersion, minCompatibilityVersion *version.Version)
-	AddFlags(fs *pflag.FlagSet)
-	Validate() []error
+	// AddFlags adds the "{prefix}-emulated-version" to the flagset.
+	AddFlags(fs *pflag.FlagSet, prefix string)
+	Validate(featureGate featuregate.FeatureGate) []error
 }
 
 type VersionVar struct {
@@ -76,7 +126,7 @@ func (v *VersionVar) Type() string {
 	return "version"
 }
 
-type effectiveVersions struct {
+type effectiveVersion struct {
 	binaryVersion atomic.Pointer[version.Version]
 	// If the emulationVersion is set by the users, it could only contain major and minor versions.
 	// In tests, emulationVersion could be the same as the binary version, or set directly,
@@ -86,43 +136,43 @@ type effectiveVersions struct {
 	minCompatibilityVersion VersionVar
 }
 
-func (m *effectiveVersions) BinaryVersion() *version.Version {
+func (m *effectiveVersion) BinaryVersion() *version.Version {
 	return m.binaryVersion.Load()
 }
 
-func (m *effectiveVersions) EmulationVersion() *version.Version {
+func (m *effectiveVersion) EmulationVersion() *version.Version {
 	// Emulation version can have "alpha" as pre-release to continue serving expired apis while we clean up the test.
 	// The pre-release should not be accessible to the users.
 	return m.emulationVersion.Val.Load().WithPreRelease(m.BinaryVersion().PreRelease())
 }
 
-func (m *effectiveVersions) MinCompatibilityVersion() *version.Version {
+func (m *effectiveVersion) MinCompatibilityVersion() *version.Version {
 	return m.minCompatibilityVersion.Val.Load()
 }
 
-func (m *effectiveVersions) Set(binaryVersion, emulationVersion, minCompatibilityVersion *version.Version) {
+func (m *effectiveVersion) Set(binaryVersion, emulationVersion, minCompatibilityVersion *version.Version) {
 	m.binaryVersion.Store(binaryVersion)
 	m.emulationVersion.Val.Store(emulationVersion)
 	m.minCompatibilityVersion.Val.Store(minCompatibilityVersion)
 }
 
-func (m *effectiveVersions) SetBinaryVersionForTests(binaryVersion *version.Version) func() {
+func (m *effectiveVersion) SetBinaryVersionForTests(binaryVersion *version.Version, featureGate featuregate.FeatureGate) func() {
 	oldBinaryVersion := m.binaryVersion.Load()
 	m.Set(binaryVersion, binaryVersion, binaryVersion.SubtractMinor(1))
-	oldFeatureGateVersion := utilfeature.DefaultFeatureGate.EmulationVersion()
-	if err := utilfeature.DefaultMutableFeatureGate.SetEmulationVersion(binaryVersion); err != nil {
+	oldFeatureGateVersion := featureGate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
+	if err := featureGate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(binaryVersion); err != nil {
 		panic(err)
 	}
 	return func() {
 		m.Set(oldBinaryVersion, oldBinaryVersion, oldBinaryVersion.SubtractMinor(1))
-		utilfeature.DefaultMutableFeatureGate.(featuregate.MutableVersionedFeatureGateForTests).Reset()
-		if err := utilfeature.DefaultMutableFeatureGate.SetEmulationVersion(oldFeatureGateVersion); err != nil {
+		featureGate.(featuregate.MutableVersionedFeatureGateForTests).Reset()
+		if err := featureGate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(oldFeatureGateVersion); err != nil {
 			panic(err)
 		}
 	}
 }
 
-func (m *effectiveVersions) Validate() []error {
+func (m *effectiveVersion) Validate(featureGate featuregate.FeatureGate) []error {
 	var errs []error
 	// Validate only checks the major and minor versions.
 	binaryVersion := m.binaryVersion.Load().WithPatch(0)
@@ -133,12 +183,8 @@ func (m *effectiveVersions) Validate() []error {
 	minEmuVer := binaryVersion
 	// emulationVersion can only be 1.{binaryMinor-1}...1.{binaryMinor} for alpha if EmulationVersion feature gate is enabled.
 	// otherwise, emulationVersion can only be 1.{binaryMinor}.
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.EmulationVersion) {
+	if featureGate.Enabled(genericfeatures.EmulationVersion) {
 		minEmuVer = binaryVersion.SubtractMinor(1)
-		// emulationVersion concept is introduced in 1.30, it cannot be set to be less than that.
-		if minEmuVer.LessThan(version.MajorMinor(1, 30)) {
-			minEmuVer = version.MajorMinor(1, 30)
-		}
 	}
 	if emulationVersion.GreaterThan(maxEmuVer) || emulationVersion.LessThan(minEmuVer) {
 		errs = append(errs, fmt.Errorf("emulation version %s is not between [%s, %s]", emulationVersion.String(), minEmuVer.String(), maxEmuVer.String()))
@@ -152,12 +198,15 @@ func (m *effectiveVersions) Validate() []error {
 	return errs
 }
 
-func (m *effectiveVersions) AddFlags(fs *pflag.FlagSet) {
+// AddFlags adds the "{prefix}-emulated-version" to the flagset.
+func (m *effectiveVersion) AddFlags(fs *pflag.FlagSet, prefix string) {
 	if m == nil {
 		return
 	}
-
-	fs.Var(&m.emulationVersion, "emulated-version", ""+
+	if len(prefix) > 0 && !strings.HasSuffix(prefix, "-") {
+		prefix += "-"
+	}
+	fs.Var(&m.emulationVersion, prefix+"emulated-version", ""+
 		"The version the K8s component emulates its capabilities (APIs, features, ...) of.\n"+
 		"If set, the component would behave like the set version instead of the underlying binary version.\n"+
 		"Any capabilities present in the binary version that were introduced after the emulated version will be unavailable and any capabilities removed after the emulated version will be available.\n"+
@@ -165,10 +214,9 @@ func (m *effectiveVersions) AddFlags(fs *pflag.FlagSet) {
 		"Format could only be major.minor")
 }
 
-func newEffectiveVersion() MutableEffectiveVersions {
-	effective := &effectiveVersions{}
-	binaryVersionInfo := baseversion.Get()
-	binaryVersion := version.MustParse(binaryVersionInfo.String())
+func NewEffectiveVersion(binaryVer string) MutableEffectiveVersion {
+	effective := &effectiveVersion{}
+	binaryVersion := version.MustParse(binaryVer)
 	compatVersion := binaryVersion.SubtractMinor(1)
 	effective.Set(binaryVersion, binaryVersion, compatVersion)
 	return effective

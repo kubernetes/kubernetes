@@ -48,6 +48,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -459,6 +460,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
+	config.EffectiveVersion = utilversion.NewEffectiveVersion(kubeVersion.String())
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {

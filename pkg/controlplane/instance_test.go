@@ -51,6 +51,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/openapi"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -102,6 +103,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	kubeVersion := kubeversion.Get()
 	config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	config.GenericConfig.Version = &kubeVersion
+	config.GenericConfig.EffectiveVersion = utilversion.NewEffectiveVersion(kubeVersion.String())
 	config.ExtraConfig.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.GenericConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")

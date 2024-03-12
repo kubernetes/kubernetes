@@ -124,6 +124,7 @@ func BuildGenericConfig(
 
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
+	genericConfig.EffectiveVersion = s.GenericServerRunOptions.EffectiveVersion
 
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup

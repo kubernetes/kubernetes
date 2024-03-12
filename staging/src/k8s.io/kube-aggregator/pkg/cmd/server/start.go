@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -91,7 +92,10 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(utilfeature.DefaultMutableFeatureGate),
+		ServerRunOptions: genericoptions.NewServerRunOptions(
+			utilfeature.DefaultMutableFeatureGate,
+			utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrDefault(utilversion.ComponentGenericAPIServer),
+		),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
@@ -155,6 +159,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 			ServiceResolver: serviceResolver,
 		},
 	}
+	config.GenericConfig.EffectiveVersion = o.ServerRunOptions.EffectiveVersion
 
 	if len(o.ProxyClientCertFile) == 0 || len(o.ProxyClientKeyFile) == 0 {
 		return errors.New("missing a client certificate along with a key to identify the proxy to the API server")

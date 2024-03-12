@@ -29,5 +29,5 @@ var (
 
 	// DefaultFeatureGate is a shared global FeatureGate.
 	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
-	DefaultFeatureGate featuregate.VersionedFeatureGate = DefaultMutableFeatureGate
+	DefaultFeatureGate featuregate.FeatureGate = DefaultMutableFeatureGate
 )

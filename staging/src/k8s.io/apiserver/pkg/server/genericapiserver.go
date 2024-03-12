@@ -52,6 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
@@ -236,7 +237,8 @@ type GenericAPIServer struct {
 	StorageVersionManager storageversion.Manager
 
 	// Version will enable the /version endpoint if non-nil
-	Version *version.Info
+	Version          *version.Info
+	EffectiveVersion utilversion.EffectiveVersion
 
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals

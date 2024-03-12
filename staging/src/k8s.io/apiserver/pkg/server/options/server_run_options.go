@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
-	serverversion "k8s.io/apiserver/pkg/util/version"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 
 	"github.com/spf13/pflag"
@@ -93,10 +93,11 @@ type ServerRunOptions struct {
 	ShutdownWatchTerminationGracePeriod time.Duration
 
 	// FeatureGate are the featuregate to install on the CLI
-	FeatureGate featuregate.MutableVersionedFeatureGate
+	FeatureGate      featuregate.MutableVersionedFeatureGate
+	EffectiveVersion utilversion.MutableEffectiveVersion
 }
 
-func NewServerRunOptions(featureGate featuregate.MutableVersionedFeatureGate) *ServerRunOptions {
+func NewServerRunOptions(featureGate featuregate.MutableVersionedFeatureGate, effectiveVersion utilversion.MutableEffectiveVersion) *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
 		MaxRequestsInFlight:                 defaults.MaxRequestsInFlight,
@@ -110,6 +111,7 @@ func NewServerRunOptions(featureGate featuregate.MutableVersionedFeatureGate) *S
 		MaxRequestBodyBytes:                 defaults.MaxRequestBodyBytes,
 		ShutdownSendRetryAfter:              false,
 		FeatureGate:                         featureGate,
+		EffectiveVersion:                    effectiveVersion,
 	}
 }
 
@@ -205,7 +207,7 @@ func (s *ServerRunOptions) Validate() []error {
 	if errs := s.FeatureGate.Validate(); len(errs) != 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := serverversion.Effective.Validate(); len(errs) != 0 {
+	if errs := s.EffectiveVersion.Validate(s.FeatureGate); len(errs) != 0 {
 		errors = append(errors, errs...)
 	}
 	return errors
@@ -351,13 +353,13 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	s.FeatureGate.DeferErrorsToValidation(true)
 	s.FeatureGate.AddFlag(fs)
-	serverversion.Effective.AddFlags(fs)
+	s.EffectiveVersion.AddFlags(fs, "")
 }
 
 // Complete sets the final emulation version for the feature gate.
 func (s *ServerRunOptions) Complete() error {
 	if s.FeatureGate.Enabled(genericfeatures.EmulationVersion) {
-		return s.FeatureGate.SetEmulationVersion(serverversion.Effective.EmulationVersion())
+		return s.FeatureGate.SetEmulationVersion(s.EffectiveVersion.EmulationVersion())
 	}
 	return nil
 }

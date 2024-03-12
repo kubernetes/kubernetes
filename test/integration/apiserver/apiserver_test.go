@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -2932,7 +2933,8 @@ func TestDedupOwnerReferences(t *testing.T) {
 }
 
 func TestEnableEmulationVersion(t *testing.T) {
-	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.32.0")))
+	effectiveVersion := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrDefault(utilversion.ComponentGenericAPIServer)
+	t.Cleanup(effectiveVersion.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.32.0"), utilfeature.DefaultFeatureGate))
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--emulated-version=1.31", "--feature-gates=EmulationVersion=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -2992,7 +2994,8 @@ func TestEnableEmulationVersion(t *testing.T) {
 }
 
 func TestDisableEmulationVersion(t *testing.T) {
-	t.Cleanup(utilversion.Effective.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.20.0")))
+	effectiveVersion := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrDefault(utilversion.ComponentGenericAPIServer)
+	t.Cleanup(effectiveVersion.SetBinaryVersionForTests(apimachineryversion.MustParse("v1.20.0"), utilfeature.DefaultFeatureGate))
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{}, framework.SharedEtcd())
 	defer server.TearDownFn()

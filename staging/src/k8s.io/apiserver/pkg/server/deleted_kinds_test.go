@@ -77,12 +77,12 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 	}
 }
 
-func storageRemovedIn(major, minor int) removedInStorage {
-	return removedInStorage{major: major, minor: minor}
+func storageRemovedIn(major, minor int) *removedInStorage {
+	return &removedInStorage{major: major, minor: minor}
 }
 
-func storageNeverRemoved() removedInStorage {
-	return removedInStorage{neverRemoved: true}
+func storageNeverRemoved() *removedInStorage {
+	return &removedInStorage{neverRemoved: true}
 }
 
 type removedInStorage struct {
@@ -90,23 +90,23 @@ type removedInStorage struct {
 	neverRemoved bool
 }
 
-func (r removedInStorage) New() runtime.Object {
+func (r *removedInStorage) New() runtime.Object {
 	if r.neverRemoved {
-		return defaultObj{}
+		return &defaultObj{}
 	}
-	return removedInObj{major: r.major, minor: r.minor}
+	return &removedInObj{major: r.major, minor: r.minor}
 }
 
-func (r removedInStorage) Destroy() {
+func (r *removedInStorage) Destroy() {
 }
 
 type defaultObj struct {
 }
 
-func (r defaultObj) GetObjectKind() schema.ObjectKind {
+func (r *defaultObj) GetObjectKind() schema.ObjectKind {
 	panic("don't do this")
 }
-func (r defaultObj) DeepCopyObject() runtime.Object {
+func (r *defaultObj) DeepCopyObject() runtime.Object {
 	panic("don't do this either")
 }
 
@@ -114,45 +114,45 @@ type removedInObj struct {
 	major, minor int
 }
 
-func (r removedInObj) GetObjectKind() schema.ObjectKind {
+func (r *removedInObj) GetObjectKind() schema.ObjectKind {
 	panic("don't do this")
 }
-func (r removedInObj) DeepCopyObject() runtime.Object {
+func (r *removedInObj) DeepCopyObject() runtime.Object {
 	panic("don't do this either")
 }
-func (r removedInObj) APILifecycleRemoved() (major, minor int) {
+func (r *removedInObj) APILifecycleRemoved() (major, minor int) {
 	return r.major, r.minor
 }
 
-func storageIntroducedIn(major, minor int) introducedInStorage {
-	return introducedInStorage{major: major, minor: minor}
+func storageIntroducedIn(major, minor int) *introducedInStorage {
+	return &introducedInStorage{major: major, minor: minor}
 }
 
 type introducedInStorage struct {
 	major, minor int
 }
 
-func (r introducedInStorage) New() runtime.Object {
+func (r *introducedInStorage) New() runtime.Object {
 	if r.major == 0 && r.minor == 0 {
-		return defaultObj{}
+		return &defaultObj{}
 	}
-	return IntroducedInObj{major: r.major, minor: r.minor}
+	return &IntroducedInObj{major: r.major, minor: r.minor}
 }
 
-func (r introducedInStorage) Destroy() {
+func (r *introducedInStorage) Destroy() {
 }
 
 type IntroducedInObj struct {
 	major, minor int
 }
 
-func (r IntroducedInObj) GetObjectKind() schema.ObjectKind {
+func (r *IntroducedInObj) GetObjectKind() schema.ObjectKind {
 	panic("don't do this")
 }
-func (r IntroducedInObj) DeepCopyObject() runtime.Object {
+func (r *IntroducedInObj) DeepCopyObject() runtime.Object {
 	panic("don't do this either")
 }
-func (r IntroducedInObj) APILifecycleIntroduced() (major, minor int) {
+func (r *IntroducedInObj) APILifecycleIntroduced() (major, minor int) {
 	return r.major, r.minor
 }
 

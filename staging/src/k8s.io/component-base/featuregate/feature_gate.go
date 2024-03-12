@@ -145,21 +145,15 @@ type MutableFeatureGate interface {
 	OverrideDefault(name Feature, override bool) error
 }
 
-// VersionedFeatureGate indicates whether a given feature is enabled or not at the emulated version of the feature gate.
-type VersionedFeatureGate interface {
-	FeatureGate
-	// EmulationVersion returns the version the feature gate is set to emulate.
-	// If set, the feature gate would enable/disable features based on
-	// feature availability and pre-release at the emulated version instead of the binary version.
-	EmulationVersion() *version.Version
-}
-
 // MutableVersionedFeatureGate parses and stores flag gates for known features from
 // a string like feature1=true,feature2=false,...
 // And sets the options for emulated version of the featured gate.
 type MutableVersionedFeatureGate interface {
-	VersionedFeatureGate
 	MutableFeatureGate
+	// EmulationVersion returns the version the feature gate is set to emulate.
+	// If set, the feature gate would enable/disable features based on
+	// feature availability and pre-release at the emulated version instead of the binary version.
+	EmulationVersion() *version.Version
 	// SetEmulationVersion overrides the emulationVersion of the feature gate.
 	// Otherwise, the emulationVersion will be the same as the binary version.
 	// If set, the feature defaults and availability will be as if the binary is at the emulated version.

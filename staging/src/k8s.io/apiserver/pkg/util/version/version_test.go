@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -52,11 +53,10 @@ func TestValidateWhenEmulationVersionEnabled(t *testing.T) {
 			minCompatibilityVersion: "v1.30.0",
 		},
 		{
-			name:                    "emulation version cannot be lower than 1.30",
+			name:                    "emulation version lower than 1.30",
 			binaryVersion:           "v1.30.2",
 			emulationVersion:        "v1.29.0",
 			minCompatibilityVersion: "v1.29.0",
-			expectErrors:            true,
 		},
 		{
 			name:                    "emulation version two minor lower than binary not ok",
@@ -105,15 +105,16 @@ func TestValidateWhenEmulationVersionEnabled(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			binaryVersion := version.MustParseGeneric(test.binaryVersion)
-			t.Cleanup(Effective.SetBinaryVersionForTests(binaryVersion))
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.EmulationVersion, true)()
+			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+			utilruntime.Must(featureGate.SetEmulationVersion(binaryVersion))
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featureGate, genericfeatures.EmulationVersion, true)()
 
-			effective := &effectiveVersions{}
+			effective := &effectiveVersion{}
 			emulationVersion := version.MustParseGeneric(test.emulationVersion)
 			minCompatibilityVersion := version.MustParseGeneric(test.minCompatibilityVersion)
 			effective.Set(binaryVersion, emulationVersion, minCompatibilityVersion)
 
-			errs := effective.Validate()
+			errs := effective.Validate(featureGate)
 			if len(errs) > 0 && !test.expectErrors {
 				t.Errorf("expected no errors, errors found %+v", errs)
 			}
@@ -148,13 +149,6 @@ func TestValidateWhenEmulationVersionDisabled(t *testing.T) {
 			expectErrors:            true,
 		},
 		{
-			name:                    "emulation version cannot be lower than 1.30",
-			binaryVersion:           "v1.30.2",
-			emulationVersion:        "v1.29.0",
-			minCompatibilityVersion: "v1.29.0",
-			expectErrors:            true,
-		},
-		{
 			name:                    "emulation version two minor lower than binary not ok",
 			binaryVersion:           "v1.32.2",
 			emulationVersion:        "v1.30.0",
@@ -201,15 +195,16 @@ func TestValidateWhenEmulationVersionDisabled(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			binaryVersion := version.MustParseGeneric(test.binaryVersion)
-			t.Cleanup(Effective.SetBinaryVersionForTests(binaryVersion))
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.EmulationVersion, false)()
+			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+			utilruntime.Must(featureGate.SetEmulationVersion(binaryVersion))
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featureGate, genericfeatures.EmulationVersion, false)()
 
-			effective := &effectiveVersions{}
+			effective := &effectiveVersion{}
 			emulationVersion := version.MustParseGeneric(test.emulationVersion)
 			minCompatibilityVersion := version.MustParseGeneric(test.minCompatibilityVersion)
 			effective.Set(binaryVersion, emulationVersion, minCompatibilityVersion)
 
-			errs := effective.Validate()
+			errs := effective.Validate(featureGate)
 			if len(errs) > 0 && !test.expectErrors {
 				t.Errorf("expected no errors, errors found %+v", errs)
 			}
@@ -252,10 +247,10 @@ func TestEffectiveVersionsFlag(t *testing.T) {
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
-			effective := newEffectiveVersion()
-			effective.AddFlags(fs)
+			effective := NewEffectiveVersion("1.30")
+			effective.AddFlags(fs, "test")
 
-			err := fs.Parse([]string{fmt.Sprintf("--emulated-version=%s", test.emulationVerson)})
+			err := fs.Parse([]string{fmt.Sprintf("--test-emulated-version=%s", test.emulationVerson)})
 			if test.parseError != "" {
 				if !strings.Contains(err.Error(), test.parseError) {
 					t.Fatalf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)

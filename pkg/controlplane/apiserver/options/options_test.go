@@ -30,7 +30,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	serverversion "k8s.io/apiserver/pkg/util/version"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -46,7 +46,9 @@ func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
 	s := NewOptions()
 	featureGate := featuregate.NewFeatureGate()
+	effectiveVersion := utilversion.NewEffectiveVersion("1.32")
 	s.GenericServerRunOptions.FeatureGate = featureGate
+	s.GenericServerRunOptions.EffectiveVersion = effectiveVersion
 	var fss cliflag.NamedFlagSets
 	s.AddFlags(&fss)
 	for _, f := range fss.FlagSets {
@@ -128,6 +130,7 @@ func TestAddFlags(t *testing.T) {
 			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
 			FeatureGate:                 featureGate,
+			EffectiveVersion:            effectiveVersion,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -298,7 +301,7 @@ func TestAddFlags(t *testing.T) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
 	}
 
-	if serverversion.Effective.EmulationVersion().String() != "1.31.0" {
-		t.Errorf("Got emulation version %s, wanted %s", serverversion.Effective.EmulationVersion().String(), "1.31.0")
+	if s.GenericServerRunOptions.EffectiveVersion.EmulationVersion().String() != "1.31.0" {
+		t.Errorf("Got emulation version %s, wanted %s", s.GenericServerRunOptions.EffectiveVersion.EmulationVersion().String(), "1.31.0")
 	}
 }
