@@ -133,7 +133,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   Description:
 	   The ValidatingAdmissionPolicy should type check the expressions defined inside policy.
 	*/
-	framework.ConformanceIt("should type check validation expressions", func(ctx context.Context) {
+	framework.It("should type check validation expressions", func(ctx context.Context) {
 		var policy *admissionregistrationv1.ValidatingAdmissionPolicy
 		ginkgo.By("creating the policy with correct types", func() {
 			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".correct-policy.example.com").
@@ -283,7 +283,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   Description:
 	   The ValidatingAdmissionPolicy should type check a CRD.
 	*/
-	framework.ConformanceIt("should type check a CRD", func(ctx context.Context) {
+	framework.It("should type check a CRD", func(ctx context.Context) {
 		crd := crontabExampleCRD()
 		crd.Spec.Group = "stable." + f.UniqueName
 		crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
