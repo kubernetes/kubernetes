@@ -6,6 +6,7 @@ package e2e
 // tests (via include.go) to tests that are relevant to openshift.
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -15,6 +16,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
+	kclientset "k8s.io/client-go/kubernetes"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -82,6 +85,11 @@ func TestMain(m *testing.M) {
 			os.Exit(1)
 		}
 		os.Exit(0)
+	}
+
+	// Ensure the test namespaces have disabled SCCs and label syncer.
+	framework.TestContext.CreateTestingNS = func(ctx context.Context, baseName string, c kclientset.Interface, labels map[string]string) (*corev1.Namespace, error) {
+		return CreateTestingNS(ctx, baseName, c, labels, true)
 	}
 
 	framework.AfterReadingAllFlags(&framework.TestContext)
