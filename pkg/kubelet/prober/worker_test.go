@@ -198,6 +198,65 @@ func TestInitialDelay(t *testing.T) {
 	}
 }
 
+func TestInitialDelayForTimeDrift(t *testing.T) {
+	ctx := context.Background()
+	m := newTestManager()
+
+	for _, probeType := range [...]probeType{liveness, readiness, startup} {
+		w := newTestWorker(m, probeType, v1.Probe{
+			InitialDelaySeconds: 10,
+		})
+		m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(probeType != startup))
+
+		expectContinue(t, w, w.doProbe(ctx), "during initial delay")
+		// Default value depends on probe, Success for liveness, Failure for readiness, Unknown for startup
+		switch probeType {
+		case liveness:
+			expectResult(t, w, results.Success, "during initial delay")
+		case readiness:
+			expectResult(t, w, results.Failure, "during initial delay")
+		case startup:
+			expectResult(t, w, results.Unknown, "during initial delay")
+		}
+
+		laterStatus := getTestRunningStatusWithStarted(probeType != startup)
+		// Set StartedAt to a future time to test time drift.
+		laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time =
+			time.Now().Add(600 * time.Second)
+		m.statusManager.SetPodStatus(w.pod, laterStatus)
+
+		// The doProbe call should fail immediately after time drift.
+		expectContinue(t, w, w.doProbe(ctx), "during initial delay")
+		switch probeType {
+		case liveness:
+			expectResult(t, w, results.Success, "during initial delay")
+		case readiness:
+			expectResult(t, w, results.Failure, "during initial delay")
+		case startup:
+			expectResult(t, w, results.Unknown, "during initial delay")
+		}
+
+		// The doProbe call would still fail when it called during specified
+		// initial delay time.
+		time.Sleep(5 * time.Second)
+		expectContinue(t, w, w.doProbe(ctx), "during initial delay")
+		switch probeType {
+		case liveness:
+			expectResult(t, w, results.Success, "during initial delay")
+		case readiness:
+			expectResult(t, w, results.Failure, "during initial delay")
+		case startup:
+			expectResult(t, w, results.Unknown, "during initial delay")
+		}
+
+		// Sleep until initial delay time elapses and probe must
+		// succeed now.
+		time.Sleep(5 * time.Second)
+		expectContinue(t, w, w.doProbe(ctx), "during initial delay")
+		expectResult(t, w, results.Success, "during initial delay")
+	}
+}
+
 func TestFailureThreshold(t *testing.T) {
 	ctx := context.Background()
 	m := newTestManager()

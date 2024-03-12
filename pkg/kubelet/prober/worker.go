@@ -70,6 +70,13 @@ type worker struct {
 	// If set, skip probing.
 	onHold bool
 
+	// Set to true when time drift is detected for the pod, will be unset
+	// once container's elapsed start time reaches +ve value.
+	timeDrift bool
+	// timeDriftStartTimeInSec contains container's elapsed start time at
+	// the time of first occurance of time drift.
+	timeDriftStartTimeInSec float64
+
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
 	proberResultsSuccessfulMetricLabels metrics.Labels
@@ -265,8 +272,21 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		return false
 	}
 
-	// Probe disabled for InitialDelaySeconds.
-	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
+	// Probe disabled for InitialDelaySeconds. This also considers
+	// time drift scenario (in that case container's started time is
+	// later than system current time).
+	startedAtInSecs := time.Since(c.State.Running.StartedAt.Time).Seconds()
+	if startedAtInSecs <= 0 && !w.timeDrift {
+		w.timeDrift = true
+		w.timeDriftStartTimeInSec = startedAtInSecs
+	} else if startedAtInSecs > 0 {
+		w.timeDrift = false
+	}
+	if startedAtInSecs <= 0 && w.timeDrift &&
+		int32(startedAtInSecs-w.timeDriftStartTimeInSec) < w.spec.InitialDelaySeconds {
+		return true
+	}
+	if startedAtInSecs > 0 && int32(startedAtInSecs) < w.spec.InitialDelaySeconds {
 		return true
 	}
 
