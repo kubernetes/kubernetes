@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	v1 "k8s.io/api/core/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -104,12 +105,12 @@ type RegistrationHandler struct {
 // Must only be called once per process because it manages global state.
 // If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
-func NewRegistrationHandler(kubeClient kubernetes.Interface, nodeName string) *RegistrationHandler {
+func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1.Node, error)) *RegistrationHandler {
 	handler := &RegistrationHandler{}
 
 	// If kubelet ever gets an API for stopping registration handlers, then
 	// that would need to be hooked up with stopping the controller.
-	handler.controller = startNodeResourcesController(context.TODO(), kubeClient, nodeName)
+	handler.controller = startNodeResourcesController(context.TODO(), kubeClient, getNode)
 
 	return handler
 }

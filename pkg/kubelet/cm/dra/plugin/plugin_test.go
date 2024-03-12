@@ -20,11 +20,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func getFakeNode() (*v1.Node, error) {
+	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}}, nil
+}
 
 func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
 	newRegistrationHandler := func() *RegistrationHandler {
-		return NewRegistrationHandler(nil, "worker")
+		return NewRegistrationHandler(nil, getFakeNode)
 	}
 
 	for _, test := range []struct {
