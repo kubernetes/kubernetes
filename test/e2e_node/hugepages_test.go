@@ -252,7 +252,22 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 			return isPresent
 		}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 	})
+	ginkgo.It("should calculate node allocatable correctly", func(ctx context.Context) {
+		ginkgo.By("mimicking support for huge pages by patching the node status")
+		patch := []byte(`[{"op": "add", "path": "/status/capacity/hugepages-2Mi", "value": "2Mi"}, {"op": "add", "path": "/status/allocatable/hugepages-2Mi", "value": "2Mi"}]`)
+		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
+		framework.ExpectNoError(result.Error(), "while patching")
 
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "while getting node status")
+
+		ginkgo.By("Verifying that the node now supports huge pages with size 3Mi")
+		value, ok := node.Status.Allocatable["memory"]
+		// if !ok {
+		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, ok)
+		// }
+
+	})
 	ginkgo.When("start the pod", func() {
 		var (
 			testpod   *v1.Pod
