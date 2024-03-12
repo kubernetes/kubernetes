@@ -69,6 +69,10 @@ func (m *mockTypeRef) Field(name string) (*types.FieldType, bool) {
 	}, true
 }
 
+func (m *mockTypeRef) FieldNames() ([]string, bool) {
+	return []string{}, false
+}
+
 func (m *mockTypeRef) Val(fields map[string]ref.Val) ref.Val {
 	return common.NewObjectVal(m, fields)
 }
@@ -78,6 +82,9 @@ func (m *mockTypeResolver) Resolve(name string) (common.TypeRef, bool) {
 		return newMockTypeRef(m, name), true
 	}
 	return nil, false
+}
+func (m *mockTypeResolver) FieldNames() ([]string, bool) {
+	return []string{}, false
 }
 
 // mockTypeResolverForOptional behaves the same as mockTypeResolver
@@ -107,4 +114,8 @@ func (m *mockTypeResolverForOptional) Resolve(name string) (common.TypeRef, bool
 		return &mockTypeRefForOptional{TypeRef: r}, ok
 	}
 	return nil, false
+}
+
+func (m *mockTypeResolverForOptional) FieldNames() ([]string, bool) {
+	return m.mockTypeResolver.FieldNames()
 }

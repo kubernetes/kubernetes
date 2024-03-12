@@ -42,4 +42,7 @@ type TypeRef interface {
 
 	// Val creates an instance for the TypeRef, given its fields and their values.
 	Val(fields map[string]ref.Val) ref.Val
+
+	// FieldNames returns the names of the fields of the TypeRef.
+	FieldNames() ([]string, bool)
 }
