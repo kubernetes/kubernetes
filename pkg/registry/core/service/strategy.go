@@ -194,6 +194,7 @@ func SelectableFields(service *api.Service) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&service.ObjectMeta, true)
 	serviceSpecificFieldsSet := fields.Set{
 		"spec.clusterIP": service.Spec.ClusterIP,
+		"spec.type":      string(service.Spec.Type),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, serviceSpecificFieldsSet)
 }

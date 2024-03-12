@@ -497,7 +497,8 @@ func AddFieldLabelConversionsForService(scheme *runtime.Scheme) error {
 			switch label {
 			case "metadata.namespace",
 				"metadata.name",
-				"spec.clusterIP":
+				"spec.clusterIP",
+				"spec.type":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
