@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -39,7 +39,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/onsi/gomega/gcustom"
 )
 
 var _ = common.SIGDescribe("TrafficDistribution", func() {
@@ -70,10 +69,21 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 		}
 	}
 
+	// gomegaCustomError constructs a function that can be returned from a gomega
+	// matcher to report an error.
+	gomegaCustomError := func(format string, a ...any) func() string {
+		return func() string {
+			return fmt.Sprintf(format, a...)
+		}
+	}
+
 	// endpointSlicesHaveSameZoneHints returns a matcher function to be used with
 	// gomega.Eventually().Should(...). It checks that the passed EndpointSlices
 	// have zone-hints which match the endpoint's zone.
-	endpointSlicesHaveSameZoneHints := gcustom.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (bool, error) {
+	endpointSlicesHaveSameZoneHints := framework.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (func() string, error) {
+		if len(slices) == 0 {
+			return nil, fmt.Errorf("no endpointslices found")
+		}
 		for _, slice := range slices {
 			for _, endpoint := range slice.Endpoints {
 				var ip string
@@ -85,11 +95,11 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 					zone = *endpoint.Zone
 				}
 				if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
-					return false, fmt.Errorf("endpoint with ip %v does not have the correct hint, want hint for zone %q", ip, zone)
+					return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for zone %q\nEndpointSlices=\n%v", ip, zone, format.Object(slices, 1 /* indent one level */)), nil
 				}
 			}
 		}
-		return true, nil
+		return nil, nil
 	})
 
 	// requestsFromClient returns a helper function to be used with
@@ -101,7 +111,6 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 			if err != nil {
 				return nil, err
 			}
-			framework.Logf("Logs from client=%q:\n%v", clientPod.GetName(), logs)
 			logLines := strings.Split(logs, "\n")
 			slices.Reverse(logLines)
 			return logLines, nil
@@ -198,10 +207,10 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 
 				framework.Logf("ensuring that requests from clientPod=%q on zone=%q stay in the same zone", clientPod.Name, clientZone)
 
-				requestsSucceedAndStayInSameZone := gcustom.MakeMatcher(func(reverseChronologicalLogLines []string) (bool, error) {
+				requestsSucceedAndStayInSameZone := framework.MakeMatcher(func(reverseChronologicalLogLines []string) (func() string, error) {
 					logLines := reverseChronologicalLogLines
 					if len(logLines) < 20 {
-						return false, fmt.Errorf("got %d log lines, waiting for at least 20", len(logLines))
+						return gomegaCustomError("got %d log lines, waiting for at least 20\nreverseChronologicalLogLines=\n%v", len(logLines), strings.Join(reverseChronologicalLogLines, "\n")), nil
 					}
 					consecutiveSameZone := 0
 
@@ -211,17 +220,18 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 						}
 						destZone, ok := zoneForServingPod[logLine]
 						if !ok {
-							return false, fmt.Errorf("could not determine dest zone from log line: %s", logLine)
+							return gomegaCustomError("could not determine dest zone from log line: %s\nreverseChronologicalLogLines=\n%v", logLine, strings.Join(reverseChronologicalLogLines, "\n")), nil
 						}
 						if clientZone != destZone {
-							return false, fmt.Errorf("expected request from clientPod=%q to stay in it's zone=%q, delivered to zone=%q", clientPod.Name, clientZone, destZone)
+							return gomegaCustomError("expected request from clientPod=%q to stay in it's zone=%q, delivered to zone=%q\nreverseChronologicalLogLines=\n%v", clientPod.Name, clientZone, destZone, strings.Join(reverseChronologicalLogLines, "\n")), nil
 						}
 						consecutiveSameZone++
 						if consecutiveSameZone >= 10 {
-							return true, nil
+							return nil, nil // Pass condition.
 						}
 					}
-					return false, nil
+					// Ideally, the matcher would never reach this condition
+					return gomegaCustomError("requests didn't meet the required criteria to stay in same zone\nreverseChronologicalLogLines=\n%v", strings.Join(reverseChronologicalLogLines, "\n")), nil
 				})
 
 				gomega.Eventually(ctx, requestsFromClient(clientPod)).WithPolling(5 * time.Second).WithTimeout(e2eservice.KubeProxyLagTimeout).Should(requestsSucceedAndStayInSameZone)
@@ -235,10 +245,10 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 
 			framework.Logf("ensuring that requests from clientPod=%q on zone=%q (without a serving pod) are not dropped, and get routed to one of the serving pods anywhere in the cluster", clientPod.Name, clientZone)
 
-			requestsSucceedByReachingAnyServingPod := gcustom.MakeMatcher(func(reverseChronologicalLogLines []string) (bool, error) {
+			requestsSucceedByReachingAnyServingPod := framework.MakeMatcher(func(reverseChronologicalLogLines []string) (func() string, error) {
 				logLines := reverseChronologicalLogLines
 				if len(logLines) < 20 {
-					return false, fmt.Errorf("got %d log lines, waiting for at least 20", len(logLines))
+					return gomegaCustomError("got %d log lines, waiting for at least 20\nreverseChronologicalLogLines=\n%v", len(logLines), strings.Join(reverseChronologicalLogLines, "\n")), nil
 				}
 
 				// Requests are counted as successful when the response read from the log
@@ -251,14 +261,15 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 					}
 					_, servingPodExists := zoneForServingPod[logLine]
 					if !servingPodExists {
-						return false, fmt.Errorf("request from client pod likely failed because we got an unrecognizable response = %v; want response to be one of the serving pod names", logLine)
+						return gomegaCustomError("request from client pod likely failed because we got an unrecognizable response = %v; want response to be one of the serving pod names\nreverseChronologicalLogLines=\n%v", logLine, strings.Join(reverseChronologicalLogLines, "\n")), nil
 					}
 					consecutiveSuccessfulRequests++
 					if consecutiveSuccessfulRequests >= 10 {
-						return true, nil
+						return nil, nil // Pass condition
 					}
 				}
-				return false, nil
+				// Ideally, the matcher would never reach this condition
+				return gomegaCustomError("requests didn't meet the required criteria to reach a serving pod\nreverseChronologicalLogLines=\n%v", strings.Join(reverseChronologicalLogLines, "\n")), nil
 			})
 
 			gomega.Eventually(ctx, requestsFromClient(clientPod)).WithPolling(5 * time.Second).WithTimeout(e2eservice.KubeProxyLagTimeout).Should(requestsSucceedByReachingAnyServingPod)
