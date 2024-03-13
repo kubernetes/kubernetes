@@ -273,7 +273,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 		evictionMem1 := resource.MustParse(kubeletConfig.EvictionHard["memory.available"])
 		evictionMem, _ := evictionMem1.AsInt64()
 		wantAllocatable := capMem - evictionMem - allMem
-		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, resource.MustParse(kubeletConfig.EvictionHard["memory.available"]), node.Status.Capacity["memory"], ok, wantAllocatable)
+		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v, %v, %v, %v, %d, %d, %d", node.Status.Capacity, node.Status.Allocatable, value, resource.MustParse(kubeletConfig.EvictionHard["memory.available"]), node.Status.Capacity["memory"], ok, wantAllocatable, capMem, allMem, evictionMem)
 		// }
 
 	})
