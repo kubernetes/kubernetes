@@ -28,6 +28,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/utils/ptr"
 )
 
 // defaultNetworkInterfaceName is used for collectng network stats.
@@ -44,8 +45,8 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 	var memoryStats *statsapi.MemoryStats
 	cpuStats = &statsapi.CPUStats{
 		Time:                 metav1.NewTime(cstat.Timestamp),
-		UsageNanoCores:       uint64Ptr(0),
-		UsageCoreNanoSeconds: uint64Ptr(0),
+		UsageNanoCores:       ptr.To[uint64](0),
+		UsageCoreNanoSeconds: ptr.To[uint64](0),
 	}
 	if info.Spec.HasCpu {
 		if cstat.CpuInst != nil {
@@ -74,7 +75,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 	} else {
 		memoryStats = &statsapi.MemoryStats{
 			Time:            metav1.NewTime(cstat.Timestamp),
-			WorkingSetBytes: uint64Ptr(0),
+			WorkingSetBytes: ptr.To[uint64](0),
 		}
 	}
 	return cpuStats, memoryStats
@@ -160,14 +161,12 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 }
 
 func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.ProcessStats {
-	klog.InfoS("CAdvisorInfo", "Info.Labels", info.Spec.Labels)
 	cstat, found := latestContainerStats(info)
 	if !found || cstat.Processes == nil {
 		return nil
 	}
 	num := cstat.Processes.ProcessCount
-	klog.InfoS("ProcessStats", "Processes", cstat.Processes.ProcessCount)
-	return &statsapi.ProcessStats{ProcessCount: uint64Ptr(num)}
+	return &statsapi.ProcessStats{ProcessCount: ptr.To(num)}
 }
 
 func mergeProcessStats(first *statsapi.ProcessStats, second *statsapi.ProcessStats) *statsapi.ProcessStats {
@@ -182,17 +181,10 @@ func mergeProcessStats(first *statsapi.ProcessStats, second *statsapi.ProcessSta
 		return first
 	}
 
-	firstProcessCount := uint64(0)
-	if first != nil && first.ProcessCount != nil {
-		firstProcessCount = *first.ProcessCount
-	}
+	firstProcessCount := ptr.Deref(first.ProcessCount, 0)
+	secondProcessCount := ptr.Deref(second.ProcessCount, 0)
 
-	secondProcessCount := uint64(0)
-	if second != nil && second.ProcessCount != nil {
-		secondProcessCount = *second.ProcessCount
-	}
-
-	return &statsapi.ProcessStats{ProcessCount: uint64Ptr(firstProcessCount + secondProcessCount)}
+	return &statsapi.ProcessStats{ProcessCount: ptr.To(firstProcessCount + secondProcessCount)}
 }
 
 // cadvisorInfoToNetworkStats returns the statsapi.NetworkStats converted from
@@ -400,10 +392,6 @@ func getUint64Value(value *uint64) uint64 {
 	}
 
 	return *value
-}
-
-func uint64Ptr(i uint64) *uint64 {
-	return &i
 }
 
 func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo,

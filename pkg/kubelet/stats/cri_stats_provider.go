@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -626,8 +627,8 @@ func (p *criStatsProvider) makeContainerStats(
 		}
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.CPU.UsageCoreNanoSeconds = uint64Ptr(0)
-		result.CPU.UsageNanoCores = uint64Ptr(0)
+		result.CPU.UsageCoreNanoSeconds = ptr.To[uint64](0)
+		result.CPU.UsageNanoCores = ptr.To[uint64](0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -636,7 +637,7 @@ func (p *criStatsProvider) makeContainerStats(
 		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Memory.WorkingSetBytes = uint64Ptr(0)
+		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
 	}
 	if stats.Swap != nil {
 		result.Swap.Time = metav1.NewTime(time.Unix(0, stats.Swap.Timestamp))
@@ -648,8 +649,8 @@ func (p *criStatsProvider) makeContainerStats(
 		}
 	} else {
 		result.Swap.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Swap.SwapUsageBytes = uint64Ptr(0)
-		result.Swap.SwapAvailableBytes = uint64Ptr(0)
+		result.Swap.SwapUsageBytes = ptr.To[uint64](0)
+		result.Swap.SwapAvailableBytes = ptr.To[uint64](0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))
@@ -716,8 +717,8 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		}
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.CPU.UsageCoreNanoSeconds = uint64Ptr(0)
-		result.CPU.UsageNanoCores = uint64Ptr(0)
+		result.CPU.UsageCoreNanoSeconds = ptr.To[uint64](0)
+		result.CPU.UsageNanoCores = ptr.To[uint64](0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -726,7 +727,7 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Memory.WorkingSetBytes = uint64Ptr(0)
+		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
 	}
 
 	return result

@@ -37,6 +37,7 @@ import (
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -181,7 +182,7 @@ func TestHasDedicatedImageFs(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
-	imageStatsExpected := &statsapi.FsStats{AvailableBytes: uint64Ptr(1)}
+	imageStatsExpected := &statsapi.FsStats{AvailableBytes: ptr.To[uint64](0)}
 
 	for desc, test := range map[string]struct {
 		rootfsDevice     string
@@ -207,8 +208,8 @@ func TestHasDedicatedImageFs(t *testing.T) {
 			rootfsDevice:     "root/device",
 			imagefsDevice:    "root/device",
 			dedicated:        true,
-			imageFsStats:     &statsapi.FsStats{AvailableBytes: uint64Ptr(1)},
-			containerFsStats: &statsapi.FsStats{AvailableBytes: uint64Ptr(2)},
+			imageFsStats:     &statsapi.FsStats{AvailableBytes: ptr.To[uint64](0)},
+			containerFsStats: &statsapi.FsStats{AvailableBytes: ptr.To[uint64](0)},
 		},
 	} {
 		t.Logf("TestCase %q", desc)

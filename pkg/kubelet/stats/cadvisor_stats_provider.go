@@ -154,10 +154,10 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			podStats.CPU = cpu
 			podStats.Memory = memory
 			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
+
 			processStats := cadvisorInfoToProcessStats(podInfo)
 			// Sum up all of the process stats for each of the containers to obtain the cumulative pod level process count
 			podStats.ProcessStats = mergeProcessStats(podStats.ProcessStats, processStats)
-			klog.InfoS("Logging Process Stats Debugging", "ProcessStats", podStats.ProcessStats)
 		}
 
 		status, found := p.statusProvider.GetPodStatus(podUID)
