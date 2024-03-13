@@ -18,22 +18,22 @@ limitations under the License.
 
 package v1
 
-// NodeRuntimeClassFeaturesApplyConfiguration represents an declarative configuration of the NodeRuntimeClassFeatures type for use
+// NodeRuntimeHandlerFeaturesApplyConfiguration represents an declarative configuration of the NodeRuntimeHandlerFeatures type for use
 // with apply.
-type NodeRuntimeClassFeaturesApplyConfiguration struct {
+type NodeRuntimeHandlerFeaturesApplyConfiguration struct {
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty"`
 }
 
-// NodeRuntimeClassFeaturesApplyConfiguration constructs an declarative configuration of the NodeRuntimeClassFeatures type for use with
+// NodeRuntimeHandlerFeaturesApplyConfiguration constructs an declarative configuration of the NodeRuntimeHandlerFeatures type for use with
 // apply.
-func NodeRuntimeClassFeatures() *NodeRuntimeClassFeaturesApplyConfiguration {
-	return &NodeRuntimeClassFeaturesApplyConfiguration{}
+func NodeRuntimeHandlerFeatures() *NodeRuntimeHandlerFeaturesApplyConfiguration {
+	return &NodeRuntimeHandlerFeaturesApplyConfiguration{}
 }
 
 // WithRecursiveReadOnlyMounts sets the RecursiveReadOnlyMounts field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RecursiveReadOnlyMounts field is set to the value of the last call.
-func (b *NodeRuntimeClassFeaturesApplyConfiguration) WithRecursiveReadOnlyMounts(value bool) *NodeRuntimeClassFeaturesApplyConfiguration {
+func (b *NodeRuntimeHandlerFeaturesApplyConfiguration) WithRecursiveReadOnlyMounts(value bool) *NodeRuntimeHandlerFeaturesApplyConfiguration {
 	b.RecursiveReadOnlyMounts = &value
 	return b
 }

@@ -2599,21 +2599,21 @@ message NodeProxyOptions {
   optional string path = 1;
 }
 
-// NodeRuntimeClass is a set of runtime class information.
-message NodeRuntimeClass {
-  // Runtime class name.
-  // Empty for the default runtime class.
+// NodeRuntimeHandler is a set of runtime handler information.
+message NodeRuntimeHandler {
+  // Runtime handler name.
+  // Empty for the default runtime handler.
   // +optional
   optional string name = 1;
 
   // Supported features.
   // +optional
-  optional NodeRuntimeClassFeatures features = 2;
+  optional NodeRuntimeHandlerFeatures features = 2;
 }
 
-// NodeRuntimeClassFeatures is a set of runtime features.
-message NodeRuntimeClassFeatures {
-  // RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+message NodeRuntimeHandlerFeatures {
+  // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
   // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional bool recursiveReadOnlyMounts = 1;
@@ -2775,11 +2775,11 @@ message NodeStatus {
   // +optional
   optional NodeConfigStatus config = 11;
 
-  // The available runtime classes.
+  // The available runtime handlers.
   // +featureGate=RecursiveReadOnlyMounts
   // +optional
   // +listType=atomic
-  repeated NodeRuntimeClass runtimeClasses = 12;
+  repeated NodeRuntimeHandler runtimeHandlers = 12;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.

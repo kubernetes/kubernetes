@@ -4833,24 +4833,24 @@ type NodeDaemonEndpoints struct {
 	KubeletEndpoint DaemonEndpoint
 }
 
-// NodeRuntimeClassFeatures is a set of runtime features.
-type NodeRuntimeClassFeatures struct {
-	// RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+type NodeRuntimeHandlerFeatures struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnlyMounts *bool
 	// Reserved: UserNamespaces *bool
 }
 
-// NodeRuntimeClass is a set of runtime class information.
-type NodeRuntimeClass struct {
-	// Runtime class name.
-	// Empty for the default runtime class.
+// NodeRuntimeHandler is a set of runtime handler information.
+type NodeRuntimeHandler struct {
+	// Runtime handler name.
+	// Empty for the default runtime handler.
 	// +optional
 	Name string
 	// Supported features.
 	// +optional
-	Features *NodeRuntimeClassFeatures
+	Features *NodeRuntimeHandlerFeatures
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -4963,10 +4963,10 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus
-	// The available runtime classes.
+	// The available runtime handlers.
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
-	RuntimeClasses []NodeRuntimeClass
+	RuntimeHandlers []NodeRuntimeHandler
 }
 
 // UniqueVolumeName defines the name of attached volume

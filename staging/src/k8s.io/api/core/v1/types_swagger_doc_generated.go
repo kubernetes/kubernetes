@@ -1214,23 +1214,23 @@ func (NodeProxyOptions) SwaggerDoc() map[string]string {
 	return map_NodeProxyOptions
 }
 
-var map_NodeRuntimeClass = map[string]string{
-	"":         "NodeRuntimeClass is a set of runtime class information.",
-	"name":     "Runtime class name. Empty for the default runtime class.",
+var map_NodeRuntimeHandler = map[string]string{
+	"":         "NodeRuntimeHandler is a set of runtime handler information.",
+	"name":     "Runtime handler name. Empty for the default runtime handler.",
 	"features": "Supported features.",
 }
 
-func (NodeRuntimeClass) SwaggerDoc() map[string]string {
-	return map_NodeRuntimeClass
+func (NodeRuntimeHandler) SwaggerDoc() map[string]string {
+	return map_NodeRuntimeHandler
 }
 
-var map_NodeRuntimeClassFeatures = map[string]string{
-	"":                        "NodeRuntimeClassFeatures is a set of runtime features.",
-	"recursiveReadOnlyMounts": "RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.",
+var map_NodeRuntimeHandlerFeatures = map[string]string{
+	"":                        "NodeRuntimeHandlerFeatures is a set of runtime features.",
+	"recursiveReadOnlyMounts": "RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
 }
 
-func (NodeRuntimeClassFeatures) SwaggerDoc() map[string]string {
-	return map_NodeRuntimeClassFeatures
+func (NodeRuntimeHandlerFeatures) SwaggerDoc() map[string]string {
+	return map_NodeRuntimeHandlerFeatures
 }
 
 var map_NodeSelector = map[string]string{
@@ -1291,7 +1291,7 @@ var map_NodeStatus = map[string]string{
 	"volumesInUse":    "List of attachable volumes in use (mounted) by the node.",
 	"volumesAttached": "List of volumes that are attached to the node.",
 	"config":          "Status of the config assigned to the node via the dynamic Kubelet config feature.",
-	"runtimeClasses":  "The available runtime classes.",
+	"runtimeHandlers": "The available runtime handlers.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
