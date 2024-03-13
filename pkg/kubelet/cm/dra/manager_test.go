@@ -84,7 +84,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(shouldTimeout bool) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.Duration) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -117,7 +117,7 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool) (fakeDRAServerInfo, error)
 		driverName: driverName,
 	}
 	if shouldTimeout {
-		timeout := plugin.PluginClientTimeout + time.Second
+		timeout := *pluginClientTimeout * 2
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
@@ -758,14 +758,20 @@ func TestPrepareResources(t *testing.T) {
 				}
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
+			var pluginClientTimeout *time.Duration
+			if test.wantTimeout {
+				timeout := time.Millisecond * 20
+				pluginClientTimeout = &timeout
+			}
+
+			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout, pluginClientTimeout)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
@@ -1058,14 +1064,20 @@ func TestUnprepareResources(t *testing.T) {
 				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
+			var pluginClientTimeout *time.Duration
+			if test.wantTimeout {
+				timeout := time.Millisecond * 20
+				pluginClientTimeout = &timeout
+			}
+
+			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout, pluginClientTimeout)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests

@@ -59,7 +59,7 @@ func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, v
 }
 
 // RegisterPlugin is a fake method
-func (f *fakePluginHandler) RegisterPlugin(pluginName, endpoint string, versions []string) error {
+func (f *fakePluginHandler) RegisterPlugin(pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	f.Lock()
 	defer f.Unlock()
 	f.events = append(f.events, "register "+pluginName)

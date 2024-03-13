@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fmt"
 	"os"
+	"time"
 
 	core "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -37,7 +38,7 @@ func (s *server) GetPluginHandler() cache.PluginHandler {
 	return s
 }
 
-func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
+func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	klog.V(2).InfoS("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
 	return s.connectClient(pluginName, endpoint)
 }

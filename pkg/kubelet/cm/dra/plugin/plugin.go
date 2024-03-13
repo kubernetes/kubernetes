@@ -49,6 +49,7 @@ type plugin struct {
 	endpoint                string
 	version                 string
 	highestSupportedVersion *utilversion.Version
+	clientTimeout           time.Duration
 }
 
 func (p *plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
@@ -116,7 +117,7 @@ func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1
 }
 
 // RegisterPlugin is called when a plugin can be registered.
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
+func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	klog.InfoS("Register new DRA plugin", "name", pluginName, "endpoint", endpoint)
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, versions)
@@ -124,11 +125,19 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
+	var timeout time.Duration
+	if pluginClientTimeout == nil {
+		timeout = PluginClientTimeout
+	} else {
+		timeout = *pluginClientTimeout
+	}
+
 	pluginInstance := &plugin{
 		conn:                    nil,
 		endpoint:                endpoint,
 		version:                 v1alpha3Version,
 		highestSupportedVersion: highestSupportedVersion,
+		clientTimeout:           timeout,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
