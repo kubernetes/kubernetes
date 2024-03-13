@@ -39,7 +39,7 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 			if !exist {
 				return "KubernetesAPI"
 			}
-			return getSpanNameFromRequestInfo(info)
+			return getSpanNameFromRequestInfo(info, r)
 		}),
 	}
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -55,9 +55,9 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 	return otelhttp.NewHandler(wrappedHandler, "KubernetesAPI", opts...)
 }
 
-func getSpanNameFromRequestInfo(info *request.RequestInfo) string {
+func getSpanNameFromRequestInfo(info *request.RequestInfo, r *http.Request) string {
 	if !info.IsResourceRequest {
-		return info.Path
+		return r.Method + " " + info.Path
 	}
 
 	spanName := "/" + info.APIPrefix
@@ -75,5 +75,5 @@ func getSpanNameFromRequestInfo(info *request.RequestInfo) string {
 	if info.Subresource != "" {
 		spanName += "/" + info.Subresource
 	}
-	return spanName
+	return r.Method + " " + spanName
 }
