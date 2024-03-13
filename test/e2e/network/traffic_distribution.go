@@ -58,7 +58,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 	////////////////////////////////////////////////////////////////////////////
 
 	// endpointSlicesForService returns a helper function to be used with
-	// gomega.Eventually(...). It fetches the EndpointSlcies for the given
+	// gomega.Eventually(...). It fetches the EndpointSlices for the given
 	// serviceName.
 	endpointSlicesForService := func(serviceName string) any {
 		return func(ctx context.Context) ([]discoveryv1.EndpointSlice, error) {
@@ -201,7 +201,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 				requestsSucceedAndStayInSameZone := gcustom.MakeMatcher(func(reverseChronologicalLogLines []string) (bool, error) {
 					logLines := reverseChronologicalLogLines
 					if len(logLines) < 20 {
-						return false, fmt.Errorf("got %d log lines, waiting for at least 10", len(logLines))
+						return false, fmt.Errorf("got %d log lines, waiting for at least 20", len(logLines))
 					}
 					consecutiveSameZone := 0
 
@@ -238,7 +238,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 			requestsSucceedByReachingAnyServingPod := gcustom.MakeMatcher(func(reverseChronologicalLogLines []string) (bool, error) {
 				logLines := reverseChronologicalLogLines
 				if len(logLines) < 20 {
-					return false, fmt.Errorf("got %d log lines, waiting for at least 10", len(logLines))
+					return false, fmt.Errorf("got %d log lines, waiting for at least 20", len(logLines))
 				}
 
 				// Requests are counted as successful when the response read from the log
