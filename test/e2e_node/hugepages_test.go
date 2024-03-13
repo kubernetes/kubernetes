@@ -265,7 +265,9 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 		value, ok := node.Status.Allocatable["memory"]
 		// if !ok {
 		kubeletConfig, _ := getCurrentKubeletConfig(ctx)
-		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, resource.MustParse(kubeletConfig.EvictionHard["memory.available"]), ok)
+
+		wantAllocatable := node.Status.Capacity["memory"].AsInt64() - resource.MustParse(kubeletConfig.EvictionHard["memory.available"]) - node.Status.Allocatable["memory"].AsInt64()
+		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v, %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, resource.MustParse(kubeletConfig.EvictionHard["memory.available"]), node.Status.Capacity["memory"], ok)
 		// }
 
 	})
