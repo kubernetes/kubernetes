@@ -968,7 +968,7 @@ func TestPrintIngress(t *testing.T) {
 	ingress := networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
-			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
 		},
 		Spec: networking.IngressSpec{
 			IngressClassName: utilpointer.StringPtr("foo"),
@@ -1016,7 +1016,7 @@ func TestPrintIngressClass(t *testing.T) {
 		ingressClass: &networking.IngressClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "test1",
-				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
 			},
 			Spec: networking.IngressClassSpec{
 				Controller: "example.com/controller",
@@ -1029,7 +1029,7 @@ func TestPrintIngressClass(t *testing.T) {
 		ingressClass: &networking.IngressClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "test1",
-				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
 			},
 			Spec: networking.IngressClassSpec{
 				Controller: "example.com/controller",
@@ -1046,7 +1046,7 @@ func TestPrintIngressClass(t *testing.T) {
 		ingressClass: &networking.IngressClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "test2",
-				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-11, 0, 0)},
+				CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-11 * 365 * 24 * time.Hour))},
 			},
 			Spec: networking.IngressClassSpec{
 				Controller: "example.com/controller2",
@@ -2248,7 +2248,7 @@ func TestTranslateTimestampSince(t *testing.T) {
 		{"an hour ago", translateTimestampSince(metav1.Time{Time: time.Now().Add(-6e12)}), "100m"},
 		{"2 days ago", translateTimestampSince(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -2)}), "2d"},
 		{"months ago", translateTimestampSince(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -90)}), "90d"},
-		{"10 years ago", translateTimestampSince(metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}), "10y"},
+		{"10 years ago", translateTimestampSince(metav1.Time{Time: time.Now().UTC().Add(time.Duration(-10 * 365 * 24 * time.Hour))}), "10y"},
 	}
 	for _, test := range tl {
 		if test.got != test.exp {
@@ -2273,7 +2273,7 @@ func TestTranslateTimestampUntil(t *testing.T) {
 		{"in an hour", translateTimestampUntil(metav1.Time{Time: time.Now().Add(6e12 + buf)}), "100m"},
 		{"in 2 days", translateTimestampUntil(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, 2).Add(buf)}), "2d"},
 		{"in months", translateTimestampUntil(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, 90).Add(buf)}), "90d"},
-		{"in 10 years", translateTimestampUntil(metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0).Add(buf)}), "10y"},
+		{"in 10 years", translateTimestampUntil(metav1.Time{Time: time.Now().UTC().Add(time.Duration(10 * 365 * 24 * time.Hour)).Add(buf)}), "10y"},
 	}
 	for _, test := range tl {
 		if test.got != test.exp {
@@ -2591,7 +2591,7 @@ func TestPrintJob(t *testing.T) {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "job3",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
 				},
 				Spec: batch.JobSpec{
 					Completions: nil,
@@ -2610,7 +2610,7 @@ func TestPrintJob(t *testing.T) {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "job4",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
 				},
 				Spec: batch.JobSpec{
 					Completions: nil,
@@ -6650,7 +6650,7 @@ func TestPrintIPAddress(t *testing.T) {
 	ip := networking.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "192.168.2.2",
-			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
 		},
 		Spec: networking.IPAddressSpec{
 			ParentRef: &networking.ParentReference{
