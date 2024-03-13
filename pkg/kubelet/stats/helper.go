@@ -160,11 +160,13 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 }
 
 func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.ProcessStats {
+	klog.InfoS("CAdvisorInfo", "Info.Labels", info.Spec.Labels)
 	cstat, found := latestContainerStats(info)
 	if !found || cstat.Processes == nil {
 		return nil
 	}
 	num := cstat.Processes.ProcessCount
+	klog.InfoS("ProcessStats", "Processes", cstat.Processes.ProcessCount)
 	return &statsapi.ProcessStats{ProcessCount: uint64Ptr(num)}
 }
 
