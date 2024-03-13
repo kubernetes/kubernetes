@@ -1724,6 +1724,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
 			var backingStorage *dummyStorage
 			if scenario.backingStorage != nil {
 				backingStorage = scenario.backingStorage
