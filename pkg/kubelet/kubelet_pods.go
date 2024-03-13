@@ -2456,6 +2456,11 @@ func (kl *Kubelet) runtimeClassSupportsRecursiveReadOnlyMounts(pod *v1.Pod) bool
 // runtimeClassSupportsRecursiveReadOnlyMounts checks whether the runtime class supports recursive read-only mounts.
 // The kubelet feature gate is not checked here.
 func runtimeClassSupportsRecursiveReadOnlyMounts(runtimeClassName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
+	if len(runtimeHandlers) == 0 {
+		// The runtime does not support returning the handler list.
+		// No need to print a warning here.
+		return false
+	}
 	for _, h := range runtimeHandlers {
 		if h.Name == runtimeClassName {
 			return h.SupportsRecursiveReadOnlyMounts
