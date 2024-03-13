@@ -402,7 +402,8 @@ done
 
 # Phase 7: update internal modules
 kube::log::status "vendor: updating internal modules" >&11
-hack/update-internal-modules.sh
+#HACK while fiddling with utils
+#hack/update-internal-modules.sh
 
 
 # Phase 8: rebuild vendor directory

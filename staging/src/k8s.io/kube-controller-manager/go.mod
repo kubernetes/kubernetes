@@ -25,7 +25,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/component-base v0.0.0 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
-	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
+	k8s.io/utils v0.0.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
@@ -41,4 +41,5 @@ replace (
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/kms => ../kms
 	k8s.io/kube-controller-manager => ../kube-controller-manager
+	k8s.io/utils => ../utils
 )

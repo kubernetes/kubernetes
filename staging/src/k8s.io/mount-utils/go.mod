@@ -9,7 +9,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sys v0.17.0
 	k8s.io/klog/v2 v2.120.1
-	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+	k8s.io/utils v0.0.0
 )
 
 require (
@@ -22,4 +22,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace k8s.io/mount-utils => ../mount-utils
+replace (
+	k8s.io/mount-utils => ../mount-utils
+	k8s.io/utils => ../utils
+)

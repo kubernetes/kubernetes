@@ -17,7 +17,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kubelet v0.0.0
-	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+	k8s.io/utils v0.0.0
 )
 
 require (
@@ -74,4 +74,5 @@ replace (
 	k8s.io/dynamic-resource-allocation => ../dynamic-resource-allocation
 	k8s.io/kms => ../kms
 	k8s.io/kubelet => ../kubelet
+	k8s.io/utils => ../utils
 )
