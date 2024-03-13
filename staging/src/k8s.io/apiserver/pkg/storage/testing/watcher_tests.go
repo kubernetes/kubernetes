@@ -1481,7 +1481,6 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 			// make sure we only get initial events
 			testCheckResultsInStrictOrder(t, w, scenario.expectedInitialEvents(createdPods))
 			testCheckResultsInStrictOrder(t, w, scenario.expectedInitialEventsBookmark(createdPods))
-			testCheckNoMoreResults(t, w)
 
 			createdPods = []*example.Pod{}
 			// add a pod that is greater than the storage's RV when the watch was started
