@@ -274,6 +274,7 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 		mutatingWebhookLatencyKey   = "apiserver.latency.k8s.io/mutating-webhook"
 		validatingWebhookLatencyKey = "apiserver.latency.k8s.io/validating-webhook"
 		decodeLatencyKey            = "apiserver.latency.k8s.io/decode-response-object"
+		apfQueueWaitLatencyKey      = "apiserver.latency.k8s.io/apf-queue-wait"
 	)
 
 	tracker, ok := LatencyTrackersFrom(ctx)
@@ -303,6 +304,8 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 	if latency := tracker.DecodeTracker.GetLatency(); latency != 0 {
 		annotations[decodeLatencyKey] = latency.String()
 	}
-
+	if latency := tracker.APFQueueWaitTracker.GetLatency(); latency != 0 {
+		annotations[apfQueueWaitLatencyKey] = latency.String()
+	}
 	return annotations
 }
