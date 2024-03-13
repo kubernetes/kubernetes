@@ -412,6 +412,17 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Sta
 	return nil
 }
 
+// FindContainerStatusByContainerID returns container status in the pod status with the given name.
+// When there are multiple containers' statuses with the same name, the first match will be returned.
+func (podStatus *PodStatus) FindContainerStatusByContainerID(containerID *ContainerID) *Status {
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.ID.String() == containerID.String() {
+			return containerStatus
+		}
+	}
+	return nil
+}
+
 // GetRunningContainerStatuses returns container status of all the running containers in a pod
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*Status {
 	runningContainerStatuses := []*Status{}
