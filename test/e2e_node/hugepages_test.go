@@ -259,15 +259,21 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 		framework.ExpectNoError(result.Error(), "while patching")
 
 		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+
 		framework.ExpectNoError(err, "while getting node status")
 
 		ginkgo.By("Verifying that the node now supports huge pages with size 3Mi")
 		value, ok := node.Status.Allocatable["memory"]
 		// if !ok {
 		kubeletConfig, _ := getCurrentKubeletConfig(ctx)
-
-		wantAllocatable := node.Status.Capacity["memory"].AsInt64() - resource.MustParse(kubeletConfig.EvictionHard["memory.available"]) - node.Status.Allocatable["memory"].AsInt64()
-		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v, %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, resource.MustParse(kubeletConfig.EvictionHard["memory.available"]), node.Status.Capacity["memory"], ok)
+		capMem1, _ := node.Status.Capacity["memory"]
+		capMem, _ := capMem1.AsInt64()
+		allMem1, _ := node.Status.Allocatable["memory"]
+		allMem, _ := allMem1.AsInt64()
+		evictionMem1 := resource.MustParse(kubeletConfig.EvictionHard["memory.available"])
+		evictionMem, _ := evictionMem1.AsInt64()
+		wantAllocatable := capMem - evictionMem - allMem
+		framework.Failf("capacity should contain resource hugepages-3Mi: %v, %v, %v, %v, %v, %v, %v", node.Status.Capacity, node.Status.Allocatable, value, resource.MustParse(kubeletConfig.EvictionHard["memory.available"]), node.Status.Capacity["memory"], ok, wantAllocatable)
 		// }
 
 	})
