@@ -98,7 +98,7 @@ message NodeListAndWatchResourcesRequest {
 }
 
 message NodeListAndWatchResourcesResponse {
-    repeated k8s.io.api.resource.v1alpha2.NodeResourceModel resources = 1;
+    repeated k8s.io.api.resource.v1alpha2.ResourceModel resources = 1;
 }
 
 message Claim {

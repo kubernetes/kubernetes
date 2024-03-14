@@ -192,7 +192,7 @@ message NamedResourcesRequest {
   optional string selector = 1;
 }
 
-// NamedResourcesResources is used in NodeResourceModel.
+// NamedResourcesResources is used in ResourceModel.
 message NamedResourcesResources {
   // The list of all individual resources instances currently available.
   //
@@ -206,14 +206,6 @@ message NamedResourcesStringSlice {
   //
   // +listType=atomic
   repeated string strings = 1;
-}
-
-// NodeResourceModel must have one and only one field set.
-message NodeResourceModel {
-  // NamedResources describes available resources using the named resources model.
-  //
-  // +optional
-  optional NamedResourcesResources namedResources = 1;
 }
 
 // PodSchedulingContext objects hold information that is needed to schedule
@@ -655,6 +647,14 @@ message ResourceHandle {
   optional StructuredResourceHandle structuredData = 5;
 }
 
+// ResourceModel must have one and only one field set.
+message ResourceModel {
+  // NamedResources describes available resources using the named resources model.
+  //
+  // +optional
+  optional NamedResourcesResources namedResources = 1;
+}
+
 // ResourceRequest is a request for resources from one particular driver.
 message ResourceRequest {
   // VendorParameters are arbitrary setup parameters for the requested
@@ -695,7 +695,7 @@ message ResourceSlice {
   // objects with a certain driver name.
   optional string driverName = 3;
 
-  optional NodeResourceModel nodeResourceModel = 4;
+  optional ResourceModel resourceModel = 4;
 }
 
 // ResourceSliceList is a collection of ResourceSlices.

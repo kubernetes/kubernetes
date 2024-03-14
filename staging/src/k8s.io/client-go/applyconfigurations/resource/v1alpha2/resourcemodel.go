@@ -18,22 +18,22 @@ limitations under the License.
 
 package v1alpha2
 
-// NodeResourceModelApplyConfiguration represents an declarative configuration of the NodeResourceModel type for use
+// ResourceModelApplyConfiguration represents an declarative configuration of the ResourceModel type for use
 // with apply.
-type NodeResourceModelApplyConfiguration struct {
+type ResourceModelApplyConfiguration struct {
 	NamedResources *NamedResourcesResourcesApplyConfiguration `json:"namedResources,omitempty"`
 }
 
-// NodeResourceModelApplyConfiguration constructs an declarative configuration of the NodeResourceModel type for use with
+// ResourceModelApplyConfiguration constructs an declarative configuration of the ResourceModel type for use with
 // apply.
-func NodeResourceModel() *NodeResourceModelApplyConfiguration {
-	return &NodeResourceModelApplyConfiguration{}
+func ResourceModel() *ResourceModelApplyConfiguration {
+	return &ResourceModelApplyConfiguration{}
 }
 
 // WithNamedResources sets the NamedResources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NamedResources field is set to the value of the last call.
-func (b *NodeResourceModelApplyConfiguration) WithNamedResources(value *NamedResourcesResourcesApplyConfiguration) *NodeResourceModelApplyConfiguration {
+func (b *ResourceModelApplyConfiguration) WithNamedResources(value *NamedResourcesResourcesApplyConfiguration) *ResourceModelApplyConfiguration {
 	b.NamedResources = value
 	return b
 }
