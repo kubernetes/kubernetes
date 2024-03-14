@@ -157,29 +157,6 @@ func (c *cache) get(id types.UID) *data {
 // Otherwise, it returns nil. The caller should acquire the lock.
 func (c *cache) getIfNewerThan(id types.UID, minTime time.Time) *data {
 	d, ok := c.pods[id]
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		// Evented PLEG has CREATED, STARTED, STOPPED and DELETED events
-		// However if the container creation fails for some reason there is no
-		// CRI event received by the kubelet and that pod will get stuck a
-		// GetNewerThan call in the pod workers. This is reproducible with
-		// the node e2e test,
-		// https://github.com/kubernetes/kubernetes/blob/83415e5c9e6e59a3d60a148160490560af2178a1/test/e2e_node/pod_hostnamefqdn_test.go#L161
-		// which forces failure during pod creation. This issue also exists in
-		// Generic PLEG but since it updates global timestamp periodically
-		// the GetNewerThan call gets unstuck.
-
-		// During node e2e tests, it was observed this change does not have any
-		// adverse impact on the behaviour of the Generic PLEG as well.
-		switch {
-		case !ok:
-			return makeDefaultData(id)
-		case ok && (d.modified.After(minTime) || (c.timestamp != nil && c.timestamp.After(minTime))):
-			return d
-		default:
-			return nil
-		}
-	}
-
 	globalTimestampIsNewer := (c.timestamp != nil && c.timestamp.After(minTime))
 	if !ok && globalTimestampIsNewer {
 		// Status is not cached, but the global timestamp is newer than
