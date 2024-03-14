@@ -19,6 +19,7 @@ package cloud
 import (
 	"context"
 	"errors"
+	"github.com/google/go-cmp/cmp"
 	"reflect"
 	"testing"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/klog/v2"
 )
@@ -599,6 +601,165 @@ func Test_NodesShutdown(t *testing.T) {
 			},
 		},
 		{
+			name: "node with empty spec providerID is not ready and was shutdown, but exists",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "",
+					Taints: []v1.Taint{
+						*ShutdownTaint,
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
+			fakeCloud: &fakecloud.Cloud{
+				NodeShutdown:            true,
+				ExistsByProviderID:      true,
+				ErrShutdownByProviderID: nil,
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "foo://12345",
+				},
+			},
+		},
+		{
+			name: "node with non-existing providerID (missing in cloud provider) gets deleted",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedDeleted: true,
+			fakeCloud: &fakecloud.Cloud{
+				ErrShutdownByProviderID: nil,
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "",
+				},
+			},
+		},
+		{
+			name: "node with error when getting providerID does not have shutdown taint",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
+			fakeCloud: &fakecloud.Cloud{
+				ErrShutdownByProviderID: nil,
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): errors.New("err!"),
+				},
+			},
+		},
+		{
+			name: "node with InstanceID returning InstanceNotFound gets deleted",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedDeleted: true,
+			fakeCloud: &fakecloud.Cloud{
+				ErrShutdownByProviderID: nil,
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.InstanceNotFound,
+				},
+			},
+		},
+		{
 			name: "node is not ready, but there is error checking if node is shutdown",
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -744,6 +905,157 @@ func Test_NodesShutdown(t *testing.T) {
 				t.Logf("actual nodes: %v", updatedNode)
 				t.Logf("expected nodes: %v", testcase.expectedNode)
 				t.Error("unexpected updated nodes")
+			}
+		})
+	}
+}
+
+func Test_GetProviderID(t *testing.T) {
+	testcases := []struct {
+		name               string
+		fakeCloud          *fakecloud.Cloud
+		existingNode       *v1.Node
+		expectedProviderID string
+		expectedErr        error
+	}{
+		{
+			name: "node initialized with provider ID",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				Err:               nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
+			},
+			expectedProviderID: "fake://12345",
+			expectedErr:        nil,
+		},
+		{
+			name: "node initialized with provider ID with InstancesV2",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				Err:               nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
+			},
+			expectedProviderID: "fake://12345",
+			expectedErr:        nil,
+		},
+		{
+			name: "cloud implemented with Instances",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+			},
+			expectedProviderID: "fake://12345",
+			expectedErr:        nil,
+		},
+		{
+			name: "cloud implemented with InstancesV2",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				ProviderID: map[types.NodeName]string{
+					types.NodeName("node0"): "fake://12345",
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+			},
+			expectedProviderID: "fake://12345",
+			expectedErr:        nil,
+		},
+		{
+			name: "cloud implemented with InstancesV2 (without providerID)",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				Err:               nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+			},
+			expectedProviderID: "",
+			expectedErr:        nil,
+		},
+		{
+			name: "cloud implemented with Instances with instance missing",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.InstanceNotFound,
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+			},
+			expectedProviderID: "",
+			expectedErr:        cloudprovider.InstanceNotFound,
+		},
+		{
+			name: "cloud implemented with Instances with unknown error",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): errors.New("unknown error"),
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+			},
+			expectedProviderID: "",
+			expectedErr:        errors.New("failed to get instance ID from cloud provider: unknown error"),
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			cloudNodeLifecycleController := &CloudNodeLifecycleController{
+				cloud: testcase.fakeCloud,
+			}
+
+			providerID, err := cloudNodeLifecycleController.getProviderID(context.TODO(), testcase.existingNode)
+
+			if err != nil && testcase.expectedErr == nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err == nil && testcase.expectedErr != nil {
+				t.Fatalf("did not get expected error %q", testcase.expectedErr)
+			}
+			if err != nil && err.Error() != testcase.expectedErr.Error() {
+				t.Fatalf("expected error %q, got %q", testcase.expectedErr.Error(), err.Error())
+			}
+
+			if !cmp.Equal(providerID, testcase.expectedProviderID) {
+				t.Errorf("unexpected providerID %s", cmp.Diff(providerID, testcase.expectedProviderID))
 			}
 		})
 	}
