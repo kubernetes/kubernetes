@@ -459,11 +459,16 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 		}
 		return label.SetFileLabel(dest, mountLabel)
 	case "tmpfs":
-		stat, err := os.Stat(dest)
-		if err != nil {
+		if stat, err := os.Stat(dest); err != nil {
 			if err := os.MkdirAll(dest, 0o755); err != nil {
 				return err
 			}
+		} else {
+			dt := fmt.Sprintf("mode=%04o", syscallMode(stat.Mode()))
+			if m.Data != "" {
+				dt = dt + "," + m.Data
+			}
+			m.Data = dt
 		}
 
 		if m.Extensions&configs.EXT_COPYUP == configs.EXT_COPYUP {
@@ -472,16 +477,7 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 			err = mountPropagate(m, rootfs, mountLabel, nil)
 		}
 
-		if err != nil {
-			return err
-		}
-
-		if stat != nil {
-			if err = os.Chmod(dest, stat.Mode()); err != nil {
-				return err
-			}
-		}
-		return nil
+		return err
 	case "bind":
 		if err := prepareBindMount(m, rootfs, mountFd); err != nil {
 			return err

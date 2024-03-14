@@ -32,11 +32,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/opencontainers/selinux/go-selinux"
 	"k8s.io/client-go/informers"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/integer"
@@ -105,6 +104,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/userns/inuserns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -468,7 +468,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
 	if err != nil {
-		if libcontaineruserns.RunningInUserNS() {
+		if inuserns.RunningInUserNS() {
 			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
 				// oomwatcher.NewWatcher returns "open /dev/kmsg: operation not permitted" error,
 				// when running in a user namespace with sysctl value `kernel.dmesg_restrict=1`.
