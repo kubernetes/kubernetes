@@ -403,7 +403,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   The validatingadmisionpolicy resource must support create, get,
 	     list, watch, update, patch, delete, and deletecollection.
 	*/
-	ginkgo.It("should support ValidatingAdmissionPolicy API operations", func(ctx context.Context) {
+	framework.ConformanceIt("should support ValidatingAdmissionPolicy API operations", func(ctx context.Context) {
 		vapVersion := "v1"
 		ginkgo.By("getting /apis")
 		{
@@ -670,7 +670,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   The ValidatingadmissionPolicyBinding resource must support create, get,
 	     list, watch, update, patch, delete, and deletecollection.
 	*/
-	ginkgo.It("should support ValidatingAdmissionPolicyBinding API operations", func(ctx context.Context) {
+	framework.ConformanceIt("should support ValidatingAdmissionPolicyBinding API operations", func(ctx context.Context) {
 		vapbVersion := "v1"
 		ginkgo.By("getting /apis")
 		{
