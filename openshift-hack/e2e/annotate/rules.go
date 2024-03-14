@@ -152,9 +152,6 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-17202
 			`\[sig-apps\] StatefulSet Scaling StatefulSetStartOrdinal \[Feature:StatefulSetStartOrdinal\] Removing \.start\.ordinal`,
-
-			// https://issues.redhat.com/browse/OCPBUGS-24481
-			`\[Feature:SELinux\]`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
