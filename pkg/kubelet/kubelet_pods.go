@@ -2445,23 +2445,32 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupP
 }
 
 func (kl *Kubelet) runtimeClassSupportsRecursiveReadOnlyMounts(pod *v1.Pod) bool {
-	var runtimeClassName string
-	if pod.Spec.RuntimeClassName != nil {
-		runtimeClassName = *pod.Spec.RuntimeClassName
+	if kl.runtimeClassManager == nil {
+		return false
+	}
+	runtimeHandlerName, err := kl.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+	if err != nil {
+		klog.ErrorS(err, "failed to look up the runtime handler", "runtimeClassName", pod.Spec.RuntimeClassName)
+		return false
 	}
 	runtimeHandlers := kl.runtimeState.runtimeHandlers()
-	return runtimeClassSupportsRecursiveReadOnlyMounts(runtimeClassName, runtimeHandlers)
+	return runtimeHandlerSupportsRecursiveReadOnlyMounts(runtimeHandlerName, runtimeHandlers)
 }
 
-// runtimeClassSupportsRecursiveReadOnlyMounts checks whether the runtime class supports recursive read-only mounts.
+// runtimeHandlerSupportsRecursiveReadOnlyMounts checks whether the runtime handler supports recursive read-only mounts.
 // The kubelet feature gate is not checked here.
-func runtimeClassSupportsRecursiveReadOnlyMounts(runtimeClassName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
+func runtimeHandlerSupportsRecursiveReadOnlyMounts(runtimeHandlerName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
+	if len(runtimeHandlers) == 0 {
+		// The runtime does not support returning the handler list.
+		// No need to print a warning here.
+		return false
+	}
 	for _, h := range runtimeHandlers {
-		if h.Name == runtimeClassName {
+		if h.Name == runtimeHandlerName {
 			return h.SupportsRecursiveReadOnlyMounts
 		}
 	}
-	klog.ErrorS(nil, "unknown runtime class", "runtimeClassName", runtimeClassName)
+	klog.ErrorS(nil, "Unknown runtime handler", "runtimeHandlerName", runtimeHandlerName)
 	return false
 }
 

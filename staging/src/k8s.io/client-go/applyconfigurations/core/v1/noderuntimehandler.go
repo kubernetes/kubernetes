@@ -18,23 +18,23 @@ limitations under the License.
 
 package v1
 
-// NodeRuntimeClassApplyConfiguration represents an declarative configuration of the NodeRuntimeClass type for use
+// NodeRuntimeHandlerApplyConfiguration represents an declarative configuration of the NodeRuntimeHandler type for use
 // with apply.
-type NodeRuntimeClassApplyConfiguration struct {
-	Name     *string                                     `json:"name,omitempty"`
-	Features *NodeRuntimeClassFeaturesApplyConfiguration `json:"features,omitempty"`
+type NodeRuntimeHandlerApplyConfiguration struct {
+	Name     *string                                       `json:"name,omitempty"`
+	Features *NodeRuntimeHandlerFeaturesApplyConfiguration `json:"features,omitempty"`
 }
 
-// NodeRuntimeClassApplyConfiguration constructs an declarative configuration of the NodeRuntimeClass type for use with
+// NodeRuntimeHandlerApplyConfiguration constructs an declarative configuration of the NodeRuntimeHandler type for use with
 // apply.
-func NodeRuntimeClass() *NodeRuntimeClassApplyConfiguration {
-	return &NodeRuntimeClassApplyConfiguration{}
+func NodeRuntimeHandler() *NodeRuntimeHandlerApplyConfiguration {
+	return &NodeRuntimeHandlerApplyConfiguration{}
 }
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *NodeRuntimeClassApplyConfiguration) WithName(value string) *NodeRuntimeClassApplyConfiguration {
+func (b *NodeRuntimeHandlerApplyConfiguration) WithName(value string) *NodeRuntimeHandlerApplyConfiguration {
 	b.Name = &value
 	return b
 }
@@ -42,7 +42,7 @@ func (b *NodeRuntimeClassApplyConfiguration) WithName(value string) *NodeRuntime
 // WithFeatures sets the Features field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Features field is set to the value of the last call.
-func (b *NodeRuntimeClassApplyConfiguration) WithFeatures(value *NodeRuntimeClassFeaturesApplyConfiguration) *NodeRuntimeClassApplyConfiguration {
+func (b *NodeRuntimeHandlerApplyConfiguration) WithFeatures(value *NodeRuntimeHandlerFeaturesApplyConfiguration) *NodeRuntimeHandlerApplyConfiguration {
 	b.Features = value
 	return b
 }

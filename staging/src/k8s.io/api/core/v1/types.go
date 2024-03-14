@@ -5769,24 +5769,24 @@ type NodeDaemonEndpoints struct {
 	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty" protobuf:"bytes,1,opt,name=kubeletEndpoint"`
 }
 
-// NodeRuntimeClassFeatures is a set of runtime features.
-type NodeRuntimeClassFeatures struct {
-	// RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+type NodeRuntimeHandlerFeatures struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty" protobuf:"varint,1,opt,name=recursiveReadOnlyMounts"`
 	// Reserved: UserNamespaces *bool (varint 2, for consistency with CRI API)
 }
 
-// NodeRuntimeClass is a set of runtime class information.
-type NodeRuntimeClass struct {
-	// Runtime class name.
-	// Empty for the default runtime class.
+// NodeRuntimeHandler is a set of runtime handler information.
+type NodeRuntimeHandler struct {
+	// Runtime handler name.
+	// Empty for the default runtime handler.
 	// +optional
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Supported features.
 	// +optional
-	Features *NodeRuntimeClassFeatures `json:"features,omitempty" protobuf:"bytes,2,opt,name=features"`
+	Features *NodeRuntimeHandlerFeatures `json:"features,omitempty" protobuf:"bytes,2,opt,name=features"`
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -5925,11 +5925,11 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
-	// The available runtime classes.
+	// The available runtime handlers.
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	// +listType=atomic
-	RuntimeClasses []NodeRuntimeClass `json:"runtimeClasses,omitempty" protobuf:"bytes,12,rep,name=runtimeClasses"`
+	RuntimeHandlers []NodeRuntimeHandler `json:"runtimeHandlers,omitempty" protobuf:"bytes,12,rep,name=runtimeHandlers"`
 }
 
 type UniqueVolumeName string

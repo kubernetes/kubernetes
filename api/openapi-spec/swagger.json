@@ -8225,25 +8225,25 @@
         }
       ]
     },
-    "io.k8s.api.core.v1.NodeRuntimeClass": {
-      "description": "NodeRuntimeClass is a set of runtime class information.",
+    "io.k8s.api.core.v1.NodeRuntimeHandler": {
+      "description": "NodeRuntimeHandler is a set of runtime handler information.",
       "properties": {
         "features": {
-          "$ref": "#/definitions/io.k8s.api.core.v1.NodeRuntimeClassFeatures",
+          "$ref": "#/definitions/io.k8s.api.core.v1.NodeRuntimeHandlerFeatures",
           "description": "Supported features."
         },
         "name": {
-          "description": "Runtime class name. Empty for the default runtime class.",
+          "description": "Runtime handler name. Empty for the default runtime handler.",
           "type": "string"
         }
       },
       "type": "object"
     },
-    "io.k8s.api.core.v1.NodeRuntimeClassFeatures": {
-      "description": "NodeRuntimeClassFeatures is a set of runtime features.",
+    "io.k8s.api.core.v1.NodeRuntimeHandlerFeatures": {
+      "description": "NodeRuntimeHandlerFeatures is a set of runtime features.",
       "properties": {
         "recursiveReadOnlyMounts": {
-          "description": "RecursiveReadOnlyMounts is set to true if the runtime class supports RecursiveReadOnlyMounts.",
+          "description": "RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
           "type": "boolean"
         }
       },
@@ -8426,10 +8426,10 @@
           "description": "NodePhase is the recently observed lifecycle phase of the node. More info: https://kubernetes.io/docs/concepts/nodes/node/#phase The field is never populated, and now is deprecated.",
           "type": "string"
         },
-        "runtimeClasses": {
-          "description": "The available runtime classes.",
+        "runtimeHandlers": {
+          "description": "The available runtime handlers.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.core.v1.NodeRuntimeClass"
+            "$ref": "#/definitions/io.k8s.api.core.v1.NodeRuntimeHandler"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"

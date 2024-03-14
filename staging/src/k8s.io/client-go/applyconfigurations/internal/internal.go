@@ -6073,17 +6073,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.DaemonEndpoint
       default: {}
-- name: io.k8s.api.core.v1.NodeRuntimeClass
+- name: io.k8s.api.core.v1.NodeRuntimeHandler
   map:
     fields:
     - name: features
       type:
-        namedType: io.k8s.api.core.v1.NodeRuntimeClassFeatures
+        namedType: io.k8s.api.core.v1.NodeRuntimeHandlerFeatures
     - name: name
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.core.v1.NodeRuntimeClassFeatures
+- name: io.k8s.api.core.v1.NodeRuntimeHandlerFeatures
   map:
     fields:
     - name: recursiveReadOnlyMounts
@@ -6211,11 +6211,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: phase
       type:
         scalar: string
-    - name: runtimeClasses
+    - name: runtimeHandlers
       type:
         list:
           elementType:
-            namedType: io.k8s.api.core.v1.NodeRuntimeClass
+            namedType: io.k8s.api.core.v1.NodeRuntimeHandler
           elementRelationship: atomic
     - name: volumesAttached
       type:

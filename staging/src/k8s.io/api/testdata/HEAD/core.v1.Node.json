@@ -157,7 +157,7 @@
       },
       "error": "errorValue"
     },
-    "runtimeClasses": [
+    "runtimeHandlers": [
       {
         "name": "nameValue",
         "features": {

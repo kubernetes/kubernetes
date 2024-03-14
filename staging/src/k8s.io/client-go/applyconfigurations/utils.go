@@ -801,10 +801,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeConfigStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeDaemonEndpoints"):
 		return &applyconfigurationscorev1.NodeDaemonEndpointsApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeClass"):
-		return &applyconfigurationscorev1.NodeRuntimeClassApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeClassFeatures"):
-		return &applyconfigurationscorev1.NodeRuntimeClassFeaturesApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandler"):
+		return &applyconfigurationscorev1.NodeRuntimeHandlerApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandlerFeatures"):
+		return &applyconfigurationscorev1.NodeRuntimeHandlerFeaturesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeSelector"):
 		return &applyconfigurationscorev1.NodeSelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeSelectorRequirement"):

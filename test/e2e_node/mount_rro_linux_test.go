@@ -231,7 +231,7 @@ func supportsRRO(ctx context.Context, f *framework.Framework) bool {
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	node := nodeList.Items[0]
-	for _, f := range node.Status.RuntimeClasses {
+	for _, f := range node.Status.RuntimeHandlers {
 		if f.Name == "" && f.Features != nil && *f.Features.RecursiveReadOnlyMounts {
 			return true
 		}

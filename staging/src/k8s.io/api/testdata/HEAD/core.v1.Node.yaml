@@ -108,7 +108,7 @@ status:
     osImage: osImageValue
     systemUUID: systemUUIDValue
   phase: phaseValue
-  runtimeClasses:
+  runtimeHandlers:
   - features:
       recursiveReadOnlyMounts: true
     name: nameValue
