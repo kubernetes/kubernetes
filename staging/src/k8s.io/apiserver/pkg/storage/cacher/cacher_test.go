@@ -194,7 +194,7 @@ func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
 	t.Cleanup(terminate)
 	// Wait before sending watch progress request to avoid https://github.com/etcd-io/etcd/issues/17507
 	// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove sleep when etcd is upgraded to version with fix.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(time.Second)
 	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
 }
 
