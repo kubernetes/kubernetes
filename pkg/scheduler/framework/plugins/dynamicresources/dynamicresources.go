@@ -1411,7 +1411,11 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		}
 		state.informationsForClaim[index].allocation = allocation
 		state.informationsForClaim[index].allocationDriverName = driverName
+		// Strictly speaking, we don't need to store the full modified object.
+		// The allocation would be enough. The full object is useful for
+		// debugging and testing, so let's make it realistic.
 		claim = claim.DeepCopy()
+		claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
 		claim.Status.DriverName = driverName
 		claim.Status.Allocation = allocation
 		pl.inFlightAllocations.Store(claim.UID, claim)
