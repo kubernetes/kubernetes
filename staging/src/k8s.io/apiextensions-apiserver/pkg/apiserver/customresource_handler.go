@@ -176,6 +176,12 @@ type crdInfo struct {
 	storageVersion string
 
 	waitGroup *utilwaitgroup.SafeWaitGroup
+
+	// storageVersionUpdate holds information about the storage version
+	// update issued when the crdInfo was created. The API server uses the
+	// information to decide whether a CR write request should be allowed,
+	// rejected, or blocked.
+	storageVersionUpdate *storageVersionUpdate
 }
 
 // crdStorageMap goes from customresourcedefinition to its storage
@@ -666,7 +672,6 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		}
 
 		updateStorageVersionUpdateMap(newCRD.UID, storageVersionUpdate)
-
 	}
 }
 
@@ -1208,7 +1213,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
 
-	/* if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+	/*if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		var processedCh, errCh chan struct{}
 		ctx := apirequest.NewContext()

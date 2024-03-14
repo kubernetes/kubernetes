@@ -42,7 +42,6 @@ import (
 )
 
 func TestStorageVersionCustomResource(t *testing.T) {
-	// ktesting.SetDefaultVerbosity(2)
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
 	etcdConfig := framework.SharedEtcd()
@@ -67,7 +66,7 @@ func TestStorageVersionCustomResource(t *testing.T) {
 	var lastErr error
 	var storageVersion apiserverinternalv1alpha1.ServerStorageVersion
 
-	if err := wait.PollUntilContextTimeout(context.TODO(), 1000*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		sv, err := kubeclient.InternalV1alpha1().StorageVersions().Get(context.TODO(), gr, metav1.GetOptions{})
 		if err != nil {
 			lastErr = fmt.Errorf("failed to get storage version: %v", err)
