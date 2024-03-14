@@ -354,7 +354,7 @@ func (ex *ExamplePlugin) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAn
 		instances[i].Name = fmt.Sprintf("instance-%d", i)
 	}
 	resp := &drapbv1alpha3.NodeListAndWatchResourcesResponse{
-		Resources: []*resourceapi.NodeResourceModel{
+		Resources: []*resourceapi.ResourceModel{
 			{
 				NamedResources: &resourceapi.NamedResourcesResources{
 					Instances: instances,

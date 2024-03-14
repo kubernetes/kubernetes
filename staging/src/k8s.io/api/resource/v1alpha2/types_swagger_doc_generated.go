@@ -67,15 +67,6 @@ func (DriverRequests) SwaggerDoc() map[string]string {
 	return map_DriverRequests
 }
 
-var map_NodeResourceModel = map[string]string{
-	"":               "NodeResourceModel must have one and only one field set.",
-	"namedResources": "NamedResources describes available resources using the named resources model.",
-}
-
-func (NodeResourceModel) SwaggerDoc() map[string]string {
-	return map_NodeResourceModel
-}
-
 var map_PodSchedulingContext = map[string]string{
 	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
@@ -329,6 +320,15 @@ var map_ResourceHandle = map[string]string{
 
 func (ResourceHandle) SwaggerDoc() map[string]string {
 	return map_ResourceHandle
+}
+
+var map_ResourceModel = map[string]string{
+	"":               "ResourceModel must have one and only one field set.",
+	"namedResources": "NamedResources describes available resources using the named resources model.",
+}
+
+func (ResourceModel) SwaggerDoc() map[string]string {
+	return map_ResourceModel
 }
 
 var map_ResourceRequest = map[string]string{

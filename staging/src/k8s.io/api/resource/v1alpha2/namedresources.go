@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// NamedResourcesResources is used in NodeResourceModel.
+// NamedResourcesResources is used in ResourceModel.
 type NamedResourcesResources struct {
 	// The list of all individual resources instances currently available.
 	//

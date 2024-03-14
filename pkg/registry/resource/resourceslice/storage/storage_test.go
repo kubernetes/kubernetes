@@ -53,7 +53,7 @@ func validNewResourceSlice(name string) *resource.ResourceSlice {
 		},
 		NodeName:   name,
 		DriverName: "cdi.example.com",
-		NodeResourceModel: resource.NodeResourceModel{
+		ResourceModel: resource.ResourceModel{
 			NamedResources: &resource.NamedResourcesResources{},
 		},
 	}

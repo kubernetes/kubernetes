@@ -74,7 +74,7 @@ type activePlugin struct {
 	// When receiving updates from the driver, the entire slice gets replaced,
 	// so it is okay to not do a deep copy of it. Only retrieving the slice
 	// must be protected by a read lock.
-	resources []*resourceapi.NodeResourceModel
+	resources []*resourceapi.ResourceModel
 }
 
 // startNodeResourcesController constructs a new controller and starts it.
@@ -364,7 +364,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 
 	// Gather information about the actual and desired state.
 	slices := c.sliceStore.List()
-	var driverResources []*resourceapi.NodeResourceModel
+	var driverResources []*resourceapi.ResourceModel
 	c.mutex.RLock()
 	if active, ok := c.activePlugins[driverName]; ok {
 		// No need for a deep copy, the entire slice gets replaced on writes.
@@ -387,7 +387,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 			continue
 		}
 
-		index := indexOfModel(driverResources, &slice.NodeResourceModel)
+		index := indexOfModel(driverResources, &slice.ResourceModel)
 		if index >= 0 {
 			storedResourceIndices.Insert(index)
 			continue
@@ -408,7 +408,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 	// We don't really know which of these slices might have
 	// been used for "the" driver resource because they don't
 	// have a unique ID. In practice, a driver is most likely
-	// to just give us one NodeResourceModel, in which case
+	// to just give us one ResourceModel, in which case
 	// this isn't a problem at all. If we have more than one,
 	// then at least conceptually it currently doesn't matter
 	// where we publish it.
@@ -433,7 +433,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 			slice := obsoleteSlices[numObsoleteSlices-1]
 			numObsoleteSlices--
 			slice = slice.DeepCopy()
-			slice.NodeResourceModel = *resource
+			slice.ResourceModel = *resource
 			logger.V(5).Info("Reusing existing node resource slice", "slice", klog.KObj(slice))
 			if _, err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("update node resource slice: %w", err)
@@ -447,9 +447,9 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 				GenerateName: c.nodeName + "-" + driverName + "-",
 				// TODO (https://github.com/kubernetes/kubernetes/issues/123692): node object as owner
 			},
-			NodeName:          c.nodeName,
-			DriverName:        driverName,
-			NodeResourceModel: *resource,
+			NodeName:      c.nodeName,
+			DriverName:    driverName,
+			ResourceModel: *resource,
 		}
 		logger.V(5).Info("Creating new node resource slice", "slice", klog.KObj(slice))
 		if _, err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
@@ -469,7 +469,7 @@ func (c *nodeResourcesController) sync(ctx context.Context, driverName string) e
 	return nil
 }
 
-func indexOfModel(models []*resourceapi.NodeResourceModel, model *resourceapi.NodeResourceModel) int {
+func indexOfModel(models []*resourceapi.ResourceModel, model *resourceapi.ResourceModel) int {
 	for index, m := range models {
 		if apiequality.Semantic.DeepEqual(m, model) {
 			return index
