@@ -395,6 +395,8 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string
+	// This option specifies the minimum number of CPUs in the shared CPU pool.
+	NumMinSharedCPUs uint8
 	// The previous version for which you want to show hidden metrics.
 	// Only the previous minor version is meaningful, other values will not be allowed.
 	// The format is <major>.<minor>, e.g.: '1.16'.

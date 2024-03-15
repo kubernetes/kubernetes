@@ -34,6 +34,7 @@ import (
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -651,9 +652,10 @@ func nextGeneration() int64 {
 
 // Resource is a collection of compute resource.
 type Resource struct {
-	MilliCPU         int64
-	Memory           int64
-	EphemeralStorage int64
+	MilliCPU          int64
+	ExclusiveMilliCPU int64
+	Memory            int64
+	EphemeralStorage  int64
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
 	AllowedPodNumber int
@@ -678,6 +680,8 @@ func (r *Resource) Add(rl v1.ResourceList) {
 		switch rName {
 		case v1.ResourceCPU:
 			r.MilliCPU += rQuant.MilliValue()
+		case v1.ResourceExclusiveCPU:
+			r.ExclusiveMilliCPU += rQuant.MilliValue()
 		case v1.ResourceMemory:
 			r.Memory += rQuant.Value()
 		case v1.ResourcePods:
@@ -695,10 +699,11 @@ func (r *Resource) Add(rl v1.ResourceList) {
 // Clone returns a copy of this resource.
 func (r *Resource) Clone() *Resource {
 	res := &Resource{
-		MilliCPU:         r.MilliCPU,
-		Memory:           r.Memory,
-		AllowedPodNumber: r.AllowedPodNumber,
-		EphemeralStorage: r.EphemeralStorage,
+		MilliCPU:          r.MilliCPU,
+		ExclusiveMilliCPU: r.ExclusiveMilliCPU,
+		Memory:            r.Memory,
+		AllowedPodNumber:  r.AllowedPodNumber,
+		EphemeralStorage:  r.EphemeralStorage,
 	}
 	if r.ScalarResources != nil {
 		res.ScalarResources = make(map[v1.ResourceName]int64, len(r.ScalarResources))
@@ -735,6 +740,8 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 			r.Memory = max(r.Memory, rQuantity.Value())
 		case v1.ResourceCPU:
 			r.MilliCPU = max(r.MilliCPU, rQuantity.MilliValue())
+		case v1.ResourceExclusiveCPU:
+			r.ExclusiveMilliCPU = max(r.ExclusiveMilliCPU, rQuantity.MilliValue())
 		case v1.ResourceEphemeralStorage:
 			r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
 		default:
@@ -907,6 +914,14 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 	res, non0CPU, non0Mem := calculateResource(pod)
 	n.Requested.MilliCPU += sign * res.MilliCPU
+	// Set exclusive cpu request
+	res.ExclusiveMilliCPU = 0
+	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+		if res.MilliCPU%1000 == 0 {
+			res.ExclusiveMilliCPU = res.MilliCPU
+		}
+	}
+	n.Requested.ExclusiveMilliCPU += sign * res.ExclusiveMilliCPU
 	n.Requested.Memory += sign * res.Memory
 	n.Requested.EphemeralStorage += sign * res.EphemeralStorage
 	if n.Requested.ScalarResources == nil && len(res.ScalarResources) > 0 {

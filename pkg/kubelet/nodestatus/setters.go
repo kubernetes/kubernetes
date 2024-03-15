@@ -285,6 +285,7 @@ func MachineInfo(nodeName string,
 			// TODO(roberthbailey): This is required for test-cmd.sh to pass.
 			// See if the test should be updated instead.
 			node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
+			node.Status.Capacity[v1.ResourceExclusiveCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 			node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(maxPods), resource.DecimalSI)
 			klog.ErrorS(err, "Error getting machine info")
@@ -544,7 +545,7 @@ func ReadyCondition(
 			LastHeartbeatTime: currentTime,
 		}
 		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc(), nodeShutdownManagerErrorsFunc()}
-		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
+		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceExclusiveCPU, v1.ResourceMemory, v1.ResourcePods}
 		if localStorageCapacityIsolation {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
 		}

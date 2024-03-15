@@ -438,7 +438,7 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) []InsufficientResource {
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string]) []InsufficientResource {
-	insufficientResources := make([]InsufficientResource, 0, 4)
+	var insufficientResources []InsufficientResource
 
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
 	if len(nodeInfo.Pods)+1 > allowedPodNumber {
@@ -466,6 +466,17 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			Used:         nodeInfo.Requested.MilliCPU,
 			Capacity:     nodeInfo.Allocatable.MilliCPU,
 		})
+	}
+	if nodeInfo.Allocatable.ExclusiveMilliCPU > 0 {
+		if podRequest.ExclusiveMilliCPU > 0 && podRequest.ExclusiveMilliCPU > (nodeInfo.Allocatable.ExclusiveMilliCPU-nodeInfo.Requested.ExclusiveMilliCPU) {
+			insufficientResources = append(insufficientResources, InsufficientResource{
+				ResourceName: v1.ResourceExclusiveCPU,
+				Reason:       "Insufficient exclusive cpu",
+				Requested:    podRequest.ExclusiveMilliCPU,
+				Used:         nodeInfo.Requested.ExclusiveMilliCPU,
+				Capacity:     nodeInfo.Allocatable.ExclusiveMilliCPU,
+			})
+		}
 	}
 	if podRequest.Memory > 0 && podRequest.Memory > (nodeInfo.Allocatable.Memory-nodeInfo.Requested.Memory) {
 		insufficientResources = append(insufficientResources, InsufficientResource{

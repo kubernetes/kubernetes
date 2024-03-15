@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
@@ -124,6 +125,15 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// Add overhead for running a pod to the sum of requests if requested:
 	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
 		addResourceList(reqs, pod.Spec.Overhead)
+	}
+
+	// Set exclusive cpu request
+	reqs[v1.ResourceExclusiveCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
+	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+		cpuQuantity := reqs[v1.ResourceCPU]
+		if cpuQuantity.Value()*1000 == cpuQuantity.MilliValue() {
+			reqs[v1.ResourceExclusiveCPU] = reqs[v1.ResourceCPU]
+		}
 	}
 
 	return reqs

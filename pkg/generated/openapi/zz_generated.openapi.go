@@ -62601,6 +62601,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"numMinSharedCPUs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "This option specifies the minimum number of CPUs in the shared CPU pool.",
+							Type:        []string{"integer"},
+							Format:      "byte",
+						},
+					},
 					"showHiddenMetricsForVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "showHiddenMetricsForVersion is the previous version for which you want to show hidden metrics. Only the previous minor version is meaningful, other values will not be allowed. The format is `<major>.<minor>`, e.g.: `1.16`. The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, rather than being surprised when they are permanently removed in the release after that. Default: \"\"",

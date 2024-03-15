@@ -112,6 +112,9 @@ type staticPolicy struct {
 	// (e.g. only reserved pairs of core siblings) this set is expected to be
 	// identical to the reserved set.
 	reservedPhysicalCPUs cpuset.CPUSet
+	// set of CPUs that are kept in the shared pool
+	numMinSharedCPUs uint8
+	minSharedCPUs    cpuset.CPUSet
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
 	// set of CPUs to reuse across allocations in a pod
@@ -126,7 +129,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, numMinSharedCPUs uint8, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
 	opts, err := NewStaticPolicyOptions(cpuPolicyOptions)
 	if err != nil {
 		return nil, err
@@ -176,6 +179,8 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	policy.reservedCPUs = reserved
 	policy.reservedPhysicalCPUs = reservedPhysicalCPUs
 
+	policy.numMinSharedCPUs = numMinSharedCPUs
+
 	return policy, nil
 }
 
@@ -195,24 +200,41 @@ func (p *staticPolicy) validateState(s state.State) error {
 	tmpAssignments := s.GetCPUAssignments()
 	tmpDefaultCPUset := s.GetDefaultCPUSet()
 
-	// Default cpuset cannot be empty when assignments exist
+	allCPUs := p.topology.CPUDetails.CPUs()
+	if p.options.StrictCPUReservation {
+		allCPUs = allCPUs.Difference(p.reservedCPUs)
+		if p.numMinSharedCPUs > 0 {
+			p.minSharedCPUs, _ = p.takeByTopology(allCPUs, int(p.numMinSharedCPUs))
+			klog.InfoS("Minimum set of CPUs not available for exclusive assignment", "numMinSharedCPUs", p.numMinSharedCPUs, "minSharedCPUs", p.minSharedCPUs)
+		}
+	}
+
 	if tmpDefaultCPUset.IsEmpty() {
+		// Default cpuset cannot be empty when assignments exist
 		if len(tmpAssignments) != 0 {
 			return fmt.Errorf("default cpuset cannot be empty")
 		}
 		// state is empty initialize
-		allCPUs := p.topology.CPUDetails.CPUs()
 		s.SetDefaultCPUSet(allCPUs)
 		return nil
 	}
+
+	klog.InfoS("Get defaultCPUSet", "defaultCPUSet", tmpDefaultCPUset)
 
 	// State has already been initialized from file (is not empty)
 	// 1. Check if the reserved cpuset is not part of default cpuset because:
 	// - kube/system reserved have changed (increased) - may lead to some containers not being able to start
 	// - user tampered with file
-	if !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
-		return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
-			p.reservedCPUs.String(), tmpDefaultCPUset.String())
+	if p.options.StrictCPUReservation {
+		if !p.reservedCPUs.Intersection(tmpDefaultCPUset).IsEmpty() {
+			return fmt.Errorf("some of strictly reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+				p.reservedCPUs.Intersection(tmpDefaultCPUset).String(), tmpDefaultCPUset.String())
+		}
+	} else {
+		if !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
+			return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+				p.reservedCPUs.String(), tmpDefaultCPUset.String())
+		}
 	}
 
 	// 2. Check if state for static policy is consistent
@@ -235,15 +257,20 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// the set of CPUs stored in the state.
 	totalKnownCPUs := tmpDefaultCPUset.Clone()
 	tmpCPUSets := []cpuset.CPUSet{}
+	tmpAllCPUs := p.topology.CPUDetails.CPUs()
 	for pod := range tmpAssignments {
 		for _, cset := range tmpAssignments[pod] {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
 	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
-	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
+	if p.options.StrictCPUReservation {
+		tmpAllCPUs = tmpAllCPUs.Difference(p.reservedCPUs)
+	}
+	if !totalKnownCPUs.Equals(tmpAllCPUs) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
-			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
+			tmpAllCPUs.String(), totalKnownCPUs.String())
+
 	}
 
 	return nil
@@ -256,7 +283,11 @@ func (p *staticPolicy) GetAllocatableCPUs(s state.State) cpuset.CPUSet {
 
 // GetAvailableCPUs returns the set of unassigned CPUs minus the reserved set.
 func (p *staticPolicy) GetAvailableCPUs(s state.State) cpuset.CPUSet {
-	return s.GetDefaultCPUSet().Difference(p.reservedCPUs)
+	availableCPUs := s.GetDefaultCPUSet().Difference(p.reservedCPUs)
+	if p.options.StrictCPUReservation {
+		availableCPUs = availableCPUs.Difference(p.minSharedCPUs)
+	}
+	return availableCPUs
 }
 
 func (p *staticPolicy) GetAvailablePhysicalCPUs(s state.State) cpuset.CPUSet {
