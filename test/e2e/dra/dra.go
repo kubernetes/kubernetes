@@ -905,10 +905,23 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				resourceClient := f.ClientSet.ResourceV1alpha2().ResourceSlices()
 				var expectedObjects []any
 				for _, nodeName := range nodes.NodeNames {
+					node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+					framework.ExpectNoError(err, "get node")
 					expectedObjects = append(expectedObjects,
 						gstruct.MatchAllFields(gstruct.Fields{
-							"TypeMeta":   gstruct.Ignore(),
-							"ObjectMeta": gstruct.Ignore(), // TODO (https://github.com/kubernetes/kubernetes/issues/123692): validate ownerref
+							"TypeMeta": gstruct.Ignore(),
+							"ObjectMeta": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"OwnerReferences": gomega.ContainElements(
+									gstruct.MatchAllFields(gstruct.Fields{
+										"APIVersion":         gomega.Equal("v1"),
+										"Kind":               gomega.Equal("Node"),
+										"Name":               gomega.Equal(nodeName),
+										"UID":                gomega.Equal(node.UID),
+										"Controller":         gomega.Equal(ptr.To(true)),
+										"BlockOwnerDeletion": gomega.BeNil(),
+									}),
+								),
+							}),
 							"NodeName":   gomega.Equal(nodeName),
 							"DriverName": gomega.Equal(driver.Name),
 							"ResourceModel": gomega.Equal(resourcev1alpha2.ResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{

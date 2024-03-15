@@ -306,6 +306,10 @@ func TestGetResources(t *testing.T) {
 	}
 }
 
+func getFakeNode() (*v1.Node, error) {
+	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}}, nil
+}
+
 func TestPrepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 
@@ -760,7 +764,7 @@ func TestPrepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, "worker")
+			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
@@ -1060,7 +1064,7 @@ func TestUnprepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, "worker")
+			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
