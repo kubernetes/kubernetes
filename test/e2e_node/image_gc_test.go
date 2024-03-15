@@ -55,7 +55,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 	})
 	ginkgo.Context("when ImageMaximumGCAge is set", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.ImageMaximumGCAge = metav1.Duration{Duration: time.Duration(time.Minute * 1)}
+			initialConfig.ImageMaximumGCAge = metav1.Duration{Duration: time.Duration(time.Minute * 3)}
 			initialConfig.ImageMinimumGCAge = metav1.Duration{Duration: time.Duration(time.Second * 1)}
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
