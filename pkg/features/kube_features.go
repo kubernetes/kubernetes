@@ -985,6 +985,7 @@ const (
 )
 
 func init() {
+	registerOpenshiftFeatures()
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
 
 	// Register all client-go features with kube's feature gate instance and make all client-go
