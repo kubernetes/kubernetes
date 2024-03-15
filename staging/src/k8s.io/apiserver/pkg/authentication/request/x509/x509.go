@@ -21,6 +21,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net/http"
 	"strings"
 	"time"
@@ -176,6 +177,9 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	*/
 
 	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
+	if remaining.Seconds() < 86400 {
+		klog.Warningf("Certificate of client: %s is about to expire in %f seconds", req.RemoteAddr, remaining.Seconds())
+	}
 	clientCertificateExpirationHistogram.WithContext(req.Context()).Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {
