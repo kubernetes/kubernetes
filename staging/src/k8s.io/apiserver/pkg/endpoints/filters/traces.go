@@ -36,8 +36,8 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
 			ctx := r.Context()
 			info, exist := request.RequestInfoFrom(ctx)
-			if !exist {
-				return "KubernetesAPI"
+			if !exist || !info.IsResourceRequest {
+				return r.Method
 			}
 			return getSpanNameFromRequestInfo(info, r)
 		}),
@@ -56,10 +56,6 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 }
 
 func getSpanNameFromRequestInfo(info *request.RequestInfo, r *http.Request) string {
-	if !info.IsResourceRequest {
-		return r.Method + " " + info.Path
-	}
-
 	spanName := "/" + info.APIPrefix
 	if info.APIGroup != "" {
 		spanName += "/" + info.APIGroup
