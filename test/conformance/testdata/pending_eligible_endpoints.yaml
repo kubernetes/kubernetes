@@ -7,6 +7,7 @@
 - deleteStorageV1CSINode
 - getInternalApiserverAPIGroup
 - getResourceAPIGroup
+- getStoragemigrationAPIGroup
 - listStorageV1CSINode
 - patchStorageV1CSINode
 - patchStorageV1VolumeAttachmentStatus
