@@ -62,7 +62,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := NewLogsOptions(streams, false, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 
