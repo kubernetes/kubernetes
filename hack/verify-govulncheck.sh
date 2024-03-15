@@ -29,7 +29,7 @@ kube::golang::setup_env
 # Opt into using go modules
 export GO111MODULE=on
 
-go install golang.org/x/vuln/cmd/govulncheck@v1.0.1
+go install golang.org/x/vuln/cmd/govulncheck@v1.0.4
 
 # KUBE_VERIFY_GIT_BRANCH is populated in verify CI jobs
 BRANCH="${KUBE_VERIFY_GIT_BRANCH:-master}"
