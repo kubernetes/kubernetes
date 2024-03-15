@@ -216,6 +216,11 @@ func TestList(t *testing.T) {
 	storagetesting.RunTestList(ctx, t, store, compactStorage(client), false)
 }
 
+func TestConsistentList(t *testing.T) {
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestConsistentList(ctx, t, store, compactStorage(client), false, true)
+}
+
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
 	return func(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
 		if reads := transformer.GetReadsAndReset(); reads != estimatedProcessedObjects {
@@ -285,9 +290,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 	storagetesting.RunTestListInconsistentContinuation(ctx, t, store, compactStorage(client))
 }
 
-func TestConsistentList(t *testing.T) {
+func TestListResourceVersionMatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, &storeWithPrefixTransformer{store})
+	storagetesting.RunTestListResourceVersionMatch(ctx, t, &storeWithPrefixTransformer{store})
 }
 
 func TestCount(t *testing.T) {

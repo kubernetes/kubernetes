@@ -1170,6 +1170,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRV:    currentRV,
 			expectedOut: []example.Pod{},
 		},
+		{
+			name:         "test non-consistent List",
+			prefix:       "/pods/empty",
+			pred:         storage.Everything,
+			rv:           "0",
+			expectRVFunc: resourceVersionNotOlderThan(list.ResourceVersion),
+			expectedOut:  []example.Pod{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1237,6 +1245,67 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 			} else {
 				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
+			}
+		})
+	}
+}
+
+func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, cacheEnabled, consistentReadsSupported bool) {
+	outPod := &example.Pod{}
+	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
+	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	lastObjecRV := outPod.ResourceVersion
+	compaction(ctx, t, outPod.ResourceVersion)
+	parsedRV, _ := strconv.Atoi(outPod.ResourceVersion)
+	currentRV := fmt.Sprintf("%d", parsedRV+1)
+
+	firstNonConsistentReadRV := lastObjecRV
+	if consistentReadsSupported && !cacheEnabled {
+		firstNonConsistentReadRV = currentRV
+	}
+
+	secondNonConsistentReadRV := lastObjecRV
+	if consistentReadsSupported {
+		secondNonConsistentReadRV = currentRV
+	}
+
+	tcs := []struct {
+		name             string
+		requestRV        string
+		expectResponseRV string
+	}{
+		{
+			name:             "Non-consistent list before sync",
+			requestRV:        "0",
+			expectResponseRV: firstNonConsistentReadRV,
+		},
+		{
+			name:             "Consistent request returns currentRV",
+			requestRV:        "",
+			expectResponseRV: currentRV,
+		},
+		{
+			name:             "Non-consistent request after sync returns currentRV",
+			requestRV:        "0",
+			expectResponseRV: secondNonConsistentReadRV,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			out := &example.PodList{}
+			opts := storage.ListOptions{
+				ResourceVersion: tc.requestRV,
+				Predicate:       storage.Everything,
+			}
+			err = store.GetList(ctx, "/pods/empty", opts, out)
+			if err != nil {
+				t.Fatalf("GetList failed: %v", err)
+			}
+			if out.ResourceVersion != tc.expectResponseRV {
+				t.Errorf("resourceVersion in list response want=%s, got=%s", tc.expectResponseRV, out.ResourceVersion)
 			}
 		})
 	}
@@ -1956,7 +2025,7 @@ type InterfaceWithPrefixTransformer interface {
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
-func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
+func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
 	nextPod := func(index uint32) (string, *example.Pod) {
 		obj := &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{

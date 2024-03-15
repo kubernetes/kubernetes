@@ -167,18 +167,45 @@ func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
 }
 
-func TestListWithListFromCache(t *testing.T) {
-	// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove skip.
-	t.Skip("This test flakes flakes due to https://github.com/etcd-io/etcd/issues/17507")
+func TestListWithConsistentListFromCache(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
+	// Wait before sending watch progress request to avoid https://github.com/etcd-io/etcd/issues/17507
+	// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove the wait when etcd is upgraded to version with fix.
+	err := cacher.ready.wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
+}
+
+func TestConsistentList(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true, false)
+}
+
+func TestConsistentListWithConsistentListFromCache(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	// Wait before sending watch progress request to avoid https://github.com/etcd-io/etcd/issues/17507
+	// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove the wait when etcd is upgraded to version with fix.
+	err := cacher.ready.wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true, true)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -227,7 +254,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	storagetesting.RunTestListInconsistentContinuation(ctx, t, cacher, nil)
 }
 
-func TestConsistentList(t *testing.T) {
+func TestListResourceVersionMatch(t *testing.T) {
 	// TODO(#109831): Enable use of this test and run it.
 }
 
