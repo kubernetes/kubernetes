@@ -32,12 +32,14 @@ const (
 	FullPCPUsOnlyOption            string = "full-pcpus-only"
 	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
 	AlignBySocketOption            string = "align-by-socket"
+	StrictCpuReservationOption     string = "strict-cpu-reservation"
 )
 
 var (
 	alphaOptions = sets.New[string](
 		DistributeCPUsAcrossNUMAOption,
 		AlignBySocketOption,
+		StrictCpuReservationOption,
 	)
 	betaOptions = sets.New[string](
 		FullPCPUsOnlyOption,
@@ -80,6 +82,8 @@ type StaticPolicyOptions struct {
 	// Flag to ensure CPUs are considered aligned at socket boundary rather than
 	// NUMA boundary
 	AlignBySocket bool
+	// Flag to remove reserved cores from the list of available cores
+	StrictCpuReservation bool
 }
 
 // NewStaticPolicyOptions creates a StaticPolicyOptions struct from the user configuration.
@@ -109,6 +113,12 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.AlignBySocket = optValue
+		case StrictCpuReservationOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.StrictCpuReservation = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
