@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/etcdfeature"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/component-base/tracing"
@@ -85,6 +86,11 @@ func (s *store) RequestWatchProgress(ctx context.Context) error {
 	// Use watchContext to match ctx metadata provided when creating the watch.
 	// In best case scenario we would use the same context that watch was created, but there is no way access it from watchCache.
 	return s.client.RequestProgress(s.watchContext(ctx))
+}
+
+func (s *store) Supports(feature storage.Feature) (bool, error) {
+	ctx := context.Background()
+	return etcdfeature.DefaultFeatureSupportChecker.ClientSupports(ctx, s.client, feature)
 }
 
 type objState struct {

@@ -202,6 +202,9 @@ type watchCache struct {
 	// Requests progress notification if there are requests waiting for watch
 	// to be fresh
 	waitingUntilFresh *conditionalProgressRequester
+
+	// For checking if a feature is supported by etcd or not.
+	supports func(storage.Feature) (bool, error)
 }
 
 func newWatchCache(
@@ -212,7 +215,8 @@ func newWatchCache(
 	indexers *cache.Indexers,
 	clock clock.WithTicker,
 	groupResource schema.GroupResource,
-	progressRequester *conditionalProgressRequester) *watchCache {
+	progressRequester *conditionalProgressRequester,
+	supports func(storage.Feature) (bool, error)) *watchCache {
 	wc := &watchCache{
 		capacity:            defaultLowerBoundCapacity,
 		keyFunc:             keyFunc,
@@ -230,6 +234,7 @@ func newWatchCache(
 		versioner:           versioner,
 		groupResource:       groupResource,
 		waitingUntilFresh:   progressRequester,
+		supports:            supports,
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.String()).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
@@ -498,7 +503,13 @@ func (s sortableStoreElements) Swap(i, j int) {
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) (result []interface{}, rv uint64, index string, err error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
+	var shouldRegister bool
+	shouldRegister, err = w.shouldRegisterAsWaitingForFresh(resourceVersion)
+	if err != nil {
+		return result, rv, index, err
+	}
+
+	if shouldRegister {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 		w.waitingUntilFresh.Remove()
@@ -526,6 +537,13 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	}()
 
 	return result, rv, index, err
+}
+
+func (w *watchCache) shouldRegisterAsWaitingForFresh(resourceVersion uint64) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !w.notFresh(resourceVersion) {
+		return false, nil
+	}
+	return w.supports(storage.RequestWatchProgress)
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {
