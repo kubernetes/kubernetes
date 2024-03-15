@@ -42,7 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/reconcilers"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/peerproxy/metrics"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -207,8 +206,8 @@ func TestPeerProxy(t *testing.T) {
 
 			if tt.reconcilerConfig.do {
 				// need to enable feature flags first
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.APIServerIdentity, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StorageVersionAPI, true)()
 
 				reconciler.UpdateLease(tt.reconcilerConfig.serverId,
 					tt.reconcilerConfig.publicIP,

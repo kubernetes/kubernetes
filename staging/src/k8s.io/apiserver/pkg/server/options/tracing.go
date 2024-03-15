@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,7 +79,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	if o == nil || o.ConfigFile == "" {
 		return nil
 	}
-	if !feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+	if !features.Enabled(features.APIServerTracing) {
 		return fmt.Errorf("APIServerTracing feature is not enabled, but tracing config file was provided")
 	}
 

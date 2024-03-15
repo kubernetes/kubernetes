@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	celmetrics "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
@@ -588,7 +588,7 @@ func TestV1WebhookCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StructuredAuthorizationConfiguration, true)()
 	expressions := []apiserver.WebhookMatchCondition{
 		{
 			Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
@@ -770,7 +770,7 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, test.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StructuredAuthorizationConfiguration, test.featureEnabled)()
 			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), test.expressions, "")
 			if test.expectedCompileErr && err == nil {
 				t.Fatalf("%d: Expected compile error", i)
@@ -1054,7 +1054,7 @@ func benchmarkNewWebhookAuthorizer(b *testing.B, expressions []apiserver.Webhook
 		b.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(b, features.DefaultFeatureGates(), features.StructuredAuthorizationConfiguration, featureEnabled)()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1087,7 +1087,7 @@ func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatc
 		b.Fatal(err)
 	}
 	defer s.Close()
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(b, features.DefaultFeatureGates(), features.StructuredAuthorizationConfiguration, featureEnabled)()
 	// Create an authorizer with or without expressions to compile
 	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), expressions, "")
 	if err != nil {
@@ -1107,7 +1107,7 @@ func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatc
 
 // TestV1WebhookMatchConditions verifies cel expressions are compiled and evaluated correctly
 func TestV1WebhookMatchConditions(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, features.DefaultFeatureGates(), features.StructuredAuthorizationConfiguration, true)()
 	service := new(mockV1Service)
 	service.statusCode = 200
 	service.Allow()

@@ -41,7 +41,6 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 )
 
@@ -198,8 +197,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			return
 		}
 
-		metainternalversion.SetListOptionsDefaults(&listOptions, utilfeature.DefaultFeatureGate.Enabled(features.WatchList))
-		if errs := metainternalversionvalidation.ValidateListOptions(&listOptions, utilfeature.DefaultFeatureGate.Enabled(features.WatchList)); len(errs) > 0 {
+		metainternalversion.SetListOptionsDefaults(&listOptions, features.Enabled(features.WatchList))
+		if errs := metainternalversionvalidation.ValidateListOptions(&listOptions, features.Enabled(features.WatchList)); len(errs) > 0 {
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "ListOptions"}, "", errs)
 			scope.err(err, w, req)
 			return

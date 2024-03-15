@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/schemamutation"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -42,7 +41,7 @@ func GetOpenAPIDefinitionsWithoutDisabledFeatures(GetOpenAPIDefinitions common.G
 // restoreDefinitions restores any changes by disabled features from definition map.
 func restoreDefinitions(defs map[string]common.OpenAPIDefinition) {
 	// revert changes from OpenAPIEnums
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIEnums) {
+	if !genericfeatures.Enabled(genericfeatures.OpenAPIEnums) {
 		for gvk, def := range defs {
 			orig := &def.Schema
 			if ret := pruneEnums(orig); ret != orig {

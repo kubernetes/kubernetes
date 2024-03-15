@@ -28,7 +28,6 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -1299,8 +1298,8 @@ func TestDropDisabledFields(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, tc.enableRatcheting)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, tc.enableSelectableFields)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, apiextensionsfeatures.DefaultFeatureGates(), apiextensionsfeatures.CRDValidationRatcheting, tc.enableRatcheting)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, apiextensionsfeatures.DefaultFeatureGates(), apiextensionsfeatures.CustomResourceFieldSelectors, tc.enableSelectableFields)()
 			old := tc.oldCRD.DeepCopy()
 
 			dropDisabledFields(tc.crd, tc.oldCRD)
