@@ -990,6 +990,7 @@ const (
 )
 
 func init() {
+	registerOpenshiftFeatures()
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
 
