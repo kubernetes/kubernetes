@@ -510,6 +510,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		1,
 		dummyAuthorizerImpl{},
 		time.Minute, time.Minute, nil, 3*1024*1024,
+		nil,
 		nil)
 	if err != nil {
 		t.Fatal(err)

@@ -52,6 +52,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/workqueue"
 )
 
 var (
@@ -204,6 +205,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		storageVersionManager = storageversion.NewManager(sc, c.GenericConfig.APIServerID)
 	}
 
+	svUpdaterQueue := workqueue.NewNamed("storageversion-updater")
+
 	crdHandler, err := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
@@ -221,6 +224,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		apiGroupInfo.StaticOpenAPISpec,
 		c.GenericConfig.MaxRequestBodyBytes,
 		storageVersionManager,
+		svUpdaterQueue,
 	)
 	if err != nil {
 		return nil, err
@@ -269,6 +273,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go nonStructuralSchemaController.Run(5, context.StopCh)
 		go apiApprovalController.Run(5, context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
+		go crdHandler.runSVUpdateLoop(context.StopCh)
 
 		discoverySyncedCh := make(chan struct{})
 		go discoveryController.Run(context.StopCh, discoverySyncedCh)
