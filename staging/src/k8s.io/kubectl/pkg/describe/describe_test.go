@@ -5666,7 +5666,8 @@ func TestDescribeNode(t *testing.T) {
   memory             1Gi (8%)     2Gi (16%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
-  hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)
+Events:`,
 		`Node bar status is now: NodeHasNoDiskPressure`,
 		`Node bar status is now: NodeReady`,
 		`Capacity:
