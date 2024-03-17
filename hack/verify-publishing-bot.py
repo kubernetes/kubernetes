@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 
 # Copyright 2019 The Kubernetes Authors.
@@ -80,6 +79,7 @@ def main():
             # And skip validation of publishing rules for it
             continue
 
+        ###
         for item in rule["branches"]:
             if "dir" in item["source"]:
                 raise Exception("use of deprecated `dir` field in rules for `%s`" % (rule["destination"]))
