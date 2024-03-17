@@ -191,6 +191,62 @@ func Duplicate(field *Path, value interface{}) *Error {
 	return &Error{ErrorTypeDuplicate, field.String(), value, ""}
 }
 
+// specified indicates that a field was specified, regardless of the value.
+const specified = "specified"
+
+func render(val interface{}) string {
+	if r, ok := val.(string); ok {
+		return r
+	}
+	return fmt.Sprintf("%#v", val)
+}
+
+func Not(val interface{}) string {
+	return fmt.Sprintf("not %v", render(val))
+}
+
+// IncompatibleSpecification returns a *Error indicating that the field is generally
+// invalid.
+func IncompatibleSpecification(field *Path, other *Path, value interface{}) *Error {
+	detail := fmt.Sprintf("may not specify %v", other.String())
+	return &Error{ErrorTypeTypeInvalid, field.String(), value, detail}
+}
+
+// IncompatibleWith returns a *Error indicating that the field is incompatible
+// with another field that has been specified
+func IncompatibleWith(field *Path, other *Path, value interface{}) *Error {
+	return IncompatibleWithValue(field, other, value, specified)
+}
+
+// IncompatibleWithValue returns a *Error indicating that the field is incompatible
+// with another field with regard for the value
+func IncompatibleWithValue(field *Path, other *Path, value interface{}, otherValue interface{}) *Error {
+	rov := render(otherValue)
+	detail := fmt.Sprintf("may not be specified when %v is %s", other.String(), rov)
+	return &Error{ErrorTypeInvalid, field.String(), value, detail}
+}
+
+// DependsOn returns a *Error indicating that a field depends on another field being specified
+func DependsOn(field *Path, dependency *Path, value interface{}) *Error {
+	return DependsOnValue(field, dependency, value, specified)
+}
+
+// DependsOnValue returns a *Error indicating that a field depends on another field
+// being specified with regard for the value
+func DependsOnValue(field *Path, dependency *Path, value interface{}, otherValue interface{}) *Error {
+	rov := render(otherValue)
+	detail := fmt.Sprintf("may only be specified when %v is %s", dependency.String(), rov)
+	return &Error{ErrorTypeInvalid, field.String(), value, detail}
+}
+
+// RequiredWhenValue returns a *Error indicating that a field is required due to the
+// value of another field
+func RequiredWhenValue(field *Path, other *Path, otherValue interface{}) *Error {
+	rov := render(otherValue)
+	detail := fmt.Sprintf("must be specified when %v is %s", other.String(), rov)
+	return &Error{ErrorTypeRequired, field.String(), "", detail}
+}
+
 // Invalid returns a *Error indicating "invalid value".  This is used
 // to report malformed values (e.g. failed regex match, too long, out of bounds).
 func Invalid(field *Path, value interface{}, detail string) *Error {

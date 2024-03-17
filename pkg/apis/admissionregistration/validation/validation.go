@@ -88,10 +88,10 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 		}
 		res, sub := parts[0], parts[1]
 		if _, ok := resourcesWithWildcardSubresoures[res]; ok {
-			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '%s/*' is present, must not specify %s", res, resSub)))
+			allErrors = append(allErrors, field.IncompatibleWith(field.NewPath(resSub), field.NewPath(fmt.Sprintf("%s/*", res)), resSub))
 		}
 		if _, ok := subResourcesWithWildcardResource[sub]; ok {
-			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resSub)))
+			allErrors = append(allErrors, field.IncompatibleWith(field.NewPath(resSub), field.NewPath(fmt.Sprintf("*/%s", sub)), resSub))
 		}
 		if sub == "*" {
 			resourcesWithWildcardSubresoures[res] = struct{}{}
@@ -101,7 +101,7 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 		}
 	}
 	if len(resources) > 1 && hasDoubleWildcard {
-		allErrors = append(allErrors, field.Invalid(fldPath, resources, "if '*/*' is present, must not specify other resources"))
+		allErrors = append(allErrors, field.IncompatibleWith(fldPath, field.NewPath("'*/*'"), resources))
 	}
 	if hasSingleWildcard && hasResourceWithoutSubresource {
 		allErrors = append(allErrors, field.Invalid(fldPath, resources, "if '*' is present, must not specify other resources without subresources"))
@@ -119,11 +119,11 @@ func validateResourcesNoSubResources(resources []string, fldPath *field.Path) fi
 			allErrors = append(allErrors, field.Required(fldPath.Index(i), ""))
 		}
 		if strings.Contains(resource, "/") {
-			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resource, "must not specify subresources"))
+			allErrors = append(allErrors, field.IncompatibleSpecification(fldPath.Index(i), field.NewPath("subresources"), resource))
 		}
 	}
 	if len(resources) > 1 && hasWildcard(resources) {
-		allErrors = append(allErrors, field.Invalid(fldPath, resources, "if '*' is present, must not specify other resources"))
+		allErrors = append(allErrors, field.IncompatibleWith(fldPath, field.NewPath("'*'"), resources))
 	}
 	return allErrors
 }
@@ -191,7 +191,7 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedAdmissi
 		hasAcceptedVersion := false
 		for i, v := range versions {
 			if seen[v] {
-				allErrors = append(allErrors, field.Invalid(fldPath.Index(i), v, "duplicate version"))
+				allErrors = append(allErrors, field.Duplicate(fldPath.Index(i), v))
 				continue
 			}
 			seen[v] = true
@@ -203,10 +203,7 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedAdmissi
 			}
 		}
 		if requireRecognizedAdmissionReviewVersion && !hasAcceptedVersion {
-			allErrors = append(allErrors, field.Invalid(
-				fldPath, versions,
-				fmt.Sprintf("must include at least one of %v",
-					strings.Join(AcceptedAdmissionReviewVersions, ", "))))
+			allErrors = append(allErrors, field.DependsOn(fldPath, field.NewPath(strings.Join(AcceptedAdmissionReviewVersions, ", ")), versions))
 		}
 	}
 	return allErrors
@@ -362,7 +359,7 @@ func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, op
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, allowedSideEffects.List()))
 	}
 	if hook.TimeoutSeconds != nil && (*hook.TimeoutSeconds > 30 || *hook.TimeoutSeconds < 1) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("timeoutSeconds"), *hook.TimeoutSeconds, "the timeout value must be between 1 and 30 seconds"))
+		allErrors = append(allErrors, field.DependsOnValue(fldPath.Child("timeoutSeconds"), fldPath.Child("timeoutSeconds"), "timeoutSeconds", "between 1 and 30 seconds"))
 	}
 
 	if hook.NamespaceSelector != nil {
@@ -412,7 +409,7 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 		allowedSideEffects = noSideEffectClasses
 	}
 	if hook.SideEffects == nil {
-		allErrors = append(allErrors, field.Required(fldPath.Child("sideEffects"), fmt.Sprintf("must specify one of %v", strings.Join(allowedSideEffects.List(), ", "))))
+		allErrors = append(allErrors, field.Required(field.NewPath(strings.Join(allowedSideEffects.List(), ", ")), ""))
 	}
 	if hook.SideEffects != nil && !allowedSideEffects.Has(string(*hook.SideEffects)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, allowedSideEffects.List()))
@@ -504,7 +501,7 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 		allErrors = append(allErrors, field.Required(fldPath.Child("operations"), ""))
 	}
 	if len(ruleWithOperations.Operations) > 1 && hasWildcardOperation(ruleWithOperations.Operations) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("operations"), ruleWithOperations.Operations, "if '*' is present, must not specify other operations"))
+		allErrors = append(allErrors, field.IncompatibleSpecification(fldPath.Child("operations"), field.NewPath("other operations"), ruleWithOperations.Operations))
 	}
 	for i, operation := range ruleWithOperations.Operations {
 		if !supportedOperations.Has(string(operation)) {
@@ -747,7 +744,7 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 		allErrors = append(allErrors, validateMatchResources(spec.MatchConstraints, fldPath.Child("matchConstraints"))...)
 		// at least one resourceRule must be defined to provide type information
 		if len(spec.MatchConstraints.ResourceRules) == 0 {
-			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
+			allErrors = append(allErrors, field.RequiredWhenValue(fldPath.Child("resourceRules"), fldPath.Child("matchConstraints"), "nil"))
 		}
 	}
 	if !opts.ignoreMatchConditions {
@@ -759,8 +756,8 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 		}
 	}
 	if len(spec.Validations) == 0 && len(spec.AuditAnnotations) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("validations"), "validations or auditAnnotations must contain at least one item"))
-		allErrors = append(allErrors, field.Required(fldPath.Child("auditAnnotations"), "validations or auditAnnotations must contain at least one item"))
+		allErrors = append(allErrors, field.RequiredWhenValue(fldPath.Child("validations"), fldPath.Child("auditAnnotaions"), "nil"))
+		allErrors = append(allErrors, field.RequiredWhenValue(fldPath.Child("auditAnnotations"), fldPath.Child("validations"), "nil"))
 	} else {
 		for i, validation := range spec.Validations {
 			allErrors = append(allErrors, validateValidation(getCompiler(), &validation, spec.ParamKind, opts, fldPath.Child("validations").Index(i))...)
@@ -768,7 +765,7 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 		if spec.AuditAnnotations != nil {
 			keys := sets.NewString()
 			if len(spec.AuditAnnotations) > maxAuditAnnotations {
-				allErrors = append(allErrors, field.Invalid(fldPath.Child("auditAnnotations"), spec.AuditAnnotations, fmt.Sprintf("must not have more than %d auditAnnotations", maxAuditAnnotations)))
+				allErrors = append(allErrors, field.TooMany(fldPath.Child("auditAnnotations"), len(spec.AuditAnnotations), maxAuditAnnotations))
 			}
 			for i, auditAnnotation := range spec.AuditAnnotations {
 				allErrors = append(allErrors, validateAuditAnnotation(getCompiler(), meta, &auditAnnotation, spec.ParamKind, opts, fldPath.Child("auditAnnotations").Index(i))...)
@@ -797,7 +794,7 @@ func validateParamKind(gvk admissionregistration.ParamKind, fldPath *field.Path)
 		}
 		// this matches the APIService version field validation
 		if len(gv.Version) == 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gvk.APIVersion, "version must be specified"))
+			allErrors = append(allErrors, field.Required(fldPath.Child("apiVersion"), "version must be specified"))
 		} else {
 			if errs := utilvalidation.IsDNS1035Label(gv.Version); len(errs) > 0 {
 				allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gv.Version, strings.Join(errs, ",")))
