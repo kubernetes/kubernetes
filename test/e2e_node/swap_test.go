@@ -82,7 +82,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 		)
 	})
 
-	f.Context(framework.WithSerial(), func() {
+	f.Context(framework.WithSwapConformance(), func() {
 
 		enableLimitedSwap := func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
 			msg := "swap behavior is already set to LimitedSwap"
