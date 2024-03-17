@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("log", func() {
 	})
 	ginkgo.AfterEach(func() {
 		framework.Logf("after")
-		gomega.Expect(true).To(gomega.BeFalse(), "true is never false either")
+		gomega.Expect(1).To(gomega.Equal(2), "1 is not equal to 2")
 	})
 	ginkgo.It("fails", func() {
 		func() {
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("log", func() {
 		}()
 	})
 	ginkgo.It("asserts", func() {
-		gomega.Expect(false).To(gomega.BeTrueBecause("Assertion failed: expected false, got true"))
+		gomega.Expect(1).To(gomega.BeTrueBecause("Assertion failed: expected 1, got 2"))
 	})
 	ginkgo.It("error", func() {
 		err := errors.New("an error with a long, useless description")
