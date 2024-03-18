@@ -46,7 +46,7 @@ func startSVMController(
 	controllerName string,
 ) (controller.Interface, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionMigrator) ||
-		!clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
+		!clientgofeaturegate.InformerResourceVersion2.Enabled() {
 		return nil, false, nil
 	}
 

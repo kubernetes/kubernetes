@@ -23,6 +23,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
+	kubeaggregatorfeatures "k8s.io/kube-aggregator/pkg/features"
+	"k8s.io/utils/featuregates"
 )
 
 const (
@@ -983,6 +985,23 @@ const (
 	// Allows recursive read-only mounts.
 	RecursiveReadOnlyMounts featuregate.Feature = "RecursiveReadOnlyMounts"
 )
+
+var (
+	kubernetesFeatureSet = featuregates.NewSimpleFeatureSet()
+)
+
+func init() {
+	kubernetesFeatureSet.AddFeatureSetsOrDie(
+		clientfeatures.LibraryFeatureSet(),
+		kubeaggregatorfeatures.LibraryFeatureSet(),
+		apiextensionsfeatures.LibraryFeatureSet(),
+	)
+}
+
+// notice that this narrows the interface from above
+func KubernetesFeatureSet() featuregates.FeatureSet {
+	return kubernetesFeatureSet
+}
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
