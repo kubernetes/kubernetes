@@ -542,6 +542,46 @@ function install-containerd-ubuntu {
   sudo systemctl start containerd
 }
 
+# If we are on cos we can try to install containerd
+function install-containerd-cos {
+  # bailout if we are not on COS
+  if [ -e /etc/os-release ] && ! grep -q "ID=cos" /etc/os-release; then
+    echo "Unable to automatically install containerd in non-cos image. Bailing out..."
+    exit 2
+  fi
+
+  # Override to latest versions of containerd and runc
+  systemctl stop containerd
+  mkdir -p /home/containerd/
+  mount --bind /home/containerd /home/containerd
+  mount -o remount,exec /home/containerd
+  if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" ]]; then
+    # containerd versions have slightly different url(s), so try both
+    # shellcheck disable=SC2086
+    ( curl ${CURL_FLAGS} \
+        --location \
+        "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" \
+      || curl ${CURL_FLAGS} \
+        --location \
+        "https://github.com/containerd/containerd/releases/download/${COS_INSTALL_CONTAINERD_VERSION}/containerd-${COS_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
+    | tar --overwrite -xzv -C /home/containerd/
+    cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service
+    # fix the path of the new containerd binary
+    sed -i 's|ExecStart=.*|ExecStart=/home/containerd/bin/containerd|' /etc/systemd/system/containerd.service
+  fi
+  if [[ -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then
+    # shellcheck disable=SC2086
+    curl ${CURL_FLAGS} \
+      --location \
+      "https://github.com/opencontainers/runc/releases/download/${COS_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /home/containerd/bin/runc \
+    && chmod 755 /home/containerd/bin/runc
+    # ensure runc gets picked up from the correct location
+    sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:$PATH" /etc/systemd/system/containerd.service
+  fi
+  systemctl daemon-reload
+  sudo systemctl start containerd
+}
+
 function install-auth-provider-gcp {
   local -r filename="auth-provider-gcp"
   local -r auth_provider_storage_full_path="${AUTH_PROVIDER_GCP_STORAGE_PATH}/${AUTH_PROVIDER_GCP_VERSION}/${HOST_PLATFORM}_${HOST_ARCH}/${filename}"
@@ -587,6 +627,9 @@ function ensure-containerd-runtime {
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
     log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
+  if [[ -n "${COS_INSTALL_CONTAINERD_VERSION:-}" || -n "${COS_INSTALL_RUNC_VERSION:-}" ]]; then
+    log-wrap "InstallContainerdCOS" install-containerd-cos
+  fi
 
   # Fall back to installing distro specific containerd, if not found
   if ! command -v containerd >/dev/null 2>&1; then
@@ -597,6 +640,9 @@ function ensure-containerd-runtime {
     case "${linuxrelease}" in
       Ubuntu)
         log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
+        ;;
+      cos)
+        log-wrap "InstallContainerdCOS" install-containerd-cos
         ;;
       *)
         echo "Installing containerd for linux release ${linuxrelease} not supported" >&2
