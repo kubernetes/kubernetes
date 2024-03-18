@@ -18,7 +18,9 @@ package features
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/utils/featuregates"
 )
 
 const (
@@ -45,6 +47,34 @@ const (
 
 func init() {
 	utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)
+}
+
+var (
+	CRDValidationRatcheting2 = featuregates.NewFeatureGate("CRDValidationRatcheting").
+					EnableByDefault().
+					Beta().
+					ToFeatureGateOrDie()
+
+	CustomResourceFieldSelectors2 = featuregates.NewFeatureGate("CustomResourceFieldSelectors").
+					Beta().
+					ToFeatureGateOrDie()
+
+	libraryFeatureSet = featuregates.NewSimpleFeatureSet()
+)
+
+func init() {
+	libraryFeatureSet.AddFeatureGatesOrDie(
+		CRDValidationRatcheting2,
+		CustomResourceFieldSelectors2,
+	)
+	libraryFeatureSet.AddFeatureSetsOrDie(
+		clientfeatures.LibraryFeatureSet(),
+	)
+}
+
+// notice that this narrows the interface from above
+func LibraryFeatureSet() featuregates.FeatureSet {
+	return libraryFeatureSet
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.

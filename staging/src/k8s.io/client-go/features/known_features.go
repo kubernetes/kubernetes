@@ -16,6 +16,8 @@ limitations under the License.
 
 package features
 
+import "k8s.io/utils/featuregates"
+
 const (
 	// Every feature gate should add method here following this template:
 	//
@@ -42,6 +44,29 @@ const (
 	// alpha: v1.30
 	InformerResourceVersion Feature = "InformerResourceVersion"
 )
+
+var (
+	WatchListClient2 = featuregates.NewEnvVarFeatureGate("WatchListClient").
+				Beta().
+				ToFeatureGateOrDie()
+
+	InformerResourceVersion2 = featuregates.NewEnvVarFeatureGate("InformerResourceVersion").
+					Alpha().
+					ToFeatureGateOrDie()
+
+	libraryFeatureSet = featuregates.NewSimpleFeatureSet()
+)
+
+func init() {
+	libraryFeatureSet.AddFeatureGatesOrDie(
+		WatchListClient2,
+		InformerResourceVersion2,
+	)
+}
+
+func LibraryFeatureSet() featuregates.FeatureSet {
+	return libraryFeatureSet
+}
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 //
