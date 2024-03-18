@@ -19,6 +19,7 @@ package options
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/features"
 	"net"
 	"os"
 	"strings"
@@ -98,7 +99,7 @@ type CompletedOptions struct {
 // NewOptions creates a new ServerRunOptions object with default parameters
 func NewOptions() *Options {
 	s := Options{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(features.KubernetesFeatureSet()),
 		Etcd:                    genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
 		SecureServing:           kubeoptions.NewSecureServingOptions(),
 		Audit:                   genericoptions.NewAuditOptions(),

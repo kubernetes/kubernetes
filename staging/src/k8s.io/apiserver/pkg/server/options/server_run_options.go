@@ -18,17 +18,16 @@ package options
 
 import (
 	"fmt"
+	"k8s.io/utils/featuregates"
 	"net"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/server"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -89,9 +88,11 @@ type ServerRunOptions struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+
+	FeatureSetOptions *featuregates.FeatureSetOptions
 }
 
-func NewServerRunOptions() *ServerRunOptions {
+func NewServerRunOptions(featureSet featuregates.FeatureSet) *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
 		MaxRequestsInFlight:                 defaults.MaxRequestsInFlight,
@@ -104,6 +105,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		JSONPatchMaxCopyBytes:               defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:                 defaults.MaxRequestBodyBytes,
 		ShutdownSendRetryAfter:              false,
+		FeatureSetOptions:                   featuregates.NewFeatureSetOptions(featureSet),
 	}
 }
 
@@ -337,5 +339,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
-	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
+	s.FeatureSetOptions.AddFlags(fs)
 }

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/kube-aggregator/pkg/features"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -90,7 +91,7 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(features.LibraryFeatureSet()),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
