@@ -338,8 +338,6 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
@@ -348,12 +346,32 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
 	}
 
-	// With unset RV, check if cacher is bypassed.
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "",
+		Predicate:       storage.Everything,
 	})
-	if err != errDummy {
-		t.Errorf("Watch with unset RV should bypass cacher: %v", err)
+	if err != nil {
+		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)()
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+		Predicate:       storage.Everything,
+	})
+	if err != nil {
+		t.Errorf("With WatchFromStorageWithoutResourceVersion disabled, watch with unset RV should be served from cache: %v", err)
+	}
+
+	// Inject error to underlying layer and check if cacher is not bypassed.
+	backingStorage.injectError(errDummy)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)()
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+		Predicate:       storage.Everything,
+	})
+	if !errors.Is(err, errDummy) {
+		t.Errorf("With WatchFromStorageWithoutResourceVersion enabled, watch with unset RV should be served from storage: %v", err)
 	}
 }
 
@@ -2032,9 +2050,11 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		// | Unset           | true/false          | nil/true/false        |
 		// +-----------------+---------------------+-----------------------+
 		{
-			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                         listOptions(true, nil, ""),
-			expectedWatchResourceVersion: 100,
+			name: "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts: listOptions(true, nil, ""),
+			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
+			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
+			expectedWatchResourceVersion: 0,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
@@ -2047,9 +2067,11 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 			expectedWatchResourceVersion: 100,
 		},
 		{
-			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                         listOptions(false, nil, ""),
-			expectedWatchResourceVersion: 100,
+			name: "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts: listOptions(false, nil, ""),
+			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
+			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
+			expectedWatchResourceVersion: 0,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true, legacy",
