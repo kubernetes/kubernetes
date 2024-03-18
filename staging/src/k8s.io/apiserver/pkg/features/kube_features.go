@@ -173,6 +173,13 @@ const (
 	// to a chunking list request.
 	RemainingItemCount featuregate.Feature = "RemainingItemCount"
 
+	// owner: @wojtek-t
+	// kep: TODO
+	// beta: v1.31
+	//
+	// Enables resilient watchcache initialization to avoid controlplane overload.
+	ResilientWatchCacheInitialization featuregate.Feature = "ResilientWatchCacheInitialization"
+
 	// owner: @serathius
 	// beta: v1.30
 	//
@@ -334,6 +341,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
+
+	ResilientWatchCacheInitialization: {Default: true, PreRelease: featuregate.Beta},
 
 	RetryGenerateName: {Default: false, PreRelease: featuregate.Alpha},
 
