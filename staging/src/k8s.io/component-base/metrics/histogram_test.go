@@ -17,12 +17,15 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"testing"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
@@ -311,5 +314,181 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHistogramWithExemplar(t *testing.T) {
+	// Arrange.
+	traceID := trace.TraceID([]byte("trace-0000-xxxxx"))
+	spanID := trace.SpanID([]byte("span-0000-xxxxx"))
+	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+	value := float64(10)
+
+	histogram := NewHistogram(&HistogramOpts{
+		Name:    "histogram_exemplar_test",
+		Help:    "helpless",
+		Buckets: []float64{100},
+	})
+	_ = histogram.WithContext(ctxForSpanCtx)
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(histogram)
+
+	// Act.
+	histogram.Observe(value)
+
+	// Assert.
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
+
+	if len(mfs) != 1 {
+		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
+	}
+
+	mf := mfs[0]
+	var m *dto.Metric
+	switch mf.GetType() {
+	case dto.MetricType_HISTOGRAM:
+		m = mfs[0].GetMetric()[0]
+	default:
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+	}
+
+	want := value
+	got := m.GetHistogram().GetSampleSum()
+	if got != want {
+		t.Fatalf("Got %f, wanted %f as the count", got, want)
+	}
+
+	buckets := m.GetHistogram().GetBucket()
+	if len(buckets) == 0 {
+		t.Fatalf("Got 0 buckets, wanted 1")
+	}
+
+	e := buckets[0].GetExemplar()
+	if e == nil {
+		t.Fatalf("Got nil exemplar, wanted an exemplar")
+	}
+
+	eLabels := e.GetLabel()
+	if eLabels == nil {
+		t.Fatalf("Got nil exemplar label, wanted an exemplar label")
+	}
+
+	if len(eLabels) != 2 {
+		t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(eLabels))
+	}
+
+	for _, l := range eLabels {
+		switch *l.Name {
+		case "trace_id":
+			if *l.Value != traceID.String() {
+				t.Fatalf("Got %s as traceID, wanted %s", *l.Value, traceID.String())
+			}
+		case "span_id":
+			if *l.Value != spanID.String() {
+				t.Fatalf("Got %s as spanID, wanted %s", *l.Value, spanID.String())
+			}
+		default:
+			t.Fatalf("Got unexpected label %s", *l.Name)
+		}
+	}
+}
+
+func TestHistogramVecWithExemplar(t *testing.T) {
+	// Arrange.
+	traceID := trace.TraceID([]byte("trace-0000-xxxxx"))
+	spanID := trace.SpanID([]byte("span-0000-xxxxx"))
+	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+	value := float64(10)
+
+	histogramVec := NewHistogramVec(&HistogramOpts{
+		Name:    "histogram_exemplar_test",
+		Help:    "helpless",
+		Buckets: []float64{100},
+	}, []string{"group"})
+	h := histogramVec.WithContext(ctxForSpanCtx)
+
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(histogramVec)
+
+	// Act.
+	h.WithLabelValues("foo").Observe(value)
+
+	// Assert.
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
+
+	if len(mfs) != 1 {
+		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
+	}
+
+	mf := mfs[0]
+	var m *dto.Metric
+	switch mf.GetType() {
+	case dto.MetricType_HISTOGRAM:
+		m = mfs[0].GetMetric()[0]
+	default:
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+	}
+
+	want := value
+	got := m.GetHistogram().GetSampleSum()
+	if got != want {
+		t.Fatalf("Got %f, wanted %f as the count", got, want)
+	}
+
+	buckets := m.GetHistogram().GetBucket()
+	if len(buckets) == 0 {
+		t.Fatalf("Got 0 buckets, wanted 1")
+	}
+
+	e := buckets[0].GetExemplar()
+	if e == nil {
+		t.Fatalf("Got nil exemplar, wanted an exemplar")
+	}
+
+	eLabels := e.GetLabel()
+	if eLabels == nil {
+		t.Fatalf("Got nil exemplar label, wanted an exemplar label")
+	}
+
+	if len(eLabels) != 2 {
+		t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(eLabels))
+	}
+
+	for _, l := range eLabels {
+		switch *l.Name {
+		case "trace_id":
+			if *l.Value != traceID.String() {
+				t.Fatalf("Got %s as traceID, wanted %s", *l.Value, traceID.String())
+			}
+		case "span_id":
+			if *l.Value != spanID.String() {
+				t.Fatalf("Got %s as spanID, wanted %s", *l.Value, spanID.String())
+			}
+		default:
+			t.Fatalf("Got unexpected label %s", *l.Name)
+		}
 	}
 }

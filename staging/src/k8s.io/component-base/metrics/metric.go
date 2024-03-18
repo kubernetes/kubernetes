@@ -19,8 +19,6 @@ package metrics
 import (
 	"sync"
 
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -215,28 +213,6 @@ func (c *selfCollector) Collect(ch chan<- prometheus.Metric) {
 // metricWithExemplar is an interface that knows how to attach an exemplar to certain supported metric types.
 type metricWithExemplar interface {
 	withExemplar(v float64)
-}
-
-// exemplarMetric is a holds a context to extract exemplar labels from, and a metric to attach them to. It implements the metricWithExemplar interface.
-type exemplarMetric struct {
-	*Counter
-}
-
-// withExemplar attaches an exemplar to the metric.
-func (e *exemplarMetric) withExemplar(v float64) {
-	if m, ok := e.CounterMetric.(prometheus.ExemplarAdder); ok {
-		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
-		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
-			exemplarLabels := prometheus.Labels{
-				"trace_id": maybeSpanCtx.TraceID().String(),
-				"span_id":  maybeSpanCtx.SpanID().String(),
-			}
-			m.AddWithExemplar(v, exemplarLabels)
-			return
-		}
-	}
-
-	e.CounterMetric.Add(v)
 }
 
 // no-op vecs for convenience
