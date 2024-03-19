@@ -20,8 +20,10 @@ limitations under the License.
 package e2enode
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -70,6 +72,19 @@ func waitForPodsCondition(ctx context.Context, f *framework.Framework, podCount 
 		}
 	}
 	return runningPods
+}
+
+func isFedoraCoreOs() bool {
+	data, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		ginkgo.By("Could not read /etc/os-release")
+		return false
+	}
+	if bytes.Contains(data, []byte("ID=fedora")) {
+		ginkgo.By("fedora detected")
+		return true
+	}
+	return false
 }
 
 var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), framework.WithDisruptive(), func() {
@@ -150,6 +165,9 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 
 	ginkgo.Context("Dbus", func() {
 		ginkgo.It("should continue to run pods after a restart", func(ctx context.Context) {
+			if isFedoraCoreOs() {
+				ginkgo.Skip("restarting dbus on fedora based os is not recommended")
+			}
 			// Allow dbus to be restarted on ubuntu
 			err := overlayDbusConfig()
 			framework.ExpectNoError(err)
