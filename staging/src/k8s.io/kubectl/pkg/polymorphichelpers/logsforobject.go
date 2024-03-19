@@ -113,8 +113,6 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 			ret := make(map[corev1.ObjectReference]rest.ResponseWrapper, 1)
 			ret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts)
 			return ret, nil
-		} else {
-			allPods = true
 		}
 
 		ret := make(map[corev1.ObjectReference]rest.ResponseWrapper)
