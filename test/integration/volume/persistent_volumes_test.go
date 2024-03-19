@@ -34,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
-	fakecloud "k8s.io/cloud-provider/fake"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -1353,7 +1352,6 @@ func createClients(ctx context.Context, namespaceName string, t *testing.T, s *k
 		Detachers:              nil,
 	}
 	plugins := []volume.VolumePlugin{plugin}
-	cloud := &fakecloud.Cloud{}
 	informers := informers.NewSharedInformerFactory(testClient, getSyncPeriod(syncPeriod))
 	ctrl, err := persistentvolumecontroller.NewController(
 		ctx,
@@ -1361,7 +1359,6 @@ func createClients(ctx context.Context, namespaceName string, t *testing.T, s *k
 			KubeClient:                binderClient,
 			SyncPeriod:                getSyncPeriod(syncPeriod),
 			VolumePlugins:             plugins,
-			Cloud:                     cloud,
 			VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 			ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 			ClassInformer:             informers.Storage().V1().StorageClasses(),

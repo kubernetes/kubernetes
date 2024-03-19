@@ -61,7 +61,6 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		nil, /* plugins */
 		nil, /* prober */
 		false,
@@ -92,7 +91,6 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		controllervolumetesting.CreateTestPlugin(),
 		nil, /* prober */
 		false,
@@ -215,7 +213,6 @@ func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		nil, /* plugins */
 		nil, /* prober */
 		false,
@@ -274,7 +271,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		plugins,
 		prober,
 		false,
@@ -538,7 +534,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		plugins,
 		nil, /* prober */
 		false,
