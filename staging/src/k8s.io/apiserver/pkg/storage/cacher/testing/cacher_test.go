@@ -55,7 +55,7 @@ func init() {
 }
 
 func TestWatchSemanticInitialEventsExtended(t *testing.T) {
-	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+	store, terminate := testSetupWithEtcdAndCreateWrapper(context.TODO(), t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)
 }
@@ -91,7 +91,7 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 	return source
 }
 
-func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *cacher.Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
+func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *cacher.Cacher, cacher.Config, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -134,16 +134,30 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
-	return ctx, cacher, server, terminate
+	return ctx, cacher, config, server, terminate
 }
 
-func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
-	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
-
-	if err := cacher.ready.wait(context.TODO()); err != nil {
-		t.Fatalf("unexpected error waiting for the cache to be ready")
+func testSetupWithEtcdAndCreateWrapper(ctx context.Context, t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
+	_, cacher, config, _, tearDown := testSetupWithEtcdServer(t, opts...)
+	// since we don't want to add any data to the db
+	// as this might influence the test,
+	// get a non-existing key and check
+	// if the proper error is returned,
+	// which means that the cacher has been initialised.
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		currentObj := config.NewFunc()
+		err := cacher.Get(ctx, "/pod/foo", storage.GetOptions{ResourceVersion: "1"}, currentObj)
+		if err != nil {
+			if storage.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatal(err)
 	}
-	return &createWrapper{Cacher: cacher}, tearDown
+	return &createWrapper{Cacher: cacher, newFunc: config.NewFunc}, tearDown
 }
 
 func newPod() runtime.Object     { return &example.Pod{} }
@@ -166,6 +180,7 @@ func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServ
 
 type createWrapper struct {
 	*cacher.Cacher
+	newFunc func() runtime.Object
 }
 
 func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
@@ -173,7 +188,7 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 		return err
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		currentObj := c.Cacher.newFunc()
+		currentObj := c.newFunc()
 		err := c.Cacher.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
 		if err != nil {
 			if storage.IsNotFound(err) {
