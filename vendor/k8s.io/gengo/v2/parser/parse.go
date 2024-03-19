@@ -602,12 +602,16 @@ func goNameToName(in string) types.Name {
 func (p *Parser) convertSignature(u types.Universe, t *gotypes.Signature) *types.Signature {
 	signature := &types.Signature{}
 	for i := 0; i < t.Params().Len(); i++ {
-		signature.Parameters = append(signature.Parameters, p.walkType(u, nil, t.Params().At(i).Type()))
-		signature.ParameterNames = append(signature.ParameterNames, t.Params().At(i).Name())
+		signature.Parameters = append(signature.Parameters, &types.ParamResult{
+			Name: t.Params().At(i).Name(),
+			Type: p.walkType(u, nil, t.Params().At(i).Type()),
+		})
 	}
 	for i := 0; i < t.Results().Len(); i++ {
-		signature.Results = append(signature.Results, p.walkType(u, nil, t.Results().At(i).Type()))
-		signature.ResultNames = append(signature.ResultNames, t.Results().At(i).Name())
+		signature.Results = append(signature.Results, &types.ParamResult{
+			Name: t.Results().At(i).Name(),
+			Type: p.walkType(u, nil, t.Results().At(i).Type()),
+		})
 	}
 	if r := t.Recv(); r != nil {
 		signature.Receiver = p.walkType(u, nil, r.Type())

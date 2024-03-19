@@ -166,15 +166,15 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 			continue
 		}
 		inType := signature.Parameters[0]
-		if inType.Kind != types.Pointer {
+		if inType.Type.Kind != types.Pointer {
 			continue
 		}
 		// Check if this is the primary defaulter.
-		args := defaultingArgsFromType(inType.Elem)
+		args := defaultingArgsFromType(inType.Type.Elem)
 		sw.Do("$.inType|defaultfn$", args)
 		switch {
 		case f.Name.Name == buffer.String():
-			key := inType.Elem
+			key := inType.Type.Elem
 			// We might scan the same package twice, and that's OK.
 			v, ok := manualMap[key]
 			if ok && v.base != nil && v.base.Name.Package != pkg.Path {
@@ -186,7 +186,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 		// Is one of the additional defaulters - a top level defaulter on a type that is
 		// also invoked.
 		case strings.HasPrefix(f.Name.Name, buffer.String()+"_"):
-			key := inType.Elem
+			key := inType.Type.Elem
 			v, ok := manualMap[key]
 			if ok {
 				exists := false
@@ -207,7 +207,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 		buffer.Reset()
 		sw.Do("$.inType|objectdefaultfn$", args)
 		if f.Name.Name == buffer.String() {
-			key := inType.Elem
+			key := inType.Type.Elem
 			// We might scan the same package twice, and that's OK.
 			v, ok := manualMap[key]
 			if ok && v.base != nil && v.base.Name.Package != pkg.Path {
