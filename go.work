@@ -35,3 +35,5 @@ use (
 	./staging/src/k8s.io/sample-cli-plugin
 	./staging/src/k8s.io/sample-controller
 )
+
+replace k8s.io/gengo/v2 => ../gengo/v2

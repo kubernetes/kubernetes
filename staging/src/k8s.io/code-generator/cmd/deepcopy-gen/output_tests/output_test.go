@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/aliases"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/builtins"
+	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/generics"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/interfaces"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/maps"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/pointer"
@@ -42,6 +43,9 @@ func TestWithValueFuzzer(t *testing.T) {
 		pointer.Ttest{},
 		slices.Ttest{},
 		structs.Ttest{},
+
+		generics.TunusedGeneric[int]{},
+		generics.TunusedGenericMulti[int, bool, byte]{},
 	}
 
 	fuzzer := fuzz.New()
@@ -63,7 +67,11 @@ func TestWithValueFuzzer(t *testing.T) {
 					t.Errorf("original and reflectCopy are different:\n\n  original = %s\n\n  jsonCopy = %s", spew.Sdump(original), spew.Sdump(reflectCopy))
 				}
 
-				deepCopy := reflect.ValueOf(original).MethodByName("DeepCopy").Call(nil)[0].Interface()
+				deepCopyMethod := reflect.ValueOf(original).MethodByName("DeepCopy")
+				if !deepCopyMethod.IsValid() {
+					t.Fatalf("unable to find DeepCopy method:\n\n  original = %s", spew.Sdump(original))
+				}
+				deepCopy := deepCopyMethod.Call(nil)[0].Interface()
 
 				if !reflect.DeepEqual(original, deepCopy) {
 					t.Fatalf("original and deepCopy are different:\n\n  original = %s\n\n  deepCopy() = %s", spew.Sdump(original), spew.Sdump(deepCopy))

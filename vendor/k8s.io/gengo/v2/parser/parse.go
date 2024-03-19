@@ -587,9 +587,16 @@ func goNameToName(in string) types.Name {
 		return types.Name{Name: in}
 	}
 
+	// There may be '.' characters within a generic. Temporarily remove
+	// the generic.
+	genericIndex := strings.IndexRune(in, '[')
+	if genericIndex == -1 {
+		genericIndex = len(in)
+	}
+
 	// Otherwise, if there are '.' characters present, the name has a
 	// package path in front.
-	nameParts := strings.Split(in, ".")
+	nameParts := strings.Split(in[:genericIndex], ".")
 	name := types.Name{Name: in}
 	if n := len(nameParts); n >= 2 {
 		// The final "." is the name of the type--previous ones must
@@ -738,6 +745,27 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 			}
 			out.Kind = types.Alias
 			out.Underlying = p.walkType(u, nil, t.Underlying())
+		case *gotypes.Struct:
+			name := goNameToName(t.String())
+			tpMap := map[string]*types.Type{}
+			if t.TypeParams().Len() != 0 {
+				// Remove generics, then readd them without the encoded
+				// type, e.g. Foo[T any] => Foo[T]
+				var tpNames []string
+				for i := 0; i < t.TypeParams().Len(); i++ {
+					tp := t.TypeParams().At(i)
+					tpName := tp.Obj().Name()
+					tpNames = append(tpNames, tpName)
+					tpMap[tpName] = p.walkType(u, nil, tp.Constraint())
+				}
+				name.Name = fmt.Sprintf("%s[%s]", strings.SplitN(name.Name, "[", 2)[0], strings.Join(tpNames, ","))
+			}
+
+			if out := u.Type(name); out.Kind != types.Unknown {
+				return out // short circuit if we've already made this.
+			}
+			out = p.walkType(u, &name, t.Underlying())
+			out.TypeParams = tpMap
 		default:
 			// gotypes package makes everything "named" with an
 			// underlying anonymous type--we remove that annoying
@@ -764,6 +792,15 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 			}
 		}
 		return out
+	case *gotypes.TypeParam:
+		// DO NOT retrieve the type from the universe. The default type-param name is only the
+		// generic variable name. Ideally, it would be namespaced by package and struct but it is
+		// not. Thus, if we try to use the universe, we would start polluting it.
+		// e.g. if Foo[T] and Bar[T] exists, we'd mistakenly use the same type T for both.
+		return &types.Type{
+			Name: name,
+			Kind: types.TypeParam,
+		}
 	default:
 		out := u.Type(name)
 		if out.Kind != types.Unknown {

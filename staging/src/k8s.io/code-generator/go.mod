@@ -40,4 +40,5 @@ require (
 replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/code-generator => ../code-generator
+	k8s.io/gengo/v2 => github.com/TheSpiritXIII/gengo/v2 v2.0.0
 )

@@ -98,6 +98,7 @@ const (
 	DeclarationOf Kind = "DeclarationOf"
 	Unknown       Kind = ""
 	Unsupported   Kind = "Unsupported"
+	TypeParam     Kind = "TypeParam"
 
 	// Protobuf is protobuf type.
 	Protobuf Kind = "Protobuf"
@@ -323,6 +324,9 @@ type Type struct {
 
 	// If Kind == Struct
 	Members []Member
+
+	// If Kind == Struct
+	TypeParams map[string]*Type
 
 	// If Kind == Map, Slice, Pointer, or Chan
 	Elem *Type

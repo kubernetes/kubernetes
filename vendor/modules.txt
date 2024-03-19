@@ -1217,7 +1217,7 @@ gopkg.in/yaml.v3
 ## explicit; go 1.22.0
 # k8s.io/endpointslice v0.0.0 => ./staging/src/k8s.io/endpointslice
 ## explicit; go 1.22.0
-# k8s.io/gengo/v2 v2.0.0-20240310015720-9cff6334dab4
+# k8s.io/gengo/v2 v2.0.0-20240310015720-9cff6334dab4 => ../gengo/v2
 ## explicit; go 1.20
 k8s.io/gengo/v2
 k8s.io/gengo/v2/generator
@@ -1428,3 +1428,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# k8s.io/gengo/v2 => ../gengo/v2
