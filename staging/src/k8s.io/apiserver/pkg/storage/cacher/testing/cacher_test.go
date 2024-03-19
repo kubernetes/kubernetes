@@ -413,7 +413,9 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 
 	// Since some tests depend on the fact that GetList shouldn't fail,
 	// we wait until the error from the underlying storage is consumed.
-	if err := wait.PollInfinite(100*time.Millisecond, wrappedStorage.ErrorsConsumed); err != nil {
+	if err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, false, func(_ context.Context) (done bool, err error) {
+		return wrappedStorage.ErrorsConsumed()
+	}); err != nil {
 		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
