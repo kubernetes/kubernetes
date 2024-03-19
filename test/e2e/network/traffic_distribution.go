@@ -49,7 +49,7 @@ var _ = common.SIGDescribe("TrafficDistribution", func() {
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
-		e2eskipper.SkipUnlessMultizone(ctx, c)
+		e2eskipper.SkipUnlessAtLeastNZones(ctx, c, 3)
 	})
 
 	////////////////////////////////////////////////////////////////////////////

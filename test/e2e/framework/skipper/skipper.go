@@ -121,6 +121,17 @@ func SkipUnlessMultizone(ctx context.Context, c clientset.Interface) {
 	}
 }
 
+// SkipUnlessAtLeastNZones skips if the cluster does not have n multizones.
+func SkipUnlessAtLeastNZones(ctx context.Context, c clientset.Interface, n int) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
+	if err != nil {
+		skipInternalf(1, "Error listing cluster zones")
+	}
+	if zones.Len() < n {
+		skipInternalf(1, "Requires >= %d zones", n)
+	}
+}
+
 // SkipIfMultizone skips if the cluster has multizone.
 func SkipIfMultizone(ctx context.Context, c clientset.Interface) {
 	zones, err := e2enode.GetClusterZones(ctx, c)
