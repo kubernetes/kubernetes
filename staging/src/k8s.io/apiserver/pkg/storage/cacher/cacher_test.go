@@ -381,18 +381,9 @@ func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
 }
 
 func TestWatchSemantics(t *testing.T) {
-	t.Run("WatchFromStorageWithoutResourceVersion=true", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)()
-		store, terminate := testSetupWithEtcdAndCreateWrapper(t)
-		t.Cleanup(terminate)
-		storagetesting.RunWatchSemantics(context.TODO(), t, store)
-	})
-	t.Run("WatchFromStorageWithoutResourceVersion=false", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)()
-		store, terminate := testSetupWithEtcdAndCreateWrapper(t)
-		t.Cleanup(terminate)
-		storagetesting.RunWatchSemantics(context.TODO(), t, store)
-	})
+	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+	t.Cleanup(terminate)
+	storagetesting.RunWatchSemantics(context.TODO(), t, store)
 }
 
 func TestWatchSemanticInitialEventsExtended(t *testing.T) {
