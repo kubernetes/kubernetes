@@ -58,18 +58,21 @@ func init() {
 }
 
 func TestCreate(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCreate(ctx, t, cacher, checkStorageInvariants)
 }
 
 func TestCreateWithTTL(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCreateWithTTL(ctx, t, cacher)
 }
 
 func TestCreateWithKeyExist(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCreateWithKeyExist(ctx, t, cacher)
@@ -82,12 +85,14 @@ func TestGet(t *testing.T) {
 }
 
 func TestUnconditionalDelete(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestUnconditionalDelete(ctx, t, cacher)
 }
 
 func TestConditionalDelete(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestConditionalDelete(ctx, t, cacher)
@@ -100,60 +105,70 @@ func TestDeleteWithSuggestion(t *testing.T) {
 }
 
 func TestDeleteWithSuggestionAndConflict(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDeleteWithSuggestionAndConflict(ctx, t, cacher)
 }
 
 func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, cacher)
 }
 
 func TestValidateDeletionWithSuggestion(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, cacher)
 }
 
 func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, cacher)
 }
 
 func TestDeleteWithConflict(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDeleteWithConflict(ctx, t, cacher)
 }
 
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, cacher)
 }
 
 func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
 }
 
 func TestListContinuation(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestListContinuation(ctx, t, cacher, checkStorageCalls)
 }
 
 func TestListPaginationRareObject(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestListPaginationRareObject(ctx, t, cacher, checkStorageCalls)
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, cacher, checkStorageCalls)
@@ -175,6 +190,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 }
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, cacher)
@@ -185,12 +201,14 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 }
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGuaranteedUpdateWithConflict(ctx, t, cacher)
 }
 
 func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, cacher)
@@ -201,30 +219,35 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCount(ctx, t, cacher)
 }
 
 func TestWatch(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatch(ctx, t, cacher)
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
 }
 
 func TestWatchFromNonZero(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchFromNonZero(ctx, t, cacher)
 }
 
 func TestDelayedWatchDelivery(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
@@ -239,48 +262,56 @@ func TestWatchContextCancel(t *testing.T) {
 }
 
 func TestWatcherTimeout(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatcherTimeout(ctx, t, cacher)
 }
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
 }
 
 func TestWatchInitializationSignal(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchInitializationSignal(ctx, t, cacher)
 }
 
 func TestClusterScopedWatch(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withSpecNodeNameIndexerFuncs)
 	t.Cleanup(terminate)
 	storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
 }
 
 func TestNamespaceScopedWatch(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
 	t.Cleanup(terminate)
 	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 }
 
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
 }
 
 func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
 }
 
 func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
+	t.Parallel()
 	ctx, store, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
