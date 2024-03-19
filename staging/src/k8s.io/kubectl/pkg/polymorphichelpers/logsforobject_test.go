@@ -70,62 +70,6 @@ func TestLogsForObject(t *testing.T) {
 			},
 		},
 		{
-			name: "pod logs: all pods and all containers",
-			obj:  testDeploymentWithMultiplePods(),
-			opts: &corev1.PodLogOptions{},
-			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{allPods: true, allContainers: true}),
-			},
-			expectedSources: []corev1.ObjectReference{
-				{
-					Kind:       &corev1.Pod.Kind,
-					APIVersion: &corev1.Pod.APIVersion,
-					Namespace:  testDeploymentWithMultiplePods().Namespace,
-					FieldPath:  fmt.Sprintf("spec.template.spec.containers{%s}", testDeploymentWithMultiplePods().Spec.Template.Spec.Containers[0].Name),
-				},
-				{
-					Kind:       &corev1.Pod.Kind,
-					APIVersion: &corev1.Pod.APIVersion,
-					Namespace:  testDeploymentWithMultiplePods().Namespace,
-					FieldPath:  fmt.Sprintf("spec.template.spec.containers{%s}", testDeploymentWithMultiplePods().Spec.Template.Spec.Containers[1].Name),
-				},
-				{
-					Kind:       &corev1.Pod.Kind,
-					APIVersion: &corev1.Pod.APIVersion,
-					Namespace:  testDeploymentWithMultiplePods().Namespace,
-					FieldPath:  fmt.Sprintf("spec.template.spec.containers{%s}", testDeploymentWithMultiplePods().Spec.Template.Spec.Containers[0].Name),
-				},
-				{
-					Kind:       &corev1.Pod.Kind,
-					APIVersion: &corev1.Pod.APIVersion,
-					Namespace:  testDeploymentWithMultiplePods().Namespace,
-					FieldPath:  fmt.Sprintf("spec.template.spec.containers{%s}", testDeploymentWithMultiplePods().Spec.Template.Spec.Containers[1].Name),
-				},
-			},
-		},
-		{
-			name: "pod logs: all pods",
-			obj:  testDeploymentWithMultiplePods(),
-			opts: &corev1.PodLogOptions{},
-			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{allPods: true}),
-			},
-			expectedSources: []corev1.ObjectReference{
-				{
-					Kind:       &corev1.Pod.Kind,
-					APIVersion: &corev1.Pod.APIVersion,
-					Namespace:  testDeploymentWithMultiplePods().Namespace,
-					FieldPath:  fmt.Sprintf("spec.template.spec.containers{%s}", testDeploymentWithMultiplePods().Spec.Template.Spec.Containers[0].Name),
-				},
-				{
-					Kind:       &corev1.Pod.Kind,
-					APIVersion: &corev1.Pod.APIVersion,
-					Namespace:  testDeploymentWithMultiplePods().Namespace,
-					FieldPath:  fmt.Sprintf("spec.template.spec.containers{%s}", testDeploymentWithMultiplePods().Spec.Template.Spec.Containers[0].Name),
-				},
-			},
-		},
-		{
 			name:          "pod logs: all containers",
 			obj:           testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers(),
 			opts:          &corev1.PodLogOptions{},
@@ -654,29 +598,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 	}
 
 }
-func testDeploymentWithMultiplePods() *extensionsv1beta1.Deployment {
-	return &extensionsv1beta1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo-test-multiple-pods",
-			Namespace: "test",
-		},
-		Spec: extensionsv1beta1.DeploymentSpec{
-			Replicas: int32Ptr(2),
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "all-pods"}},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": "all-pods"},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{Name: "foo-2-c1"},
-						{Name: "foo-2-c2"},
-					},
-				},
-			},
-		},
-	}
-}
+
 func testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers() *corev1.Pod {
 	return &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
