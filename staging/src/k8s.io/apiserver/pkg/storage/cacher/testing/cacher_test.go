@@ -34,12 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 )
 
@@ -52,6 +55,250 @@ func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	utilruntime.Must(example.AddToScheme(scheme))
 	utilruntime.Must(examplev1.AddToScheme(scheme))
+}
+
+func TestCreate(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCreate(ctx, t, cacher, checkStorageInvariants)
+}
+
+func TestCreateWithTTL(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCreateWithTTL(ctx, t, cacher)
+}
+
+func TestCreateWithKeyExist(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCreateWithKeyExist(ctx, t, cacher)
+}
+
+func TestGet(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGet(ctx, t, cacher)
+}
+
+func TestUnconditionalDelete(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestUnconditionalDelete(ctx, t, cacher)
+}
+
+func TestConditionalDelete(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestConditionalDelete(ctx, t, cacher)
+}
+
+func TestDeleteWithSuggestion(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithSuggestion(ctx, t, cacher)
+}
+
+func TestDeleteWithSuggestionAndConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithSuggestionAndConflict(ctx, t, cacher)
+}
+
+func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, cacher)
+}
+
+func TestValidateDeletionWithSuggestion(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, cacher)
+}
+
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, cacher)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, cacher)
+}
+
+func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, cacher)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
+}
+
+func TestListContinuation(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListContinuation(ctx, t, cacher, checkStorageCalls)
+}
+
+func TestListPaginationRareObject(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListPaginationRareObject(ctx, t, cacher, checkStorageCalls)
+}
+
+func TestListContinuationWithFilter(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListContinuationWithFilter(ctx, t, cacher, checkStorageCalls)
+}
+
+func TestListInconsistentContinuation(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	// TODO(#109831): Enable use of this by setting compaction.
+	storagetesting.RunTestListInconsistentContinuation(ctx, t, cacher, nil)
+}
+
+func TestListResourceVersionMatch(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestGuaranteedUpdate(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestGuaranteedUpdateWithTTL(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, cacher)
+}
+
+func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestGuaranteedUpdateWithConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdateWithConflict(ctx, t, cacher)
+}
+
+func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, cacher)
+}
+
+func TestTransformationFailure(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestCount(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCount(ctx, t, cacher)
+}
+
+func TestWatch(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatch(ctx, t, cacher)
+}
+
+func TestDeleteTriggerWatch(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
+}
+
+func TestWatchFromNonZero(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchFromNonZero(ctx, t, cacher)
+}
+
+func TestDelayedWatchDelivery(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
+}
+
+func TestWatchError(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestWatchContextCancel(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestWatcherTimeout(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatcherTimeout(ctx, t, cacher)
+}
+
+func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
+}
+
+func TestWatchInitializationSignal(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchInitializationSignal(ctx, t, cacher)
+}
+
+func TestClusterScopedWatch(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
+}
+
+func TestNamespaceScopedWatch(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
+}
+
+func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
+}
+
+func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
+}
+
+func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
+	ctx, store, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
+}
+
+func TestWatchSemantics(t *testing.T) {
+	t.Run("WatchFromStorageWithoutResourceVersion=true", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)()
+		store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+		t.Cleanup(terminate)
+		storagetesting.RunWatchSemantics(context.TODO(), t, store)
+	})
+	t.Run("WatchFromStorageWithoutResourceVersion=false", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)()
+		store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+		t.Cleanup(terminate)
+		storagetesting.RunWatchSemantics(context.TODO(), t, store)
+	})
 }
 
 func TestWatchSemanticInitialEventsExtended(t *testing.T) {
@@ -89,6 +336,11 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 		source["metadata.namespace"] = objectMeta.Namespace
 	}
 	return source
+}
+
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacher.Cacher, tearDownFunc) {
+	ctx, cacher, _, _, tearDown := testSetupWithEtcdServer(t, opts...)
+	return ctx, cacher, tearDown
 }
 
 func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *cacher.Cacher, cacher.Config, *etcd3testing.EtcdTestServer, tearDownFunc) {
@@ -220,4 +472,30 @@ func withDefaults(options *setupOptions) {
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
 	options.clock = clock.RealClock{}
+}
+
+func withClusterScopedKeyFunc(options *setupOptions) {
+	options.keyFunc = func(obj runtime.Object) (string, error) {
+		return storage.NoNamespaceKeyFunc(options.resourcePrefix, obj)
+	}
+}
+
+func withSpecNodeNameIndexerFuncs(options *setupOptions) {
+	options.indexerFuncs = map[string]storage.IndexerFunc{
+		"spec.nodeName": func(obj runtime.Object) string {
+			pod, ok := obj.(*example.Pod)
+			if !ok {
+				return ""
+			}
+			return pod.Spec.NodeName
+		},
+	}
+}
+
+func checkStorageCalls(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
+	// No-op function for now, since cacher passes pagination calls to underlying storage.
+}
+
+func checkStorageInvariants(ctx context.Context, t *testing.T, key string) {
+	// No-op function since cacher simply passes object creation to the underlying storage.
 }
