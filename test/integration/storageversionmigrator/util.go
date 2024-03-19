@@ -33,6 +33,7 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+
 	corev1 "k8s.io/api/core/v1"
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -1002,7 +1003,7 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName 
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		wait.ForeverTestTimeout,
+		1*time.Minute,
 		true,
 		func(ctx context.Context) (bool, error) {
 			triggerCR := svm.createCR(ctx, t, "triggercr", "v1")
