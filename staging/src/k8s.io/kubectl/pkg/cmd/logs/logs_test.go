@@ -247,7 +247,7 @@ func TestLog(t *testing.T) {
 			name: "fail if LogsForObject fails",
 			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
 				o := NewLogsOptions(streams, false, false)
-				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
+				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool, allPods bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 					return nil, errors.New("Error from the LogsForObject")
 				}
 				return o
@@ -917,7 +917,7 @@ func (l *logTestMock) mockConsumeRequest(request restclient.ResponseWrapper, out
 	return err
 }
 
-func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
+func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool, allPods bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 	switch object.(type) {
 	case *corev1.Pod:
 		_, ok := options.(*corev1.PodLogOptions)

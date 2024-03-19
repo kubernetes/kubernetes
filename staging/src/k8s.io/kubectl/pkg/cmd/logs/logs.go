@@ -397,6 +397,9 @@ func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReferenc
 }
 
 func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Writer) io.Writer {
+	if o.AllPods {
+		o.Prefix = true
+	}
 	if !o.Prefix || ref.FieldPath == "" || ref.Name == "" {
 		return writer
 	}
