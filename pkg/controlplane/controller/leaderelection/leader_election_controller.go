@@ -51,8 +51,6 @@ const EndOfTermAnnotationName = "coordination.k8s.io/end-of-term"
 
 const ElectedByAnnotationName = "coordination.k8s.io/elected-by" // Value should be set to controllerName
 
-const electionDuration = time.Second * 1
-
 // Controller is the leader election controller, which observes component identity leases for
 // components that have self-nominated as candidate leaders for leases and elects leaders
 // for those leases, favoring candidates with higher versions.

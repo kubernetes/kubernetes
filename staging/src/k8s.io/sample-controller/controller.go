@@ -256,13 +256,14 @@ func leaderElectAndRun(ctx context.Context, kubeconfig *restclient.Config, lockI
 	}
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: 10 * time.Second,
-		RenewDeadline: 5 * time.Second,
-		RetryPeriod:   1 * time.Second,
-		Callbacks:     callbacks,
-		WatchDog:      electionChecker,
-		Name:          leaseName,
+		Lock:                      rl,
+		LeaseDuration:             60 * time.Second,
+		RenewDeadline:             30 * time.Second,
+		RetryPeriod:               10 * time.Second,
+		Callbacks:                 callbacks,
+		WatchDog:                  electionChecker,
+		Name:                      leaseName,
+		CoordinatedLeaderElection: true,
 	})
 
 	panic("unreachable")
