@@ -156,6 +156,9 @@ type kubeGenericRuntimeManager struct {
 	// PodState provider instance
 	podStateProvider podStateProvider
 
+	// Manage container termination in a non-blocking way
+	containerTermination *containerTermination
+
 	// Use RuntimeDefault as the default seccomp profile for all workloads.
 	seccompDefault bool
 
@@ -280,7 +283,9 @@ func NewKubeGenericRuntimeManager(
 		imagePullQPS,
 		imagePullBurst,
 		podPullingTimeRecorder)
-	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
+
+	runner := lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
+	kubeRuntimeManager.runner = runner
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
 	kubeRuntimeManager.podStateProvider = podStateProvider
 
@@ -290,6 +295,8 @@ func NewKubeGenericRuntimeManager(
 		},
 		versionCacheTTL,
 	)
+
+	kubeRuntimeManager.containerTermination = newContainerTermination(recorder, runtimeService, runner)
 
 	return kubeRuntimeManager, nil
 }
@@ -1080,15 +1087,33 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			m.purgeInitContainers(ctx, pod, podStatus)
 		}
 	} else {
-		// Step 3: kill any running containers in this pod which are not to keep.
-		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
-			klog.V(3).InfoS("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
-			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				klog.ErrorS(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-				return
+		if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainerRestartDuringTermination) {
+			// Step 3: kill any running containers in this pod which are not to keep.
+			for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+				klog.V(3).InfoS("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+				result.AddSyncResult(killContainerResult)
+				if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
+					killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+					klog.ErrorS(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+					return
+				}
+			}
+		} else {
+			// Step 3: kill any running containers in this pod which are not to keep.
+			terminationResults := m.containerTermination.DrainResults(pod.UID)
+			for _, terminationResult := range terminationResults {
+				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, terminationResult.containerName)
+				result.AddSyncResult(killContainerResult)
+				if terminationResult.err != nil {
+					killContainerResult.Fail(kubecontainer.ErrKillContainer, terminationResult.err.Error())
+					klog.ErrorS(terminationResult.err, "killContainer for pod failed", "containerName", terminationResult.containerName, "containerID", terminationResult.containerID, "pod", klog.KObj(pod))
+				}
+			}
+
+			for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+				klog.V(3).InfoS("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+				m.containerTermination.Terminate(pod, containerID, containerInfo.name, nil, nil)
 			}
 		}
 	}
@@ -1223,6 +1248,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// metricLabel is the label used to describe this type of container in monitoring metrics.
 	// currently: "container", "init_container" or "ephemeral_container"
 	start := func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainerRestartDuringTermination) {
+			if m.containerTermination.IsTerminating(pod.UID, spec.container.Name) {
+				klog.V(4).InfoS("Skipping start of the terminating container", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod))
+				return fmt.Errorf("cannot start container %s, it is terminating", spec.container.Name)
+			}
+		}
+
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
 		result.AddSyncResult(startContainerResult)
 
