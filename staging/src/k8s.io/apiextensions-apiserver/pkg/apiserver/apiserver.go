@@ -272,7 +272,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 			utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
-			go crdHandler.storageVersionManager.RunUpdateLoop(context.StopCh)
+			// this goroutine will just monitor when its time for the storageversion
+			// manager to shutdown its queues.
+			go crdHandler.storageVersionManager.Shutdown(context.StopCh)
 		}
 
 		discoverySyncedCh := make(chan struct{})

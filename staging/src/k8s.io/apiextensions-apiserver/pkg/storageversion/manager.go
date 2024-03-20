@@ -50,6 +50,9 @@ var (
 	// map from crd.UID -> storageVersionUpdateInfo to keep
 	// track of the latest storageversion update for a CRD.
 	latestStorageVersionUpdateInfo sync.Map
+
+	// workqueues per crd.UID to process storageversion updates.
+	updateQueues sync.Map
 )
 
 // Manager provides methods for updating StorageVersion for CRDs. It does
@@ -61,8 +64,8 @@ type Manager struct {
 	client genericstorageversion.Client
 	// apiserverID is the ID of the apiserver that invokes this manager.
 	apiserverID string
-	// workqueue keyed by crd.UID to process storageversion updates.
-	queue *workqueue.Type
+	// quit if true, shutsdown all updateQueues
+	shutdownQueues chan struct{}
 }
 
 // storageVersionUpdateInfo holds information about a storage version update,
@@ -104,15 +107,16 @@ type storageVersionUpdateChannels struct {
 // NewManager creates a CRD StorageVersion Manager.
 func NewManager(client genericstorageversion.Client, apiserverID string) Manager {
 	return Manager{
-		client:      client,
-		apiserverID: apiserverID,
-		queue:       workqueue.NewNamed("storageversion-updater"),
+		client:         client,
+		apiserverID:    apiserverID,
+		shutdownQueues: make(chan struct{}),
 	}
 }
 
 func (m *Manager) Enqueue(crd *apiextensionsv1.CustomResourceDefinition, tearDownFinishedCh <-chan struct{}) {
 	m.recordLatestSVUpdateInfoWithTeardown(crd, tearDownFinishedCh)
-	m.queue.Add(crd.UID)
+	q := m.getOrCreateUpdateQueueFor(crd)
+	q.Add(crd.UID)
 }
 
 func (m *Manager) WaitForStorageVersionUpdate(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
@@ -136,38 +140,47 @@ func (m *Manager) WaitForStorageVersionUpdate(ctx context.Context, crd *apiexten
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("aborted waiting for CRD storage version update: %w", ctx.Err())
-	// Unblock the requests if the storage version update takes a long time, otherwise
-	// CR requests may stack up and overwhelm the API server.
-	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
 	case <-time.After(storageVersionUpdateTimeout):
 		return fmt.Errorf("timeout waiting for CRD storage version update")
 	}
 
 }
 
-func (m *Manager) RunUpdateLoop(stopCh <-chan struct{}) {
-	go wait.Until(m.worker, time.Second, stopCh)
-	defer m.queue.ShutDown()
+func (m *Manager) Shutdown(stopCh <-chan struct{}) {
+	<-stopCh
+	close(m.shutdownQueues)
+}
+
+func (m *Manager) sync(stopCh <-chan struct{}, crdUID types.UID) {
+	go wait.Until(func() {
+		m.worker(crdUID)
+	}, time.Second, stopCh)
+	val, _ := updateQueues.Load(crdUID)
+	queue := val.(*workqueue.Type)
+	defer queue.ShutDown()
 	<-stopCh
 }
 
-func (m *Manager) worker() {
-	for m.processLatestSVUpdate() {
+func (m *Manager) worker(crdUID types.UID) {
+	for m.processLatestUpdateFor(crdUID) {
 	}
 }
 
-func (m *Manager) processLatestSVUpdate() bool {
+func (m *Manager) processLatestUpdateFor(crdUID types.UID) bool {
 	ctx := context.TODO()
-	key, quit := m.queue.Get()
+	val, _ := updateQueues.Load(crdUID)
+	queue := val.(*workqueue.Type)
+
+	key, quit := queue.Get()
+	defer queue.Done(key)
 	if quit {
 		return false
 	}
-	defer m.queue.Done(key)
 
 	val, ok := latestStorageVersionUpdateInfo.Load(key)
 	latestSVUpdateInfo := val.(*storageVersionUpdateInfo)
 	if !ok || latestSVUpdateInfo.processed {
-		klog.V(2).Infof("No pending storageversion update found, returning")
+		klog.V(4).Infof("No pending storageversion update found for crdUID: %s, returning", crdUID)
 		return true
 	}
 
@@ -192,6 +205,19 @@ func (m *Manager) recordLatestSVUpdateInfoWithTeardown(crd *apiextensionsv1.Cust
 
 func (m *Manager) updateLatestStorageVersionUpdateInfo(crdUID types.UID, svUpdateInfo *storageVersionUpdateInfo) {
 	latestStorageVersionUpdateInfo.Store(crdUID, svUpdateInfo)
+}
+
+func (m *Manager) getOrCreateUpdateQueueFor(crd *apiextensionsv1.CustomResourceDefinition) *workqueue.Type {
+	val, ok := updateQueues.Load(crd.UID)
+	if ok {
+		queue := val.(*workqueue.Type)
+		return queue
+	}
+
+	queue := workqueue.NewNamed(fmt.Sprintf("%s-storageversion-updater", crd.Name))
+	updateQueues.Store(crd.UID, queue)
+	go m.sync(m.shutdownQueues, crd.UID)
+	return queue
 }
 
 // updateStorageVersion updates a StorageVersion for the given
