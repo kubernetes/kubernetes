@@ -599,6 +599,14 @@ const (
 	// No effect for other cases such as using serverTLSbootstap.
 	ReloadKubeletServerCertificateFile featuregate.Feature = "ReloadKubeletServerCertificateFile"
 
+	// owner: @gjkim42 @SergeyKanzhelev @matthyx
+	// kep: http://kep.k8s.io/753
+	// kep: http://kep.k8s.io/4438
+	// alpha: v1.33
+	//
+	// Allows containers to restart during pod termination.
+	RestartContainerDuringTermination featuregate.Feature = "RestartContainerDuringTermination"
+
 	// owner: @SergeyKanzhelev
 	// kep: https://kep.k8s.io/4680
 	//
