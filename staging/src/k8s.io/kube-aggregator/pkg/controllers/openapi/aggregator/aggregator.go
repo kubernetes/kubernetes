@@ -197,7 +197,10 @@ func (s *specAggregator) updateServiceLocked(name string) error {
 		if result.Err != nil {
 			return result
 		}
-		return cached.NewResultOK(aggregator.FilterSpecByPathsWithoutSideEffects(result.Data, []string{"/apis/"}), result.Etag)
+		group := specInfo.apiService.Spec.Group
+		version := specInfo.apiService.Spec.Version
+
+		return cached.NewResultOK(aggregator.FilterSpecByPathsWithoutSideEffects(result.Data, []string{"/apis/" + group + "/" + version + "/"}), result.Etag)
 	}, result)
 	specInfo.spec.Replace(filteredResult)
 	return result.Err
