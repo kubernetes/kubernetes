@@ -224,9 +224,6 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration_To_config_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
 		return err
 	}
-	if err := leaderelectionconfigv1alpha1.Convert_v1alpha1_LeaderElectionControllerConfiguration_To_config_LeaderElectionControllerConfiguration(&in.LeaderElectionController, &out.LeaderElectionController, s); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -321,9 +318,6 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := validatingadmissionpolicystatusconfigv1alpha1.Convert_config_ValidatingAdmissionPolicyStatusControllerConfiguration_To_v1alpha1_ValidatingAdmissionPolicyStatusControllerConfiguration(&in.ValidatingAdmissionPolicyStatusController, &out.ValidatingAdmissionPolicyStatusController, s); err != nil {
-		return err
-	}
-	if err := leaderelectionconfigv1alpha1.Convert_config_LeaderElectionControllerConfiguration_To_v1alpha1_LeaderElectionControllerConfiguration(&in.LeaderElectionController, &out.LeaderElectionController, s); err != nil {
 		return err
 	}
 	return nil
