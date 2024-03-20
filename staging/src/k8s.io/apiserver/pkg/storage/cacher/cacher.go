@@ -522,7 +522,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
 		opts.SendInitialEvents = nil
 	}
-	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
 		return c.storage.Watch(ctx, key, opts)
 	}
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
