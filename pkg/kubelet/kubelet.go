@@ -2030,12 +2030,25 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 
 	kl.probeManager.StopLivenessAndStartup(pod)
 
-	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-	if err := kl.killPod(ctx, pod, p, gracePeriod); err != nil {
+	var podStopped bool
+	var err error
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainerRestartDuringTermination) {
+		p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
+		err = kl.killPod(ctx, pod, p, gracePeriod)
+	} else {
+		podStopped, err = kl.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, kl.getPullSecretsForPod(pod), kl.backOff)
+	}
+	if err != nil {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 		// there was an error killing the pod, so we return that error directly
 		utilruntime.HandleError(err)
 		return err
+	}
+
+	if !podStopped {
+		// If the pod is not yet stopped, we should return an error to signal
+		// that the sync loop should back off.
+		return fmt.Errorf("pod is not yet stopped")
 	}
 
 	// Once the containers are stopped, we can stop probing for liveness and readiness.
@@ -2049,7 +2062,7 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	// catch race conditions introduced by callers updating pod status out of order.
 	// TODO: have KillPod return the terminal status of stopped containers and write that into the
 	//  cache immediately
-	podStatus, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err = kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		klog.ErrorS(err, "Unable to read pod status prior to final pod termination", "pod", klog.KObj(pod), "podUID", pod.UID)
 		return err
