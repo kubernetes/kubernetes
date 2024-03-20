@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	"google.golang.org/grpc/metadata"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -401,10 +402,17 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		// so that future reuse does not get a spurious timeout.
 		<-cacher.timer.C
 	}
+	var contextMetadata metadata.MD
+	if utilfeature.DefaultFeatureGate.Enabled(features.SeparateCacheWatchRPC) {
+		// Add grpc context metadata to watch and progress notify requests done by cacher to:
+		// * Prevent starvation of watch opened by cacher, by moving it to separate Watch RPC than watch request that bypass cacher.
+		// * Ensure that progress notification requests are executed on the same Watch RPC as their watch, which is required for it to work.
+		contextMetadata = metadata.New(map[string]string{"source": "cache"})
+	}
 
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
-	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
 	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
@@ -1311,17 +1319,19 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type cacherListerWatcher struct {
-	storage        storage.Interface
-	resourcePrefix string
-	newListFunc    func() runtime.Object
+	storage         storage.Interface
+	resourcePrefix  string
+	newListFunc     func() runtime.Object
+	contextMetadata metadata.MD
 }
 
 // NewCacherListerWatcher returns a storage.Interface backed ListerWatcher.
-func NewCacherListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object) cache.ListerWatcher {
+func NewCacherListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
 	return &cacherListerWatcher{
-		storage:        storage,
-		resourcePrefix: resourcePrefix,
-		newListFunc:    newListFunc,
+		storage:         storage,
+		resourcePrefix:  resourcePrefix,
+		newListFunc:     newListFunc,
+		contextMetadata: contextMetadata,
 	}
 }
 
@@ -1340,7 +1350,11 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 		Predicate:            pred,
 		Recursive:            true,
 	}
-	if err := lw.storage.GetList(context.TODO(), lw.resourcePrefix, storageOpts, list); err != nil {
+	ctx := context.Background()
+	if lw.contextMetadata != nil {
+		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
+	}
+	if err := lw.storage.GetList(ctx, lw.resourcePrefix, storageOpts, list); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -1354,7 +1368,11 @@ func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interfac
 		Recursive:       true,
 		ProgressNotify:  true,
 	}
-	return lw.storage.Watch(context.TODO(), lw.resourcePrefix, opts)
+	ctx := context.Background()
+	if lw.contextMetadata != nil {
+		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
+	}
+	return lw.storage.Watch(ctx, lw.resourcePrefix, opts)
 }
 
 // errWatcher implements watch.Interface to return a single error

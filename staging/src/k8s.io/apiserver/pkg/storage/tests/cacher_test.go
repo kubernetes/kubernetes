@@ -548,7 +548,7 @@ func TestCacherListerWatcher(t *testing.T) {
 	_ = updatePod(t, store, podBar, nil)
 	_ = updatePod(t, store, podBaz, nil)
 
-	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn)
+	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn, nil)
 
 	obj, err := lw.List(metav1.ListOptions{})
 	if err != nil {
@@ -577,7 +577,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 	_ = updatePod(t, store, podBar, nil)
 	_ = updatePod(t, store, podBaz, nil)
 
-	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn)
+	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn, nil)
 
 	obj1, err := lw.List(metav1.ListOptions{Limit: 2})
 	if err != nil {
