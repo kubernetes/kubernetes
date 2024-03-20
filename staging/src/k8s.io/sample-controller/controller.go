@@ -169,8 +169,6 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 	klog.Info("Running")
 	defer utilruntime.HandleCrash()
 
-	// TODO: Port in identityLease from controllermanager.go
-
 	// Start component identity lease management
 	identityLease := &leaderelection.IdentityLease{
 		LeaseClient:            c.kubeclientset.CoordinationV1().Leases("kube-system"),
