@@ -85,7 +85,6 @@ func (l leaderLeaseId) String() string {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
-	klog.Infof("Running")
 	defer utilruntime.HandleCrash()
 
 	klog.Infof("Start WaitForNamedCacheSync")
@@ -103,7 +102,6 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	}
 
 	<-ctx.Done()
-	klog.Infof("Done Running")
 }
 
 func NewController(leaseInformer coordinationv1.LeaseInformer, leaseClient coordinationv1client.CoordinationV1Interface) (*Controller, error) {
@@ -225,63 +223,78 @@ func (c *Controller) runElectionLoop(stopCh <-chan struct{}) {
 	}
 }
 
+func (c *Controller) reconcileIdentityLease(ctx context.Context, lease *v1.Lease) error {
+	klog.Infof("reconcile found canLead label namespace=%q, name=%q: %q", lease.Namespace, lease.Name, canLead)
+	canLead, _ := lease.Annotations[CanLeadLeasesAnnotationName]
+	for _, leadeLeaseId := range strings.Split(canLead, ",") {
+		leaderLeaseId, err := parseLeaderLeaseId(leadeLeaseId)
+		if err != nil {
+			return err
+		}
+
+		// Check if the lease has a current leader, and if that leader is an ideal leader
+		leader, ok, err := c.activeLeader(ctx, leaderLeaseId)
+		if err != nil {
+			return err
+		}
+		if ok {
+			klog.Infof("finding candidates for lease namespace=%q, name=%q", lease.Namespace, lease.Name)
+			candidates, err := c.listCandidates(leaderLeaseId)
+			if err != nil {
+				return err
+			}
+			if !shouldReelect(candidates, leader) {
+				klog.Infof("shouldReelect returned false")
+				continue
+			}
+		}
+
+		err = c.scheduleElection(leaderLeaseId)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Controller) reconcileComponentLease(ctx context.Context, lease *v1.Lease) error {
+	isExpired := isLeaseExpired(lease)
+	if !isExpired {
+		// If the lease was renewed and not expired, short circuit and return
+		return nil
+	}
+	clone := lease.DeepCopy()
+	if isExpired && lease.Annotations[ElectedByAnnotationName] == controllerName && lease.Spec.HolderIdentity != nil && clone.Spec.RenewTime != nil && clone.Spec.LeaseDurationSeconds != nil && clone.Spec.AcquireTime != nil {
+		delete(clone.Annotations, EndOfTermAnnotationName)
+		clone.ObjectMeta.Annotations[ElectedByAnnotationName] = controllerName
+		clone.Spec.HolderIdentity = nil
+		clone.Spec.RenewTime = nil
+		clone.Spec.LeaseDurationSeconds = nil
+		clone.Spec.AcquireTime = nil
+	}
+	_, err := c.leaseClient.Leases(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+
+	err = c.scheduleElection(leaderLeaseId{namespace: lease.Namespace, name: lease.Name})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 	if lease == nil {
 		return nil
 	}
 	klog.Infof("reconcile for lease namespace=%q, name=%q", lease.Namespace, lease.Name)
 
-	if canLead, ok := lease.Annotations[CanLeadLeasesAnnotationName]; ok {
-		klog.Infof("reconcile found canLead label namespace=%q, name=%q: %q", lease.Namespace, lease.Name, canLead)
-		for _, leadeLeaseId := range strings.Split(canLead, ",") {
-			leaderLeaseId, err := parseLeaderLeaseId(leadeLeaseId)
-			if err != nil {
-				return err
-			}
-
-			// Check if the lease has a current leader, and if that leader is an ideal leader
-			leader, ok, err := c.activeLeader(ctx, leaderLeaseId)
-			if err != nil {
-				return err
-			}
-			if ok {
-				klog.Infof("finding candidates for lease namespace=%q, name=%q", lease.Namespace, lease.Name)
-				candidates, err := c.listCandidates(leaderLeaseId)
-				if err != nil {
-					return err
-				}
-				if !shouldReelect(candidates, leader) {
-					klog.Infof("shouldReelect returned false")
-					continue
-				}
-			}
-
-			err = c.scheduleElection(leaderLeaseId)
-			if err != nil {
-				return err
-			}
-		}
+	if _, ok := lease.Annotations[CanLeadLeasesAnnotationName]; ok {
+		return c.reconcileIdentityLease(ctx, lease)
 	} else {
-		isExpired := isLeaseExpired(lease)
-		clone := lease.DeepCopy()
-		if isExpired && lease.Annotations[ElectedByAnnotationName] == controllerName && lease.Spec.HolderIdentity != nil && clone.Spec.RenewTime != nil && clone.Spec.LeaseDurationSeconds != nil && clone.Spec.AcquireTime != nil {
-			delete(clone.Annotations, EndOfTermAnnotationName)
-			clone.ObjectMeta.Annotations[ElectedByAnnotationName] = controllerName
-			clone.Spec.HolderIdentity = nil
-			clone.Spec.RenewTime = nil
-			clone.Spec.LeaseDurationSeconds = nil
-			clone.Spec.AcquireTime = nil
-		}
-		_, err := c.leaseClient.Leases(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-		err = c.scheduleElection(leaderLeaseId{namespace: lease.Namespace, name: lease.Name})
-		if err != nil {
-			return err
-		}
+		return c.reconcileComponentLease(ctx, lease)
 	}
-	return nil
 }
 
 func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLeaseId) (*v1.Lease, bool, error) {
@@ -379,6 +392,9 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseI
 				}
 			} else if lease.Spec.HolderIdentity != nil && electee.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity != *electee.Spec.HolderIdentity {
 				klog.Infof("lease %q %q already exists for holder %q but should be held by %q, marking end of term", leaderLeaseId.namespace, leaderLeaseId.name, *lease.Spec.HolderIdentity, *electee.Spec.HolderIdentity)
+				if lease.Annotations == nil {
+					lease.Annotations = make(map[string]string)
+				}
 				lease.Annotations[EndOfTermAnnotationName] = "true"
 				_, err = c.leaseClient.Leases(leaderLeaseId.namespace).Update(ctx, lease, metav1.UpdateOptions{})
 				if err != nil {
