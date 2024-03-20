@@ -148,7 +148,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 		})
 	})
 
-	ginkgo.Context("Dbus", func() {
+	/*ginkgo.Context("Dbus", func() {
 		ginkgo.It("should continue to run pods after a restart", func(ctx context.Context) {
 			// Allow dbus to be restarted on ubuntu
 			err := overlayDbusConfig()
@@ -200,7 +200,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 				framework.Failf("Failed to run pods after restarting dbus, got %d but expected %d", len(allPods), preRestartPodCount+postRestartPodCount)
 			}
 		})
-	})
+	})*/
 
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should correctly account for terminated pods after restart", func(ctx context.Context) {

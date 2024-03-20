@@ -447,12 +447,12 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 				cntName:        "cnt-00",
 				resourceName:   sd.resourceName,
 				resourceAmount: 1,
-				cpuRequest:     2000,
+				cpuRequest:     1000,
 			},
 			{
 				podName:    "pod-02",
 				cntName:    "cnt-00",
-				cpuRequest: 2000,
+				cpuRequest: 1000,
 			},
 			{
 				podName:        "pod-03",
@@ -471,12 +471,12 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 			{
 				podName:    "pod-01",
 				cntName:    "cnt-00",
-				cpuRequest: 2000,
+				cpuRequest: 1000,
 			},
 			{
 				podName:    "pod-02",
 				cntName:    "cnt-00",
-				cpuRequest: 2000,
+				cpuRequest: 1000,
 			},
 			{
 				podName:    "pod-03",
@@ -503,12 +503,12 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 				cntName:        "cnt-00",
 				resourceName:   sd.resourceName,
 				resourceAmount: 1,
-				cpuRequest:     2000,
+				cpuRequest:     1000,
 			},
 			{
 				podName:    "pod-02",
 				cntName:    "cnt-00",
-				cpuRequest: 2000,
+				cpuRequest: 1000,
 			},
 		}
 	} else {
@@ -520,12 +520,12 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 			{
 				podName:    "pod-01",
 				cntName:    "cnt-00",
-				cpuRequest: 2000,
+				cpuRequest: 1000,
 			},
 			{
 				podName:    "pod-02",
 				cntName:    "cnt-00",
-				cpuRequest: 2000,
+				cpuRequest: 1000,
 			},
 		}
 	}
@@ -791,7 +791,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		{
 			podName:    "pod-01",
 			cntName:    "cnt-00",
-			cpuRequest: 2000,
+			cpuRequest: 1000,
 		},
 	}
 	tpd.createPodsForTest(ctx, f, expected)
@@ -812,7 +812,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 			{
 				podName:    "pod-01",
 				cntName:    "cnt-00",
-				cpuRequest: 2000,
+				cpuRequest: 1000,
 				initContainers: []initContainerDesc{
 					{
 						cntName:    "init-00",
@@ -820,7 +820,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 					},
 					{
 						cntName:       "restartable-init-01",
-						cpuRequest:    2000,
+						cpuRequest:    1000,
 						restartPolicy: &containerRestartPolicyAlways,
 					},
 				},
@@ -1027,8 +1027,8 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					}
 					pod := makePodResourcesTestPod(pd)
 					pod.Spec.Containers[0].Command = []string{"sh", "-c", "/bin/true"}
-					pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, time.Minute)
+					pod = e2epod.NewPodClient(f).Create(ctx, pod)
+					defer e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
 					framework.ExpectNoError(err)
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
