@@ -40,6 +40,10 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 	var timeCh <-chan time.Time
 	doneCh := ctx.Done()
 
+	if !sliding {
+		timeCh = t.C()
+	}
+
 	// if immediate is true the condition is
 	// guaranteed to be executed at least once,
 	// if we haven't requested immediate execution, delay once
@@ -50,17 +54,27 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 		}(); err != nil || ok {
 			return err
 		}
-	} else {
+	}
+
+	if sliding {
 		timeCh = t.C()
+	}
+
+	for {
+
+		// Wait for either the context to be cancelled or the next invocation be called
 		select {
 		case <-doneCh:
 			return ctx.Err()
 		case <-timeCh:
 		}
-	}
 
-	for {
-		// checking ctx.Err() is slightly faster than checking a select
+		// IMPORTANT: Because there is no channel priority selection in golang
+		// it is possible for very short timers to "win" the race in the previous select
+		// repeatedly even when the context has been canceled.  We therefore must
+		// explicitly check for context cancellation on every loop and exit if true to
+		// guarantee that we don't invoke condition more than once after context has
+		// been cancelled.
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -76,22 +90,6 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 		}
 		if sliding {
 			t.Next()
-		}
-
-		if timeCh == nil {
-			timeCh = t.C()
-		}
-
-		// NOTE: b/c there is no priority selection in golang
-		// it is possible for this to race, meaning we could
-		// trigger t.C and doneCh, and t.C select falls through.
-		// In order to mitigate we re-check doneCh at the beginning
-		// of every loop to guarantee at-most one extra execution
-		// of condition.
-		select {
-		case <-doneCh:
-			return ctx.Err()
-		case <-timeCh:
 		}
 	}
 }
