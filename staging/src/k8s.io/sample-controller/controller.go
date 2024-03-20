@@ -22,17 +22,14 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	restclient "k8s.io/client-go/rest"
@@ -43,7 +40,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/ptr"
 
 	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
@@ -176,23 +172,23 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 	// TODO: Port in identityLease from controllermanager.go
 
 	// Start component identity lease management
-	identityLease := &identityLease{
-		leaseClient:            c.kubeclientset.CoordinationV1().Leases("kube-system"),
-		holderIdentity:         c.identity,
-		leaseName:              c.identity,    // TODO: safely append uids
-		leaseNamespace:         "kube-system", // TODO: put this in kube-system once RBAC is set up for that
-		leaseDurationSeconds:   60,
-		clock:                  clock.RealClock{},
-		canLeadLeasesNamespace: "kube-system",
-		canLeadLeasesName:      "sample-controller",
-		canLeadLeases:          "kube-system/sample-controller", // TODO: wire this in. It must be comma separated namespace/name pairs.
-		renewInterval:          10,
-		binaryVersion:          binaryVersion,
-		compatibilityVersion:   compatibilityVersion,
+	identityLease := &leaderelection.IdentityLease{
+		LeaseClient:            c.kubeclientset.CoordinationV1().Leases("kube-system"),
+		HolderIdentity:         c.identity,
+		LeaseName:              c.identity,    // TODO: safely append uids
+		LeaseNamespace:         "kube-system", // TODO: put this in kube-system once RBAC is set up for that
+		LeaseDurationSeconds:   60,
+		Clock:                  clock.RealClock{},
+		CanLeadLeasesNamespace: "kube-system",
+		CanLeadLeasesName:      "sample-controller",
+		CanLeadLeases:          "kube-system/sample-controller", // TODO: wire this in. It must be comma separated namespace/name pairs.
+		RenewInterval:          10,
+		BinaryVersion:          binaryVersion,
+		CompatibilityVersion:   compatibilityVersion,
 	}
 	// TODO: Wrap this in a Run/sync() loop like lease.controller.Run()/sync()
 	// TODO: Need to fix this in order to trigger re-elections!
-	go identityLease.acquireOrRenewLease(ctx)
+	go identityLease.Run(ctx)
 
 	// TODO: Port in leaderElectAndRun from controllermanager.go
 
@@ -259,9 +255,9 @@ func leaderElectAndRun(ctx context.Context, kubeconfig *restclient.Config, lockI
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:                      rl,
-		LeaseDuration:             60 * time.Second,
-		RenewDeadline:             30 * time.Second,
-		RetryPeriod:               10 * time.Second,
+		LeaseDuration:             20 * time.Second,
+		RenewDeadline:             10 * time.Second,
+		RetryPeriod:               5 * time.Second,
 		Callbacks:                 callbacks,
 		WatchDog:                  electionChecker,
 		Name:                      leaseName,
@@ -269,154 +265,6 @@ func leaderElectAndRun(ctx context.Context, kubeconfig *restclient.Config, lockI
 	})
 
 	panic("unreachable")
-}
-
-type identityLease struct {
-	leaseClient    coordinationv1client.LeaseInterface
-	holderIdentity string
-
-	// identity lease
-	leaseName      string
-	leaseNamespace string
-
-	// controller lease
-	canLeadLeasesNamespace string
-	canLeadLeasesName      string
-	canLeadLeases          string
-
-	leaseDurationSeconds int32
-	renewInterval        time.Duration
-	clock                clock.Clock
-
-	binaryVersion, compatibilityVersion string
-}
-
-func (c *identityLease) acquireOrRenewLease(ctx context.Context) {
-	klog.Infof("Starting identity lease management")
-	sleep := 1 * time.Second
-	for {
-		c.backoffEnsureLease(ctx)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(sleep):
-		}
-	}
-	klog.Infof("Shutting down identity lease management")
-}
-
-// backoffEnsureLease attempts to create the lease if it does not exist,
-// and uses exponentially increasing waits to prevent overloading the API server
-// with retries. Returns the lease, and true if this call created the lease,
-// false otherwise.
-func (c *identityLease) backoffEnsureLease(ctx context.Context) (*v1.Lease, bool) {
-	//klog.Infof("Starting identity lease management")
-	var (
-		lease   *v1.Lease
-		created bool
-		err     error
-	)
-	sleep := 100 * time.Millisecond
-	for {
-		lease, created, err = c.ensureLease(ctx)
-		if err == nil {
-			break
-		}
-		sleep = minDuration(2*sleep, maxBackoff)
-		klog.FromContext(ctx).Error(err, "Failed to ensure identity lease exists, will retry", "interval", sleep)
-		// backoff wait with early return if the context gets canceled
-		select {
-		case <-ctx.Done():
-			return nil, false
-		case <-time.After(sleep):
-		}
-	}
-	//klog.Infof("Shutting down identity lease management")
-	return lease, created
-}
-
-const maxBackoff = 7 * time.Second
-
-func minDuration(a, b time.Duration) time.Duration {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// ensureLease creates the lease if it does not exist and renew it if it exists. Returns the lease and
-// a bool (true if this call created the lease), or any error that occurs.
-func (c *identityLease) ensureLease(ctx context.Context) (*v1.Lease, bool, error) {
-	lease, err := c.leaseClient.Get(ctx, c.leaseName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		klog.Infof("Creating identity lease")
-		// lease does not exist, create it.
-		leaseToCreate, err := c.newLease(nil)
-		// An error occurred during allocating the new lease (likely from newLeasePostProcessFunc).
-		// Given that we weren't able to set the lease correctly, we simply
-		// not create it this time - we will retry in the next iteration.
-		if err != nil {
-			return nil, false, nil
-		}
-		lease, err := c.leaseClient.Create(ctx, leaseToCreate, metav1.CreateOptions{})
-		if err != nil {
-			return nil, false, err
-		}
-		return lease, true, nil
-	} else if err != nil {
-		// unexpected error getting lease
-		return nil, false, err
-	}
-	//klog.Infof("identity lease exists.. renewing")
-	clone := lease.DeepCopy()
-	clone.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
-	lease, err = c.leaseClient.Update(ctx, clone, metav1.UpdateOptions{})
-	if err != nil {
-		return nil, false, err
-	}
-	return lease, false, nil
-}
-
-// newLease constructs a new lease if base is nil, or returns a copy of base
-// with desired state asserted on the copy.
-// Note that an error will block lease CREATE, causing the CREATE to be retried in
-// the next iteration; but the error won't block lease refresh (UPDATE).
-func (c *identityLease) newLease(base *v1.Lease) (*v1.Lease, error) {
-	// Use the bare minimum set of fields; other fields exist for debugging/legacy,
-	// but we don't need to make component heartbeats more complicated by using them.
-	var lease *v1.Lease
-	if base == nil {
-		lease = &v1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      c.leaseName,
-				Namespace: c.leaseNamespace,
-				Labels: map[string]string{
-					"coordination.k8s.io/can-lead-leases-namspace": c.canLeadLeasesNamespace,
-					"coordination.k8s.io/can-lead-leases-name":     c.canLeadLeasesName,
-				},
-				Annotations: map[string]string{
-					// TODO: use constants
-					"coordination.k8s.io/can-lead-leases":       c.canLeadLeases,
-					"coordination.k8s.io/binary-version":        c.binaryVersion,
-					"coordination.k8s.io/compatibility-version": c.compatibilityVersion,
-				},
-			},
-			Spec: v1.LeaseSpec{
-				HolderIdentity:       ptr.To(c.holderIdentity),
-				LeaseDurationSeconds: ptr.To(c.leaseDurationSeconds),
-			},
-		}
-	} else {
-		lease = base.DeepCopy()
-	}
-	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
-
-	//if c.newLeasePostProcessFunc != nil {
-	//	err := c.newLeasePostProcessFunc(lease)
-	//	return lease, err
-	//}
-
-	return lease, nil
 }
 
 // runWorker is a long-running function that will continually call the
