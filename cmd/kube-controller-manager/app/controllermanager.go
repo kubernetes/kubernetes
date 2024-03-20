@@ -22,12 +22,13 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"os"
 	"sort"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/spf13/cobra"
 
@@ -713,9 +714,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
 		}
 	}
-	// TODO: Add feature gate
-	// register(names.LeaderElectionController, startLeaderElectionController)
-
 	return controllers
 }
 
