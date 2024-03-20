@@ -59,6 +59,8 @@ var (
 	}
 	// HNS 13.0 allows for Set Policy support
 	SetPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 13, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+	// HNS 13.0 allows for Modify Policy support (#yet to find the supported version)
+	ModifyPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 11, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 	// HNS 10.3 allows for VXLAN ports
 	VxlanPortVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 10, Minor: 3}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 

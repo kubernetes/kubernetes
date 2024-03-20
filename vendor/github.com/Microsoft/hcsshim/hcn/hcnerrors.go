@@ -18,6 +18,7 @@ var (
 	errInvalidNamespaceID    = errors.New("invalid namespace ID")
 	errInvalidLoadBalancerID = errors.New("invalid load balancer ID")
 	errInvalidRouteID        = errors.New("invalid route ID")
+	errUnsupportedRequest	 = errors.New("The specified request is unsupported.")
 )
 
 func checkForErrors(methodName string, hr error, resultBuffer *uint16) error {
