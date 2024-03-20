@@ -24,9 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
@@ -72,15 +70,4 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	}
 
 	return mpaSet.Has(pluginName)
-}
-
-// volumeLimits returns volume limits associated with the node.
-func volumeLimits(n *framework.NodeInfo) map[v1.ResourceName]int64 {
-	volumeLimits := map[v1.ResourceName]int64{}
-	for k, v := range n.Allocatable.ScalarResources {
-		if v1helper.IsAttachableVolumeResourceName(k) {
-			volumeLimits[k] = v
-		}
-	}
-	return volumeLimits
 }
