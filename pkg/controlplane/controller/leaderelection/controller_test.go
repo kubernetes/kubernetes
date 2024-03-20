@@ -254,7 +254,7 @@ func TestPickLeader(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			leader := pickLeader(tc.candidates)
+			leader := pickBestLeader(tc.candidates)
 			if tc.expectNoLeader == true {
 				if leader != nil {
 					t.Errorf("Expected no leader but got %s", leader.Name)
