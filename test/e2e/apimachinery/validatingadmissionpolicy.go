@@ -205,11 +205,14 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][
 					Expression: "object.spec.replicas",
 				}).
 				WithVariable(admissionregistrationv1beta1.Variable{
-					Name:       "replicasReminder", // a bit artificial but good for testing purpose
-					Expression: "variables.replicas % 2",
+					Name:       "oddReplicas",
+					Expression: "variables.replicas % 2 == 1",
 				}).
 				WithValidation(admissionregistrationv1beta1.Validation{
-					Expression: "variables.replicas > 1 && variables.replicasReminder == 1",
+					Expression: "variables.replicas > 1",
+				}).
+				WithValidation(admissionregistrationv1beta1.Validation{
+					Expression: "variables.oddReplicas",
 				}).
 				Build()
 			policy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})

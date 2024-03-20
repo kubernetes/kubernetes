@@ -69,8 +69,8 @@ func (c *CompositedCompiler) CompileAndStoreVariables(variables []NamedExpressio
 }
 
 func (c *CompositedCompiler) CompileAndStoreVariable(variable NamedExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) CompilationResult {
-	c.CompositionEnv.AddField(variable.GetName())
 	result := c.Compiler.CompileCELExpression(variable, options, mode)
+	c.CompositionEnv.AddField(variable.GetName(), result.OutputType)
 	c.CompositionEnv.CompiledVariables[variable.GetName()] = result
 	return result
 }
@@ -90,8 +90,8 @@ type CompositionEnv struct {
 	CompiledVariables map[string]CompilationResult
 }
 
-func (c *CompositionEnv) AddField(name string) {
-	c.MapType.Fields[name] = apiservercel.NewDeclField(name, apiservercel.DynType, true, nil, nil)
+func (c *CompositionEnv) AddField(name string, celType *cel.Type) {
+	c.MapType.Fields[name] = apiservercel.NewDeclField(name, convertCelTypeToDeclType(celType), true, nil, nil)
 }
 
 func NewCompositionEnv(typeName string, baseEnvSet *environment.EnvSet) (*CompositionEnv, error) {
@@ -195,4 +195,37 @@ func (a *variableAccessor) Callback(_ *lazy.MapValue) ref.Val {
 		return types.NewErr("composited variable %q fails to evaluate: %v", a.name, err)
 	}
 	return v
+}
+
+// convertCelTypeToDeclType converts a cel.Type to DeclType, for the use of
+// the TypeProvider and the cost estimator.
+// List and map types are created on-demand with their parameters converted recursively.
+func convertCelTypeToDeclType(celType *cel.Type) *apiservercel.DeclType {
+	if celType == nil {
+		return apiservercel.DynType
+	}
+	switch celType {
+	case cel.AnyType:
+		return apiservercel.AnyType
+	case cel.BoolType:
+		return apiservercel.BoolType
+	case cel.BytesType:
+		return apiservercel.BytesType
+	case cel.DoubleType:
+		return apiservercel.DoubleType
+	case cel.DurationType:
+		return apiservercel.DurationType
+	case cel.IntType:
+		return apiservercel.IntType
+	case cel.NullType:
+		return apiservercel.NullType
+	case cel.StringType:
+		return apiservercel.StringType
+	case cel.TimestampType:
+		return apiservercel.TimestampType
+	case cel.UintType:
+		return apiservercel.UintType
+	default:
+		return apiservercel.DynType
+	}
 }

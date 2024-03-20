@@ -70,7 +70,7 @@ func TestCompositedPolicies(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			name: "delayed compile error",
+			name: "early compile error",
 			variables: []NamedExpressionAccessor{
 				&testVariable{
 					name:       "name",
@@ -80,20 +80,20 @@ func TestCompositedPolicies(t *testing.T) {
 			attributes:           endpointCreateAttributes(),
 			expression:           "variables.name == 'endpoints1'",
 			expectErr:            true,
-			expectedErrorMessage: `composited variable "name" fails to compile:`,
+			expectedErrorMessage: `found no matching overload for '_==_' applied to '(int, string)'`,
 		},
 		{
 			name: "delayed eval error",
 			variables: []NamedExpressionAccessor{
 				&testVariable{
-					name:       "name",
-					expression: "object.spec.subsets[114514].addresses.size()", // array index out of bound
+					name:       "count",
+					expression: "object.subsets[114514].addresses.size()", // array index out of bound
 				},
 			},
 			attributes:           endpointCreateAttributes(),
-			expression:           "variables.name == 'endpoints1'",
+			expression:           "variables.count == 810",
 			expectErr:            true,
-			expectedErrorMessage: `composited variable "name" fails to evaluate:`,
+			expectedErrorMessage: `composited variable "count" fails to evaluate: index out of bounds: 114514`,
 		},
 		{
 			name: "out of budget during lazy evaluation",
@@ -122,6 +122,42 @@ func TestCompositedPolicies(t *testing.T) {
 			expression:        "variables.name == 'endpoints1' && variables.name == 'endpoints1' ", // cost = 7
 			expectedResult:    true,
 			runtimeCostBudget: 10, // enough for one lazy evaluation but not two, should pass
+		},
+		{
+			name: "single boolean variable in expression",
+			variables: []NamedExpressionAccessor{
+				&testVariable{
+					name:       "fortuneTelling",
+					expression: "true",
+				},
+			},
+			attributes:     endpointCreateAttributes(),
+			expression:     "variables.fortuneTelling",
+			expectedResult: true,
+		},
+		{
+			name: "variable of a list",
+			variables: []NamedExpressionAccessor{
+				&testVariable{
+					name:       "list",
+					expression: "[1, 2, 3, 4]",
+				},
+			},
+			attributes:     endpointCreateAttributes(),
+			expression:     "variables.list.sum() == 10",
+			expectedResult: true,
+		},
+		{
+			name: "variable of a map",
+			variables: []NamedExpressionAccessor{
+				&testVariable{
+					name:       "dict",
+					expression: `{"foo": "bar"}`,
+				},
+			},
+			attributes:     endpointCreateAttributes(),
+			expression:     "variables.dict['foo'].contains('bar')",
+			expectedResult: true,
 		},
 	}
 	for _, tc := range cases {
