@@ -193,7 +193,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 
-	var storageVersionManager storageversion.Manager
+	var storageVersionManager *storageversion.Manager
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		kubeclientset, err := kubernetes.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)

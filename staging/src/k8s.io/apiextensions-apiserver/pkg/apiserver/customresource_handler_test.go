@@ -42,7 +42,6 @@ import (
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
-	"k8s.io/apiextensions-apiserver/pkg/storageversion"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -511,7 +510,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		1,
 		dummyAuthorizerImpl{},
 		time.Minute, time.Minute, nil, 3*1024*1024,
-		storageversion.Manager{})
+		nil)
 	if err != nil {
 		t.Fatal(err)
 	}

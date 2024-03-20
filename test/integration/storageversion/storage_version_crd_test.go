@@ -123,7 +123,7 @@ func TestStorageVersionCustomResource(t *testing.T) {
 		}
 		storageVersion := sv.Status.StorageVersions[0]
 		if len(storageVersion.DecodableVersions) != 2 {
-			lastErr = fmt.Errorf("unexpected number of decodable versions, expected 2 versions, got: %v", sv.Status.StorageVersions)
+			lastErr = fmt.Errorf("unexpected number of decodable versions, expected 2 versions, got: %v", len(sv.Status.StorageVersions))
 			return false, nil
 		}
 		if !reflect.DeepEqual(storageVersion.DecodableVersions, expectedDecodableVersions) {
