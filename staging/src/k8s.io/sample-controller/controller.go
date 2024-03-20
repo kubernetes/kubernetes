@@ -177,16 +177,18 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 
 	// Start component identity lease management
 	identityLease := &identityLease{
-		leaseClient:          c.kubeclientset.CoordinationV1().Leases("kube-system"),
-		holderIdentity:       c.identity,
-		leaseName:            c.identity,    // TODO: safely append uids
-		leaseNamespace:       "kube-system", // TODO: put this in kube-system once RBAC is set up for that
-		leaseDurationSeconds: 10,
-		clock:                clock.RealClock{},
-		canLeadLeases:        "kube-system/sample-controller", // TODO: wire this in. It must be comma separated namespace/name pairs.
-		renewInterval:        5,
-		binaryVersion:        binaryVersion,
-		compatibilityVersion: compatibilityVersion,
+		leaseClient:            c.kubeclientset.CoordinationV1().Leases("kube-system"),
+		holderIdentity:         c.identity,
+		leaseName:              c.identity,    // TODO: safely append uids
+		leaseNamespace:         "kube-system", // TODO: put this in kube-system once RBAC is set up for that
+		leaseDurationSeconds:   60,
+		clock:                  clock.RealClock{},
+		canLeadLeasesNamespace: "kube-system",
+		canLeadLeasesName:      "sample-controller",
+		canLeadLeases:          "kube-system/sample-controller", // TODO: wire this in. It must be comma separated namespace/name pairs.
+		renewInterval:          10,
+		binaryVersion:          binaryVersion,
+		compatibilityVersion:   compatibilityVersion,
 	}
 	// TODO: Wrap this in a Run/sync() loop like lease.controller.Run()/sync()
 	// TODO: Need to fix this in order to trigger re-elections!
@@ -278,7 +280,9 @@ type identityLease struct {
 	leaseNamespace string
 
 	// controller lease
-	canLeadLeases string
+	canLeadLeasesNamespace string
+	canLeadLeasesName      string
+	canLeadLeases          string
 
 	leaseDurationSeconds int32
 	renewInterval        time.Duration
@@ -386,6 +390,10 @@ func (c *identityLease) newLease(base *v1.Lease) (*v1.Lease, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      c.leaseName,
 				Namespace: c.leaseNamespace,
+				Labels: map[string]string{
+					"coordination.k8s.io/can-lead-leases-namspace": c.canLeadLeasesNamespace,
+					"coordination.k8s.io/can-lead-leases-name":     c.canLeadLeasesName,
+				},
 				Annotations: map[string]string{
 					// TODO: use constants
 					"coordination.k8s.io/can-lead-leases":       c.canLeadLeases,
