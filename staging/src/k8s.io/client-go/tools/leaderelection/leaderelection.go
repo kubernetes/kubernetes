@@ -344,16 +344,16 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 		// TODO: We need to skip this create if we want to only do handoffs from the leader election controller
 		// TODO: We should make this configurable via LeaderElectionConfig
 
-		//if err = le.config.Lock.Create(ctx, leaderElectionRecord); err != nil {
+		// if err = le.config.Lock.Create(ctx, leaderElectionRecord); err != nil {
 		//	klog.Errorf("error initially creating leader election record: %v", err)
 		//	return false
-		//}
+		// }
 
-		//klog.Info("lease lock not found: %v", le.config.Lock.Describe())
+		// klog.Info("lease lock not found: %v", le.config.Lock.Describe())
 		return true
 	}
 
-	//klog.Info("lease lock found: %v", le.config.Lock.Describe())
+	// klog.Info("lease lock found: %v", le.config.Lock.Describe())
 	// 3. Record obtained, check the Identity & Time
 	if !bytes.Equal(le.observedRawRecord, oldLeaderElectionRawRecord) {
 		le.setObservedRecord(oldLeaderElectionRecord)
@@ -363,20 +363,20 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 	hasNotExpired := le.observedTime.Add(time.Second * time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).After(now.Time)
 
 	if !hasNotExpired { // TODO: switch to hasExpired
-		//klog.Infof("lock has expired: %v", le.config.Lock.Describe())
+		// klog.Infof("lock has expired: %v", le.config.Lock.Describe())
 		return false
 	}
 
 	if !le.IsLeader() {
-		//klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
-		//klog.Infof("lock is held by %v and has not yet expired: %v", oldLeaderElectionRecord.HolderIdentity, le.config.Lock.Describe())
+		// klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
+		// klog.Infof("lock is held by %v and has not yet expired: %v", oldLeaderElectionRecord.HolderIdentity, le.config.Lock.Describe())
 		return false
 	}
 
 	// 2b. If the lease has been marked as "end of term", don't renew it
 	if le.IsLeader() && oldLeaderElectionRecord.EndOfTerm {
-		//klog.V(4).Infof("lock is marked as 'end of term', yielding lease ownership")
-		//klog.Infof("lock is marked as 'end of term': %v", le.config.Lock.Describe())
+		// klog.V(4).Infof("lock is marked as 'end of term', yielding lease ownership")
+		// klog.Infof("lock is marked as 'end of term': %v", le.config.Lock.Describe())
 		// TODO: Instead of letting lease expire, the holder may deleted it directly
 		// This will not be compatible with all controllers, so it needs to be opt-in behavior..
 		// Usually once this returns false, the process is terminated..

@@ -344,12 +344,12 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseI
 		return err
 	}
 
-	electee := pickLeader(candidates)
+	electee := pickBestLeader(candidates)
 	if electee == nil {
 		return nil
 	}
 
-	klog.Infof("pickLeader found %q %q", electee.Namespace, electee.Name)
+	klog.Infof("pickBestLeader found %q %q", electee.Namespace, electee.Name)
 
 	klog.Infof("Creating lease %q %q for %q", leaderLeaseId.namespace, leaderLeaseId.name, electee.Spec.HolderIdentity)
 	// create the leader election lease
@@ -416,7 +416,7 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseI
 	return nil
 }
 
-func pickLeader(candidates []*v1.Lease) *v1.Lease {
+func pickBestLeader(candidates []*v1.Lease) *v1.Lease {
 	var electee *v1.Lease
 	for _, c := range candidates {
 		if electee == nil || compare(electee, c) > 0 {
@@ -424,16 +424,16 @@ func pickLeader(candidates []*v1.Lease) *v1.Lease {
 		}
 	}
 	if electee == nil {
-		klog.Infof("pickLeader: none found")
+		klog.Infof("pickBestLeader: none found")
 	} else {
-		klog.Infof("pickLeader: %s %s", electee.Namespace, electee.Name)
+		klog.Infof("pickBestLeader: %s %s", electee.Namespace, electee.Name)
 	}
 	return electee
 }
 
 func shouldReelect(candidates []*v1.Lease, currentLeader *v1.Lease) bool {
 	klog.Infof("shouldReelect for candidates: %+v", candidates)
-	pickedLeader := pickLeader(candidates)
+	pickedLeader := pickBestLeader(candidates)
 	if pickedLeader == nil {
 		return false
 	}
