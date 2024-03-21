@@ -331,10 +331,10 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	var options []string
+	options := []string{"noswap"}
 	// Linux system default is 50% of capacity.
 	if ed.sizeLimit != nil && ed.sizeLimit.Value() > 0 {
-		options = []string{fmt.Sprintf("size=%d", ed.sizeLimit.Value())}
+		options = append(options, fmt.Sprintf("size=%d", ed.sizeLimit.Value()))
 	}
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
