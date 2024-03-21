@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestCompare(t *testing.T) {
@@ -372,14 +372,14 @@ func TestShouldReelect(t *testing.T) {
 func TestController(t *testing.T) {
 	cases := []struct {
 		name                       string
-		leaderLeaseId              leaderLeaseId
+		leaderLeaseID              leaderLeaseID
 		createAfterControllerStart []*v1.Lease
-		deleteAfterControllerStart []leaderLeaseId
+		deleteAfterControllerStart []leaderLeaseID
 		expectedLeaderLeases       []*v1.Lease
 	}{
 		{
 			name:          "single candidate leader election",
-			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
 			createAfterControllerStart: []*v1.Lease{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -392,7 +392,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-1"),
+						HolderIdentity: ptr.To("component-identity-1"),
 					},
 				},
 			},
@@ -406,14 +406,14 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-1"),
+						HolderIdentity: ptr.To("component-identity-1"),
 					},
 				},
 			},
 		},
 		{
 			name:          "multiple candidate leader election",
-			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
 			createAfterControllerStart: []*v1.Lease{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -426,7 +426,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-1"),
+						HolderIdentity: ptr.To("component-identity-1"),
 					},
 				},
 				{
@@ -440,7 +440,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-2"),
+						HolderIdentity: ptr.To("component-identity-2"),
 					},
 				},
 				{
@@ -454,7 +454,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-3"),
+						HolderIdentity: ptr.To("component-identity-3"),
 					},
 				},
 			},
@@ -468,14 +468,14 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-3"),
+						HolderIdentity: ptr.To("component-identity-3"),
 					},
 				},
 			},
 		},
 		{
 			name:          "deletion of lease triggers reelection",
-			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
 			createAfterControllerStart: []*v1.Lease{
 				{
 					// Leader lease
@@ -487,7 +487,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-9"),
+						HolderIdentity: ptr.To("component-identity-9"),
 					},
 				},
 				{
@@ -501,11 +501,11 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-1"),
+						HolderIdentity: ptr.To("component-identity-1"),
 					},
 				},
 			},
-			deleteAfterControllerStart: []leaderLeaseId{
+			deleteAfterControllerStart: []leaderLeaseID{
 				{namespace: "kube-system", name: "component-A"},
 			},
 			expectedLeaderLeases: []*v1.Lease{
@@ -518,14 +518,14 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-1"),
+						HolderIdentity: ptr.To("component-identity-1"),
 					},
 				},
 			},
 		},
 		{
 			name:          "better candidate triggers reelection",
-			leaderLeaseId: leaderLeaseId{namespace: "kube-system", name: "component-A"},
+			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
 			createAfterControllerStart: []*v1.Lease{
 				{
 					// Leader lease
@@ -537,7 +537,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-1"),
+						HolderIdentity: ptr.To("component-identity-1"),
 					},
 				},
 				{
@@ -551,7 +551,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-1"),
+						HolderIdentity: ptr.To("component-identity-1"),
 					},
 				},
 				{
@@ -565,7 +565,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-2"),
+						HolderIdentity: ptr.To("component-identity-2"),
 					},
 				},
 			},
@@ -579,7 +579,7 @@ func TestController(t *testing.T) {
 						},
 					},
 					Spec: v1.LeaseSpec{
-						HolderIdentity: pointer.String("component-identity-2"),
+						HolderIdentity: ptr.To("component-identity-2"),
 					},
 				},
 			},
@@ -591,7 +591,7 @@ func TestController(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 
-			//client := fake.NewSimpleClientset(tc.createAfterControllerStart...)
+			// client := fake.NewSimpleClientset(tc.createAfterControllerStart...)
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			controller, err := NewController(

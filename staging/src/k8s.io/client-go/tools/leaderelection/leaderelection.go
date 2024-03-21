@@ -294,7 +294,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 			return
 		}
 		le.metrics.leaderOff(le.config.Name)
-		//klog.Infof("failed to renew lease %v: %v", desc, err)
+		// klog.Infof("failed to renew lease %v: %v", desc, err)
 		cancel()
 	}, le.config.RetryPeriod, ctx.Done())
 
