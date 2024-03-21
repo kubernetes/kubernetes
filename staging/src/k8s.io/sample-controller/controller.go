@@ -179,7 +179,7 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 		Clock:                  clock.RealClock{},
 		CanLeadLeasesNamespace: "kube-system",
 		CanLeadLeasesName:      "foo",
-		CanLeadLeases:          "kube-system/kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
+		CanLeadLeases:          "kube-system/sample-controller", // TODO: wire this in. It must be comma separated namespace/name pairs.
 		RenewInterval:          10,
 		BinaryVersion:          binaryVersion,
 		CompatibilityVersion:   compatibilityVersion,
@@ -220,7 +220,7 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 	go leaderElectAndRun(ctx, c.kubeconfig, c.identity, electionChecker,
 		"kube-system",
 		"coordinatedLeases",
-		"kube-controller-manager",
+		"sample-controller",
 		leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				klog.Info("Elected leader, starting..")

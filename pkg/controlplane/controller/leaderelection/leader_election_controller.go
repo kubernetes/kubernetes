@@ -292,9 +292,10 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 
 	if _, ok := lease.Annotations[CanLeadLeasesAnnotationName]; ok {
 		return c.reconcileIdentityLease(ctx, lease)
-	} else {
+	} else if lease.Annotations[ElectedByAnnotationName] == controllerName {
 		return c.reconcileComponentLease(ctx, lease)
 	}
+	return nil
 }
 
 func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLeaseId) (*v1.Lease, bool, error) {
