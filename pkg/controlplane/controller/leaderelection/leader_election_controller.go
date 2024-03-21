@@ -402,7 +402,7 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseI
 					return err
 				}
 
-				// Hack: force reconcilation
+				// Hack: force reconciliation
 				key, err := controller.KeyFunc(lease)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("cannot get name of object %v: %w", lease, err))

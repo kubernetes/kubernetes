@@ -108,6 +108,13 @@ const (
 	// Enables expression validation in Admission Control
 	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
 
+	// owner: @jefftree
+	// kep: https://kep.k8s.io/4355
+	// alpha: v1.31
+	//
+	// Enables coordinated leader election in the API server
+	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
+
 	// owner: @cici37
 	// kep: https://kep.k8s.io/2876
 	// alpha: v1.23
@@ -116,13 +123,6 @@ const (
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
-
-	// owner: @jefftree
-	// kep: https://kep.k8s.io/4355
-	// alpha: v1.31
-	//
-	// Enables coordinated leader election in the API server
-	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
 
 	// alpha: v1.20
 	// beta: v1.21
@@ -322,9 +322,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
 	CoordinatedLeaderElection: {Default: true, PreRelease: featuregate.Alpha},
+
+	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
