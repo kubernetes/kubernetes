@@ -215,8 +215,8 @@ func (c *Controller) runElectionLoop(stopCh <-chan struct{}) {
 			select {
 			case <-stopCh:
 				return
-			// TODO: Isn't this always true? Is this to counteract time drift?
-			case <-time.Until(e.electionStart): // elections are time ordered in the channel
+			// TODO; Isn't this always true? Is this for dealing with time drift?
+			case <-time.After(time.Until(e.electionStart)): // elections are time ordered in the channel
 				err := c.runElection(ctx, e.leaderLeaseID)
 				utilruntime.HandleError(err)
 			}
