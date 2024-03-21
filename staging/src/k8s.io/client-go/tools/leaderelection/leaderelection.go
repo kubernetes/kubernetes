@@ -252,14 +252,19 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	desc := le.config.Lock.Describe()
 	klog.Infof("attempting to acquire leader lease %v...", desc)
 	wait.JitterUntil(func() {
-		succeeded = le.tryAcquireOrRenew(ctx)
+		if !le.config.CoordinatedLeaderElection {
+			succeeded = le.tryAcquireOrRenew(ctx)
+		} else {
+			succeeded = le.tryCoordinatedRenew(ctx)
+		}
 		le.maybeReportTransition()
 		if !succeeded {
 			klog.V(4).Infof("failed to acquire lease %v", desc)
 			return
 		}
-		//le.config.Lock.RecordEvent("became leader")
-		//le.metrics.leaderOn(le.config.Name)
+		// For coordinated leader election the two lines below should probably be within the leader election controller instead
+		le.config.Lock.RecordEvent("became leader")
+		le.metrics.leaderOn(le.config.Name)
 		klog.Infof("successfully acquired lease %v", desc)
 		cancel()
 	}, le.config.RetryPeriod, JitterFactor, true, ctx.Done())

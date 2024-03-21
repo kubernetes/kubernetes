@@ -224,8 +224,8 @@ func (c *Controller) runElectionLoop(stopCh <-chan struct{}) {
 }
 
 func (c *Controller) reconcileIdentityLease(ctx context.Context, lease *v1.Lease) error {
-	klog.Infof("reconcile found canLead label namespace=%q, name=%q: %q", lease.Namespace, lease.Name, canLead)
 	canLead, _ := lease.Annotations[CanLeadLeasesAnnotationName]
+	klog.Infof("reconcile found canLead label namespace=%q, name=%q: %q", lease.Namespace, lease.Name, canLead)
 	for _, leadeLeaseId := range strings.Split(canLead, ",") {
 		leaderLeaseId, err := parseLeaderLeaseId(leadeLeaseId)
 		if err != nil {
@@ -259,10 +259,10 @@ func (c *Controller) reconcileIdentityLease(ctx context.Context, lease *v1.Lease
 
 func (c *Controller) reconcileComponentLease(ctx context.Context, lease *v1.Lease) error {
 	isExpired := isLeaseExpired(lease)
-	if !isExpired {
-		// If the lease was renewed and not expired, short circuit and return
-		return nil
-	}
+	// if !isExpired {
+	// If the lease was renewed and not expired, short circuit and return
+	// return nil
+	// }
 	clone := lease.DeepCopy()
 	if isExpired && lease.Annotations[ElectedByAnnotationName] == controllerName && lease.Spec.HolderIdentity != nil && clone.Spec.RenewTime != nil && clone.Spec.LeaseDurationSeconds != nil && clone.Spec.AcquireTime != nil {
 		delete(clone.Annotations, EndOfTermAnnotationName)
@@ -298,7 +298,6 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 }
 
 func (c *Controller) activeLeader(ctx context.Context, leaderLeaseId leaderLeaseId) (*v1.Lease, bool, error) {
-	klog.Infof("activeLeader checking for lease namespace=%q, name=%q", leaderLeaseId.namespace, leaderLeaseId.name)
 	leaderLease, err := c.leaseInformer.Lister().Leases(leaderLeaseId.namespace).Get(leaderLeaseId.name)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
@@ -351,7 +350,8 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseId leaderLeaseI
 
 	klog.Infof("pickBestLeader found %q %q", electee.Namespace, electee.Name)
 
-	klog.Infof("Creating lease %q %q for %q", leaderLeaseId.namespace, leaderLeaseId.name, electee.Spec.HolderIdentity)
+	// TODO: Is taking the pointer safe
+	klog.Infof("Creating lease %q %q for %q", leaderLeaseId.namespace, leaderLeaseId.name, *electee.Spec.HolderIdentity)
 	// create the leader election lease
 	leaderLease := &v1.Lease{
 		// TODO: fill out all lease fields
@@ -437,6 +437,8 @@ func shouldReelect(candidates []*v1.Lease, currentLeader *v1.Lease) bool {
 	if pickedLeader == nil {
 		return false
 	}
+	fmt.Println(pickedLeader.Annotations)
+	fmt.Println(currentLeader.Annotations)
 	return compare(currentLeader, pickedLeader) > 0
 }
 

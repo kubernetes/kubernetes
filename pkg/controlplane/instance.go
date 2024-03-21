@@ -593,15 +593,17 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-coordinated-leader-election-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		ctx := wait.ContextForChannel(hookContext.StopCh)
-		le, err := leaderelection.NewController(c.ExtraConfig.VersionedInformers.Coordination().V1().Leases(), clientset.CoordinationV1())
-		if err != nil {
-			runtime.HandleError(err)
-		}
-		go le.Run(ctx, 1)
-		return nil
-	})
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
+		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-coordinated-leader-election-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			ctx := wait.ContextForChannel(hookContext.StopCh)
+			le, err := leaderelection.NewController(c.ExtraConfig.VersionedInformers.Coordination().V1().Leases(), clientset.CoordinationV1())
+			if err != nil {
+				runtime.HandleError(err)
+			}
+			go le.Run(ctx, 1)
+			return nil
+		})
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {

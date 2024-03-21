@@ -135,6 +135,13 @@ const (
 	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
+	// owner: @jefftree
+	// kep: https://kep.k8s.io/4355
+	// alpha: v1.31
+	//
+	// Enables coordinated leader election in the API server
+	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
+
 	// owner: @mfordjody
 	// alpha: v1.26
 	//

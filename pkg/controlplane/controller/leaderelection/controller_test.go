@@ -285,7 +285,7 @@ func TestShouldReelect(t *testing.T) {
 						Name: "component-identity-1",
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.19",
-							BinaryVersionAnnotationName:        "1.20",
+							BinaryVersionAnnotationName:        "1.19",
 						},
 					},
 				},
@@ -294,7 +294,7 @@ func TestShouldReelect(t *testing.T) {
 						Name: "component-identity-2",
 						Annotations: map[string]string{
 							CompatibilityVersionAnnotationName: "1.19",
-							BinaryVersionAnnotationName:        "1.19",
+							BinaryVersionAnnotationName:        "1.20",
 						},
 					},
 				},
@@ -308,7 +308,7 @@ func TestShouldReelect(t *testing.T) {
 					},
 				},
 			},
-			expectResult: true,
+			expectResult: false,
 		},
 		{
 			name: "no newer candidates",
