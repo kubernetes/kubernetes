@@ -224,11 +224,10 @@ func (c *Controller) runElectionLoop(stopCh <-chan struct{}) {
 	}
 }
 
-func (c *Controller) reconcileIdentityLease(ctx context.Context, lease *v1.Lease) error {
-	canLead, _ := lease.Annotations[CanLeadLeasesAnnotationName]
+func (c *Controller) reconcileIdentityLease(ctx context.Context, lease *v1.Lease, canLead string) error {
 	klog.Infof("reconcile found canLead label namespace=%q, name=%q: %q", lease.Namespace, lease.Name, canLead)
-	for _, leadeLeaseId := range strings.Split(canLead, ",") {
-		leaderLeaseID, err := parseLeaderLeaseID(leadeLeaseId)
+	for _, leaderLeaseID := range strings.Split(canLead, ",") {
+		leaderLeaseID, err := parseLeaderLeaseID(leaderLeaseID)
 		if err != nil {
 			return err
 		}
@@ -291,8 +290,8 @@ func (c *Controller) reconcile(ctx context.Context, lease *v1.Lease) error {
 	}
 	klog.Infof("reconcile for lease namespace=%q, name=%q", lease.Namespace, lease.Name)
 
-	if _, ok := lease.Annotations[CanLeadLeasesAnnotationName]; ok {
-		return c.reconcileIdentityLease(ctx, lease)
+	if canLead, ok := lease.Annotations[CanLeadLeasesAnnotationName]; ok {
+		return c.reconcileIdentityLease(ctx, lease, canLead)
 	} else if lease.Annotations[ElectedByAnnotationName] == controllerName {
 		return c.reconcileComponentLease(ctx, lease)
 	}
