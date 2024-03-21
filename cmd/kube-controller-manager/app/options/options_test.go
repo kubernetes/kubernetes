@@ -115,8 +115,6 @@ var args = []string{
 	"--enable-hostpath-provisioner=true",
 	"--cluster-signing-duration=10h",
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
-	"--volume-host-cidr-denylist=127.0.0.1/28,feed::/16",
-	"--volume-host-allow-local-loopback=false",
 	"--horizontal-pod-autoscaler-sync-period=45s",
 	"--horizontal-pod-autoscaler-downscale-stabilization=3m",
 	"--horizontal-pod-autoscaler-cpu-initialization-period=90s",
@@ -368,8 +366,6 @@ func TestAddFlags(t *testing.T) {
 						IncrementTimeoutHostPath: 45,
 					},
 				},
-				VolumeHostCIDRDenylist:       []string{"127.0.0.1/28", "feed::/16"},
-				VolumeHostAllowLocalLoopback: false,
 			},
 		},
 		PodGCController: &PodGCControllerOptions{
@@ -617,8 +613,6 @@ func TestApplyTo(t *testing.T) {
 						IncrementTimeoutHostPath: 45,
 					},
 				},
-				VolumeHostCIDRDenylist:       []string{"127.0.0.1/28", "feed::/16"},
-				VolumeHostAllowLocalLoopback: false,
 			},
 			PodGCController: podgcconfig.PodGCControllerConfiguration{
 				TerminatedPodGCThreshold: 12000,
