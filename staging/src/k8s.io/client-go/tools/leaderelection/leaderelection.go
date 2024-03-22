@@ -263,8 +263,10 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 			return
 		}
 		// For coordinated leader election the two lines below should probably be within the leader election controller instead
-		le.config.Lock.RecordEvent("became leader")
-		le.metrics.leaderOn(le.config.Name)
+		if !le.config.CoordinatedLeaderElection {
+			le.config.Lock.RecordEvent("became leader")
+			le.metrics.leaderOn(le.config.Name)
+		}
 		klog.Infof("successfully acquired lease %v", desc)
 		cancel()
 	}, le.config.RetryPeriod, JitterFactor, true, ctx.Done())
