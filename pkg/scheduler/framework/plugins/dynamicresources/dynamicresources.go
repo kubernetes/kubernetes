@@ -1209,7 +1209,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			// Then we can simply clear the allocation. Once the
 			// claim informer catches up, the controllers will
 			// be notified about this change.
-			clearAllocation := state.informationsForClaim[index].controller != nil
+			clearAllocation := state.informationsForClaim[index].structuredParameters
 
 			// Before we tell a driver to deallocate a claim, we
 			// have to stop telling it to allocate. Otherwise,
@@ -1228,6 +1228,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim := claim.DeepCopy()
 			claim.Status.ReservedFor = nil
 			if clearAllocation {
+				claim.Status.DriverName = ""
 				claim.Status.Allocation = nil
 			} else {
 				claim.Status.DeallocationRequested = true
