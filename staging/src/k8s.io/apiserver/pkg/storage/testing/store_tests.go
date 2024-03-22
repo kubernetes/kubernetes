@@ -1822,6 +1822,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
+	// FIXME: We know that watchcache doesn't honor it with RV=0, should be fixed.
 	if len(out.Continue) == 0 {
 		t.Errorf("No continuation token set")
 	}
