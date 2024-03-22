@@ -1631,7 +1631,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		}
 	}
 	options := storage.ListOptions{
-		ResourceVersion: "0",
+		ResourceVersion: "",
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
@@ -1654,7 +1654,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	// no limit, should get two items
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		ResourceVersion: out.ResourceVersion,
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
@@ -1815,7 +1815,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		}
 	}
 	options := storage.ListOptions{
-		ResourceVersion: "0",
+		ResourceVersion: "",
 		Predicate:       pred(2, ""),
 		Recursive:       true,
 	}
@@ -1845,7 +1845,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	// both read counters should be incremented for the singular calls they make in this case
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		ResourceVersion: out.ResourceVersion,
 		Predicate:       pred(2, cont),
 		Recursive:       true,
 	}
