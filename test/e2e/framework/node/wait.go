@@ -160,6 +160,27 @@ func WaitForNodeSchedulable(ctx context.Context, c clientset.Interface, name str
 	return false
 }
 
+// WaitForNodeHeartbeatAfter waits up to timeout for node to send the next
+// heartbeat after the given timestamp.
+//
+// To ensure the node status is posted by a restarted kubelet process,
+// after should be retrieved by [GetNodeHeartbeatTime] while the kubelet is down.
+func WaitForNodeHeartbeatAfter(ctx context.Context, c clientset.Interface, name string, after metav1.Time, timeout time.Duration) bool {
+	framework.Logf("Waiting up to %v for node %s to send a heartbeat after %v", timeout, name, after)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Couldn't get node %s", name)
+			continue
+		}
+		if GetNodeHeartbeatTime(node).After(after.Time) {
+			return true
+		}
+	}
+	framework.Logf("Node %s didn't send a heartbeat after %v within %v", name, after, timeout)
+	return false
+}
+
 // CheckReady waits up to timeout for cluster to has desired size and
 // there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func CheckReady(ctx context.Context, c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
