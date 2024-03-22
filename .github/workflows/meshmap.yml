@@ -1,0 +1,47 @@
+name: MeshMap Screenshot Service
+'on':
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_call:
+    inputs:
+      fileName:
+        description: Relative file path from the root directory
+        required: true
+        type: string
+    outputs:
+      resource_url:
+        description: The URL of the generated resource.
+        value: ${{ jobs.MeshMapScreenshot.outputs.resource_url }}
+permissions:
+  actions: read
+  contents: write
+  security-events: write
+  statuses: write
+  pull-requests: write
+  id-token: write
+jobs:
+  MeshMapScreenshot:
+    runs-on: ubuntu-latest
+    outputs:
+      resource_url: ${{ steps.test_result.outputs.resource_url }}
+    steps:
+      - name: Set PR number
+        run: |
+          export pull_number=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
+          echo "PULL_NO=$pull_number" >> $GITHUB_ENV
+      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+        with:
+          path: action
+          repository: layer5labs/meshmap-snapshot
+      - id: test_result
+        uses: ${GITHUB_REF/refs/tags//}
+        with:
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          providerToken: ${{ secrets.PROVIDER_TOKEN }}
+          prNumber: ${{ env.PULL_NO }}
+          application_type: Kubernetes Manifest
+          filePath: ${{ inputs.fileName == '' && 'Kubernetes ' || inputs.fileName }}
