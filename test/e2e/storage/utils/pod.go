@@ -24,7 +24,6 @@ import (
 	"path"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -99,74 +98,52 @@ func StartPodLogs(ctx context.Context, f *framework.Framework, driverNamespace *
 
 // KubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod and waits
 // for the desired statues..
-// - First issues the command via `systemctl`
-// - If `systemctl` returns stderr "command not found, issues the command via `service`
-// - If `service` also returns stderr "command not found", the test is aborted.
 // Allowed kubeletOps are `KStart`, `KStop`, and `KRestart`
 func KubeletCommand(ctx context.Context, kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
-	command := ""
-	systemctlPresent := false
-	kubeletPid := ""
-
 	nodeIP, err := getHostAddress(ctx, c, pod)
 	framework.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
 
-	framework.Logf("Checking if systemctl command is present")
-	sshResult, err := e2essh.SSH(ctx, "systemctl --version", nodeIP, framework.TestContext.Provider)
-	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
-	if !strings.Contains(sshResult.Stderr, "command not found") {
-		command = fmt.Sprintf("systemctl %s kubelet", string(kOp))
-		systemctlPresent = true
-	} else {
-		command = fmt.Sprintf("service kubelet %s", string(kOp))
-	}
-
+	commandTemplate := "systemctl %s kubelet"
 	sudoPresent := isSudoPresent(ctx, nodeIP, framework.TestContext.Provider)
 	if sudoPresent {
-		command = fmt.Sprintf("sudo %s", command)
+		commandTemplate = "sudo " + commandTemplate
 	}
 
-	if kOp == KRestart {
-		kubeletPid = getKubeletMainPid(ctx, nodeIP, sudoPresent, systemctlPresent)
+	runCmd := func(cmd string) {
+		command := fmt.Sprintf(commandTemplate, cmd)
+		framework.Logf("Attempting `%s`", command)
+		sshResult, err := e2essh.SSH(ctx, command, nodeIP, framework.TestContext.Provider)
+		framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
+		e2essh.LogResult(sshResult)
+		gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to [%s] kubelet:\n%#v", cmd, sshResult)
 	}
 
-	framework.Logf("Attempting `%s`", command)
-	sshResult, err = e2essh.SSH(ctx, command, nodeIP, framework.TestContext.Provider)
-	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
-	e2essh.LogResult(sshResult)
-	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
-
+	if kOp == KStop || kOp == KRestart {
+		runCmd("stop")
+	}
 	if kOp == KStop {
-		if ok := e2enode.WaitForNodeToBeNotReady(ctx, c, pod.Spec.NodeName, NodeStateTimeout); !ok {
-			framework.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
-		}
+		return
 	}
-	if kOp == KRestart {
-		// Wait for a minute to check if kubelet Pid is getting changed
-		isPidChanged := false
-		for start := time.Now(); time.Since(start) < 1*time.Minute; time.Sleep(2 * time.Second) {
-			if ctx.Err() != nil {
-				framework.Fail("timed out waiting for Kubelet POD change")
-			}
-			kubeletPidAfterRestart := getKubeletMainPid(ctx, nodeIP, sudoPresent, systemctlPresent)
-			if kubeletPid != kubeletPidAfterRestart {
-				isPidChanged = true
-				break
-			}
-		}
-		if !isPidChanged {
-			framework.Fail("Kubelet PID remained unchanged after restarting Kubelet")
-		}
 
-		framework.Logf("Noticed that kubelet PID is changed. Waiting for 30 Seconds for Kubelet to come back")
-		time.Sleep(30 * time.Second)
+	if kOp == KStart && getKubeletRunning(ctx, nodeIP) {
+		framework.Logf("Kubelet is already running on node %q", pod.Spec.NodeName)
+		// Just skip. Or we cannot get a new heartbeat in time.
+		return
 	}
-	if kOp == KStart || kOp == KRestart {
-		// For kubelet start and restart operations, Wait until Node becomes Ready
-		if ok := e2enode.WaitForNodeToBeReady(ctx, c, pod.Spec.NodeName, NodeStateTimeout); !ok {
-			framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
-		}
+
+	node, err := c.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	heartbeatTime := e2enode.GetNodeHeartbeatTime(node)
+
+	runCmd("start")
+	// Wait for next heartbeat, which must be sent by the new kubelet process.
+	if ok := e2enode.WaitForNodeHeartbeatAfter(ctx, c, pod.Spec.NodeName, heartbeatTime, NodeStateTimeout); !ok {
+		framework.Failf("Node %s failed to send a heartbeat after %v", pod.Spec.NodeName, heartbeatTime)
+	}
+	// Then wait until Node with new process becomes Ready.
+	if ok := e2enode.WaitForNodeToBeReady(ctx, c, pod.Spec.NodeName, NodeStateTimeout); !ok {
+		framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
 	}
 }
 
