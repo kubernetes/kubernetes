@@ -30,6 +30,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -422,6 +424,13 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 func isContainerRunning(ctx context.Context, logger *klog.Logger, id string, r internalapi.RuntimeService) (bool, error) {
 	resp, err := r.ContainerStatus(ctx, id, false)
 	if err != nil {
+		// Assume that the container is still running when the runtime is
+		// unavailable. Most runtimes support that containers can be in running
+		// state even if their CRI server is not available right now.
+		if status.Code(err) == codes.Unavailable {
+			return true, nil
+		}
+
 		return false, err
 	}
 	status := resp.GetStatus()
