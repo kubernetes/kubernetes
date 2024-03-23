@@ -58,7 +58,7 @@ make quick-release
 
 For the full story, head over to the [developer's documentation].
 
-## Support
+## Support / Guide
 
 If you need support, start with the [troubleshooting guide],
 and work your way through the process that we've outlined.
