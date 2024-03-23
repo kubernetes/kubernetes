@@ -138,11 +138,10 @@ func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, 
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		if err != nil {
-			klog.Errorf("retry %d, failed to update storage version for %v: %v", retry, gr, err)
-			retry++
-			time.Sleep(1 * time.Second)
-		}
+		klog.Errorf("retry %d, failed to update storage version for %v: %v", retry, gr, err)
+		retry++
+		time.Sleep(1 * time.Second)
+
 	}
 	return err
 }

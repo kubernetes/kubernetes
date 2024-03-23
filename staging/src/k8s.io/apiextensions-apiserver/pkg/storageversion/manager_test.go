@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +40,6 @@ const (
 
 func TestEnqueue(t *testing.T) {
 	fooCRD := testCRD("foo", "1")
-	manager := fakeManager(t)
 
 	testcases := map[string]struct {
 		resourceversion string
@@ -58,6 +58,11 @@ func TestEnqueue(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
+		StorageVersionUpdateTimeout = 2 * time.Second
+		stopCh := make(chan struct{})
+		manager := fakeManager(t)
+		defer manager.Shutdown(stopCh)
+
 		if tc.resourceversion != "" {
 			fooCRD.ObjectMeta.ResourceVersion = tc.resourceversion
 		}
@@ -71,12 +76,13 @@ func TestEnqueue(t *testing.T) {
 		if diff := cmp.Diff(gotSVUpdateInfo.crd, tc.wantMapEntry); diff != "" {
 			t.Errorf("unexpected storageversion updated info (-want, +got):\n%s", diff)
 		}
+		// signal manager to shutdown
+		close(stopCh)
 	}
 }
 
 func TestWaitForStorageVersionUpdate(t *testing.T) {
 	fooCRD := testCRD("foo", "1")
-	manager := fakeManager(t)
 	ctx := context.TODO()
 
 	testcases := map[string]struct {
@@ -109,6 +115,11 @@ func TestWaitForStorageVersionUpdate(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
+		StorageVersionUpdateTimeout = 2 * time.Second
+		stopCh := make(chan struct{})
+		manager := fakeManager(t)
+		defer manager.Shutdown(stopCh)
+
 		if tc.crd != nil {
 			updateCh := &storageVersionUpdateChannels{}
 			if tc.updateChannels != nil {
@@ -135,21 +146,21 @@ func TestWaitForStorageVersionUpdate(t *testing.T) {
 		if (err != nil) != tc.wantErr {
 			t.Errorf("WaitForStorageVersionUpdate: got error %v, want error %v", err, tc.wantErr)
 		}
+		// signal manager to shutdown
+		close(stopCh)
 	}
 }
 
-func TestStorageVersionUpdateSuccess(t *testing.T) {
-	manager := fakeManager(t)
-
+func TestStorageVersionUpdateInfoSuccess(t *testing.T) {
 	testcases := map[string]struct {
-		createCRDs   []*v1.CustomResourceDefinition
-		updateCRDs   []*v1.CustomResourceDefinition
-		wantSVstates []*v1.CustomResourceDefinition
-		wantErr      bool
+		createCRDs        []*v1.CustomResourceDefinition
+		updateCRDs        []*v1.CustomResourceDefinition
+		wantLatestSVInfos []*v1.CustomResourceDefinition
+		wantErr           bool
 	}{
 		"single CRD create": {
 			createCRDs: []*v1.CustomResourceDefinition{testCRD("foo", "1")},
-			wantSVstates: []*v1.CustomResourceDefinition{
+			wantLatestSVInfos: []*v1.CustomResourceDefinition{
 				testCRD("foo", "1"),
 			},
 		},
@@ -158,7 +169,7 @@ func TestStorageVersionUpdateSuccess(t *testing.T) {
 				testCRD("foo", "1"),
 				testCRD("bar", "1"),
 			},
-			wantSVstates: []*v1.CustomResourceDefinition{
+			wantLatestSVInfos: []*v1.CustomResourceDefinition{
 				testCRD("foo", "1"),
 				testCRD("bar", "1"),
 			},
@@ -168,7 +179,7 @@ func TestStorageVersionUpdateSuccess(t *testing.T) {
 			updateCRDs: []*v1.CustomResourceDefinition{
 				testCRD("foo", "2"),
 			},
-			wantSVstates: []*v1.CustomResourceDefinition{
+			wantLatestSVInfos: []*v1.CustomResourceDefinition{
 				testCRD("foo", "2"),
 			},
 		},
@@ -178,7 +189,7 @@ func TestStorageVersionUpdateSuccess(t *testing.T) {
 				testCRD("foo", "3"),
 				testCRD("foo", "4"),
 			},
-			wantSVstates: []*v1.CustomResourceDefinition{
+			wantLatestSVInfos: []*v1.CustomResourceDefinition{
 				testCRD("foo", "4"),
 			},
 		},
@@ -193,7 +204,7 @@ func TestStorageVersionUpdateSuccess(t *testing.T) {
 				testCRD("bar", "11"),
 				testCRD("bar", "10"),
 			},
-			wantSVstates: []*v1.CustomResourceDefinition{
+			wantLatestSVInfos: []*v1.CustomResourceDefinition{
 				testCRD("foo", "6"),
 				testCRD("bar", "11"),
 			},
@@ -201,6 +212,11 @@ func TestStorageVersionUpdateSuccess(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		StorageVersionUpdateTimeout = 2 * time.Second
+		WorkerFrequency = 1 * time.Millisecond
+		stopCh := make(chan struct{})
+		manager := fakeManager(t)
+		defer manager.Shutdown(stopCh)
 		if tc.createCRDs == nil {
 			t.Fatalf("CRDS must be created first for the test to proceed")
 		}
@@ -214,8 +230,8 @@ func TestStorageVersionUpdateSuccess(t *testing.T) {
 			manager.Enqueue(updatedCRD, nil)
 		}
 
-		// validate we have the correct updated storageversions
-		for _, wantCRD := range tc.wantSVstates {
+		// validate we have the correct updated storageversion info
+		for _, wantCRD := range tc.wantLatestSVInfos {
 			val, ok := manager.storageVersionUpdateInfoMap.Load(wantCRD.UID)
 			if !ok {
 				t.Fatalf("expected UID to be present in storageVersionUpdateInfoMap for crd %s, got none", wantCRD.Name)
@@ -226,49 +242,61 @@ func TestStorageVersionUpdateSuccess(t *testing.T) {
 				t.Fatalf("unexpected final CRD state for %s, diff = %s", wantCRD.Name, diff)
 			}
 		}
+		// signal manager to shutdown
+		close(stopCh)
 	}
 }
 
 func TestStorageVersionUpdateFailures(t *testing.T) {
+	stopCh := make(chan struct{})
 	manager := fakeManager(t)
+	defer manager.Shutdown(stopCh)
+	StorageVersionUpdateTimeout = 2 * time.Second
 
-	testcases := map[string]struct {
-		createCRDs   []*v1.CustomResourceDefinition
-		updateCRDs   []*v1.CustomResourceDefinition
-		wantSVstates []*v1.CustomResourceDefinition
-		wantErr      bool
-	}{
-		"teardown og old storage timed out": {
-			createCRDs: []*v1.CustomResourceDefinition{testCRD("foo", "1")},
-			updateCRDs: []*v1.CustomResourceDefinition{
-				testCRD("foo", "2"),
-			},
-			wantSVstates: []*v1.CustomResourceDefinition{
-				testCRD("foo", "1"),
-			},
-		},
+	// create CRD
+	crd := testCRD("foo", "1")
+	manager.Enqueue(crd, nil)
+	markSVUpdateAsAlreadyProcessed(manager, crd)
+
+	// process update, dont close its teardDownCh
+	updatedCRD := testCRD("foo", "2")
+	manager.Enqueue(updatedCRD, make(chan struct{}))
+
+	updateFailed := new(bool)
+	go waitForIntermediateUpdateToFinish(manager, updatedCRD, updateFailed)
+	time.Sleep(2 * time.Second)
+
+	// update the CRD again, this time close its teardDownCh
+	updatedCRD = testCRD("foo", "3")
+	teardownFinishedCh2 := make(chan struct{})
+	manager.Enqueue(updatedCRD, teardownFinishedCh2)
+	close(teardownFinishedCh2)
+	markSVUpdateAsAlreadyProcessed(manager, crd)
+
+	err := manager.WaitForStorageVersionUpdate(context.TODO(), updatedCRD)
+	if err != nil {
+		t.Errorf("expected latest update to succeed but got fail")
 	}
 
-	for _, tc := range testcases {
-		if tc.createCRDs == nil {
-			t.Fatalf("CRDS must be created first for the test to proceed")
-		}
-		// create CRDs
-		for _, crd := range tc.createCRDs {
-			manager.Enqueue(crd, nil)
-		}
-
-		// process updates
-		for _, updatedCRD := range tc.updateCRDs {
-			teardownFinishedCh := make(<-chan struct{})
-			manager.Enqueue(updatedCRD, teardownFinishedCh)
-			err := manager.WaitForStorageVersionUpdate(context.TODO(), updatedCRD)
-			if err == nil {
-				t.Fatalf("Expected error, got nil")
-			}
-		}
-
+	if !*updateFailed {
+		t.Errorf("expected intermediary update to fail if the storageVersionUpdateInfoMap was overwritten with new updates, but got success")
 	}
+	// signal manager to shutdown
+	close(stopCh)
+}
+
+func markSVUpdateAsAlreadyProcessed(m *Manager, crd *v1.CustomResourceDefinition) {
+	val, _ := m.storageVersionUpdateInfoMap.Load(crd.UID)
+	svUpdateInfo := val.(*storageVersionUpdateInfo)
+	close(svUpdateInfo.updateChannels.processedCh)
+}
+
+func waitForIntermediateUpdateToFinish(m *Manager, crd *v1.CustomResourceDefinition, updateFailed *bool) {
+	err := m.WaitForStorageVersionUpdate(context.TODO(), crd)
+	if err != nil {
+		*updateFailed = true
+	}
+
 }
 
 func fakeManager(t *testing.T) *Manager {
@@ -278,7 +306,6 @@ func fakeManager(t *testing.T) *Manager {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	defer server.Close()
 	kubeclientset := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	sc := kubeclientset.InternalV1alpha1().StorageVersions()
 	return NewManager(sc, apiserverID)

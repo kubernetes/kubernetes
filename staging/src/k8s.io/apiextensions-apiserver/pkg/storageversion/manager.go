@@ -22,33 +22,34 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
+
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
-	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
 )
 
-const (
+var (
 	// If the StorageVersionAPI feature gate is enabled, after a CRD storage
 	// (a.k.a. serving info) is created, the API server will block CR write
 	// requests that hit this storage until the corresponding storage
 	// version update gets processed by the storage version manager.
 	// The API server will fail CR write requests if the storage version
-	// update takes longer than storageVersionUpdateTimeout after the
+	// update takes longer than StorageVersionUpdateTimeout after the
 	// storage is created.
-	storageVersionUpdateTimeout = 15 * time.Second
-	// teardownFinishedTimeout is the time to wait for teardown of an old storage
+	StorageVersionUpdateTimeout = 15 * time.Second
+	// TeardownFinishedTimeout is the time to wait for teardown of an old storage
 	// to finish while updating storageversion of a CRD. If the teardown of
 	// old storage times out, we return an error for the storageversion update,
 	// and if there are any CR requests blocked on this storgaversion update,
 	// they are served 503.
-	teardownFinishedTimeout = 1 * time.Minute
+	TeardownFinishedTimeout = 1 * time.Minute
+	WorkerFrequency         = 1 * time.Second
 )
 
 // Manager maintains necessary structures needed for updating
@@ -142,7 +143,7 @@ func (m *Manager) WaitForStorageVersionUpdate(ctx context.Context, crd *apiexten
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("aborted waiting for CRD storage version update: %w", ctx.Err())
-	case <-time.After(storageVersionUpdateTimeout):
+	case <-time.After(StorageVersionUpdateTimeout):
 		return fmt.Errorf("timeout waiting for CRD storage version update")
 	}
 
@@ -157,12 +158,13 @@ func (m *Manager) Shutdown(stopCh <-chan struct{}) {
 
 // sync runs a goroutine over the provided queue to indefinitely
 // process any queued storageversion updates unless stopCh is invoked.
-func (m *Manager) sync(stopCh <-chan struct{}, queue *workqueue.Type) {
+func (m *Manager) sync(shutdownQueue <-chan struct{}, queue *workqueue.Type) {
+	defer queue.ShutDownWithDrain()
 	go wait.Until(func() {
 		m.worker(queue)
-	}, time.Second, stopCh)
-	defer queue.ShutDown()
-	<-stopCh
+	}, WorkerFrequency, shutdownQueue)
+
+	<-shutdownQueue
 }
 
 func (m *Manager) worker(queue *workqueue.Type) {
@@ -172,6 +174,7 @@ func (m *Manager) worker(queue *workqueue.Type) {
 
 func (m *Manager) processLatestUpdateFor(queue *workqueue.Type) bool {
 	ctx := context.TODO()
+
 	key, quit := queue.Get()
 	defer queue.Done(key)
 	if quit {
@@ -235,8 +238,13 @@ func (m *Manager) recordLatestSVUpdateInfoWithTeardown(crd *apiextensionsv1.Cust
 	// there's a new latest update event.
 	existingSVUpdateInfo := val.(*storageVersionUpdateInfo)
 	if crd.ObjectMeta.ResourceVersion > existingSVUpdateInfo.crd.ObjectMeta.ResourceVersion {
-		existingSVUpdateInfo.crd = latestSVUpdateInfo.crd
-		existingSVUpdateInfo.updateChannels = latestSVUpdateInfo.updateChannels
+		updatedSVInfo := &storageVersionUpdateInfo{
+			crd:            latestSVUpdateInfo.crd,
+			updateChannels: latestSVUpdateInfo.updateChannels,
+			queue:          existingSVUpdateInfo.queue,
+		}
+		m.storageVersionUpdateInfoMap.Store(crd.UID, updatedSVInfo)
+		return updatedSVInfo
 	}
 	return existingSVUpdateInfo
 }
@@ -263,7 +271,7 @@ func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1
 					close(errCh)
 				}
 				return
-			case <-time.After(teardownFinishedTimeout):
+			case <-time.After(TeardownFinishedTimeout):
 				klog.V(4).Infof("timeout waiting for waitCh to close before proceeding with storageversion update for %v", crd)
 				if errCh != nil {
 					close(errCh)
@@ -277,7 +285,6 @@ func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1
 	}
 
 	if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
-		utilruntime.HandleError(err)
 		if errCh != nil {
 			klog.Infof("error while updating storage version for crd %v: %v", crd, err)
 			close(errCh)
