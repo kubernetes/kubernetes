@@ -58,6 +58,12 @@ func readEnablementFile() {
 	}
 }
 
+// TestOnlySetEnabled allows changing the state of management partition enablement
+// This method MUST NOT be used outside of test code
+func TestOnlySetEnabled(enabled bool) {
+	pinnedManagementEnabled = enabled
+}
+
 func IsEnabled() bool {
 	return pinnedManagementEnabled
 }
