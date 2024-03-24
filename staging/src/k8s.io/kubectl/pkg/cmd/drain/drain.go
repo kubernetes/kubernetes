@@ -357,7 +357,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 		}
 
 		if o.drainer.DelayBetweenNodeSeconds > 0 && idx+1 < nodeCount {
-			fmt.Fprintf(o.Out, "Waiting %d seconds before starting next node...\n", o.drainer.DelayBetweenNodeSeconds)
+			fmt.Fprintf(o.Out, "Waiting %d seconds before draining next node...\n", o.drainer.DelayBetweenNodeSeconds)
 			time.Sleep(time.Duration(o.drainer.DelayBetweenNodeSeconds) * time.Second)
 		}
 	}
