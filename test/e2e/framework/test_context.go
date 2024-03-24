@@ -26,7 +26,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -592,7 +591,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 			klog.Errorf("Create report dir: %v", err)
 			Exit(1)
 		}
-		ginkgoDir := path.Join(TestContext.ReportDir, "ginkgo")
+		ginkgoDir := filepath.Join(TestContext.ReportDir, "ginkgo")
 		if TestContext.ReportCompleteGinkgo || TestContext.ReportCompleteJUnit {
 			if err := os.MkdirAll(ginkgoDir, 0777); err != nil && !os.IsExist(err) {
 				klog.Errorf("Create <report-dir>/ginkgo: %v", err)
@@ -602,10 +601,10 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 		if TestContext.ReportCompleteGinkgo {
 			ginkgo.ReportAfterSuite("Ginkgo JSON report", func(report ginkgo.Report) {
-				ExpectNoError(reporters.GenerateJSONReport(report, path.Join(ginkgoDir, "report.json")))
+				ExpectNoError(reporters.GenerateJSONReport(report, filepath.Join(ginkgoDir, "report.json")))
 			})
 			ginkgo.ReportAfterSuite("JUnit XML report", func(report ginkgo.Report) {
-				ExpectNoError(reporters.GenerateJUnitReport(report, path.Join(ginkgoDir, "report.xml")))
+				ExpectNoError(reporters.GenerateJUnitReport(report, filepath.Join(ginkgoDir, "report.xml")))
 			})
 		}
 
@@ -615,7 +614,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 			// all results into a report for us. The 01 suffix is
 			// kept in case that users expect files to be called
 			// "junit_<prefix><number>.xml".
-			junitReport := path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
+			junitReport := path.filepath(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
 
 			// writeJUnitReport generates a JUnit file in the e2e
 			// report directory that is shorter than the one

@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
@@ -257,7 +257,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 		for _, qosContainerName := range qosContainersList {
 			// get the subsystems QoS cgroup absolute name
 			qcConversion := m.cgroupManager.Name(qosContainerName)
-			qc := path.Join(val, qcConversion)
+			qc := filepath.Join(val, qcConversion)
 			dirInfo, err := os.ReadDir(qc)
 			if err != nil {
 				if os.IsNotExist(err) {
@@ -274,7 +274,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 				// this is needed to handle path conversion for systemd environments.
 				// we pass the fully qualified path so decoding can work as expected
 				// since systemd encodes the path in each segment.
-				cgroupfsPath := path.Join(qcConversion, dirInfo[i].Name())
+				cgroupfsPath := filepath.Join(qcConversion, dirInfo[i].Name())
 				internalPath := m.cgroupManager.CgroupName(cgroupfsPath)
 				// we only care about base segment of the converted path since that
 				// is what we are reading currently to know if it is a pod or not.

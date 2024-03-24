@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/klog/v2"
@@ -153,7 +153,7 @@ func (e *E2EServices) collectLogFiles() {
 	klog.Info("Fetching log files...")
 	journaldFound := isJournaldAvailable()
 	for targetFileName, log := range e.logs {
-		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
+		targetLink := filepath.Join(framework.TestContext.ReportDir, targetFileName)
 		if journaldFound {
 			// Skip log files that do not have an equivalent in journald-based machines.
 			if len(log.JournalctlCommand) == 0 {

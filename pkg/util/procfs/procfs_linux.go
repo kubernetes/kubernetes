@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -54,7 +53,7 @@ func containerNameFromProcCgroup(content string) (string, error) {
 // E.g. if the devices cgroup for the container is stored in /sys/fs/cgroup/devices/docker/nginx,
 // return docker/nginx. Assumes that the process is part of exactly one cgroup hierarchy.
 func (pfs *ProcFS) GetFullContainerName(pid int) (string, error) {
-	filePath := path.Join("/proc", strconv.Itoa(pid), "cgroup")
+	filePath := filepath.Join("/proc", strconv.Itoa(pid), "cgroup")
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {

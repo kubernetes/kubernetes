@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -314,7 +314,7 @@ func printSummaries(summaries []TestDataSummary, testBaseName string) {
 				Logf(summaries[i].PrintHumanReadable())
 			} else {
 				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
+				filePath := filepath.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
 				if err := os.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
 					Logf("Failed to write file %v with test performance data: %v", filePath, err)
 				}
@@ -330,7 +330,7 @@ func printSummaries(summaries []TestDataSummary, testBaseName string) {
 				Logf("Finished")
 			} else {
 				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				filePath := filepath.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
 				Logf("Writing to %s", filePath)
 				if err := os.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
 					Logf("Failed to write file %v with test performance data: %v", filePath, err)

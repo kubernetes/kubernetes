@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,17 +61,17 @@ var _ = utils.SIGDescribe("HostPathType Directory", framework.WithSlow(), func()
 		ns = f.Namespace.Name
 
 		ginkgo.By("Create a pod for further testing")
-		hostBaseDir = path.Join("/tmp", ns)
+		hostBaseDir = filepath.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
 		basePod = e2epod.NewPodClient(f).CreateSync(ctx, newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
-		targetDir = path.Join(hostBaseDir, "adir")
+		targetDir = filepath.Join(hostBaseDir, "adir")
 		ginkgo.By("Should automatically create a new directory 'adir' when HostPathType is HostPathDirectoryOrCreate")
 		verifyPodHostPathType(ctx, f, map[string]string{"kubernetes.io/hostname": basePod.Spec.NodeName}, targetDir, &hostPathDirectoryOrCreate)
 	})
 
 	ginkgo.It("Should fail on mounting non-existent directory 'does-not-exist-dir' when HostPathType is HostPathDirectory", func(ctx context.Context) {
-		dirPath := path.Join(hostBaseDir, "does-not-exist-dir")
+		dirPath := filepath.Join(hostBaseDir, "does-not-exist-dir")
 		verifyPodHostPathTypeFailure(ctx, f, map[string]string{"kubernetes.io/hostname": basePod.Spec.NodeName},
 			dirPath, fmt.Sprintf("%s is not a directory", dirPath), &hostPathDirectory)
 	})
@@ -129,17 +129,17 @@ var _ = utils.SIGDescribe("HostPathType File", framework.WithSlow(), func() {
 		ns = f.Namespace.Name
 
 		ginkgo.By("Create a pod for further testing")
-		hostBaseDir = path.Join("/tmp", ns)
+		hostBaseDir = filepath.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
 		basePod = e2epod.NewPodClient(f).CreateSync(ctx, newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
-		targetFile = path.Join(hostBaseDir, "afile")
+		targetFile = filepath.Join(hostBaseDir, "afile")
 		ginkgo.By("Should automatically create a new file 'afile' when HostPathType is HostPathFileOrCreate")
 		verifyPodHostPathType(ctx, f, map[string]string{"kubernetes.io/hostname": basePod.Spec.NodeName}, targetFile, &hostPathFileOrCreate)
 	})
 
 	ginkgo.It("Should fail on mounting non-existent file 'does-not-exist-file' when HostPathType is HostPathFile", func(ctx context.Context) {
-		filePath := path.Join(hostBaseDir, "does-not-exist-file")
+		filePath := filepath.Join(hostBaseDir, "does-not-exist-file")
 		verifyPodHostPathTypeFailure(ctx, f, map[string]string{"kubernetes.io/hostname": basePod.Spec.NodeName},
 			filePath, fmt.Sprintf("%s is not a file", filePath), &hostPathFile)
 	})
@@ -197,15 +197,15 @@ var _ = utils.SIGDescribe("HostPathType Socket", framework.WithSlow(), func() {
 		ns = f.Namespace.Name
 
 		ginkgo.By("Create a pod for further testing")
-		hostBaseDir = path.Join("/tmp", ns)
+		hostBaseDir = filepath.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
-		basePod = e2epod.NewPodClient(f).CreateSync(ctx, newHostPathTypeTestPodWithCommand(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate, fmt.Sprintf("nc -lU %s", path.Join(mountBaseDir, "asocket"))))
+		basePod = e2epod.NewPodClient(f).CreateSync(ctx, newHostPathTypeTestPodWithCommand(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate, fmt.Sprintf("nc -lU %s", filepath.Join(mountBaseDir, "asocket"))))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
-		targetSocket = path.Join(hostBaseDir, "asocket")
+		targetSocket = filepath.Join(hostBaseDir, "asocket")
 	})
 
 	ginkgo.It("Should fail on mounting non-existent socket 'does-not-exist-socket' when HostPathType is HostPathSocket", func(ctx context.Context) {
-		socketPath := path.Join(hostBaseDir, "does-not-exist-socket")
+		socketPath := filepath.Join(hostBaseDir, "does-not-exist-socket")
 		verifyPodHostPathTypeFailure(ctx, f, map[string]string{"kubernetes.io/hostname": basePod.Spec.NodeName},
 			socketPath, fmt.Sprintf("%s is not a socket", socketPath), &hostPathSocket)
 	})
@@ -263,19 +263,19 @@ var _ = utils.SIGDescribe("HostPathType Character Device", framework.WithSlow(),
 		ns = f.Namespace.Name
 
 		ginkgo.By("Create a pod for further testing")
-		hostBaseDir = path.Join("/tmp", ns)
+		hostBaseDir = filepath.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
 		basePod = e2epod.NewPodClient(f).CreateSync(ctx, newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
-		targetCharDev = path.Join(hostBaseDir, "achardev")
+		targetCharDev = filepath.Join(hostBaseDir, "achardev")
 		ginkgo.By("Create a character device for further testing")
-		cmd := fmt.Sprintf("mknod %s c 89 1", path.Join(mountBaseDir, "achardev"))
+		cmd := fmt.Sprintf("mknod %s c 89 1", filepath.Join(mountBaseDir, "achardev"))
 		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
 		framework.ExpectNoError(err, "command: %q, stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 
 	ginkgo.It("Should fail on mounting non-existent character device 'does-not-exist-char-dev' when HostPathType is HostPathCharDev", func(ctx context.Context) {
-		charDevPath := path.Join(hostBaseDir, "does-not-exist-char-dev")
+		charDevPath := filepath.Join(hostBaseDir, "does-not-exist-char-dev")
 		verifyPodHostPathTypeFailure(ctx, f, map[string]string{"kubernetes.io/hostname": basePod.Spec.NodeName},
 			charDevPath, fmt.Sprintf("%s is not a character device", charDevPath), &hostPathCharDev)
 	})
@@ -333,19 +333,19 @@ var _ = utils.SIGDescribe("HostPathType Block Device", framework.WithSlow(), fun
 		ns = f.Namespace.Name
 
 		ginkgo.By("Create a pod for further testing")
-		hostBaseDir = path.Join("/tmp", ns)
+		hostBaseDir = filepath.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
 		basePod = e2epod.NewPodClient(f).CreateSync(ctx, newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
-		targetBlockDev = path.Join(hostBaseDir, "ablkdev")
+		targetBlockDev = filepath.Join(hostBaseDir, "ablkdev")
 		ginkgo.By("Create a block device for further testing")
-		cmd := fmt.Sprintf("mknod %s b 89 1", path.Join(mountBaseDir, "ablkdev"))
+		cmd := fmt.Sprintf("mknod %s b 89 1", filepath.Join(mountBaseDir, "ablkdev"))
 		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
 		framework.ExpectNoError(err, "command %q: stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 
 	ginkgo.It("Should fail on mounting non-existent block device 'does-not-exist-blk-dev' when HostPathType is HostPathBlockDev", func(ctx context.Context) {
-		blkDevPath := path.Join(hostBaseDir, "does-not-exist-blk-dev")
+		blkDevPath := filepath.Join(hostBaseDir, "does-not-exist-blk-dev")
 		verifyPodHostPathTypeFailure(ctx, f, map[string]string{"kubernetes.io/hostname": basePod.Spec.NodeName},
 			blkDevPath, fmt.Sprintf("%s is not a block device", blkDevPath), &hostPathBlockDev)
 	})

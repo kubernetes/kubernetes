@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"path"
+	"path/filepath"
 
 	"time"
 
@@ -73,7 +73,7 @@ func testFlexVolume(ctx context.Context, driver string, config e2evolume.TestCon
 // controller-manager if 'restart' is true.
 func installFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vendor, driver, filePath string) {
 	flexDir := getFlexDir(c, node, vendor, driver)
-	flexFile := path.Join(flexDir, driver)
+	flexFile := filepath.Join(flexDir, driver)
 
 	host := ""
 	var err error
@@ -133,7 +133,7 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 	if framework.ProviderIs("gce") {
 		volumePluginDir = gciVolumePluginDir
 	}
-	flexDir := path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
+	flexDir := filepath.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
 	return flexDir
 }
 
@@ -192,8 +192,8 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		driver := "dummy"
 		driverInstallAs := driver + "-" + suffix
 
-		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", filepath.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(ctx, cs, node, "k8s", driverInstallAs, filepath.Join(driverDir, driver))
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
 
@@ -205,10 +205,10 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 
-		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
-		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(ctx, cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", filepath.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(ctx, cs, node, "k8s", driverInstallAs, filepath.Join(driverDir, driver))
+		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", filepath.Join(driverDir, driver), driverInstallAs))
+		installFlex(ctx, cs, nil, "k8s", driverInstallAs, filepath.Join(driverDir, driver))
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
 

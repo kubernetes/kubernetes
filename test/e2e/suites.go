@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -70,7 +70,7 @@ func gatherTestSuiteMetrics(ctx context.Context) error {
 	metricsForE2E := (*e2emetrics.ComponentCollection)(&received)
 	metricsJSON := metricsForE2E.PrintJSON()
 	if framework.TestContext.ReportDir != "" {
-		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
+		filePath := filepath.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
 		if err := os.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
 			return fmt.Errorf("error writing to %q: %w", filePath, err)
 		}

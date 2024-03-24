@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -232,7 +231,7 @@ func resolveSymlink(basePath string, entry os.DirEntry) (os.FileInfo, error) {
 //
 //	Refactor that method to expose it in a reusable way, and delete this version.
 func getLoadedProfiles() (map[string]bool, error) {
-	profilesPath := path.Join(apparmorfs, "profiles")
+	profilesPath := filepath.Join(apparmorfs, "profiles")
 	profilesFile, err := os.Open(profilesPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open %s: %v", profilesPath, err)

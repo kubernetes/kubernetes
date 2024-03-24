@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -124,7 +124,7 @@ func (s *server) start() error {
 		defer close(errCh)
 
 		// Create the output filename
-		outPath := path.Join(framework.TestContext.ReportDir, s.outFilename)
+		outPath := filepath.Join(framework.TestContext.ReportDir, s.outFilename)
 		outfile, err := os.Create(outPath)
 		if err != nil {
 			errCh <- fmt.Errorf("failed to create file %q for `%s` %v", outPath, s, err)

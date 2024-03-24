@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -230,7 +230,7 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 		if err := os.MkdirAll(*dataItemsDir, 0750); err != nil {
 			return fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %v", *dataItemsDir, err)
 		}
-		destFile = path.Join(*dataItemsDir, destFile)
+		destFile = filepath.Join(*dataItemsDir, destFile)
 	}
 	formatted := &bytes.Buffer{}
 	if err := json.Indent(formatted, b, "", "  "); err != nil {

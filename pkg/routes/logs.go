@@ -19,7 +19,7 @@ package routes
 import (
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/emicklei/go-restful/v3"
 )
@@ -42,7 +42,7 @@ func (l Logs) Install(c *restful.Container) {
 
 func logFileHandler(req *restful.Request, resp *restful.Response) {
 	logdir := "/var/log"
-	actual := path.Join(logdir, req.PathParameter("logpath"))
+	actual := filepath.Join(logdir, req.PathParameter("logpath"))
 
 	// check filename length first, return 404 if it's oversize.
 	if logFileNameIsTooLong(actual) {

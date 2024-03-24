@@ -19,7 +19,7 @@ package framework_test
 import (
 	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -288,7 +288,7 @@ In [AfterEach] at: log_test.go:53 <time>
 
 	oldStderr := os.Stderr
 	tmp := t.TempDir()
-	filename := path.Join(tmp, "stderr.log")
+	filename := filepath.Join(tmp, "stderr.log")
 	f, err := os.Create(filename)
 	require.NoError(t, err, "create temporary file")
 	os.Stderr = f

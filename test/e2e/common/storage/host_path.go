@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,7 +67,7 @@ var _ = SIGDescribe("HostPath", func() {
 
 	// This test requires mounting a folder into a container with write privileges.
 	f.It("should support r/w", f.WithNodeConformance(), func(ctx context.Context) {
-		filePath := path.Join(volumePath, "test-file")
+		filePath := filepath.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
@@ -99,8 +99,8 @@ var _ = SIGDescribe("HostPath", func() {
 		fileName := "test-file"
 		retryDuration := 180
 
-		filePathInWriter := path.Join(volumePath, fileName)
-		filePathInReader := path.Join(volumePath, subPath, fileName)
+		filePathInWriter := filepath.Join(volumePath, fileName)
+		filePathInReader := filepath.Join(volumePath, subPath, fileName)
 
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",

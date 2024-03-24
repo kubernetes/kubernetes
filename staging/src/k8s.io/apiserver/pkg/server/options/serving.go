@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -345,8 +345,8 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		if len(s.ServerCert.PairName) == 0 {
 			return fmt.Errorf("PairName is required if CertDirectory is set")
 		}
-		keyCert.CertFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".crt")
-		keyCert.KeyFile = path.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".key")
+		keyCert.CertFile = filepath.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".crt")
+		keyCert.KeyFile = filepath.Join(s.ServerCert.CertDirectory, s.ServerCert.PairName+".key")
 		if canRead, err := certutil.CanReadCertAndKey(keyCert.CertFile, keyCert.KeyFile); err != nil {
 			return err
 		} else {

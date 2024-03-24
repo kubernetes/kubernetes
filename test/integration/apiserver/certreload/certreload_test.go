@@ -28,6 +28,7 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -530,8 +531,8 @@ func TestSNICert(t *testing.T) {
 
 			opts.SecureServing.SNICertKeys = []flag.NamedCertKey{{
 				Names:    []string{"foo"},
-				CertFile: path.Join(servingCertPath, "foo.crt"),
-				KeyFile:  path.Join(servingCertPath, "foo.key"),
+				CertFile: filepath.Join(servingCertPath, "foo.crt"),
+				KeyFile:  filepath.Join(servingCertPath, "foo.key"),
 			}}
 		},
 	})

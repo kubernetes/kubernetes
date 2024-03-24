@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
@@ -93,7 +94,7 @@ func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfi
 
 	adminKubeConfig := kubeconfig.CreateKubeConfig(wardleToKASKubeClientConfig)
 	tmpDir := t.TempDir()
-	kubeConfigFile := path.Join(tmpDir, "kube.config")
+	kubeConfigFile := filepath.Join(tmpDir, "kube.config")
 	if err := clientcmd.WriteToFile(*adminKubeConfig, kubeConfigFile); err != nil {
 		t.Fatal(err)
 	}

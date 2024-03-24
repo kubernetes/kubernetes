@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -116,7 +115,7 @@ func runCleanupNode(c workflow.RunData) error {
 
 	dirsToClean = append(dirsToClean, certsDir)
 	if r.CleanupTmpDir() {
-		tempDir := path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)
+		tempDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)
 		dirsToClean = append(dirsToClean, tempDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, dirsToClean, r.DryRun())

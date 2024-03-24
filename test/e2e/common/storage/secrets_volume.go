@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -300,7 +300,7 @@ var _ = SIGDescribe("Secrets", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
-								MountPath: path.Join(volumeMountPath, "delete"),
+								MountPath: filepath.Join(volumeMountPath, "delete"),
 								ReadOnly:  true,
 							},
 						},
@@ -312,7 +312,7 @@ var _ = SIGDescribe("Secrets", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
-								MountPath: path.Join(volumeMountPath, "update"),
+								MountPath: filepath.Join(volumeMountPath, "update"),
 								ReadOnly:  true,
 							},
 						},
@@ -324,7 +324,7 @@ var _ = SIGDescribe("Secrets", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
-								MountPath: path.Join(volumeMountPath, "create"),
+								MountPath: filepath.Join(volumeMountPath, "create"),
 								ReadOnly:  true,
 							},
 						},
@@ -642,7 +642,7 @@ func createNonOptionalSecretPod(ctx context.Context, f *framework.Framework, vol
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      createVolumeName,
-							MountPath: path.Join(volumeMountPath, "create"),
+							MountPath: filepath.Join(volumeMountPath, "create"),
 							ReadOnly:  true,
 						},
 					},
@@ -703,7 +703,7 @@ func createNonOptionalSecretPodWithSecret(ctx context.Context, f *framework.Fram
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      createVolumeName,
-							MountPath: path.Join(volumeMountPath, "create"),
+							MountPath: filepath.Join(volumeMountPath, "create"),
 							ReadOnly:  true,
 						},
 					},

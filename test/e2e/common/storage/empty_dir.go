@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -369,7 +369,7 @@ const (
 
 func doTestSetgidFSGroup(ctx context.Context, f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	var (
-		filePath = path.Join(volumePath, "test-file")
+		filePath = filepath.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
 		pod      = testPodWithVolume(uid, volumePath, source)
 	)
@@ -457,7 +457,7 @@ func doTestVolumeModeFSGroup(ctx context.Context, f *framework.Framework, uid in
 
 func doTest0644FSGroup(ctx context.Context, f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	var (
-		filePath = path.Join(volumePath, "test-file")
+		filePath = filepath.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
 		pod      = testPodWithVolume(uid, volumePath, source)
 	)
@@ -507,7 +507,7 @@ func doTestVolumeMode(ctx context.Context, f *framework.Framework, uid int64, me
 
 func doTest0644(ctx context.Context, f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	var (
-		filePath = path.Join(volumePath, "test-file")
+		filePath = filepath.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
 		pod      = testPodWithVolume(uid, volumePath, source)
 	)
@@ -532,7 +532,7 @@ func doTest0644(ctx context.Context, f *framework.Framework, uid int64, medium v
 
 func doTest0666(ctx context.Context, f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	var (
-		filePath = path.Join(volumePath, "test-file")
+		filePath = filepath.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
 		pod      = testPodWithVolume(uid, volumePath, source)
 	)
@@ -557,7 +557,7 @@ func doTest0666(ctx context.Context, f *framework.Framework, uid int64, medium v
 
 func doTest0777(ctx context.Context, f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	var (
-		filePath = path.Join(volumePath, "test-file")
+		filePath = filepath.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
 		pod      = testPodWithVolume(uid, volumePath, source)
 	)

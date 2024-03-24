@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -206,7 +206,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
-	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
+	draAddr := filepath.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
 	numNodes := int32(len(nodes.NodeNames))
 	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
@@ -232,8 +232,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 					},
 				},
 			}
-			item.Spec.Template.Spec.Volumes[0].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins")
-			item.Spec.Template.Spec.Volumes[2].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
+			item.Spec.Template.Spec.Volumes[0].HostPath.Path = filepath.Join(framework.TestContext.KubeletRootDir, "plugins")
+			item.Spec.Template.Spec.Volumes[2].HostPath.Path = filepath.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
 			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
 			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
 		case *apiextensionsv1.CustomResourceDefinition:

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -95,7 +95,7 @@ if [ $count -eq 2 ]; then
 fi
 while true; do sleep 1; done
 `
-					tmpCmd := fmt.Sprintf(cmdScripts, path.Join(restartCountVolumePath, "restartCount"))
+					tmpCmd := fmt.Sprintf(cmdScripts, filepath.Join(restartCountVolumePath, "restartCount"))
 					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{

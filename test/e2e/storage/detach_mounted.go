@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	"time"
 
@@ -76,10 +76,10 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", func() {
 		driver := "attachable-with-long-mount"
 		driverInstallAs := driver + "-" + suffix
 
-		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
-		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(ctx, cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", filepath.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(ctx, cs, node, "k8s", driverInstallAs, filepath.Join(driverDir, driver))
+		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", filepath.Join(driverDir, driver), driverInstallAs))
+		installFlex(ctx, cs, nil, "k8s", driverInstallAs, filepath.Join(driverDir, driver))
 		volumeSource := v1.VolumeSource{
 			FlexVolume: &v1.FlexVolumeSource{
 				Driver: "k8s/" + driverInstallAs,

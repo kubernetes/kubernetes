@@ -20,7 +20,6 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -98,15 +97,15 @@ func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	certFile = path.Join(tempDir, "etcdcert.pem")
+	certFile = filepath.Join(tempDir, "etcdcert.pem")
 	if err := ioutil.WriteFile(certFile, []byte(testingcert.CertFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
-	keyFile = path.Join(tempDir, "etcdkey.pem")
+	keyFile = filepath.Join(tempDir, "etcdkey.pem")
 	if err := ioutil.WriteFile(keyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
-	caFile = path.Join(tempDir, "ca.pem")
+	caFile = filepath.Join(tempDir, "ca.pem")
 	if err := ioutil.WriteFile(caFile, []byte(testingcert.CAFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}

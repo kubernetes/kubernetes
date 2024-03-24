@@ -24,7 +24,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -100,7 +100,7 @@ func TestCSRDuration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	caPublicKeyFile := path.Join(s.TmpDir, "test-ca-public-key")
+	caPublicKeyFile := filepath.Join(s.TmpDir, "test-ca-public-key")
 	if err := os.WriteFile(caPublicKeyFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caCert.Raw}), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestCSRDuration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	caPrivateKeyFile := path.Join(s.TmpDir, "test-ca-private-key")
+	caPrivateKeyFile := filepath.Join(s.TmpDir, "test-ca-private-key")
 	if err := os.WriteFile(caPrivateKeyFile, caPrivateKeyBytes, os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}

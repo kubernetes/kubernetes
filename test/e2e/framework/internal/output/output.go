@@ -19,7 +19,7 @@ package output
 import (
 	"encoding/xml"
 	"os"
-	"path"
+	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -43,7 +43,7 @@ import (
 // run tests with "go test -v".
 func TestGinkgoOutput(t *testing.T, expected TestResult, runSpecsArgs ...interface{}) {
 	tmpdir := t.TempDir()
-	junitFile := path.Join(tmpdir, "junit.xml")
+	junitFile := filepath.Join(tmpdir, "junit.xml")
 	gomega.RegisterFailHandler(framework.Fail)
 	ginkgo.ReportAfterSuite("write JUnit file", func(report ginkgo.Report) {
 		junit.WriteJUnitReport(report, junitFile)

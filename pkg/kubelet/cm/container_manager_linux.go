@@ -24,7 +24,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -181,11 +181,11 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 
 	// Check if cpu quota is available.
 	// CPU cgroup is required and so it expected to be mounted at this point.
-	periodExists, err := utilpath.Exists(utilpath.CheckFollowSymlink, path.Join(cpuMountPoint, "cpu.cfs_period_us"))
+	periodExists, err := utilpath.Exists(utilpath.CheckFollowSymlink, filepath.Join(cpuMountPoint, "cpu.cfs_period_us"))
 	if err != nil {
 		klog.ErrorS(err, "Failed to detect if CPU cgroup cpu.cfs_period_us is available")
 	}
-	quotaExists, err := utilpath.Exists(utilpath.CheckFollowSymlink, path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
+	quotaExists, err := utilpath.Exists(utilpath.CheckFollowSymlink, filepath.Join(cpuMountPoint, "cpu.cfs_quota_us"))
 	if err != nil {
 		klog.ErrorS(err, "Failed to detect if CPU cgroup cpu.cfs_quota_us is available")
 	}

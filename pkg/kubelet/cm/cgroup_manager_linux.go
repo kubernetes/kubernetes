@@ -113,7 +113,7 @@ func ParseSystemdToCgroupName(name string) CgroupName {
 }
 
 func (cgroupName CgroupName) ToCgroupfs() string {
-	return "/" + path.Join(cgroupName...)
+	return "/" + filepath.Join(cgroupName...)
 }
 
 func ParseCgroupfsToCgroupName(name string) CgroupName {
@@ -185,7 +185,7 @@ func (m *cgroupManagerImpl) buildCgroupPaths(name CgroupName) map[string]string 
 	cgroupFsAdaptedName := m.Name(name)
 	cgroupPaths := make(map[string]string, len(m.subsystems.MountPoints))
 	for key, val := range m.subsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, cgroupFsAdaptedName)
+		cgroupPaths[key] = filepath.Join(val, cgroupFsAdaptedName)
 	}
 	return cgroupPaths
 }
@@ -193,7 +193,7 @@ func (m *cgroupManagerImpl) buildCgroupPaths(name CgroupName) map[string]string 
 // buildCgroupUnifiedPath builds a path to the specified name.
 func (m *cgroupManagerImpl) buildCgroupUnifiedPath(name CgroupName) string {
 	cgroupFsAdaptedName := m.Name(name)
-	return path.Join(cmutil.CgroupRoot, cgroupFsAdaptedName)
+	return filepath.Join(cmutil.CgroupRoot, cgroupFsAdaptedName)
 }
 
 // libctCgroupConfig converts CgroupConfig to libcontainer's Cgroup config.
@@ -488,7 +488,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 	pidsToKill := sets.New[int]()
 	var pids []int
 	for _, val := range m.subsystems.MountPoints {
-		dir := path.Join(val, cgroupFsName)
+		dir := filepath.Join(val, cgroupFsName)
 		_, err := os.Stat(dir)
 		if os.IsNotExist(err) {
 			// The subsystem pod cgroup is already deleted

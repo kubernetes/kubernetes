@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
+	"path/filepath"
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
@@ -185,7 +185,7 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	)
 	flagSet.BoolVar(
 		&resetOptions.externalcfg.CleanupTmpDir, options.CleanupTmpDir, resetOptions.externalcfg.CleanupTmpDir,
-		fmt.Sprintf("Cleanup the %q directory", path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)),
+		fmt.Sprintf("Cleanup the %q directory", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)),
 	)
 	options.AddKubeConfigFlag(flagSet, &resetOptions.kubeconfigPath)
 	options.AddConfigFlag(flagSet, &resetOptions.cfgPath)

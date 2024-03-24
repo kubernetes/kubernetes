@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -294,7 +294,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
-								MountPath: path.Join(volumeMountPath, "delete"),
+								MountPath: filepath.Join(volumeMountPath, "delete"),
 								ReadOnly:  true,
 							},
 						},
@@ -306,7 +306,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
-								MountPath: path.Join(volumeMountPath, "update"),
+								MountPath: filepath.Join(volumeMountPath, "update"),
 								ReadOnly:  true,
 							},
 						},
@@ -318,7 +318,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
-								MountPath: path.Join(volumeMountPath, "create"),
+								MountPath: filepath.Join(volumeMountPath, "create"),
 								ReadOnly:  true,
 							},
 						},

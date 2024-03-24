@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -511,7 +512,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 func waitForWardleRunning(ctx context.Context, t *testing.T, wardleToKASKubeConfig *rest.Config, wardleCertDir string, wardlePort int) (*rest.Config, error) {
 	directWardleClientConfig := rest.AnonymousClientConfig(rest.CopyConfig(wardleToKASKubeConfig))
-	directWardleClientConfig.CAFile = path.Join(wardleCertDir, "apiserver.crt")
+	directWardleClientConfig.CAFile = filepath.Join(wardleCertDir, "apiserver.crt")
 	directWardleClientConfig.CAData = nil
 	directWardleClientConfig.ServerName = ""
 	directWardleClientConfig.BearerToken = wardleToKASKubeConfig.BearerToken

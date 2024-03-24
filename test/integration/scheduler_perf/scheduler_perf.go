@@ -24,7 +24,7 @@ import (
 	"io"
 	"math"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -616,7 +616,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 		output = framework.NewTBWriter(tb)
 	} else {
 		tmpDir := tb.TempDir()
-		logfileName := path.Join(tmpDir, "output.log")
+		logfileName := filepath.Join(tmpDir, "output.log")
 		fileOutput, err := os.Create(logfileName)
 		if err != nil {
 			tb.Fatalf("create log file: %v", err)

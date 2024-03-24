@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -499,7 +499,7 @@ kind: KubeProxyConfiguration
 			flags := tc.flags
 			if len(tc.config) > 0 {
 				tmp := t.TempDir()
-				configFile := path.Join(tmp, "kube-proxy.conf")
+				configFile := filepath.Join(tmp, "kube-proxy.conf")
 				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
 				flags = append(flags, "--config", configFile)
 			}

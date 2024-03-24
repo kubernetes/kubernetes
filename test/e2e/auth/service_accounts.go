@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -101,11 +101,11 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
 		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
-		mountedToken, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
+		mountedToken, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, filepath.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
 		framework.ExpectNoError(err)
-		mountedCA, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey))
+		mountedCA, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, filepath.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey))
 		framework.ExpectNoError(err)
-		mountedNamespace, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey))
+		mountedNamespace, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, filepath.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey))
 		framework.ExpectNoError(err)
 
 		// CA and namespace should be identical
@@ -583,7 +583,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
 						"test-service-account-issuer-discovery",
-						"--token-path", path.Join(tokenPath, tokenName),
+						"--token-path", filepath.Join(tokenPath, tokenName),
 						"--audience", audience,
 					},
 					VolumeMounts: []v1.VolumeMount{{

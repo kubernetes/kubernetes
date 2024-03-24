@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -183,7 +184,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 
 	// Adjust the loopback config for external use (external server name and CA)
 	kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
-	kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
+	kubeAPIServerClientConfig.CAFile = filepath.Join(certDir, "apiserver.crt")
 	kubeAPIServerClientConfig.CAData = nil
 	kubeAPIServerClientConfig.ServerName = ""
 

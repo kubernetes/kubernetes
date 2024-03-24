@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -342,7 +342,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
-								MountPath: path.Join(volumeMountPath, "delete"),
+								MountPath: filepath.Join(volumeMountPath, "delete"),
 								ReadOnly:  true,
 							},
 						},
@@ -354,7 +354,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
-								MountPath: path.Join(volumeMountPath, "update"),
+								MountPath: filepath.Join(volumeMountPath, "update"),
 								ReadOnly:  true,
 							},
 						},
@@ -366,7 +366,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
-								MountPath: path.Join(volumeMountPath, "create"),
+								MountPath: filepath.Join(volumeMountPath, "create"),
 								ReadOnly:  true,
 							},
 						},
@@ -689,7 +689,7 @@ func createNonOptionalConfigMapPod(ctx context.Context, f *framework.Framework, 
 	createVolumeName := "createcm-volume"
 
 	// creating a pod without configMap object created, by mentioning the configMap volume source's local reference name
-	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, createVolumeName, createName, path.Join(volumeMountPath, "create"),
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, createVolumeName, createName, filepath.Join(volumeMountPath, "create"),
 		"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1")
 	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Optional = &falseValue
 
@@ -713,7 +713,7 @@ func createNonOptionalConfigMapPodWithConfig(ctx context.Context, f *framework.F
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 	// creating a pod with configMap object, but with different key which is not present in configMap object.
-	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, createVolumeName, createName, path.Join(volumeMountPath, "create"),
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, createVolumeName, createName, filepath.Join(volumeMountPath, "create"),
 		"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1")
 	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Optional = &falseValue
 	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items = []v1.KeyToPath{

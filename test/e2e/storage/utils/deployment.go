@@ -19,6 +19,7 @@ package utils
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -68,7 +69,7 @@ func PatchCSIDeployment(f *e2eframework.Framework, o PatchCSIOptions, object int
 				p := &volume.HostPath.Path
 				dir, file := path.Split(*p)
 				if file == o.OldDriverName {
-					*p = path.Join(dir, o.NewDriverName)
+					*p = filepath.Join(dir, o.NewDriverName)
 				}
 				// Inject non-standard kubelet path.
 				*p = substKubeletRootDir(*p)

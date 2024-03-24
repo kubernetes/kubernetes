@@ -19,7 +19,7 @@ package providers
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -61,7 +61,7 @@ func MasterUpgradeGKE(ctx context.Context, namespace string, v string) error {
 // GCEUpgradeScript returns path of script for upgrading on GCE.
 func GCEUpgradeScript() string {
 	if len(framework.TestContext.GCEUpgradeScript) == 0 {
-		return path.Join(framework.TestContext.RepoRoot, "cluster/gce/upgrade.sh")
+		return filepath.Join(framework.TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
 	return framework.TestContext.GCEUpgradeScript
 }

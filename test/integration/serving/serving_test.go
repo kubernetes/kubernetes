@@ -24,7 +24,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -242,7 +242,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 
 				// read self-signed server cert disk
 				pool := x509.NewCertPool()
-				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+				serverCertPath := filepath.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
 				serverCert, err := os.ReadFile(serverCertPath)
 				if err != nil {
 					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)

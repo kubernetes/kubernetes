@@ -22,7 +22,6 @@ package oom
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -60,7 +59,7 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	}
 
 	maxTries := 2
-	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
+	oomScoreAdjPath := filepath.Join("/proc", pidStr, "oom_score_adj")
 	value := strconv.Itoa(oomScoreAdj)
 	klog.V(4).Infof("attempting to set %q to %q", oomScoreAdjPath, value)
 	var err error

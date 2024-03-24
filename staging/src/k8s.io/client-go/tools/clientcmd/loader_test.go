@@ -539,13 +539,13 @@ func TestResolveRelativePaths(t *testing.T) {
 
 	configDir1, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir1)
-	configFile1 := path.Join(configDir1, ".kubeconfig")
+	configFile1 := filepath.Join(configDir1, ".kubeconfig")
 	configDir1, _ = filepath.Abs(configDir1)
 
 	configDir2, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir2)
 	configDir2, _ = os.MkdirTemp(configDir2, "")
-	configFile2 := path.Join(configDir2, ".kubeconfig")
+	configFile2 := filepath.Join(configDir2, ".kubeconfig")
 	configDir2, _ = filepath.Abs(configDir2)
 
 	WriteToFile(pathResolutionConfig1, configFile1)

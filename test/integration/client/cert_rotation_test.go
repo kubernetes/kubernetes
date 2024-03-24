@@ -28,6 +28,7 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -159,7 +160,7 @@ func writeCACertFiles(t *testing.T, certDir string) (string, *x509.Certificate, 
 		t.Fatal(err)
 	}
 
-	clientCAFilename := path.Join(certDir, "ca.crt")
+	clientCAFilename := filepath.Join(certDir, "ca.crt")
 
 	if err := os.WriteFile(clientCAFilename, utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
@@ -207,9 +208,9 @@ func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigning
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(path.Join(certDir, "client.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDERBytes}), 0666); err != nil {
+	if err := os.WriteFile(filepath.Join(certDir, "client.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDERBytes}), 0666); err != nil {
 		t.Fatal(err)
 	}
 
-	return path.Join(certDir, "client.crt"), path.Join(certDir, "client.key")
+	return filepath.Join(certDir, "client.crt"), filepath.Join(certDir, "client.key")
 }
