@@ -334,7 +334,8 @@ func (o *DrainCmdOptions) RunDrain() error {
 	var fatal []error
 
 	remainingNodes := []string{}
-	for _, info := range o.nodeInfos {
+	nodeCount := len(o.nodeInfos)
+	for idx, info := range o.nodeInfos {
 		if err := o.deleteOrEvictPodsSimple(info); err == nil {
 			drainedNodes.Insert(info.Name)
 
@@ -355,7 +356,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 			continue
 		}
 
-		if o.drainer.DelayBetweenNodeSeconds > 0 {
+		if o.drainer.DelayBetweenNodeSeconds > 0 && idx+1 < nodeCount {
 			fmt.Fprintf(o.Out, "Waiting %d seconds before starting next node...\n", o.drainer.DelayBetweenNodeSeconds)
 			time.Sleep(time.Duration(o.drainer.DelayBetweenNodeSeconds) * time.Second)
 		}
