@@ -12,6 +12,17 @@ tests:
       apiVersion: config.openshift.io/v1
       kind: Authentication
       spec: {}
+  - name: Should be able to use the OIDC type
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Authentication
+      spec:
+        type: OIDC
   - name: Cannot set username claim prefix with policy NoPrefix
     initial: |
       apiVersion: config.openshift.io/v1

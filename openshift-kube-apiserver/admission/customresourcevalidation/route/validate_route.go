@@ -1,6 +1,7 @@
 package route
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -47,7 +48,7 @@ func toRoute(uncastObj runtime.Object) (*routev1.Route, field.ErrorList) {
 type routeV1 struct {
 }
 
-func (routeV1) ValidateCreate(obj runtime.Object) field.ErrorList {
+func (routeV1) ValidateCreate(_ context.Context, obj runtime.Object) field.ErrorList {
 	routeObj, errs := toRoute(obj)
 	if len(errs) > 0 {
 		return errs
@@ -56,7 +57,7 @@ func (routeV1) ValidateCreate(obj runtime.Object) field.ErrorList {
 	return routevalidation.ValidateRoute(routeObj)
 }
 
-func (routeV1) ValidateUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+func (routeV1) ValidateUpdate(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
 	routeObj, errs := toRoute(obj)
 	if len(errs) > 0 {
 		return errs
@@ -70,7 +71,7 @@ func (routeV1) ValidateUpdate(obj runtime.Object, oldObj runtime.Object) field.E
 	return routevalidation.ValidateRouteUpdate(routeObj, routeOldObj)
 }
 
-func (c routeV1) ValidateStatusUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+func (c routeV1) ValidateStatusUpdate(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
 	routeObj, errs := toRoute(obj)
 	if len(errs) > 0 {
 		return errs

@@ -16,53 +16,97 @@ spec:
     singular: imagecontentpolicy
   scope: Cluster
   versions:
-    - name: v1
-      schema:
-        openAPIV3Schema:
-          description: "ImageContentPolicy holds cluster-wide information about how to handle registry mirror rules. When multiple policies are defined, the outcome of the behavior is defined on each field. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
-          type: object
-          required:
-            - spec
-          properties:
-            apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-              type: string
-            kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-              type: string
-            metadata:
-              type: object
-            spec:
-              description: spec holds user settable values for configuration
-              type: object
-              properties:
-                repositoryDigestMirrors:
-                  description: "repositoryDigestMirrors allows images referenced by image digests in pods to be pulled from alternative mirrored repository locations. The image pull specification provided to the pod will be compared to the source locations described in RepositoryDigestMirrors and the image may be pulled down from any of the mirrors in the list instead of the specified repository allowing administrators to choose a potentially faster mirror. To pull image from mirrors by tags, should set the \"allowMirrorByTags\". \n Each “source” repository is treated independently; configurations for different “source” repositories don’t interact. \n If the \"mirrors\" is not specified, the image will continue to be pulled from the specified repository in the pull spec. \n When multiple policies are defined for the same “source” repository, the sets of defined mirrors will be merged together, preserving the relative order of the mirrors, if possible. For example, if policy A has mirrors `a, b, c` and policy B has mirrors `c, d, e`, the mirrors will be used in the order `a, b, c, d, e`.  If the orders of mirror entries conflict (e.g. `a, b` vs. `b, a`) the configuration is not rejected but the resulting order is unspecified."
-                  type: array
-                  items:
-                    description: RepositoryDigestMirrors holds cluster-wide information about how to handle mirrors in the registries config.
-                    type: object
-                    required:
-                      - source
-                    properties:
-                      allowMirrorByTags:
-                        description: allowMirrorByTags if true, the mirrors can be used to pull the images that are referenced by their tags. Default is false, the mirrors only work when pulling the images that are referenced by their digests. Pulling images by tag can potentially yield different images, depending on which endpoint we pull from. Forcing digest-pulls for mirrors avoids that issue.
-                        type: boolean
-                      mirrors:
-                        description: mirrors is zero or more repositories that may also contain the same images. If the "mirrors" is not specified, the image will continue to be pulled from the specified repository in the pull spec. No mirror will be configured. The order of mirrors in this list is treated as the user's desired priority, while source is by default considered lower priority than all mirrors. Other cluster configuration, including (but not limited to) other repositoryDigestMirrors objects, may impact the exact order mirrors are contacted in, or some mirrors may be contacted in parallel, so this should be considered a preference rather than a guarantee of ordering.
-                        type: array
-                        items:
-                          type: string
-                          pattern: ^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])(:[0-9]+)?(\/[^\/:\n]+)*(\/[^\/:\n]+((:[^\/:\n]+)|(@[^\n]+)))?$
-                        x-kubernetes-list-type: set
-                      source:
-                        description: source is the repository that users refer to, e.g. in image pull specifications.
-                        type: string
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: "ImageContentPolicy holds cluster-wide information about how
+          to handle registry mirror rules. When multiple policies are defined, the
+          outcome of the behavior is defined on each field. \n Compatibility level
+          1: Stable within a major release for a minimum of 12 months or 3 minor releases
+          (whichever is longer)."
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec holds user settable values for configuration
+            properties:
+              repositoryDigestMirrors:
+                description: "repositoryDigestMirrors allows images referenced by
+                  image digests in pods to be pulled from alternative mirrored repository
+                  locations. The image pull specification provided to the pod will
+                  be compared to the source locations described in RepositoryDigestMirrors
+                  and the image may be pulled down from any of the mirrors in the
+                  list instead of the specified repository allowing administrators
+                  to choose a potentially faster mirror. To pull image from mirrors
+                  by tags, should set the \"allowMirrorByTags\". \n Each “source”
+                  repository is treated independently; configurations for different
+                  “source” repositories don’t interact. \n If the \"mirrors\" is not
+                  specified, the image will continue to be pulled from the specified
+                  repository in the pull spec. \n When multiple policies are defined
+                  for the same “source” repository, the sets of defined mirrors will
+                  be merged together, preserving the relative order of the mirrors,
+                  if possible. For example, if policy A has mirrors `a, b, c` and
+                  policy B has mirrors `c, d, e`, the mirrors will be used in the
+                  order `a, b, c, d, e`.  If the orders of mirror entries conflict
+                  (e.g. `a, b` vs. `b, a`) the configuration is not rejected but the
+                  resulting order is unspecified."
+                items:
+                  description: RepositoryDigestMirrors holds cluster-wide information
+                    about how to handle mirrors in the registries config.
+                  properties:
+                    allowMirrorByTags:
+                      description: allowMirrorByTags if true, the mirrors can be used
+                        to pull the images that are referenced by their tags. Default
+                        is false, the mirrors only work when pulling the images that
+                        are referenced by their digests. Pulling images by tag can
+                        potentially yield different images, depending on which endpoint
+                        we pull from. Forcing digest-pulls for mirrors avoids that
+                        issue.
+                      type: boolean
+                    mirrors:
+                      description: mirrors is zero or more repositories that may also
+                        contain the same images. If the "mirrors" is not specified,
+                        the image will continue to be pulled from the specified repository
+                        in the pull spec. No mirror will be configured. The order
+                        of mirrors in this list is treated as the user's desired priority,
+                        while source is by default considered lower priority than
+                        all mirrors. Other cluster configuration, including (but not
+                        limited to) other repositoryDigestMirrors objects, may impact
+                        the exact order mirrors are contacted in, or some mirrors
+                        may be contacted in parallel, so this should be considered
+                        a preference rather than a guarantee of ordering.
+                      items:
                         pattern: ^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])(:[0-9]+)?(\/[^\/:\n]+)*(\/[^\/:\n]+((:[^\/:\n]+)|(@[^\n]+)))?$
-                  x-kubernetes-list-map-keys:
-                    - source
-                  x-kubernetes-list-type: map
-      served: true
-      storage: true
-      subresources:
-        status: {}
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                    source:
+                      description: source is the repository that users refer to, e.g.
+                        in image pull specifications.
+                      pattern: ^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])(:[0-9]+)?(\/[^\/:\n]+)*(\/[^\/:\n]+((:[^\/:\n]+)|(@[^\n]+)))?$
+                      type: string
+                  required:
+                  - source
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - source
+                x-kubernetes-list-type: map
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

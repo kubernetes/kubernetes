@@ -2,25 +2,37 @@ package apiserverconfig
 
 import (
 	"net/http"
-	"regexp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+
+	buildv1 "github.com/openshift/api/build/v1"
+	imagev1 "github.com/openshift/api/image/v1"
 )
 
-// request paths that match this regular expression will be treated as long running
-// and not subjected to the default server timeout.
-const originLongRunningEndpointsRE = "(/|^)(buildconfigs/.*/instantiatebinary|imagestreamimports)$"
-
 var (
-	originLongRunningRequestRE = regexp.MustCompile(originLongRunningEndpointsRE)
-	kubeLongRunningFunc        = genericfilters.BasicLongRunningRequestCheck(
-		sets.NewString("watch", "proxy"),
-		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
-	)
+	longRunningVerbs        = sets.NewString("watch", "proxy")
+	longRunningSubresources = sets.NewString("attach", "exec", "proxy", "log", "portforward")
+	kubeLongRunningFunc     = genericfilters.BasicLongRunningRequestCheck(longRunningVerbs, longRunningSubresources)
 )
 
 func IsLongRunningRequest(r *http.Request, requestInfo *apirequest.RequestInfo) bool {
-	return originLongRunningRequestRE.MatchString(r.URL.Path) || kubeLongRunningFunc(r, requestInfo)
+	if requestInfo == nil {
+		return false
+	}
+
+	if requestInfo.APIGroup == buildv1.GroupName &&
+		requestInfo.Resource == "buildconfigs" &&
+		requestInfo.Subresource == "instantiatebinary" {
+		return true
+	}
+	if requestInfo.APIGroup == imagev1.GroupName &&
+		requestInfo.Resource == "imagestreamimports" {
+		return true
+	}
+	if kubeLongRunningFunc(r, requestInfo) {
+		return true
+	}
+	return false
 }

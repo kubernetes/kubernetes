@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -56,7 +57,7 @@ func toDNSV1(uncastObj runtime.Object) (*operatorv1.DNS, field.ErrorList) {
 type dnsV1 struct{}
 
 // ValidateCreate validates a DNS that is being created.
-func (dnsV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (dnsV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, errs := toDNSV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -69,7 +70,7 @@ func (dnsV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 }
 
 // ValidateUpdate validates a DNS that is being updated.
-func (dnsV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (dnsV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toDNSV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -86,7 +87,7 @@ func (dnsV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Objec
 }
 
 // ValidateStatusUpdate validates a DNS status that is being updated.
-func (dnsV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (dnsV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toDNSV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

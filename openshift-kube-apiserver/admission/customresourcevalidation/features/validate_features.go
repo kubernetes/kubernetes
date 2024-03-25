@@ -1,6 +1,7 @@
 package features
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -89,7 +90,7 @@ func validateFeatureGateSpecUpdate(spec, oldSpec configv1.FeatureGateSpec) field
 	return allErrs
 }
 
-func (featureGateV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (featureGateV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, allErrs := toFeatureGateV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -101,7 +102,7 @@ func (featureGateV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return allErrs
 }
 
-func (featureGateV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (featureGateV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, allErrs := toFeatureGateV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -117,7 +118,7 @@ func (featureGateV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runti
 	return allErrs
 }
 
-func (featureGateV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (featureGateV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toFeatureGateV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

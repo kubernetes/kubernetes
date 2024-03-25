@@ -95,7 +95,6 @@ type NetworkStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 

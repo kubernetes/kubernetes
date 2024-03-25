@@ -1,6 +1,7 @@
 package kubecontrollermanager
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -68,7 +69,7 @@ func validateKubeControllerManagerSpecUpdate(spec, oldSpec operatorv1.KubeContro
 	return allErrs
 }
 
-func (kubeControllerManagerV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (kubeControllerManagerV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, allErrs := toKubeControllerManager(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -80,7 +81,7 @@ func (kubeControllerManagerV1) ValidateCreate(uncastObj runtime.Object) field.Er
 	return allErrs
 }
 
-func (kubeControllerManagerV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (kubeControllerManagerV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, allErrs := toKubeControllerManager(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -96,7 +97,7 @@ func (kubeControllerManagerV1) ValidateUpdate(uncastObj runtime.Object, uncastOl
 	return allErrs
 }
 
-func (kubeControllerManagerV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (kubeControllerManagerV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toKubeControllerManager(uncastObj)
 	if len(errs) > 0 {
 		return errs

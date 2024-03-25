@@ -1,6 +1,7 @@
 package securitycontextconstraints
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -48,7 +49,7 @@ func toSecurityContextConstraints(uncastObj runtime.Object) (*securityv1.Securit
 type securityContextConstraintsV1 struct {
 }
 
-func (securityContextConstraintsV1) ValidateCreate(obj runtime.Object) field.ErrorList {
+func (securityContextConstraintsV1) ValidateCreate(_ context.Context, obj runtime.Object) field.ErrorList {
 	securityContextConstraintsObj, errs := toSecurityContextConstraints(obj)
 	if len(errs) > 0 {
 		return errs
@@ -59,7 +60,7 @@ func (securityContextConstraintsV1) ValidateCreate(obj runtime.Object) field.Err
 	return errs
 }
 
-func (securityContextConstraintsV1) ValidateUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+func (securityContextConstraintsV1) ValidateUpdate(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
 	securityContextConstraintsObj, errs := toSecurityContextConstraints(obj)
 	if len(errs) > 0 {
 		return errs
@@ -74,6 +75,6 @@ func (securityContextConstraintsV1) ValidateUpdate(obj runtime.Object, oldObj ru
 	return errs
 }
 
-func (c securityContextConstraintsV1) ValidateStatusUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
-	return c.ValidateUpdate(obj, oldObj)
+func (c securityContextConstraintsV1) ValidateStatusUpdate(ctx context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+	return c.ValidateUpdate(ctx, obj, oldObj)
 }

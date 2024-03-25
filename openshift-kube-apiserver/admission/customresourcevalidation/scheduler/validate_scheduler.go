@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -61,7 +62,7 @@ func validateSchedulerSpec(spec configv1.SchedulerSpec) field.ErrorList {
 	return allErrs
 }
 
-func (schedulerV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (schedulerV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, allErrs := toSchedulerV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -73,7 +74,7 @@ func (schedulerV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return allErrs
 }
 
-func (schedulerV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (schedulerV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, allErrs := toSchedulerV1(uncastObj)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -89,7 +90,7 @@ func (schedulerV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime
 	return allErrs
 }
 
-func (schedulerV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (schedulerV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toSchedulerV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

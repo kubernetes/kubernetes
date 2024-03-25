@@ -11,10 +11,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 )
 
+// ObjectValidator validates a given resource across create,
+// update and status update ops.
 type ObjectValidator interface {
-	ValidateCreate(obj runtime.Object) field.ErrorList
-	ValidateUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList
-	ValidateStatusUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList
+	// TODO: add router validation logic with ctx, remove this todo once added
+	ValidateCreate(ctx context.Context, obj runtime.Object) field.ErrorList
+	ValidateUpdate(ctx context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList
+	ValidateStatusUpdate(ctx context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList
 }
 
 // ValidateCustomResource is an implementation of admission.Interface.
@@ -54,7 +57,7 @@ func (a *validateCustomResource) Validate(ctx context.Context, uncastAttributes 
 		if len(attributes.GetSubresource()) > 0 {
 			return nil
 		}
-		errors := validator.ValidateCreate(attributes.GetObject())
+		errors := validator.ValidateCreate(ctx, attributes.GetObject())
 		if len(errors) == 0 {
 			return nil
 		}
@@ -63,14 +66,14 @@ func (a *validateCustomResource) Validate(ctx context.Context, uncastAttributes 
 	case admission.Update:
 		switch attributes.GetSubresource() {
 		case "":
-			errors := validator.ValidateUpdate(attributes.GetObject(), attributes.GetOldObject())
+			errors := validator.ValidateUpdate(ctx, attributes.GetObject(), attributes.GetOldObject())
 			if len(errors) == 0 {
 				return nil
 			}
 			return apierrors.NewInvalid(attributes.GetKind().GroupKind(), attributes.GetName(), errors)
 
 		case "status":
-			errors := validator.ValidateStatusUpdate(attributes.GetObject(), attributes.GetOldObject())
+			errors := validator.ValidateStatusUpdate(ctx, attributes.GetObject(), attributes.GetOldObject())
 			if len(errors) == 0 {
 				return nil
 			}

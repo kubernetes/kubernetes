@@ -20,3 +20,4 @@
       - vpc.block.csi.ibm.io
       - powervs.csi.ibm.com
       - secrets-store.csi.k8s.io
+      - smb.csi.k8s.io

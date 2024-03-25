@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -48,7 +49,7 @@ func toOAuthV1(uncastObj runtime.Object) (*configv1.OAuth, field.ErrorList) {
 
 type oauthV1 struct{}
 
-func (oauthV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
+func (oauthV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, errs := toOAuthV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -60,7 +61,7 @@ func (oauthV1) ValidateCreate(uncastObj runtime.Object) field.ErrorList {
 	return errs
 }
 
-func (oauthV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (oauthV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toOAuthV1(uncastObj)
 	if len(errs) > 0 {
 		return errs
@@ -76,7 +77,7 @@ func (oauthV1) ValidateUpdate(uncastObj runtime.Object, uncastOldObj runtime.Obj
 	return errs
 }
 
-func (oauthV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
+func (oauthV1) ValidateStatusUpdate(_ context.Context, uncastObj runtime.Object, uncastOldObj runtime.Object) field.ErrorList {
 	obj, errs := toOAuthV1(uncastObj)
 	if len(errs) > 0 {
 		return errs

@@ -1,6 +1,7 @@
 package rolebindingrestriction
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -50,7 +51,7 @@ func toRoleBindingRestriction(uncastObj runtime.Object) (*authorizationv1.RoleBi
 type roleBindingRestrictionV1 struct {
 }
 
-func (roleBindingRestrictionV1) ValidateCreate(obj runtime.Object) field.ErrorList {
+func (roleBindingRestrictionV1) ValidateCreate(_ context.Context, obj runtime.Object) field.ErrorList {
 	roleBindingRestrictionObj, errs := toRoleBindingRestriction(obj)
 	if len(errs) > 0 {
 		return errs
@@ -62,7 +63,7 @@ func (roleBindingRestrictionV1) ValidateCreate(obj runtime.Object) field.ErrorLi
 	return errs
 }
 
-func (roleBindingRestrictionV1) ValidateUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+func (roleBindingRestrictionV1) ValidateUpdate(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
 	roleBindingRestrictionObj, errs := toRoleBindingRestriction(obj)
 	if len(errs) > 0 {
 		return errs
@@ -78,6 +79,6 @@ func (roleBindingRestrictionV1) ValidateUpdate(obj runtime.Object, oldObj runtim
 	return errs
 }
 
-func (r roleBindingRestrictionV1) ValidateStatusUpdate(obj runtime.Object, oldObj runtime.Object) field.ErrorList {
-	return r.ValidateUpdate(obj, oldObj)
+func (r roleBindingRestrictionV1) ValidateStatusUpdate(ctx context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
+	return r.ValidateUpdate(ctx, obj, oldObj)
 }
