@@ -67,11 +67,11 @@ func TestEnqueue(t *testing.T) {
 		if tc.createCRD == nil {
 			t.Fatalf("CRDs must be created first for the test to proceed")
 		}
-		manager.Enqueue(tc.createCRD, make(<-chan struct{}))
+		manager.Enqueue(tc.createCRD, make(<-chan struct{}), 0)
 
 		// update CRD
 		if tc.updateCRD != nil {
-			manager.Enqueue(tc.updateCRD, make(<-chan struct{}))
+			manager.Enqueue(tc.updateCRD, make(<-chan struct{}), 0)
 		}
 		val, ok := manager.storageVersionUpdateInfoMap.Load(fooCRD.UID)
 		if !ok {
@@ -98,15 +98,12 @@ func TestWaitForStorageVersionUpdate(t *testing.T) {
 		wantErr          bool
 		wantSVUpdateInfo *storageVersionUpdateInfo
 	}{
-		"no err if CRD seen for the first time": {
-			wantErr: false,
-			wantSVUpdateInfo: &storageVersionUpdateInfo{
-				crd: fooCRD,
-			},
+		"err if CRD not found in storageVersionUpdateInfoMap": {
+			wantErr: true,
 		},
 		"err if CRD is being deleted": {
 			crd:     terminatingCRD("foo"),
-			wantErr: false,
+			wantErr: true,
 		},
 		"no err if SV is updated successfully": {
 			crd: testCRD("foo", "2"),
@@ -250,13 +247,13 @@ func TestStorageVersionUpdateInfoSuccess(t *testing.T) {
 		}
 		// create CRDs
 		for _, crd := range tc.createCRDs {
-			manager.Enqueue(crd, nil)
+			manager.Enqueue(crd, nil, 0)
 		}
 
 		// process updates
 		for _, updatedCRD := range tc.updateCRDs {
 			time.Sleep(4 * time.Second)
-			manager.Enqueue(updatedCRD, nil)
+			manager.Enqueue(updatedCRD, nil, 0)
 		}
 
 		// validate we have the correct updated storageversion info
@@ -276,7 +273,7 @@ func TestStorageVersionUpdateInfoSuccess(t *testing.T) {
 	}
 }
 
-func TestStorageVersionUpdateFailures(t *testing.T) {
+func TestSVUpdateFailureTeardownTimeout(t *testing.T) {
 	stopCh := make(chan struct{})
 	manager := fakeManager()
 	defer manager.Shutdown(stopCh)
@@ -284,11 +281,11 @@ func TestStorageVersionUpdateFailures(t *testing.T) {
 
 	// create CRD
 	crd := testCRD("foo", "1")
-	manager.Enqueue(crd, nil)
+	manager.Enqueue(crd, nil, 0)
 
 	// process update, dont close its teardDownCh
 	updatedCRD := testCRD("foo", "2")
-	manager.Enqueue(updatedCRD, make(chan struct{}))
+	manager.Enqueue(updatedCRD, make(chan struct{}), 0)
 
 	err := manager.WaitForStorageVersionUpdate(context.TODO(), updatedCRD)
 	if err == nil {
@@ -298,7 +295,42 @@ func TestStorageVersionUpdateFailures(t *testing.T) {
 	// update the CRD again, this time close its teardDownCh
 	updatedCRD = testCRD("foo", "3")
 	teardownFinishedCh2 := make(chan struct{})
-	manager.Enqueue(updatedCRD, teardownFinishedCh2)
+	manager.Enqueue(updatedCRD, teardownFinishedCh2, 0)
+	close(teardownFinishedCh2)
+
+	err = manager.WaitForStorageVersionUpdate(context.TODO(), updatedCRD)
+	if err != nil {
+		t.Errorf("expected latest update to succeed but got fail: %v", err)
+	}
+
+	// signal manager to shutdown
+	close(stopCh)
+}
+
+func TestSVUpdateFailureRequeueAttemptsExceedThreshold(t *testing.T) {
+	stopCh := make(chan struct{})
+	manager := fakeManager()
+	defer manager.Shutdown(stopCh)
+	TeardownFinishedTimeout = 2 * time.Second
+
+	// create CRD
+	crd := testCRD("foo", "1")
+	manager.Enqueue(crd, nil, 0)
+
+	// process update, with failure count at storageversionUpdateFailureThreshold
+	// do not close teardownFinishedCh so that the update fails.
+	updatedCRD := testCRD("foo", "2")
+	manager.Enqueue(updatedCRD, make(chan struct{}), storageversionUpdateFailureThreshold)
+
+	err := manager.WaitForStorageVersionUpdate(context.TODO(), updatedCRD)
+	if err == nil {
+		t.Errorf("expected first update to error out but got success: %v", err)
+	}
+
+	// update the CRD again, with failure count 0
+	updatedCRD = testCRD("foo", "3")
+	teardownFinishedCh2 := make(chan struct{})
+	manager.Enqueue(updatedCRD, teardownFinishedCh2, 0)
 	close(teardownFinishedCh2)
 
 	err = manager.WaitForStorageVersionUpdate(context.TODO(), updatedCRD)

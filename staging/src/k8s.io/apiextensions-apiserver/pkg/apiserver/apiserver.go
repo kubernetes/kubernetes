@@ -291,11 +291,17 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// but we won't go healthy until we can handle the ones already present.
 	s.GenericAPIServer.AddPostStartHookOrDie("crd-informer-synced", func(context genericapiserver.PostStartHookContext) error {
 		return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
-			if s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced() {
-				close(hasCRDInformerSyncedSignal)
-				return true, nil
+			if !s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced() {
+				return false, nil
 			}
-			return false, nil
+			if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+				utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+				if !crdHandler.storageVersionManager.SyncSVOnStartup(s.Informers.Apiextensions().V1().CustomResourceDefinitions()) {
+					return false, nil
+				}
+			}
+			close(hasCRDInformerSyncedSignal)
+			return true, nil
 		}, context.StopCh)
 	})
 

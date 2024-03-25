@@ -514,7 +514,7 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
-		r.storageVersionManager.Enqueue(crd, tearDownFinishedCh)
+		r.storageVersionManager.Enqueue(crd, tearDownFinishedCh, 0)
 	}
 }
 
@@ -559,7 +559,7 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
-		r.storageVersionManager.Enqueue(newCRD, tearDownFinishedCh)
+		r.storageVersionManager.Enqueue(newCRD, tearDownFinishedCh, 0)
 	}
 }
 
@@ -615,8 +615,13 @@ func (r *crdHandler) removeDeadStorage() {
 
 	for uid, crdInfo := range storageMap {
 		if _, ok := storageMap2[uid]; !ok {
+			tearDownFinishedCh := make(chan struct{})
 			klog.V(4).Infof("Removing dead CRD storage for %s/%s", crdInfo.spec.Group, crdInfo.spec.Names.Kind)
-			go r.tearDown(crdInfo, nil)
+			go r.tearDown(crdInfo, tearDownFinishedCh)
+			if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+				utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+				r.storageVersionManager.DeleteSVUpdateInfo(uid, tearDownFinishedCh)
+			}
 		}
 	}
 }
