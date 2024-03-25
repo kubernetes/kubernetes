@@ -116,7 +116,7 @@ func NewManager(client genericstorageversion.Client, apiserverID string) *Manage
 // It will first update the sync.Map with the CRD, prepare updateChannels for its storageversion update.
 // And finally add it to the relevant CRD queue.
 func (m *Manager) Enqueue(crd *apiextensionsv1.CustomResourceDefinition, tearDownFinishedCh <-chan struct{}) {
-	svUpdateInfo := m.recordLatestSVUpdateInfoWithTeardown(crd, tearDownFinishedCh)
+	svUpdateInfo := m.recordLatestSVUpdateInfo(crd, tearDownFinishedCh)
 	svUpdateInfo.queue.Add(crd.UID)
 }
 
@@ -126,6 +126,14 @@ func (m *Manager) WaitForStorageVersionUpdate(ctx context.Context, crd *apiexten
 	var svUpdateInfo *storageVersionUpdateInfo
 	val, found := m.storageVersionUpdateInfoMap.Load(crd.UID)
 	if !found {
+		// This means either the CRD was deleted, or the server has restarted.
+		// In the former case, return err.
+		// In the latter case, requeue CRD for SV update.
+		if apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating) {
+			return fmt.Errorf("CRD %s is being deleted", crd.Name)
+		}
+
+		m.Enqueue(crd, nil)
 		return nil
 	}
 
@@ -158,21 +166,21 @@ func (m *Manager) Shutdown(stopCh <-chan struct{}) {
 
 // sync runs a goroutine over the provided queue to indefinitely
 // process any queued storageversion updates unless stopCh is invoked.
-func (m *Manager) sync(shutdownQueue <-chan struct{}, queue *workqueue.Type) {
+func (m *Manager) sync(shutdownQueue <-chan struct{}, queue *workqueue.Type, workerFrequency, teardownFinishedTimeout time.Duration) {
 	defer queue.ShutDownWithDrain()
 	go wait.Until(func() {
-		m.worker(queue)
-	}, WorkerFrequency, shutdownQueue)
+		m.worker(queue, teardownFinishedTimeout)
+	}, workerFrequency, shutdownQueue)
 
 	<-shutdownQueue
 }
 
-func (m *Manager) worker(queue *workqueue.Type) {
-	for m.processLatestUpdateFor(queue) {
+func (m *Manager) worker(queue *workqueue.Type, teardownFinishedTimeout time.Duration) {
+	for m.processLatestUpdateFor(queue, teardownFinishedTimeout) {
 	}
 }
 
-func (m *Manager) processLatestUpdateFor(queue *workqueue.Type) bool {
+func (m *Manager) processLatestUpdateFor(queue *workqueue.Type, teardownFinishedTimeout time.Duration) bool {
 	ctx := context.TODO()
 
 	key, quit := queue.Get()
@@ -205,12 +213,12 @@ func (m *Manager) processLatestUpdateFor(queue *workqueue.Type) bool {
 		klog.V(4).Infof("Storageversion is already processed for crdUID: %s, but returned an error.", key)
 		return true
 	default:
-		m.updateStorageVersion(ctx, latestSVUpdateInfo.crd, latestSVUpdateInfo.updateChannels.teardownFinishedCh, latestSVUpdateInfo.updateChannels.processedCh, latestSVUpdateInfo.updateChannels.errCh)
+		m.updateStorageVersion(ctx, latestSVUpdateInfo.crd, latestSVUpdateInfo.updateChannels.teardownFinishedCh, latestSVUpdateInfo.updateChannels.processedCh, latestSVUpdateInfo.updateChannels.errCh, teardownFinishedTimeout)
 		return true
 	}
 }
 
-func (m *Manager) recordLatestSVUpdateInfoWithTeardown(crd *apiextensionsv1.CustomResourceDefinition, tearDownFinishedCh <-chan struct{}) *storageVersionUpdateInfo {
+func (m *Manager) recordLatestSVUpdateInfo(crd *apiextensionsv1.CustomResourceDefinition, tearDownFinishedCh <-chan struct{}) *storageVersionUpdateInfo {
 	latestSVUpdateInfo := &storageVersionUpdateInfo{
 		crd: crd,
 		updateChannels: &storageVersionUpdateChannels{
@@ -229,7 +237,7 @@ func (m *Manager) recordLatestSVUpdateInfoWithTeardown(crd *apiextensionsv1.Cust
 		// 4. update sync.map and return it
 		queue := workqueue.NewNamed(fmt.Sprintf("%s-storageversion-updater", crd.Name))
 		latestSVUpdateInfo.queue = queue
-		go m.sync(m.shutdown, queue)
+		go m.sync(m.shutdown, queue, WorkerFrequency, TeardownFinishedTimeout)
 		m.storageVersionUpdateInfoMap.Store(crd.UID, latestSVUpdateInfo)
 		return latestSVUpdateInfo
 	}
@@ -258,7 +266,7 @@ func (m *Manager) recordLatestSVUpdateInfoWithTeardown(crd *apiextensionsv1.Cust
 // processing the StorageVersion update (note that the update can either
 // succeeded or failed).
 func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition,
-	waitCh <-chan struct{}, processedCh chan<- struct{}, errCh chan<- struct{}) {
+	waitCh <-chan struct{}, processedCh chan<- struct{}, errCh chan<- struct{}, teardownFinishedTimeout time.Duration) {
 	if waitCh != nil {
 		done := false
 		for {
@@ -271,7 +279,7 @@ func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1
 					close(errCh)
 				}
 				return
-			case <-time.After(TeardownFinishedTimeout):
+			case <-time.After(teardownFinishedTimeout):
 				klog.V(4).Infof("timeout waiting for waitCh to close before proceeding with storageversion update for %v", crd)
 				if errCh != nil {
 					close(errCh)
