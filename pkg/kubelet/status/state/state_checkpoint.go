@@ -18,7 +18,6 @@ package state
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"sync"
 
