@@ -294,6 +294,7 @@ func TestUpgradeCSA(t *testing.T) {
 		Name           string
 		CSAManagers    []string
 		SSAManager     string
+		Options        []csaupgrade.Option
 		OriginalObject []byte
 		ExpectedObject []byte
 	}{
@@ -1081,6 +1082,163 @@ metadata:
     namespace: default
 `),
 		},
+		{
+			// Expect multiple targets to be merged into a new ssa manager
+			Name:        "subresource",
+			CSAManagers: []string{"kube-controller-manager"},
+			SSAManager:  "kube-controller-manager",
+			Options:     []csaupgrade.Option{csaupgrade.Subresource("status")},
+			OriginalObject: []byte(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: openshift-storage.cephfs.csi.ceph.com
+    volume.kubernetes.io/storage-provisioner: openshift-storage.cephfs.csi.ceph.com
+  creationTimestamp: "2024-02-24T15:24:31Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+        f:accessModes: {}
+        f:resources:
+          f:requests:
+            .: {}
+            f:storage: {}
+        f:storageClassName: {}
+        f:volumeMode: {}
+    manager: Mozilla
+    operation: Update
+    time: "2024-02-24T15:24:31Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:pv.kubernetes.io/bind-completed: {}
+          f:pv.kubernetes.io/bound-by-controller: {}
+          f:volume.beta.kubernetes.io/storage-provisioner: {}
+          f:volume.kubernetes.io/storage-provisioner: {}
+      f:spec:
+        f:volumeName: {}
+    manager: kube-controller-manager
+    operation: Update
+    time: "2024-02-24T15:24:32Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:accessModes: {}
+        f:capacity:
+          .: {}
+          f:storage: {}
+        f:phase: {}
+    manager: kube-controller-manager
+    operation: Update
+    subresource: status
+    time: "2024-02-24T15:24:32Z"
+  name: test
+  namespace: default
+  resourceVersion: "948647140"
+  uid: f0692a61-0ffe-4fd5-b00f-0b95f3654fb9
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ocs-storagecluster-cephfs
+  volumeMode: Filesystem
+  volumeName: pvc-f0692a61-0ffe-4fd5-b00f-0b95f3654fb9
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  phase: Bound
+`),
+			ExpectedObject: []byte(`
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: openshift-storage.cephfs.csi.ceph.com
+    volume.kubernetes.io/storage-provisioner: openshift-storage.cephfs.csi.ceph.com
+  creationTimestamp: "2024-02-24T15:24:31Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+        f:accessModes: {}
+        f:resources:
+          f:requests:
+            .: {}
+            f:storage: {}
+        f:storageClassName: {}
+        f:volumeMode: {}
+    manager: Mozilla
+    operation: Update
+    time: "2024-02-24T15:24:31Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:pv.kubernetes.io/bind-completed: {}
+          f:pv.kubernetes.io/bound-by-controller: {}
+          f:volume.beta.kubernetes.io/storage-provisioner: {}
+          f:volume.kubernetes.io/storage-provisioner: {}
+      f:spec:
+        f:volumeName: {}
+    manager: kube-controller-manager
+    operation: Update
+    time: "2024-02-24T15:24:32Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:accessModes: {}
+        f:capacity:
+          .: {}
+          f:storage: {}
+        f:phase: {}
+    manager: kube-controller-manager
+    operation: Apply
+    subresource: status
+    time: "2024-02-24T15:24:32Z"
+  name: test
+  namespace: default
+  resourceVersion: "948647140"
+  uid: f0692a61-0ffe-4fd5-b00f-0b95f3654fb9
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ocs-storagecluster-cephfs
+  volumeMode: Filesystem
+  volumeName: pvc-f0692a61-0ffe-4fd5-b00f-0b95f3654fb9
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  phase: Bound
+`),
+		},
 	}
 
 	for _, testCase := range cases {
@@ -1096,6 +1254,7 @@ metadata:
 				upgraded,
 				sets.New(testCase.CSAManagers...),
 				testCase.SSAManager,
+				testCase.Options...,
 			)
 
 			if err != nil {
@@ -1118,7 +1277,7 @@ metadata:
 
 			initialCopy := initialObject.DeepCopyObject()
 			patchBytes, err := csaupgrade.UpgradeManagedFieldsPatch(
-				initialCopy, sets.New(testCase.CSAManagers...), testCase.SSAManager)
+				initialCopy, sets.New(testCase.CSAManagers...), testCase.SSAManager, testCase.Options...)
 
 			if err != nil {
 				t.Fatal(err)

@@ -88,7 +88,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo,
 	updateCPUNanoCoreUsage bool) error {
-	for _, criContainerStat := range criSandboxStat.Windows.Containers {
+	for _, criContainerStat := range criSandboxStat.GetWindows().GetContainers() {
 		container, found := containerMap[criContainerStat.Attributes.Id]
 		if !found {
 			continue
@@ -142,7 +142,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 			result.Memory.AvailableBytes = &stats.Memory.AvailableBytes.Value
 		}
 		if stats.Memory.PageFaults != nil {
-			result.Memory.AvailableBytes = &stats.Memory.PageFaults.Value
+			result.Memory.PageFaults = &stats.Memory.PageFaults.Value
 		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))

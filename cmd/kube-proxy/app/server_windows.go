@@ -41,6 +41,9 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 	if config.Mode == "" {
 		config.Mode = proxyconfigapi.ProxyModeKernelspace
 	}
+	if config.Winkernel.RootHnsEndpointName == "" {
+		config.Winkernel.RootHnsEndpointName = "cbr0"
+	}
 }
 
 // platformSetup is called after setting up the ProxyServer, but before creating the

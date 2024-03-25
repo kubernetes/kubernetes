@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -704,80 +706,104 @@ func TestDropProcMount(t *testing.T) {
 }
 
 func TestDropAppArmor(t *testing.T) {
-	podWithAppArmor := func() *api.Pod {
-		return &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.AppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
+	tests := []struct {
+		description    string
+		hasAnnotations bool
+		hasFields      bool
+		pod            api.Pod
+	}{{
+		description:    "with AppArmor Annotations",
+		hasAnnotations: true,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
 			Spec:       api.PodSpec{},
-		}
-	}
-	podWithoutAppArmor := func() *api.Pod {
-		return &api.Pod{
+		},
+	}, {
+		description:    "with AppArmor Annotations & fields",
+		hasAnnotations: true,
+		hasFields:      true,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					AppArmorProfile: &api.AppArmorProfile{
+						Type: api.AppArmorProfileTypeRuntimeDefault,
+					},
+				},
+			},
+		},
+	}, {
+		description: "with pod AppArmor profile",
+		hasFields:   true,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					AppArmorProfile: &api.AppArmorProfile{
+						Type: api.AppArmorProfileTypeRuntimeDefault,
+					},
+				},
+			},
+		},
+	}, {
+		description: "with container AppArmor profile",
+		hasFields:   true,
+		pod: api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec: api.PodSpec{
+				Containers: []api.Container{{
+					SecurityContext: &api.SecurityContext{
+						AppArmorProfile: &api.AppArmorProfile{
+							Type: api.AppArmorProfileTypeRuntimeDefault,
+						},
+					},
+				}},
+			},
+		},
+	}, {
+		description: "without AppArmor",
+		pod: api.Pod{
 			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
 			Spec:       api.PodSpec{},
-		}
-	}
-
-	podInfo := []struct {
-		description string
-		hasAppArmor bool
-		pod         func() *api.Pod
-	}{
-		{
-			description: "has AppArmor",
-			hasAppArmor: true,
-			pod:         podWithAppArmor,
 		},
-		{
-			description: "does not have AppArmor",
-			hasAppArmor: false,
-			pod:         podWithoutAppArmor,
-		},
-		{
-			description: "is nil",
-			hasAppArmor: false,
-			pod:         func() *api.Pod { return nil },
-		},
-	}
+	}}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasAppArmor, oldPod := oldPodInfo.hasAppArmor, oldPodInfo.pod()
-				newPodHasAppArmor, newPod := newPodInfo.hasAppArmor, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+	for _, test := range tests {
+		for _, enabled := range []bool{true, false} {
+			for _, fieldsEnabled := range []bool{true, false} {
+				t.Run(fmt.Sprintf("%v/enabled=%v/fields=%v", test.description, enabled, fieldsEnabled), func(t *testing.T) {
 					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmorFields, fieldsEnabled)()
 
-					DropDisabledPodFields(newPod, oldPod)
+					newPod := test.pod.DeepCopy()
 
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					if hasAnnotations := appArmorAnnotationsInUse(newPod.Annotations); hasAnnotations != test.hasAnnotations {
+						t.Errorf("appArmorAnnotationsInUse does not match expectation: %t != %t", hasAnnotations, test.hasAnnotations)
+					}
+					if hasFields := appArmorFieldsInUse(&newPod.Spec); hasFields != test.hasFields {
+						t.Errorf("appArmorFieldsInUse does not match expectation: %t != %t", hasFields, test.hasFields)
 					}
 
-					switch {
-					case enabled || oldPodHasAppArmor:
-						// new pod should not be changed if the feature is enabled, or if the old pod had AppArmor
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasAppArmor:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have AppArmor
-						if !reflect.DeepEqual(newPod, podWithoutAppArmor()) {
-							t.Errorf("new pod had EmptyDir SizeLimit: %v", cmp.Diff(newPod, podWithoutAppArmor()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
+					DropDisabledPodFields(newPod, newPod)
+					require.Equal(t, &test.pod, newPod, "unchanged pod should never be mutated")
+
+					DropDisabledPodFields(newPod, nil)
+
+					if enabled && fieldsEnabled {
+						assert.Equal(t, &test.pod, newPod, "pod should not be mutated when both feature gates are enabled")
+						return
+					}
+
+					expectAnnotations := test.hasAnnotations && enabled
+					assert.Equal(t, expectAnnotations, appArmorAnnotationsInUse(newPod.Annotations), "AppArmor annotations expectation")
+					if expectAnnotations == test.hasAnnotations {
+						assert.Equal(t, test.pod.Annotations, newPod.Annotations, "annotations should not be mutated")
+					}
+
+					expectFields := test.hasFields && enabled && fieldsEnabled
+					assert.Equal(t, expectFields, appArmorFieldsInUse(&newPod.Spec), "AppArmor fields expectation")
+					if expectFields == test.hasFields {
+						assert.Equal(t, &test.pod.Spec, &newPod.Spec, "PodSpec should not be mutated")
 					}
 				})
 			}
@@ -998,173 +1024,6 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 	}
 }
 
-func TestDropDisabledTopologySpreadConstraintsFields(t *testing.T) {
-	testCases := []struct {
-		name        string
-		enabled     bool
-		podSpec     *api.PodSpec
-		oldPodSpec  *api.PodSpec
-		wantPodSpec *api.PodSpec
-	}{
-		{
-			name:        "TopologySpreadConstraints is nil",
-			podSpec:     &api.PodSpec{},
-			oldPodSpec:  &api.PodSpec{},
-			wantPodSpec: &api.PodSpec{},
-		},
-		{
-			name:        "TopologySpreadConstraints is empty",
-			podSpec:     &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{}},
-			oldPodSpec:  &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{}},
-			wantPodSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{}},
-		},
-		{
-			name: "TopologySpreadConstraints is not empty, but all constraints don't have minDomains",
-			podSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{
-				{
-					MinDomains: nil,
-				},
-				{
-					MinDomains: nil,
-				},
-			}},
-			oldPodSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{
-				{
-					MinDomains: nil,
-				},
-				{
-					MinDomains: nil,
-				},
-			}},
-			wantPodSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{
-				{
-					MinDomains: nil,
-				},
-				{
-					MinDomains: nil,
-				},
-			}},
-		},
-		{
-			name: "one constraint in podSpec has non-empty minDomains, feature gate is disabled " +
-				"and all constraint in oldPodSpec doesn't have minDomains",
-			enabled: false,
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						MinDomains: pointer.Int32(2),
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						MinDomains: nil,
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						// cleared.
-						MinDomains: nil,
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-		},
-		{
-			name: "one constraint in podSpec has non-empty minDomains, feature gate is disabled " +
-				"and one constraint in oldPodSpec has minDomains",
-			enabled: false,
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						MinDomains: pointer.Int32(2),
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						MinDomains: pointer.Int32(2),
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						// not cleared.
-						MinDomains: pointer.Int32(2),
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-		},
-		{
-			name: "one constraint in podSpec has non-empty minDomains, feature gate is enabled" +
-				"and all constraint in oldPodSpec doesn't have minDomains",
-			enabled: true,
-			podSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						MinDomains: pointer.Int32(2),
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						MinDomains: nil,
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-			wantPodSpec: &api.PodSpec{
-				TopologySpreadConstraints: []api.TopologySpreadConstraint{
-					{
-						// not cleared.
-						MinDomains: pointer.Int32(2),
-					},
-					{
-						MinDomains: nil,
-					},
-				},
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, tc.enabled)()
-			dropDisabledFields(tc.podSpec, nil, tc.oldPodSpec, nil)
-			if diff := cmp.Diff(tc.wantPodSpec, tc.podSpec); diff != "" {
-				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
 func TestDropDisabledPodStatusFields(t *testing.T) {
 	podWithHostIPs := func() *api.PodStatus {
 		return &api.PodStatus{
@@ -1179,81 +1038,42 @@ func TestDropDisabledPodStatusFields(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		podStatus      *api.PodStatus
-		oldPodStatus   *api.PodStatus
-		wantPodStatus  *api.PodStatus
-		featureEnabled bool
+		name          string
+		podStatus     *api.PodStatus
+		oldPodStatus  *api.PodStatus
+		wantPodStatus *api.PodStatus
 	}{
 		{
-			name:           "gate off, old=without, new=without",
-			oldPodStatus:   podWithoutHostIPs(),
-			podStatus:      podWithoutHostIPs(),
-			featureEnabled: false,
+			name:         "old=without, new=without",
+			oldPodStatus: podWithoutHostIPs(),
+			podStatus:    podWithoutHostIPs(),
 
 			wantPodStatus: podWithoutHostIPs(),
 		},
 		{
-			name:           "gate off, old=without, new=with",
-			oldPodStatus:   podWithoutHostIPs(),
-			podStatus:      podWithHostIPs(),
-			featureEnabled: false,
-
-			wantPodStatus: podWithoutHostIPs(),
-		},
-		{
-			name:           "gate off, old=with, new=without",
-			oldPodStatus:   podWithHostIPs(),
-			podStatus:      podWithoutHostIPs(),
-			featureEnabled: false,
-
-			wantPodStatus: podWithoutHostIPs(),
-		},
-		{
-			name:           "gate off, old=with, new=with",
-			oldPodStatus:   podWithHostIPs(),
-			podStatus:      podWithHostIPs(),
-			featureEnabled: false,
+			name:         "old=without, new=with",
+			oldPodStatus: podWithoutHostIPs(),
+			podStatus:    podWithHostIPs(),
 
 			wantPodStatus: podWithHostIPs(),
 		},
 		{
-			name:           "gate on, old=without, new=without",
-			oldPodStatus:   podWithoutHostIPs(),
-			podStatus:      podWithoutHostIPs(),
-			featureEnabled: true,
+			name:         "old=with, new=without",
+			oldPodStatus: podWithHostIPs(),
+			podStatus:    podWithoutHostIPs(),
 
 			wantPodStatus: podWithoutHostIPs(),
 		},
 		{
-			name:           "gate on, old=without, new=with",
-			oldPodStatus:   podWithoutHostIPs(),
-			podStatus:      podWithHostIPs(),
-			featureEnabled: true,
-
-			wantPodStatus: podWithHostIPs(),
-		},
-		{
-			name:           "gate on, old=with, new=without",
-			oldPodStatus:   podWithHostIPs(),
-			podStatus:      podWithoutHostIPs(),
-			featureEnabled: true,
-
-			wantPodStatus: podWithoutHostIPs(),
-		},
-		{
-			name:           "gate on, old=with, new=with",
-			oldPodStatus:   podWithHostIPs(),
-			podStatus:      podWithHostIPs(),
-			featureEnabled: true,
+			name:         "old=with, new=with",
+			oldPodStatus: podWithHostIPs(),
+			podStatus:    podWithHostIPs(),
 
 			wantPodStatus: podWithHostIPs(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, tt.featureEnabled)()
-
 			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
 
 			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
@@ -2602,88 +2422,6 @@ func TestDropHostUsers(t *testing.T) {
 
 }
 
-func TestDropSchedulingGates(t *testing.T) {
-	podWithSchedulingGates := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				SchedulingGates: []api.PodSchedulingGate{
-					{Name: "foo"},
-					{Name: "bar"},
-				},
-			},
-		}
-	}
-	podWithoutSchedulingGates := func() *api.Pod { return &api.Pod{} }
-
-	podInfo := []struct {
-		description             string
-		hasSchedulingGatesField bool
-		pod                     func() *api.Pod
-	}{
-		{
-			description:             "has SchedulingGates field",
-			hasSchedulingGatesField: true,
-			pod:                     podWithSchedulingGates,
-		},
-		{
-			description:             "does not have SchedulingGates field",
-			hasSchedulingGatesField: false,
-			pod:                     podWithoutSchedulingGates,
-		},
-		{
-			description:             "is nil",
-			hasSchedulingGatesField: false,
-			pod:                     func() *api.Pod { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasSchedulingGates, oldPod := oldPodInfo.hasSchedulingGatesField, oldPodInfo.pod()
-				newPodHasSchedulingGates, newPod := newPodInfo.hasSchedulingGatesField, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, enabled)()
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-					// Old Pod should never be changed.
-					if diff := cmp.Diff(oldPod, oldPodInfo.pod()); diff != "" {
-						t.Errorf("old pod changed: %v", diff)
-					}
-					switch {
-					case enabled || oldPodHasSchedulingGates:
-						// New Pod should not be changed if the feature is enabled, or if the old Pod had schedulingGates.
-						if diff := cmp.Diff(newPod, newPodInfo.pod()); diff != "" {
-							t.Errorf("new pod changed: %v", diff)
-						}
-					case newPodHasSchedulingGates:
-						// New Pod should be changed.
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// New Pod should not have SchedulingGates field.
-						if diff := cmp.Diff(newPod, podWithoutSchedulingGates()); diff != "" {
-							t.Errorf("new pod has SchedulingGates field: %v", diff)
-						}
-					default:
-						// New pod should not need to be changed.
-						if diff := cmp.Diff(newPod, newPodInfo.pod()); diff != "" {
-							t.Errorf("new pod changed: %v", diff)
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
 func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -3468,6 +3206,239 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 			dropDisabledClusterTrustBundleProjection(tc.newPod, tc.oldPod)
 			if diff := cmp.Diff(tc.newPod, tc.wantPod); diff != "" {
 				t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDropPodLifecycleSleepAction(t *testing.T) {
+	makeSleepHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			Sleep: &api.SleepAction{Seconds: 1},
+		}
+	}
+
+	makeExecHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			Exec: &api.ExecAction{Command: []string{"foo"}},
+		}
+	}
+
+	makeHTTPGetHandler := func() *api.LifecycleHandler {
+		return &api.LifecycleHandler{
+			HTTPGet: &api.HTTPGetAction{Host: "foo"},
+		}
+	}
+
+	makeContainer := func(preStop, postStart *api.LifecycleHandler) api.Container {
+		container := api.Container{Name: "foo"}
+		if preStop != nil || postStart != nil {
+			container.Lifecycle = &api.Lifecycle{
+				PostStart: postStart,
+				PreStop:   preStop,
+			}
+		}
+		return container
+	}
+
+	makeEphemeralContainer := func(preStop, postStart *api.LifecycleHandler) api.EphemeralContainer {
+		container := api.EphemeralContainer{
+			EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "foo"},
+		}
+		if preStop != nil || postStart != nil {
+			container.Lifecycle = &api.Lifecycle{
+				PostStart: postStart,
+				PreStop:   preStop,
+			}
+		}
+		return container
+	}
+
+	makePod := func(containers []api.Container, initContainers []api.Container, ephemeralContainers []api.EphemeralContainer) *api.PodSpec {
+		return &api.PodSpec{
+			Containers:          containers,
+			InitContainers:      initContainers,
+			EphemeralContainers: ephemeralContainers,
+		}
+	}
+
+	testCases := []struct {
+		gateEnabled            bool
+		oldLifecycleHandler    *api.LifecycleHandler
+		newLifecycleHandler    *api.LifecycleHandler
+		expectLifecycleHandler *api.LifecycleHandler
+	}{
+		// nil -> nil
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    nil,
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    nil,
+			expectLifecycleHandler: nil,
+		},
+		// nil -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// nil -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    nil,
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		// exec -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// exec -> http
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeHTTPGetHandler(),
+			expectLifecycleHandler: makeHTTPGetHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeHTTPGetHandler(),
+			expectLifecycleHandler: makeHTTPGetHandler(),
+		},
+		// exec -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: nil,
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeExecHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		// sleep -> exec
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeExecHandler(),
+			expectLifecycleHandler: makeExecHandler(),
+		},
+		// sleep -> sleep
+		{
+			gateEnabled:            false,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+		{
+			gateEnabled:            true,
+			oldLifecycleHandler:    makeSleepHandler(),
+			newLifecycleHandler:    makeSleepHandler(),
+			expectLifecycleHandler: makeSleepHandler(),
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)()
+
+			// preStop
+			// container
+			{
+				oldPod := makePod([]api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				newPod := makePod([]api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				expectPod := makePod([]api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// InitContainer
+			{
+				oldPod := makePod(nil, []api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil)
+				newPod := makePod(nil, []api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil)
+				expectPod := makePod(nil, []api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// EphemeralContainer
+			{
+				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.oldLifecycleHandler.DeepCopy(), nil)})
+				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.newLifecycleHandler.DeepCopy(), nil)})
+				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.expectLifecycleHandler.DeepCopy(), nil)})
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// postStart
+			// container
+			{
+				oldPod := makePod([]api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil, nil)
+				newPod := makePod([]api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil, nil)
+				expectPod := makePod([]api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// InitContainer
+			{
+				oldPod := makePod(nil, []api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil)
+				newPod := makePod(nil, []api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil)
+				expectPod := makePod(nil, []api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// EphemeralContainer
+			{
+				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.oldLifecycleHandler.DeepCopy())})
+				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.newLifecycleHandler.DeepCopy())})
+				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.expectLifecycleHandler.DeepCopy())})
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
 			}
 		})
 	}

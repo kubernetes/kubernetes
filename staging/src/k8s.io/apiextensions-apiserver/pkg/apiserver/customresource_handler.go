@@ -725,8 +725,20 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
 		resource := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Plural}
+		if len(resource.Resource) == 0 {
+			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.plural", crd.Name))
+			return nil, fmt.Errorf("the server could not properly serve the resource")
+		}
 		singularResource := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Singular}
+		if len(singularResource.Resource) == 0 {
+			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.singular", crd.Name))
+			return nil, fmt.Errorf("the server could not properly serve the resource")
+		}
 		kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.Kind}
+		if len(kind.Kind) == 0 {
+			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.kind", crd.Name))
+			return nil, fmt.Errorf("the server could not properly serve the kind")
+		}
 		equivalentResourceRegistry.RegisterKindFor(resource, "", kind)
 
 		typer := newUnstructuredObjectTyper(parameterScheme)
@@ -794,11 +806,17 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
 		}
 
+		listKind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind}
+		if len(listKind.Kind) == 0 {
+			utilruntime.HandleError(fmt.Errorf("CustomResourceDefinition %s has unexpected empty status.acceptedNames.listKind", crd.Name))
+			return nil, fmt.Errorf("the server could not properly serve the list kind")
+		}
+
 		storages[v.Name] = customresource.NewStorage(
 			resource.GroupResource(),
 			singularResource.GroupResource(),
 			kind,
-			schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind},
+			listKind,
 			customresource.NewStrategy(
 				typer,
 				crd.Spec.Scope == apiextensionsv1.NamespaceScoped,
@@ -808,6 +826,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				structuralSchemas[v.Name],
 				statusSpec,
 				scaleSpec,
+				v.SelectableFields,
 			),
 			crdConversionRESTOptionsGetter{
 				RESTOptionsGetter:     r.restOptionsGetter,

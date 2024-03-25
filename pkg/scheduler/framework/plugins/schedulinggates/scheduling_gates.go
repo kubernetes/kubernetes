@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -31,9 +30,7 @@ import (
 const Name = names.SchedulingGates
 
 // SchedulingGates checks if a Pod carries .spec.schedulingGates.
-type SchedulingGates struct {
-	EnablePodSchedulingReadiness bool
-}
+type SchedulingGates struct{}
 
 var _ framework.PreEnqueuePlugin = &SchedulingGates{}
 var _ framework.EnqueueExtensions = &SchedulingGates{}
@@ -43,7 +40,7 @@ func (pl *SchedulingGates) Name() string {
 }
 
 func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
-	if !pl.EnablePodSchedulingReadiness || len(p.Spec.SchedulingGates) == 0 {
+	if len(p.Spec.SchedulingGates) == 0 {
 		return nil
 	}
 	gates := make([]string, 0, len(p.Spec.SchedulingGates))
@@ -60,6 +57,6 @@ func (pl *SchedulingGates) EventsToRegister() []framework.ClusterEventWithHint {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
-	return &SchedulingGates{EnablePodSchedulingReadiness: fts.EnablePodSchedulingReadiness}, nil
+func New(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return &SchedulingGates{}, nil
 }

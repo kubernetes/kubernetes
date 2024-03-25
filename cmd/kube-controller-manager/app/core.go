@@ -375,7 +375,7 @@ func startPersistentVolumeAttachDetachController(ctx context.Context, controller
 	ctx = klog.NewContext(ctx, logger)
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
-			logger,
+			ctx,
 			controllerContext.ClientBuilder.ClientOrDie("attachdetach-controller"),
 			controllerContext.InformerFactory.Core().V1().Pods(),
 			controllerContext.InformerFactory.Core().V1().Nodes(),
@@ -389,6 +389,7 @@ func startPersistentVolumeAttachDetachController(ctx context.Context, controller
 			GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
+			controllerContext.ComponentConfig.AttachDetachController.DisableForceDetachOnTimeout,
 			attachdetach.DefaultTimerConfig,
 		)
 	if attachDetachControllerErr != nil {
@@ -415,6 +416,7 @@ func startPersistentVolumeExpanderController(ctx context.Context, controllerCont
 	csiTranslator := csitrans.New()
 
 	expandController, expandControllerErr := expand.NewExpandController(
+		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("expand-controller"),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.Cloud,
@@ -440,6 +442,7 @@ func newEphemeralVolumeControllerDescriptor() *ControllerDescriptor {
 
 func startEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	ephemeralController, err := ephemeral.NewController(
+		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims())
@@ -488,6 +491,7 @@ func newEndpointsControllerDescriptor() *ControllerDescriptor {
 
 func startEndpointsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go endpointcontroller.NewEndpointController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Services(),
 		controllerContext.InformerFactory.Core().V1().Endpoints(),
@@ -507,7 +511,7 @@ func newReplicationControllerDescriptor() *ControllerDescriptor {
 
 func startReplicationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go replicationcontroller.NewReplicationManager(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().ReplicationControllers(),
 		controllerContext.ClientBuilder.ClientOrDie("replication-controller"),
@@ -684,16 +688,16 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 	for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
-	garbageCollector, err := garbagecollector.NewGarbageCollector(
+
+	garbageCollector, err := garbagecollector.NewComposedGarbageCollector(
+		ctx,
 		gcClientset,
 		metadataClient,
 		controllerContext.RESTMapper,
-		ignoredResources,
-		controllerContext.ObjectOrMetadataInformerFactory,
-		controllerContext.InformersStarted,
+		controllerContext.GraphBuilder,
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %v", err)
+		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %w", err)
 	}
 
 	// Start the garbage collector.

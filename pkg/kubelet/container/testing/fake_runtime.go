@@ -362,6 +362,14 @@ func (f *FakeRuntime) GetImageRef(_ context.Context, image kubecontainer.ImageSp
 	return "", f.InspectErr
 }
 
+func (f *FakeRuntime) GetImageSize(_ context.Context, image kubecontainer.ImageSpec) (uint64, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetImageSize")
+	return 0, f.Err
+}
+
 func (f *FakeRuntime) ListImages(_ context.Context) ([]kubecontainer.Image, error) {
 	f.Lock()
 	defer f.Unlock()

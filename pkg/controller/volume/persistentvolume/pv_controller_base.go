@@ -77,7 +77,7 @@ type ControllerParameters struct {
 
 // NewController creates a new PersistentVolume controller
 func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolumeController, error) {
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 
 	controller := &PersistentVolumeController{
@@ -305,7 +305,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	defer ctrl.volumeQueue.ShutDown()
 
 	// Start events processing pipeline.
-	ctrl.eventBroadcaster.StartStructuredLogging(0)
+	ctrl.eventBroadcaster.StartStructuredLogging(3)
 	ctrl.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ctrl.kubeClient.CoreV1().Events("")})
 	defer ctrl.eventBroadcaster.Shutdown()
 

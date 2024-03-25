@@ -96,6 +96,18 @@ func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubec
 	return resp.Image.Id, nil
 }
 
+func (m *kubeGenericRuntimeManager) GetImageSize(ctx context.Context, image kubecontainer.ImageSpec) (uint64, error) {
+	resp, err := m.imageService.ImageStatus(ctx, toRuntimeAPIImageSpec(image), false)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get image status", "image", image.Image)
+		return 0, err
+	}
+	if resp.Image == nil {
+		return 0, nil
+	}
+	return resp.Image.Size_, nil
+}
+
 // ListImages gets all images currently on the machine.
 func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubecontainer.Image, error) {
 	var images []kubecontainer.Image

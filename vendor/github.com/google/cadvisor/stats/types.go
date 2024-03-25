@@ -22,7 +22,7 @@ import info "github.com/google/cadvisor/info/v1"
 // For each container detected by the cAdvisor manager, it will call
 // GetCollector() with the devices cgroup path for that container.
 // GetCollector() is supposed to return an object that can update
-// accelerator stats for that container.
+// external stats for that container.
 type Manager interface {
 	Destroy()
 	GetCollector(deviceCgroup string) (Collector, error)

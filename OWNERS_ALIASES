@@ -250,6 +250,7 @@ aliases:
     - haircommander
     - tzneal
     - rphillips
+    - kannon92
   sig-network-approvers:
     - andrewsykim
     - aojea
@@ -490,6 +491,7 @@ aliases:
   feature-approvers:
     - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
+    - aojea # Network, Testing
     - danwinship # Network
     - dchen1107 # Node
     - deads2k # API Machinery
@@ -519,6 +521,7 @@ aliases:
     - sergeykanzhelev # Node
     - shaneutt # Network
     - soltysh # Apps, CLI
+    - sttts # API Machinery
     - tallclair # Auth
     - thockin # Network
     - xing-yang # Storage

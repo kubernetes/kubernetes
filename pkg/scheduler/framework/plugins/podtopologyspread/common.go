@@ -24,6 +24,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/utils/ptr"
 )
 
 type topologyPair struct {
@@ -112,12 +113,9 @@ func (pl *PodTopologySpread) filterTopologySpreadConstraints(constraints []v1.To
 				MaxSkew:            c.MaxSkew,
 				TopologyKey:        c.TopologyKey,
 				Selector:           selector,
-				MinDomains:         1,                            // If MinDomains is nil, we treat MinDomains as 1.
+				MinDomains:         ptr.Deref(c.MinDomains, 1),   // If MinDomains is nil, we treat MinDomains as 1.
 				NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,  // If NodeAffinityPolicy is nil, we treat NodeAffinityPolicy as "Honor".
 				NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore, // If NodeTaintsPolicy is nil, we treat NodeTaintsPolicy as "Ignore".
-			}
-			if pl.enableMinDomainsInPodTopologySpread && c.MinDomains != nil {
-				tsc.MinDomains = *c.MinDomains
 			}
 			if pl.enableNodeInclusionPolicyInPodTopologySpread {
 				if c.NodeAffinityPolicy != nil {

@@ -30,8 +30,10 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
@@ -829,6 +831,48 @@ func TestNoResourceFoundMessage(t *testing.T) {
 
 	expectedErr := "No resources found in test namespace.\n"
 	if e, a := expectedErr, errbuf.String(); e != a {
+		t.Errorf("expected to find:\n\t%s\nfound:\n\t%s\n", e, a)
+	}
+}
+
+func TestNoPodInNamespaceFoundMessage(t *testing.T) {
+	namespace, podName := "test", "bar"
+
+	tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	errStatus := apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, podName).Status()
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case fmt.Sprintf("/namespaces/%s/pods/%s", namespace, podName):
+				fallthrough
+			case fmt.Sprintf("/namespaces/%s/pods", namespace):
+				fallthrough
+			case fmt.Sprintf("/api/v1/namespaces/%s", namespace):
+				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &errStatus)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdLogs(tf, streams)
+	o := NewLogsOptions(streams, false)
+	err := o.Complete(tf, cmd, []string{podName})
+
+	if err == nil {
+		t.Fatal("Expected NotFound error, got nil")
+	}
+
+	expected := fmt.Sprintf("error from server (NotFound): pods %q not found in namespace %q", podName, namespace)
+	if e, a := expected, err.Error(); e != a {
 		t.Errorf("expected to find:\n\t%s\nfound:\n\t%s\n", e, a)
 	}
 }

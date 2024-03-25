@@ -24,8 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -119,18 +117,6 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 		})
 
 		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
-			cfg, configErr := getCurrentKubeletConfig(context.TODO())
-			framework.ExpectNoError(configErr)
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-				// If Swap is enabled, we should test OOM with LimitedSwap.
-				// UnlimitedSwap allows for workloads to use unbounded swap which
-				// makes testing OOM challenging.
-				// We are not able to change the default for these conformance tests,
-				// so we will skip these tests if swap is enabled.
-				if cfg.MemorySwap.SwapBehavior == "" || cfg.MemorySwap.SwapBehavior == "UnlimitedSwap" {
-					ginkgo.Skip("OOMKiller should not run with UnlimitedSwap")
-				}
-			}
 			ginkgo.By("Waiting for the pod to be failed")
 			err := e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, testCase.podSpec.Name, "", f.Namespace.Name)
 			framework.ExpectNoError(err, "Failed waiting for pod to terminate, %s/%s", f.Namespace.Name, testCase.podSpec.Name)

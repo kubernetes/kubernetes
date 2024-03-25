@@ -42,8 +42,6 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	utilkubectl "k8s.io/kubectl/pkg/cmd/util"
-
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -818,7 +816,6 @@ metadata:
 			// We wait for a non-empty line so we know kubectl has attached
 			e2ekubectl.NewKubectlCommand(ns, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
 				WithStdinData("value\nabcd1234").
-				AppendEnv([]string{string(utilkubectl.RemoteCommandWebsockets), "true"}).
 				ExecOrDie(ns)
 
 			runOutput := waitForStdinContent("run-test", "stdin closed")
@@ -836,7 +833,6 @@ metadata:
 			// to the container, this does not solve the race though.
 			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
-				AppendEnv([]string{string(utilkubectl.RemoteCommandWebsockets), "true"}).
 				ExecOrDie(ns)
 
 			runOutput = waitForStdinContent("run-test-2", "stdin closed")
@@ -848,7 +844,6 @@ metadata:
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
 			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234\n").
-				AppendEnv([]string{string(utilkubectl.RemoteCommandWebsockets), "true"}).
 				ExecOrDie(ns)
 
 			runOutput = waitForStdinContent("run-test-3", "abcd1234")
@@ -2218,13 +2213,21 @@ func startProxyServer(ns string) (int, *exec.Cmd, error) {
 	if err != nil {
 		return -1, nil, err
 	}
-	defer stdout.Close()
-	defer stderr.Close()
 	buf := make([]byte, 128)
 	var n int
 	if n, err = stdout.Read(buf); err != nil {
 		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %w", err)
 	}
+	go func() {
+		out, _ := io.ReadAll(stdout)
+		framework.Logf("kubectl proxy stdout: %s", string(buf[:n])+string(out))
+		stdout.Close()
+	}()
+	go func() {
+		err, _ := io.ReadAll(stderr)
+		framework.Logf("kubectl proxy stderr: %s", string(err))
+		stderr.Close()
+	}()
 	output := string(buf[:n])
 	match := proxyRegexp.FindStringSubmatch(output)
 	if len(match) == 2 {

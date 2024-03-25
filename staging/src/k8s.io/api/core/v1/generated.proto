@@ -77,6 +77,25 @@ message Affinity {
   optional PodAntiAffinity podAntiAffinity = 3;
 }
 
+// AppArmorProfile defines a pod or container's AppArmor settings.
+// +union
+message AppArmorProfile {
+  // type indicates which kind of AppArmor profile will be applied.
+  // Valid options are:
+  //   Localhost - a profile pre-loaded on the node.
+  //   RuntimeDefault - the container runtime's default profile.
+  //   Unconfined - no AppArmor enforcement.
+  // +unionDiscriminator
+  optional string type = 1;
+
+  // localhostProfile indicates a profile loaded on the node that should be used.
+  // The profile must be preconfigured on the node to work.
+  // Must match the loaded name of the profile.
+  // Must be set if and only if type is "Localhost".
+  // +optional
+  optional string localhostProfile = 2;
+}
+
 // AttachedVolume describes a volume attached to a node
 message AttachedVolume {
   // Name of the attached volume
@@ -1081,6 +1100,15 @@ message ContainerStatus {
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional ResourceRequirements resources = 11;
+
+  // Status of volume mounts.
+  // +optional
+  // +patchMergeKey=mountPath
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
+  // +featureGate=RecursiveReadOnlyMounts
+  repeated VolumeMountStatus volumeMounts = 12;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1104,7 +1132,7 @@ message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
   optional string path = 1;
 
-  // Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+  // Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
   // +optional
   optional ObjectFieldSelector fieldRef = 2;
 
@@ -2571,11 +2599,24 @@ message NodeProxyOptions {
   optional string path = 1;
 }
 
-// NodeResources is an object for conveying resource information about a node.
-// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
-message NodeResources {
-  // Capacity represents the available resources of a node
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
+// NodeRuntimeHandler is a set of runtime handler information.
+message NodeRuntimeHandler {
+  // Runtime handler name.
+  // Empty for the default runtime handler.
+  // +optional
+  optional string name = 1;
+
+  // Supported features.
+  // +optional
+  optional NodeRuntimeHandlerFeatures features = 2;
+}
+
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+message NodeRuntimeHandlerFeatures {
+  // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional bool recursiveReadOnlyMounts = 1;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -2733,6 +2774,12 @@ message NodeStatus {
   // Status of the config assigned to the node via the dynamic Kubelet config feature.
   // +optional
   optional NodeConfigStatus config = 11;
+
+  // The available runtime handlers.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  // +listType=atomic
+  repeated NodeRuntimeHandler runtimeHandlers = 12;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -3004,7 +3051,7 @@ message PersistentVolumeClaimSpec {
   // If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
   // set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
   // exists.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+  // More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
   // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
   // +featureGate=VolumeAttributesClass
   // +optional
@@ -3873,6 +3920,11 @@ message PodSecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 10;
+
+  // appArmorProfile is the AppArmor options to use by the containers in this pod.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 11;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -3979,7 +4031,7 @@ message PodSpec {
   // +optional
   optional string serviceAccountName = 8;
 
-  // DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
+  // DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
   // +k8s:conversion-gen=false
   // +optional
@@ -4063,7 +4115,7 @@ message PodSpec {
   repeated Toleration tolerations = 22;
 
   // HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
-  // file if specified. This is only valid for non-hostNetwork pods.
+  // file if specified.
   // +optional
   // +patchMergeKey=ip
   // +patchStrategy=merge
@@ -4161,6 +4213,7 @@ message PodSpec {
   // - spec.hostPID
   // - spec.hostIPC
   // - spec.hostUsers
+  // - spec.securityContext.appArmorProfile
   // - spec.securityContext.seLinuxOptions
   // - spec.securityContext.seccompProfile
   // - spec.securityContext.fsGroup
@@ -4170,6 +4223,7 @@ message PodSpec {
   // - spec.securityContext.runAsUser
   // - spec.securityContext.runAsGroup
   // - spec.securityContext.supplementalGroups
+  // - spec.containers[*].securityContext.appArmorProfile
   // - spec.containers[*].securityContext.seLinuxOptions
   // - spec.containers[*].securityContext.seccompProfile
   // - spec.containers[*].securityContext.capabilities
@@ -4201,13 +4255,10 @@ message PodSpec {
   //
   // SchedulingGates can only be set at pod creation time, and be removed only afterwards.
   //
-  // This is a beta feature enabled by the PodSchedulingReadiness feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=PodSchedulingReadiness
   // +optional
   repeated PodSchedulingGate schedulingGates = 38;
 
@@ -5353,6 +5404,12 @@ message SecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 11;
+
+  // appArmorProfile is the AppArmor options to use by this container. If set, this profile
+  // overrides the pod's appArmorProfile.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 12;
 }
 
 // SerializedReference is a reference to serialized object.
@@ -5774,6 +5831,15 @@ message ServiceSpec {
   // (possibly modified by topology and other features).
   // +optional
   optional string internalTrafficPolicy = 22;
+
+  // TrafficDistribution offers a way to express preferences for how traffic is
+  // distributed to Service endpoints. Implementations can use this field as a
+  // hint, but are not required to guarantee strict adherence. If the field is
+  // not set, the implementation will apply its default routing strategy. If set
+  // to "PreferClose", implementations should prioritize endpoints that are
+  // topologically close (e.g., same zone).
+  // +optional
+  optional string trafficDistribution = 23;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -6056,8 +6122,6 @@ message TopologySpreadConstraint {
   // In this situation, new pod with the same labelSelector cannot be scheduled,
   // because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
   // it will violate MaxSkew.
-  //
-  // This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
   // +optional
   optional int32 minDomains = 5;
 
@@ -6167,6 +6231,27 @@ message VolumeMount {
   // +optional
   optional bool readOnly = 2;
 
+  // RecursiveReadOnly specifies whether read-only mounts should be handled
+  // recursively.
+  //
+  // If ReadOnly is false, this field has no meaning and must be unspecified.
+  //
+  // If ReadOnly is true, and this field is set to Disabled, the mount is not made
+  // recursively read-only.  If this field is set to IfPossible, the mount is made
+  // recursively read-only, if it is supported by the container runtime.  If this
+  // field is set to Enabled, the mount is made recursively read-only if it is
+  // supported by the container runtime, otherwise the pod will not be started and
+  // an error will be generated to indicate the reason.
+  //
+  // If this field is set to IfPossible or Enabled, MountPropagation must be set to
+  // None (or be unspecified, which defaults to None).
+  //
+  // If this field is not specified, it is treated as an equivalent of Disabled.
+  //
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 7;
+
   // Path within the container at which the volume should be mounted.  Must
   // not contain ':'.
   optional string mountPath = 3;
@@ -6180,6 +6265,8 @@ message VolumeMount {
   // to container and the other way around.
   // When not set, MountPropagationNone is used.
   // This field is beta in 1.10.
+  // When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+  // (which defaults to None).
   // +optional
   optional string mountPropagation = 5;
 
@@ -6189,6 +6276,26 @@ message VolumeMount {
   // SubPathExpr and SubPath are mutually exclusive.
   // +optional
   optional string subPathExpr = 6;
+}
+
+// VolumeMountStatus shows status of volume mounts.
+message VolumeMountStatus {
+  // Name corresponds to the name of the original VolumeMount.
+  optional string name = 1;
+
+  // MountPath corresponds to the original VolumeMount.
+  optional string mountPath = 2;
+
+  // ReadOnly corresponds to the original VolumeMount.
+  // +optional
+  optional bool readOnly = 3;
+
+  // RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+  // An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+  // depending on the mount result.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 4;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.

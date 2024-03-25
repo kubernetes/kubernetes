@@ -336,6 +336,16 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	return MetaNamespaceKeyFunc(obj)
 }
 
+// DeletionHandlingObjectToName checks for
+// DeletedFinalStateUnknown objects before calling
+// ObjectToName.
+func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
+	if d, ok := obj.(DeletedFinalStateUnknown); ok {
+		return ParseObjectName(d.Key)
+	}
+	return ObjectToName(obj)
+}
+
 // NewInformer returns a Store and a controller for populating the store
 // while also providing event notifications. You should only used the returned
 // Store for Get/List operations; Add/Modify/Deletes will cause the event

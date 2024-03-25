@@ -181,7 +181,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		queue:                     workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "disruption"), workqueue.DefaultControllerRateLimiter()),
 		recheckQueue:              workqueue.NewDelayingQueueWithCustomClock(clock, "disruption_recheck"),
 		stalePodDisruptionQueue:   workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "stale_pod_disruption"), workqueue.DefaultControllerRateLimiter()),
-		broadcaster:               record.NewBroadcaster(),
+		broadcaster:               record.NewBroadcaster(record.WithContext(ctx)),
 		stalePodDisruptionTimeout: stalePodDisruptionTimeout,
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
@@ -994,6 +994,7 @@ func (dc *DisruptionController) updatePdbStatus(ctx context.Context, pdb *policy
 		DisruptionsAllowed: disruptionsAllowed,
 		DisruptedPods:      disruptedPods,
 		ObservedGeneration: pdb.Generation,
+		Conditions:         newPdb.Status.Conditions,
 	}
 
 	pdbhelper.UpdateDisruptionAllowedCondition(newPdb)

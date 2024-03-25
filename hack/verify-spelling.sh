@@ -25,14 +25,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 export KUBE_ROOT
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::golang::setup_env
+
 # Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BINPATH}"
+export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  GO111MODULE=on go install github.com/client9/misspell/cmd/misspell
-popd >/dev/null
+go -C "${KUBE_ROOT}/hack/tools" install github.com/client9/misspell/cmd/misspell
 
 # Spell checking
 # All the skipping files are defined in hack/.spelling_failures

@@ -63,7 +63,8 @@ func (t *AppArmorUpgradeTest) Setup(ctx context.Context, f *framework.Framework)
 
 	// Create the initial test pod.
 	ginkgo.By("Creating a long-running AppArmor enabled pod.")
-	t.pod = e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, false)
+	pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, false)
+	t.pod = e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(ctx, f)
@@ -99,7 +100,8 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(ctx context.Context, f *framework
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is enforced for a new pod")
-	e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, true)
+	pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, true)
+	t.pod = e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(ctx context.Context, f *framework.Framework) {

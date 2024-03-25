@@ -706,8 +706,8 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	containerLogStats0 := makeFakeLogStats(0)
 	containerLogStats1 := makeFakeLogStats(0)
 	fakeStats := map[string]*volume.Metrics{
-		kuberuntime.BuildContainerLogsDirectory(prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName00): containerLogStats0,
-		kuberuntime.BuildContainerLogsDirectory(prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName01): containerLogStats1,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName00): containerLogStats0,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName01): containerLogStats1,
 	}
 	fakeStatsSlice := []*volume.Metrics{containerLogStats0, containerLogStats1}
 	fakeOS := &containertest.FakeOS{}

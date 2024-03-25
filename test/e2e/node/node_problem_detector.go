@@ -384,9 +384,17 @@ func getNpdPodStat(ctx context.Context, f *framework.Framework, nodeName string)
 		if !strings.HasPrefix(pod.PodRef.Name, "node-problem-detector") {
 			continue
 		}
-		cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
-		rss = float64(*pod.Memory.RSSBytes) / 1024 / 1024
-		workingSet = float64(*pod.Memory.WorkingSetBytes) / 1024 / 1024
+		if pod.CPU != nil && pod.CPU.UsageNanoCores != nil {
+			cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
+		}
+		if pod.Memory != nil {
+			if pod.Memory.RSSBytes != nil {
+				rss = float64(*pod.Memory.RSSBytes) / 1024 / 1024
+			}
+			if pod.Memory.WorkingSetBytes != nil {
+				workingSet = float64(*pod.Memory.WorkingSetBytes) / 1024 / 1024
+			}
+		}
 		hasNpdPod = true
 		break
 	}

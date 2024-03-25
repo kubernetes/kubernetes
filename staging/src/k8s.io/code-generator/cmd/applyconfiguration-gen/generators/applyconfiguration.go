@@ -18,11 +18,12 @@ package generators
 
 import (
 	"io"
+	"path"
 	"strings"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
@@ -31,14 +32,14 @@ import (
 
 // applyConfigurationGenerator produces apply configurations for a given GroupVersion and type.
 type applyConfigurationGenerator struct {
-	generator.DefaultGen
-	outputPackage string
-	localPackage  types.Name
-	groupVersion  clientgentypes.GroupVersion
-	applyConfig   applyConfig
-	imports       namer.ImportTracker
-	refGraph      refGraph
-	openAPIType   *string // if absent, extraction function cannot be generated
+	generator.GoGenerator
+	// outPkgBase is the base package, under which the "internal" and GV-specific subdirs live
+	outPkgBase   string // must be a Go import-path
+	groupVersion clientgentypes.GroupVersion
+	applyConfig  applyConfig
+	imports      namer.ImportTracker
+	refGraph     refGraph
+	openAPIType  *string // if absent, extraction function cannot be generated
 }
 
 var _ generator.Generator = &applyConfigurationGenerator{}
@@ -48,8 +49,9 @@ func (g *applyConfigurationGenerator) Filter(_ *generator.Context, t *types.Type
 }
 
 func (g *applyConfigurationGenerator) Namers(*generator.Context) namer.NameSystems {
+	localPkg := path.Join(g.outPkgBase, g.groupVersion.Group.PackageName(), g.groupVersion.Version.PackageName())
 	return namer.NameSystems{
-		"raw":          namer.NewRawNamer(g.localPackage.Package, g.imports),
+		"raw":          namer.NewRawNamer(localPkg, g.imports),
 		"singularKind": namer.NewPublicNamer(0),
 	}
 }
@@ -90,7 +92,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 		Tags:        genclientTags(t),
 		APIVersion:  g.groupVersion.ToAPIVersion(),
 		ExtractInto: extractInto,
-		ParserFunc:  types.Ref(g.outputPackage+"/internal", "Parser"),
+		ParserFunc:  types.Ref(path.Join(g.outPkgBase, "internal"), "Parser"),
 		OpenAPIType: g.openAPIType,
 	}
 

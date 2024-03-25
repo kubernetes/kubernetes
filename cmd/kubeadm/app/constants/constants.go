@@ -223,13 +223,6 @@ const (
 	// TLSBootstrapRetryInterval specifies how long kubeadm should wait before retrying the TLS Bootstrap check
 	TLSBootstrapRetryInterval = 1 * time.Second
 
-	// StaticPodMirroringTimeout specifies how much time kubeadm should wait for the static pods
-	// to be mirrored on the API server.
-	StaticPodMirroringTimeout = 30 * time.Second
-	// StaticPodMirroringRetryInterval specifies how often to check if static pods are mirrored at the
-	// API server.
-	StaticPodMirroringRetryInterval = 500 * time.Millisecond
-
 	// EtcdAPICallTimeout specifies how much time to wait for completion of requests against the etcd API.
 	EtcdAPICallTimeout = 2 * time.Minute
 	// EtcdAPICallRetryInterval specifies how frequently to retry requests against the etcd API.
@@ -240,6 +233,9 @@ const (
 
 	// KubeletHealthCheckTimeout specifies the default kubelet timeout
 	KubeletHealthCheckTimeout = 4 * time.Minute
+
+	// UpgradeManifestsTimeout specifies the default timeout for upgradring static Pod manifests
+	UpgradeManifestsTimeout = 5 * time.Minute
 
 	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
 	PullImageRetry = 5
@@ -324,7 +320,7 @@ const (
 	MinExternalEtcdVersion = "3.4.13-4"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.11-0"
+	DefaultEtcdVersion = "3.5.12-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -340,6 +336,8 @@ const (
 	CoreDNS = "CoreDNS"
 	// Kubelet defines variable used internally when referring to the Kubelet
 	Kubelet = "kubelet"
+	// Kubeadm defines variable used internally when referring to the kubeadm component
+	Kubeadm = "kubeadm"
 
 	// KubeCertificatesVolumeName specifies the name for the Volume that is used for injecting certificates to control plane components (can be both a hostPath volume or a projected, all-in-one volume)
 	KubeCertificatesVolumeName = "k8s-certs"
@@ -450,6 +448,8 @@ const (
 	EtcdUserName string = "kubeadm-etcd"
 	// ServiceAccountKeyReadersGroupName is the group of users that are allowed to read the service account private key.
 	ServiceAccountKeyReadersGroupName string = "kubeadm-sa-key-readers"
+	// UpgradeConfigurationKind is the string kind value for the UpgradeConfiguration struct
+	UpgradeConfigurationKind = "UpgradeConfiguration"
 )
 
 var (
@@ -479,15 +479,15 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		22: "3.5.11-0",
-		23: "3.5.11-0",
-		24: "3.5.11-0",
-		25: "3.5.11-0",
-		26: "3.5.11-0",
-		27: "3.5.11-0",
-		28: "3.5.11-0",
-		29: "3.5.11-0",
-		30: "3.5.11-0",
+		22: "3.5.12-0",
+		23: "3.5.12-0",
+		24: "3.5.12-0",
+		25: "3.5.12-0",
+		26: "3.5.12-0",
+		27: "3.5.12-0",
+		28: "3.5.12-0",
+		29: "3.5.12-0",
+		30: "3.5.12-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

@@ -373,6 +373,19 @@
             ],
             "description": "schema describes the schema used for validation, pruning, and defaulting of this version of the custom resource."
           },
+          "selectableFields": {
+            "description": "selectableFields specifies paths to fields that may be used as field selectors. A maximum of 8 selectable fields are allowed. See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.SelectableField"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "served": {
             "default": false,
             "description": "served is a flag enabling/disabling this version from being served via REST APIs",
@@ -728,6 +741,20 @@
       },
       "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray": {
         "description": "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array."
+      },
+      "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.SelectableField": {
+        "description": "SelectableField specifies the JSON path of a field that may be used with field selectors.",
+        "properties": {
+          "jsonPath": {
+            "default": "",
+            "description": "jsonPath is a simple JSON path which is evaluated against each custom resource to produce a field selector value. Only JSON paths without the array notation are allowed. Must point to a field of type string, boolean or integer. Types with enum values and strings with formats are allowed. If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string. Must not point to metdata fields. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jsonPath"
+        ],
+        "type": "object"
       },
       "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ServiceReference": {
         "description": "ServiceReference holds a reference to Service.legacy.k8s.io",
@@ -1288,6 +1315,11 @@
             "group": "storage.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           }
         ]
       },
@@ -1967,6 +1999,11 @@
             "group": "storage.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           }
         ]
       },

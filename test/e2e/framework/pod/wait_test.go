@@ -366,7 +366,16 @@ In [It] at: wait_test.go:71 <time>
 					Status: "failed",
 					Failure: &reporters.JUnitFailure{
 						Description: `[FAILED] Told to stop trying after <after>.
-Expected pod to reach phase "Running", got final phase "Failed" instead.
+Expected pod to reach phase "Running", got final phase "Failed" instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: failed-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Failed
 In [It] at: wait_test.go:75 <time>
 `,
 						Type: "failed",
@@ -378,7 +387,16 @@ In [It] at: wait_test.go:75 <time>
     k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.6()
     	wait_test.go:75
 [FAILED] Told to stop trying after <after>.
-Expected pod to reach phase "Running", got final phase "Failed" instead.
+Expected pod to reach phase "Running", got final phase "Failed" instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: failed-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Failed
 In [It] at: wait_test.go:75 <time>
 < Exit [It] failed - wait_test.go:74 <time>
 `,

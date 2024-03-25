@@ -44,9 +44,10 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-# Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BINPATH}"
-PATH="${GOBIN}:${PATH}"
+kube::golang::setup_env
+export GOBIN="${KUBE_OUTPUT_BIN}"
+
+kube::util::require-jq
 
 invocation=(./hack/verify-golangci-lint.sh "$@")
 golangci=("${GOBIN}/golangci-lint" run)
@@ -113,8 +114,6 @@ if [ "$base" ]; then
     golangci+=(--new --new-from-rev="$base")
 fi
 
-kube::golang::verify_go_version
-
 # Filter out arguments that start with "-" and move them to the run flags.
 shift $((OPTIND-1))
 targets=()
@@ -126,20 +125,15 @@ for arg; do
   fi
 done
 
-kube::golang::verify_go_version
-
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
-
 # Install golangci-lint
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  go install github.com/golangci/golangci-lint/cmd/golangci-lint
-  if [ "${golangci_config}" ]; then
-    # This cannot be used without a config.
-    go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
-  fi
-popd >/dev/null
+go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/cmd/golangci-lint
+if [ "${golangci_config}" ]; then
+  # This cannot be used without a config.
+  # This uses `go build` because `go install -buildmode=plugin` doesn't work
+  # (on purpose: https://github.com/golang/go/issues/64964).
+  go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+fi
 
 if [ "${golangci_config}" ]; then
   # The relative path to _output/local/bin only works if that actually is the
@@ -161,30 +155,25 @@ cd "${KUBE_ROOT}"
 
 res=0
 run () {
-  if [[ "${#targets[@]}" -gt 0 ]]; then
-    echo "running ${golangci[*]} ${targets[*]}" >&2
-    "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
-  else
-    echo "running ${golangci[*]} ./..." >&2
-    "${golangci[@]}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
-    for d in staging/src/k8s.io/*; do
-      MODPATH="staging/src/k8s.io/$(basename "${d}")"
-      echo "running ( cd ${KUBE_ROOT}/${MODPATH}; ${golangci[*]} --path-prefix ${MODPATH} ./... )"
-      pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
-        "${golangci[@]}" --path-prefix "${MODPATH}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
-      popd >/dev/null
-    done
+  if [[ "${#targets[@]}" -eq 0 ]]; then
+    # Doing it this way is MUCH faster than simply saying "all", and there doesn't
+    # seem to be a simpler way to express "this whole workspace".
+    kube::util::read-array targets < <(
+        go work edit -json | jq -r '.Use[].DiskPath + "/..."'
+    )
   fi
+  echo "running ${golangci[*]} ${targets[*]}" >&2
+  "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
 }
 # First run with normal output.
-run "${targets[@]}"
+run
 
 # Then optionally do it again with github-actions as format.
 # Because golangci-lint caches results, this is faster than the
 # initial invocation.
 if [ "$githubactions" ]; then
-  golangci+=(--out-format=github-actions)
-  run "$${targets[@]}" >"$githubactions" 2>&1
+  golangci+=("--out-format=github-actions")
+  run >"$githubactions" 2>&1
 fi
 
 # print a message based on the result

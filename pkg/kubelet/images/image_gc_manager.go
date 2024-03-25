@@ -50,6 +50,13 @@ const instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/images"
 // indexed as imageId-RuntimeHandler
 const imageIndexTupleFormat = "%s,%s"
 
+// ImageGarbageCollectedTotalReason* specify the reason why an image was garbage collected
+// in the `image_garbage_collected_total` metric.
+const (
+	ImageGarbageCollectedTotalReasonAge   = "age"
+	ImageGarbageCollectedTotalReasonSpace = "space"
+)
+
 // StatsProvider is an interface for fetching stats used during image garbage
 // collection.
 type StatsProvider interface {
@@ -62,7 +69,7 @@ type StatsProvider interface {
 type ImageGCManager interface {
 	// Applies the garbage collection policy. Errors include being unable to free
 	// enough space as per the garbage collection policy.
-	GarbageCollect(ctx context.Context) error
+	GarbageCollect(ctx context.Context, beganGC time.Time) error
 
 	// Start async garbage collection of images.
 	Start()
@@ -242,11 +249,11 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
 			if !isRuntimeClassInImageCriAPIEnabled {
-				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID)
+				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef)
 				imagesInUse.Insert(container.ImageID)
 			} else {
 				imageKey := getImageTuple(container.ImageID, container.ImageRuntimeHandler)
-				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageKey", imageKey)
+				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef, "imageKey", imageKey)
 				imagesInUse.Insert(imageKey)
 			}
 		}
@@ -301,7 +308,7 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	return imagesInUse, nil
 }
 
-func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
+func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.Time) error {
 	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
 	defer otelSpan.End()
 
@@ -311,7 +318,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 		return err
 	}
 
-	images, err = im.freeOldImages(ctx, images, freeTime)
+	images, err = im.freeOldImages(ctx, images, freeTime, beganGC)
 	if err != nil {
 		return err
 	}
@@ -362,8 +369,14 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 	return nil
 }
 
-func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evictionInfo, freeTime time.Time) ([]evictionInfo, error) {
+func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evictionInfo, freeTime, beganGC time.Time) ([]evictionInfo, error) {
 	if im.policy.MaxAge == 0 {
+		return images, nil
+	}
+
+	// Wait until the MaxAge has passed since the Kubelet has started,
+	// or else we risk prematurely garbage collecting images.
+	if freeTime.Sub(beganGC) <= im.policy.MaxAge {
 		return images, nil
 	}
 	var deletionErrors []error
@@ -372,7 +385,7 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 		klog.V(5).InfoS("Evaluating image ID for possible garbage collection based on image age", "imageID", image.id)
 		// Evaluate whether image is older than MaxAge.
 		if freeTime.Sub(image.lastUsed) > im.policy.MaxAge {
-			if err := im.freeImage(ctx, image); err != nil {
+			if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonAge); err != nil {
 				deletionErrors = append(deletionErrors, err)
 				remainingImages = append(remainingImages, image)
 				continue
@@ -423,7 +436,7 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 			continue
 		}
 
-		if err := im.freeImage(ctx, image); err != nil {
+		if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonSpace); err != nil {
 			deletionErrors = append(deletionErrors, err)
 			continue
 		}
@@ -440,7 +453,7 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 	return spaceFreed, nil
 }
 
-func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo) error {
+func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo, reason string) error {
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
 	// Remove image. Continue despite errors.
 	var err error
@@ -456,7 +469,7 @@ func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo)
 	}
 	delete(im.imageRecords, imageKey)
 
-	metrics.ImageGarbageCollectedTotal.Inc()
+	metrics.ImageGarbageCollectedTotal.WithLabelValues(reason).Inc()
 	return err
 }
 

@@ -1,0 +1,8 @@
+rules:
+  - selectorRegexp: k8s[.]io
+    allowedPrefixes:
+      - k8s.io/kubernetes/cmd/import-boss/testdata/nested-fwd/allowed-by-root
+      - k8s.io/kubernetes/cmd/import-boss/testdata/nested-fwd/allowed-by-both
+    forbiddenPrefixes:
+      - k8s.io/kubernetes/cmd/import-boss/testdata/nested-fwd/forbidden-by-root
+      - k8s.io/kubernetes/cmd/import-boss/testdata/nested-fwd/forbidden-by-both

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -89,8 +91,9 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	podutil.DropDisabledPodFields(pod, nil)
 
-	applyWaitingForSchedulingGatesCondition(pod)
+	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
+	applyAppArmorVersionSkew(ctx, pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -737,11 +740,10 @@ func mutatePodAffinity(pod *api.Pod) {
 	}
 }
 
-// applyWaitingForSchedulingGatesCondition adds a {type:PodScheduled, reason:WaitingForGates} condition
+// applySchedulingGatedCondition adds a {type:PodScheduled, reason:SchedulingGated} condition
 // to a new-created Pod if necessary.
-func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) ||
-		len(pod.Spec.SchedulingGates) == 0 {
+func applySchedulingGatedCondition(pod *api.Pod) {
+	if len(pod.Spec.SchedulingGates) == 0 {
 		return
 	}
 
@@ -758,4 +760,131 @@ func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
 		Reason:  apiv1.PodReasonSchedulingGated,
 		Message: "Scheduling is blocked due to non-empty scheduling gates",
 	})
+}
+
+// applyAppArmorVersionSkew implements the version skew behavior described in:
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/24-apparmor#version-skew-strategy
+func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields) {
+		return
+	}
+
+	if pod.Spec.OS != nil && pod.Spec.OS.Name == api.Windows {
+		return
+	}
+
+	var podProfile *api.AppArmorProfile
+	if pod.Spec.SecurityContext != nil {
+		podProfile = pod.Spec.SecurityContext.AppArmorProfile
+	}
+
+	// Handle the containers of the pod
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(),
+		func(ctr *api.Container, _ podutil.ContainerType) bool {
+			// get possible annotation and field
+			key := api.DeprecatedAppArmorAnnotationKeyPrefix + ctr.Name
+			annotation, hasAnnotation := pod.Annotations[key]
+
+			var containerProfile *api.AppArmorProfile
+			if ctr.SecurityContext != nil {
+				containerProfile = ctr.SecurityContext.AppArmorProfile
+			}
+
+			// sync field and annotation
+			if !hasAnnotation {
+				newAnnotation := ""
+				if containerProfile != nil {
+					newAnnotation = appArmorAnnotationForField(containerProfile)
+				} else if podProfile != nil {
+					newAnnotation = appArmorAnnotationForField(podProfile)
+				}
+
+				if newAnnotation != "" {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[key] = newAnnotation
+				}
+			} else if containerProfile == nil {
+				newField := apparmorFieldForAnnotation(annotation)
+				if errs := corevalidation.ValidateAppArmorProfileField(newField, &field.Path{}); len(errs) > 0 {
+					// Skip copying invalid value.
+					newField = nil
+				}
+
+				// warn if we had an annotation that we couldn't derive a valid field from
+				deprecationWarning := newField == nil
+
+				// Only copy the annotation to the field if it is different from the pod-level profile.
+				if newField != nil && !apiequality.Semantic.DeepEqual(newField, podProfile) {
+					if ctr.SecurityContext == nil {
+						ctr.SecurityContext = &api.SecurityContext{}
+					}
+					ctr.SecurityContext.AppArmorProfile = newField
+					// warn if there was an annotation without a corresponding field
+					deprecationWarning = true
+				}
+
+				if deprecationWarning {
+					// Note: annotation deprecation warning must be added here rather than the
+					// typical WarningsOnCreate path to emit the warning before syncing the
+					// annotations & fields.
+					fldPath := field.NewPath("metadata", "annotations").Key(key)
+					warning.AddWarning(ctx, "", fmt.Sprintf(`%s: deprecated since v1.30; use the "appArmorProfile" field instead`, fldPath))
+				}
+			}
+
+			return true
+		})
+}
+
+// appArmorFieldForAnnotation takes a pod apparmor profile field and returns the
+// converted annotation value
+func appArmorAnnotationForField(field *api.AppArmorProfile) string {
+	// If only apparmor fields are specified, add the corresponding annotations.
+	// This ensures that the fields are enforced even if the node version
+	// trails the API version
+	switch field.Type {
+	case api.AppArmorProfileTypeUnconfined:
+		return api.DeprecatedAppArmorAnnotationValueUnconfined
+
+	case api.AppArmorProfileTypeRuntimeDefault:
+		return api.DeprecatedAppArmorAnnotationValueRuntimeDefault
+
+	case api.AppArmorProfileTypeLocalhost:
+		if field.LocalhostProfile != nil {
+			return api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + *field.LocalhostProfile
+		}
+	}
+
+	// we can only reach this code path if the LocalhostProfile is nil but the
+	// provided field type is AppArmorProfileTypeLocalhost or if an unrecognized
+	// type is specified
+	return ""
+}
+
+// apparmorFieldForAnnotation takes a pod annotation and returns the converted
+// apparmor profile field.
+func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
+	if annotation == api.DeprecatedAppArmorAnnotationValueUnconfined {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
+	}
+
+	if annotation == api.DeprecatedAppArmorAnnotationValueRuntimeDefault {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
+	}
+
+	if strings.HasPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix)
+		if localhostProfile != "" {
+			return &api.AppArmorProfile{
+				Type:             api.AppArmorProfileTypeLocalhost,
+				LocalhostProfile: &localhostProfile,
+			}
+		}
+	}
+
+	// we can only reach this code path if the localhostProfile name has a zero
+	// length or if the annotation has an unrecognized value
+	return nil
 }

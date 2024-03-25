@@ -28,20 +28,15 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-kube::golang::verify_go_version
+kube::golang::setup_env
 
 # Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BINPATH}"
+export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
-
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
 
 # Install golangci-lint
 echo 'installing net parser converter'
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  go install github.com/aojea/sloppy-netparser
-popd >/dev/null
+go -C "${KUBE_ROOT}/hack/tools" install github.com/aojea/sloppy-netparser
 
 cd "${KUBE_ROOT}"
 
@@ -53,7 +48,8 @@ function git_find() {
         ':!:vendor/*'        `# catches vendor/...` \
         ':!:*/vendor/*'      `# catches any subdir/vendor/...` \
         ':!:third_party/*'   `# catches third_party/...` \
-        ':!:*/third_party/*' `# catches third_party/...` \
+        ':!:*/third_party/*' `# catches any subdir/third_party/...` \
+        ':!:*/testdata/*'    `# catches any subdir/testdata/...` \
         ':(glob)**/*.go' \
         "$@"
 }

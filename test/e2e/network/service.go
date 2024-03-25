@@ -1077,7 +1077,7 @@ var _ = common.SIGDescribe("Services", func() {
 		pausePods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
 		framework.ExpectNoError(err, "Error in listing pods associated with pause pod deployments")
 
-		framework.ExpectNotEqual(pausePods.Items[0].Spec.NodeName, pausePods.Items[1].Spec.NodeName)
+		gomega.Expect(pausePods.Items[0].Spec.NodeName).NotTo(gomega.Equal(pausePods.Items[1].Spec.NodeName))
 
 		serviceAddress := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 
@@ -3111,15 +3111,18 @@ var _ = common.SIGDescribe("Services", func() {
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
 			// pausePod0 -> node1 node port fails because it's "external" and there are no local endpoints
 			// pausePod1 -> node0 node port succeeds because webserver0 is running on node0
-			// pausePod0 -> node0 and pausePod1 -> node1 both succeed because pod-to-same-node-NodePort
-			// connections are neither internal nor external and always get Cluster traffic policy.
+			// pausePod0 -> node0 node port succeeds because webserver0 is running on node0
+			//
+			// NOTE: pausePod1 -> node1 will succeed for kube-proxy because kube-proxy considers pod-to-same-node-NodePort
+			// connections as neither internal nor external and always get Cluster traffic policy. However, we do not test
+			// this here because not all Network implementations follow kube-proxy's interpretation of "destination"
+			// traffic policy. See: https://github.com/kubernetes/kubernetes/pull/123622
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
-			execHostnameTest(*pausePod1, nodePortAddress1, webserverPod0.Name)
 
 			time.Sleep(5 * time.Second)
 		}
@@ -3917,7 +3920,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 			family = v1.IPv6Protocol
 		}
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
@@ -4000,7 +4003,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 			family = v1.IPv6Protocol
 		}
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP

@@ -2676,11 +2676,10 @@ func TestReasonAndFldPath(t *testing.T) {
 		return &r
 	}()
 	tests := []struct {
-		name      string
-		schema    *schema.Structural
-		obj       interface{}
-		errors    []string
-		errorType field.ErrorType
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		errors field.ErrorList
 	}{
 		{name: "Return error based on input reason",
 			obj: map[string]interface{}{
@@ -2691,8 +2690,12 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", forbiddenReason),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeForbidden,
-			errors:    []string{"root.f: Forbidden"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.f",
+				},
+			},
 		},
 		{name: "Return error default is invalid",
 			obj: map[string]interface{}{
@@ -2703,8 +2706,12 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", nil),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeInvalid,
-			errors:    []string{"root.f: Invalid"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "root.f",
+				},
+			},
 		},
 		{name: "Return error based on input fieldPath",
 			obj: map[string]interface{}{
@@ -2715,8 +2722,63 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ".m", forbiddenReason),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeForbidden,
-			errors:    []string{"root.f.m: Forbidden"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.f.m",
+				},
+			},
+		},
+		{
+			name: "multiple rules with custom reason and field path",
+			obj: map[string]interface{}{
+				"field1": "value1",
+				"field2": "value2",
+				"field3": "value3",
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"field1": stringType,
+					"field2": stringType,
+					"field3": stringType,
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:      `self.field2 != "value2"`,
+							Reason:    ptr.To(apiextensions.FieldValueDuplicate),
+							FieldPath: ".field2",
+						},
+						{
+							Rule:      `self.field3 != "value3"`,
+							Reason:    ptr.To(apiextensions.FieldValueRequired),
+							FieldPath: ".field3",
+						},
+						{
+							Rule:      `self.field1 != "value1"`,
+							Reason:    ptr.To(apiextensions.FieldValueForbidden),
+							FieldPath: ".field1",
+						},
+					},
+				},
+			},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "root.field2",
+				},
+				{
+					Type:  field.ErrorTypeRequired,
+					Field: "root.field3",
+				},
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.field1",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -2727,30 +2789,14 @@ func TestReasonAndFldPath(t *testing.T) {
 				t.Fatal("expected non nil validator")
 			}
 			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, nil, celconfig.RuntimeCELCostBudget)
-			unmatched := map[string]struct{}{}
-			for _, e := range tt.errors {
-				unmatched[e] = struct{}{}
+
+			for i := range errs {
+				// Ignore unchecked fields for this test
+				errs[i].Detail = ""
+				errs[i].BadValue = nil
 			}
-			for _, err := range errs {
-				if err.Type != tt.errorType {
-					t.Errorf("expected error type %v, but got: %v", tt.errorType, err.Type)
-					continue
-				}
-				matched := false
-				for expected := range unmatched {
-					if strings.Contains(err.Error(), expected) {
-						delete(unmatched, expected)
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
-				}
-			}
-			if len(unmatched) > 0 {
-				t.Errorf("expected errors %v", unmatched)
-			}
+
+			require.ElementsMatch(t, tt.errors, errs)
 		})
 	}
 }
@@ -3073,7 +3119,7 @@ func TestValidateFieldPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
+			validField, _, err := ValidFieldPath(tc.fieldPath, tc.schema)
 
 			if err == nil && tc.errDetail != "" {
 				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
@@ -3620,6 +3666,106 @@ func TestRatcheting(t *testing.T) {
 			newObj: "unchanged",
 			errors: []string{
 				`rule compile error: compilation failed: ERROR: <input>:1:1: undeclared reference to 'asdausidyhASDNJm'`,
+			},
+		},
+		{
+			name: "typemeta fields are not ratcheted",
+			schema: mustSchema(`
+				type: object
+				properties:
+					apiVersion:
+						type: string
+						x-kubernetes-validations:
+						- rule: self == "v1"
+					kind:
+						type: string
+						x-kubernetes-validations:
+						- rule: self == "Pod"
+			`),
+			oldObj: mustUnstructured(`
+				apiVersion: v2
+				kind: Baz
+			`),
+			newObj: mustUnstructured(`
+				apiVersion: v2
+				kind: Baz
+			`),
+			errors: []string{
+				`root.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.kind: Invalid value: "string": failed rule: self == "Pod"`,
+			},
+		},
+		{
+			name: "nested typemeta fields may still be ratcheted",
+			schema: mustSchema(`
+				type: object
+				properties:
+					list:
+						type: array
+						x-kubernetes-list-type: map
+						x-kubernetes-list-map-keys: ["name"]
+						maxItems: 2
+						items:
+							type: object
+							properties:
+								name:
+									type: string
+								apiVersion:
+									type: string
+									x-kubernetes-validations:
+									- rule: self == "v1"
+								kind:
+									type: string
+									x-kubernetes-validations:
+									- rule: self == "Pod"
+					subField:
+						type: object
+						properties:
+							apiVersion:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "v1"
+							kind:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "Pod"
+							otherField:
+								type: string
+			`),
+			oldObj: mustUnstructured(`
+				subField:
+					apiVersion: v2
+					kind: Baz
+				list:	
+				- name: entry1
+				  apiVersion: v2
+				  kind: Baz
+				- name: entry2
+				  apiVersion: v3
+				  kind: Bar
+			`),
+			newObj: mustUnstructured(`
+				subField:
+					apiVersion: v2
+					kind: Baz
+					otherField: newValue
+				list:	
+				- name: entry1
+				  apiVersion: v2
+				  kind: Baz
+				  otherField: newValue2
+				- name: entry2
+				  apiVersion: v3
+				  kind: Bar
+				  otherField: newValue3
+			`),
+			warnings: []string{
+				`root.subField.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.subField.kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.list[0].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.list[0].kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.list[1].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
+				`root.list[1].kind: Invalid value: "string": failed rule: self == "Pod"`,
 			},
 		},
 	}
@@ -4420,6 +4566,14 @@ func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
 		s.ValueValidation = &schema.ValueValidation{}
 	}
 	s.ValueValidation.MaxItems = maxItems
+	return s
+}
+
+func withMaxProperties(s schema.Structural, maxProperties *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxProperties = maxProperties
 	return s
 }
 

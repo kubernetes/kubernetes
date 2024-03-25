@@ -104,8 +104,8 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring no jobs are scheduled")
-		err = waitForNoJobs(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name, false)
-		framework.ExpectError(err)
+		gomega.Consistently(ctx, framework.GetObject(f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).Get, cronJob.Name, metav1.GetOptions{})).WithPolling(framework.Poll).WithTimeout(cronJobTimeout).
+			Should(gomega.HaveField("Status.Active", gomega.BeEmpty()))
 
 		ginkgo.By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
@@ -145,8 +145,15 @@ var _ = SIGDescribe("CronJob", func() {
 		gomega.Expect(activeJobs).To(gomega.HaveLen(1))
 
 		ginkgo.By("Ensuring no more jobs are scheduled")
-		err = waitForActiveJobs(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name, 2)
-		framework.ExpectError(err)
+		gomega.Eventually(ctx, framework.GetObject(f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).Get, cronJob.Name, metav1.GetOptions{})).WithPolling(framework.Poll).WithTimeout(cronJobTimeout).
+			Should(framework.MakeMatcher(func(cj *batchv1.CronJob) (func() string, error) {
+				if len(cj.Status.Active) < 2 {
+					return nil, nil
+				}
+				return func() string {
+					return fmt.Sprintf("unexpect active job number: %d\n", len(cj.Status.Active))
+				}, nil
+			}))
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -230,8 +237,24 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(err, "Failed to ensure at least on finished job exists in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring no unexpected event has happened")
-		err = waitForEventWithReason(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
-		framework.ExpectError(err)
+		gomega.Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*v1.EventList, error) {
+			sj, err := getCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
+			if err != nil {
+				return nil, err
+			}
+			return f.ClientSet.CoreV1().Events(f.Namespace.Name).Search(scheme.Scheme, sj)
+		})).WithPolling(framework.Poll).WithTimeout(30 * time.Second).Should(framework.MakeMatcher(func(actual *v1.EventList) (failure func() string, err error) {
+			for _, e := range actual.Items {
+				for _, reason := range []string{"MissingJob", "UnexpectedJob"} {
+					if e.Reason == reason {
+						return func() string {
+							return fmt.Sprintf("unexpected event: %s\n", reason)
+						}, nil
+					}
+				}
+			}
+			return nil, nil
+		}))
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -261,10 +284,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-		framework.ExpectError(err)
-		if !apierrors.IsNotFound(err) {
-			framework.Failf("Failed to delete %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
-		}
+		gomega.Expect(err).To(gomega.MatchError(apierrors.IsNotFound, fmt.Sprintf("Failed to delete %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)))
 
 		ginkgo.By("Ensuring the job is not in the cronjob active list")
 		err = waitForJobNotActive(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name, job.Name)
@@ -308,10 +328,7 @@ var _ = SIGDescribe("CronJob", func() {
 		badTimeZone := "bad-time-zone"
 		cronJob.Spec.TimeZone = &badTimeZone
 		_, err := createCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob)
-		framework.ExpectError(err, "CronJob creation should fail with invalid time zone error")
-		if !apierrors.IsInvalid(err) {
-			framework.Failf("Failed to create CronJob, invalid time zone.")
-		}
+		gomega.Expect(err).To(gomega.MatchError(apierrors.IsInvalid, "Failed to create CronJob, invalid time zone."))
 	})
 
 	/*
@@ -611,24 +628,6 @@ func waitForActiveJobs(ctx context.Context, c clientset.Interface, ns, cronJobNa
 			return false, err
 		}
 		return len(curr.Status.Active) >= active, nil
-	})
-}
-
-// Wait for jobs to appear in the active list of a cronjob or not.
-// When failIfNonEmpty is set, this fails if the active set of jobs is still non-empty after
-// the timeout. When failIfNonEmpty is not set, this fails if the active set of jobs is still
-// empty after the timeout.
-func waitForNoJobs(ctx context.Context, c clientset.Interface, ns, jobName string, failIfNonEmpty bool) error {
-	return wait.PollWithContext(ctx, framework.Poll, cronJobTimeout, func(ctx context.Context) (bool, error) {
-		curr, err := getCronJob(ctx, c, ns, jobName)
-		if err != nil {
-			return false, err
-		}
-
-		if failIfNonEmpty {
-			return len(curr.Status.Active) == 0, nil
-		}
-		return len(curr.Status.Active) != 0, nil
 	})
 }
 

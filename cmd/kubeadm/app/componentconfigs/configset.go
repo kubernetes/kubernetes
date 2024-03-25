@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
@@ -289,7 +289,7 @@ func FetchFromClusterWithLocalOverwrites(clusterCfg *kubeadmapi.ClusterConfigura
 
 // GetVersionStates returns a slice of ComponentConfigVersionState structs
 // describing all supported component config groups that were identified on the cluster
-func GetVersionStates(clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) ([]outputapiv1alpha2.ComponentConfigVersionState, error) {
+func GetVersionStates(clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) ([]outputapiv1alpha3.ComponentConfigVersionState, error) {
 	// We don't want to modify clusterCfg so we make a working deep copy of it.
 	// Also, we don't want the defaulted component configs so we get rid of them.
 	scratchClusterCfg := clusterCfg.DeepCopy()
@@ -301,12 +301,12 @@ func GetVersionStates(clusterCfg *kubeadmapi.ClusterConfiguration, client client
 		return nil, err
 	}
 
-	results := []outputapiv1alpha2.ComponentConfigVersionState{}
+	results := []outputapiv1alpha3.ComponentConfigVersionState{}
 	for _, handler := range known {
 		group := handler.GroupVersion.Group
 		if _, ok := scratchClusterCfg.ComponentConfigs[group]; ok {
 			// Normally loaded component config. No manual upgrade required on behalf of users.
-			results = append(results, outputapiv1alpha2.ComponentConfigVersionState{
+			results = append(results, outputapiv1alpha3.ComponentConfigVersionState{
 				Group:            group,
 				CurrentVersion:   handler.GroupVersion.Version, // Currently kubeadm supports only one version per API
 				PreferredVersion: handler.GroupVersion.Version, // group so we can get away with these being the same
@@ -315,7 +315,7 @@ func GetVersionStates(clusterCfg *kubeadmapi.ClusterConfiguration, client client
 			// This config was either not present (user did not install an addon) or the config was unsupported kubeadm
 			// generated one and is therefore skipped so we can automatically re-generate it (no action required on
 			// behalf of the user).
-			results = append(results, outputapiv1alpha2.ComponentConfigVersionState{
+			results = append(results, outputapiv1alpha3.ComponentConfigVersionState{
 				Group:            group,
 				PreferredVersion: handler.GroupVersion.Version,
 			})

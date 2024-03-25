@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -42,7 +41,10 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	// set ApparmorProfile.
-	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
+	synthesized.Apparmor, synthesized.ApparmorProfile, err = getAppArmorProfile(pod, container)
+	if err != nil {
+		return nil, err
+	}
 
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
@@ -53,7 +55,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	// set namespace options and supplemental groups.
-	namespaceOptions, err := runtimeutil.NamespacesForPod(pod, m.runtimeHelper)
+	namespaceOptions, err := runtimeutil.NamespacesForPod(pod, m.runtimeHelper, m.runtimeClassManager)
 	if err != nil {
 		return nil, err
 	}

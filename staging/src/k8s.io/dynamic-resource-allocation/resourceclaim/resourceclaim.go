@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -95,14 +96,15 @@ func NewNameLookup(client kubernetes.Interface) *Lookup {
 // Lookup stores the state which is necessary to look up ResourceClaim names.
 type Lookup struct {
 	client       kubernetes.Interface
-	usePodStatus *bool
+	usePodStatus atomic.Pointer[bool]
 }
 
 // Name is a variant of the stand-alone Name with support also for Kubernetes < 1.28.
 func (l *Lookup) Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOwner bool, err error) {
-	if l.usePodStatus == nil {
+	usePodStatus := l.usePodStatus.Load()
+	if usePodStatus == nil {
 		if value, _ := os.LookupEnv("DRA_WITH_DETERMINISTIC_RESOURCE_CLAIM_NAMES"); value != "" {
-			l.usePodStatus = ptr.To(false)
+			usePodStatus = ptr.To(false)
 		} else if l.client != nil {
 			// Check once. This does not detect upgrades or
 			// downgrades, but that is good enough for the simple
@@ -114,25 +116,29 @@ func (l *Lookup) Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string,
 			}
 			if info.Major == "" {
 				// Fake client...
-				l.usePodStatus = ptr.To(true)
+				usePodStatus = ptr.To(true)
 			} else {
 				switch strings.Compare(info.Major, "1") {
 				case -1:
 					// Huh?
-					l.usePodStatus = ptr.To(false)
+					usePodStatus = ptr.To(false)
 				case 0:
 					// info.Minor may have a suffix which makes it larger than 28.
 					// We don't care about pre-releases here.
-					l.usePodStatus = ptr.To(strings.Compare("28", info.Minor) <= 0)
+					usePodStatus = ptr.To(strings.Compare("28", info.Minor) <= 0)
 				case 1:
 					// Kubernetes 2? Yeah!
-					l.usePodStatus = ptr.To(true)
+					usePodStatus = ptr.To(true)
 				}
 			}
+		} else {
+			// No information. Let's assume recent Kubernetes.
+			usePodStatus = ptr.To(true)
 		}
+		l.usePodStatus.Store(usePodStatus)
 	}
 
-	if *l.usePodStatus {
+	if *usePodStatus {
 		return Name(pod, podClaim)
 	}
 
@@ -176,4 +182,18 @@ func IsReservedForPod(pod *v1.Pod, claim *resourcev1alpha2.ResourceClaim) bool {
 func CanBeReserved(claim *resourcev1alpha2.ResourceClaim) bool {
 	return claim.Status.Allocation.Shareable ||
 		len(claim.Status.ReservedFor) == 0
+}
+
+// IsAllocatedWithStructuredParameters checks whether the claim is allocated
+// and the allocation was done with structured parameters.
+func IsAllocatedWithStructuredParameters(claim *resourcev1alpha2.ResourceClaim) bool {
+	if claim.Status.Allocation == nil {
+		return false
+	}
+	for _, handle := range claim.Status.Allocation.ResourceHandles {
+		if handle.StructuredData != nil {
+			return true
+		}
+	}
+	return false
 }

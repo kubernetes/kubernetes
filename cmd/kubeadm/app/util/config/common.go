@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package config contains utilities for managing the kubeadm configuration API.
 package config
 
 import (
@@ -389,11 +390,13 @@ func isKubeadmPrereleaseVersion(versionInfo *apimachineryversion.Info, k8sVersio
 func prepareStaticVariables(config any) {
 	switch c := config.(type) {
 	case *kubeadmapi.InitConfiguration:
-		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
 	case *kubeadmapi.JoinConfiguration:
-		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
 	case *kubeadmapi.ResetConfiguration:
-		kubeadmapi.SetActiveTimeouts(c.Timeouts.DeepCopy())
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
+	case *kubeadmapi.UpgradeConfiguration:
+		kubeadmapi.SetActiveTimeouts(c.Timeouts)
 	}
 }
 
@@ -489,4 +492,14 @@ func defaultEmptyMigrateMutators() migrateMutators {
 	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
 
 	return *mutators
+}
+
+// isKubeadmConfigPresent checks if a kubeadm config type is found in the provided document map
+func isKubeadmConfigPresent(docmap kubeadmapi.DocumentMap) bool {
+	for gvk := range docmap {
+		if gvk.Group == kubeadmapi.GroupName {
+			return true
+		}
+	}
+	return false
 }

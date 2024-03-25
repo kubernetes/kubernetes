@@ -18,18 +18,22 @@ package authorizerfactory
 
 import (
 	"context"
+	"sync"
 
+	celmetrics "k8s.io/apiserver/pkg/authorization/cel"
+	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-type registerables []compbasemetrics.Registerable
+var registerMetrics sync.Once
 
-// init registers all metrics
-func init() {
-	for _, metric := range metrics {
-		legacyregistry.MustRegister(metric)
-	}
+// RegisterMetrics registers authorizer metrics.
+func RegisterMetrics() {
+	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(requestTotal)
+		legacyregistry.MustRegister(requestLatency)
+	})
 }
 
 var (
@@ -51,19 +55,28 @@ var (
 		},
 		[]string{"code"},
 	)
-
-	metrics = registerables{
-		requestTotal,
-		requestLatency,
-	}
 )
 
+var _ = webhookmetrics.AuthorizerMetrics(delegatingAuthorizerMetrics{})
+
+type delegatingAuthorizerMetrics struct {
+	// no-op for webhook metrics for now, delegating authorization reports original total/latency metrics
+	webhookmetrics.NoopWebhookMetrics
+	// no-op for matchCondition metrics for now, delegating authorization doesn't configure match conditions
+	celmetrics.NoopMatcherMetrics
+}
+
+func NewDelegatingAuthorizerMetrics() delegatingAuthorizerMetrics {
+	RegisterMetrics()
+	return delegatingAuthorizerMetrics{}
+}
+
 // RecordRequestTotal increments the total number of requests for the delegated authorization.
-func RecordRequestTotal(ctx context.Context, code string) {
+func (delegatingAuthorizerMetrics) RecordRequestTotal(ctx context.Context, code string) {
 	requestTotal.WithContext(ctx).WithLabelValues(code).Add(1)
 }
 
 // RecordRequestLatency measures request latency in seconds for the delegated authorization. Broken down by status code.
-func RecordRequestLatency(ctx context.Context, code string, latency float64) {
+func (delegatingAuthorizerMetrics) RecordRequestLatency(ctx context.Context, code string, latency float64) {
 	requestLatency.WithContext(ctx).WithLabelValues(code).Observe(latency)
 }

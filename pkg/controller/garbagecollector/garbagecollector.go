@@ -20,11 +20,11 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"reflect"
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,10 +42,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/controller"
-	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	c "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 )
 
@@ -85,6 +83,7 @@ var _ controller.Debuggable = (*GarbageCollector)(nil)
 
 // NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	mapper meta.ResettableRESTMapper,
@@ -92,36 +91,28 @@ func NewGarbageCollector(
 	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
+	graphBuilder := NewDependencyGraphBuilder(ctx, metadataClient, mapper, ignoredResources, sharedInformers, informersStarted)
+	return NewComposedGarbageCollector(ctx, kubeClient, metadataClient, mapper, graphBuilder)
+}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
+func NewComposedGarbageCollector(
+	ctx context.Context,
+	kubeClient clientset.Interface,
+	metadataClient metadata.Interface,
+	mapper meta.ResettableRESTMapper,
+	graphBuilder *GraphBuilder,
+) (*GarbageCollector, error) {
+	attemptToDelete, attemptToOrphan, absentOwnerCache := graphBuilder.GetGraphResources()
 
-	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
-	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
-	absentOwnerCache := NewReferenceCache(500)
 	gc := &GarbageCollector{
-		metadataClient:   metadataClient,
-		restMapper:       mapper,
-		attemptToDelete:  attemptToDelete,
-		attemptToOrphan:  attemptToOrphan,
-		absentOwnerCache: absentOwnerCache,
-		kubeClient:       kubeClient,
-		eventBroadcaster: eventBroadcaster,
-	}
-	gc.dependencyGraphBuilder = &GraphBuilder{
-		eventRecorder:    eventRecorder,
-		metadataClient:   metadataClient,
-		informersStarted: informersStarted,
-		restMapper:       mapper,
-		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
-		uidToNode: &concurrentUIDToNode{
-			uidToNode: make(map[types.UID]*node),
-		},
-		attemptToDelete:  attemptToDelete,
-		attemptToOrphan:  attemptToOrphan,
-		absentOwnerCache: absentOwnerCache,
-		sharedInformers:  sharedInformers,
-		ignoredResources: ignoredResources,
+		metadataClient:         metadataClient,
+		restMapper:             mapper,
+		attemptToDelete:        attemptToDelete,
+		attemptToOrphan:        attemptToOrphan,
+		absentOwnerCache:       absentOwnerCache,
+		kubeClient:             kubeClient,
+		eventBroadcaster:       graphBuilder.eventBroadcaster,
+		dependencyGraphBuilder: graphBuilder,
 	}
 
 	metrics.Register()
@@ -147,7 +138,7 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	// Start events processing pipeline.
-	gc.eventBroadcaster.StartStructuredLogging(0)
+	gc.eventBroadcaster.StartStructuredLogging(3)
 	gc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: gc.kubeClient.CoreV1().Events("")})
 	defer gc.eventBroadcaster.Shutdown()
 
@@ -861,4 +852,9 @@ func GetDeletableResources(logger klog.Logger, discoveryClient discovery.ServerR
 
 func (gc *GarbageCollector) Name() string {
 	return "garbagecollector"
+}
+
+// GetDependencyGraphBuilder return graph builder which is particularly helpful for testing where controllerContext is not available
+func (gc *GarbageCollector) GetDependencyGraphBuilder() *GraphBuilder {
+	return gc.dependencyGraphBuilder
 }

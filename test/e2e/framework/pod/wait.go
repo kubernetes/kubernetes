@@ -75,7 +75,7 @@ func BeRunningNoRetries() types.GomegaMatcher {
 		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed, v1.PodSucceeded:
-				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead.", v1.PodRunning, pod.Status.Phase))
+				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
 			default:
 				return true, nil
 			}
@@ -401,14 +401,14 @@ func WaitForPodTerminatingInNamespaceTimeout(ctx context.Context, c clientset.In
 func WaitForPodSuccessInNamespaceTimeout(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(ctx, c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.DeletionTimestamp == nil && pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
-			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName))
 		}
 		switch pod.Status.Phase {
 		case v1.PodSucceeded:
 			ginkgo.By("Saw pod success")
 			return true, nil
 		case v1.PodFailed:
-			return true, fmt.Errorf("pod %q failed with status: %+v", podName, pod.Status)
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q failed with status: %+v", podName, pod.Status))
 		default:
 			return false, nil
 		}
@@ -768,6 +768,21 @@ func WaitForContainerRunning(ctx context.Context, c clientset.Interface, namespa
 			for _, cs := range statuses {
 				if cs.Name == containerName {
 					return cs.State.Running != nil, nil
+				}
+			}
+		}
+		return false, nil
+	})
+}
+
+// WaitForContainerTerminated waits for the given Pod container to have a state of terminated
+func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %s terminated", containerName)
+	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
+			for _, cs := range statuses {
+				if cs.Name == containerName {
+					return cs.State.Terminated != nil, nil
 				}
 			}
 		}

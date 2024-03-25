@@ -98,6 +98,11 @@ func NewFakeStaticPodWaiter(errsToReturn map[string]error) apiclient.Waiter {
 	}
 }
 
+// WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
+func (w *fakeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
+	return nil
+}
+
 // WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
 func (w *fakeWaiter) WaitForAPI() error {
 	return nil

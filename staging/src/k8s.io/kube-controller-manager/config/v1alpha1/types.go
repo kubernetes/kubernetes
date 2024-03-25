@@ -179,6 +179,10 @@ type AttachDetachControllerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 60 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+	// DisableForceDetachOnTimeout disables force detach when the maximum unmount
+	// time is exceeded. Is false by default, and thus force detach on unmount is
+	// enabled.
+	DisableForceDetachOnTimeout bool `json:"disableForceDetachOnTimeout"`
 }
 
 // CSRSigningControllerConfiguration contains elements describing CSRSigningController.

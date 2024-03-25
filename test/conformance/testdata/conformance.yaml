@@ -60,6 +60,28 @@
     and attempt to create an object; the webhook MUST deny the create.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, create and update mutating webhook configuration
+    with matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    be able to create and update mutating webhook configurations with match conditions
+    [Conformance]'
+  description: Register a mutating webhook configuration. Verify that the match conditions
+    field are properly stored in the api-server.  Update the mutating webhook configuration
+    and retrieve it; the retrieved object must contain the newly update matchConditions
+    fields.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
+- testname: Validating Admission webhook, create and update validating webhook configuration
+    with matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    be able to create and update validating webhook configurations with match conditions
+    [Conformance]'
+  description: Register a validating webhook configuration. Verify that the match
+    conditions field are properly stored in the api-server.  Update the validating
+    webhook configuration and retrieve it; the retrieved object must contain the newly
+    update matchConditions fields.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny attach
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     be able to deny attaching pod [Conformance]'
@@ -150,6 +172,16 @@
     present.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, mutating webhook excluding object with specific
+    name
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    mutate everything except ''skip-me'' configmaps [Conformance]'
+  description: Create a mutating webhook configuration with matchConditions field
+    that will reject all resources except ones with a specific name 'skip-me'. Create
+    a configMap with the name 'skip-me' and verify that it's mutated. Create a configMap
+    with a different name than 'skip-me' and verify that it's mustated.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutation with defaulting
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     mutate pod and apply defaults after mutation [Conformance]'
@@ -167,6 +199,24 @@
     MUST be allowed and the webhook configuration object MUST NOT be mutated the webhooks.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, reject mutating webhook configurations with
+    invalid matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    reject mutating webhook configurations with invalid match conditions [Conformance]'
+  description: Creates a mutating webhook configuration with an invalid CEL expression
+    in it's matchConditions field. The api-server server should reject the create
+    request with a "compilation failed" error message.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
+- testname: Validing Admission webhook, reject validating webhook configurations with
+    invalid matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    reject validating webhook configurations with invalid match conditions [Conformance]'
+  description: Creates a validating webhook configuration with an invalid CEL expression
+    in it's matchConditions field. The api-server server should reject the create
+    request with a "compilation failed" error message.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, fail closed
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     unconditionally reject operations on fail closed webhook [Conformance]'
@@ -175,6 +225,35 @@
     all MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Aggregated Discovery Interface
+  codename: '[sig-api-machinery] AggregatedDiscovery should support aggregated discovery
+    interface [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery client interface.
+    Built-in resources MUST all be present.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Interface CRDs
+  codename: '[sig-api-machinery] AggregatedDiscovery should support aggregated discovery
+    interface for CRDs [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery client interface.
+    Add a CRD to the apiserver. The CRD resource MUST be present in the discovery
+    document.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Endpoint Accept Headers
+  codename: '[sig-api-machinery] AggregatedDiscovery should support raw aggregated
+    discovery endpoint Accept headers [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery endpoint Accept
+    headers. Built-in resources MUST all be present.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Endpoint Accept Headers CRDs
+  codename: '[sig-api-machinery] AggregatedDiscovery should support raw aggregated
+    discovery request for CRDs [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery endpoint Accept
+    headers. Add a CRD to the apiserver. The CRD MUST appear in the discovery document.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
     API Server using the current Aggregator [Conformance]'
@@ -699,6 +778,41 @@
     code of 406.
   release: v1.16
   file: test/e2e/apimachinery/table_conversion.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should allow expressions to refer variables. [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should allow expressions to refer variables.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingAdmissionPolicy API
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should support ValidatingAdmissionPolicy API operations [Conformance]'
+  description: ' The admissionregistration.k8s.io API group MUST exist in the /apis
+    discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
+    exist in the /apis/admissionregistration.k8s.io discovery document. The validatingadmisionpolicy
+    and validatingadmissionpolicy/status resources MUST exist in the /apis/admissionregistration.k8s.io/v1
+    discovery document. The validatingadmisionpolicy resource must support create,
+    get, list, watch, update, patch, delete, and deletecollection.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingadmissionPolicyBinding API
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should support ValidatingAdmissionPolicyBinding API operations [Conformance]'
+  description: ' The admissionregistration.k8s.io API group MUST exist in the /apis
+    discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
+    exist in the /apis/admissionregistration.k8s.io discovery document. The ValidatingadmissionPolicyBinding
+    resources MUST exist in the /apis/admissionregistration.k8s.io/v1 discovery document.
+    The ValidatingadmissionPolicyBinding resource must support create, get, list,
+    watch, update, patch, delete, and deletecollection.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should validate against a Deployment [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should validate a deployment as the
+    expression defined inside the policy.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
 - testname: watch-configmaps-closed-and-restarted
   codename: '[sig-api-machinery] Watchers should be able to restart watching from
     the last resource version observed by the previous watch [Conformance]'
@@ -944,10 +1058,9 @@
 - testname: Jobs, apply changes to status
   codename: '[sig-apps] Job should apply changes to a job status [Conformance]'
   description: Attempt to create a running Job which MUST succeed. Attempt to patch
-    the Job status to include a new start time which MUST succeed. An annotation for
-    the job that was patched MUST be found. Attempt to replace the job status with
-    a new start time which MUST succeed. Attempt to read its status sub-resource which
-    MUST succeed
+    the Job status which MUST succeed. An annotation for the job that was patched
+    MUST be found. Attempt to replace the job status with update which MUST succeed.
+    Attempt to read its status sub-resource which MUST succeed
   release: v1.24
   file: test/e2e/apps/job.go
 - testname: Ensure Pods of an Indexed Job get a unique index.
@@ -3454,4 +3567,18 @@
     was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
+- testname: VolumeAttachment, lifecycle
+  codename: '[sig-storage] VolumeAttachment Conformance should run through the lifecycle
+    of a VolumeAttachment [Conformance]'
+  description: Creating an initial VolumeAttachment MUST succeed. Reading the VolumeAttachment
+    MUST succeed with with required name retrieved. Patching a VolumeAttachment MUST
+    succeed with its new label found. Listing VolumeAttachment with a labelSelector
+    MUST succeed with a single item retrieved. Deleting a VolumeAttachment MUST succeed
+    and it MUST be confirmed. Creating a second VolumeAttachment MUST succeed. Updating
+    the second VolumentAttachment with a new label MUST succeed with its new label
+    found. Creating a third VolumeAttachment MUST succeed. Updating the third VolumentAttachment
+    with a new label MUST succeed with its new label found. Deleting both VolumeAttachments
+    via deleteCollection MUST succeed and it MUST be confirmed.
+  release: v1.30
+  file: test/e2e/storage/volume_attachment.go
 

@@ -30,22 +30,22 @@ metadata:
   namespace: kube-system
   labels:
     app.kubernetes.io/name: node-problem-detector
-    app.kubernetes.io/version: v0.8.13
+    app.kubernetes.io/version: v0.8.16
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: node-problem-detector
-      app.kubernetes.io/version: v0.8.13
+      app.kubernetes.io/version: v0.8.16
   template:
     metadata:
       labels:
         app.kubernetes.io/name: node-problem-detector
-        app.kubernetes.io/version: v0.8.13
+        app.kubernetes.io/version: v0.8.16
     spec:
       containers:
       - name: node-problem-detector
-        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.13
+        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.16
         command:
         - "/bin/sh"
         - "-c"

@@ -60,7 +60,7 @@ func runControlPlane() func(c workflow.RunData) error {
 		}
 
 		// otherwise, retrieve all the info required for control plane upgrade
-		cfg := data.Cfg()
+		cfg := data.InitCfg()
 		client := data.Client()
 		dryRun := data.DryRun()
 		etcdUpgrade := data.EtcdUpgrade()
@@ -73,7 +73,7 @@ func runControlPlane() func(c workflow.RunData) error {
 			return upgrade.DryRunStaticPodUpgrade(patchesDir, cfg)
 		}
 
-		waiter := apiclient.NewKubeWaiter(data.Client(), upgrade.UpgradeManifestTimeout, os.Stdout)
+		waiter := apiclient.NewKubeWaiter(data.Client(), data.Cfg().Timeouts.UpgradeManifests.Duration, os.Stdout)
 
 		if err := upgrade.PerformStaticPodUpgrade(client, waiter, cfg, etcdUpgrade, renewCerts, patchesDir); err != nil {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")

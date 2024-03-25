@@ -102,36 +102,34 @@ import (
 
 	generatorargs "k8s.io/code-generator/cmd/conversion-gen/args"
 	"k8s.io/code-generator/cmd/conversion-gen/generators"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
 )
 
 func main() {
 	klog.InitFlags(nil)
-	genericArgs, customArgs := generatorargs.NewDefaults()
+	args := generatorargs.New()
 
-	genericArgs.AddFlags(pflag.CommandLine)
-	customArgs.AddFlags(pflag.CommandLine)
+	args.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	// k8s.io/apimachinery/pkg/runtime contains a number of manual conversions,
-	// that we need to generate conversions.
-	// Packages being dependencies of explicitly requested packages are only
-	// partially scanned - only types explicitly used are being traversed.
-	// Not used functions or types are omitted.
-	// Adding this explicitly to InputDirs ensures that the package is fully
-	// scanned and all functions are parsed and processed.
-	genericArgs.InputDirs = append(genericArgs.InputDirs, "k8s.io/apimachinery/pkg/runtime")
-
-	if err := generatorargs.Validate(genericArgs); err != nil {
+	if err := args.Validate(); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
 
+	myTargets := func(context *generator.Context) []generator.Target {
+		return generators.GetTargets(context, args)
+	}
+
 	// Run it.
-	if err := genericArgs.Execute(
+	if err := gengo.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
-		generators.Packages,
+		myTargets,
+		gengo.StdBuildTag,
+		pflag.Args(),
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

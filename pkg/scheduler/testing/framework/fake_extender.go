@@ -137,30 +137,6 @@ func (pl *node2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-type equalPrioritizerPlugin struct{}
-
-// NewEqualPrioritizerPlugin returns a factory function to build equalPrioritizerPlugin.
-func NewEqualPrioritizerPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &equalPrioritizerPlugin{}, nil
-	}
-}
-
-// Name returns the name of the plugin.
-func (pl *equalPrioritizerPlugin) Name() string {
-	return "EqualPrioritizerPlugin"
-}
-
-// Score returns score 1 for each node.
-func (pl *equalPrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
-	return int64(1), nil
-}
-
-// ScoreExtensions returns nil.
-func (pl *equalPrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
-	return nil
-}
-
 // FakeExtender is a data struct which implements the Extender interface.
 type FakeExtender struct {
 	// ExtenderName indicates this fake extender's name.
@@ -173,6 +149,7 @@ type FakeExtender struct {
 	FilteredNodes    []*framework.NodeInfo
 	UnInterested     bool
 	Ignorable        bool
+	Binder           func() error
 
 	// Cached node information for fake extender
 	CachedNodeNameToInfo map[string]*framework.NodeInfo
@@ -385,6 +362,9 @@ func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*framework.NodeInfo) (*ex
 
 // Bind implements the extender Bind function.
 func (f *FakeExtender) Bind(binding *v1.Binding) error {
+	if f.Binder != nil {
+		return f.Binder()
+	}
 	if len(f.FilteredNodes) != 0 {
 		for _, node := range f.FilteredNodes {
 			if node.Node().Name == binding.Target.Name {
@@ -407,6 +387,11 @@ func (f *FakeExtender) IsBinder() bool {
 // IsPrioritizer returns true if there are any prioritizers.
 func (f *FakeExtender) IsPrioritizer() bool {
 	return len(f.Prioritizers) > 0
+}
+
+// IsFilter returns true if there are any filters.
+func (f *FakeExtender) IsFilter() bool {
+	return len(f.Predicates) > 0
 }
 
 // IsInterested returns a bool indicating whether this extender is interested in this Pod.

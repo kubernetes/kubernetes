@@ -25,6 +25,7 @@ import (
 var PluginsV1 = &config.Plugins{
 	MultiPoint: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.SchedulingGates},
 			{Name: names.PrioritySort},
 			{Name: names.NodeUnschedulable},
 			{Name: names.NodeName},
@@ -45,7 +46,6 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
-			{Name: names.SchedulingGates},
 		},
 	},
 }

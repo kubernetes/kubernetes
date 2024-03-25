@@ -21,23 +21,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
-	defaultergen "k8s.io/gengo/examples/defaulter-gen/generators"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/klog/v2"
 )
 
 // This is the comment tag that carries parameters for open API generation.
 const tagName = "k8s:openapi-gen"
+const markerPrefix = "+k8s:validation:"
 const tagOptional = "optional"
+const tagRequired = "required"
 const tagDefault = "default"
 
 // Known values for the tag.
@@ -54,11 +58,11 @@ var tempPatchTags = [...]string{
 }
 
 func getOpenAPITagValue(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[tagName]
+	return gengo.ExtractCommentTags("+", comments)[tagName]
 }
 
 func getSingleTagsValue(comments []string, tag string) (string, error) {
-	tags, ok := types.ExtractCommentTags("+", comments)[tag]
+	tags, ok := gengo.ExtractCommentTags("+", comments)[tag]
 	if !ok || len(tags) == 0 {
 		return "", nil
 	}
@@ -78,14 +82,25 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 	return false
 }
 
-// hasOptionalTag returns true if the member has +optional in its comments or
-// omitempty in its json tags.
-func hasOptionalTag(m *types.Member) bool {
-	hasOptionalCommentTag := types.ExtractCommentTags(
+// isOptional returns error if the member has +optional and +required in
+// its comments. If +optional is present it returns true. If +required is present
+// it returns false. Otherwise, it returns true if `omitempty` JSON tag is present
+func isOptional(m *types.Member) (bool, error) {
+	hasOptionalCommentTag := gengo.ExtractCommentTags(
 		"+", m.CommentLines)[tagOptional] != nil
-	hasOptionalJsonTag := strings.Contains(
-		reflect.StructTag(m.Tags).Get("json"), "omitempty")
-	return hasOptionalCommentTag || hasOptionalJsonTag
+	hasRequiredCommentTag := gengo.ExtractCommentTags(
+		"+", m.CommentLines)[tagRequired] != nil
+	if hasOptionalCommentTag && hasRequiredCommentTag {
+		return false, fmt.Errorf("member %s cannot be both optional and required", m.Name)
+	} else if hasRequiredCommentTag {
+		return false, nil
+	} else if hasOptionalCommentTag {
+		return true, nil
+	}
+
+	// If neither +optional nor +required is present in the comments,
+	// infer optional from the json tags.
+	return strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty"), nil
 }
 
 func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
@@ -110,16 +125,16 @@ const (
 
 // openApiGen produces a file with auto-generated OpenAPI functions.
 type openAPIGen struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	// TargetPackage is the package that will get GetOpenAPIDefinitions function returns all open API definitions.
 	targetPackage string
 	imports       namer.ImportTracker
 }
 
-func newOpenAPIGen(sanitizedName string, targetPackage string) generator.Generator {
+func newOpenAPIGen(outputFilename string, targetPackage string) generator.Generator {
 	return &openAPIGen{
-		DefaultGen: generator.DefaultGen{
-			OptionalName: sanitizedName,
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: outputFilename,
 		},
 		imports:       generator.NewImportTrackerForPackage(targetPackage),
 		targetPackage: targetPackage,
@@ -139,16 +154,6 @@ func (g *openAPIGen) Namers(c *generator.Context) namer.NameSystems {
 			PrependPackageNames: 4, // enough to fully qualify from k8s.io/api/...
 		},
 	}
-}
-
-func (g *openAPIGen) isOtherPackage(pkg string) bool {
-	if pkg == g.targetPackage {
-		return false
-	}
-	if strings.HasSuffix(pkg, "\""+g.targetPackage+"\"") {
-		return false
-	}
-	return true
 }
 
 func (g *openAPIGen) Imports(c *generator.Context) []string {
@@ -292,7 +297,8 @@ func hasOpenAPIV3OneOfMethod(t *types.Type) bool {
 
 // typeShortName returns short package name (e.g. the name x appears in package x definition) dot type name.
 func typeShortName(t *types.Type) string {
-	return filepath.Base(t.Name.Package) + "." + t.Name.Name
+	// `path` vs. `filepath` because packages use '/'
+	return path.Base(t.Name.Package) + "." + t.Name.Name
 }
 
 func (g openAPITypeWriter) generateMembers(t *types.Type, required []string) ([]string, error) {
@@ -315,7 +321,10 @@ func (g openAPITypeWriter) generateMembers(t *types.Type, required []string) ([]
 		if name == "" {
 			continue
 		}
-		if !hasOptionalTag(&m) {
+		if isOptional, err := isOptional(&m); err != nil {
+			klog.Errorf("Error when generating: %v, %v\n", name, m)
+			return required, err
+		} else if !isOptional {
 			required = append(required, name)
 		}
 		if err = g.generateProperty(&m, t); err != nil {
@@ -353,10 +362,76 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 	return g.Error()
 }
 
+func (g openAPITypeWriter) generateValueValidations(vs *spec.SchemaProps) error {
+
+	if vs == nil {
+		return nil
+	}
+	args := generator.Args{
+		"ptrTo": &types.Type{
+			Name: types.Name{
+				Package: "k8s.io/utils/ptr",
+				Name:    "To",
+			}},
+		"spec": vs,
+	}
+	if vs.Minimum != nil {
+		g.Do("Minimum: $.ptrTo|raw$[float64]($.spec.Minimum$),\n", args)
+	}
+	if vs.Maximum != nil {
+		g.Do("Maximum: $.ptrTo|raw$[float64]($.spec.Maximum$),\n", args)
+	}
+	if vs.ExclusiveMinimum {
+		g.Do("ExclusiveMinimum: true,\n", args)
+	}
+	if vs.ExclusiveMaximum {
+		g.Do("ExclusiveMaximum: true,\n", args)
+	}
+	if vs.MinLength != nil {
+		g.Do("MinLength: $.ptrTo|raw$[int64]($.spec.MinLength$),\n", args)
+	}
+	if vs.MaxLength != nil {
+		g.Do("MaxLength: $.ptrTo|raw$[int64]($.spec.MaxLength$),\n", args)
+	}
+
+	if vs.MinProperties != nil {
+		g.Do("MinProperties: $.ptrTo|raw$[int64]($.spec.MinProperties$),\n", args)
+	}
+	if vs.MaxProperties != nil {
+		g.Do("MaxProperties: $.ptrTo|raw$[int64]($.spec.MaxProperties$),\n", args)
+	}
+	if len(vs.Pattern) > 0 {
+		p, err := json.Marshal(vs.Pattern)
+		if err != nil {
+			return err
+		}
+		g.Do("Pattern: $.$,\n", string(p))
+	}
+	if vs.MultipleOf != nil {
+		g.Do("MultipleOf: $.ptrTo|raw$[float64]($.spec.MultipleOf$),\n", args)
+	}
+	if vs.MinItems != nil {
+		g.Do("MinItems: $.ptrTo|raw$[int64]($.spec.MinItems$),\n", args)
+	}
+	if vs.MaxItems != nil {
+		g.Do("MaxItems: $.ptrTo|raw$[int64]($.spec.MaxItems$),\n", args)
+	}
+	if vs.UniqueItems {
+		g.Do("UniqueItems: true,\n", nil)
+	}
+
+	return nil
+}
+
 func (g openAPITypeWriter) generate(t *types.Type) error {
 	// Only generate for struct type and ignore the rest
 	switch t.Kind {
 	case types.Struct:
+		validationSchema, err := ParseCommentTags(t, t.CommentLines, markerPrefix)
+		if err != nil {
+			return err
+		}
+
 		hasV2Definition := hasOpenAPIDefinitionMethod(t)
 		hasV2DefinitionTypeAndFormat := hasOpenAPIDefinitionMethods(t)
 		hasV3OneOfTypes := hasOpenAPIV3OneOfMethod(t)
@@ -376,10 +451,17 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 				"SchemaProps: spec.SchemaProps{\n", args)
 			g.generateDescription(t.CommentLines)
 			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
-				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
-				"},\n"+
-				"},\n"+
-				"})\n}\n\n", args)
+				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n", args)
+			err = g.generateValueValidations(&validationSchema.SchemaProps)
+			if err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			if err := g.generateStructExtensions(t, validationSchema.Extensions); err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			g.Do("})\n}\n\n", args)
 			return nil
 		case hasV2DefinitionTypeAndFormat && hasV3OneOfTypes:
 			// generate v3 def.
@@ -388,20 +470,34 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 				"SchemaProps: spec.SchemaProps{\n", args)
 			g.generateDescription(t.CommentLines)
 			g.Do("OneOf:common.GenerateOpenAPIV3OneOfSchema($.type|raw${}.OpenAPIV3OneOfTypes()),\n"+
-				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
-				"},\n"+
-				"},\n"+
-				"},", args)
+				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n", args)
+			err = g.generateValueValidations(&validationSchema.SchemaProps)
+			if err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			if err := g.generateStructExtensions(t, validationSchema.Extensions); err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			g.Do("},", args)
 			// generate v2 def.
 			g.Do("$.OpenAPIDefinition|raw${\n"+
 				"Schema: spec.Schema{\n"+
 				"SchemaProps: spec.SchemaProps{\n", args)
 			g.generateDescription(t.CommentLines)
 			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
-				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
-				"},\n"+
-				"},\n"+
-				"})\n}\n\n", args)
+				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n", args)
+			err = g.generateValueValidations(&validationSchema.SchemaProps)
+			if err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			if err := g.generateStructExtensions(t, validationSchema.Extensions); err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			g.Do("})\n}\n\n", args)
 			return nil
 		case hasV2DefinitionTypeAndFormat:
 			g.Do("return $.OpenAPIDefinition|raw${\n"+
@@ -409,18 +505,30 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 				"SchemaProps: spec.SchemaProps{\n", args)
 			g.generateDescription(t.CommentLines)
 			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
-				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
-				"},\n"+
-				"},\n"+
-				"}\n}\n\n", args)
+				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n", args)
+			err = g.generateValueValidations(&validationSchema.SchemaProps)
+			if err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			if err := g.generateStructExtensions(t, validationSchema.Extensions); err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			g.Do("}\n}\n\n", args)
 			return nil
 		case hasV3OneOfTypes:
 			// having v3 oneOf types without custom v2 type or format does not make sense.
 			return fmt.Errorf("type %q has v3 one of types but not v2 type or format", t.Name)
 		}
+
 		g.Do("return $.OpenAPIDefinition|raw${\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", args)
 		g.generateDescription(t.CommentLines)
 		g.Do("Type: []string{\"object\"},\n", nil)
+		err = g.generateValueValidations(&validationSchema.SchemaProps)
+		if err != nil {
+			return err
+		}
 
 		// write members into a temporary buffer, in order to postpone writing out the Properties field. We only do
 		// that if it is not empty.
@@ -441,7 +549,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
 		}
 		g.Do("},\n", nil)
-		if err := g.generateStructExtensions(t); err != nil {
+		if err := g.generateStructExtensions(t, validationSchema.Extensions); err != nil {
 			return err
 		}
 		g.Do("},\n", nil)
@@ -474,7 +582,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 	return nil
 }
 
-func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
+func (g openAPITypeWriter) generateStructExtensions(t *types.Type, otherExtensions map[string]interface{}) error {
 	extensions, errors := parseExtensions(t.CommentLines)
 	// Initially, we will only log struct extension errors.
 	if len(errors) > 0 {
@@ -490,11 +598,11 @@ func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
 	}
 
 	// TODO(seans3): Validate struct extensions here.
-	g.emitExtensions(extensions, unions)
+	g.emitExtensions(extensions, unions, otherExtensions)
 	return nil
 }
 
-func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *types.Type) error {
+func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *types.Type, otherExtensions map[string]interface{}) error {
 	extensions, parseErrors := parseExtensions(m.CommentLines)
 	validationErrors := validateMemberExtensions(extensions, m)
 	errors := append(parseErrors, validationErrors...)
@@ -505,13 +613,13 @@ func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *typ
 			klog.V(2).Infof("%s %s\n", errorPrefix, e)
 		}
 	}
-	g.emitExtensions(extensions, nil)
+	g.emitExtensions(extensions, nil, otherExtensions)
 	return nil
 }
 
-func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union) {
+func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union, otherExtensions map[string]interface{}) {
 	// If any extensions exist, then emit code to create them.
-	if len(extensions) == 0 && len(unions) == 0 {
+	if len(extensions) == 0 && len(unions) == 0 && len(otherExtensions) == 0 {
 		return
 	}
 	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
@@ -534,6 +642,16 @@ func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union
 		}
 		g.Do("},\n", nil)
 	}
+
+	if len(otherExtensions) > 0 {
+		for k, v := range otherExtensions {
+			g.Do("$.key$: $.value$,\n", map[string]interface{}{
+				"key":   fmt.Sprintf("%#v", k),
+				"value": fmt.Sprintf("%#v", v),
+			})
+		}
+	}
+
 	g.Do("},\n},\n", nil)
 }
 
@@ -585,13 +703,38 @@ func defaultFromComments(comments []string, commentPath string, t *types.Type) (
 	}
 
 	var i interface{}
-	if id, ok := defaultergen.ParseSymbolReference(tag, commentPath); ok {
+	if id, ok := parseSymbolReference(tag, commentPath); ok {
 		klog.Errorf("%v, %v", id, commentPath)
 		return nil, &id, nil
 	} else if err := json.Unmarshal([]byte(tag), &i); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal default: %v", err)
 	}
 	return i, nil, nil
+}
+
+var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
+var refREIdentIndex = refRE.SubexpIndex("reference")
+
+// parseSymbolReference looks for strings that match one of the following:
+//   - ref(Ident)
+//   - ref(pkgpath.Ident)
+//     If the input string matches either of these, it will return the (optional)
+//     pkgpath, the Ident, and true.  Otherwise it will return empty strings and
+//     false.
+//
+// This is borrowed from k8s.io/code-generator.
+func parseSymbolReference(s, sourcePackage string) (types.Name, bool) {
+	matches := refRE.FindStringSubmatch(s)
+	if len(matches) < refREIdentIndex || matches[refREIdentIndex] == "" {
+		return types.Name{}, false
+	}
+
+	contents := matches[refREIdentIndex]
+	name := types.ParseFullyQualifiedName(contents)
+	if len(name.Package) == 0 {
+		name.Package = sourcePackage
+	}
+	return name, true
 }
 
 func implementsCustomUnmarshalling(t *types.Type) bool {
@@ -718,11 +861,15 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	if name == "" {
 		return nil
 	}
+	validationSchema, err := ParseCommentTags(m.Type, m.CommentLines, markerPrefix)
+	if err != nil {
+		return err
+	}
 	if err := g.validatePatchTags(m, parent); err != nil {
 		return err
 	}
 	g.Do("\"$.$\": {\n", name)
-	if err := g.generateMemberExtensions(m, parent); err != nil {
+	if err := g.generateMemberExtensions(m, parent, validationSchema.Extensions); err != nil {
 		return err
 	}
 	g.Do("SchemaProps: spec.SchemaProps{\n", nil)
@@ -740,6 +887,10 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	omitEmpty := strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty")
 	if err := g.generateDefault(m.CommentLines, m.Type, omitEmpty, parent); err != nil {
 		return fmt.Errorf("failed to generate default in %v: %v: %v", parent, m.Name, err)
+	}
+	err = g.generateValueValidations(&validationSchema.SchemaProps)
+	if err != nil {
+		return err
 	}
 	t := resolveAliasAndPtrType(m.Type)
 	// If we can get a openAPI type and format for this type, we consider it to be simple property
@@ -814,6 +965,10 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
+		if enumType, isEnum := g.enumContext.EnumType(t.Elem); isEnum {
+			// original type is an enum, add "Enum: " and the values
+			g.Do("Enum: []interface{}{$.$},\n", strings.Join(enumType.ValueStrings(), ", "))
+		}
 		g.Do("},\n},\n},\n", nil)
 		return nil
 	}
@@ -847,6 +1002,10 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
+		if enumType, isEnum := g.enumContext.EnumType(t.Elem); isEnum {
+			// original type is an enum, add "Enum: " and the values
+			g.Do("Enum: []interface{}{$.$},\n", strings.Join(enumType.ValueStrings(), ", "))
+		}
 		g.Do("},\n},\n},\n", nil)
 		return nil
 	}

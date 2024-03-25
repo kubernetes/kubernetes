@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
@@ -65,10 +67,16 @@ var (
 	synchronizeTokenIDVerifierForTest = false
 )
 
+const (
+	wellKnownEndpointPath = "/.well-known/openid-configuration"
+)
+
 type Options struct {
 	// JWTAuthenticator is the authenticator that will be used to verify the JWT.
 	JWTAuthenticator apiserver.JWTAuthenticator
+
 	// Optional KeySet to allow for synchronous initialization instead of fetching from the remote issuer.
+	// Mutually exclusive with JWTAuthenticator.Issuer.DiscoveryURL.
 	KeySet oidc.KeySet
 
 	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
@@ -88,6 +96,8 @@ type Options struct {
 	// https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 	SupportedSigningAlgs []string
 
+	DisallowedIssuers []string
+
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
 }
@@ -99,12 +109,12 @@ type CAContentProvider interface {
 
 // initVerifier creates a new ID token verifier for the given configuration and issuer URL.  On success, calls setVerifier with the
 // resulting verifier.
-func initVerifier(ctx context.Context, config *oidc.Config, iss string) (*oidc.IDTokenVerifier, error) {
+func initVerifier(ctx context.Context, config *oidc.Config, iss string, audiences sets.Set[string]) (*idTokenVerifier, error) {
 	provider, err := oidc.NewProvider(ctx, iss)
 	if err != nil {
 		return nil, fmt.Errorf("init verifier failed: %v", err)
 	}
-	return provider.Verifier(config), nil
+	return &idTokenVerifier{provider.Verifier(config), audiences}, nil
 }
 
 // asyncIDTokenVerifier is an ID token verifier that allows async initialization
@@ -115,21 +125,21 @@ type asyncIDTokenVerifier struct {
 	// v is the ID token verifier initialized asynchronously.  It remains nil
 	// up until it is eventually initialized.
 	// Guarded by m
-	v *oidc.IDTokenVerifier
+	v *idTokenVerifier
 }
 
 // newAsyncIDTokenVerifier creates a new asynchronous token verifier.  The
 // verifier is available immediately, but may remain uninitialized for some time
 // after creation.
-func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss string) *asyncIDTokenVerifier {
+func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss string, audiences sets.Set[string]) *asyncIDTokenVerifier {
 	t := &asyncIDTokenVerifier{}
 
 	sync := make(chan struct{})
 	// Polls indefinitely in an attempt to initialize the distributed claims
 	// verifier, or until context canceled.
-	initFn := func() (done bool, err error) {
+	initFn := func(ctx context.Context) (done bool, err error) {
 		klog.V(4).Infof("oidc authenticator: attempting init: iss=%v", iss)
-		v, err := initVerifier(ctx, c, iss)
+		v, err := initVerifier(ctx, c, iss, audiences)
 		if err != nil {
 			klog.Errorf("oidc authenticator: async token verifier for issuer: %q: %v", iss, err)
 			return false, nil
@@ -142,33 +152,32 @@ func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss string) *a
 	}
 
 	go func() {
-		if done, _ := initFn(); !done {
-			go wait.PollUntil(time.Second*10, initFn, ctx.Done())
-		}
+		_ = wait.PollUntilContextCancel(ctx, 10*time.Second, true, initFn)
 	}()
 
 	if synchronizeTokenIDVerifierForTest {
-		<-sync
+		select {
+		case <-sync:
+		case <-ctx.Done():
+		}
 	}
 
 	return t
 }
 
 // verifier returns the underlying ID token verifier, or nil if one is not yet initialized.
-func (a *asyncIDTokenVerifier) verifier() *oidc.IDTokenVerifier {
+func (a *asyncIDTokenVerifier) verifier() *idTokenVerifier {
 	a.m.Lock()
 	defer a.m.Unlock()
 	return a.v
 }
 
-type Authenticator struct {
+type jwtAuthenticator struct {
 	jwtAuthenticator apiserver.JWTAuthenticator
 
 	// Contains an *oidc.IDTokenVerifier. Do not access directly use the
 	// idTokenVerifier method.
 	verifier atomic.Value
-
-	cancel context.CancelFunc
 
 	// resolver is used to resolve distributed claims.
 	resolver *claimResolver
@@ -179,25 +188,38 @@ type Authenticator struct {
 
 	// requiredClaims contains the list of claims that must be present in the token.
 	requiredClaims map[string]string
+
+	healthCheck atomic.Pointer[errorHolder]
 }
 
-func (a *Authenticator) setVerifier(v *oidc.IDTokenVerifier) {
+// idTokenVerifier is a wrapper around oidc.IDTokenVerifier. It uses the oidc.IDTokenVerifier
+// to verify the raw ID token and then performs audience validation locally.
+type idTokenVerifier struct {
+	verifier  *oidc.IDTokenVerifier
+	audiences sets.Set[string]
+}
+
+func (a *jwtAuthenticator) setVerifier(v *idTokenVerifier) {
 	a.verifier.Store(v)
+	if v != nil {
+		// this must be done after the verifier has been stored so that a nil error
+		// from HealthCheck always means that the authenticator is ready for use.
+		a.healthCheck.Store(&errorHolder{})
+	}
 }
 
-func (a *Authenticator) idTokenVerifier() (*oidc.IDTokenVerifier, bool) {
+func (a *jwtAuthenticator) idTokenVerifier() (*idTokenVerifier, bool) {
 	if v := a.verifier.Load(); v != nil {
-		return v.(*oidc.IDTokenVerifier), true
+		return v.(*idTokenVerifier), true
 	}
 	return nil, false
 }
 
-func (a *Authenticator) Close() {
-	a.cancel()
+func AllValidSigningAlgorithms() []string {
+	return sets.List(sets.KeySet(allowedSigningAlgs))
 }
 
-// whitelist of signing algorithms to ensure users don't mistakenly pass something
-// goofy.
+// allowlist of signing algorithms to ensure users don't mistakenly pass something goofy.
 var allowedSigningAlgs = map[string]bool{
 	oidc.RS256: true,
 	oidc.RS384: true,
@@ -210,8 +232,19 @@ var allowedSigningAlgs = map[string]bool{
 	oidc.PS512: true,
 }
 
-func New(opts Options) (*Authenticator, error) {
-	celMapper, fieldErr := apiservervalidation.CompileAndValidateJWTAuthenticator(opts.JWTAuthenticator)
+type AuthenticatorTokenWithHealthCheck interface {
+	authenticator.Token
+	HealthCheck() error
+}
+
+// New returns an authenticator that is asynchronously initialized when opts.KeySet is not set.
+// The input lifecycleCtx is used to:
+// - terminate background goroutines that are needed for asynchronous initialization
+// - as the base context for any requests that are made (i.e. for key fetching)
+// Thus, once the lifecycleCtx is canceled, the authenticator must not be used.
+// A caller may check if the authenticator is healthy by calling the HealthCheck method.
+func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHealthCheck, error) {
+	celMapper, fieldErr := apiservervalidation.CompileAndValidateJWTAuthenticator(opts.JWTAuthenticator, opts.DisallowedIssuers)
 	if err := fieldErr.ToAggregate(); err != nil {
 		return nil, err
 	}
@@ -257,24 +290,59 @@ func New(opts Options) (*Authenticator, error) {
 		client = &http.Client{Transport: tr, Timeout: 30 * time.Second}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx = oidc.ClientContext(ctx, client)
+	// If the discovery URL is set in authentication configuration, we set up a
+	// roundTripper to rewrite the {url}/.well-known/openid-configuration to
+	// the discovery URL. This is useful for self-hosted providers, for example,
+	// providers that run on top of Kubernetes itself.
+	if len(opts.JWTAuthenticator.Issuer.DiscoveryURL) > 0 {
+		if opts.KeySet != nil {
+			return nil, fmt.Errorf("oidc: KeySet and DiscoveryURL are mutually exclusive")
+		}
+
+		discoveryURL, err := url.Parse(opts.JWTAuthenticator.Issuer.DiscoveryURL)
+		if err != nil {
+			return nil, fmt.Errorf("oidc: invalid discovery URL: %w", err)
+		}
+
+		clientWithDiscoveryURL := *client
+		baseTransport := clientWithDiscoveryURL.Transport
+		if baseTransport == nil {
+			baseTransport = http.DefaultTransport
+		}
+		// This matches the url construction in oidc.NewProvider as of go-oidc v2.2.1.
+		// xref: https://github.com/coreos/go-oidc/blob/40cd342c4a2076195294612a834d11df23c1b25a/oidc.go#L114
+		urlToRewrite := strings.TrimSuffix(opts.JWTAuthenticator.Issuer.URL, "/") + wellKnownEndpointPath
+		clientWithDiscoveryURL.Transport = &discoveryURLRoundTripper{baseTransport, discoveryURL, urlToRewrite}
+		client = &clientWithDiscoveryURL
+	}
+
+	lifecycleCtx = oidc.ClientContext(lifecycleCtx, client)
 
 	now := opts.now
 	if now == nil {
 		now = time.Now
 	}
 
+	audiences := sets.New[string](opts.JWTAuthenticator.Issuer.Audiences...)
 	verifierConfig := &oidc.Config{
 		ClientID:             opts.JWTAuthenticator.Issuer.Audiences[0],
 		SupportedSigningAlgs: supportedSigningAlgs,
 		Now:                  now,
 	}
+	if audiences.Len() > 1 {
+		verifierConfig.ClientID = ""
+		// SkipClientIDCheck is set to true because we want to support multiple audiences
+		// in the authentication configuration.
+		// The go oidc library does not support validating
+		// multiple audiences, so we have to skip the client ID check and do it ourselves.
+		// xref: https://github.com/coreos/go-oidc/issues/397
+		verifierConfig.SkipClientIDCheck = true
+	}
 
 	var resolver *claimResolver
 	groupsClaim := opts.JWTAuthenticator.ClaimMappings.Groups.Claim
 	if groupsClaim != "" {
-		resolver = newClaimResolver(groupsClaim, client, verifierConfig)
+		resolver = newClaimResolver(lifecycleCtx, groupsClaim, client, verifierConfig, audiences)
 	}
 
 	requiredClaims := make(map[string]string)
@@ -284,40 +352,80 @@ func New(opts Options) (*Authenticator, error) {
 		}
 	}
 
-	authenticator := &Authenticator{
+	authn := &jwtAuthenticator{
 		jwtAuthenticator: opts.JWTAuthenticator,
-		cancel:           cancel,
 		resolver:         resolver,
 		celMapper:        celMapper,
 		requiredClaims:   requiredClaims,
 	}
+	authn.healthCheck.Store(&errorHolder{
+		err: fmt.Errorf("oidc: authenticator for issuer %q is not initialized", authn.jwtAuthenticator.Issuer.URL),
+	})
 
+	issuerURL := opts.JWTAuthenticator.Issuer.URL
 	if opts.KeySet != nil {
 		// We already have a key set, synchronously initialize the verifier.
-		authenticator.setVerifier(oidc.NewVerifier(opts.JWTAuthenticator.Issuer.URL, opts.KeySet, verifierConfig))
+		authn.setVerifier(&idTokenVerifier{
+			oidc.NewVerifier(issuerURL, opts.KeySet, verifierConfig),
+			audiences,
+		})
 	} else {
 		// Asynchronously attempt to initialize the authenticator. This enables
 		// self-hosted providers, providers that run on top of Kubernetes itself.
-		go wait.PollImmediateUntil(10*time.Second, func() (done bool, err error) {
-			provider, err := oidc.NewProvider(ctx, opts.JWTAuthenticator.Issuer.URL)
-			if err != nil {
-				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
-				return false, nil
-			}
+		go func() {
+			// we ignore any errors from polling because they can only come from the context being canceled
+			_ = wait.PollUntilContextCancel(lifecycleCtx, 10*time.Second, true, func(_ context.Context) (done bool, err error) {
+				// this must always use lifecycleCtx because NewProvider uses that context for future key set fetching.
+				// this also means that there is no correct way to control the timeout of the discovery request made by NewProvider.
+				// the global timeout of the http.Client is still honored.
+				provider, err := oidc.NewProvider(lifecycleCtx, issuerURL)
+				if err != nil {
+					klog.Errorf("oidc authenticator: initializing plugin: %v", err)
+					authn.healthCheck.Store(&errorHolder{err: err})
+					return false, nil
+				}
 
-			verifier := provider.Verifier(verifierConfig)
-			authenticator.setVerifier(verifier)
-			return true, nil
-		}, ctx.Done())
+				verifier := provider.Verifier(verifierConfig)
+				authn.setVerifier(&idTokenVerifier{verifier, audiences})
+				return true, nil
+			})
+		}()
 	}
 
-	return authenticator, nil
+	return newInstrumentedAuthenticator(issuerURL, authn), nil
+}
+
+type errorHolder struct {
+	err error
+}
+
+// discoveryURLRoundTripper is a http.RoundTripper that rewrites the
+// {url}/.well-known/openid-configuration to the discovery URL.
+type discoveryURLRoundTripper struct {
+	base http.RoundTripper
+	// discoveryURL is the URL to use to fetch the openid configuration
+	discoveryURL *url.URL
+	// urlToRewrite is the URL to rewrite to the discovery URL
+	urlToRewrite string
+}
+
+func (t *discoveryURLRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method == http.MethodGet && req.URL.String() == t.urlToRewrite {
+		clone := req.Clone(req.Context())
+		clone.Host = ""
+		clone.URL = t.discoveryURL
+		return t.base.RoundTrip(clone)
+	}
+	return t.base.RoundTrip(req)
 }
 
 // untrustedIssuer extracts an untrusted "iss" claim from the given JWT token,
 // or returns an error if the token can not be parsed.  Since the JWT is not
 // verified, the returned issuer should not be trusted.
 func untrustedIssuer(token string) (string, error) {
+	if strings.HasPrefix(strings.TrimSpace(token), "{") {
+		return "", fmt.Errorf("token is not compact JWT")
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return "", fmt.Errorf("malformed token")
@@ -371,8 +479,14 @@ type endpoint struct {
 // claimResolver expands distributed claims by calling respective claim source
 // endpoints.
 type claimResolver struct {
+	ctx context.Context
+
 	// claim is the distributed claim that may be resolved.
 	claim string
+
+	// audiences is the set of acceptable audiences the JWT must be issued to.
+	// At least one of the entries must match the "aud" claim in presented JWTs.
+	audiences sets.Set[string]
 
 	// client is the to use for resolving distributed claims
 	client *http.Client
@@ -390,19 +504,26 @@ type claimResolver struct {
 }
 
 // newClaimResolver creates a new resolver for distributed claims.
-func newClaimResolver(claim string, client *http.Client, config *oidc.Config) *claimResolver {
-	return &claimResolver{claim: claim, client: client, config: config, verifierPerIssuer: map[string]*asyncIDTokenVerifier{}}
+// the input ctx is retained and is used as the base context for background requests such as key fetching.
+func newClaimResolver(ctx context.Context, claim string, client *http.Client, config *oidc.Config, audiences sets.Set[string]) *claimResolver {
+	return &claimResolver{
+		ctx:               ctx,
+		claim:             claim,
+		audiences:         audiences,
+		client:            client,
+		config:            config,
+		verifierPerIssuer: map[string]*asyncIDTokenVerifier{},
+	}
 }
 
 // Verifier returns either the verifier for the specified issuer, or error.
-func (r *claimResolver) Verifier(iss string) (*oidc.IDTokenVerifier, error) {
+func (r *claimResolver) Verifier(iss string) (*idTokenVerifier, error) {
 	r.m.Lock()
 	av := r.verifierPerIssuer[iss]
 	if av == nil {
 		// This lazy init should normally be very quick.
-		// TODO: Make this context cancelable.
-		ctx := oidc.ClientContext(context.Background(), r.client)
-		av = newAsyncIDTokenVerifier(ctx, r.config, iss)
+		ctx := oidc.ClientContext(r.ctx, r.client)
+		av = newAsyncIDTokenVerifier(ctx, r.config, iss, r.audiences)
 		r.verifierPerIssuer[iss] = av
 	}
 	r.m.Unlock()
@@ -520,7 +641,38 @@ func (r *claimResolver) resolve(ctx context.Context, endpoint endpoint, allClaim
 	return nil
 }
 
-func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+func (v *idTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*oidc.IDToken, error) {
+	t, err := v.verifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		return nil, err
+	}
+	if err := v.verifyAudience(t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// verifyAudience verifies the audience field in the ID token matches the expected audience.
+// This is added based on https://github.com/coreos/go-oidc/blob/b203e58c24394ddf5e816706a7645f01280245c7/oidc/verify.go#L275-L281
+// with the difference that we allow multiple audiences.
+//
+// AuthenticationConfiguration has a audienceMatchPolicy field, but the only supported value now is "MatchAny".
+// So, The default match behavior is to match at least one of the audiences in the ID token.
+func (v *idTokenVerifier) verifyAudience(t *oidc.IDToken) error {
+	// We validate audience field is not empty in the authentication configuration.
+	// This check ensures callers of "Verify" using idTokenVerifier are not passing
+	// an empty audience.
+	if v.audiences.Len() == 0 {
+		return fmt.Errorf("oidc: invalid configuration, audiences cannot be empty")
+	}
+	if v.audiences.HasAny(t.Audience...) {
+		return nil
+	}
+
+	return fmt.Errorf("oidc: expected audience in %q got %q", sets.List(v.audiences), t.Audience)
+}
+
+func (a *jwtAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	if !hasCorrectIssuer(a.jwtAuthenticator.Issuer.URL, token) {
 		return nil, false, nil
 	}
@@ -641,7 +793,15 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 	return &authenticator.Response{User: info}, true, nil
 }
 
-func (a *Authenticator) getUsername(ctx context.Context, c claims, claimsUnstructured *unstructured.Unstructured) (string, error) {
+func (a *jwtAuthenticator) HealthCheck() error {
+	if holder := *a.healthCheck.Load(); holder.err != nil {
+		return fmt.Errorf("oidc: authenticator for issuer %q is not healthy: %w", a.jwtAuthenticator.Issuer.URL, holder.err)
+	}
+
+	return nil
+}
+
+func (a *jwtAuthenticator) getUsername(ctx context.Context, c claims, claimsUnstructured *unstructured.Unstructured) (string, error) {
 	if a.celMapper.Username != nil {
 		evalResult, err := a.celMapper.Username.EvalClaimMapping(ctx, claimsUnstructured)
 		if err != nil {
@@ -651,7 +811,13 @@ func (a *Authenticator) getUsername(ctx context.Context, c claims, claimsUnstruc
 			return "", fmt.Errorf("oidc: error evaluating username claim expression: %w", fmt.Errorf("username claim expression must return a string"))
 		}
 
-		return evalResult.EvalResult.Value().(string), nil
+		username := evalResult.EvalResult.Value().(string)
+
+		if len(username) == 0 {
+			return "", fmt.Errorf("oidc: empty username via CEL expression is not allowed")
+		}
+
+		return username, nil
 	}
 
 	var username string
@@ -683,7 +849,7 @@ func (a *Authenticator) getUsername(ctx context.Context, c claims, claimsUnstruc
 	return username, nil
 }
 
-func (a *Authenticator) getGroups(ctx context.Context, c claims, claimsUnstructured *unstructured.Unstructured) ([]string, error) {
+func (a *jwtAuthenticator) getGroups(ctx context.Context, c claims, claimsUnstructured *unstructured.Unstructured) ([]string, error) {
 	groupsClaim := a.jwtAuthenticator.ClaimMappings.Groups.Claim
 	if len(groupsClaim) > 0 {
 		if _, ok := c[groupsClaim]; ok {
@@ -723,7 +889,7 @@ func (a *Authenticator) getGroups(ctx context.Context, c claims, claimsUnstructu
 	return groups, nil
 }
 
-func (a *Authenticator) getUID(ctx context.Context, c claims, claimsUnstructured *unstructured.Unstructured) (string, error) {
+func (a *jwtAuthenticator) getUID(ctx context.Context, c claims, claimsUnstructured *unstructured.Unstructured) (string, error) {
 	uidClaim := a.jwtAuthenticator.ClaimMappings.UID.Claim
 	if len(uidClaim) > 0 {
 		var uid string
@@ -748,7 +914,7 @@ func (a *Authenticator) getUID(ctx context.Context, c claims, claimsUnstructured
 	return evalResult.EvalResult.Value().(string), nil
 }
 
-func (a *Authenticator) getExtra(ctx context.Context, claimsUnstructured *unstructured.Unstructured) (map[string][]string, error) {
+func (a *jwtAuthenticator) getExtra(ctx context.Context, claimsUnstructured *unstructured.Unstructured) (map[string][]string, error) {
 	if a.celMapper.Extra == nil {
 		return nil, nil
 	}

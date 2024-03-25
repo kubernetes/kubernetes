@@ -18,47 +18,45 @@ package args
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/spf13/pflag"
-	codegenutil "k8s.io/code-generator/pkg/util"
-	"k8s.io/gengo/args"
 )
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
+// Args is used by the gengo framework to pass args specific to this generator.
+type Args struct {
+	OutputDir    string // must be a directory path
+	OutputPkg    string // must be a Go import-path
+	GoHeaderFile string
+
 	// PluralExceptions specify list of exceptions used when pluralizing certain types.
 	// For example 'Endpoints:Endpoints', otherwise the pluralizer will generate 'Endpointes'.
 	PluralExceptions []string
 }
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	customArgs := &CustomArgs{
-		PluralExceptions: []string{"Endpoints:Endpoints"},
-	}
-	genericArgs.CustomArgs = customArgs
-
-	if pkg := codegenutil.CurrentPackage(); len(pkg) != 0 {
-		genericArgs.OutputPackagePath = path.Join(pkg, "pkg/client/listers")
-	}
-
-	return genericArgs, customArgs
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{}
 }
 
 // AddFlags add the generator flags to the flag set.
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	fs.StringSliceVar(&ca.PluralExceptions, "plural-exceptions", ca.PluralExceptions, "list of comma separated plural exception definitions in Type:PluralizedType format")
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputDir, "output-dir", "",
+		"the base directory under which to generate results")
+	fs.StringVar(&args.OutputPkg, "output-pkg", "",
+		"the base Go import-path under which to generate results")
+	fs.StringSliceVar(&args.PluralExceptions, "plural-exceptions", args.PluralExceptions,
+		"list of comma separated plural exception definitions in Type:PluralizedType format")
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*CustomArgs)
-
-	if len(genericArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package cannot be empty")
+func (args *Args) Validate() error {
+	if len(args.OutputDir) == 0 {
+		return fmt.Errorf("--output-dir must be specified")
 	}
-
+	if len(args.OutputPkg) == 0 {
+		return fmt.Errorf("--output-pkg must be specified")
+	}
 	return nil
 }

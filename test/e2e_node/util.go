@@ -74,6 +74,7 @@ import (
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
+var agnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
@@ -233,7 +234,10 @@ func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletCon
 
 	ginkgo.By("Starting the kubelet")
 	startKubelet()
+	waitForKubeletToStart(ctx, f)
+}
 
+func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
@@ -310,16 +314,6 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	} else {
 		framework.Logf("Kubelet Metrics: %+v", e2emetrics.GetKubeletLatencyMetrics(metric, metricSet))
 	}
-}
-
-// runCommand runs the cmd and returns the combined stdout and stderr, or an
-// error if the command failed.
-func runCommand(cmd ...string) (string, error) {
-	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
-	}
-	return string(output), nil
 }
 
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.

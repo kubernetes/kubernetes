@@ -156,6 +156,14 @@
         }
       },
       "error": "errorValue"
-    }
+    },
+    "runtimeHandlers": [
+      {
+        "name": "nameValue",
+        "features": {
+          "recursiveReadOnlyMounts": true
+        }
+      }
+    ]
   }
 }

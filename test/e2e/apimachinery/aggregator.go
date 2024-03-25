@@ -164,6 +164,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups("flowcontrol.apiserver.k8s.io").Resources("prioritylevelconfigurations", "flowschemas").RuleOrDie(),
 			},
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating cluster role %s", n.clusterRole)
@@ -412,7 +413,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 	framework.ExpectNoError(err, "gave up waiting for apiservice wardle to come up successfully")
 }
 
-// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.29 and compiled against 1.29
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image, apiServiceGroupName, apiServiceVersion string) {
 	n := generateSampleAPIServerObjectNames(f.Namespace.Name)

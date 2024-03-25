@@ -70,8 +70,8 @@ type Controller struct {
 
 // New creates an instance of Controller
 func New(ctx context.Context, jobInformer batchinformers.JobInformer, client clientset.Interface) *Controller {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	eventBroadcaster.StartStructuredLogging(3)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	metrics.Register()

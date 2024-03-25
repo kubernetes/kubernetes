@@ -106,7 +106,7 @@ type AttachDetachController interface {
 
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
-	logger klog.Logger,
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
@@ -120,7 +120,10 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
+	disableForceDetachOnTimeout bool,
 	timerConfig TimerConfig) (AttachDetachController, error) {
+
+	logger := klog.FromContext(ctx)
 
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
@@ -150,7 +153,7 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("could not initialize volume plugins for Attach/Detach Controller: %w", err)
 	}
 
-	adc.broadcaster = record.NewBroadcaster()
+	adc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
 	recorder := adc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
@@ -171,6 +174,7 @@ func NewAttachDetachController(
 		timerConfig.ReconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
 		disableReconciliationSync,
+		disableForceDetachOnTimeout,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
@@ -330,7 +334,7 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	defer adc.pvcQueue.ShutDown()
 
 	// Start events processing pipeline.
-	adc.broadcaster.StartStructuredLogging(0)
+	adc.broadcaster.StartStructuredLogging(3)
 	adc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: adc.kubeClient.CoreV1().Events("")})
 	defer adc.broadcaster.Shutdown()
 

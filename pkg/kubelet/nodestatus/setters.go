@@ -480,13 +480,32 @@ func GoRuntime() Setter {
 	}
 }
 
+// RuntimeHandlers returns a Setter that sets RuntimeHandlers on the node.
+func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
+	return func(ctx context.Context, node *v1.Node) error {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
+			return nil
+		}
+		handlers := fn()
+		node.Status.RuntimeHandlers = make([]v1.NodeRuntimeHandler, len(handlers))
+		for i, h := range handlers {
+			node.Status.RuntimeHandlers[i] = v1.NodeRuntimeHandler{
+				Name: h.Name,
+				Features: &v1.NodeRuntimeHandlerFeatures{
+					RecursiveReadOnlyMounts: &h.SupportsRecursiveReadOnlyMounts,
+				},
+			}
+		}
+		return nil
+	}
+}
+
 // ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
 func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now
 	runtimeErrorsFunc func() error, // typically Kubelet.runtimeState.runtimeErrors
 	networkErrorsFunc func() error, // typically Kubelet.runtimeState.networkErrors
 	storageErrorsFunc func() error, // typically Kubelet.runtimeState.storageErrors
-	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	nodeShutdownManagerErrorsFunc func() error, // typically kubelet.shutdownManager.errors.
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
@@ -525,13 +544,6 @@ func ReadyCondition(
 				Reason:            "KubeletNotReady",
 				Message:           aggregatedErr.Error(),
 				LastHeartbeatTime: currentTime,
-			}
-		}
-		// Append AppArmor status if it's enabled.
-		// TODO(tallclair): This is a temporary message until node feature reporting is added.
-		if appArmorValidateHostFunc != nil && newNodeReadyCondition.Status == v1.ConditionTrue {
-			if err := appArmorValidateHostFunc(); err == nil {
-				newNodeReadyCondition.Message = fmt.Sprintf("%s. AppArmor enabled", newNodeReadyCondition.Message)
 			}
 		}
 

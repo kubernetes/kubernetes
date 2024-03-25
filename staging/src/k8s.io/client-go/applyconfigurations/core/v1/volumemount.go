@@ -25,12 +25,13 @@ import (
 // VolumeMountApplyConfiguration represents an declarative configuration of the VolumeMount type for use
 // with apply.
 type VolumeMountApplyConfiguration struct {
-	Name             *string                  `json:"name,omitempty"`
-	ReadOnly         *bool                    `json:"readOnly,omitempty"`
-	MountPath        *string                  `json:"mountPath,omitempty"`
-	SubPath          *string                  `json:"subPath,omitempty"`
-	MountPropagation *v1.MountPropagationMode `json:"mountPropagation,omitempty"`
-	SubPathExpr      *string                  `json:"subPathExpr,omitempty"`
+	Name              *string                   `json:"name,omitempty"`
+	ReadOnly          *bool                     `json:"readOnly,omitempty"`
+	RecursiveReadOnly *v1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
+	MountPath         *string                   `json:"mountPath,omitempty"`
+	SubPath           *string                   `json:"subPath,omitempty"`
+	MountPropagation  *v1.MountPropagationMode  `json:"mountPropagation,omitempty"`
+	SubPathExpr       *string                   `json:"subPathExpr,omitempty"`
 }
 
 // VolumeMountApplyConfiguration constructs an declarative configuration of the VolumeMount type for use with
@@ -52,6 +53,14 @@ func (b *VolumeMountApplyConfiguration) WithName(value string) *VolumeMountApply
 // If called multiple times, the ReadOnly field is set to the value of the last call.
 func (b *VolumeMountApplyConfiguration) WithReadOnly(value bool) *VolumeMountApplyConfiguration {
 	b.ReadOnly = &value
+	return b
+}
+
+// WithRecursiveReadOnly sets the RecursiveReadOnly field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RecursiveReadOnly field is set to the value of the last call.
+func (b *VolumeMountApplyConfiguration) WithRecursiveReadOnly(value v1.RecursiveReadOnlyMode) *VolumeMountApplyConfiguration {
+	b.RecursiveReadOnly = &value
 	return b
 }
 

@@ -20,6 +20,7 @@ import (
 	"math"
 	"sync"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	endpointsliceutil "k8s.io/endpointslice/util"
 )
@@ -27,8 +28,9 @@ import (
 // NewCache returns a new Cache with the specified endpointsPerSlice.
 func NewCache(endpointsPerSlice int32) *Cache {
 	return &Cache{
-		maxEndpointsPerSlice: endpointsPerSlice,
-		cache:                map[types.NamespacedName]*ServicePortCache{},
+		maxEndpointsPerSlice:          endpointsPerSlice,
+		cache:                         map[types.NamespacedName]*ServicePortCache{},
+		servicesByTrafficDistribution: make(map[string]map[types.NamespacedName]bool),
 	}
 }
 
@@ -40,7 +42,7 @@ type Cache struct {
 	maxEndpointsPerSlice int32
 
 	// lock protects changes to numEndpoints, numSlicesActual, numSlicesDesired,
-	// and cache.
+	// cache and servicesByTrafficDistribution
 	lock sync.Mutex
 	// numEndpoints represents the total number of endpoints stored in
 	// EndpointSlices.
@@ -52,7 +54,17 @@ type Cache struct {
 	// cache stores a ServicePortCache grouped by NamespacedNames representing
 	// Services.
 	cache map[types.NamespacedName]*ServicePortCache
+	// Tracks all services partitioned by their trafficDistribution field.
+	//
+	// The type should be read as map[trafficDistribution]setOfServices
+	servicesByTrafficDistribution map[string]map[types.NamespacedName]bool
 }
+
+const (
+	// Label value for cases when service.spec.trafficDistribution is set to an
+	// unknown value.
+	trafficDistributionImplementationSpecific = "ImplementationSpecific"
+)
 
 // ServicePortCache tracks values for total numbers of desired endpoints as well
 // as the efficiency of EndpointSlice endpoints distribution for each unique
@@ -124,11 +136,45 @@ func (c *Cache) UpdateServicePortCache(serviceNN types.NamespacedName, spCache *
 	c.updateMetrics()
 }
 
+func (c *Cache) UpdateTrafficDistributionForService(serviceNN types.NamespacedName, trafficDistributionPtr *string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	defer c.updateMetrics()
+
+	for _, serviceSet := range c.servicesByTrafficDistribution {
+		delete(serviceSet, serviceNN)
+	}
+
+	if trafficDistributionPtr == nil {
+		return
+	}
+
+	trafficDistribution := *trafficDistributionPtr
+	// If we don't explicitly recognize a value for trafficDistribution, it should
+	// be treated as an implementation specific value. All such implementation
+	// specific values should use the label value "ImplementationSpecific" to not
+	// explode the metric labels cardinality.
+	if trafficDistribution != corev1.ServiceTrafficDistributionPreferClose {
+		trafficDistribution = trafficDistributionImplementationSpecific
+	}
+	serviceSet, ok := c.servicesByTrafficDistribution[trafficDistribution]
+	if !ok {
+		serviceSet = make(map[types.NamespacedName]bool)
+		c.servicesByTrafficDistribution[trafficDistribution] = serviceSet
+	}
+	serviceSet[serviceNN] = true
+}
+
 // DeleteService removes references of a Service from the global cache and
 // updates the corresponding metrics.
 func (c *Cache) DeleteService(serviceNN types.NamespacedName) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	for _, serviceSet := range c.servicesByTrafficDistribution {
+		delete(serviceSet, serviceNN)
+	}
 
 	if spCache, ok := c.cache[serviceNN]; ok {
 		actualSlices, desiredSlices, endpoints := spCache.totals(int(c.maxEndpointsPerSlice))
@@ -137,7 +183,6 @@ func (c *Cache) DeleteService(serviceNN types.NamespacedName) {
 		c.numSlicesActual -= actualSlices
 		c.updateMetrics()
 		delete(c.cache, serviceNN)
-
 	}
 }
 
@@ -147,6 +192,11 @@ func (c *Cache) updateMetrics() {
 	NumEndpointSlices.WithLabelValues().Set(float64(c.numSlicesActual))
 	DesiredEndpointSlices.WithLabelValues().Set(float64(c.numSlicesDesired))
 	EndpointsDesired.WithLabelValues().Set(float64(c.numEndpoints))
+
+	ServicesCountByTrafficDistribution.Reset()
+	for trafficDistribution, services := range c.servicesByTrafficDistribution {
+		ServicesCountByTrafficDistribution.WithLabelValues(trafficDistribution).Set(float64(len(services)))
+	}
 }
 
 // numDesiredSlices calculates the number of EndpointSlices that would exist

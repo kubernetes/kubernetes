@@ -85,6 +85,11 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    volumeMounts:
+    - mountPath: mountPathValue
+      name: nameValue
+      readOnly: true
+      recursiveReadOnly: recursiveReadOnlyValue
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -130,6 +135,11 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    volumeMounts:
+    - mountPath: mountPathValue
+      name: nameValue
+      readOnly: true
+      recursiveReadOnly: recursiveReadOnlyValue
   hostIP: hostIPValue
   hostIPs:
   - ip: ipValue
@@ -178,6 +188,11 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    volumeMounts:
+    - mountPath: mountPathValue
+      name: nameValue
+      readOnly: true
+      recursiveReadOnly: recursiveReadOnlyValue
   message: messageValue
   nominatedNodeName: nominatedNodeNameValue
   phase: phaseValue

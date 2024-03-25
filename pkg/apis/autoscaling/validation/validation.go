@@ -317,11 +317,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 		expectedField = "external"
 	case autoscaling.ContainerResourceMetricSourceType:
 		if spec.ContainerResource == nil {
-			if utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) {
-				allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source"))
-			} else {
-				allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source (only allowed when HPAContainerMetrics feature is enabled)"))
-			}
+			allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source"))
 		}
 		expectedField = "containerResource"
 	default:

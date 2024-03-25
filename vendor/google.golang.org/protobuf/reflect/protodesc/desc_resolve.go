@@ -276,8 +276,8 @@ func unmarshalDefault(s string, fd protoreflect.FieldDescriptor, allowUnresolvab
 	} else if err != nil {
 		return v, ev, err
 	}
-	if fd.Syntax() == protoreflect.Proto3 {
-		return v, ev, errors.New("cannot be specified under proto3 semantics")
+	if !fd.HasPresence() {
+		return v, ev, errors.New("cannot be specified with implicit field presence")
 	}
 	if fd.Kind() == protoreflect.MessageKind || fd.Kind() == protoreflect.GroupKind || fd.Cardinality() == protoreflect.Repeated {
 		return v, ev, errors.New("cannot be specified on composite types")

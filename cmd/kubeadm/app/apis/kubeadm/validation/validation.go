@@ -758,3 +758,15 @@ func ValidateImagePullPolicy(policy corev1.PullPolicy, fldPath *field.Path) fiel
 		return allErrs
 	}
 }
+
+// ValidateUpgradeConfiguration validates a UpgradeConfiguration object and collects all encountered errors
+func ValidateUpgradeConfiguration(c *kubeadm.UpgradeConfiguration) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c.Apply.Patches != nil {
+		allErrs = append(allErrs, ValidateAbsolutePath(c.Apply.Patches.Directory, field.NewPath("patches").Child("directory"))...)
+	}
+	if c.Node.Patches != nil {
+		allErrs = append(allErrs, ValidateAbsolutePath(c.Node.Patches.Directory, field.NewPath("patches").Child("directory"))...)
+	}
+	return allErrs
+}

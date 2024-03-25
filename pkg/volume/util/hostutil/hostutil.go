@@ -41,6 +41,10 @@ const (
 	FileTypeUnknown FileType = ""
 )
 
+var (
+	errUnknownFileType = fmt.Errorf("only recognise file, directory, socket, block device and character device")
+)
+
 // HostUtils defines the set of methods for interacting with paths on a host.
 type HostUtils interface {
 	// DeviceOpened determines if the device (e.g. /dev/sdc) is in use elsewhere
@@ -109,5 +113,5 @@ func getFileType(pathname string) (FileType, error) {
 		return FileTypeBlockDev, nil
 	}
 
-	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
+	return pathType, errUnknownFileType
 }

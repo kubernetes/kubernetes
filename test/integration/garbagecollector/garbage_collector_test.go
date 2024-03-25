@@ -47,11 +47,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -247,9 +247,13 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	}
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
+
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
+		tCtx,
 		clientSet,
 		metadataClient,
 		restMapper,
@@ -261,10 +265,8 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
 	tearDown := func() {
-		cancel()
+		tCtx.Cancel("tearing down")
 		result.TearDownFn()
 	}
 	syncPeriod := 5 * time.Second
@@ -274,9 +276,9 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			restMapper.Reset()
-		}, syncPeriod, ctx.Done())
-		go gc.Run(ctx, workers)
-		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
+		}, syncPeriod, tCtx.Done())
+		go gc.Run(tCtx, workers)
+		go gc.Sync(tCtx, clientSet.Discovery(), syncPeriod)
 	}
 
 	if workerCount > 0 {

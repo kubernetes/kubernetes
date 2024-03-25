@@ -240,23 +240,6 @@ leaderElection:
 			},
 		},
 		{
-			name: "default config with a beta feature disabled",
-			flags: []string{
-				"--kubeconfig", configKubeconfig,
-				"--feature-gates=PodSchedulingReadiness=false",
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.ExpandedPluginsV1.DeepCopy()
-					plugins.PreEnqueue = config.PluginSet{}
-					return plugins
-				}(),
-			},
-			restoreFeatures: map[featuregate.Feature]bool{
-				features.PodSchedulingReadiness: true,
-			},
-		},
-		{
 			name: "default config",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,

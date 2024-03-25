@@ -46,11 +46,12 @@ KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
 kube::test::find_integration_test_dirs() {
   (
     cd "${KUBE_ROOT}"
-    find test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+    # The "./" syntax here produces Go-compatible package names.
+    find ./test/integration/ -name '*_test.go' -print0 \
+      | xargs -0n1 dirname \
       | LC_ALL=C sort -u
-    find vendor/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+    find ./staging/src/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
+      | xargs -0n1 dirname \
       | LC_ALL=C sort -u
   )
 }
@@ -75,12 +76,17 @@ runTests() {
   kube::etcd::start_scraping
   kube::log::status "Running integration test cases"
 
-  make -C "${KUBE_ROOT}" test \
+  # shellcheck disable=SC2034
+  # KUBE_RACE and MAKEFLAGS are used in the downstream make, and we set them to
+  # empty here to ensure that we aren't unintentionally consuming them from the
+  # previous make invocation.
+  KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
-      KUBE_RACE=""
+      KUBE_RACE="" \
+      MAKEFLAGS="" \
+      make -C "${KUBE_ROOT}" test
 
   cleanup
 }

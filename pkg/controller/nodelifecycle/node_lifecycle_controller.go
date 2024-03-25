@@ -323,7 +323,7 @@ func NewNodeLifecycleController(
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 
 	nc := &Controller{
@@ -454,7 +454,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// Start events processing pipeline.
-	nc.broadcaster.StartStructuredLogging(0)
+	nc.broadcaster.StartStructuredLogging(3)
 	logger := klog.FromContext(ctx)
 	logger.Info("Sending events to api server")
 	nc.broadcaster.StartRecordingToSink(
@@ -623,6 +623,11 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 				return false, 50 * time.Millisecond
 			}
 			_, condition := controllerutil.GetNodeCondition(&node.Status, v1.NodeReady)
+			if condition == nil {
+				logger.Info("Failed to get NodeCondition from the node status", "node", klog.KRef("", value.Value))
+				// retry in 50 millisecond
+				return false, 50 * time.Millisecond
+			}
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
 			oppositeTaint := v1.Taint{}

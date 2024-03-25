@@ -117,7 +117,7 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool) (fakeDRAServerInfo, error)
 		driverName: driverName,
 	}
 	if shouldTimeout {
-		timeout := plugin.PluginClientTimeout + 30*time.Millisecond
+		timeout := plugin.PluginClientTimeout + time.Second
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
@@ -154,7 +154,7 @@ func TestNewManagerImpl(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, test.stateFileDirectory)
+			manager, err := NewManagerImpl(kubeClient, test.stateFileDirectory, "worker")
 			if test.wantErr {
 				assert.Error(t, err)
 				return
@@ -287,7 +287,7 @@ func TestGetResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, t.TempDir())
+			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
 			assert.NoError(t, err)
 
 			if test.claimInfo != nil {
@@ -304,6 +304,10 @@ func TestGetResources(t *testing.T) {
 			assert.Equal(t, test.claimInfo.CDIDevices[driverName][0], containerInfo.CDIDevices[0].Name)
 		})
 	}
+}
+
+func getFakeNode() (*v1.Node, error) {
+	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}}, nil
 }
 
 func TestPrepareResources(t *testing.T) {
@@ -760,7 +764,7 @@ func TestPrepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler()
+			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
@@ -1060,7 +1064,7 @@ func TestUnprepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler()
+			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}

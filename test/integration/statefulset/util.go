@@ -19,6 +19,7 @@ package statefulset
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"sync"
 	"testing"
 	"time"
@@ -161,7 +162,8 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
-func scSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+func scSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
@@ -174,7 +176,7 @@ func scSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 
 	sc := statefulset.NewStatefulSetController(
-		ctx,
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),
@@ -182,12 +184,16 @@ func scSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-controller")),
 	)
 
-	return server.TearDownFn, sc, informers, clientSet
+	teardown := func() {
+		tCtx.Cancel("tearing down controller")
+		server.TearDownFn()
+	}
+	return tCtx, teardown, sc, informers, clientSet
 }
 
 // Run STS controller and informers
-func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) context.CancelFunc {
-	ctx, cancel := context.WithCancel(context.Background())
+func runControllerAndInformers(ctx context.Context, sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) context.CancelFunc {
+	ctx, cancel := context.WithCancel(ctx)
 	informers.Start(ctx.Done())
 	go sc.Run(ctx, 5)
 	return cancel

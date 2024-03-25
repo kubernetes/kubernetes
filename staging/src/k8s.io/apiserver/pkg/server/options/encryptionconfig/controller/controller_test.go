@@ -47,11 +47,17 @@ func TestController(t *testing.T) {
 # HELP apiserver_encryption_config_controller_automatic_reload_success_total [ALPHA] Total number of successful automatic reloads of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reload_success_total counter
 apiserver_encryption_config_controller_automatic_reload_success_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027"} 1
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
+apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="success"} 1
 `
 	const expectedFailureMetricValue = `
 # HELP apiserver_encryption_config_controller_automatic_reload_failures_total [ALPHA] Total number of failed automatic reloads of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reload_failures_total counter
 apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027"} 1
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
+apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="failure"} 1
 `
 
 	tests := []struct {
@@ -334,6 +340,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.wantMetrics),
 				"apiserver_encryption_config_controller_automatic_reload_success_total",
 				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
 			); err != nil {
 				t.Errorf("failed to validate metrics: %v", err)
 			}

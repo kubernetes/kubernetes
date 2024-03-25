@@ -41,9 +41,6 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(flowcontrolv1beta3.AddToScheme(scheme))
 	utilruntime.Must(flowcontrolv1.AddToScheme(scheme))
 
-	// TODO(#121119): This controls serialization order, for 1.29, we continue
-	//  to use v1beta3 as the serialization version because vN-1 understands that
-	//  level. In 1.30, we should set the serialization version to v1.
-	utilruntime.Must(scheme.SetVersionPriority(flowcontrolv1beta3.SchemeGroupVersion, flowcontrolv1.SchemeGroupVersion,
+	utilruntime.Must(scheme.SetVersionPriority(flowcontrolv1.SchemeGroupVersion, flowcontrolv1beta3.SchemeGroupVersion,
 		flowcontrolv1beta2.SchemeGroupVersion, flowcontrolv1beta1.SchemeGroupVersion))
 }

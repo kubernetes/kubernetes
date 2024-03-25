@@ -50,10 +50,10 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -64,9 +64,9 @@ var (
 func testNewReplicaSetControllerFromClient(tb testing.TB, client clientset.Interface, stopCh chan struct{}, burstReplicas int) (*ReplicaSetController, informers.SharedInformerFactory) {
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
-	logger, _ := ktesting.NewTestContext(tb)
+	tCtx := ktesting.Init(tb)
 	ret := NewReplicaSetController(
-		logger,
+		tCtx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		client,
@@ -628,9 +628,9 @@ func TestWatchControllers(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	logger, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	manager := NewReplicaSetController(
-		logger,
+		tCtx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		client,
@@ -659,7 +659,7 @@ func TestWatchControllers(t *testing.T) {
 	}
 	// Start only the ReplicaSet watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method.
-	go wait.UntilWithContext(ctx, manager.worker, 10*time.Millisecond)
+	go wait.UntilWithContext(tCtx, manager.worker, 10*time.Millisecond)
 
 	testRSSpec.Name = "foo"
 	fakeWatch.Add(&testRSSpec)
@@ -1189,15 +1189,15 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 }
 
 func TestExpectationsOnRecreate(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	manager := NewReplicaSetController(
-		logger,
+		tCtx,
 		f.Apps().V1().ReplicaSets(),
 		f.Core().V1().Pods(),
 		client,
@@ -1213,7 +1213,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	oldRS := newReplicaSet(1, map[string]string{"foo": "bar"})
-	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(ctx, oldRS, metav1.CreateOptions{})
+	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(tCtx, oldRS, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1226,7 +1226,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatalf("initial RS didn't result in new item in the queue: %v", err)
 	}
 
-	ok := manager.processNextWorkItem(ctx)
+	ok := manager.processNextWorkItem(tCtx)
 	if !ok {
 		t.Fatal("queue is shutting down")
 	}
@@ -1257,7 +1257,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal("Unexpected item in the queue")
 	}
 
-	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(ctx, oldRS.Name, metav1.DeleteOptions{})
+	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(tCtx, oldRS.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1294,7 +1294,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	newRS := oldRS.DeepCopy()
 	newRS.UID = uuid.NewUUID()
-	newRS, err = client.AppsV1().ReplicaSets(newRS.Namespace).Create(ctx, newRS, metav1.CreateOptions{})
+	newRS, err = client.AppsV1().ReplicaSets(newRS.Namespace).Create(tCtx, newRS, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1312,7 +1312,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatalf("Re-creating RS didn't result in new item in the queue: %v", err)
 	}
 
-	ok = manager.processNextWorkItem(ctx)
+	ok = manager.processNextWorkItem(tCtx)
 	if !ok {
 		t.Fatal("Queue is shutting down!")
 	}

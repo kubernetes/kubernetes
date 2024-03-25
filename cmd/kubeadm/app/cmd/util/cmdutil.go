@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -135,6 +136,18 @@ func ValueFromFlagsOrConfig(flagSet *pflag.FlagSet, name string, cfgValue interf
 	if flagSet.Changed(name) {
 		return flagValue
 	}
+
+	// covert the nil to false if this is a bool, this will help to get rid of nil dereference error.
+	cfg, ok := cfgValue.(*bool)
+	if ok && cfg == nil {
+		return ptr.To(false)
+	}
+
 	// assume config has all the defaults set correctly.
 	return cfgValue
+}
+
+// TypeMismatchErr return an error which indicates how the type is mismatched.
+func TypeMismatchErr(opt, rType string) error {
+	return errors.Errorf("type mismatch, %s is expected to be a pointer to %s", opt, rType)
 }

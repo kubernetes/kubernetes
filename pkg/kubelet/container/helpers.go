@@ -59,7 +59,7 @@ type RuntimeHelper interface {
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-	GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error)
+	GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
 
 	// PrepareDynamicResources prepares resources for a pod.
 	PrepareDynamicResources(pod *v1.Pod) error
@@ -273,6 +273,7 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			Name:                 containerStatus.Name,
 			Image:                containerStatus.Image,
 			ImageID:              containerStatus.ImageID,
+			ImageRef:             containerStatus.ImageRef,
 			ImageRuntimeHandler:  containerStatus.ImageRuntimeHandler,
 			Hash:                 containerStatus.Hash,
 			HashWithoutResources: containerStatus.HashWithoutResources,

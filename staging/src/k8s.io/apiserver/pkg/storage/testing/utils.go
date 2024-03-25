@@ -193,14 +193,6 @@ func testCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEven
 	}
 }
 
-func testCheckResultsInRandomOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
-	for range expectedEvents {
-		testCheckResultFunc(t, w, func(actualEvent watch.Event) {
-			ExpectContains(t, "unexpected event", toInterfaceSlice(expectedEvents), actualEvent)
-		})
-	}
-}
-
 func testCheckNoMoreResults(t *testing.T, w watch.Interface) {
 	select {
 	case e := <-w.ResultChan():

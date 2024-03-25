@@ -77,7 +77,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	tracing "k8s.io/component-base/tracing"
+	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	nodeutil "k8s.io/component-helpers/node/util"
@@ -105,6 +105,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
@@ -214,10 +215,6 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 			// Merge the kubelet configurations if --config-dir is set
 			if len(kubeletFlags.KubeletDropinConfigDirectory) > 0 {
-				_, ok := os.LookupEnv("KUBELET_CONFIG_DROPIN_DIR_ALPHA")
-				if !ok {
-					return fmt.Errorf("flag %s specified but environment variable KUBELET_CONFIG_DROPIN_DIR_ALPHA not set, cannot start kubelet", kubeletFlags.KubeletDropinConfigDirectory)
-				}
 				if err := mergeKubeletConfigurations(kubeletConfig, kubeletFlags.KubeletDropinConfigDirectory); err != nil {
 					return fmt.Errorf("failed to merge kubelet configs: %w", err)
 				}
@@ -803,11 +800,22 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+			if !isCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == kubelettypes.LimitedSwap {
+				// This feature is not supported for cgroupv1 so we are failing early.
+				return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
+			}
+			if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
+				// This is just a log because we are using a default of NoSwap.
+				klog.InfoS("NoSwap is set due to memorySwapBehavior not specified", "memorySwapBehavior", s.MemorySwap.SwapBehavior, "FailSwapOn", s.FailSwapOn)
+			}
+		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
 			cm.NodeConfig{
+				NodeName:              nodeName,
 				RuntimeCgroupsName:    s.RuntimeCgroups,
 				SystemCgroupsName:     s.SystemCgroups,
 				KubeletCgroupsName:    s.KubeletCgroups,
@@ -1292,6 +1300,7 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,
 		kubeServer.RootDirectory,
+		kubeServer.PodLogsDir,
 		kubeServer.ImageCredentialProviderConfigFile,
 		kubeServer.ImageCredentialProviderBinDir,
 		kubeServer.RegisterNode,

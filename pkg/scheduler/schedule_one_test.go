@@ -91,8 +91,9 @@ type fakeExtender struct {
 	interestedPodName string
 	ignorable         bool
 	gotBind           bool
-	isPrioritizer     bool
 	errBind           bool
+	isPrioritizer     bool
+	isFilter          bool
 }
 
 func (f *fakeExtender) Name() string {
@@ -147,6 +148,10 @@ func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 
 func (f *fakeExtender) IsPrioritizer() bool {
 	return f.isPrioritizer
+}
+
+func (f *fakeExtender) IsFilter() bool {
+	return f.isFilter
 }
 
 type falseMapPlugin struct{}
@@ -768,9 +773,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				registerPluginFuncs,
 				testSchedulerName,
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
-				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-			)
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -806,7 +809,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			sched.scheduleOne(ctx)
+			sched.ScheduleOne(ctx)
 			<-called
 			if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
 				t.Errorf("assumed pod: wanted %v, got %v", e, a)
@@ -879,7 +882,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	// We use conflicted pod ports to incur fit predicate failure if first pod not removed.
 	secondPod := podWithPort("bar", "", 8080)
 	queuedPodStore.Add(secondPod)
-	scheduler.scheduleOne(ctx)
+	scheduler.ScheduleOne(ctx)
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
@@ -916,7 +919,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	// queuedPodStore: [bar:8080]
 	// cache: [(assumed)foo:8080]
 
-	scheduler.scheduleOne(ctx)
+	scheduler.ScheduleOne(ctx)
 	select {
 	case err := <-errChan:
 		expectErr := &framework.FitError{
@@ -949,7 +952,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	}
 
 	queuedPodStore.Add(secondPod)
-	scheduler.scheduleOne(ctx)
+	scheduler.ScheduleOne(ctx)
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
@@ -1025,7 +1028,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	scheduler, _, errChan := setupTestScheduler(ctx, t, queuedPodStore, scache, informerFactory, nil, fns...)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
-	scheduler.scheduleOne(ctx)
+	scheduler.ScheduleOne(ctx)
 	select {
 	case err := <-errChan:
 		expectErr := &framework.FitError{
@@ -1155,7 +1158,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			s.scheduleOne(ctx)
+			s.ScheduleOne(ctx)
 			// Wait for pod to succeed or fail scheduling
 			select {
 			case <-eventChan:
@@ -1828,7 +1831,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
-				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"node1", "node2"},
@@ -1946,7 +1949,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterPreFilterPlugin(volumebinding.Name, frameworkruntime.FactoryAdapter(fts, volumebinding.New)),
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
-				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"node1", "node2"},
@@ -2060,7 +2063,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					"PreFilter",
 					"Filter",
 				),
-				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"node1", "node2", "node3"},
@@ -2363,7 +2366,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						},
 					}, nil
 				}, "PreFilter", "Filter"),
-				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:              []string{"node1", "node2", "node3"},
@@ -2399,7 +2402,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			wantEvaluatedNodes: ptr.To[int32](1),
 		},
 		{
-			name: "test no score plugin, prefilter plugin returning 2 nodes, only 1 node is evaluated in Filter",
+			name: "test no score plugin, prefilter plugin returning 2 nodes",
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterPreFilterPlugin(
@@ -2786,7 +2789,7 @@ func TestZeroRequest(t *testing.T) {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
 			fwk.RunPreScorePlugins(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
-			list, err := sched.prioritizeNodes(ctx, fwk, state, test.pod, tf.BuildNodeInfos(test.nodes))
+			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3182,10 +3185,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			sched := &Scheduler{
-				Extenders: extenders,
-			}
-			nodesscores, err := sched.prioritizeNodes(ctx, fwk, state, test.pod, tf.BuildNodeInfos(test.nodes))
+			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3288,7 +3288,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		[]tf.RegisterPluginFunc{
 			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
-			tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+			tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
@@ -3367,7 +3367,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			registerPlugins := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				registerFakeFilterFunc,
-				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			fwk, err := tf.NewFramework(
@@ -3479,7 +3479,7 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queue
 	// queuedPodStore: [foo:8080]
 	// cache: []
 
-	scheduler.scheduleOne(ctx)
+	scheduler.ScheduleOne(ctx)
 	// queuedPodStore: []
 	// cache: [(assumed)foo:8080]
 
@@ -3523,7 +3523,6 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		informerFactory = informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0)
 	}
 	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
-	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
 	fwk, _ := tf.NewFramework(
 		ctx,
@@ -3533,7 +3532,6 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
-		frameworkruntime.WithWaitingPods(waitingPods),
 	)
 
 	errChan := make(chan error, 1)

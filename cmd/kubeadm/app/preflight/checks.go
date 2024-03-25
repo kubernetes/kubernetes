@@ -54,8 +54,6 @@ import (
 )
 
 const (
-	bridgenf                    = "/proc/sys/net/bridge/bridge-nf-call-iptables"
-	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
 	ipv4Forward                 = "/proc/sys/net/ipv4/ip_forward"
 	ipv6DefaultForwarding       = "/proc/sys/net/ipv6/conf/default/forwarding"
 	externalEtcdRequestTimeout  = 10 * time.Second

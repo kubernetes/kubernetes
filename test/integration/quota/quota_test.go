@@ -37,13 +37,13 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -60,9 +60,7 @@ const (
 //	quota_test.go:100: Took 4.196205966s to scale up without quota
 //	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	// Set up a API server
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
@@ -82,7 +80,7 @@ func TestQuota(t *testing.T) {
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
-		logger,
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
@@ -291,12 +289,10 @@ plugins:
 		t.Fatal(err)
 	}
 
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	// Set up an API server
-	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
@@ -313,13 +309,13 @@ plugins:
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
-		logger,
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
 	)
-	go rm.Run(ctx, 3)
+	go rm.Run(tCtx, 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -336,16 +332,16 @@ plugins:
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(tCtx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	go resourceQuotaController.Run(ctx, 2)
+	go resourceQuotaController.Run(tCtx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
+	go resourceQuotaController.Sync(tCtx, discoveryFunc, 30*time.Second)
 
-	informers.Start(ctx.Done())
+	informers.Start(tCtx.Done())
 	close(informersStarted)
 
 	// try to create a pod
@@ -363,7 +359,7 @@ plugins:
 			},
 		},
 	}
-	if _, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err == nil {
+	if _, err := clientset.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{}); err == nil {
 		t.Fatalf("expected error for insufficient quota")
 	}
 
@@ -386,7 +382,7 @@ plugins:
 	// attempt to create a new pod once the quota is propagated
 	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
 		// retry until we succeed (to allow time for all changes to propagate)
-		if _, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err == nil {
+		if _, err := clientset.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{}); err == nil {
 			return true, nil
 		}
 		return false, nil
@@ -419,12 +415,10 @@ plugins:
 		t.Fatal(err)
 	}
 
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	// Set up an API server
-	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
@@ -441,13 +435,13 @@ plugins:
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
-		logger,
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
 	)
-	go rm.Run(ctx, 3)
+	go rm.Run(tCtx, 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -464,16 +458,16 @@ plugins:
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(tCtx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	go resourceQuotaController.Run(ctx, 2)
+	go resourceQuotaController.Run(tCtx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
+	go resourceQuotaController.Sync(tCtx, discoveryFunc, 30*time.Second)
 
-	informers.Start(ctx.Done())
+	informers.Start(tCtx.Done())
 	close(informersStarted)
 
 	// now create a covering quota
@@ -496,14 +490,14 @@ plugins:
 
 	// Creating the first node port service should succeed
 	nodePortService := newService("np-svc", v1.ServiceTypeNodePort, true)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, nodePortService, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(tCtx, nodePortService, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating first node port Service should not have returned error: %v", err)
 	}
 
 	// Creating the first loadbalancer service should succeed
 	lbServiceWithNodePort1 := newService("lb-svc-withnp1", v1.ServiceTypeLoadBalancer, true)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, lbServiceWithNodePort1, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(tCtx, lbServiceWithNodePort1, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating first loadbalancer Service should not have returned error: %v", err)
 	}
@@ -522,7 +516,7 @@ plugins:
 
 	// Creating a loadbalancer Service without node ports should succeed
 	lbServiceWithoutNodePort1 := newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, lbServiceWithoutNodePort1, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(tCtx, lbServiceWithoutNodePort1, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating another loadbalancer Service without node ports should not have returned error: %v", err)
 	}
@@ -541,7 +535,7 @@ plugins:
 
 	// Creating a ClusterIP Service should succeed
 	clusterIPService1 := newService("clusterip-svc1", v1.ServiceTypeClusterIP, false)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, clusterIPService1, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(tCtx, clusterIPService1, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating a cluster IP Service should not have returned error: %v", err)
 	}
