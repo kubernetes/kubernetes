@@ -268,8 +268,9 @@ func TestNodeUnprepareResource(t *testing.T) {
 			defer teardown()
 
 			p := &plugin{
-				endpoint: addr,
-				version:  v1alpha3Version,
+				endpoint:      addr,
+				version:       v1alpha3Version,
+				clientTimeout: PluginClientTimeout,
 			}
 
 			conn, err := p.getOrCreateGRPCConn()
