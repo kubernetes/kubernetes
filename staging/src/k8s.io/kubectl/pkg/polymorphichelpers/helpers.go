@@ -36,6 +36,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 )
 
+// GetPodList returns a PodList matching the namespace and label selector
 func GetPodList(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*corev1.Pod) sort.Interface) (*corev1.PodList, error) {
 	options := metav1.ListOptions{LabelSelector: selector}
 
