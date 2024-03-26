@@ -17,19 +17,19 @@ limitations under the License.
 package transformation
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMain(m *testing.M) {
 	framework.EtcdMain(m.Run)
 }
 
-func testContext(t *testing.T) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	t.Cleanup(cancel)
-	return ctx
+func testContext(t *testing.T) ktesting.TContext {
+	tCtx := ktesting.Init(t)
+	tCtx = ktesting.WithTimeout(tCtx, 30*time.Second, "test timed out")
+	return tCtx
 }

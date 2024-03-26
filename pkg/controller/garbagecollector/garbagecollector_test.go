@@ -75,6 +75,9 @@ func (m *testRESTMapper) Reset() {
 }
 
 func TestGarbageCollectorConstruction(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
 	config := &restclient.Config{}
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
@@ -98,7 +101,6 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	logger, tCtx := ktesting.NewTestContext(t)
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
@@ -208,7 +210,7 @@ type garbageCollector struct {
 }
 
 func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -218,7 +220,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,6 +254,7 @@ func serilizeOrDie(t *testing.T, object interface{}) []byte {
 
 // test the attemptToDeleteItem function making the expected actions.
 func TestAttemptToDeleteItem(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := getPod("ToBeDeletedPod", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
@@ -292,7 +295,7 @@ func TestAttemptToDeleteItem(t *testing.T) {
 		owners:  nil,
 		virtual: true,
 	}
-	err := gc.attemptToDeleteItem(context.TODO(), item)
+	err := gc.attemptToDeleteItem(tCtx, item)
 	if err != nil {
 		t.Errorf("Unexpected Error: %v", err)
 	}
@@ -489,6 +492,7 @@ func podToGCNode(pod *v1.Pod) *node {
 }
 
 func TestAbsentOwnerCache(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	rc1Pod1 := getPod("rc1Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
@@ -560,12 +564,20 @@ func TestAbsentOwnerCache(t *testing.T) {
 	gc := setupGC(t, clientConfig)
 	defer close(gc.stop)
 	gc.absentOwnerCache = NewReferenceCache(2)
-	gc.attemptToDeleteItem(context.TODO(), podToGCNode(rc1Pod1))
-	gc.attemptToDeleteItem(context.TODO(), podToGCNode(rc2Pod1))
+	if err := gc.attemptToDeleteItem(ctx, podToGCNode(rc1Pod1)); err != nil {
+		t.Errorf("unexpected error deleting rc1Pod1: %v", err)
+	}
+	if err := gc.attemptToDeleteItem(ctx, podToGCNode(rc2Pod1)); err != nil {
+		t.Errorf("unexpected error deleting rc2Pod1: %v", err)
+	}
 	// rc1 should already be in the cache, no request should be sent. rc1 should be promoted in the UIDCache
-	gc.attemptToDeleteItem(context.TODO(), podToGCNode(rc1Pod2))
+	if err := gc.attemptToDeleteItem(ctx, podToGCNode(rc1Pod2)); err != nil {
+		t.Errorf("unexpected error deleting rc1Pod2: %v", err)
+	}
 	// after this call, rc2 should be evicted from the UIDCache
-	gc.attemptToDeleteItem(context.TODO(), podToGCNode(rc3Pod1))
+	if err := gc.attemptToDeleteItem(ctx, podToGCNode(rc3Pod1)); err != nil {
+		t.Errorf("unexpected error deleting rc3Pod1: %v", err)
+	}
 	// check cache
 	if !gc.absentOwnerCache.Has(objectReference{Namespace: "ns1", OwnerReference: metav1.OwnerReference{Kind: "ReplicationController", Name: "rc1", UID: "1", APIVersion: "v1"}}) {
 		t.Errorf("expected rc1 to be in the cache")
