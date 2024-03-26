@@ -3053,8 +3053,9 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 
 	rootFsUsedBytes := uint64(rootFsUsed.Value())
 	logsUsedBytes := uint64(logsUsed.Value())
-	for range pod.Spec.Containers {
+	for _, container := range pod.Spec.Containers {
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
+			Name: container.Name,
 			Rootfs: &statsapi.FsStats{
 				UsedBytes: &rootFsUsedBytes,
 			},
