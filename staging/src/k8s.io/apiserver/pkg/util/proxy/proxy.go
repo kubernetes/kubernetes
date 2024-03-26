@@ -131,6 +131,18 @@ func ResolveCluster(services listersv1.ServiceLister, namespace, id string, port
 	}
 }
 
+// ResolveClusterServerName returns the TLS Server Name Indication (SNI) of an external service and a boolean indicating if the service is an external service.
+func ResolveClusterServerName(services listersv1.ServiceLister, namespace, id string) (string, bool, error) {
+	svc, err := services.Services(namespace).Get(id)
+	if err != nil {
+		return "", false, err
+	}
+	if svc.Spec.Type == v1.ServiceTypeExternalName {
+		return svc.Spec.ExternalName, true, nil
+	}
+	return "", false, nil
+}
+
 // NewRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
 func NewRequestForProxy(location *url.URL, req *http.Request) (*http.Request, context.CancelFunc) {
 	newCtx := req.Context()

@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -24,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -134,10 +136,29 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Scheme = "https"
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
-		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		utilruntime.HandleError(fmt.Errorf("error resolving %s/%s: %w", handlingInfo.serviceNamespace, handlingInfo.serviceName, err))
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
+
+	// If the ServiceResolver also implements ServerNameResolver, check to see if a service's external name should be used for TLS config.
+	if serverNameResolver, ok := r.serviceResolver.(ServerNameResolver); ok {
+		serverName, isExternal, err := serverNameResolver.ResolveServerName(handlingInfo.serviceNamespace, handlingInfo.serviceName)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("error resolving ServerName %s/%s: %w", handlingInfo.serviceNamespace, handlingInfo.serviceName, err))
+			proxyError(w, req, "server name unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if isExternal && handlingInfo.transportConfig.TLS.ServerName != serverName {
+			handlingInfo.transportConfig.TLS.ServerName = serverName
+			r.updateHandlingInfo(&handlingInfo)
+			if handlingInfo.transportBuildingError != nil {
+				proxyError(w, req, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
 	location.Host = rloc.Host
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
@@ -226,9 +247,14 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		servicePort:      *apiService.Spec.Service.Port,
 		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
-	newInfo.proxyRoundTripper, newInfo.transportBuildingError = transport.New(newInfo.transportConfig)
-	if newInfo.transportBuildingError != nil {
-		klog.Warning(newInfo.transportBuildingError.Error())
+
+	r.updateHandlingInfo(&newInfo)
+}
+
+func (r *proxyHandler) updateHandlingInfo(handlingInfo *proxyHandlingInfo) {
+	handlingInfo.proxyRoundTripper, handlingInfo.transportBuildingError = transport.New(handlingInfo.transportConfig)
+	if handlingInfo.transportBuildingError != nil {
+		klog.Warning(handlingInfo.transportBuildingError.Error())
 	}
-	r.handlingInfo.Store(newInfo)
+	r.handlingInfo.Store(*handlingInfo)
 }
