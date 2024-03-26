@@ -140,6 +140,8 @@ type validationOptions struct {
 	suppressPerExpressionCost bool
 
 	celEnvironmentSet *environment.EnvSet
+	// allowInvalidCABundle allows an invalid conversion webhook CABundle on update only if the existing CABundle is invalid
+	allowInvalidCABundle bool
 }
 
 type preexistingExpressions struct {
@@ -232,8 +234,8 @@ func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *ap
 		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
 		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
-		// strictCost is always true to enforce cost limits.
 		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		allowInvalidCABundle:                     allowInvalidCABundle(oldObj.Spec.Conversion),
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
 }
@@ -485,7 +487,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 	if (spec.Conversion != nil && spec.Conversion.Strategy != apiextensions.NoneConverter) && (spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conversion").Child("strategy"), spec.Conversion.Strategy, "must be None if spec.preserveUnknownFields is true"))
 	}
-	allErrs = append(allErrs, validateCustomResourceConversion(spec.Conversion, opts.requireRecognizedConversionReviewVersion, fldPath.Child("conversion"))...)
+	allErrs = append(allErrs, validateCustomResourceConversion(spec.Conversion, opts.requireRecognizedConversionReviewVersion, fldPath.Child("conversion"), opts)...)
 
 	return allErrs
 }
@@ -545,6 +547,15 @@ func validateConversionReviewVersions(versions []string, requireRecognizedVersio
 	return allErrs
 }
 
+// Allows invalid CA Bundle to be specified only if the existing CABundle is invalid
+func allowInvalidCABundle(oldConversion *apiextensions.CustomResourceConversion) bool {
+	if oldConversion == nil || oldConversion.WebhookClientConfig == nil ||
+		len(oldConversion.WebhookClientConfig.CABundle) == 0 {
+		return false
+	}
+	return len(webhook.ValidateCABundle(field.NewPath("caBundle"), oldConversion.WebhookClientConfig.CABundle)) > 0
+}
+
 // hasValidConversionReviewVersion return true if there is a valid version or if the list is empty.
 func hasValidConversionReviewVersionOrEmpty(versions []string) bool {
 	if len(versions) < 1 {
@@ -559,11 +570,11 @@ func hasValidConversionReviewVersionOrEmpty(versions []string) bool {
 }
 
 // ValidateCustomResourceConversion statically validates
-func ValidateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, fldPath *field.Path) field.ErrorList {
-	return validateCustomResourceConversion(conversion, true, fldPath)
+func ValidateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, fldPath *field.Path, opts validationOptions) field.ErrorList {
+	return validateCustomResourceConversion(conversion, true, fldPath, opts)
 }
 
-func validateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, requireRecognizedVersion bool, fldPath *field.Path) field.ErrorList {
+func validateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, requireRecognizedVersion bool, fldPath *field.Path, opts validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if conversion == nil {
 		return allErrs
@@ -581,6 +592,9 @@ func validateCustomResourceConversion(conversion *apiextensions.CustomResourceCo
 				allErrs = append(allErrs, webhook.ValidateWebhookURL(fldPath.Child("webhookClientConfig").Child("url"), *cc.URL, true)...)
 			case cc.Service != nil:
 				allErrs = append(allErrs, webhook.ValidateWebhookService(fldPath.Child("webhookClientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
+			}
+			if len(cc.CABundle) > 0 && !opts.allowInvalidCABundle {
+				allErrs = append(allErrs, webhook.ValidateCABundle(fldPath.Child("webhookClientConfig").Child("caBundle"), cc.CABundle)...)
 			}
 		}
 		allErrs = append(allErrs, validateConversionReviewVersions(conversion.ConversionReviewVersions, requireRecognizedVersion, fldPath.Child("conversionReviewVersions"))...)
