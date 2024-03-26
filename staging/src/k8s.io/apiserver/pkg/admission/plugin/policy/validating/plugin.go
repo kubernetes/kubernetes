@@ -121,7 +121,7 @@ func compilePolicy(policy *Policy) Validator {
 	matchConditions := policy.Spec.MatchConditions
 
 	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
-	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
+	filterCompiler.CompileAndStoreVariables(convertv1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 
 	if len(matchConditions) > 0 {
 		matchExpressionAccessors := make([]cel.ExpressionAccessor, len(matchConditions))
@@ -179,7 +179,7 @@ func convertv1AuditAnnotations(inputValidations []v1.AuditAnnotation) []cel.Expr
 	return celExpressionAccessor
 }
 
-func convertv1beta1Variables(variables []v1.Variable) []cel.NamedExpressionAccessor {
+func convertv1Variables(variables []v1.Variable) []cel.NamedExpressionAccessor {
 	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
 	for i, variable := range variables {
 		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}
