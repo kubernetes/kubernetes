@@ -155,6 +155,17 @@ func main() {
 			fmt.Println()
 			fmt.Println()
 
+			if sourceDir != "" {
+				log.Fatalf("use of deprecated `dir` field in rules for `%s`", destination)
+			}
+			if len(branchData["source"].(map[interface{}]interface{})["dirs"].(string)) > 1 {
+				log.Fatalf("cannot have more than one directory (`%s`) per source branch `%s` of `%s`",
+					(branchData["source"].(map[interface{}]interface{})["dirs"].(string)),
+					(branchData["source"].(map[interface{}]interface{})["branch"]),
+					destination,
+				)
+			}
+
 			if !strings.HasSuffix(sourceDir, destination) {
 				log.Fatalf("Copy/paste error `%s` refers to `%s`", destination, sourceDir)
 			}
