@@ -625,10 +625,9 @@ func TestWatchControllers(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	client := fake.NewSimpleClientset()
 	client.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	tCtx := ktesting.Init(t)
+	stopCh := tCtx.Done()
 	manager := NewReplicaSetController(
 		tCtx,
 		informers.Apps().V1().ReplicaSets(),
@@ -1190,12 +1189,10 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 
 func TestExpectationsOnRecreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	tCtx := ktesting.Init(t)
 	logger := tCtx.Logger()
+	stopCh := tCtx.Done()
 	manager := NewReplicaSetController(
 		tCtx,
 		f.Apps().V1().ReplicaSets(),

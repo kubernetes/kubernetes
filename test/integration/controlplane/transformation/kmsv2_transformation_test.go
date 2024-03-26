@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type envelopekmsv2 struct {
@@ -283,7 +284,7 @@ resources:
 	}
 	defer test.cleanUp()
 
-	ctx := testContext(t)
+	tCtx := testContext(t)
 
 	// the global metrics registry persists across test runs - reset it here so we can make assertions
 	copyConfig := rest.CopyConfig(test.kubeAPIServer.ClientConfig)
@@ -293,7 +294,7 @@ resources:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := rc.Delete().AbsPath("/metrics").Do(ctx).Error(); err != nil {
+	if err := rc.Delete().AbsPath("/metrics").Do(tCtx).Error(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -306,7 +307,7 @@ resources:
 		`apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="to_storage"} 1`,
 	}
 	defer func() {
-		body, err := rc.Get().AbsPath("/metrics").DoRaw(ctx)
+		body, err := rc.Get().AbsPath("/metrics").DoRaw(tCtx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -359,7 +360,7 @@ resources:
 	if err != nil {
 		t.Fatalf("failed to get ciphertext DEK/seed from KMSv2 Plugin: %v", err)
 	}
-	decryptResponse, err := pluginMock.Decrypt(ctx, &kmsv2api.DecryptRequest{Uid: string(uuid.NewUUID()), Ciphertext: ciphertext})
+	decryptResponse, err := pluginMock.Decrypt(tCtx, &kmsv2api.DecryptRequest{Uid: string(uuid.NewUUID()), Ciphertext: ciphertext})
 	if err != nil {
 		t.Fatalf("failed to decrypt DEK, %v", err)
 	}
@@ -381,7 +382,7 @@ resources:
 
 	secretClient := test.restClient.CoreV1().Secrets(testNamespace)
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := secretClient.Get(ctx, testSecret, metav1.GetOptions{})
+	s, err := secretClient.Get(tCtx, testSecret, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
 	}
@@ -449,8 +450,7 @@ resources:
 		t.Fatalf("Resource version should not have changed. old pod: %v, new pod: %v", testPod, updatedPod)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	t.Cleanup(cancel)
+	tCtx := ktesting.WithTimeout(test, 5*time.Minute, "test timed out")
 
 	useSeed := encryptionconfig.GetKDF()
 
@@ -480,7 +480,7 @@ resources:
 			}
 		}
 	}
-	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKSources(tCtx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
 		1, 1, "k8s:enc:kms:v2:kms-provider:", f,
 	)
 	if len(firstEncryptedDEKSource) == 0 {
@@ -576,7 +576,7 @@ resources:
 
 	// 4. when kms-plugin is down, expect creation of new pod and encryption to succeed because the DEK is still valid
 	pluginMock.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	mustBeUnHealthy(tCtx, "/kms-providers",
 		"internal server error: kms-provider-0: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
 		test.kubeAPIServer.ClientConfig)
 
@@ -618,7 +618,7 @@ resources:
 		t.Fatalf("Resource version should not have changed again after the initial version updated as a result of the keyID update. old pod: %v, new pod: %v", newPod, updatedNewPod)
 	}
 
-	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKSources(tCtx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
 		1, 1, "k8s:enc:kms:v2:kms-provider:", checkDEK,
 	)
 
@@ -865,12 +865,12 @@ resources:
 
 	// Stage 1 - Since all kms-plugins are guaranteed to be up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(test, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
 
 	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the healthz check
 	// to fail and report that provider-1 is down
 	pluginMock1.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	mustBeUnHealthy(test, "/kms-providers",
 		"internal server error: kms-provider-0: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
 		test.kubeAPIServer.ClientConfig)
 	pluginMock1.ExitFailedState()
@@ -878,19 +878,19 @@ resources:
 	// Stage 3 - kms-plugin for provider-1 is now up. Therefore, expect the health check for provider-1
 	// to succeed now, but provider-2 is now down.
 	pluginMock2.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	mustBeUnHealthy(test, "/kms-providers",
 		"internal server error: kms-provider-1: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
 		test.kubeAPIServer.ClientConfig)
 	pluginMock2.ExitFailedState()
 
 	// Stage 4 - All kms-plugins are once again up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(test, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
 
 	// Stage 5 - All kms-plugins are unhealthy at the same time and we can observe both failures.
 	pluginMock1.EnterFailedState()
 	pluginMock2.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	mustBeUnHealthy(test, "/kms-providers",
 		"internal server error: "+
 			"[kms-provider-0: failed to perform status section of the healthz check for KMS Provider provider-1, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled,"+
 			" kms-provider-1: failed to perform status section of the healthz check for KMS Provider provider-2, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled]",
@@ -1022,12 +1022,12 @@ resources:
 		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
 	}
 
-	ctx := testContext(t)
+	tCtx := testContext(t)
 	ciphertext, err := envelopeData.cipherTextDEKSource()
 	if err != nil {
 		t.Fatalf("failed to get ciphertext DEK from KMSv2 Plugin: %v", err)
 	}
-	decryptResponse, err := pluginMock.Decrypt(ctx, &kmsv2api.DecryptRequest{Uid: string(uuid.NewUUID()), Ciphertext: ciphertext})
+	decryptResponse, err := pluginMock.Decrypt(tCtx, &kmsv2api.DecryptRequest{Uid: string(uuid.NewUUID()), Ciphertext: ciphertext})
 	if err != nil {
 		t.Fatalf("failed to decrypt DEK, %v", err)
 	}
@@ -1049,7 +1049,7 @@ resources:
 
 	secretClient := test.restClient.CoreV1().Secrets(testNamespace)
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := secretClient.Get(ctx, testSecret, metav1.GetOptions{})
+	s, err := secretClient.Get(tCtx, testSecret, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
 	}
@@ -1067,7 +1067,7 @@ resources:
 
 	// Getting an old secret that was encrypted by the same plugin should not fail.
 	s, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
-		ctx,
+		tCtx,
 		testSecret,
 		metav1.GetOptions{},
 	)
@@ -1425,9 +1425,9 @@ resources:
 		t.Errorf("kms v2 legacy encrypted object diff (-want, +got):\n%s", diff)
 	}
 
-	ctx := testContext(t)
+	tCtx := testContext(t)
 
-	legacySecrets, err := test.restClient.CoreV1().Secrets(legacyDataNamespace).List(ctx, metav1.ListOptions{})
+	legacySecrets, err := test.restClient.CoreV1().Secrets(legacyDataNamespace).List(tCtx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

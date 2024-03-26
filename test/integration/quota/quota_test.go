@@ -17,7 +17,6 @@ limitations under the License.
 package quota
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -60,10 +59,10 @@ const (
 //	quota_test.go:100: Took 4.196205966s to scale up without quota
 //	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	ctx := ktesting.Init(t)
+	tCtx := ktesting.Init(t)
 
 	// Set up a API server
-	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
@@ -80,13 +79,13 @@ func TestQuota(t *testing.T) {
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
-		ctx,
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
 	)
-	go rm.Run(ctx, 3)
+	go rm.Run(tCtx, 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -103,16 +102,16 @@ func TestQuota(t *testing.T) {
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(tCtx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	go resourceQuotaController.Run(ctx, 2)
+	go resourceQuotaController.Run(tCtx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
+	go resourceQuotaController.Sync(tCtx, discoveryFunc, 30*time.Second)
 
-	informers.Start(ctx.Done())
+	informers.Start(tCtx.Done())
 	close(informersStarted)
 
 	startTime := time.Now()
@@ -131,7 +130,7 @@ func TestQuota(t *testing.T) {
 			},
 		},
 	}
-	waitForQuota(t, quota, clientset)
+	waitForQuota(tCtx, quota, clientset)
 
 	startTime = time.Now()
 	scale(t, "quotaed", clientset)
@@ -139,19 +138,17 @@ func TestQuota(t *testing.T) {
 	t.Logf("Took %v to scale up with quota", endTime.Sub(startTime))
 }
 
-func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Clientset) {
-	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
+func waitForQuota(tCtx ktesting.TContext, quota *v1.ResourceQuota, clientset *clientset.Clientset) {
+	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(tCtx, metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		tCtx.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(context.TODO(), quota, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(tCtx, quota, metav1.CreateOptions{}); err != nil {
+		tCtx.Fatalf("unexpected error: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+	_, err = watchtools.UntilWithoutRetry(ktesting.WithTimeout(tCtx, time.Minute, "polling timed out"), w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Modified:
 		default:
@@ -167,14 +164,14 @@ func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Cl
 		return false, nil
 	})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		tCtx.Fatalf("unexpected error: %v", err)
 	}
 }
 
 // waitForUsedResourceQuota polls a ResourceQuota status for an expected used value
-func waitForUsedResourceQuota(t *testing.T, c clientset.Interface, ns, quotaName string, used v1.ResourceList) {
+func waitForUsedResourceQuota(tCtx ktesting.TContext, c clientset.Interface, ns, quotaName string, used v1.ResourceList) {
 	err := wait.Poll(1*time.Second, resourceQuotaTimeout, func() (bool, error) {
-		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(tCtx, quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -188,23 +185,24 @@ func waitForUsedResourceQuota(t *testing.T, c clientset.Interface, ns, quotaName
 		for k, v := range used {
 			actualValue, found := resourceQuota.Status.Used[k]
 			if !found {
-				t.Logf("resource %s was not found in ResourceQuota status", k)
+				tCtx.Logf("resource %s was not found in ResourceQuota status", k)
 				return false, nil
 			}
 
 			if !actualValue.Equal(v) {
-				t.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
+				tCtx.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
 				return false, nil
 			}
 		}
 		return true, nil
 	})
 	if err != nil {
-		t.Errorf("error waiting or ResourceQuota status: %v", err)
+		tCtx.Errorf("error waiting or ResourceQuota status: %v", err)
 	}
 }
 
 func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
+	tCtx := ktesting.Init(t)
 	target := int32(100)
 	rc := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
@@ -232,18 +230,16 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		},
 	}
 
-	w, err := clientset.CoreV1().ReplicationControllers(namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: rc.Name}))
+	w, err := clientset.CoreV1().ReplicationControllers(namespace).Watch(tCtx, metav1.SingleObject(metav1.ObjectMeta{Name: rc.Name}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := clientset.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), rc, metav1.CreateOptions{}); err != nil {
+	if _, err := clientset.CoreV1().ReplicationControllers(namespace).Create(tCtx, rc, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+	_, err = watchtools.UntilWithoutRetry(ktesting.WithTimeout(tCtx, 3*time.Minute, "polling timed out"), w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Modified:
 		default:
@@ -261,7 +257,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		return false, nil
 	})
 	if err != nil {
-		pods, _ := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String(), FieldSelector: fields.Everything().String()})
+		pods, _ := clientset.CoreV1().Pods(namespace).List(tCtx, metav1.ListOptions{LabelSelector: labels.Everything().String(), FieldSelector: fields.Everything().String()})
 		t.Fatalf("unexpected error: %v, ended with %v pods", err, len(pods.Items))
 	}
 }
@@ -377,7 +373,7 @@ plugins:
 			},
 		},
 	}
-	waitForQuota(t, quota, clientset)
+	waitForQuota(tCtx, quota, clientset)
 
 	// attempt to create a new pod once the quota is propagated
 	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
@@ -486,7 +482,7 @@ plugins:
 		},
 	}
 
-	waitForQuota(t, quota, clientset)
+	waitForQuota(tCtx, quota, clientset)
 
 	// Creating the first node port service should succeed
 	nodePortService := newService("np-svc", v1.ServiceTypeNodePort, true)
@@ -508,7 +504,7 @@ plugins:
 		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
 		v1.ResourceServicesLoadBalancers: resource.MustParse("1"),
 	}
-	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+	waitForUsedResourceQuota(tCtx, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating another loadbalancer Service using node ports should fail because node prot quota is exceeded
 	lbServiceWithNodePort2 := newService("lb-svc-withnp2", v1.ServiceTypeLoadBalancer, true)
@@ -527,7 +523,7 @@ plugins:
 		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
 		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
 	}
-	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+	waitForUsedResourceQuota(tCtx, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating another loadbalancer Service without node ports should fail because loadbalancer quota is exceeded
 	lbServiceWithoutNodePort2 := newService("lb-svc-wonp2", v1.ServiceTypeLoadBalancer, false)
@@ -546,7 +542,7 @@ plugins:
 		v1.ResourceServicesNodePorts:     resource.MustParse("2"),
 		v1.ResourceServicesLoadBalancers: resource.MustParse("2"),
 	}
-	waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+	waitForUsedResourceQuota(tCtx, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
 
 	// Creating a ClusterIP Service should fail because Service quota has been exceeded.
 	clusterIPService2 := newService("clusterip-svc2", v1.ServiceTypeClusterIP, false)
@@ -555,8 +551,9 @@ plugins:
 
 // testServiceForbidden attempts to create a Service expecting 403 Forbidden due to resource quota limits being exceeded.
 func testServiceForbidden(clientset clientset.Interface, namespace string, service *v1.Service, t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	pollErr := wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
-		_, err := clientset.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+		_, err := clientset.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
 		if apierrors.IsForbidden(err) {
 			return true, nil
 		}

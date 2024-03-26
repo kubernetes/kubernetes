@@ -37,6 +37,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -44,6 +45,7 @@ import (
 // Test_ServiceLoadBalancerAllocateNodePorts tests that a Service with spec.allocateLoadBalancerNodePorts=false
 // does not allocate node ports for the Service.
 func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -71,7 +73,7 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -84,6 +86,7 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 // Test_ServiceUpdateLoadBalancerAllocateNodePorts tests that a Service that is updated from ClusterIP to LoadBalancer
 // with spec.allocateLoadBalancerNodePorts=false does not allocate node ports for the Service
 func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -110,7 +113,7 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -121,7 +124,7 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 
 	service.Spec.Type = corev1.ServiceTypeLoadBalancer
 	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
-	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Error updating test service: %v", err)
 	}
@@ -134,6 +137,7 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 // Test_ServiceLoadBalancerSwitchToDeallocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=false, does not de-allocate existing node ports.
 func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -161,7 +165,7 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -171,7 +175,7 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 	}
 
 	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
-	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Error updating test service: %v", err)
 	}
@@ -366,6 +370,7 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch(t *testing.T) {
 // Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=true from false, allocate new node ports.
 func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -393,7 +398,7 @@ func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -403,7 +408,7 @@ func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
 	}
 
 	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Error updating test service: %v", err)
 	}
@@ -426,6 +431,7 @@ func serviceHasNodePorts(svc *corev1.Service) bool {
 // Test_ServiceLoadBalancerEnableLoadBalancerClass tests that when a LoadBalancer
 // type of service has spec.LoadBalancerClass set, cloud provider should not create default load balancer.
 func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -439,10 +445,8 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -457,7 +461,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -472,6 +476,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 // type of service has spec.LoadBalancerClass set, it should be immutable as long as the service type
 // is still LoadBalancer.
 func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -485,10 +490,8 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -503,13 +506,13 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
 	service.Spec.LoadBalancerClass = utilpointer.String("test.com/update")
-	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(tCtx, service, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatal("Error: updating test service load balancer class should throw error, field is immutable")
 	}
@@ -523,6 +526,7 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 // Test_UpdateLoadBalancerWithLoadBalancerClass tests that when a Load Balancer type of Service that
 // is updated from non loadBalancerClass set to loadBalancerClass set, it should be not allowed.
 func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -536,10 +540,8 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -553,13 +555,13 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
 	service.Spec.LoadBalancerClass = utilpointer.String("test.com/test")
-	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(tCtx, service, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatal("Error: updating test service load balancer class should throw error, field is immutable")
 	}
@@ -573,6 +575,7 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 // Test_ServiceLoadBalancerMixedProtocolSetup tests that a LoadBalancer Service with different protocol values
 // can be created.
 func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -586,10 +589,8 @@ func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+	informer.Start(tCtx.Done())
+	go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -612,7 +613,7 @@ func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
 		},
 	}
 
-	_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -629,7 +630,8 @@ func newServiceController(t *testing.T, client *clientset.Clientset) (*serviceco
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
-	controller, err := servicecontroller.New(cloud,
+	controller, err := servicecontroller.New(
+		cloud,
 		client,
 		serviceInformer,
 		nodeInformer,
@@ -679,10 +681,9 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 			controller, cloud, informer := newServiceController(t, client)
 			cloud.ExternalIP = net.ParseIPSloppy(tc.externalIP)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			informer.Start(ctx.Done())
-			go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+			tCtx := ktesting.Init(t)
+			informer.Start(tCtx.Done())
+			go controller.Run(tCtx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -696,13 +697,13 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 				},
 			}
 
-			service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+			service, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating test service: %v", err)
 			}
 
 			time.Sleep(5 * time.Second) // sleep 5 second to wait for the service controller reconcile
-			service, err = client.CoreV1().Services(ns.Name).Get(ctx, service.Name, metav1.GetOptions{})
+			service, err = client.CoreV1().Services(ns.Name).Get(tCtx, service.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Error getting test service: %v", err)
 			}

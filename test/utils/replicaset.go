@@ -19,13 +19,13 @@ package utils
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type UpdateReplicaSetFunc func(d *apps.ReplicaSet)
@@ -54,10 +54,10 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
+func WaitRSStable(tCtx ktesting.TContext, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
 	desiredGeneration := rs.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Get(context.TODO(), rs.Name, metav1.GetOptions{})
+		newRS, err := tCtx.Client().AppsV1().ReplicaSets(rs.Namespace).Get(tCtx, rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

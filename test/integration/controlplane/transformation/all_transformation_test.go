@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/integration/etcd"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func createResources(t *testing.T, test *transformTest,
@@ -120,9 +121,10 @@ resources:
 		tt := tt
 		t.Run(tt.resource, func(t *testing.T) {
 			t.Parallel()
+			tCtx := ktesting.Init(t)
 
 			createResources(t, test, tt.group, tt.version, tt.kind, tt.resource, tt.name, tt.namespace)
-			test.runResource(t, unSealWithCBCTransformer, aesCBCPrefix, tt.group, tt.version, tt.resource, tt.name, tt.namespace)
+			test.runResource(tCtx, unSealWithCBCTransformer, aesCBCPrefix, tt.group, tt.version, tt.resource, tt.name, tt.namespace)
 		})
 	}
 }

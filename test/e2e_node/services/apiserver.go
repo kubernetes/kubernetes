@@ -52,9 +52,10 @@ type APIServer struct {
 
 // NewAPIServer creates an apiserver.
 func NewAPIServer(storageConfig storagebackend.Config) *APIServer {
-	return &APIServer{
+	a := &APIServer{
 		storageConfig: storageConfig,
 	}
+	return a
 }
 
 // Start starts the apiserver, returns when apiserver is ready.

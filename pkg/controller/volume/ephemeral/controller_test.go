@@ -17,12 +17,12 @@ limitations under the License.
 package ephemeral
 
 import (
-	"context"
 	"errors"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,9 +33,9 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/volume/ephemeral/metrics"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (
@@ -51,10 +51,6 @@ var (
 	conflictingClaim      = makePVC(testPodName+"-"+ephemeralVolumeName, testNamespace, nil)
 	otherNamespaceClaim   = makePVC(testPodName+"-"+ephemeralVolumeName, otherNamespace, nil)
 )
-
-func init() {
-	klog.InitFlags(nil)
-}
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
@@ -120,11 +116,7 @@ func TestSyncHandler(t *testing.T) {
 	for _, tc := range tests {
 		// Run sequentially because of global logging and global metrics.
 		t.Run(tc.name, func(t *testing.T) {
-			// There is no good way to shut down the informers. They spawn
-			// various goroutines and some of them (in particular shared informer)
-			// become very unhappy ("close on closed channel") when using a context
-			// that gets cancelled. Therefore we just keep everything running.
-			ctx := context.Background()
+			tCtx := ktesting.Init(t)
 
 			var objects []runtime.Object
 			for _, pod := range tc.pods {
@@ -145,18 +137,22 @@ func TestSyncHandler(t *testing.T) {
 			podInformer := informerFactory.Core().V1().Pods()
 			pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 
-			c, err := NewController(ctx, fakeKubeClient, podInformer, pvcInformer)
+			c, err := NewController(tCtx, fakeKubeClient, podInformer, pvcInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
 			ec, _ := c.(*ephemeralController)
 
 			// Ensure informers are up-to-date.
-			go informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
-			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, pvcInformer.Informer().HasSynced)
+			go informerFactory.Start(tCtx.Done())
+			defer func() {
+				tCtx.Cancel("test has completed")
+				informerFactory.Shutdown()
+			}()
+			informerFactory.WaitForCacheSync(tCtx.Done())
+			cache.WaitForCacheSync(tCtx.Done(), podInformer.Informer().HasSynced, pvcInformer.Informer().HasSynced)
 
-			err = ec.syncHandler(context.TODO(), tc.podKey)
+			err = ec.syncHandler(tCtx, tc.podKey)
 			if err != nil && !tc.expectedError {
 				t.Fatalf("unexpected error while running handler: %v", err)
 			}
@@ -164,7 +160,7 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("unexpected success")
 			}
 
-			pvcs, err := fakeKubeClient.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
+			pvcs, err := fakeKubeClient.CoreV1().PersistentVolumeClaims("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing PVCs: %v", err)
 			}

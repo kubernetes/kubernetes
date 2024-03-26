@@ -110,15 +110,6 @@ type TestServer struct {
 	EtcdStoragePrefix string                    // storage prefix in etcd
 }
 
-// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
-type Logger interface {
-	Helper()
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
-	Cleanup(func())
-}
-
 // ProxyCA contains the certificate authority certificate and key which is used to verify client connections
 // to kube-apiservers. The clients can be :
 // 1. aggregated apiservers
@@ -501,7 +492,7 @@ func createLocalhostListenerOnFreePort() (net.Listener, int, error) {
 //
 // The approach taken here works for both go test and bazel on the assumption
 // that if and only if trimpath is passed, we are running under bazel.
-func pkgPath(t Logger) (string, error) {
+func pkgPath(t ktesting.TB) (string, error) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("failed to get current file")
