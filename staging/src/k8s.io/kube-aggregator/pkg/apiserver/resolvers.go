@@ -28,6 +28,11 @@ type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
 }
 
+// A ServerNameResolver knows how to get the TLS Server Name Indication (SNI) of an external service.
+type ServerNameResolver interface {
+	ResolveServerName(namespace, name string) (string, bool, error)
+}
+
 // NewEndpointServiceResolver returns a ServiceResolver that chooses one of the
 // service's endpoints.
 func NewEndpointServiceResolver(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister) ServiceResolver {
@@ -54,12 +59,19 @@ func NewClusterIPServiceResolver(services listersv1.ServiceLister) ServiceResolv
 	}
 }
 
+var _ ServiceResolver = &aggregatorClusterRouting{}
+var _ ServerNameResolver = &aggregatorClusterRouting{}
+
 type aggregatorClusterRouting struct {
 	services listersv1.ServiceLister
 }
 
 func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return proxy.ResolveCluster(r.services, namespace, name, port)
+}
+
+func (r *aggregatorClusterRouting) ResolveServerName(namespace, name string) (string, bool, error) {
+	return proxy.ResolveExternalName(r.services, namespace, name)
 }
 
 // NewLoopbackServiceResolver returns a ServiceResolver that routes

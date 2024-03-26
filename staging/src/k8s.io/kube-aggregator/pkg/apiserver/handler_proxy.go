@@ -17,13 +17,18 @@ limitations under the License.
 package apiserver
 
 import (
+	"crypto/x509"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -67,7 +72,7 @@ type proxyHandlingInfo struct {
 
 	// name is the name of the APIService
 	name string
-	// transportConfig holds the information for building a roundtripper
+	// transportConfig holds the information for building proxyRoundTripper
 	transportConfig *transport.Config
 	// transportBuildingError is an error produced while building the transport.  If this
 	// is non-nil, it will be reported to clients.
@@ -82,6 +87,10 @@ type proxyHandlingInfo struct {
 	serviceAvailable bool
 	// servicePort is the port of the service this handler proxies to
 	servicePort int32
+	// externalServerName holds the TLS ServerNameIndication (SNIs) for an external service when available.
+	externalServerName string
+	// externalProxyRoundTripper is a round tripper that can be used for proxying to external services.
+	externalProxyRoundTripper http.RoundTripper
 }
 
 func proxyError(w http.ResponseWriter, req *http.Request, error string, code int) {
@@ -134,10 +143,11 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Scheme = "https"
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
-		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		utilruntime.HandleError(fmt.Errorf("error resolving %s/%s: %w", handlingInfo.serviceNamespace, handlingInfo.serviceName, err))
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
+
 	location.Host = rloc.Host
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
@@ -150,9 +160,19 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	proxyRoundTripper := handlingInfo.proxyRoundTripper
+	fallbackRoundTripper, err := newFallbackRoundTripper(&handlingInfo, r.serviceResolver)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error resolving ServerName %s/%s: %w", handlingInfo.serviceNamespace, handlingInfo.serviceName, err))
+		proxyError(w, req, "server name unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	// store the externalTransportConfig and externalRoundTripper for future requests
+	r.storeExternalProxyInfo(handlingInfo, fallbackRoundTripper.externalServerName, fallbackRoundTripper.externalProxyRoundTripper)
+
+	proxyRoundTripper := http.RoundTripper(fallbackRoundTripper)
 	upgrade := httpstream.IsUpgradeRequest(req)
 
+	// If the ServiceResolver also implements ServerNameResolver, check to see if a service's external name should be used for TLS config.
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), proxyRoundTripper)
 
 	// If we are upgrading, then the upgrade path tries to use this request with the TLS config we provide, but it does
@@ -168,6 +188,16 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	utilflowcontrol.RequestDelegated(req.Context())
 	handler.ServeHTTP(w, newReq)
+}
+
+func (r *proxyHandler) storeExternalProxyInfo(handlingInfo proxyHandlingInfo, serverName string, rt http.RoundTripper) {
+	if handlingInfo.externalServerName == serverName && handlingInfo.externalProxyRoundTripper == rt {
+		return
+	}
+
+	handlingInfo.externalServerName = serverName
+	handlingInfo.externalProxyRoundTripper = rt
+	r.handlingInfo.Store(handlingInfo)
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
@@ -226,9 +256,81 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		servicePort:      *apiService.Spec.Service.Port,
 		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
+
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = transport.New(newInfo.transportConfig)
 	if newInfo.transportBuildingError != nil {
 		klog.Warning(newInfo.transportBuildingError.Error())
 	}
 	r.handlingInfo.Store(newInfo)
+}
+
+var _ utilnet.RoundTripperWrapper = &fallbackRoundTripper{}
+
+type fallbackRoundTripper struct {
+	proxyRoundTripper         http.RoundTripper
+	externalServerName        string
+	externalProxyRoundTripper http.RoundTripper
+}
+
+func newFallbackRoundTripper(handlingInfo *proxyHandlingInfo, serviceResolver ServiceResolver) (*fallbackRoundTripper, error) {
+	fallbackRoundTripper := &fallbackRoundTripper{
+		proxyRoundTripper:         handlingInfo.proxyRoundTripper,
+		externalServerName:        handlingInfo.externalServerName,
+		externalProxyRoundTripper: handlingInfo.externalProxyRoundTripper,
+	}
+	serverNameResolver, ok := serviceResolver.(ServerNameResolver)
+	// the ServerNameResolver interface is not implemented by all ServiceResolvers, so we should not fail if it is not implemented.
+	if !ok {
+		return fallbackRoundTripper, nil
+	}
+
+	serverName, isExternal, err := serverNameResolver.ResolveServerName(handlingInfo.serviceNamespace, handlingInfo.serviceName)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving ServerName %s/%s: %w", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+	}
+
+	// if the service is not external, we should not set the externalRoundTripper.
+	if !isExternal || serverName == "" {
+		fallbackRoundTripper.externalServerName = ""
+		fallbackRoundTripper.externalProxyRoundTripper = nil
+		return fallbackRoundTripper, nil
+	}
+
+	// skip creating a new externalRoundTripper if the externalServerName is the same
+	if fallbackRoundTripper.externalServerName == serverName {
+		return fallbackRoundTripper, nil
+	}
+
+	fallbackRoundTripper.externalServerName = serverName
+	externalTransportConfig := *handlingInfo.transportConfig
+	externalTransportConfig.TLS.ServerName = serverName
+	fallbackRoundTripper.externalProxyRoundTripper, err = transport.New(&externalTransportConfig)
+	if err != nil {
+		return nil, err
+	}
+	return fallbackRoundTripper, nil
+}
+
+func (f *fallbackRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	if f.externalProxyRoundTripper != nil {
+		return f.externalProxyRoundTripper
+	}
+	return f.proxyRoundTripper
+}
+
+func (f *fallbackRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	clonedReq := utilnet.CloneRequest(req)
+
+	if f.externalProxyRoundTripper != nil {
+		resp, err := f.externalProxyRoundTripper.RoundTrip(req)
+		// return error if the error is not an x509 HostnameError
+		if err != nil && !errors.As(err, &x509.HostnameError{}) {
+			return nil, err
+		}
+		if err == nil {
+			return resp, err
+		}
+	}
+
+	return f.proxyRoundTripper.RoundTrip(clonedReq)
 }

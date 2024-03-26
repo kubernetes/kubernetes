@@ -54,6 +54,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type targetHTTPHandler struct {
@@ -97,6 +98,8 @@ func contextHandler(handler http.Handler, user user.Info) http.Handler {
 	})
 }
 
+var _ ServiceResolver = &mockedRouter{}
+
 type mockedRouter struct {
 	destinationHost string
 	err             error
@@ -104,6 +107,25 @@ type mockedRouter struct {
 
 func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return &url.URL{Scheme: "https", Host: r.destinationHost}, r.err
+}
+
+var _ ServerNameResolver = &mockedServerNameResolver{}
+
+type mockedServerNameResolver struct {
+	externalHost string
+	err          error
+}
+
+func (r *mockedServerNameResolver) ResolveServerName(namespace, name string) (string, bool, error) {
+	if r.externalHost != "" {
+		return r.externalHost, true, r.err
+	}
+	return "", false, r.err
+}
+
+type wrappedRouterWithHostname struct {
+	ServiceResolver
+	ServerNameResolver
 }
 
 func emptyCert() []byte {
@@ -117,6 +139,7 @@ func TestProxyHandler(t *testing.T) {
 		apiService *apiregistration.APIService
 
 		serviceResolver        ServiceResolver
+		serverNameResolver     ServerNameResolver
 		serviceCertOverride    []byte
 		increaseSANWarnCounter bool
 
@@ -299,6 +322,188 @@ func TestProxyHandler(t *testing.T) {
 			increaseSANWarnCounter: true,
 			expectedStatusCode:     http.StatusServiceUnavailable,
 		},
+		"external service cert w/ SNI resolver": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			serverNameResolver: &mockedServerNameResolver{
+				externalHost: "test.example.local",
+			},
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To(int32(443))},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			expectedCalled:      true,
+			serviceCertOverride: svcCrtExternal,
+			expectedStatusCode:  http.StatusOK,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"external service w/ fallback to default SNI": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			serverNameResolver: &mockedServerNameResolver{
+				externalHost: "test.example.local",
+			},
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To(int32(443))},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			expectedCalled:      true,
+			serviceCertOverride: svcCrt,
+			expectedStatusCode:  http.StatusOK,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"SNI resolver w/o external host set": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				Groups: []string{"one", "two"},
+			},
+			path:               "/request/path",
+			serverNameResolver: &mockedServerNameResolver{},
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To(int32(443))},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			expectedCalled:      true,
+			serviceCertOverride: svcCrt,
+			expectedStatusCode:  http.StatusOK,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"fail on external serving cert w/o SNI resolver": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To(int32(443))},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			serviceCertOverride: svcCrtExternal,
+			expectedStatusCode:  http.StatusServiceUnavailable,
+		},
+		"fail on external serving cert w/ SNI resolver error": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				Groups: []string{"one", "two"},
+			},
+			serverNameResolver: &mockedServerNameResolver{
+				externalHost: "test.example.local",
+				err:          fmt.Errorf("hostname resolver error"),
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To(int32(443))},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			serviceCertOverride: svcCrtExternal,
+			expectedStatusCode:  http.StatusServiceUnavailable,
+		},
+		"fail on bad external serving cert": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				Groups: []string{"one", "two"},
+			},
+			serverNameResolver: &mockedServerNameResolver{
+				externalHost: "test2.example.local",
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To(int32(443))},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			serviceCertOverride: svcCrtExternal,
+			expectedStatusCode:  http.StatusServiceUnavailable,
+		},
 	}
 
 	target := &targetHTTPHandler{}
@@ -323,6 +528,12 @@ func TestProxyHandler(t *testing.T) {
 			serviceResolver := tc.serviceResolver
 			if serviceResolver == nil {
 				serviceResolver = &mockedRouter{destinationHost: targetServer.Listener.Addr().String()}
+			}
+			if tc.serverNameResolver != nil {
+				serviceResolver = &wrappedRouterWithHostname{
+					ServiceResolver:    serviceResolver,
+					ServerNameResolver: tc.serverNameResolver,
+				}
 			}
 			handler := &proxyHandler{
 				localDelegate:              http.NewServeMux(),
@@ -702,6 +913,29 @@ Y0++skz8kYIR1KuZnCtC6A0kaM2XrTWCXAc5KB0Q/WO0wqqWbH/xmEYQVZmDqWOH
 k+qVFD+I1oT5NOzFpzaUe4T7grzoLs24IE0c+0clcc9pxTDXTfPyoLG9n3zxG0Ma
 hPtkUeeEK8p73Zf/F4JHQ4tJv5XY1ytWkTROE79P6qT0BY/XZSpsGmB7TIS7wFCW
 RfKAqN95Uso3IBI=
+-----END CERTIFICATE-----`)
+
+// valid for hostname test.example.local
+// signed by testCACrt
+var svcCrtExternal = []byte(`-----BEGIN CERTIFICATE-----
+MIIDPjCCAiagAwIBAgIUFTmTVBWR1MAC2k+oHqC5q7vLrlEwDQYJKoZIhvcNAQEL
+BQAwGzEZMBcGA1UEAwwQd2ViaG9va190ZXN0c19jYTAgFw0yNDA0MTAyMTAxMzJa
+GA8yMjk4MDEyNDIxMDEzMlowHTEbMBkGA1UEAwwSdGVzdC5leGFtcGxlLmxvY2Fs
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvDXYxvaUdbX/MA3+3SdY
+Y4o8Jl2s1PW9MX4Mr/nCNltyOKDgfSABCN4XVsrd+/A+/zQt+EyJEJxMrd1syhzd
+/TJAnGzexmZg/dIi0jC3oBe/qyERWimZhqbu0O+0EpFx5qLzQ5eLabLU9CtBwRSy
+YQjqsDmPoqplsKxaFF9NIFQrh1zmxBay9vTY7P7sLkfZ8LifP6jgQ5NHQkjaY9XC
+MzYbcrzbc2r9vxTm//IR1cWxaifTNE9qo2NL1iiPGTpot65z83BWeu/qWOU+aGUh
+Y/xcZH0w/rUJ7ffviyd94EY4IN7FUJv53EJgmEp4UOaY1fAFtAFQQbVztGjYGpZ2
+2wIDAQABo3YwdDAdBgNVHREEFjAUghJ0ZXN0LmV4YW1wbGUubG9jYWwwEwYDVR0l
+BAwwCgYIKwYBBQUHAwEwHQYDVR0OBBYEFB3+77vvzYxwPyaJP+aYO2/R6Lc4MB8G
+A1UdIwQYMBaAFJnGJQd3VkQP5cZLB1n9/FRKyBLPMA0GCSqGSIb3DQEBCwUAA4IB
+AQBN0uM4T092jIwyjx63x1u3dckVIjhAYKGRPl8V4IL5/HDoB3IAWWdPjyXGuVgZ
+TUVCRqV5UoIgTGhkLS+KdFVkj/vf11/P8WUQ3AU9lYZ4m0DfVApeKBetjlJpoHK8
+P0ZxVSKF2ZWurB6Wbhv1FsDmJSVwKzPCYXydxMkYEJWMrGDrblzXJFgSXrNYp3Z2
+VsX+Q5T8uExYPVOMQYM+riN/s9Ea2i4uwPs7Q8MS42oWhhWbAH4jGlPKLr/522GZ
+UcqWB0N7xsPdUprgsZ6lnrIZVp6CIppJP0+MoiErfzNFKq6DGzykQ8lZ8uGUSBbW
+xj7rMJFdFVC4SfeiFHieCPhL
 -----END CERTIFICATE-----`)
 
 var svcKey = []byte(`-----BEGIN RSA PRIVATE KEY-----

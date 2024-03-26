@@ -131,6 +131,19 @@ func ResolveCluster(services listersv1.ServiceLister, namespace, id string, port
 	}
 }
 
+// ResolveExternalName returns the external service value and a boolean indicating if the service is ServiceTypeExternalName.
+// This is used to set the Server Name Indication (SNI) in the proxy handler's TLS config.
+func ResolveExternalName(services listersv1.ServiceLister, namespace, id string) (string, bool, error) {
+	svc, err := services.Services(namespace).Get(id)
+	if err != nil {
+		return "", false, err
+	}
+	if svc.Spec.Type == v1.ServiceTypeExternalName {
+		return svc.Spec.ExternalName, true, nil
+	}
+	return "", false, nil
+}
+
 // NewRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
 func NewRequestForProxy(location *url.URL, req *http.Request) (*http.Request, context.CancelFunc) {
 	newCtx := req.Context()
