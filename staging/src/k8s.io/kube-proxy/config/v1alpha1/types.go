@@ -94,6 +94,8 @@ type KubeProxyNFTablesConfiguration struct {
 	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
 	// result in an immediate iptables resync.
 	MinSyncPeriod metav1.Duration `json:"minSyncPeriod"`
+	// The name of the tables (ip and ip6) that this instance of kube-proxy will use
+	TableName string `json:"tableName,omitempty"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -201,6 +203,10 @@ type KubeProxyConfiguration struct {
 	EnableProfiling bool `json:"enableProfiling"`
 	// showHiddenMetricsForVersion is the version for which you want to show hidden metrics.
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
+	// The value for the "service.kubernetes.io/service-proxy-name" label that this
+	// kube-proxy instance shall handle. If unset (default), kube-proxy will handle
+	// any service that has NOT set this label.
+	ServiceProxyName string `json:"serviceProxyName,omitempty"`
 
 	// mode specifies which proxy mode to use.
 	Mode ProxyMode `json:"mode"`

@@ -322,6 +322,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.Recorder,
 				s.HealthzServer,
 				config.NodePortAddresses,
+				config.NFTables.TableName,
 				initOnly,
 			)
 		} else {
@@ -345,6 +346,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.Recorder,
 				s.HealthzServer,
 				config.NodePortAddresses,
+				config.NFTables.TableName,
 				initOnly,
 			)
 		}
