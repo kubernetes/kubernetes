@@ -1648,6 +1648,13 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID, status *podSyncStatus
 // killPodNow returns a KillPodFunc that can be used to kill a pod.
 // It is intended to be injected into other modules that need to kill a pod.
 func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFunc {
+	return killPodNowWithMaxTimeout(podWorkers, recorder, -1)
+}
+
+// killPodNowWithMaxTimeout returns a KillPodFunc that can be used to kill a pod.
+// It is intended to be injected into other modules that need to kill a pod.
+// accepts a max timeout before returning to the caller
+func killPodNowWithMaxTimeout(podWorkers PodWorkers, recorder record.EventRecorder, maxTimeout int64) eviction.KillPodFunc {
 	return func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
 		// determine the grace period to use when killing the pod
 		gracePeriod := int64(0)
@@ -1663,6 +1670,9 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 		minTimeout := int64(10)
 		if timeout < minTimeout {
 			timeout = minTimeout
+		}
+		if maxTimeout != -1 && timeout > maxTimeout {
+			timeout = maxTimeout
 		}
 		timeoutDuration := time.Duration(timeout) * time.Second
 
