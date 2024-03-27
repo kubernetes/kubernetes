@@ -182,7 +182,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return fmt.Errorf("at least one taint update is required")
 	}
 
-	if o.taintsToAdd, o.taintsToRemove, err = parseTaints(taintArgs); err != nil {
+	if o.taintsToAdd, o.taintsToRemove, err = ParseTaints(taintArgs); err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 	o.builder = f.NewBuilder().

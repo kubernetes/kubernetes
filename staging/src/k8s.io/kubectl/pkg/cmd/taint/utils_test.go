@@ -516,7 +516,7 @@ func TestParseTaints(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		taints, taintsToRemove, err := parseTaints(c.spec)
+		taints, taintsToRemove, err := ParseTaints(c.spec)
 		if c.expectedErr && err == nil {
 			t.Errorf("[%s] expected error for spec %s, but got nothing", c.name, c.spec)
 		}
