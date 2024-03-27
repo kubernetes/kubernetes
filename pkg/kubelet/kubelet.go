@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	sysruntime "runtime"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -2871,6 +2872,30 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 	return val.(time.Time)
 }
 
+// emitRuntimeConditionEvent emits an event about optional runtime conditions for informative purpose.
+func (kl *Kubelet) emitOptionalRuntimeConditionEvent(conditions []kubecontainer.RuntimeCondition) {
+	var ss []string
+	for _, cond := range conditions {
+		switch cond.Type {
+		case kubecontainer.RuntimeReady, kubecontainer.NetworkReady:
+			// NOP, as they are not optional.
+		default:
+			// https://github.com/kubernetes/cri-api/blob/v0.29.1/pkg/apis/runtime/v1/api.proto#L1496-L1517
+			// > 2. Optional conditions: Conditions are informative to the user, but kubelet
+			// > will not rely on. Since condition type is an arbitrary string, all conditions
+			// > not required are optional. These conditions will be exposed to users to help
+			// > them understand the status of the system.
+			if !cond.Status {
+				ss = append(ss, fmt.Sprintf("%s is unsatisfied: %s: %q", string(cond.Type), cond.Reason, cond.Message))
+			}
+		}
+	}
+	if len(ss) != 0 {
+		// Just emit a single event, as the event reason string (OptionalRuntimeConditionUnsatisfied) has to be unique.
+		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.OptionalRuntimeConditionUnsatisfied, strings.Join(ss, "; "))
+	}
+}
+
 // updateRuntimeUp calls the container runtime status callback, initializing
 // the runtime dependent modules when the container runtime first comes up,
 // and returns an error if the status check fails.  If the status check is OK,
@@ -2891,6 +2916,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	// Periodically log the whole runtime status for debugging.
 	klog.V(4).InfoS("Container runtime status", "status", s)
+	kl.emitOptionalRuntimeConditionEvent(s.Conditions)
 	klogErrorS := klog.ErrorS
 	if !kl.containerRuntimeReadyExpected {
 		klogErrorS = klog.V(4).ErrorS
