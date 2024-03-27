@@ -595,8 +595,9 @@ func TestValidateOnlyStatus(t *testing.T) {
 			if !isStatus || statusError == nil {
 				t.Fatalf("expected status error, got %T: %v", err, err)
 			}
-			if !strings.Contains(statusError.Error(), "Invalid value") {
-				t.Fatalf("expected 'Invalid value' in error, got: %v", err)
+			expectedErr := "WishIHadChosenNoxu.mygroup.example.com \"foo\" is invalid: status.num: Invalid value: 15: num in body should be less than or equal to 10"
+			if !strings.Contains(statusError.Error(), expectedErr) {
+				t.Fatalf("expected %q in error, got: %v", expectedErr, err)
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
