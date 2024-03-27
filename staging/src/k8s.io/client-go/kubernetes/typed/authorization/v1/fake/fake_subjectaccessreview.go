@@ -37,10 +37,11 @@ var subjectaccessreviewsKind = v1.SchemeGroupVersion.WithKind("SubjectAccessRevi
 
 // Create takes the representation of a subjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReview, and an error, if there is any.
 func (c *FakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (result *v1.SubjectAccessReview, err error) {
+	emptyResult := &v1.SubjectAccessReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(subjectaccessreviewsResource, subjectAccessReview), &v1.SubjectAccessReview{})
+		Invokes(testing.NewRootCreateAction(subjectaccessreviewsResource, subjectAccessReview), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.SubjectAccessReview), err
 }
