@@ -191,14 +191,15 @@ func TestControllerSync(t *testing.T) {
 					return err
 				}
 				// wait for volume delete operation to appear once volumeWorker() runs
-				return wait.PollImmediate(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-					// make sure the operation timestamp cache is NOT empty
-					if ctrl.operationTimestamps.Has("volume5-6") {
-						return true, nil
-					}
-					t.Logf("missing volume5-6 from timestamp cache, will retry")
-					return false, nil
-				})
+				return wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true,
+					func(ctx context.Context) (bool, error) {
+						// make sure the operation timestamp cache is NOT empty
+						if ctrl.operationTimestamps.Has("volume5-6") {
+							return true, nil
+						}
+						t.Logf("missing volume5-6 from timestamp cache, will retry")
+						return false, nil
+					})
 			},
 		},
 		{

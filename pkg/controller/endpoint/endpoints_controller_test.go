@@ -1094,9 +1094,10 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			time.Sleep(150 * time.Millisecond)
 			if test.shouldUpdateEndpoints {
 				// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
-				wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
-					return endpoints.queue.Len() == 0, nil
-				})
+				_ = wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 1*time.Second, true,
+					func(ctx context.Context) (bool, error) {
+						return endpoints.queue.Len() == 0, nil
+					})
 				endpointsHandler.ValidateRequestCount(t, 1)
 			} else {
 				endpointsHandler.ValidateRequestCount(t, 0)
@@ -2411,9 +2412,10 @@ func TestMultipleServiceChanges(t *testing.T) {
 	controller.onServiceUpdate(svc)
 
 	// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
-	wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
-		return controller.queue.Len() == 0, nil
-	})
+	_ = wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 1*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			return controller.queue.Len() == 0, nil
+		})
 
 	// Cause test server to delete endpoints
 	close(blockDelete)
