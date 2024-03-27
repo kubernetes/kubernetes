@@ -18,10 +18,13 @@ package testing
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -33,6 +36,7 @@ type FakeRuntimeHelper struct {
 	HostName        string
 	HostDomain      string
 	PodContainerDir string
+	RuntimeHandlers map[string]kubecontainer.RuntimeHandler
 	Err             error
 }
 
@@ -69,7 +73,38 @@ func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int6
 }
 
 func (f *FakeRuntimeHelper) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
-	return nil, nil
+	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
+	if pod == nil || pod.Spec.HostUsers == nil {
+		return nil, nil
+	}
+	// pod.Spec.HostUsers is set to true/false
+	if !featureEnabled {
+		return nil, fmt.Errorf("the feature gate %q is disabled: can't set spec.HostUsers", features.UserNamespacesSupport)
+	}
+	if *pod.Spec.HostUsers {
+		return nil, nil
+	}
+
+	// From here onwards, hostUsers=false and the feature gate is enabled.
+
+	// if the pod requested a user namespace and the runtime doesn't support user namespaces then return an error.
+	if h, ok := f.RuntimeHandlers[runtimeHandler]; !ok {
+		return nil, fmt.Errorf("RuntimeClass handler %q not found", runtimeHandler)
+	} else if !h.SupportsUserNamespaces {
+		return nil, fmt.Errorf("RuntimeClass handler %q does not support user namespaces", runtimeHandler)
+	}
+
+	ids := &runtimeapi.IDMapping{
+		HostId:      65536,
+		ContainerId: 0,
+		Length:      65536,
+	}
+
+	return &runtimeapi.UserNamespace{
+		Mode: runtimeapi.NamespaceMode_POD,
+		Uids: []*runtimeapi.IDMapping{ids},
+		Gids: []*runtimeapi.IDMapping{ids},
+	}, nil
 }
 
 func (f *FakeRuntimeHelper) PrepareDynamicResources(pod *v1.Pod) error {
