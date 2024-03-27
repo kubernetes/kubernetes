@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remote
+package cri
 
 import (
 	"context"
@@ -31,16 +31,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/logs/logreduction"
 	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri/pkg/errors"
+	"k8s.io/cri/pkg/util"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/probe/exec"
 
 	utilexec "k8s.io/utils/exec"
 )
@@ -90,7 +87,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if tp != nil {
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithPropagators(tracing.Propagators()),
 			otelgrpc.WithTracerProvider(tp),
@@ -497,7 +494,7 @@ func (r *remoteRuntimeService) execSyncV1(ctx context.Context, containerID strin
 
 		// interpret DeadlineExceeded gRPC errors as timedout probes
 		if status.Code(err) == codes.DeadlineExceeded {
-			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
+			err = crierrors.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
 		}
 
 		return nil, nil, err
@@ -807,15 +804,17 @@ func (r *remoteRuntimeService) CheckpointContainer(ctx context.Context, options 
 	return nil
 }
 
-func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	containerEventsStreamingClient, err := r.runtimeClient.GetContainerEvents(context.Background(), &runtimeapi.GetEventsRequest{})
 	if err != nil {
 		klog.ErrorS(err, "GetContainerEvents failed to get streaming client")
 		return err
 	}
 
-	// The connection is successfully established and we have a streaming client ready for use.
-	metrics.EventedPLEGConn.Inc()
+	if connectionEstablishedCallback != nil {
+		// The connection is successfully established and we have a streaming client ready for use.
+		connectionEstablishedCallback(containerEventsStreamingClient)
+	}
 
 	for {
 		resp, err := containerEventsStreamingClient.Recv()

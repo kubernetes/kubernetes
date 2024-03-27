@@ -1209,6 +1209,8 @@ gopkg.in/yaml.v3
 ## explicit; go 1.22.0
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
 ## explicit; go 1.22.0
+# k8s.io/cri v0.0.0 => ./staging/src/k8s.io/cri
+## explicit; go 1.22.0
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 ## explicit; go 1.22.0
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib

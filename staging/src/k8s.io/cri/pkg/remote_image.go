@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remote
+package cri
 
 import (
 	"context"
@@ -29,14 +29,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	tracing "k8s.io/component-base/tracing"
+	"k8s.io/cri/pkg/util"
 	"k8s.io/klog/v2"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // remoteImageService is a gRPC implementation of internalapi.ImageManagerService.
@@ -61,7 +59,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if tp != nil {
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithPropagators(tracing.Propagators()),
 			otelgrpc.WithTracerProvider(tp),

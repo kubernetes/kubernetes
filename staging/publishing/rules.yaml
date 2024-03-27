@@ -1452,6 +1452,14 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-proxy
   library: true
+- destination: cri
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/cri-api
+  library: true
 - destination: cri-api
   branches:
   - name: master
