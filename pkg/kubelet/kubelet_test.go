@@ -311,7 +311,7 @@ func newTestKubeletWithImageList(
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, oteltrace.NewNoopTracerProvider())
+	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, oteltrace.NewNoopTracerProvider(), kubelet.updateNodeCondition(v1.NodeImageGCRunning))
 	assert.NoError(t, err)
 	kubelet.imageManager = &fakeImageGCManager{
 		fakeImageService: fakeRuntime,

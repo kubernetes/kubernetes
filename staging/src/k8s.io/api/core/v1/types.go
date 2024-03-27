@@ -6017,6 +6017,8 @@ const (
 	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeImageGCRunning means that image GC is triggered on the node.
+	NodeImageGCRunning NodeConditionType = "ImageGCRunning"
 )
 
 // NodeCondition contains condition information for a node.

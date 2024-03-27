@@ -45,13 +45,17 @@ var sandboxImage = "registry.k8s.io/pause-amd64:latest"
 
 func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provider) (*realImageGCManager, *containertest.FakeRuntime) {
 	fakeRuntime := &containertest.FakeRuntime{}
+	fakeUpdateImageGCRunningCondition := func(status bool, reason, message string) error {
+		return nil
+	}
 	return &realImageGCManager{
-		runtime:       fakeRuntime,
-		policy:        policy,
-		imageRecords:  make(map[string]*imageRecord),
-		statsProvider: mockStatsProvider,
-		recorder:      &record.FakeRecorder{},
-		tracer:        oteltrace.NewNoopTracerProvider().Tracer(""),
+		runtime:                       fakeRuntime,
+		policy:                        policy,
+		imageRecords:                  make(map[string]*imageRecord),
+		statsProvider:                 mockStatsProvider,
+		recorder:                      &record.FakeRecorder{},
+		tracer:                        oteltrace.NewNoopTracerProvider().Tracer(""),
+		updateImageGCRunningCondition: fakeUpdateImageGCRunningCondition,
 	}, fakeRuntime
 }
 
@@ -949,7 +953,7 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, oteltrace.NewNoopTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, oteltrace.NewNoopTracerProvider(), nil); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
