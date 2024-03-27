@@ -18,7 +18,6 @@ package nodeports
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -182,8 +181,11 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, framework.ErrNotFound))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	if wantStatus.Code() != gotStatus.Code() {
+		t.Error("Filter: status does not match")
+	}
+	if wantStatus.AsError().Error() != gotStatus.AsError().Error() {
+		t.Error("Filter: status does not match")
 	}
 }
 
@@ -204,7 +206,8 @@ func TestGetContainerPorts(t *testing.T) {
 					ContainerPort: 8002,
 					HostPort:      8002,
 					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
+				},
+			}).ContainerPort([]v1.ContainerPort{
 				{
 					ContainerPort: 8003,
 					HostPort:      8003,
@@ -214,7 +217,8 @@ func TestGetContainerPorts(t *testing.T) {
 					ContainerPort: 8004,
 					HostPort:      8004,
 					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
+				},
+			}).ContainerPort([]v1.ContainerPort{
 				{
 					ContainerPort: 8005,
 					Protocol:      v1.ProtocolTCP,
@@ -230,7 +234,8 @@ func TestGetContainerPorts(t *testing.T) {
 					ContainerPort: 8012,
 					HostPort:      8012,
 					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
+				},
+			}).ContainerPort([]v1.ContainerPort{
 				{
 					ContainerPort: 8013,
 					HostPort:      8013,
@@ -240,7 +245,8 @@ func TestGetContainerPorts(t *testing.T) {
 					ContainerPort: 8014,
 					HostPort:      8014,
 					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
+				},
+			}).ContainerPort([]v1.ContainerPort{
 				{
 					ContainerPort: 8015,
 					Protocol:      v1.ProtocolTCP,

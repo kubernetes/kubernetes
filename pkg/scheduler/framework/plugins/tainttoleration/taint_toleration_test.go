@@ -18,9 +18,9 @@ package tainttoleration
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -209,10 +209,10 @@ func TestTaintTolerationScore(t *testing.T) {
 		},
 		{
 			name: "Default behaviour No taints and tolerations, lands on node with no taints",
-			//pod without tolerations
+			// pod without tolerations
 			pod: podWithTolerations("pod1", []v1.Toleration{}),
 			nodes: []*v1.Node{
-				//Node without taints
+				// Node without taints
 				nodeWithTaints("nodeA", []v1.Taint{}),
 				nodeWithTaints("nodeB", []v1.Taint{
 					{
@@ -261,8 +261,8 @@ func TestTaintTolerationScore(t *testing.T) {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("unexpected status (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -347,8 +347,8 @@ func TestTaintTolerationFilter(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("status mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

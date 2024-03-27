@@ -18,10 +18,11 @@ package scheduler
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -364,9 +365,8 @@ func TestSchedulerWithExtenders(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 					return
 				}
-
-				if !reflect.DeepEqual(result, test.expectedResult) {
-					t.Errorf("Expected: %+v, Saw: %+v", test.expectedResult, result)
+				if diff := cmp.Diff(test.expectedResult, result, cmpopts.EquateComparable(ScheduleResult{})); diff != "" {
+					t.Errorf("Unexpected result (-want +got):\n%s", diff)
 				}
 			}
 		})
@@ -480,8 +480,9 @@ func TestConvertToMetaVictims(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := convertToMetaVictims(tt.nodeNameToVictims); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertToMetaVictims() = %v, want %v", got, tt.want)
+			got := convertToMetaVictims(tt.nodeNameToVictims)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("convertToMetaVictims() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -562,8 +563,8 @@ func TestConvertToVictims(t *testing.T) {
 				t.Errorf("convertToVictims() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertToVictims() got = %v, want %v", got, tt.want)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("convertToVictims() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
