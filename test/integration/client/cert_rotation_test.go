@@ -42,11 +42,11 @@ import (
 )
 
 func TestCertRotation(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	stopCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	transport.CertCallbackRefreshDuration = 1 * time.Second
-	transport.DialerStopCh = stopCh
+	transport.ControllerStopCtx = stopCtx
 
 	certDir := os.TempDir()
 	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
@@ -100,11 +100,11 @@ func TestCertRotation(t *testing.T) {
 }
 
 func TestCertRotationContinuousRequests(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	stopCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	transport.CertCallbackRefreshDuration = 1 * time.Second
-	transport.DialerStopCh = stopCh
+	transport.ControllerStopCtx = stopCtx
 
 	certDir := os.TempDir()
 	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)

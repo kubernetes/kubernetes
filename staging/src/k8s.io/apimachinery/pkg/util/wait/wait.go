@@ -39,6 +39,9 @@ var ForeverTestTimeout = time.Second * 30
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
 
+// NeverStopCtx may be passed to functions to make it never stop.
+var NeverStopCtx context.Context = context.Background()
+
 // Group allows to start a group of goroutines and wait for their completion.
 type Group struct {
 	wg sync.WaitGroup

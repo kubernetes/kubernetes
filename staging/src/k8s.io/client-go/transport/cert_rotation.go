@@ -18,6 +18,7 @@ package transport
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"reflect"
@@ -129,22 +130,25 @@ func byteMatrixEqual(left, right [][]byte) bool {
 	return true
 }
 
-// run starts the controller and blocks until stopCh is closed.
-func (c *dynamicClientCert) Run(stopCh <-chan struct{}) {
+// run starts the controller and blocks until stopCtx expires or is canceled.
+func (c *dynamicClientCert) Run(stopCtx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.V(3).Infof("Starting client certificate rotation controller")
 	defer klog.V(3).Infof("Shutting down client certificate rotation controller")
 
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.Until(c.runWorker, time.Second, stopCtx.Done())
 
-	go wait.PollImmediateUntil(CertCallbackRefreshDuration, func() (bool, error) {
-		c.queue.Add(workItemKey)
-		return false, nil
-	}, stopCh)
+	go func() {
+		err := wait.PollUntilContextCancel(stopCtx, CertCallbackRefreshDuration, true, func(_ context.Context) (bool, error) {
+			c.queue.Add(workItemKey)
+			return false, nil
+		})
+		klog.V(3).InfoS("Queue add function for the client certificate rotation controller has completed", "err", err)
+	}()
 
-	<-stopCh
+	<-stopCtx.Done()
 }
 
 func (c *dynamicClientCert) runWorker() {

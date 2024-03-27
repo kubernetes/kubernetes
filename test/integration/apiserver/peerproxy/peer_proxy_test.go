@@ -54,7 +54,7 @@ func TestPeerProxiedRequest(t *testing.T) {
 	t.Cleanup(cancel)
 
 	// ensure to stop cert reloading after shutdown
-	transport.DialerStopCh = ctx.Done()
+	transport.ControllerStopCtx = ctx
 
 	// enable feature flags
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
@@ -115,7 +115,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	t.Cleanup(cancel)
 
 	// ensure to stop cert reloading after shutdown
-	transport.DialerStopCh = ctx.Done()
+	transport.ControllerStopCtx = ctx
 
 	// enable feature flags
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
