@@ -603,7 +603,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validation.ValidateKubeletConfiguration(tc.configure(successConfig.DeepCopy()), featureGate)
+			cfg := tc.configure(successConfig.DeepCopy())
+			if err := cfg.Mutate(); err != nil {
+				t.Errorf("mutate error: %s", err)
+			}
+			errs := validation.ValidateKubeletConfiguration(cfg, featureGate)
 
 			if len(tc.errMsg) == 0 {
 				if errs != nil {
