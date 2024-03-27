@@ -507,6 +507,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.PodAffinityTerm":                                                                    schema_k8sio_api_core_v1_PodAffinityTerm(ref),
 		"k8s.io/api/core/v1.PodAntiAffinity":                                                                    schema_k8sio_api_core_v1_PodAntiAffinity(ref),
 		"k8s.io/api/core/v1.PodAttachOptions":                                                                   schema_k8sio_api_core_v1_PodAttachOptions(ref),
+		"k8s.io/api/core/v1.PodCheckpointOptions":                                                               schema_k8sio_api_core_v1_PodCheckpointOptions(ref),
 		"k8s.io/api/core/v1.PodCondition":                                                                       schema_k8sio_api_core_v1_PodCondition(ref),
 		"k8s.io/api/core/v1.PodDNSConfig":                                                                       schema_k8sio_api_core_v1_PodDNSConfig(ref),
 		"k8s.io/api/core/v1.PodDNSConfigOption":                                                                 schema_k8sio_api_core_v1_PodDNSConfigOption(ref),
@@ -26410,6 +26411,40 @@ func schema_k8sio_api_core_v1_PodAttachOptions(ref common.ReferenceCallback) com
 					"container": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The container in which to execute the command. Defaults to only container if there is only one container in the pod.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_PodCheckpointOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCheckpointOptions is the query options to checkpoint a container",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"container": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Container which to checkpoint Defaults to the only container if there is only one container in the pod.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

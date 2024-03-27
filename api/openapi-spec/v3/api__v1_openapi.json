@@ -16512,6 +16512,67 @@
         }
       }
     },
+    "/api/v1/namespaces/{namespace}/pods/{name}/checkpoint": {
+      "parameters": [
+        {
+          "description": "Container which to checkpoint Defaults to the only container if there is only one container in the pod.",
+          "in": "query",
+          "name": "container",
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "name of the PodCheckpointOptions",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "object name and auth scope, such as for teams and projects",
+          "in": "path",
+          "name": "namespace",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        }
+      ],
+      "post": {
+        "description": "connect POST requests to checkpoint of Pod",
+        "operationId": "connectCoreV1PostNamespacedPodCheckpoint",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "connect",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "PodCheckpointOptions",
+          "version": "v1"
+        }
+      }
+    },
     "/api/v1/namespaces/{namespace}/pods/{name}/ephemeralcontainers": {
       "get": {
         "description": "read ephemeralcontainers of the specified Pod",

@@ -693,6 +693,100 @@ func TestPortForwardLocation(t *testing.T) {
 	}
 }
 
+func TestCheckpointLocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	tcs := []struct {
+		in          *api.Pod
+		info        *client.ConnectionInfo
+		opts        *api.PodCheckpointOptions
+		expectedErr error
+		expectedURL *url.URL
+	}{
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{},
+			},
+			opts:        &api.PodCheckpointOptions{},
+			expectedErr: errors.NewBadRequest("a container name must be specified for pod "),
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			opts:        &api.PodCheckpointOptions{},
+			expectedErr: errors.NewBadRequest("pod test does not have a host assigned"),
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+					Containers: []api.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			opts:        &api.PodCheckpointOptions{},
+			expectedURL: &url.URL{Host: ":", Path: "/checkpoint/ns/pod1/container1"},
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			opts:        &api.PodCheckpointOptions{Container: "container2"},
+			expectedURL: &url.URL{Host: ":", Path: "/checkpoint/ns/pod1/container2"},
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			opts:        &api.PodCheckpointOptions{Container: "container3"},
+			expectedErr: errors.NewBadRequest("container container3 is not valid for pod pod1"),
+		},
+	}
+	for _, tc := range tcs {
+		getter := &mockPodGetter{tc.in}
+		connectionGetter := &mockConnectionInfoGetter{tc.info}
+		loc, _, err := CheckpointLocation(ctx, getter, connectionGetter, "test", tc.opts)
+		if !reflect.DeepEqual(err, tc.expectedErr) {
+			t.Errorf("expected %v, got %v", tc.expectedErr, err)
+		}
+		if !reflect.DeepEqual(loc, tc.expectedURL) {
+			t.Errorf("expected %v, got %v", tc.expectedURL, loc)
+		}
+	}
+}
+
 func TestGetPodIP(t *testing.T) {
 	testCases := []struct {
 		name       string

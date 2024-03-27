@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
+	"k8s.io/kubectl/pkg/cmd/checkpoint"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -33,6 +34,10 @@ func NewCmdAlpha(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.C
 		Short: i18n.T("Commands for features in alpha"),
 		Long:  templates.LongDesc(i18n.T("These commands correspond to alpha features that are not enabled in Kubernetes clusters by default.")),
 	}
+
+	// Alpha commands should be added here. As features graduate from alpha they should move
+	// from here to the CommandGroups defined by NewKubeletCommand() in cmd.go.
+	cmd.AddCommand(checkpoint.NewCmdCheckpoint(f, streams))
 
 	// NewKubeletCommand() will hide the alpha command if it has no subcommands. Overriding
 	// the help function ensures a reasonable message if someone types the hidden command anyway.

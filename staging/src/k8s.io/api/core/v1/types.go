@@ -6453,6 +6453,19 @@ type PodPortForwardOptions struct {
 	Ports []int32 `json:"ports,omitempty" protobuf:"varint,1,rep,name=ports"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:conversion-gen:explicit-from=net/url.Values
+
+// PodCheckpointOptions is the query options to checkpoint a container
+type PodCheckpointOptions struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Container which to checkpoint
+	// Defaults to the only container if there is only one container in the pod.
+	// +optional
+	Container string `json:"container,omitempty" protobuf:"bytes,1,opt,name=container"`
+}
+
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
