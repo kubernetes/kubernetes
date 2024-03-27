@@ -208,7 +208,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 // assertCleanup asserts that cleanup of a namespace wrt selectors occurred.
 func assertCleanup(ns string, selectors ...string) {
 	var e error
-	verifyCleanupFunc := func() (bool, error) {
+	verifyCleanupFunc := func(ctx context.Context) (bool, error) {
 		e = nil
 		for _, selector := range selectors {
 			resources := e2ekubectl.RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers")
@@ -224,7 +224,7 @@ func assertCleanup(ns string, selectors ...string) {
 		}
 		return true, nil
 	}
-	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
+	err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 1*time.Minute, true, verifyCleanupFunc)
 	if err != nil {
 		framework.Failf(e.Error())
 	}
@@ -1494,13 +1494,14 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, cronjobYaml, "create", "-f", "-")
 
 			ginkgo.By("waiting for cronjob to start.")
-			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				cj, err := c.BatchV1().CronJobs(ns).List(ctx, metav1.ListOptions{})
-				if err != nil {
-					return false, fmt.Errorf("Failed getting CronJob %s: %w", ns, err)
-				}
-				return len(cj.Items) > 0, nil
-			})
+			err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true,
+				func(ctx context.Context) (bool, error) {
+					cj, err := c.BatchV1().CronJobs(ns).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return false, fmt.Errorf("Failed getting CronJob %s: %w", ns, err)
+					}
+					return len(cj.Items) > 0, nil
+				})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("verifying kubectl describe prints")
@@ -2173,16 +2174,17 @@ func checkOutput(output string, required [][]string) {
 
 func checkKubectlOutputWithRetry(namespace string, required [][]string, args ...string) {
 	var pollErr error
-	wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		output := e2ekubectl.RunKubectlOrDie(namespace, args...)
-		err := checkOutputReturnError(output, required)
-		if err != nil {
-			pollErr = err
-			return false, nil
-		}
-		pollErr = nil
-		return true, nil
-	})
+	_ = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			output := e2ekubectl.RunKubectlOrDie(namespace, args...)
+			err := checkOutputReturnError(output, required)
+			if err != nil {
+				pollErr = err
+				return false, nil
+			}
+			pollErr = nil
+			return true, nil
+		})
 	if pollErr != nil {
 		framework.Failf("%v", pollErr)
 	}
