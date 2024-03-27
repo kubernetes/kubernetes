@@ -23,6 +23,8 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"k8s.io/apiserver/pkg/authentication/user"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	tracing "k8s.io/component-base/tracing"
 )
 
@@ -30,7 +32,7 @@ import (
 func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 	opts := []otelhttp.Option{
 		otelhttp.WithPropagators(tracing.Propagators()),
-		otelhttp.WithPublicEndpoint(),
+		otelhttp.WithPublicEndpointFn(notSystemPrivilegedGroup),
 		otelhttp.WithTracerProvider(tp),
 	}
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,4 +46,15 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 	// With Noop TracerProvider, the otelhttp still handles context propagation.
 	// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 	return otelhttp.NewHandler(wrappedHandler, "KubernetesAPI", opts...)
+}
+
+func notSystemPrivilegedGroup(req *http.Request) bool {
+	if u, ok := genericapirequest.UserFrom(req.Context()); ok {
+		for _, group := range u.GetGroups() {
+			if group == user.SystemPrivilegedGroup {
+				return false
+			}
+		}
+	}
+	return true
 }
