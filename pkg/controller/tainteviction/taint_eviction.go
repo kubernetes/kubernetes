@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,13 +41,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
-	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
 const (
@@ -59,6 +58,9 @@ const (
 	UpdateWorkerSize     = 8
 	podUpdateChannelSize = 1
 	retries              = 5
+
+	// fieldManager used to add pod disruption condition when evicting pods due to NoExecute taint
+	fieldManager = "TaintEviction"
 )
 
 type nodeUpdateItem struct {
@@ -134,17 +136,16 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, 
 		if err != nil {
 			return err
 		}
-		newStatus := pod.Status.DeepCopy()
-		updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
-			Type:    v1.DisruptionTarget,
-			Status:  v1.ConditionTrue,
-			Reason:  "DeletionByTaintManager",
-			Message: "Taint manager: deleting due to NoExecute taint",
-		})
-		if updated {
-			if _, _, _, err := utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
-				return err
-			}
+		podApply := corev1apply.Pod(pod.Name, pod.Namespace).WithStatus(corev1apply.PodStatus())
+		podApply.Status.WithConditions(corev1apply.PodCondition().
+			WithType(v1.DisruptionTarget).
+			WithStatus(v1.ConditionTrue).
+			WithReason("DeletionByTaintManager").
+			WithMessage("Taint manager: deleting due to NoExecute taint").
+			WithLastTransitionTime(metav1.Now()),
+		)
+		if _, err := c.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+			return err
 		}
 	}
 	return c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
