@@ -152,12 +152,18 @@ func (c *FakeDeployments) Apply(ctx context.Context, deployment *appsv1beta1.Dep
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := deployment.Name
 	if name == nil {
 		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Deployment{})
+		Invokes(testing.NewApplySubresourceAction(deploymentsResource, c.ns, *name, data, manager, opts.Force), &v1beta1.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeDeployments) ApplyStatus(ctx context.Context, deployment *appsv1bet
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := deployment.Name
 	if name == nil {
 		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta1.Deployment{})
+		Invokes(testing.NewApplySubresourceAction(deploymentsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1beta1.Deployment{})
 
 	if obj == nil {
 		return nil, err

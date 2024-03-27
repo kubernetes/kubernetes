@@ -152,12 +152,18 @@ func (c *FakePodSchedulingContexts) Apply(ctx context.Context, podSchedulingCont
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := podSchedulingContext.Name
 	if name == nil {
 		return nil, fmt.Errorf("podSchedulingContext.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podschedulingcontextsResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha2.PodSchedulingContext{})
+		Invokes(testing.NewApplySubresourceAction(podschedulingcontextsResource, c.ns, *name, data, manager, opts.Force), &v1alpha2.PodSchedulingContext{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakePodSchedulingContexts) ApplyStatus(ctx context.Context, podScheduli
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := podSchedulingContext.Name
 	if name == nil {
 		return nil, fmt.Errorf("podSchedulingContext.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podschedulingcontextsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1alpha2.PodSchedulingContext{})
+		Invokes(testing.NewApplySubresourceAction(podschedulingcontextsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1alpha2.PodSchedulingContext{})
 
 	if obj == nil {
 		return nil, err

@@ -132,12 +132,18 @@ func (c *FakeClusterTrustBundles) Apply(ctx context.Context, clusterTrustBundle 
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := clusterTrustBundle.Name
 	if name == nil {
 		return nil, fmt.Errorf("clusterTrustBundle.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertrustbundlesResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterTrustBundle{})
+		Invokes(testing.NewRootApplySubresourceAction(clustertrustbundlesResource, *name, data, manager, opts.Force), &v1alpha1.ClusterTrustBundle{})
 	if obj == nil {
 		return nil, err
 	}

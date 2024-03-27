@@ -132,12 +132,18 @@ func (c *FakeIPAddresses) Apply(ctx context.Context, iPAddress *networkingv1alph
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := iPAddress.Name
 	if name == nil {
 		return nil, fmt.Errorf("iPAddress.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ipaddressesResource, *name, types.ApplyPatchType, data), &v1alpha1.IPAddress{})
+		Invokes(testing.NewRootApplySubresourceAction(ipaddressesResource, *name, data, manager, opts.Force), &v1alpha1.IPAddress{})
 	if obj == nil {
 		return nil, err
 	}

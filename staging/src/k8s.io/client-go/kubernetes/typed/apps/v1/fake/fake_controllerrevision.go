@@ -140,12 +140,18 @@ func (c *FakeControllerRevisions) Apply(ctx context.Context, controllerRevision 
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := controllerRevision.Name
 	if name == nil {
 		return nil, fmt.Errorf("controllerRevision.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, *name, types.ApplyPatchType, data), &v1.ControllerRevision{})
+		Invokes(testing.NewApplySubresourceAction(controllerrevisionsResource, c.ns, *name, data, manager, opts.Force), &v1.ControllerRevision{})
 
 	if obj == nil {
 		return nil, err

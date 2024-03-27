@@ -132,12 +132,18 @@ func (c *FakePriorityClasses) Apply(ctx context.Context, priorityClass *scheduli
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := priorityClass.Name
 	if name == nil {
 		return nil, fmt.Errorf("priorityClass.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, *name, types.ApplyPatchType, data), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootApplySubresourceAction(priorityclassesResource, *name, data, manager, opts.Force), &v1beta1.PriorityClass{})
 	if obj == nil {
 		return nil, err
 	}

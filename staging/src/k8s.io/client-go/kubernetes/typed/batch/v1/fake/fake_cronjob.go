@@ -152,12 +152,18 @@ func (c *FakeCronJobs) Apply(ctx context.Context, cronJob *batchv1.CronJobApplyC
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := cronJob.Name
 	if name == nil {
 		return nil, fmt.Errorf("cronJob.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, *name, types.ApplyPatchType, data), &v1.CronJob{})
+		Invokes(testing.NewApplySubresourceAction(cronjobsResource, c.ns, *name, data, manager, opts.Force), &v1.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeCronJobs) ApplyStatus(ctx context.Context, cronJob *batchv1.CronJob
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := cronJob.Name
 	if name == nil {
 		return nil, fmt.Errorf("cronJob.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.CronJob{})
+		Invokes(testing.NewApplySubresourceAction(cronjobsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1.CronJob{})
 
 	if obj == nil {
 		return nil, err

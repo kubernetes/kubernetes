@@ -132,12 +132,18 @@ func (c *FakeResourceClasses) Apply(ctx context.Context, resourceClass *resource
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := resourceClass.Name
 	if name == nil {
 		return nil, fmt.Errorf("resourceClass.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourceclassesResource, *name, types.ApplyPatchType, data), &v1alpha2.ResourceClass{})
+		Invokes(testing.NewRootApplySubresourceAction(resourceclassesResource, *name, data, manager, opts.Force), &v1alpha2.ResourceClass{})
 	if obj == nil {
 		return nil, err
 	}
