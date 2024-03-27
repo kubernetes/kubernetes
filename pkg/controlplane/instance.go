@@ -677,9 +677,8 @@ type RESTStorageProvider interface {
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	nonLegacy := []*genericapiserver.APIGroupInfo{}
-
 	// used later in the loop to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*m.GenericAPIServer.Version)
+	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(m.GenericAPIServer.EffectiveVersion.EmulationVersion())
 	if err != nil {
 		return err
 	}

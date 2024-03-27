@@ -27,6 +27,8 @@ import (
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -98,19 +100,20 @@ type CompletedOptions struct {
 // NewOptions creates a new ServerRunOptions object with default parameters
 func NewOptions() *Options {
 	s := Options{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:                    genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
-		SecureServing:           kubeoptions.NewSecureServingOptions(),
-		Audit:                   genericoptions.NewAuditOptions(),
-		Features:                genericoptions.NewFeatureOptions(),
-		Admission:               kubeoptions.NewAdmissionOptions(),
-		Authentication:          kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
-		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
-		EgressSelector:          genericoptions.NewEgressSelectorOptions(),
-		Metrics:                 metrics.NewOptions(),
-		Logs:                    logs.NewOptions(),
-		Traces:                  genericoptions.NewTracingOptions(),
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(utilfeature.DefaultMutableFeatureGate,
+			utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrDefault(utilversion.ComponentGenericAPIServer)),
+		Etcd:           genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
+		SecureServing:  kubeoptions.NewSecureServingOptions(),
+		Audit:          genericoptions.NewAuditOptions(),
+		Features:       genericoptions.NewFeatureOptions(),
+		Admission:      kubeoptions.NewAdmissionOptions(),
+		Authentication: kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:  kubeoptions.NewBuiltInAuthorizationOptions(),
+		APIEnablement:  genericoptions.NewAPIEnablementOptions(),
+		EgressSelector: genericoptions.NewEgressSelectorOptions(),
+		Metrics:        metrics.NewOptions(),
+		Logs:           logs.NewOptions(),
+		Traces:         genericoptions.NewTracingOptions(),
 
 		EnableLogsHandler:                   true,
 		EventTTL:                            1 * time.Hour,
@@ -197,6 +200,11 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 
 	completed := completedOptions{
 		Options: *o,
+	}
+
+	// set feature gate emulation version first.
+	if err := completed.GenericServerRunOptions.Complete(); err != nil {
+		return CompletedOptions{}, err
 	}
 
 	// set defaults

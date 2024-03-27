@@ -100,6 +100,7 @@ func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error 
 func (s *Options) Validate() []error {
 	var errs []error
 
+	errs = append(errs, s.GenericServerRunOptions.Validate()...)
 	errs = append(errs, s.Etcd.Validate()...)
 	errs = append(errs, validateAPIPriorityAndFairness(s)...)
 	errs = append(errs, s.SecureServing.Validate()...)

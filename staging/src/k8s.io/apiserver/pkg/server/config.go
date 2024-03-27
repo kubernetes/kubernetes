@@ -70,6 +70,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
@@ -148,7 +149,8 @@ type Config struct {
 	PostStartHooks map[string]PostStartHookConfigEntry
 
 	// Version will enable the /version endpoint if non-nil
-	Version *version.Info
+	Version          *version.Info
+	EffectiveVersion utilversion.EffectiveVersion
 	// AuditBackend is where audit events are sent to.
 	AuditBackend audit.Backend
 	// AuditPolicyRuleEvaluator makes the decision of whether and how to audit log a request.
@@ -819,7 +821,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
 
-		Version: c.Version,
+		Version:          c.Version,
+		EffectiveVersion: c.EffectiveVersion,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}

@@ -36,9 +36,11 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/webhook"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/listers/core/v1"
@@ -60,7 +62,10 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(
+			utilfeature.DefaultMutableFeatureGate,
+			utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrDefault(utilversion.ComponentGenericAPIServer),
+		),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
@@ -92,7 +97,7 @@ func (o CustomResourceDefinitionsServerOptions) Validate() error {
 
 // Complete fills in missing options.
 func (o *CustomResourceDefinitionsServerOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // Config returns an apiextensions-apiserver configuration.
@@ -114,6 +119,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	}
 
 	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions), openapinamer.NewDefinitionNamer(apiserver.Scheme, scheme.Scheme))
+	serverConfig.EffectiveVersion = o.ServerRunOptions.EffectiveVersion
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
