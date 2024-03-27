@@ -424,10 +424,13 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-ips { 192.168.99.33 . tcp . 80 : goto external-LAUZTJTB-ns4/svc4/tcp/p80 }
 
 		# svc5
-		add set ip kube-proxy affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 { type ipv4_addr ; flags dynamic,timeout ; timeout 10800s ; }
+		add map ip kube-proxy affinityMapToEP-HVFWP5L3-ns5/svc5/tcp/p80 { type ipv4_addr : ipv4_addr ; flags dynamic,timeout ; timeout 10800s ; comment "map to store known source IPs mapped to respective endpoint IPs" ; }
+		add map ip kube-proxy affinityGotoChain-HVFWP5L3-ns5/svc5/tcp/p80 { type ipv4_addr : verdict ; flags dynamic ; comment "vmap between endpoint IPs and their coresponding endpoint chains" ; }
 		add chain ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80
 		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip daddr 172.30.0.45 tcp dport 80 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip saddr @affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 goto endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
+		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip daddr set ip saddr map @affinityMapToEP-HVFWP5L3-ns5/svc5/tcp/p80
+		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip daddr vmap @affinityGotoChain-HVFWP5L3-ns5/svc5/tcp/p80
+		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip daddr != 172.30.0.45 delete @affinityMapToEP-HVFWP5L3-ns5/svc5/tcp/p80 { ip saddr :  ip daddr }
 		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 }
 		add chain ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80
 		add rule ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 jump mark-for-masquerade
@@ -435,7 +438,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 		add chain ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 ip saddr 10.180.0.3 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 update @affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 { ip saddr }
+		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 update @affinityMapToEP-HVFWP5L3-ns5/svc5/tcp/p80 { ip saddr :  10.180.0.3 }
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 meta l4proto tcp dnat to 10.180.0.3:80
 
 		add chain ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80
@@ -446,6 +449,8 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-ips { 5.6.7.8 . tcp . 80 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3002 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 comment "ns5/svc5:p80" : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
+
+		add element ip kube-proxy affinityGotoChain-HVFWP5L3-ns5/svc5/tcp/p80 { 10.180.0.3 : goto endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 }
 
 		# svc6
 		add element ip kube-proxy cluster-ips { 172.30.0.46 }
