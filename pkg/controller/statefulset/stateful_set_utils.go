@@ -332,7 +332,7 @@ func removeOwnerRef(target, owner metav1.Object) bool {
 }
 
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
-// returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
+// returned PersistentVolumeClaims are each constructed with a name specific to the Pod. This name is determined
 // by getPersistentVolumeClaimName.
 func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1.PersistentVolumeClaim {
 	ordinal := getOrdinal(pod)

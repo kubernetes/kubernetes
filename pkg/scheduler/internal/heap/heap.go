@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Below is the implementation of the a heap. The logic is pretty much the same
+// Below is the implementation of a heap. The logic is pretty much the same
 // as cache.heap, however, this heap does not perform synchronization. It leaves
 // synchronization to the SchedulingQueue.
 
