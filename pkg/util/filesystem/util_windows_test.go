@@ -34,7 +34,6 @@ import (
 
 func TestIsUnixDomainSocketPipe(t *testing.T) {
 	generatePipeName := func(suffixLen int) string {
-		rand.Seed(time.Now().UnixNano())
 		letter := []rune("abcdef0123456789")
 		b := make([]rune, suffixLen)
 		for i := range b {
