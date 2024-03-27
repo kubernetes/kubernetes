@@ -24,6 +24,6 @@ import (
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
-func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
+func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration, warningf func(string, ...interface{})) error {
 	return nil
 }

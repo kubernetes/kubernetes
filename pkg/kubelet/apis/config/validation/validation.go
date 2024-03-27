@@ -42,8 +42,11 @@ var (
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
-func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
+func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate, warningf func(string, ...interface{})) error {
 	allErrors := []error{}
+	if warningf == nil {
+		warningf = func(string, ...interface{}) {}
+	}
 
 	// Make a local copy of the feature gates and combine it with the gates set by this configuration.
 	// This allows us to validate the config against the set of gates it will actually run against.
@@ -245,7 +248,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 	allErrors = append(allErrors, validateReservedMemoryConfiguration(kc)...)
 
-	if err := validateKubeletOSConfiguration(kc); err != nil {
+	if err := validateKubeletOSConfiguration(kc, warningf); err != nil {
 		allErrors = append(allErrors, err)
 	}
 	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
