@@ -173,3 +173,51 @@ func TestNotSupported(t *testing.T) {
 		t.Errorf("Expected: %s\n, but got: %s\n", expected, notSupported.ErrorBody())
 	}
 }
+
+func TestIncompatibleSpecification(t *testing.T) {
+	incompatibleSpecification := IncompatibleSpecification(NewPath("f"), NewPath("o"), "v")
+	expected := `Invalid value: "v": may not specify o`
+	if incompatibleSpecification.ErrorBody() != expected {
+		t.Errorf("Expected: %s\n, but got: %s\n", expected, incompatibleSpecification.ErrorBody())
+	}
+}
+
+func TestIncompatibleWith(t *testing.T) {
+	incompatibleWith := IncompatibleWith(NewPath("f"), NewPath("o"), "v")
+	expected := `Invalid value: "v": may not be specified when o is specified`
+	if incompatibleWith.ErrorBody() != expected {
+		t.Errorf("Expected: %s\n, but got: %s\n", expected, incompatibleWith.ErrorBody())
+	}
+}
+
+func TestIncompatibleWithValue(t *testing.T) {
+	incompatibleWithValue := IncompatibleWithValue(NewPath("f"), NewPath("o"), "v", "specified")
+	expected := `Invalid value: "v": may not be specified when o is specified`
+	if incompatibleWithValue.ErrorBody() != expected {
+		t.Errorf("Expected: %s\n, but got: %s\n", expected, incompatibleWithValue.ErrorBody())
+	}
+}
+
+func TestDependsOn(t *testing.T) {
+	dependsOn := DependsOn(NewPath("f"), NewPath("o"), "v")
+	expected := `Invalid value: "v": may only be specified when o is specified`
+	if dependsOn.ErrorBody() != expected {
+		t.Errorf("Expected: %s\n, but got: %s\n", expected, dependsOn.ErrorBody())
+	}
+}
+
+func TestDependsOnValue(t *testing.T) {
+	dependsOnValue := DependsOnValue(NewPath("f"), NewPath("o"), "v", "l")
+	expected := `Invalid value: "v": may only be specified when o is l`
+	if dependsOnValue.ErrorBody() != expected {
+		t.Errorf("Expected: %s\n, but got: %s\n", expected, dependsOnValue.ErrorBody())
+	}
+}
+
+func TestRequiredWhenValue(t *testing.T) {
+	requiredWhenValue := RequiredWhenValue(NewPath("f"), NewPath("o"), "v")
+	expected := `Required value: must be specified when o is v`
+	if requiredWhenValue.ErrorBody() != expected {
+		t.Errorf("Expected: %s\n, but got: %s\n", expected, requiredWhenValue.ErrorBody())
+	}
+}
