@@ -1181,6 +1181,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 }
 
 func TestPrintPod(t *testing.T) {
+	deleteTime := metav1.NewTime(time.Now().Add(-10 * time.Second))
 	tests := []struct {
 		pod    api.Pod
 		expect []metav1.TableRow
@@ -1523,6 +1524,60 @@ func TestPrintPod(t *testing.T) {
 				},
 			},
 			[]metav1.TableRow{{Cells: []interface{}{"test15", "0/2", apiv1.PodReasonSchedulingGated, "0", "<unknown>"}}},
+		},
+		{
+			// Test pod condition succeed
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test16"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: api.PodSucceeded,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:        false,
+							RestartCount: 0,
+							State:        api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Conditions: podSuccessConditions, Cells: []interface{}{"test16", "0/1", "Completed", "0", "<unknown>"}}},
+		},
+		{
+			// Test pod condition failed
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test17"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: api.PodFailed,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:        false,
+							RestartCount: 0,
+							State:        api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 1}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Conditions: podFailedConditions, Cells: []interface{}{"test17", "0/1", "Error", "0", "<unknown>"}}},
+		},
+		{
+			// Test pod condition succeed with deletion
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test18", DeletionTimestamp: &deleteTime},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: api.PodSucceeded,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:        false,
+							RestartCount: 0,
+							State:        api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Conditions: podSuccessConditions, Cells: []interface{}{"test18", "0/1", string(api.PodSucceeded), "0", "<unknown>"}}},
 		},
 	}
 
