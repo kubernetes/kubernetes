@@ -89,8 +89,7 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // SerializeObject renders an object in the content type negotiated by the client using the provided encoder.
 // The context is optional and can be nil. This method will perform optional content compression if requested by
 // a client and the feature gate for APIResponseCompression is enabled.
-func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
-	ctx := req.Context()
+func SerializeObject(ctx context.Context, mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	ctx, span := tracing.Start(ctx, "SerializeObject",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("method", req.Method),
@@ -259,7 +258,7 @@ func (w *deferredResponseWriter) Close() error {
 }
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
-func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
+func WriteObjectNegotiated(ctx context.Context, s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
@@ -287,9 +286,9 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 	encoder := s.EncoderForVersion(serializer.Serializer, gv)
 	request.TrackSerializeResponseObjectLatency(req.Context(), func() {
 		if listGVKInContentType {
-			SerializeObject(generateMediaTypeWithGVK(serializer.MediaType, mediaType.Convert), encoder, w, req, statusCode, object)
+			SerializeObject(ctx, generateMediaTypeWithGVK(serializer.MediaType, mediaType.Convert), encoder, w, req, statusCode, object)
 		} else {
-			SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+			SerializeObject(ctx, serializer.MediaType, encoder, w, req, statusCode, object)
 		}
 	})
 }
@@ -326,7 +325,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 		return code
 	}
 
-	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status, false)
+	WriteObjectNegotiated(req.Context(), s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status, false)
 	return code
 }
 

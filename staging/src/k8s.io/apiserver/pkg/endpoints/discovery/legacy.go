@@ -76,5 +76,5 @@ func (s *legacyRootAPIHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 		Versions:                   []string{"v1"},
 	}
 
-	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, resp, req, http.StatusOK, apiVersions, false)
+	responsewriters.WriteObjectNegotiated(req.Context(), s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, resp, req, http.StatusOK, apiVersions, false)
 }

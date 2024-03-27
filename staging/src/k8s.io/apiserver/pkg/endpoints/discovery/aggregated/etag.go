@@ -64,6 +64,7 @@ func ServeHTTPWithETag(
 	}
 
 	responsewriters.WriteObjectNegotiated(
+		req.Context(),
 		serializer,
 		DiscoveryEndpointRestrictions,
 		targetGV,

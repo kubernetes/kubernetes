@@ -554,6 +554,7 @@ func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *ht
 		// Default to normal response in rare case etag is
 		// not cached with the object for some reason.
 		responsewriters.WriteObjectNegotiated(
+			req.Context(),
 			rdm.serializer,
 			DiscoveryEndpointRestrictions,
 			targetGV,
