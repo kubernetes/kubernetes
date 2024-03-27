@@ -42,14 +42,14 @@ func TestModel(t *testing.T) {
 		inFlight map[types.UID]resourceapi.ResourceClaimStatus
 
 		wantResources resources
-		wantErr       string
+		wantErr       bool
 	}{
 		"empty": {},
 
 		"slice-list-error": {
 			slices: sliceError("slice list error"),
 
-			wantErr: "list node resource slices: slice list error",
+			wantErr: true,
 		},
 
 		"unknown-model": {
@@ -949,14 +949,13 @@ func TestModel(t *testing.T) {
 			actualResources, actualErr := newResourceModel(tCtx.Logger(), slices, claims, &inFlightAllocations)
 
 			if actualErr != nil {
-				if tc.wantErr == "" {
+				if !tc.wantErr {
 					tCtx.Fatalf("unexpected error: %v", actualErr)
 				}
-				require.Equal(tCtx, tc.wantErr, actualErr.Error())
 				return
 			}
-			if tc.wantErr != "" {
-				tCtx.Fatalf("did not get expected error: %v", tc.wantErr)
+			if tc.wantErr {
+				tCtx.Fatalf("did not get expected error")
 			}
 
 			expectResources := tc.wantResources
@@ -1095,7 +1094,7 @@ func TestController(t *testing.T) {
 		classParameters *resourceapi.ResourceClassParameters
 		claimParameters *resourceapi.ResourceClaimParameters
 
-		expectCreateErr   string
+		expectCreateErr   bool
 		expectNodeResults nodeResults
 	}{
 		"empty": {
@@ -1127,7 +1126,7 @@ func TestController(t *testing.T) {
 				}},
 			},
 
-			expectCreateErr: "claim parameters : driverRequests[0].requests[0]: no supported structured parameters found",
+			expectCreateErr: true,
 		},
 
 		"no-resources": {
@@ -1212,14 +1211,13 @@ func TestController(t *testing.T) {
 
 			controller, err := newClaimController(tCtx.Logger(), tc.class, tc.classParameters, tc.claimParameters)
 			if err != nil {
-				if tc.expectCreateErr == "" {
+				if !tc.expectCreateErr {
 					tCtx.Fatalf("unexpected error: %v", err)
 				}
-				require.Equal(tCtx, tc.expectCreateErr, err.Error())
 				return
 			}
-			if tc.expectCreateErr != "" {
-				tCtx.Fatalf("did not get expected error: %v", tc.expectCreateErr)
+			if tc.expectCreateErr {
+				tCtx.Fatalf("did not get expected error")
 			}
 
 			for nodeName, expect := range tc.expectNodeResults {

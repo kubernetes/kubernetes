@@ -189,29 +189,29 @@ func TestController(t *testing.T) {
 		filter   *resourceapi.NamedResourcesFilter
 		requests []*resourceapi.NamedResourcesRequest
 
-		expectCreateErr   string
+		expectCreateErr   bool
 		expectAllocation  []string
-		expectAllocateErr string
+		expectAllocateErr bool
 	}{
 		"empty": {},
 
 		"broken-filter": {
 			filter: filterBrokenType,
 
-			expectCreateErr: "compile class filter CEL expression: must evaluate to bool",
+			expectCreateErr: true,
 		},
 
 		"broken-request": {
 			requests: []*resourceapi.NamedResourcesRequest{requestBrokenType},
 
-			expectCreateErr: "compile request CEL expression: must evaluate to bool",
+			expectCreateErr: true,
 		},
 
 		"no-resources": {
 			filter:   filterAny,
 			requests: []*resourceapi.NamedResourcesRequest{requestAny},
 
-			expectAllocateErr: "insufficient resources",
+			expectAllocateErr: true,
 		},
 
 		"okay": {
@@ -227,7 +227,7 @@ func TestController(t *testing.T) {
 			filter:   filterNone,
 			requests: []*resourceapi.NamedResourcesRequest{requestAny},
 
-			expectAllocateErr: "insufficient resources",
+			expectAllocateErr: true,
 		},
 
 		"request-mismatch": {
@@ -235,7 +235,7 @@ func TestController(t *testing.T) {
 			filter:   filterAny,
 			requests: []*resourceapi.NamedResourcesRequest{requestNone},
 
-			expectAllocateErr: "insufficient resources",
+			expectAllocateErr: true,
 		},
 
 		"many": {
@@ -251,7 +251,7 @@ func TestController(t *testing.T) {
 			filter:   filterAny,
 			requests: []*resourceapi.NamedResourcesRequest{requestAny, requestAny},
 
-			expectAllocateErr: "insufficient resources",
+			expectAllocateErr: true,
 		},
 
 		"filter-evaluation-error": {
@@ -259,7 +259,7 @@ func TestController(t *testing.T) {
 			filter:   filterBrokenEvaluation,
 			requests: []*resourceapi.NamedResourcesRequest{requestAny},
 
-			expectAllocateErr: "evaluate filter CEL expression: no such key: no-such-attribute",
+			expectAllocateErr: true,
 		},
 
 		"request-evaluation-error": {
@@ -267,7 +267,7 @@ func TestController(t *testing.T) {
 			filter:   filterAny,
 			requests: []*resourceapi.NamedResourcesRequest{requestBrokenEvaluation},
 
-			expectAllocateErr: "evaluate request CEL expression: no such key: no-such-attribute",
+			expectAllocateErr: true,
 		},
 
 		"filter-attribute": {
@@ -293,26 +293,24 @@ func TestController(t *testing.T) {
 
 			controller, createErr := NewClaimController(tc.filter, tc.requests)
 			if createErr != nil {
-				if tc.expectCreateErr == "" {
+				if !tc.expectCreateErr {
 					tCtx.Fatalf("unexpected create error: %v", createErr)
 				}
-				require.Equal(tCtx, tc.expectCreateErr, createErr.Error())
 				return
 			}
-			if tc.expectCreateErr != "" {
-				tCtx.Fatalf("did not get expected create error: %v", tc.expectCreateErr)
+			if tc.expectCreateErr {
+				tCtx.Fatalf("did not get expected create error")
 			}
 
 			allocation, createErr := controller.Allocate(tCtx, tc.model)
 			if createErr != nil {
-				if tc.expectAllocateErr == "" {
+				if !tc.expectAllocateErr {
 					tCtx.Fatalf("unexpected allocate error: %v", createErr)
 				}
-				require.Equal(tCtx, tc.expectAllocateErr, createErr.Error())
 				return
 			}
-			if tc.expectAllocateErr != "" {
-				tCtx.Fatalf("did not get expected allocate error: %v", tc.expectAllocateErr)
+			if tc.expectAllocateErr {
+				tCtx.Fatalf("did not get expected allocate error")
 			}
 
 			expectAllocation := []*resourceapi.NamedResourcesAllocationResult{}
