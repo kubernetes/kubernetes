@@ -28,11 +28,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/kubernetes/pkg/features"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
@@ -70,7 +67,6 @@ func createRemoteRuntimeServiceWithTracerProvider(endpoint string, tp oteltrace.
 }
 
 func TestGetSpans(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletTracing, true)()
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
 		fakeRuntime.Stop()
