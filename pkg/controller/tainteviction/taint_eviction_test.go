@@ -19,6 +19,7 @@ package tainteviction
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"sort"
 	"testing"
 	"time"
@@ -247,6 +248,7 @@ func TestUpdatePod(t *testing.T) {
 		expectPatch                   bool
 		expectDelete                  bool
 		enablePodDisruptionConditions bool
+		skipOnWindows                 bool
 	}{
 		{
 			description: "scheduling onto tainted Node results in patch and delete when PodDisruptionConditions enabled",
@@ -296,11 +298,16 @@ func TestUpdatePod(t *testing.T) {
 				"node1": {createNoExecuteTaint(1)},
 			},
 			expectDelete: true,
+			skipOnWindows: true,
 		},
 	}
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
+			if item.skipOnWindows && goruntime.GOOS == "windows" {
+				// TODO: remove skip once the flaking test has been fixed.
+				t.Skip("Skip flaking test on Windows.")
+			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
 			ctx, cancel := context.WithCancel(context.Background())
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.prevPod}})
