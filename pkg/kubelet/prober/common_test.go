@@ -117,7 +117,7 @@ func newTestManager() *manager {
 		testRootDir = tempDir
 	}
 	m := NewManager(
-		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir),
+		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir, ""),
 		results.NewManager(),
 		results.NewManager(),
 		results.NewManager(),
