@@ -2577,10 +2577,12 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				podCopy := pod.DeepCopy()
 				kl.updateContainerResourceAllocation(podCopy)
 
-				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
-					kl.rejectPod(pod, reason, message)
-					continue
+				if pod.Status.Phase == v1.PodPending && pod.Status.PodIP == "" {
+					// Check if we can admit the pod; if not, reject it.
+					if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
+						kl.rejectPod(pod, reason, message)
+						continue
+					}
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
 				if err := kl.statusManager.SetPodAllocation(podCopy); err != nil {
