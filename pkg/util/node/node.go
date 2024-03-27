@@ -31,15 +31,6 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-const (
-	// NodeUnreachablePodReason is the reason on a pod when its state cannot be confirmed as kubelet is unresponsive
-	// on the node it is (was) running.
-	NodeUnreachablePodReason = "NodeLost"
-	// NodeUnreachablePodMessage is the message on a pod when its state cannot be confirmed as kubelet is unresponsive
-	// on the node it is (was) running.
-	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
-)
-
 // NoMatchError is a typed implementation of the error interface. It indicates a failure to get a matching Node.
 type NoMatchError struct {
 	addresses []v1.NodeAddress
