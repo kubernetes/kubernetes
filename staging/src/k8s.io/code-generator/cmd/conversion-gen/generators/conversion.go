@@ -158,27 +158,27 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			klog.V(6).Infof("%s has a receiver", f.Name)
 			continue
 		}
-		if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
+		if len(signature.Parameters) != 3 || signature.Parameters[2].Type.Name != scopeName {
 			klog.V(6).Infof("%s has wrong parameters", f.Name)
 			continue
 		}
-		if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
+		if len(signature.Results) != 1 || signature.Results[0].Type.Name != errorName {
 			klog.V(6).Infof("%s has wrong results", f.Name)
 			continue
 		}
 		inType := signature.Parameters[0]
 		outType := signature.Parameters[1]
-		if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
+		if inType.Type.Kind != types.Pointer || outType.Type.Kind != types.Pointer {
 			klog.V(6).Infof("%s has wrong parameter types", f.Name)
 			continue
 		}
 		// Now check if the name satisfies the convention.
 		// TODO: This should call the Namer directly.
-		args := argsFromType(inType.Elem, outType.Elem)
+		args := argsFromType(inType.Type.Elem, outType.Type.Elem)
 		sw.Do("Convert_$.inType|public$_To_$.outType|public$", args)
 		if f.Name.Name == buffer.String() {
 			klog.V(2).Infof("Found conversion function %s", f.Name)
-			key := conversionPair{inType.Elem, outType.Elem}
+			key := conversionPair{inType.Type.Elem, outType.Type.Elem}
 			// We might scan the same package twice, and that's OK.
 			if v, ok := manualMap[key]; ok && v != nil && v.Name.Package != pkg.Path {
 				panic(fmt.Sprintf("duplicate static conversion defined: %s -> %s from:\n%s.%s\n%s.%s", key.inType, key.outType, v.Name.Package, v.Name.Name, f.Name.Package, f.Name.Name))
