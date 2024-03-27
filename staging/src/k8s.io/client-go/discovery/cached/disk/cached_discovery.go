@@ -84,11 +84,6 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 		klog.V(3).Infof("skipped caching discovery info due to %v", err)
 		return liveResources, err
 	}
-	if liveResources == nil || len(liveResources.APIResources) == 0 {
-		klog.V(3).Infof("skipped caching discovery info, no resources found")
-		return liveResources, err
-	}
-
 	if err := d.writeCachedFile(filename, liveResources); err != nil {
 		klog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
 	}
