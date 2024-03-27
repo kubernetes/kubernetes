@@ -359,14 +359,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		klog.V(2).InfoS("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
-	if kl.keepTerminatedPodVolumes {
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		klog.V(2).InfoS("Setting node annotation to keep pod volumes of terminated pods attached to the node")
-		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
-	}
-
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {

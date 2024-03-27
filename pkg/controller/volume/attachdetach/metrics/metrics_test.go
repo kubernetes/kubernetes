@@ -147,7 +147,7 @@ func TestTotalVolumesMetricCollection(t *testing.T) {
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
 
-	dsw.AddNode(nodeName, false)
+	dsw.AddNode(nodeName)
 	_, err := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)

@@ -887,15 +887,9 @@ func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
 	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; exists {
-		keepTerminatedPodVolumes := false
-
-		if t, ok := node.Annotations[volumeutil.KeepTerminatedPodVolumesAnnotation]; ok {
-			keepTerminatedPodVolumes = t == "true"
-		}
-
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
+		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
 }
 
