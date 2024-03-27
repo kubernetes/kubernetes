@@ -590,16 +590,17 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 				return false, nil
 			}
 			klog.V(2).InfoS("IPTables canary deleted", "table", tables[0], "chain", canary)
-			// Wait for the other canaries to be deleted too before returning
+			// Wait for the other canaries to be deleted too before returning,
 			// so we don't start reloading too soon.
-			err := utilwait.PollImmediate(iptablesFlushPollTime, iptablesFlushTimeout, func() (bool, error) {
-				for i := 1; i < len(tables); i++ {
-					if exists, err := runner.ChainExists(tables[i], canary); exists || isResourceError(err) {
-						return false, nil
+			err := utilwait.PollUntilContextTimeout(context.Background(), iptablesFlushPollTime, iptablesFlushTimeout, true,
+				func(ctx context.Context) (bool, error) {
+					for i := 1; i < len(tables); i++ {
+						if exists, err := runner.ChainExists(tables[i], canary); exists || isResourceError(err) {
+							return false, nil
+						}
 					}
-				}
-				return true, nil
-			})
+					return true, nil
+				})
 			if err != nil {
 				klog.InfoS("Inconsistent iptables state detected")
 			}

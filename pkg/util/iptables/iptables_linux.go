@@ -20,6 +20,7 @@ limitations under the License.
 package iptables
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -72,23 +73,25 @@ func grabIptablesLocks(lockfilePath14x, lockfilePath16x string) (iptablesLocker,
 		return nil, fmt.Errorf("failed to open iptables lock %s: %v", lockfilePath16x, err)
 	}
 
-	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
-		if err := grabIptablesFileLock(l.lock16); err != nil {
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
+	if err = wait.PollUntilContextTimeout(context.Background(), 200*time.Millisecond, 2*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			if err := grabIptablesFileLock(l.lock16); err != nil {
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
 		return nil, fmt.Errorf("failed to acquire new iptables lock: %v", err)
 	}
 
 	// Roughly duplicate iptables 1.4.x xtables_lock() function.
-	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
-		l.lock14, err = net.ListenUnix("unix", &net.UnixAddr{Name: lockfilePath14x, Net: "unix"})
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
+	if err = wait.PollUntilContextTimeout(context.Background(), 200*time.Millisecond, 2*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			l.lock14, err = net.ListenUnix("unix", &net.UnixAddr{Name: lockfilePath14x, Net: "unix"})
+			if err != nil {
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
 		return nil, fmt.Errorf("failed to acquire old iptables lock: %v", err)
 	}
 
