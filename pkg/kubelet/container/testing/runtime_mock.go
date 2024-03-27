@@ -404,6 +404,21 @@ func (mr *MockRuntimeMockRecorder) SyncPod(ctx, pod, podStatus, pullSecrets, bac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncPod", reflect.TypeOf((*MockRuntime)(nil).SyncPod), ctx, pod, podStatus, pullSecrets, backOff)
 }
 
+// SyncTerminatingPod mocks base method.
+func (m *MockRuntime) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *container.PodStatus, gracePeriodOverride *int64, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (container.PodSyncResult, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncTerminatingPod", ctx, pod, podStatus, gracePeriodOverride, pullSecrets, backOff)
+	ret0, _ := ret[0].(container.PodSyncResult)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// SyncTerminatingPod indicates an expected call of SyncTerminatingPod.
+func (mr *MockRuntimeMockRecorder) SyncTerminatingPod(ctx, pod, podStatus, gracePeriodOverride, pullSecrets, backOff interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncTerminatingPod", reflect.TypeOf((*MockRuntime)(nil).SyncTerminatingPod), ctx, pod, podStatus, gracePeriodOverride, pullSecrets, backOff)
+}
+
 // Type mocks base method.
 func (m *MockRuntime) Type() string {
 	m.ctrl.T.Helper()
