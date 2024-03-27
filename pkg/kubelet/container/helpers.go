@@ -423,3 +423,18 @@ func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStat
 
 	return false
 }
+
+func GetNotStartInitContainers(pod *v1.Pod) []v1.Container {
+	var initContainers []v1.Container
+	for _, container := range pod.Spec.InitContainers {
+		for _, containerStatus := range pod.Status.InitContainerStatuses {
+			if containerStatus.Name == container.Name {
+				if containerStatus.State.Running != nil || containerStatus.State.Terminated != nil {
+					continue
+				}
+			}
+		}
+		initContainers = append(initContainers, container)
+	}
+	return initContainers
+}
