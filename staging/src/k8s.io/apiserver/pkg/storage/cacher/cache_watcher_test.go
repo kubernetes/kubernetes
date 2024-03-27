@@ -579,7 +579,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 		{Type: watch.Bookmark, Object: &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "10",
-				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 			},
 		}},
 		{Type: watch.Added, Object: makePod(15)},

@@ -1952,7 +1952,7 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 		{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "102",
-				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 			},
 		}},
 	}, true)
