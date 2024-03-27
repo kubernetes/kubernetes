@@ -210,13 +210,14 @@ func ensureWindowsDNSAvailability(issuer string) error {
 		return err
 	}
 
-	return wait.PollImmediate(5*time.Second, 20*time.Second, func() (bool, error) {
-		ips, err := net.LookupHost(u.Host)
-		if err != nil {
-			log.Println(err)
-			return false, nil
-		}
-		log.Printf("OK: Resolved host %s: %v", u.Host, ips)
-		return true, nil
-	})
+	return wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 20*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			ips, err := net.LookupHost(u.Host)
+			if err != nil {
+				log.Println(err)
+				return false, nil
+			}
+			log.Printf("OK: Resolved host %s: %v", u.Host, ips)
+			return true, nil
+		})
 }
