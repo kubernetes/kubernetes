@@ -26,6 +26,8 @@ import (
 const (
 	// Finalizer is the finalizer that gets set for claims
 	// which were allocated through a builtin controller.
+	// Reserved for use by Kubernetes, DRA driver controllers must
+	// use their own finalizer.
 	Finalizer = "dra.k8s.io/delete-protection"
 )
 
