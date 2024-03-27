@@ -19,6 +19,7 @@ package responsewriters
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -105,7 +106,7 @@ func TestSerializeObjectParallel(t *testing.T) {
 				fe:                 encoder,
 				errorAfterEncoding: true,
 			}
-			SerializeObject(ctt.mediaType, encoder, recorder, ctt.req, ctt.statusCode, ctt.object)
+			SerializeObject(context.Background(), ctt.mediaType, encoder, recorder, ctt.req, ctt.statusCode, ctt.object)
 			result := recorder.Result()
 			if result.StatusCode != ctt.wantCode {
 				t.Fatalf("unexpected code: %v", result.StatusCode)
@@ -355,7 +356,7 @@ func TestSerializeObject(t *testing.T) {
 				tt.statusCode = http.StatusOK
 			}
 			recorder := httptest.NewRecorder()
-			SerializeObject(tt.mediaType, encoder, recorder, tt.req, tt.statusCode, tt.object)
+			SerializeObject(context.Background(), tt.mediaType, encoder, recorder, tt.req, tt.statusCode, tt.object)
 			result := recorder.Result()
 			if result.StatusCode != tt.wantCode {
 				t.Fatalf("unexpected code: %v", result.StatusCode)
@@ -468,7 +469,7 @@ func benchmarkSerializeObject(b *testing.B, payload []byte) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		recorder := httptest.NewRecorder()
-		SerializeObject("application/json", encoder, recorder, req, http.StatusOK, nil /* object */)
+		SerializeObject(context.Background(), "application/json", encoder, recorder, req, http.StatusOK, nil /* object */)
 		result := recorder.Result()
 		if result.StatusCode != http.StatusOK {
 			b.Fatalf("incorrect status code: got %v;  want: %v", result.StatusCode, http.StatusOK)
