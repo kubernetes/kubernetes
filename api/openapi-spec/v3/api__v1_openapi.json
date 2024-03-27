@@ -4053,7 +4053,7 @@
           },
           "kubeProxyVersion": {
             "default": "",
-            "description": "KubeProxy Version reported by the node.",
+            "description": "Deprecated: KubeProxy Version reported by the node.",
             "type": "string"
           },
           "kubeletVersion": {
