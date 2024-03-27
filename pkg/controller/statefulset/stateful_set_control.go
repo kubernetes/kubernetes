@@ -759,7 +759,7 @@ func updateStatefulSetAfterInvariantEstablished(
 	// those pods and count the successful deletions. Update the status with the correct number of deletions.
 	unavailablePods := 0
 	for target := len(replicas) - 1; target >= 0; target-- {
-		if !isHealthy(replicas[target]) {
+		if !isRunningAndAvailable(replicas[target], set.Spec.MinReadySeconds) || isTerminating(replicas[target]) {
 			unavailablePods++
 		}
 	}

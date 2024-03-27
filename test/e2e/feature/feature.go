@@ -181,6 +181,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
 
+	// TODO: Once the feature and API version are stable, this label should be removed and
+	// these tests will be run by default on any cluster. The test-infra job also should
+	// be updated to not focus on this feature anymore.
+	MaxUnavailableStatefulSet = framework.WithFeature(framework.ValidFeatures.Add("MaxUnavailableStatefulSet"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("MasterUpgrade"))
 
