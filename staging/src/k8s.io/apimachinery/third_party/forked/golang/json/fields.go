@@ -57,7 +57,11 @@ func LookupPatchMetadataForStruct(t reflect.Type, jsonField string) (
 		tjf := t.Field(f.index[0])
 		// we must navigate down all the anonymously included structs in the chain
 		for i := 1; i < len(f.index); i++ {
-			tjf = tjf.Type.Field(f.index[i])
+			if tjf.Type.Kind() == reflect.Ptr {
+				tjf = tjf.Type.Elem().Field(f.index[i])
+			} else {
+				tjf = tjf.Type.Field(f.index[i])
+			}
 		}
 		patchStrategy := tjf.Tag.Get(patchStrategyTagKey)
 		patchMergeKey = tjf.Tag.Get(patchMergeKeyTagKey)
