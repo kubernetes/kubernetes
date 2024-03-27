@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,6 +36,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -225,7 +227,10 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod)
+	events := podSchedulingPropertiesChange(newPod, oldPod)
+	for _, evt := range events {
+		sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod, evt)
+	}
 }
 
 func (sched *Scheduler) deletePodFromCache(obj interface{}) {
@@ -545,6 +550,26 @@ func addAllEventHandlers(
 	return nil
 }
 
+// podSchedulingPropertiesChange interprets the update of a pod and returns corresponding UpdatePodXYZ event(s).
+func podSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) []framework.ClusterEvent {
+	var events []framework.ClusterEvent
+
+	if labelsChanged(newPod.ObjectMeta, oldPod.ObjectMeta) {
+		events = append(events, queue.PodLabelChange)
+	}
+
+	if podResourceRequestChanged(newPod, oldPod) {
+		events = append(events, queue.PodRequestChange)
+	}
+
+	if len(events) == 0 {
+		events = append(events, queue.AssignedPodUpdate)
+	}
+
+	return events
+}
+
+// nodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
 func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framework.ClusterEvent {
 	var events []framework.ClusterEvent
 
@@ -554,7 +579,7 @@ func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framew
 	if nodeAllocatableChanged(newNode, oldNode) {
 		events = append(events, queue.NodeAllocatableChange)
 	}
-	if nodeLabelsChanged(newNode, oldNode) {
+	if labelsChanged(newNode.ObjectMeta, oldNode.ObjectMeta) {
 		events = append(events, queue.NodeLabelChange)
 	}
 	if nodeTaintsChanged(newNode, oldNode) {
@@ -570,12 +595,17 @@ func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framew
 	return events
 }
 
+func podResourceRequestChanged(newPod, oldPod *v1.Pod) bool {
+	opt := resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)}
+	return !equality.Semantic.DeepEqual(resource.PodRequests(newPod, opt), resource.PodRequests(oldPod, opt))
+}
+
 func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 	return !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
 }
 
-func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
+func labelsChanged(newObj, oldObj metav1.ObjectMeta) bool {
+	return !equality.Semantic.DeepEqual(oldObj.GetLabels(), newObj.GetLabels())
 }
 
 func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
