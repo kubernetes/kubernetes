@@ -35,6 +35,7 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 	machineInfo := &info.MachineInfo{
 		NumCores:       2,
 		MemoryCapacity: 2048,
+		SwapCapacity:   1024,
 		HugePages: []info.HugePagesInfo{
 			{
 				PageSize: 5,
@@ -44,9 +45,10 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 	}
 
 	expected := v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(int64(2000), resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(int64(2048), resource.BinarySI),
-		"hugepages-5Ki":   *resource.NewQuantity(int64(51200), resource.BinarySI),
+		v1.ResourceCPU:        *resource.NewMilliQuantity(int64(2000), resource.DecimalSI),
+		v1.ResourceMemory:     *resource.NewQuantity(int64(2048), resource.BinarySI),
+		v1.ResourceSwapMemory: *resource.NewQuantity(int64(1024), resource.BinarySI),
+		"hugepages-5Ki":       *resource.NewQuantity(int64(51200), resource.BinarySI),
 	}
 	actual := CapacityFromMachineInfo(machineInfo)
 	if !reflect.DeepEqual(actual, expected) {

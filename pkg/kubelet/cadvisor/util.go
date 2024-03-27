@@ -44,6 +44,9 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 		v1.ResourceMemory: *resource.NewQuantity(
 			int64(info.MemoryCapacity),
 			resource.BinarySI),
+		v1.ResourceSwapMemory: *resource.NewQuantity(
+			int64(info.SwapCapacity),
+			resource.BinarySI),
 	}
 
 	// if huge pages are enabled, we report them as a schedulable resource on the node

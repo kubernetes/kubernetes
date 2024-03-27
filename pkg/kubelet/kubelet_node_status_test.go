@@ -217,6 +217,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				BootID:         "1b3",
 				NumCores:       2,
 				MemoryCapacity: 10e9, // 10G
+				SwapCapacity:   5e9,  // 5G
 			}
 			kubelet.setCachedMachineInfo(machineInfo)
 
@@ -273,12 +274,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(9900e6, resource.BinarySI),
+						v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 					},
@@ -396,6 +399,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 20e9,
+		SwapCapacity:   5e9,
 	}
 	kubelet.setCachedMachineInfo(machineInfo)
 
@@ -452,12 +456,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(20e9, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(19900e6, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
@@ -608,6 +614,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 10e9,
+		SwapCapacity:   5e9,
 	}
 	kubelet.setCachedMachineInfo(machineInfo)
 
@@ -657,12 +664,14 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(20e9, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(9900e6, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(10e9, resource.BinarySI),
 			},
@@ -830,6 +839,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 20e9,
+		SwapCapacity:   5e9,
 	}
 	kubelet.setCachedMachineInfo(machineInfo)
 
@@ -887,12 +897,14 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(20e9, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(19900e6, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
@@ -1541,6 +1553,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		BootID:         "1b3",
 		NumCores:       2,
 		MemoryCapacity: 10e9, // 10G
+		SwapCapacity:   5e9,  // 5G
 	}
 	kubelet.setCachedMachineInfo(machineInfo)
 
@@ -1551,12 +1564,14 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(0, resource.DecimalSI),
 				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+				v1.ResourceSwapMemory:       *resource.NewQuantity(5e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(2000, resource.BinarySI),
 			},
