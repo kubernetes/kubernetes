@@ -31,6 +31,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,9 @@ import (
 func alwaysReady() bool { return true }
 
 func TestIsResponsibleForRoute(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	myClusterName := "my-awesome-cluster"
 	myClusterRoute := "my-awesome-cluster-12345678-90ab-cdef-1234-567890abcdef"
 	testCases := []struct {
@@ -69,7 +73,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
-		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
+		rc := NewWithContext(ctx, nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
@@ -415,7 +419,8 @@ func TestReconcile(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route)}
 			for _, route := range testCase.initialRoutes {
@@ -435,7 +440,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
-			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			rc := NewWithContext(ctx, routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
 			rc.nodeListerSynced = alwaysReady
 			assert.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
 			for _, action := range testCase.clientset.Actions() {

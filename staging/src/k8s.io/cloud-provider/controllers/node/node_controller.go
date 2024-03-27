@@ -113,15 +113,14 @@ type CloudNodeController struct {
 }
 
 // NewCloudNodeController creates a CloudNodeController object
+//
+//logcheck:context // NewCloudNodeControllerWithContext should be used instead of NewCloudNodeController in code which supports contextual logging.
 func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
 	workerCount int32) (*CloudNodeController, error) {
-
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
 
 	_, instancesSupported := cloud.Instances()
 	_, instancesV2Supported := cloud.InstancesV2()
@@ -132,8 +131,6 @@ func NewCloudNodeController(
 	cnc := &CloudNodeController{
 		nodeInformer:              nodeInformer,
 		kubeClient:                kubeClient,
-		broadcaster:               eventBroadcaster,
-		recorder:                  recorder,
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		workerCount:               workerCount,
@@ -156,7 +153,21 @@ func NewCloudNodeController(
 // This controller updates newly registered nodes with information
 // from the cloud provider. This call is blocking so should be called
 // via a goroutine
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
+	cnc.RunWithContext(wait.ContextForChannel(stopCh), controllerManagerMetrics)
+}
+
+// RunWithContext will sync informer caches and starting workers.
+// This controller updates newly registered nodes with information
+// from the cloud provider. This call is blocking so should be called
+// via a goroutine
+func (cnc *CloudNodeController) RunWithContext(ctx context.Context, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
+	cnc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	cnc.recorder = cnc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
+	stopCh := ctx.Done()
+
 	defer utilruntime.HandleCrash()
 	defer cnc.workqueue.ShutDown()
 
@@ -178,16 +189,16 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMet
 
 	// The periodic loop for updateNodeStatus polls the Cloud Provider periodically
 	// to reconcile the nodes addresses and labels.
-	go wait.Until(func() {
-		if err := cnc.UpdateNodeStatus(context.TODO()); err != nil {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		if err := cnc.UpdateNodeStatus(ctx); err != nil {
 			klog.Errorf("failed to update node status: %v", err)
 		}
-	}, cnc.nodeStatusUpdateFrequency, stopCh)
+	}, cnc.nodeStatusUpdateFrequency)
 
 	// These workers initialize the nodes added to the cluster,
 	// those that are Tainted with TaintExternalCloudProvider.
 	for i := int32(0); i < cnc.workerCount; i++ {
-		go wait.Until(cnc.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, cnc.runWorker, time.Second)
 	}
 
 	<-stopCh
@@ -196,14 +207,14 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMet
 // runWorker is a long-running function that will continually call the
 // processNextWorkItem function in order to read and process a message on the
 // workqueue.
-func (cnc *CloudNodeController) runWorker() {
-	for cnc.processNextWorkItem() {
+func (cnc *CloudNodeController) runWorker(ctx context.Context) {
+	for cnc.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem will read a single work item off the workqueue and
 // attempt to process it, by calling the syncHandler.
-func (cnc *CloudNodeController) processNextWorkItem() bool {
+func (cnc *CloudNodeController) processNextWorkItem(ctx context.Context) bool {
 	obj, shutdown := cnc.workqueue.Get()
 	if shutdown {
 		return false
@@ -223,7 +234,7 @@ func (cnc *CloudNodeController) processNextWorkItem() bool {
 
 		// Run the syncHandler, passing it the key of the
 		// Node resource to be synced.
-		if err := cnc.syncHandler(key); err != nil {
+		if err := cnc.syncHandler(ctx, key); err != nil {
 			// Put the item back on the workqueue to handle any transient errors.
 			cnc.workqueue.AddRateLimited(key)
 			klog.Infof("error syncing '%s': %v, requeuing", key, err)
@@ -245,14 +256,14 @@ func (cnc *CloudNodeController) processNextWorkItem() bool {
 }
 
 // syncHandler implements the logic of the controller.
-func (cnc *CloudNodeController) syncHandler(key string) error {
+func (cnc *CloudNodeController) syncHandler(ctx context.Context, key string) error {
 	_, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
 
-	return cnc.syncNode(context.TODO(), name)
+	return cnc.syncNode(ctx, name)
 }
 
 // UpdateNodeStatus updates the node status, such as node addresses
@@ -462,7 +473,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 			}
 
 			// fetch latest node from API server since GCE-specific condition was set and informer cache may be stale
-			curNode, err = cnc.kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			curNode, err = cnc.kubeClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -478,7 +489,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 			modify(newNode)
 		}
 
-		_, err = cnc.kubeClient.CoreV1().Nodes().Update(context.TODO(), newNode, metav1.UpdateOptions{})
+		_, err = cnc.kubeClient.CoreV1().Nodes().Update(ctx, newNode, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
