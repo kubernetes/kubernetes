@@ -25,8 +25,17 @@ import (
 
 const ContentTypeOpenAPIV3PB = "application/com.github.proto-openapi.spec.v3@v1.0+protobuf"
 
+// HashParamName is the name of the query parameter in the schema URL.
+// the schema URL is expected to be like /openapi/v3/apis/apps/v1?hash=014fbff9a07c
+const HashParamName = "hash"
+
 type GroupVersion interface {
 	Schema(contentType string) ([]byte, error)
+
+	// Hash returns the hash that uniquely identifies the version of the requested schema.
+	// It returns an empty string if the hash does not present in the URL to the schema,
+	// or an error if the URL fails to parse.
+	Hash() (string, error)
 }
 
 type groupversion struct {
@@ -67,4 +76,15 @@ func (g *groupversion) Schema(contentType string) ([]byte, error) {
 	}
 
 	return path.Do(context.TODO()).Raw()
+}
+
+func (g *groupversion) Hash() (string, error) {
+	locator, err := url.Parse(g.item.ServerRelativeURL)
+	if err != nil {
+		return "", err
+	}
+	if query := locator.Query(); query.Has(HashParamName) {
+		return query.Get(HashParamName), nil
+	}
+	return "", nil
 }

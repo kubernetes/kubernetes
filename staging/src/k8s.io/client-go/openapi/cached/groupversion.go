@@ -56,3 +56,9 @@ func (g *groupversion) Schema(contentType string) ([]byte, error) {
 
 	return cachedInfo.data, cachedInfo.err
 }
+
+func (g *groupversion) Hash() (string, error) {
+	// obtaining hash does not involve a network round-trip
+	// delegate directly.
+	return g.delegate.Hash()
+}

@@ -93,13 +93,21 @@ func TestGroupVersion(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error occurred: %v", err)
 			}
-			schema, err := paths["apis/apps/v1"].Schema(runtime.ContentTypeJSON)
+			gv := paths["apis/apps/v1"]
+			schema, err := gv.Schema(runtime.ContentTypeJSON)
 			if err != nil {
 				t.Fatalf("unexpected error occurred: %v", err)
 			}
 			expectedResult := `{"openapi":"3.0.0","info":{"title":"Kubernetes","version":"unversioned"}}`
 			if string(schema) != expectedResult {
 				t.Fatalf("unexpected result actual: %s expected: %s", string(schema), expectedResult)
+			}
+			if h, err := gv.Hash(); err == nil {
+				if h != "014fbff9a07c" {
+					t.Fatalf("unexpected hash, expected %q but got %q", "014fbff9a07c", h)
+				}
+			} else {
+				t.Fatalf("unexpected error when parsing the hash: %v", err)
 			}
 		})
 	}
