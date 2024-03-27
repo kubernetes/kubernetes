@@ -244,8 +244,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.CSRSigningController.AddFlags(fss.FlagSet(names.CertificateSigningRequestSigningController))
 	s.DeploymentController.AddFlags(fss.FlagSet(names.DeploymentController))
 	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
-	s.DaemonSetController.AddFlags(fss.FlagSet(names.DaemonSetController))
-	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
 	s.EndpointController.AddFlags(fss.FlagSet(names.EndpointsController))
 	s.EndpointSliceController.AddFlags(fss.FlagSet(names.EndpointSliceController))
 	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet(names.EndpointSliceMirroringController))
