@@ -446,31 +446,9 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 	})
 
 	err = clientretry.RetryOnConflict(UpdateNodeSpecBackoff, func() error {
-		var curNode *v1.Node
-		if cnc.cloud.ProviderName() == "gce" {
-			// TODO(wlan0): Move this logic to the route controller using the node taint instead of condition
-			// Since there are node taints, do we still need this?
-			// This condition marks the node as unusable until routes are initialized in the cloud provider
-			if err := nodeutil.SetNodeCondition(cnc.kubeClient, types.NodeName(nodeName), v1.NodeCondition{
-				Type:               v1.NodeNetworkUnavailable,
-				Status:             v1.ConditionTrue,
-				Reason:             "NoRouteCreated",
-				Message:            "Node created without a route",
-				LastTransitionTime: metav1.Now(),
-			}); err != nil {
-				return err
-			}
-
-			// fetch latest node from API server since GCE-specific condition was set and informer cache may be stale
-			curNode, err = cnc.kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-		} else {
-			curNode, err = cnc.nodeInformer.Lister().Get(nodeName)
-			if err != nil {
-				return err
-			}
+		curNode, err = cnc.nodeInformer.Lister().Get(nodeName)
+		if err != nil {
+			return err
 		}
 
 		newNode := curNode.DeepCopy()
