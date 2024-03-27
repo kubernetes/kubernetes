@@ -41,7 +41,7 @@ func TestMetricShutdown(t *testing.T) {
 		updateCalled: ch,
 	}
 	c := testingclock.NewFakeClock(time.Now())
-	q := newQueue(c, m, time.Millisecond)
+	q := newQueue(c, DefaultQueue(), m, time.Millisecond)
 	for !c.HasWaiters() {
 		// Wait for the go routine to call NewTicker()
 		time.Sleep(time.Millisecond)
