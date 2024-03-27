@@ -312,23 +312,24 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		]`), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "setting default for a to \"A\" in schema")
 
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-			u1, err := crClient.Get(ctx, name1, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			a, found, err := unstructured.NestedFieldNoCopy(u1.Object, "a")
-			if err != nil {
-				return false, err
-			}
-			if !found {
-				return false, nil
-			}
-			if a != "A" {
-				return false, fmt.Errorf("expected a:\"A\", but got a:%q", a)
-			}
-			return true, nil
-		})
+		err = wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				u1, err := crClient.Get(ctx, name1, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				a, found, err := unstructured.NestedFieldNoCopy(u1.Object, "a")
+				if err != nil {
+					return false, err
+				}
+				if !found {
+					return false, nil
+				}
+				if a != "A" {
+					return false, fmt.Errorf("expected a:\"A\", but got a:%q", a)
+				}
+				return true, nil
+			})
 		framework.ExpectNoError(err, "waiting for CR to be defaulted on read")
 
 		// create CR with default in storage
@@ -354,33 +355,34 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		]`), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "setting default for b to \"B\" and remove default for a")
 
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-			u2, err := crClient.Get(ctx, name2, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			b, found, err := unstructured.NestedFieldNoCopy(u2.Object, "b")
-			if err != nil {
-				return false, err
-			}
-			if !found {
-				return false, nil
-			}
-			if b != "B" {
-				return false, fmt.Errorf("expected b:\"B\", but got b:%q", b)
-			}
-			a, found, err := unstructured.NestedFieldNoCopy(u2.Object, "a")
-			if err != nil {
-				return false, err
-			}
-			if !found {
-				return false, fmt.Errorf("expected a:\"A\" to be unchanged, but it was removed")
-			}
-			if a != "A" {
-				return false, fmt.Errorf("expected a:\"A\" to be unchanged, but it changed to %q", a)
-			}
-			return true, nil
-		})
+		err = wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, true,
+			func(ctx context.Context) (bool, error) {
+				u2, err := crClient.Get(ctx, name2, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				b, found, err := unstructured.NestedFieldNoCopy(u2.Object, "b")
+				if err != nil {
+					return false, err
+				}
+				if !found {
+					return false, nil
+				}
+				if b != "B" {
+					return false, fmt.Errorf("expected b:\"B\", but got b:%q", b)
+				}
+				a, found, err := unstructured.NestedFieldNoCopy(u2.Object, "a")
+				if err != nil {
+					return false, err
+				}
+				if !found {
+					return false, fmt.Errorf("expected a:\"A\" to be unchanged, but it was removed")
+				}
+				if a != "A" {
+					return false, fmt.Errorf("expected a:\"A\" to be unchanged, but it changed to %q", a)
+				}
+				return true, nil
+			})
 		framework.ExpectNoError(err, "waiting for CR to be defaulted on read for b and a staying the same")
 	})
 

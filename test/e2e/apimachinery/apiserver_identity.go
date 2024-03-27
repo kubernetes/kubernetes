@@ -148,26 +148,26 @@ var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func()
 			err = restartAPIServer(ctx, &node)
 			framework.ExpectNoError(err)
 
-			err = wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-				lease, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), leaseName, metav1.GetOptions{})
-				if err != nil {
-					return false, nil
-				}
+			err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true,
+				func(ctx context.Context) (bool, error) {
+					lease, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), leaseName, metav1.GetOptions{})
+					if err != nil {
+						return false, nil
+					}
 
-				// expect only the holder identity to change after a restart
-				newHolderIdentity := lease.Spec.HolderIdentity
-				if newHolderIdentity == oldHolderIdentity {
-					return false, nil
-				}
+					// expect only the holder identity to change after a restart
+					newHolderIdentity := lease.Spec.HolderIdentity
+					if newHolderIdentity == oldHolderIdentity {
+						return false, nil
+					}
 
-				// wait for at least one lease heart beat after the holder identity changes
-				if !lease.Spec.RenewTime.After(lastRenewedTime.Time) {
-					return false, nil
-				}
+					// wait for at least one lease heart beat after the holder identity changes
+					if !lease.Spec.RenewTime.After(lastRenewedTime.Time) {
+						return false, nil
+					}
 
-				return true, nil
-
-			})
+					return true, nil
+				})
 			framework.ExpectNoError(err, "holder identity did not change after a restart")
 		}
 
