@@ -12413,6 +12413,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: driverName
       type:
         scalar: string
+      default: ""
     - name: structuredData
       type:
         namedType: io.k8s.api.resource.v1alpha2.StructuredResourceHandle
