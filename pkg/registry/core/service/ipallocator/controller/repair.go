@@ -156,20 +156,21 @@ func (c *Repair) doRunOnce() error {
 	snapshotByFamily := make(map[v1.IPFamily]*api.RangeAllocation)
 	storedByFamily := make(map[v1.IPFamily]ipallocator.Interface)
 
-	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
-		for family, allocator := range c.allocatorByFamily {
-			// get snapshot if it is not there
-			if _, ok := snapshotByFamily[family]; !ok {
-				snapshot, err := allocator.Get()
-				if err != nil {
-					return false, err
-				}
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, 10*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			for family, allocator := range c.allocatorByFamily {
+				// get snapshot if it is not there
+				if _, ok := snapshotByFamily[family]; !ok {
+					snapshot, err := allocator.Get()
+					if err != nil {
+						return false, err
+					}
 
-				snapshotByFamily[family] = snapshot
+					snapshotByFamily[family] = snapshot
+				}
 			}
-		}
-		return true, nil
-	})
+			return true, nil
+		})
 
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)

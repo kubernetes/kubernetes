@@ -113,11 +113,12 @@ func (c *Repair) doRunOnce() error {
 	// important when we start apiserver and etcd at the same time.
 	var snapshot *api.RangeAllocation
 
-	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
-		var err error
-		snapshot, err = c.alloc.Get()
-		return err == nil, err
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, 10*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			var err error
+			snapshot, err = c.alloc.Get()
+			return err == nil, err
+		})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port allocations: %v", err)
 	}
