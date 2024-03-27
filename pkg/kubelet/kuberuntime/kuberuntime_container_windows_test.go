@@ -165,7 +165,7 @@ func TestCalculateWindowsResources(t *testing.T) {
 			cpuLim: resource.MustParse("2"),
 			memLim: resource.MustParse("128Mi"),
 			expected: &runtimeapi.WindowsContainerResources{
-				CpuMaximum:         2500,
+				CpuMaximum:         10000 / int64(winstats.ProcessorCount()),
 				MemoryLimitInBytes: 134217728,
 			},
 		},
@@ -183,7 +183,7 @@ func TestCalculateWindowsResources(t *testing.T) {
 			cpuLim: resource.MustParse("0"),
 			memLim: resource.MustParse("128Mi"),
 			expected: &runtimeapi.WindowsContainerResources{
-				CpuMaximum:         1,
+				CpuMaximum:         0,
 				MemoryLimitInBytes: 134217728,
 			},
 		},
