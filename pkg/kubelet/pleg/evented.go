@@ -36,28 +36,28 @@ import (
 // call, after this period it will be unblocked.
 const globalCacheUpdatePeriod = 5 * time.Second
 
-var (
-	eventedPLEGUsage   = false
-	eventedPLEGUsageMu = sync.RWMutex{}
-)
+// var (
+// 	eventedPLEGUsage   = false
+// 	eventedPLEGUsageMu = sync.RWMutex{}
+// )
 
-// isEventedPLEGInUse indicates whether Evented PLEG is in use. Even after enabling
-// the Evented PLEG feature gate, there could be several reasons it may not be in use.
-// e.g. Streaming data issues from the runtime or the runtime does not implement the
-// container events stream.
-func isEventedPLEGInUse() bool {
-	eventedPLEGUsageMu.RLock()
-	defer eventedPLEGUsageMu.RUnlock()
-	return eventedPLEGUsage
-}
+// // isEventedPLEGInUse indicates whether Evented PLEG is in use. Even after enabling
+// // the Evented PLEG feature gate, there could be several reasons it may not be in use.
+// // e.g. Streaming data issues from the runtime or the runtime does not implement the
+// // container events stream.
+// func IsEventedPLEGInUse() bool {
+// 	eventedPLEGUsageMu.RLock()
+// 	defer eventedPLEGUsageMu.RUnlock()
+// 	return eventedPLEGUsage
+// }
 
-// setEventedPLEGUsage should only be accessed from
-// Start/Stop of Evented PLEG.
-func setEventedPLEGUsage(enable bool) {
-	eventedPLEGUsageMu.Lock()
-	defer eventedPLEGUsageMu.Unlock()
-	eventedPLEGUsage = enable
-}
+// // setEventedPLEGUsage should only be accessed from
+// // Start/Stop of Evented PLEG.
+// func setEventedPLEGUsage(enable bool) {
+// 	eventedPLEGUsageMu.Lock()
+// 	defer eventedPLEGUsageMu.Unlock()
+// 	eventedPLEGUsage = enable
+// }
 
 type EventedPLEG struct {
 	// The container runtime.
@@ -118,10 +118,10 @@ func (e *EventedPLEG) Relist() {
 func (e *EventedPLEG) Start() {
 	e.runningMu.Lock()
 	defer e.runningMu.Unlock()
-	if isEventedPLEGInUse() {
+	if kubecontainer.IsEventedPLEGInUse() {
 		return
 	}
-	setEventedPLEGUsage(true)
+	kubecontainer.SetEventedPLEGUsage(true)
 	e.stopCh = make(chan struct{})
 	e.stopCacheUpdateCh = make(chan struct{})
 	go wait.Until(e.watchEventsChannel, 0, e.stopCh)
@@ -132,10 +132,10 @@ func (e *EventedPLEG) Start() {
 func (e *EventedPLEG) Stop() {
 	e.runningMu.Lock()
 	defer e.runningMu.Unlock()
-	if !isEventedPLEGInUse() {
+	if !kubecontainer.IsEventedPLEGInUse() {
 		return
 	}
-	setEventedPLEGUsage(false)
+	kubecontainer.SetEventedPLEGUsage(false)
 	close(e.stopCh)
 	close(e.stopCacheUpdateCh)
 }
@@ -181,7 +181,7 @@ func (e *EventedPLEG) watchEventsChannel() {
 		numAttempts := 0
 		for {
 			if numAttempts >= e.eventedPlegMaxStreamRetries {
-				if isEventedPLEGInUse() {
+				if kubecontainer.IsEventedPLEGInUse() {
 					// Fall back to Generic PLEG relisting since Evented PLEG is not working.
 					klog.V(4).InfoS("Fall back to Generic PLEG relisting since Evented PLEG is not working")
 					e.Stop()
@@ -202,7 +202,7 @@ func (e *EventedPLEG) watchEventsChannel() {
 		}
 	}()
 
-	if isEventedPLEGInUse() {
+	if kubecontainer.IsEventedPLEGInUse() {
 		e.processCRIEvents(containerEventsResponseCh)
 	}
 }
