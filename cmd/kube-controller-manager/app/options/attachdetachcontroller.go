@@ -38,6 +38,7 @@ func (o *AttachDetachControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
 	fs.DurationVar(&o.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", o.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 	fs.BoolVar(&o.DisableForceDetachOnTimeout, "disable-force-detach-on-timeout", false, "Prevent force detaching volumes based on maximum unmount time and node status. If this flag is set to true, the non-graceful node shutdown feature must be used to recover from node failure. See https://k8s.io/docs/storage-disable-force-detach-on-timeout/.")
+	fs.DurationVar(&o.ErrorLogInterval.Duration, "attach-detach-err-log-interval", o.ErrorLogInterval.Duration, "The interval of logging errors for the same volume.")
 }
 
 // ApplyTo fills up AttachDetachController config with options.
@@ -49,6 +50,7 @@ func (o *AttachDetachControllerOptions) ApplyTo(cfg *attachdetachconfig.AttachDe
 	cfg.DisableAttachDetachReconcilerSync = o.DisableAttachDetachReconcilerSync
 	cfg.ReconcilerSyncLoopPeriod = o.ReconcilerSyncLoopPeriod
 	cfg.DisableForceDetachOnTimeout = o.DisableForceDetachOnTimeout
+	cfg.ErrorLogInterval = o.ErrorLogInterval
 
 	return nil
 }

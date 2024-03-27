@@ -24,8 +24,6 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -121,23 +119,25 @@ func NewAttachDetachController(
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
 	disableForceDetachOnTimeout bool,
+	throttleLogger *util.ThrottleLogger,
 	timerConfig TimerConfig) (AttachDetachController, error) {
 
 	logger := klog.FromContext(ctx)
 
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		podIndexer:  podInformer.Informer().GetIndexer(),
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		kubeClient:     kubeClient,
+		pvcLister:      pvcInformer.Lister(),
+		pvcsSynced:     pvcInformer.Informer().HasSynced,
+		pvLister:       pvInformer.Lister(),
+		pvsSynced:      pvInformer.Informer().HasSynced,
+		podLister:      podInformer.Lister(),
+		podsSynced:     podInformer.Informer().HasSynced,
+		podIndexer:     podInformer.Informer().GetIndexer(),
+		nodeLister:     nodeInformer.Lister(),
+		nodesSynced:    nodeInformer.Informer().HasSynced,
+		cloud:          cloud,
+		pvcQueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		throttleLogger: throttleLogger,
 	}
 
 	adc.csiNodeLister = csiNodeInformer.Lister()
@@ -195,7 +195,9 @@ func NewAttachDetachController(
 		pvcInformer.Lister(),
 		pvInformer.Lister(),
 		adc.csiMigratedPluginManager,
-		adc.intreeToCSITranslator)
+		adc.intreeToCSITranslator,
+		adc.throttleLogger,
+	)
 
 	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -327,6 +329,8 @@ type attachDetachController struct {
 
 	// intreeToCSITranslator translates from in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
+
+	throttleLogger *util.ThrottleLogger
 }
 
 func (adc *attachDetachController) Run(ctx context.Context) {
@@ -510,7 +514,7 @@ func (adc *attachDetachController) podAdd(logger klog.Logger, obj interface{}) {
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator, adc.throttleLogger)
 }
 
 // GetDesiredStateOfWorld returns desired state of world associated with controller
@@ -534,7 +538,7 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator, adc.throttleLogger)
 }
 
 func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}) {
@@ -544,7 +548,7 @@ func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}
 	}
 
 	util.ProcessPodVolumes(logger, pod, false, /* addVolumes */
-		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator, adc.throttleLogger)
 }
 
 func (adc *attachDetachController) nodeAdd(logger klog.Logger, obj interface{}) {
@@ -666,7 +670,7 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 			true /* default volume action */)
 
 		util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
-			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator, adc.throttleLogger)
 	}
 	return nil
 }
