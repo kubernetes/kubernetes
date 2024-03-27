@@ -9,6 +9,7 @@ import (
 	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	kutilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,10 +29,11 @@ import (
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 
 	securityv1 "github.com/openshift/api/security/v1"
-	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccmatching"
-	sccsort "github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort"
 	securityv1informer "github.com/openshift/client-go/security/informers/externalversions/security/v1"
 	securityv1listers "github.com/openshift/client-go/security/listers/security/v1"
+
+	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccmatching"
+	sccsort "github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort"
 )
 
 const PluginName = "security.openshift.io/SecurityContextConstraint"
@@ -470,6 +472,10 @@ var ignoredSubresources = sets.NewString(
 	"status",
 )
 
+var ignoredAnnotations = sets.NewString(
+	"k8s.ovn.org/pod-networks",
+)
+
 func shouldIgnore(a admission.Attributes) (bool, error) {
 	if a.GetResource().GroupResource() != coreapi.Resource("pods") {
 		return true, nil
@@ -491,14 +497,64 @@ func shouldIgnore(a admission.Attributes) (bool, error) {
 	if pod.Spec.OS != nil && pod.Spec.OS.Name == coreapi.Windows {
 		return true, nil
 	}
-	// if this is an update, see if we are only updating the ownerRef.  Garbage collection does this
-	// and we should allow it in general, since you had the power to update and the power to delete.
-	// The worst that happens is that you delete something, but you aren't controlling the privileged object itself
-	if a.GetOperation() == admission.Update && rbacregistry.IsOnlyMutatingGCFields(a.GetObject(), a.GetOldObject(), kapihelper.Semantic) {
-		return true, nil
+
+	if a.GetOperation() == admission.Update {
+		oldPod, ok := a.GetOldObject().(*coreapi.Pod)
+		if !ok {
+			return false, admission.NewForbidden(a, fmt.Errorf("object was marked as kind pod but was unable to be converted: %v", a.GetOldObject()))
+		}
+
+		// never ignore any spec changes
+		if !kapihelper.Semantic.DeepEqual(pod.Spec, oldPod.Spec) {
+			return false, nil
+		}
+
+		// see if we are only doing meta changes that should be ignored during admission
+		// for example, the OVN controller adds informative networking annotations that shouldn't cause the pod to go through admission again
+		if shouldIgnoreMetaChanges(pod, oldPod) {
+			return true, nil
+		}
 	}
 
 	return false, nil
+}
+
+func shouldIgnoreMetaChanges(newPod, oldPod *coreapi.Pod) bool {
+	// check if we're adding or changing only annotations from the ignore list
+	for key, newVal := range newPod.ObjectMeta.Annotations {
+		if oldVal, ok := oldPod.ObjectMeta.Annotations[key]; ok && newVal == oldVal {
+			continue
+		}
+
+		if !ignoredAnnotations.Has(key) {
+			return false
+		}
+	}
+
+	// check if we're removing only annotations from the ignore list
+	for key := range oldPod.ObjectMeta.Annotations {
+		if _, ok := newPod.ObjectMeta.Annotations[key]; ok {
+			continue
+		}
+
+		if !ignoredAnnotations.Has(key) {
+			return false
+		}
+	}
+
+	newPodCopy := newPod.DeepCopyObject()
+	newPodCopyMeta, err := meta.Accessor(newPodCopy)
+	if err != nil {
+		return false
+	}
+	newPodCopyMeta.SetAnnotations(oldPod.ObjectMeta.Annotations)
+
+	// see if we are only updating the ownerRef. Garbage collection does this
+	// and we should allow it in general, since you had the power to update and the power to delete.
+	// The worst that happens is that you delete something, but you aren't controlling the privileged object itself
+	res := rbacregistry.IsOnlyMutatingGCFields(newPodCopy, oldPod, kapihelper.Semantic)
+
+	return res
 }
 
 // SetSecurityInformers implements WantsSecurityInformer interface for constraint.
