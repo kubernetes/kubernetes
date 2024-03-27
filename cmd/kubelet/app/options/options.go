@@ -212,6 +212,9 @@ func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 		return nil, err
 	}
 	applyLegacyDefaults(config)
+	if err := config.Mutate(); err != nil {
+		return nil, err
+	}
 	return config, nil
 }
 
