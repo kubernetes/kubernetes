@@ -543,7 +543,7 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 								for _, containerMemory := range containerResource.Memory {
 									q := c.Resources.Limits[v1.ResourceName(containerMemory.MemoryType)]
 									value, ok := q.AsInt64()
-									gomega.Expect(ok).To(gomega.BeTrue())
+									gomega.Expect(ok).To(gomega.BeTrueBecause("cannot convert value to integer"))
 									gomega.Expect(value).To(gomega.BeEquivalentTo(containerMemory.Size_))
 								}
 							}
@@ -626,9 +626,9 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 
 					return true
 				}, time.Minute, 5*time.Second).Should(
-					gomega.BeTrue(),
-					"the pod succeeded to start, when it should fail with the admission error",
-				)
+					gomega.BeTrueBecause(
+						"the pod succeeded to start, when it should fail with the admission error",
+					))
 			})
 
 			ginkgo.JustAfterEach(func(ctx context.Context) {

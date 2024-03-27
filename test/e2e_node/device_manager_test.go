@@ -130,7 +130,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				return nodes == 1
-			}, time.Minute, time.Second).Should(gomega.BeTrue())
+			}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 
 			// note we DO NOT start the sriov device plugin. This is intentional.
 			// issue#102880 reproduces because of a race on startup caused by corrupted device manager
@@ -250,7 +250,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				return nodes == 1
-			}, time.Minute, time.Second).Should(gomega.BeTrue())
+			}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 
 			sd2 := &sriovData{
 				configMap:      sd.configMap,

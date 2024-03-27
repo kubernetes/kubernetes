@@ -194,7 +194,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, time.Minute, time.Second).Should(gomega.BeFalse())
+			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 
@@ -204,7 +204,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 		}
 	})
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
@@ -221,7 +221,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// wait until the kubelet health check will fail
 	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalse())
+	}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 
@@ -231,7 +231,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	if err != nil {
 		return err

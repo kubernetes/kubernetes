@@ -202,7 +202,7 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework, setupResour
 	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		return areGPUsAvailableOnAllSchedulableNodes(ctx, f)
-	}, driverInstallTimeout, time.Second).Should(gomega.BeTrue())
+	}, driverInstallTimeout, time.Second).Should(gomega.BeTrueBecause("NVIDIA GPUs are not available on all nodes"))
 
 	return rsgather
 }
