@@ -22,9 +22,9 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/klog/v2"
-
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/klog/v2"
 )
 
 // WarningHandler is an interface for handling warning headers
@@ -61,13 +61,22 @@ type NoWarnings struct{}
 func (NoWarnings) HandleWarningHeader(code int, agent string, message string) {}
 
 // WarningLogger is an implementation of WarningHandler that logs code 299 warnings
-type WarningLogger struct{}
+type WarningLogger struct {
+	// Logger sets a logger to print warning message that from header,
+	// if it's not set, the default value klog.Background() is used.
+	Logger *logr.Logger
+}
 
-func (WarningLogger) HandleWarningHeader(code int, agent string, message string) {
+//logcheck:context // Use HandleWarningHeaderWithContext instead in code which supports contextual logging.
+func (l WarningLogger) HandleWarningHeader(code int, agent string, message string) {
 	if code != 299 || len(message) == 0 {
 		return
 	}
-	klog.Warning(message)
+	if l.Logger == nil {
+		def := klog.Background()
+		l.Logger = &def
+	}
+	l.Logger.Info(message)
 }
 
 type warningWriter struct {
