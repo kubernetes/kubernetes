@@ -1,0 +1,10 @@
+apiVersion: coordination.k8s.io/v1
+kind: Lease
+metadata:
+  annotations:
+    coordination.k8s.io/can-lead-leases: "kube-system/amazing-controller"
+    coordination.k8s.io/compatibility-version: "1.30"
+  name: amazing-controller-identity-1
+  namespace: kube-system
+spec:
+  holderIdentity: amazing-controller-1

@@ -22,12 +22,14 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/spf13/cobra"
 
@@ -71,6 +73,10 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
+
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -259,9 +265,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	if err != nil {
 		return err
 	}
+	id = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(id, "")
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
-	id = id + "_" + string(uuid.NewUUID())
+	id = id + "-" + string(uuid.NewUUID())
 
 	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
 	var leaderMigrator *leadermigration.LeaderMigrator = nil
@@ -284,8 +291,25 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 	}
 
+	// Start component identity lease management
+	identityLease := &leaderelection.IdentityLease{
+		LeaseClient:            c.Client.CoordinationV1().Leases("kube-system"),
+		HolderIdentity:         "kube-controller-manager-" + id,
+		LeaseName:              "kube-controller-manager-" + id, // TODO: safely append uids
+		LeaseNamespace:         "kube-system",                   // TODO: put this in kube-system once RBAC is set up for that
+		LeaseDurationSeconds:   10,
+		Clock:                  clock.RealClock{},
+		CanLeadLeasesName:      "kube-controller-manager",
+		CanLeadLeasesNamespace: "kube-system",
+		CanLeadLeases:          "kube-system/kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
+		RenewInterval:          5,
+		BinaryVersion:          version.Get().Major + "." + version.Get().Minor,
+		CompatibilityVersion:   version.Get().Major + "." + version.Get().Minor,
+	}
+	go identityLease.Run(ctx)
+
 	// Start the main lock
-	go leaderElectAndRun(ctx, c, id, electionChecker,
+	go leaderElectAndRun(ctx, c, "kube-controller-manager-"+id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
@@ -570,7 +594,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
 		}
 	}
-
 	return controllers
 }
 
@@ -871,13 +894,14 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 	}
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks:     callbacks,
-		WatchDog:      electionChecker,
-		Name:          leaseName,
+		Lock:                      rl,
+		LeaseDuration:             c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline:             c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:               c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks:                 callbacks,
+		WatchDog:                  electionChecker,
+		Name:                      leaseName,
+		CoordinatedLeaderElection: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
 	})
 
 	panic("unreachable")

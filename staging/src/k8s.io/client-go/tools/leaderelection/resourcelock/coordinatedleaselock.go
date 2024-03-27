@@ -28,7 +28,7 @@ import (
 	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 )
 
-type LeaseLock struct {
+type CoordinatedLeaseLock struct {
 	// LeaseMeta should contain a Name and a Namespace of a
 	// LeaseMeta object that the LeaderElector will attempt to lead.
 	LeaseMeta  metav1.ObjectMeta
@@ -38,13 +38,14 @@ type LeaseLock struct {
 }
 
 // Get returns the election record from a Lease spec
-func (ll *LeaseLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
+func (ll *CoordinatedLeaseLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
 	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ctx, ll.LeaseMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
 	ll.lease = lease
-	record := LeaseSpecToLeaderElectionRecord(&ll.lease.Spec, false)
+	endOfTerm := ll.lease.Annotations["coordination.k8s.io/end-of-term"]
+	record := LeaseSpecToLeaderElectionRecord(&ll.lease.Spec, endOfTerm == "true")
 	recordByte, err := json.Marshal(*record)
 	if err != nil {
 		return nil, nil, err
@@ -53,7 +54,7 @@ func (ll *LeaseLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, er
 }
 
 // Create attempts to create a Lease
-func (ll *LeaseLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
+func (ll *CoordinatedLeaseLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
 	var err error
 	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Create(ctx, &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
@@ -66,11 +67,16 @@ func (ll *LeaseLock) Create(ctx context.Context, ler LeaderElectionRecord) error
 }
 
 // Update will update an existing Lease spec.
-func (ll *LeaseLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
+func (ll *CoordinatedLeaseLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
 	if ll.lease == nil {
 		return errors.New("lease not initialized, call get or create first")
 	}
 	ll.lease.Spec = LeaderElectionRecordToLeaseSpec(&ler)
+	if ler.EndOfTerm {
+		ll.lease.Annotations["coordination.k8s.io/end-of-term"] = "true"
+	} else {
+		delete(ll.lease.Annotations, "coordination.k8s.io/end-of-term")
+	}
 
 	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Update(ctx, ll.lease, metav1.UpdateOptions{})
 	if err != nil {
@@ -82,7 +88,7 @@ func (ll *LeaseLock) Update(ctx context.Context, ler LeaderElectionRecord) error
 }
 
 // RecordEvent in leader election while adding meta-data
-func (ll *LeaseLock) RecordEvent(s string) {
+func (ll *CoordinatedLeaseLock) RecordEvent(s string) {
 	if ll.LockConfig.EventRecorder == nil {
 		return
 	}
@@ -96,45 +102,11 @@ func (ll *LeaseLock) RecordEvent(s string) {
 
 // Describe is used to convert details on current resource lock
 // into a string
-func (ll *LeaseLock) Describe() string {
+func (ll *CoordinatedLeaseLock) Describe() string {
 	return fmt.Sprintf("%v/%v", ll.LeaseMeta.Namespace, ll.LeaseMeta.Name)
 }
 
 // Identity returns the Identity of the lock
-func (ll *LeaseLock) Identity() string {
+func (ll *CoordinatedLeaseLock) Identity() string {
 	return ll.LockConfig.Identity
-}
-
-func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec, endOfTerm bool) *LeaderElectionRecord {
-	var r LeaderElectionRecord
-	if spec.HolderIdentity != nil {
-		r.HolderIdentity = *spec.HolderIdentity
-	}
-	if spec.LeaseDurationSeconds != nil {
-		r.LeaseDurationSeconds = int(*spec.LeaseDurationSeconds)
-	}
-	if spec.LeaseTransitions != nil {
-		r.LeaderTransitions = int(*spec.LeaseTransitions)
-	}
-	if spec.AcquireTime != nil {
-		r.AcquireTime = metav1.Time{Time: spec.AcquireTime.Time}
-	}
-	if spec.RenewTime != nil {
-		r.RenewTime = metav1.Time{Time: spec.RenewTime.Time}
-	}
-	r.EndOfTerm = endOfTerm
-	return &r
-
-}
-
-func LeaderElectionRecordToLeaseSpec(ler *LeaderElectionRecord) coordinationv1.LeaseSpec {
-	leaseDurationSeconds := int32(ler.LeaseDurationSeconds)
-	leaseTransitions := int32(ler.LeaderTransitions)
-	return coordinationv1.LeaseSpec{
-		HolderIdentity:       &ler.HolderIdentity,
-		LeaseDurationSeconds: &leaseDurationSeconds,
-		AcquireTime:          &metav1.MicroTime{Time: ler.AcquireTime.Time},
-		RenewTime:            &metav1.MicroTime{Time: ler.RenewTime.Time},
-		LeaseTransitions:     &leaseTransitions,
-	}
 }

@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,10 +32,14 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
 	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
@@ -65,6 +67,11 @@ const (
 
 // Controller is the controller implementation for Foo resources
 type Controller struct {
+	identity             string
+	binaryVersion        string
+	compatibilityVersion string
+
+	kubeconfig *restclient.Config
 	// kubeclientset is a standard kubernetes clientset
 	kubeclientset kubernetes.Interface
 	// sampleclientset is a clientset for our own API group
@@ -89,6 +96,8 @@ type Controller struct {
 // NewController returns a new sample controller
 func NewController(
 	ctx context.Context,
+	kubeconfig *restclient.Config,
+	identity, binaryVersion, compatibilityVersion string,
 	kubeclientset kubernetes.Interface,
 	sampleclientset clientset.Interface,
 	deploymentInformer appsinformers.DeploymentInformer,
@@ -105,20 +114,19 @@ func NewController(
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
-	ratelimiter := workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(50), 300)},
-	)
-
 	controller := &Controller{
-		kubeclientset:     kubeclientset,
-		sampleclientset:   sampleclientset,
-		deploymentsLister: deploymentInformer.Lister(),
-		deploymentsSynced: deploymentInformer.Informer().HasSynced,
-		foosLister:        fooInformer.Lister(),
-		foosSynced:        fooInformer.Informer().HasSynced,
-		workqueue:         workqueue.NewRateLimitingQueue(ratelimiter),
-		recorder:          recorder,
+		kubeconfig:           kubeconfig,
+		identity:             identity,
+		binaryVersion:        binaryVersion,
+		compatibilityVersion: compatibilityVersion,
+		kubeclientset:        kubeclientset,
+		sampleclientset:      sampleclientset,
+		deploymentsLister:    deploymentInformer.Lister(),
+		deploymentsSynced:    deploymentInformer.Informer().HasSynced,
+		foosLister:           fooInformer.Lister(),
+		foosSynced:           fooInformer.Informer().HasSynced,
+		workqueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Foos"),
+		recorder:             recorder,
 	}
 
 	logger.Info("Setting up event handlers")
@@ -158,31 +166,103 @@ func NewController(
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
 func (c *Controller) Run(ctx context.Context, workers int) error {
+	klog.Info("Running")
 	defer utilruntime.HandleCrash()
-	defer c.workqueue.ShutDown()
-	logger := klog.FromContext(ctx)
 
-	// Start the informer factories to begin populating the informer caches
-	logger.Info("Starting Foo controller")
-
-	// Wait for the caches to be synced before starting workers
-	logger.Info("Waiting for informer caches to sync")
-
-	if ok := cache.WaitForCacheSync(ctx.Done(), c.deploymentsSynced, c.foosSynced); !ok {
-		return fmt.Errorf("failed to wait for caches to sync")
+	// Start component identity lease management
+	identityLease := &leaderelection.IdentityLease{
+		LeaseClient:            c.kubeclientset.CoordinationV1().Leases("kube-system"),
+		HolderIdentity:         c.identity,
+		LeaseName:              c.identity,    // TODO: safely append uids
+		LeaseNamespace:         "kube-system", // TODO: put this in kube-system once RBAC is set up for that
+		LeaseDurationSeconds:   60,
+		Clock:                  clock.RealClock{},
+		CanLeadLeasesNamespace: "kube-system",
+		CanLeadLeasesName:      "foo",
+		CanLeadLeases:          "kube-system/sample-controller", // TODO: wire this in. It must be comma separated namespace/name pairs.
+		RenewInterval:          10,
+		BinaryVersion:          binaryVersion,
+		CompatibilityVersion:   compatibilityVersion,
 	}
+	// TODO: Wrap this in a Run/sync() loop like lease.controller.Run()/sync()
+	// TODO: Need to fix this in order to trigger re-elections!
+	go identityLease.Run(ctx)
 
-	logger.Info("Starting workers", "count", workers)
-	// Launch two workers to process Foo resources
-	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+	// TODO: Port in leaderElectAndRun from controllermanager.go
+
+	run := func(ctx context.Context) {
+		defer c.workqueue.ShutDown()
+		logger := klog.FromContext(ctx)
+
+		// Start the informer factories to begin populating the informer caches
+		logger.Info("Starting Foo controller")
+
+		// Wait for the caches to be synced before starting workers
+		logger.Info("Waiting for informer caches to sync")
+
+		if ok := cache.WaitForCacheSync(ctx.Done(), c.deploymentsSynced, c.foosSynced); !ok {
+			logger.Info("Error starting controllers")
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		}
+
+		logger.Info("Starting workers", "count", workers)
+		// Launch two workers to process Foo resources
+		for i := 0; i < workers; i++ {
+			go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		}
+
+		logger.Info("Started workers")
+		<-ctx.Done()
+		logger.Info("Shutting down workers")
 	}
+	electionChecker := leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
+	klog.Info("calling leaderElectAndRun")
+	go leaderElectAndRun(ctx, c.kubeconfig, c.identity, electionChecker,
+		"kube-system",
+		"coordinatedLeases",
+		"sample-controller",
+		leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				klog.Info("Elected leader, starting..")
+				run(ctx)
+			},
+			OnStoppedLeading: func() {
+				klog.Error("Lost leadership, stopping")
+				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			},
+		})
 
-	logger.Info("Started workers")
 	<-ctx.Done()
-	logger.Info("Shutting down workers")
-
 	return nil
+}
+
+func leaderElectAndRun(ctx context.Context, kubeconfig *restclient.Config, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceNamespace, resourceLock, leaseName string, callbacks leaderelection.LeaderCallbacks) {
+	logger := klog.FromContext(ctx)
+	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
+		resourceNamespace,
+		leaseName,
+		resourcelock.ResourceLockConfig{
+			Identity: lockIdentity,
+		},
+		kubeconfig,
+		5*time.Second)
+	if err != nil {
+		logger.Error(err, "Error creating lock")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+		Lock:                      rl,
+		LeaseDuration:             20 * time.Second,
+		RenewDeadline:             10 * time.Second,
+		RetryPeriod:               5 * time.Second,
+		Callbacks:                 callbacks,
+		WatchDog:                  electionChecker,
+		Name:                      leaseName,
+		CoordinatedLeaderElection: true,
+	})
+
+	panic("unreachable")
 }
 
 // runWorker is a long-running function that will continually call the

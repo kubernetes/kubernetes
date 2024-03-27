@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -50,6 +51,9 @@ func createLockObject(t *testing.T, objectType, namespace, name string, record *
 		recordBytes, _ := json.Marshal(record)
 		objectMeta.Annotations = map[string]string{
 			rl.LeaderElectionRecordAnnotationKey: string(recordBytes),
+		}
+		if record.EndOfTerm {
+			objectMeta.Annotations["coordination.k8s.io/end-of-term"] = "true"
 		}
 	}
 	switch objectType {
@@ -370,14 +374,14 @@ func TestLeaseSpecToLeaderElectionRecordRoundTrip(t *testing.T) {
 		LeaseTransitions:     &leaseTransitions,
 	}
 
-	oldRecord := rl.LeaseSpecToLeaderElectionRecord(&oldSpec)
+	oldRecord := rl.LeaseSpecToLeaderElectionRecord(&oldSpec, false)
 	newSpec := rl.LeaderElectionRecordToLeaseSpec(oldRecord)
 
 	if !equality.Semantic.DeepEqual(oldSpec, newSpec) {
 		t.Errorf("diff: %v", cmp.Diff(oldSpec, newSpec))
 	}
 
-	newRecord := rl.LeaseSpecToLeaderElectionRecord(&newSpec)
+	newRecord := rl.LeaseSpecToLeaderElectionRecord(&newSpec, false)
 
 	if !equality.Semantic.DeepEqual(oldRecord, newRecord) {
 		t.Errorf("diff: %v", cmp.Diff(oldRecord, newRecord))
