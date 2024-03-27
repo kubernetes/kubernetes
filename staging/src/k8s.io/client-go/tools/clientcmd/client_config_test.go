@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	utiltesting "k8s.io/client-go/util/testing"
 
@@ -69,7 +70,7 @@ func TestMergoSemantics(t *testing.T) {
 			t.Errorf("error while merging: %s", err)
 		}
 		if !reflect.DeepEqual(data.dst, data.expected) {
-			// The mergo library has previously changed in a an incompatible way.
+			// The mergo library has previously changed in an incompatible way.
 			// example:
 			//
 			//   https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a
@@ -788,6 +789,14 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 			},
 		},
 		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server: "https://host-from-overrides.com",
+				},
+				Timeout: "30",
+			},
+		},
+		{
 			overrides: &ConfigOverrides{},
 		},
 	}
@@ -797,6 +806,7 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		expectedToken := "token-from-cluster"
 		expectedTokenFile := "tokenfile-from-cluster"
 		expectedCAFile := "/path/to/ca-from-cluster.crt"
+		expectedTimeout := time.Duration(0)
 
 		icc := &inClusterClientConfig{
 			inClusterConfigProvider: func() (*restclient.Config, error) {
@@ -839,6 +849,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		}
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)
+		}
+		if clientConfig.Timeout != expectedTimeout {
+			t.Errorf("Expected timeout %v, got %v", expectedTimeout, clientConfig.Timeout)
 		}
 	}
 }

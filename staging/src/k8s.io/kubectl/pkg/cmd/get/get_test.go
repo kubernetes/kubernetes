@@ -1577,6 +1577,8 @@ func TestGetMultipleTypeTableObjectsWithLabelSelector(t *testing.T) {
 	cmd.SetErr(buf)
 
 	cmd.Flags().Set("selector", "a=b")
+	//cmd.Flags().Set("request-timeout", "20s")
+	//cmd.Flags().Set("as", "foo")
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
