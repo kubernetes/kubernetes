@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -166,7 +167,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			_, err = ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
-			framework.ExpectError(err, "While updating non-expandable PVC")
+			gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "While updating non-expandable PVC"))
 		})
 	} else {
 		ginkgo.It("Verify if offline PVC expansion works", func(ctx context.Context) {
@@ -316,7 +317,7 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 		return true, nil
 	})
 	if wait.Interrupted(waitErr) {
-		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %v", lastUpdateError)
+		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %w", lastUpdateError)
 	}
 	if waitErr != nil {
 		return nil, fmt.Errorf("failed to expand PVC size (check logs for error): %v", waitErr)

@@ -23,6 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,7 +102,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 					}
 				}
 				if test.disableAttach {
-					framework.ExpectError(err, "Unexpected VolumeAttachment found")
+					gomega.Expect(err).To(gomega.MatchError(apierrors.IsNotFound, "Unexpected VolumeAttachment found"))
 				}
 			})
 
