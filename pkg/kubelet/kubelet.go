@@ -2590,8 +2590,14 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			} else {
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
-					kl.rejectPod(pod, reason, message)
-					continue
+					// Check whether the Pod is in non-pending state 
+					if pod.Status.Phase != v1.PodPending {
+						klog.Warningln("Admit failed, rejects are skipped", "pod", klog.KObj(pod), "reason", reason, "message", message)
+						kl.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
+					} else {
+						kl.rejectPod(pod, reason, message)
+						continue
+					}
 				}
 			}
 		}
