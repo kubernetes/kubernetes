@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug encountered while operating Kubernetes
+description: Report a bug encountered while operating Kubernetes or feature request
 labels: kind/bug
 body:
   - type: textarea
