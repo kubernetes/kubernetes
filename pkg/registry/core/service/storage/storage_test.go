@@ -6079,7 +6079,7 @@ func TestCreateInvalidClusterIPInputs(t *testing.T) {
 		families: []api.IPFamily{api.IPv4Protocol},
 		svc: svctest.MakeService("foo",
 			svctest.SetClusterIPs("")),
-		expect: []string{"must be empty when", "must be a valid IP"},
+		expect: []string{"must be empty when", "expected an IP address"},
 	}, {
 		name:     "None_IP_1",
 		families: []api.IPFamily{api.IPv4Protocol},

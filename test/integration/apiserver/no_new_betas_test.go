@@ -23,6 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+func gvr(g, v, r string) schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: g, Version: v, Resource: r}
+}
+
 func TestNoNewBetaAPIsByDefault(t *testing.T) {
 	// yes, this *is* a copy/paste from somewhere else.  We really do mean it when we say you shouldn't be modifying
 	// this list and this test was created to make it more painful.

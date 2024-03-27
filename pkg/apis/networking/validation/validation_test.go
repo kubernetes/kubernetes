@@ -299,6 +299,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		"invalid ipv6 cidr format": makeNetworkPolicyCustom(setIngressFromIPBlockIPV6, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "fd00:192:168::"
 		}),
+		"formerly-valid, now invalid cidr format": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
+			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "192.168.5.6/24"
+		}),
 		"except field is an empty string": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{""}
 		}),
@@ -311,7 +314,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		"except IP is outside of CIDR range": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
 				CIDR:   "192.168.8.0/24",
-				Except: []string{"192.168.9.1/24"},
+				Except: []string{"192.168.9.1/32"},
 			}
 		}),
 		"except IP is not strictly within CIDR range": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
@@ -417,12 +420,93 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
+		"fix pre-existing invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
+		"fail to fix pre-existing invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.1.0/24",
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
 	}
 
 	for testName, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{false}); len(errs) != 0 {
+		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success (%s): %v", testName, errs)
 		}
 	}
@@ -444,12 +528,53 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
+		"add new invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.1.1/24",
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
 	}
 
 	for testName, errorCase := range errorCases {
 		errorCase.old.ObjectMeta.ResourceVersion = "1"
 		errorCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{false}); len(errs) == 0 {
+		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -1801,7 +1926,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	invalidIP.Status = networking.IngressStatus{
 		LoadBalancer: networking.IngressLoadBalancerStatus{
 			Ingress: []networking.IngressLoadBalancerIngress{
-				{IP: "abcd", Hostname: "foo.com"},
+				{IP: "127.0.0.02", Hostname: "foo.com"},
 			},
 		},
 	}
@@ -1815,6 +1940,12 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	}
 
 	errs := ValidateIngressStatusUpdate(&newValue, &oldValue)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error %v", errs)
+	}
+
+	// Invalid IP is ignored if unmodified
+	errs = ValidateIngressStatusUpdate(&invalidIP, &invalidIP)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
 	}
