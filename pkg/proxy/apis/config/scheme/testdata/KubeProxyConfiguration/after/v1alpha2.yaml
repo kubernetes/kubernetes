@@ -1,0 +1,59 @@
+apiVersion: kubeproxy.config.k8s.io/v1alpha2
+bindAddressHardFail: false
+clientConnection:
+  acceptContentTypes: ""
+  burst: 10
+  contentType: application/vnd.kubernetes.protobuf
+  kubeconfig: ""
+  qps: 5
+configHardFail: true
+configSyncPeriod: 15m0s
+detectLocal: {}
+enableProfiling: false
+healthzBindAddresses:
+- 0.0.0.0/0
+- ::/0
+healthzBindPort: 10256
+iptables:
+  localhostNodePorts: false
+  masqueradeBit: 14
+ipvs:
+  masqueradeBit: 14
+  strictARP: false
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
+kind: KubeProxyConfiguration
+linux:
+  conntrack:
+    maxPerCore: 32768
+    min: 131072
+    tcpBeLiberal: false
+    tcpCloseWaitTimeout: 1h0m0s
+    tcpEstablishedTimeout: 24h0m0s
+    udpStreamTimeout: 0s
+    udpTimeout: 0s
+  masqueradeAll: false
+  oomScoreAdj: -999
+logging:
+  flushFrequency: 5s
+  format: text
+  options:
+    json:
+      infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
+  verbosity: 0
+metricsBindAddresses:
+- 127.0.0.0/8
+- ::1/128
+metricsBindPort: 10249
+minSyncPeriod: 1s
+nftables:
+  masqueradeBit: 14
+syncPeriod: 30s
+windows:
+  runAsService: false
+winkernel:
+  enableDSR: false
+  forwardHealthCheckVip: false

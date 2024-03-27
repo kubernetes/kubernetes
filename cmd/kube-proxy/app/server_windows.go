@@ -91,25 +91,25 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 
 	if dualStackMode {
 		proxier, err = winkernel.NewDualStackProxier(
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
+			config.SyncPeriod.Duration,
+			config.MinSyncPeriod.Duration,
 			s.Hostname,
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
-			config.HealthzBindAddress,
+			config.HealthzBindPort,
 			config.Winkernel,
 		)
 	} else {
 		proxier, err = winkernel.NewProxier(
 			s.PrimaryIPFamily,
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
+			config.SyncPeriod.Duration,
+			config.MinSyncPeriod.Duration,
 			s.Hostname,
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,
-			config.HealthzBindAddress,
+			config.HealthzBindPort,
 			config.Winkernel,
 		)
 	}

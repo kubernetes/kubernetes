@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package v1alpha2
 
 import (
-	"fmt"
-	"sort"
-	"strings"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfig "k8s.io/component-base/config"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
@@ -31,19 +27,19 @@ import (
 type KubeProxyLinuxConfiguration struct {
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
 	// the range [-1000, 1000]
-	OOMScoreAdj *int32
+	OOMScoreAdj *int32 `json:"oomScoreAdj,omitempty"`
 	// conntrack contains conntrack-related configuration options.
-	Conntrack KubeProxyConntrackConfiguration
+	Conntrack KubeProxyConntrackConfiguration `json:"conntrack,omitempty"`
 	// masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs. This may
 	// be required with some CNI plugins.
-	MasqueradeAll bool
+	MasqueradeAll bool `json:"masqueradeAll"`
 }
 
 // KubeProxyWindowsConfiguration contains windows-platform-related configuration details for the
 // Kubernetes proxy server that aren't specific to a particular backend
 type KubeProxyWindowsConfiguration struct {
 	// runAsService, if true, enables windows service control manager API integration.
-	RunAsService bool
+	RunAsService bool `json:"runAsService"`
 }
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
@@ -51,12 +47,12 @@ type KubeProxyWindowsConfiguration struct {
 type KubeProxyIPTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the iptables proxy mode. Values must be within the range [0, 31].
-	MasqueradeBit *int32
+	MasqueradeBit *int32 `json:"masqueradeBit,omitempty"`
 	// localhostNodePorts, if false, tells kube-proxy to disable the legacy behavior
 	// of allowing NodePort services to be accessed via localhost. (Applies only to
 	// iptables mode and IPv4; localhost NodePorts are never allowed with other proxy
 	// modes or with IPv6.)
-	LocalhostNodePorts *bool
+	LocalhostNodePorts *bool `json:"localhostNodePorts,omitempty"`
 }
 
 // KubeProxyIPVSConfiguration contains ipvs-related configuration
@@ -64,24 +60,24 @@ type KubeProxyIPTablesConfiguration struct {
 type KubeProxyIPVSConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the ipvs proxy mode. Values must be within the range [0, 31].
-	MasqueradeBit *int32
+	MasqueradeBit *int32 `json:"masqueradeBit,omitempty"`
 	// scheduler is the IPVS scheduler to use
-	Scheduler string
+	Scheduler string `json:"scheduler,omitempty"`
 	// excludeCIDRs is a list of CIDRs which the ipvs proxier should not touch
 	// when cleaning up ipvs services.
-	ExcludeCIDRs []string
+	ExcludeCIDRs []string `json:"excludeCIDRs,omitempty"`
 	// strictARP configures arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
-	StrictARP bool
+	StrictARP bool `json:"strictARP"`
 	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
 	// The default value is 0, which preserves the current timeout value on the system.
-	TCPTimeout metav1.Duration
+	TCPTimeout metav1.Duration `json:"tcpTimeout,omitempty"`
 	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
 	// The default value is 0, which preserves the current timeout value on the system.
-	TCPFinTimeout metav1.Duration
+	TCPFinTimeout metav1.Duration `json:"tcpFinTimeout,omitempty"`
 	// udpTimeout is the timeout value used for IPVS UDP packets.
 	// The default value is 0, which preserves the current timeout value on the system.
-	UDPTimeout metav1.Duration
+	UDPTimeout metav1.Duration `json:"udpTimeout,omitempty"`
 }
 
 // KubeProxyNFTablesConfiguration contains nftables-related configuration
@@ -89,7 +85,7 @@ type KubeProxyIPVSConfiguration struct {
 type KubeProxyNFTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the nftables proxy mode. Values must be within the range [0, 31].
-	MasqueradeBit *int32
+	MasqueradeBit *int32 `json:"masqueradeBit,omitempty"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -97,29 +93,29 @@ type KubeProxyNFTablesConfiguration struct {
 type KubeProxyConntrackConfiguration struct {
 	// maxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave the limit as-is and ignore min).
-	MaxPerCore *int32
+	MaxPerCore *int32 `json:"maxPerCore,omitempty"`
 	// min is the minimum value of connect-tracking records to allocate,
 	// regardless of maxPerCore (set maxPerCore=0 to leave the limit as-is).
-	Min *int32
+	Min *int32 `json:"min,omitempty"`
 	// tcpEstablishedTimeout is how long an idle TCP connection will be kept open
 	// (e.g. '2s').  Must be greater than 0 to set.
-	TCPEstablishedTimeout *metav1.Duration
+	TCPEstablishedTimeout *metav1.Duration `json:"tcpEstablishedTimeout,omitempty"`
 	// tcpCloseWaitTimeout is how long an idle conntrack entry
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
-	TCPCloseWaitTimeout *metav1.Duration
+	TCPCloseWaitTimeout *metav1.Duration `json:"tcpCloseWaitTimeout,omitempty"`
 	// tcpBeLiberal, if true, kube-proxy will configure conntrack
 	// to run in liberal mode for TCP connections and packets with
 	// out-of-window sequence numbers won't be marked INVALID.
-	TCPBeLiberal bool
+	TCPBeLiberal bool `json:"tcpBeLiberal"`
 	// udpTimeout is how long an idle UDP conntrack entry in
 	// UNREPLIED state will remain in the conntrack table
 	// (e.g. '30s'). Must be greater than 0 to set.
-	UDPTimeout metav1.Duration
+	UDPTimeout metav1.Duration `json:"udpTimeout,omitempty"`
 	// udpStreamTimeout is how long an idle UDP conntrack entry in
 	// ASSURED state will remain in the conntrack table
 	// (e.g. '300s'). Must be greater than 0 to set.
-	UDPStreamTimeout metav1.Duration
+	UDPStreamTimeout metav1.Duration `json:"udpStreamTimeout,omitempty"`
 }
 
 // KubeProxyWinkernelConfiguration contains Windows/HNS settings for
@@ -127,19 +123,19 @@ type KubeProxyConntrackConfiguration struct {
 type KubeProxyWinkernelConfiguration struct {
 	// networkName is the name of the network kube-proxy will use
 	// to create endpoints and policies
-	NetworkName string
+	NetworkName string `json:"networkName,omitempty"`
 	// sourceVip is the IP address of the source VIP endpoint used for
 	// NAT when loadbalancing
-	SourceVip string
+	SourceVip string `json:"sourceVip,omitempty"`
 	// enableDSR tells kube-proxy whether HNS policies should be created
 	// with DSR
-	EnableDSR bool
+	EnableDSR bool `json:"enableDSR"`
 	// rootHnsEndpointName is the name of hnsendpoint that is attached to
 	// l2bridge for root network namespace
-	RootHnsEndpointName string
+	RootHnsEndpointName string `json:"rootHnsEndpointName,omitempty"`
 	// forwardHealthCheckVip forwards service VIP for health check port on
 	// Windows
-	ForwardHealthCheckVip bool
+	ForwardHealthCheckVip bool `json:"forwardHealthCheckVip"`
 }
 
 // DetectLocalConfiguration contains optional settings related to DetectLocalMode option
@@ -147,15 +143,15 @@ type DetectLocalConfiguration struct {
 	// bridgeInterface is a bridge interface name. When DetectLocalMode is set to
 	// LocalModeBridgeInterface, kube-proxy will consider traffic to be local if
 	// it originates from this bridge.
-	BridgeInterface string
+	BridgeInterface string `json:"bridgeInterface,omitempty"`
 	// interfaceNamePrefix is an interface name prefix. When DetectLocalMode is set to
 	// LocalModeInterfaceNamePrefix, kube-proxy will consider traffic to be local if
 	// it originates from any interface whose name begins with this prefix.
-	InterfaceNamePrefix string
+	InterfaceNamePrefix string `json:"interfaceNamePrefix,omitempty"`
 	// clusterCIDRs is the list of CIDR ranges of the pods in the cluster. When
 	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
 	// traffic to be local if its source IP is in this range.
-	ClusterCIDRs []string
+	ClusterCIDRs []string `json:"clusterCIDRs,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -163,92 +159,90 @@ type DetectLocalConfiguration struct {
 // KubeProxyConfiguration contains everything necessary to configure the
 // Kubernetes proxy server.
 type KubeProxyConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
-	FeatureGates map[string]bool
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
-	ClientConnection componentbaseconfig.ClientConnectionConfiguration
+	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
 	// logging specifies the options of logging.
 	// Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go)
 	// for more information.
-	Logging logsapi.LoggingConfiguration
+	Logging logsapi.LoggingConfiguration `json:"logging,omitempty"`
 
 	// hostnameOverride, if non-empty, will be used as the name of the Node that
 	// kube-proxy is running on. If unset, the node name is assumed to be the same as
 	// the node's hostname.
-	HostnameOverride string
+	HostnameOverride string `json:"hostnameOverride,omitempty"`
 	// nodeIPOverride can be used to override kube-proxy's idea of what its node's
 	// primary IPs are.
-	NodeIPOverride []string
+	NodeIPOverride []string `json:"nodeIPOverride,omitempty"`
 	// healthzBindAddresses is a list of CIDR ranges that contains a valid node IP on which
 	// healthz server will be served on, defaulting to [ "0.0.0.0/0", "::/0" ].
-	HealthzBindAddresses []string
+	HealthzBindAddresses []string `json:"healthzBindAddresses,omitempty"`
 	// healthzBindPort is the port on which helathz server will be exposed, defaulting to 10256.
-	HealthzBindPort int32
+	HealthzBindPort int32 `json:"healthzBindPort,omitempty"`
 	// metricsBindAddresses is a list of CIDR ranges that contains a valid node IP on which
 	// metrics server will be served on, defaulting to [ "127.0.0.0/8", "::1/128" ].
-	MetricsBindAddresses []string
+	MetricsBindAddresses []string `json:"metricsBindAddresses,omitempty"`
 	// metricsBindPort is the port on which metrics server will be exposed, defaulting to 10249.
-	MetricsBindPort int32
-	// bindAddressHardFail, if true, tells kube-proxy to treat failure to bind to a
-	// port as fatal and exit
-	BindAddressHardFail bool
+	MetricsBindPort int32 `json:"metricsBindPort,omitempty"`
 	// configHardFail if set to true kube-proxy will exit rather than just warning on config errors.
-	ConfigHardFail *bool
+	ConfigHardFail      *bool `json:"configHardFail,omitempty"`
+	BindAddressHardFail bool  `json:"bindAddressHardFail"`
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
-	EnableProfiling bool
+	EnableProfiling bool `json:"enableProfiling"`
 	// showHiddenMetricsForVersion is the version for which you want to show hidden metrics.
-	ShowHiddenMetricsForVersion string
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 
 	// mode specifies which proxy mode to use.
-	Mode ProxyMode
+	Mode ProxyMode `json:"mode,omitempty"`
 
 	// linux contains linux-platform-related configuration options.
-	Linux KubeProxyLinuxConfiguration
+	Linux KubeProxyLinuxConfiguration `json:"linux,omitempty"`
 	// windows contains windows-related configuration options.
-	Windows KubeProxyWindowsConfiguration
+	Windows KubeProxyWindowsConfiguration `json:"windows,omitempty"`
 
 	// iptables contains iptables-related configuration options.
-	IPTables KubeProxyIPTablesConfiguration
+	IPTables KubeProxyIPTablesConfiguration `json:"iptables,omitempty"`
 	// ipvs contains ipvs-related configuration options.
-	IPVS KubeProxyIPVSConfiguration
-	// winkernel contains winkernel-related configuration options.
-	Winkernel KubeProxyWinkernelConfiguration
+	IPVS KubeProxyIPVSConfiguration `json:"ipvs,omitempty"`
 	// nftables contains nftables-related configuration options.
-	NFTables KubeProxyNFTablesConfiguration
+	NFTables KubeProxyNFTablesConfiguration `json:"nftables,omitempty"`
+	// winkernel contains winkernel-related configuration options.
+	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel,omitempty"`
 
 	// detectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
-	DetectLocalMode LocalMode
+	DetectLocalMode LocalMode `json:"detectLocalMode,omitempty"`
 	// detectLocal contains optional configuration settings related to DetectLocalMode.
-	DetectLocal DetectLocalConfiguration
+	DetectLocal DetectLocalConfiguration `json:"detectLocal,omitempty"`
 
 	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set,
 	// connections to NodePort services will only be accepted on node IPs in one of
 	// the indicated ranges. If unset, NodePort connections will be accepted on all
 	// local IPs.
-	NodePortAddresses []string
+	NodePortAddresses []string `json:"nodePortAddresses,omitempty"`
 
 	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
 	// various re-synchronizing and cleanup operations are performed. Must be greater
 	// than 0.
-	SyncPeriod metav1.Duration
+	SyncPeriod metav1.Duration `json:"syncPeriod,omitempty"`
 	// minSyncPeriod is the minimum period between proxier rule resyncs (e.g. '5s',
 	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
 	// result in an immediate proxier resync.
-	MinSyncPeriod metav1.Duration
+	MinSyncPeriod metav1.Duration `json:"minSyncPeriod,omitempty"`
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
-	ConfigSyncPeriod metav1.Duration
+	ConfigSyncPeriod metav1.Duration `json:"configSyncPeriod,omitempty"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
 //
-// Currently, three modes of proxy are available on Linux platforms: 'iptables', 'ipvs',
-// and 'nftables'. One mode of proxy is available on Windows platforms: 'kernelspace'.
+// Currently, two modes of proxy are available on Linux platforms: 'iptables' and 'ipvs'.
+// One mode of proxy is available on Windows platforms: 'kernelspace'.
 //
 // If the proxy mode is unspecified, the best-available proxy mode will be used (currently this
 // is `iptables` on Linux and `kernelspace` on Windows). If the selected proxy mode cannot be
@@ -256,82 +250,5 @@ type KubeProxyConfiguration struct {
 // will exit with an error.
 type ProxyMode string
 
-const (
-	ProxyModeIPTables    ProxyMode = "iptables"
-	ProxyModeIPVS        ProxyMode = "ipvs"
-	ProxyModeNFTables    ProxyMode = "nftables"
-	ProxyModeKernelspace ProxyMode = "kernelspace"
-)
-
 // LocalMode represents modes to detect local traffic from the node
 type LocalMode string
-
-// Currently supported modes for LocalMode
-const (
-	LocalModeClusterCIDR         LocalMode = "ClusterCIDR"
-	LocalModeNodeCIDR            LocalMode = "NodeCIDR"
-	LocalModeBridgeInterface     LocalMode = "BridgeInterface"
-	LocalModeInterfaceNamePrefix LocalMode = "InterfaceNamePrefix"
-)
-
-func (m *ProxyMode) Set(s string) error {
-	*m = ProxyMode(s)
-	return nil
-}
-
-func (m *ProxyMode) String() string {
-	if m != nil {
-		return string(*m)
-	}
-	return ""
-}
-
-func (m *ProxyMode) Type() string {
-	return "ProxyMode"
-}
-
-func (m *LocalMode) Set(s string) error {
-	*m = LocalMode(s)
-	return nil
-}
-
-func (m *LocalMode) String() string {
-	if m != nil {
-		return string(*m)
-	}
-	return ""
-}
-
-func (m *LocalMode) Type() string {
-	return "LocalMode"
-}
-
-type ConfigurationMap map[string]string
-
-func (m *ConfigurationMap) String() string {
-	pairs := []string{}
-	for k, v := range *m {
-		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
-	}
-	sort.Strings(pairs)
-	return strings.Join(pairs, ",")
-}
-
-func (m *ConfigurationMap) Set(value string) error {
-	for _, s := range strings.Split(value, ",") {
-		if len(s) == 0 {
-			continue
-		}
-		arr := strings.SplitN(s, "=", 2)
-		if len(arr) == 2 {
-			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
-		} else {
-			(*m)[strings.TrimSpace(arr[0])] = ""
-		}
-	}
-	return nil
-}
-
-func (*ConfigurationMap) Type() string {
-	return "mapStringString"
-}
