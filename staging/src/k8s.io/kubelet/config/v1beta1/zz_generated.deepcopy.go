@@ -408,6 +408,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	if in.DisabledMetrics != nil {
+		in, out := &in.DisabledMetrics, &out.DisabledMetrics
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.EnforceNodeAllocatable != nil {
 		in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
 		*out = make([]string, len(*in))
