@@ -94,7 +94,7 @@ W+S7SneWTL09leh5ATNhog6s
 // TestGracefulShutdownForActiveHTTP2Streams checks if graceful shut down of HTTP2 server works.
 // It expects that all active connections will be finished (without any errors) before the server exits.
 //
-// The test sends 25 requests to the target server in parallel. Each request is held by the target server for 60s.
+// The test sends 25 requests to the target server in parallel. Each request is held by the target server for 10s.
 // As soon as the target server receives the last request the test calls backendServer.Config.Shutdown which gracefully shuts down the server without interrupting any active connections.
 //
 // See more at: https://github.com/golang/go/issues/39776
@@ -187,7 +187,7 @@ func (b *backendHTTPHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	}
 	handlerLock.Unlock()
 
-	time.Sleep(60 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	w.Write([]byte("hello from the backend"))
 	w.WriteHeader(http.StatusOK)
