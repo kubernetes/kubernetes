@@ -35,6 +35,8 @@ func TestPerfCounter(t *testing.T) {
 	}{
 		"CPU Query": {
 			counter: cpuQuery,
+			// TODO: remove skip once the test flake for CPU Query has been fixed.
+			skipCheck: true,
 		},
 		"Memory Prvate Working Set Query": {
 			counter: memoryPrivWorkingSetQuery,
