@@ -211,7 +211,6 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 		p.addSwapStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
-		p.addProcessStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
@@ -220,7 +219,9 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 			klog.V(5).InfoS("Unable to find cadvisor stats for container", "containerID", containerID)
 		} else {
 			p.addCadvisorContainerStats(cs, &caStats)
+			p.addProcessStats(ps, &caStats)
 		}
+
 		ps.Containers = append(ps.Containers, *cs)
 	}
 	// cleanup outdated caches.
@@ -584,16 +585,11 @@ func (p *criStatsProvider) addSwapStats(
 
 func (p *criStatsProvider) addProcessStats(
 	ps *statsapi.PodStats,
-	podUID types.UID,
-	allInfos map[string]cadvisorapiv2.ContainerInfo,
-	cs *statsapi.ContainerStats,
+	container *cadvisorapiv2.ContainerInfo,
 ) {
-	// try get process stats from cadvisor only.
-	info := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-	if info != nil {
-		ps.ProcessStats = cadvisorInfoToProcessStats(info)
-		return
-	}
+	processStats := cadvisorInfoToProcessStats(container)
+	// Sum up all of the process stats for each of the containers to obtain the cumulative pod level process count
+	ps.ProcessStats = mergeProcessStats(ps.ProcessStats, processStats)
 }
 
 func (p *criStatsProvider) makeContainerStats(
