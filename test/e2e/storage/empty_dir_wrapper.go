@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -205,6 +206,101 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		for i := 0; i < wrappedVolumeRaceGitRepoIterationCount; i++ {
 			testNoWrappedVolumeRace(ctx, f, volumes, volumeMounts, wrappedVolumeRaceGitRepoPodCount)
 		}
+	})
+
+	f.It("Make sure tmpfs is being mounted with a noswap option", func() {
+		ctx := context.Background()
+
+		ginkgo.By("Creating a secret")
+		const secretVolumeName = "secret-volume"
+		const secretMountPath = "/etc/secret-volume"
+		secretName := "secret-" + string(uuid.NewUUID())
+
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      secretName,
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("value-1\n"),
+			},
+		}
+
+		var err error
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+		}
+
+		const emptyDirVolumeName = "emptydir-volume"
+		const emptyDirMountPath = "/etc/emptydir-volume"
+
+		ginkgo.By("Creating a pod consuming config map and secret")
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-" + string(uuid.NewUUID()),
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: secretVolumeName,
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: secretName,
+							},
+						},
+					},
+					{
+						Name: emptyDirVolumeName,
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: v1.StorageMediumMemory,
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  "test-container",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"test-webserver"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      secretVolumeName,
+								MountPath: secretMountPath,
+							},
+							{
+								Name:      emptyDirVolumeName,
+								MountPath: emptyDirMountPath,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+		err = e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ginkgo.By("Ensuring volumes are mounted with the noswap option")
+		for _, mountPath := range []string{secretMountPath, emptyDirMountPath} {
+			cmd := fmt.Sprintf("cat /proc/mounts | grep %s", mountPath)
+			output := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-ec", cmd)
+			gomega.Expect(output).To(gomega.ContainSubstring("tmpfs"))
+			gomega.Expect(output).To(gomega.ContainSubstring("noswap"))
+		}
+
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			ginkgo.By("Cleaning up the secret")
+			if err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
+				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
+			}
+			ginkgo.By("Cleaning up the pod")
+			if err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
+				framework.Failf("unable to delete pod %v: %v", pod.Name, err)
+			}
+		})
 	})
 })
 
