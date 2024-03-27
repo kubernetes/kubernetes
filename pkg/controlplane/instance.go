@@ -64,6 +64,7 @@ import (
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -674,9 +675,42 @@ type RESTStorageProvider interface {
 	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error)
 }
 
+// storageReadinessHook implements PostStartHook functionality for checking readiness
+// of storages for underlying resources.
+type storageReadinessHook struct {
+	checks map[string]func() error
+}
+
+func newStorageReadinessHook() *storageReadinessHook {
+	return &storageReadinessHook{
+		checks: make(map[string]func() error),
+	}
+}
+
+func (srh *storageReadinessHook) addStorage(gvr string, storage rest.StorageWithReadiness) {
+	// FIXME: Handle duplicates.
+	srh.checks[gvr] = storage.ReadinessCheck
+}
+
+func (srh *storageReadinessHook) hook(_ genericapiserver.PostStartHookContext) error {
+	failedChecks := []string{}
+	for gvr, check := range srh.checks {
+		if err := check(); err != nil {
+			failedChecks = append(failedChecks, gvr)
+		}
+	}
+	if len(failedChecks) == 0 {
+		return nil
+	}
+	// FIXME: Meaningful error
+	return fmt.Errorf("failed")
+}
+
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	nonLegacy := []*genericapiserver.APIGroupInfo{}
+
+	storageReadinessHook := newStorageReadinessHook()
 
 	// used later in the loop to filter the served resource by those that have expired.
 	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*m.GenericAPIServer.Version)
@@ -725,11 +759,29 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			// everything else goes to /apis
 			nonLegacy = append(nonLegacy, &apiGroupInfo)
 		}
+
+		for version, storageMap := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource, storage := range storageMap {
+				if withReadiness, ok := storage.(rest.StorageWithReadiness); ok {
+					gvr := fmt.Sprintf("%s/%s", version, resource)
+					if len(groupName) > 0 {
+						gvr = fmt.Sprintf("%s/%s", groupName, gvr)
+					}
+					storageReadinessHook.addStorage(gvr, withReadiness)
+				}
+			}
+		}
 	}
 
 	if err := m.GenericAPIServer.InstallAPIGroups(nonLegacy...); err != nil {
 		return fmt.Errorf("error in registering group versions: %v", err)
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.ResilientWatchCacheInitialization) {
+		// Register storage readiness post-start hook.
+		m.GenericAPIServer.AddPostStartHookOrDie("storage-readiness", storageReadinessHook.hook)
+	}
+
 	return nil
 }
 

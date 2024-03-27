@@ -63,6 +63,14 @@ type Storage interface {
 	Destroy()
 }
 
+// StorageWithReadiness extends Storage interface with the readiness check.
+type StorageWithReadiness interface {
+	Storage
+
+	// ReadinessCheck allows for checking storage readiness.
+	ReadinessCheck() error
+}
+
 // Scoper indicates what scope the resource is at. It must be specified.
 // It is usually provided automatically based on your strategy.
 type Scoper interface {
