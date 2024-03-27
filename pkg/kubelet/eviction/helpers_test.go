@@ -1177,12 +1177,93 @@ func TestSortByEvictionPriority(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "hard threshold first",
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+					GracePeriod: 1,
+				},
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("500Mi"),
+					},
+					GracePeriod: 0,
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("500Mi"),
+					},
+					GracePeriod: 0,
+				},
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+					GracePeriod: 1,
+				},
+			},
+		},
+		{
+			name: "memory first, even before hard threshold",
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:      evictionapi.SignalNodeFsAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 1,
+				},
+				{
+					Signal:      evictionapi.SignalMemoryAvailable,
+					GracePeriod: 1,
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal:      evictionapi.SignalMemoryAvailable,
+					GracePeriod: 1,
+				},
+				{
+					Signal:      evictionapi.SignalNodeFsAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 1,
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sort.Sort(byEvictionPriority(tc.thresholds))
 			for i := range tc.expected {
 				if tc.thresholds[i].Signal != tc.expected[i].Signal {
 					t.Errorf("At index %d, expected threshold with signal %s, but got %s", i, tc.expected[i].Signal, tc.thresholds[i].Signal)
+				}
+				if tc.thresholds[i].GracePeriod != tc.expected[i].GracePeriod {
+					t.Errorf("At index %d, expected threshold with grace period %s, but got %s", i, tc.expected[i].GracePeriod, tc.thresholds[i].GracePeriod)
 				}
 			}
 
