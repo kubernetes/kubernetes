@@ -160,6 +160,9 @@ type Config struct {
 	// TracerProvider can provide a tracer, which records spans for distributed tracing.
 	TracerProvider tracing.TracerProvider
 
+	// PrivateEndpoint, if true, uses the trace context from incoming requests for tracing.
+	PrivateEndpoint bool
+
 	//===========================================================================
 	// Fields you probably don't care about changing
 	//===========================================================================
@@ -1040,7 +1043,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 	handler = genericfilters.WithHTTPLogging(handler)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
+		handler = genericapifilters.WithTracing(handler, c.TracerProvider, c.PrivateEndpoint)
 	}
 	handler = genericapifilters.WithLatencyTrackers(handler)
 	// WithRoutine will execute future handlers in a separate goroutine and serving

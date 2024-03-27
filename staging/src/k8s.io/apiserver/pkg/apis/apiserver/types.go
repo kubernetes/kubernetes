@@ -154,6 +154,12 @@ type TLSConfig struct {
 type TracingConfiguration struct {
 	metav1.TypeMeta
 
+	// PrivateEndpoint, if true, uses the trace context from incoming requests for tracing.
+	// Enabling this is not recommended unless access to the APIServer is limited
+	// to trusted clients.
+	// Default: false
+	PrivateEndpoint bool
+
 	// Embed the component config tracing configuration struct
 	tracingapi.TracingConfiguration
 }
