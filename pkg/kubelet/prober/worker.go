@@ -265,8 +265,11 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		return false
 	}
 
-	// Probe disabled for InitialDelaySeconds.
-	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
+	// Probe disabled for InitialDelaySeconds only if container's StartedAt time is
+	// earlier than system current time. But probe must be on for time drift case,
+	// This may happen due to nvram flash which resets system BIOS settings and RTC.
+	startedAtInSecs := time.Since(c.State.Running.StartedAt.Time).Seconds()
+	if startedAtInSecs > 0 && int32(startedAtInSecs) < w.spec.InitialDelaySeconds {
 		return true
 	}
 
