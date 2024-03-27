@@ -233,10 +233,11 @@ func getCoreSiblingList(cpuRes int64) string {
 }
 
 type cpuManagerKubeletArguments struct {
-	policyName              string
-	enableCPUManagerOptions bool
-	reservedSystemCPUs      cpuset.CPUSet
-	options                 map[string]string
+	policyName                      string
+	enableCPUManagerOptions         bool
+	reservedSystemCPUs              cpuset.CPUSet
+	options                         map[string]string
+	enableInPlacePodVerticalScaling bool
 }
 
 func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
@@ -245,6 +246,7 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
+	newCfg.FeatureGates["InPlacePodVerticalScaling"] = kubeletArguments.enableInPlacePodVerticalScaling
 	newCfg.FeatureGates["CPUManagerPolicyOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
@@ -571,7 +573,7 @@ func runMultipleGuPods(ctx context.Context, f *framework.Framework) {
 	waitForContainerRemoval(ctx, pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 }
 
-func runCPUManagerTests(f *framework.Framework) {
+func runCPUManagerTests(f *framework.Framework, alongsideInPlacePodVerticalScaling bool) {
 	var cpuCap, cpuAlloc int64
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	var expAllowedCPUsListRegex string
@@ -599,8 +601,9 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			reservedSystemCPUs: cpuset.CPUSet{},
+			policyName:                      string(cpumanager.PolicyStatic),
+			reservedSystemCPUs:              cpuset.CPUSet{},
+			enableInPlacePodVerticalScaling: alongsideInPlacePodVerticalScaling,
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -692,10 +695,11 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:      cpuset.New(0),
-				enableCPUManagerOptions: true,
-				options:                 cpuPolicyOptions,
+				policyName:                      string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:              cpuset.New(0),
+				enableCPUManagerOptions:         true,
+				options:                         cpuPolicyOptions,
+				enableInPlacePodVerticalScaling: alongsideInPlacePodVerticalScaling,
 			},
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -715,8 +719,9 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			reservedSystemCPUs: cpuset.CPUSet{},
+			policyName:                      string(cpumanager.PolicyStatic),
+			reservedSystemCPUs:              cpuset.CPUSet{},
+			enableInPlacePodVerticalScaling: alongsideInPlacePodVerticalScaling,
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -882,11 +887,15 @@ func isSMTAlignmentError(pod *v1.Pod) bool {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("CPU Manager", framework.WithSerial(), feature.CPUManager, func() {
+var _ = SIGDescribe("CPU Manager", framework.WithSerial(), feature.CPUManager, feature.InPlacePodVerticalScaling, func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
-		runCPUManagerTests(f)
+	ginkgo.Context("With kubeconfig updated with static CPU Manager policy without InPlacePodVerticalScaling run the CPU Manager tests", func() {
+		runCPUManagerTests(f, false)
+	})
+
+	ginkgo.Context("With kubeconfig updated with static CPU Manager policy alognside InPlacePodVerticalScaling run the CPU Manager tests", func() {
+		runCPUManagerTests(f, true)
 	})
 })
