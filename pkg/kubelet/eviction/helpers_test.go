@@ -19,7 +19,9 @@ package eviction
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
 func quantityMustParse(value string) *resource.Quantity {
@@ -1307,7 +1310,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	actualObservations, statsFunc := makeSignalObservations(fakeStats)
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
-		t.Errorf("Expected allocatable memory observation, but didnt find one")
+		t.Errorf("Expected allocatable memory observation, but didn't find one")
 	}
 	if expectedBytes := int64(nodeAvailableBytes); allocatableMemQuantity.available.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, allocatableMemQuantity.available.Value())
@@ -1319,11 +1322,25 @@ func TestMakeSignalObservations(t *testing.T) {
 	if !found {
 		t.Error("Expected available memory observation")
 	}
-	if expectedBytes := int64(nodeAvailableBytes); memQuantity.available.Value() != expectedBytes {
-		t.Errorf("Expected %v, actual: %v", expectedBytes, memQuantity.available.Value())
-	}
-	if expectedBytes := int64(nodeWorkingSetBytes + nodeAvailableBytes); memQuantity.capacity.Value() != expectedBytes {
-		t.Errorf("Expected %v, actual: %v", expectedBytes, memQuantity.capacity.Value())
+	if runtime.GOOS == "windows" {
+		// on Windows evictionapi.SignalMemoryAvailable is constructed from global memory stats fetched from system perf counters
+		availablePhysMem, totalPhysMem, err := winstats.GetAvailableAndTotalPhysicalMemory()
+		if err != nil {
+			t.Errorf("Error fetching available and total physical memory: %v", err)
+		}
+		if expectedBytes := int64(totalPhysMem); memQuantity.capacity.Value() != expectedBytes {
+			t.Errorf("Expected %v, actual: %v", expectedBytes, memQuantity.capacity.Value())
+		}
+		if math.Abs(float64(int64(availablePhysMem)-memQuantity.available.Value())) > (10 * 1024 * 1024) {
+			t.Errorf("Reported available memory is not within 10Mb of expected value. Expected: %v, actual: %v", availablePhysMem, memQuantity.available.Value())
+		}
+	} else {
+		if expectedBytes := int64(nodeAvailableBytes); memQuantity.available.Value() != expectedBytes {
+			t.Errorf("Expected %v, actual: %v", expectedBytes, memQuantity.available.Value())
+		}
+		if expectedBytes := int64(nodeWorkingSetBytes + nodeAvailableBytes); memQuantity.capacity.Value() != expectedBytes {
+			t.Errorf("Expected %v, actual: %v", expectedBytes, memQuantity.capacity.Value())
+		}
 	}
 	nodeFsQuantity, found := actualObservations[evictionapi.SignalNodeFsAvailable]
 	if !found {

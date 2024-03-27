@@ -290,6 +290,18 @@ func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
 	return statex.TotalPhys, nil
 }
 
+func GetAvailableAndTotalPhysicalMemory() (uint64, uint64, error) {
+	var statex MemoryStatusEx
+	statex.Length = uint32(unsafe.Sizeof(statex))
+	ret, _, _ := procGlobalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&statex)))
+
+	if ret == 0 {
+		return 0, 0, errors.New("unable to read physical memory")
+	}
+
+	return statex.AvailPhys, statex.TotalPhys, nil
+}
+
 func getBootID() (string, error) {
 	regKey, err := registry.OpenKey(registry.LOCAL_MACHINE, bootIdRegistry, registry.READ)
 	if err != nil {

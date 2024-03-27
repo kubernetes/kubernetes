@@ -1,8 +1,8 @@
-//go:build !linux && !windows
-// +build !linux,!windows
+//go:build windows
+// +build windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ package eviction
 
 // DefaultEvictionHard includes default options for hard eviction.
 var DefaultEvictionHard = map[string]string{
-	"memory.available":  "100Mi",
+	"memory.available":  "500Mi",
 	"nodefs.available":  "10%",
 	"imagefs.available": "15%",
 }

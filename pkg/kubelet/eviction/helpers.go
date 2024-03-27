@@ -19,6 +19,7 @@ package eviction
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -847,10 +849,30 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 	result := signalObservations{}
 
 	if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
-		result[evictionapi.SignalMemoryAvailable] = signalObservation{
-			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
-			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
-			time:      memory.Time,
+		if runtime.GOOS == "windows" {
+			// Don't use stats summary to compute available memory on Windows because it does not take into account
+			// system process memory usage (which can be significant). Instead use win32 api's to query global
+			// memory usage.
+			availablePhysMem, totalPhysMem, err := winstats.GetAvailableAndTotalPhysicalMemory()
+			if err != nil {
+				klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalMemoryAvailable)
+			} else {
+				klog.V(5).InfoS(
+					"Eviction manager: memory signal observations for windows",
+					"TotalPhys", totalPhysMem,
+					"AvailPhys", availablePhysMem)
+				result[evictionapi.SignalMemoryAvailable] = signalObservation{
+					available: resource.NewQuantity(int64(availablePhysMem), resource.BinarySI),
+					capacity:  resource.NewQuantity(int64(totalPhysMem), resource.BinarySI),
+					time:      memory.Time,
+				}
+			}
+		} else {
+			result[evictionapi.SignalMemoryAvailable] = signalObservation{
+				available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+				time:      memory.Time,
+			}
 		}
 	}
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
