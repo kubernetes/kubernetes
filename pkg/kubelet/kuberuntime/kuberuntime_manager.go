@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -170,6 +171,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Root directory used to store pod logs
 	podLogsDirectory string
+
+	// imageGCLock is the mutex to avoid races between container creation and image garbage collection.
+	imageGCLock *sync.RWMutex
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -212,6 +216,7 @@ func NewKubeGenericRuntimeManager(
 	memoryThrottlingFactor float64,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
+	imageGCLock *sync.RWMutex,
 ) (KubeGenericRuntime, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
@@ -240,6 +245,7 @@ func NewKubeGenericRuntimeManager(
 		getNodeAllocatable:     getNodeAllocatable,
 		memoryThrottlingFactor: memoryThrottlingFactor,
 		podLogsDirectory:       podLogsDirectory,
+		imageGCLock:            imageGCLock,
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion(ctx)

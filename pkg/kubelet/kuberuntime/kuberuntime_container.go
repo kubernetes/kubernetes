@@ -202,6 +202,11 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return msg, err
 	}
 
+	// Don't let the image garbage collection race with container creation
+	// See: https://github.com/kubernetes/kubernetes/issues/123631
+	m.imageGCLock.RLock()
+	defer m.imageGCLock.RUnlock()
+
 	// Step 2: create the container.
 	// For a new container, the RestartCount should be 0
 	restartCount := 0

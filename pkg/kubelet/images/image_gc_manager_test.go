@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	goruntime "runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -52,6 +53,7 @@ func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provide
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
 		tracer:        oteltrace.NewNoopTracerProvider().Tracer(""),
+		lock:          &sync.RWMutex{},
 	}, fakeRuntime
 }
 
@@ -949,7 +951,7 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, oteltrace.NewNoopTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, oteltrace.NewNoopTracerProvider(), &sync.RWMutex{}); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
