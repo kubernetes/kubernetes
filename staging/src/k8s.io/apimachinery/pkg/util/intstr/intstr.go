@@ -114,6 +114,21 @@ func (intstr *IntOrString) IntValue() int {
 	return int(intstr.IntVal)
 }
 
+// IsZero returns if the value is nil, or is parsed as 0 (for int), or
+// "0" or "0%" as string.
+func (intstr *IntOrString) IsZero() bool {
+	if intstr == nil {
+		return true
+	}
+	switch intstr.Type {
+	case Int:
+		return intstr.IntVal == 0
+	case String:
+		return intstr.StrVal == "0" || intstr.StrVal == "0%"
+	}
+	return false
+}
+
 // MarshalJSON implements the json.Marshaller interface.
 func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	switch intstr.Type {
