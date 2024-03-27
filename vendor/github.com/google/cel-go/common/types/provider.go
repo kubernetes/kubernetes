@@ -54,6 +54,10 @@ type Provider interface {
 	// Returns false if not found.
 	FindStructType(structType string) (*Type, bool)
 
+	// FindStructFieldNames returns thet field names associated with the type, if the type
+	// is found.
+	FindStructFieldNames(structType string) ([]string, bool)
+
 	// FieldStructFieldType returns the field type for a checked type value. Returns
 	// false if the field could not be found.
 	FindStructFieldType(structType, fieldName string) (*FieldType, bool)
@@ -154,7 +158,7 @@ func (p *Registry) EnumValue(enumName string) ref.Val {
 	return Int(enumVal.Value())
 }
 
-// FieldFieldType returns the field type for a checked type value. Returns false if
+// FindFieldType returns the field type for a checked type value. Returns false if
 // the field could not be found.
 //
 // Deprecated: use FindStructFieldType
@@ -173,7 +177,24 @@ func (p *Registry) FindFieldType(structType, fieldName string) (*ref.FieldType, 
 		GetFrom: field.GetFrom}, true
 }
 
-// FieldStructFieldType returns the field type for a checked type value. Returns
+// FindStructFieldNames returns the set of field names for the given struct type,
+// if the type exists in the registry.
+func (p *Registry) FindStructFieldNames(structType string) ([]string, bool) {
+	msgType, found := p.pbdb.DescribeType(structType)
+	if !found {
+		return []string{}, false
+	}
+	fieldMap := msgType.FieldMap()
+	fields := make([]string, len(fieldMap))
+	idx := 0
+	for f := range fieldMap {
+		fields[idx] = f
+		idx++
+	}
+	return fields, true
+}
+
+// FindStructFieldType returns the field type for a checked type value. Returns
 // false if the field could not be found.
 func (p *Registry) FindStructFieldType(structType, fieldName string) (*FieldType, bool) {
 	msgType, found := p.pbdb.DescribeType(structType)

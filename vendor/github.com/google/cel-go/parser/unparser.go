@@ -20,9 +20,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/operators"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"github.com/google/cel-go/common/types"
 )
 
 // Unparse takes an input expression and source position information and generates a human-readable
@@ -39,7 +39,7 @@ import (
 //
 // This function optionally takes in one or more UnparserOption to alter the unparsing behavior, such as
 // performing word wrapping on expressions.
-func Unparse(expr *exprpb.Expr, info *exprpb.SourceInfo, opts ...UnparserOption) (string, error) {
+func Unparse(expr ast.Expr, info *ast.SourceInfo, opts ...UnparserOption) (string, error) {
 	unparserOpts := &unparserOption{
 		wrapOnColumn:         defaultWrapOnColumn,
 		wrapAfterColumnLimit: defaultWrapAfterColumnLimit,
@@ -68,12 +68,12 @@ func Unparse(expr *exprpb.Expr, info *exprpb.SourceInfo, opts ...UnparserOption)
 // unparser visits an expression to reconstruct a human-readable string from an AST.
 type unparser struct {
 	str              strings.Builder
-	info             *exprpb.SourceInfo
+	info             *ast.SourceInfo
 	options          *unparserOption
 	lastWrappedIndex int
 }
 
-func (un *unparser) visit(expr *exprpb.Expr) error {
+func (un *unparser) visit(expr ast.Expr) error {
 	if expr == nil {
 		return errors.New("unsupported expression")
 	}
@@ -81,27 +81,29 @@ func (un *unparser) visit(expr *exprpb.Expr) error {
 	if visited || err != nil {
 		return err
 	}
-	switch expr.GetExprKind().(type) {
-	case *exprpb.Expr_CallExpr:
+	switch expr.Kind() {
+	case ast.CallKind:
 		return un.visitCall(expr)
-	case *exprpb.Expr_ConstExpr:
+	case ast.LiteralKind:
 		return un.visitConst(expr)
-	case *exprpb.Expr_IdentExpr:
+	case ast.IdentKind:
 		return un.visitIdent(expr)
-	case *exprpb.Expr_ListExpr:
+	case ast.ListKind:
 		return un.visitList(expr)
-	case *exprpb.Expr_SelectExpr:
+	case ast.MapKind:
+		return un.visitStructMap(expr)
+	case ast.SelectKind:
 		return un.visitSelect(expr)
-	case *exprpb.Expr_StructExpr:
-		return un.visitStruct(expr)
+	case ast.StructKind:
+		return un.visitStructMsg(expr)
 	default:
 		return fmt.Errorf("unsupported expression: %v", expr)
 	}
 }
 
-func (un *unparser) visitCall(expr *exprpb.Expr) error {
-	c := expr.GetCallExpr()
-	fun := c.GetFunction()
+func (un *unparser) visitCall(expr ast.Expr) error {
+	c := expr.AsCall()
+	fun := c.FunctionName()
 	switch fun {
 	// ternary operator
 	case operators.Conditional:
@@ -141,10 +143,10 @@ func (un *unparser) visitCall(expr *exprpb.Expr) error {
 	}
 }
 
-func (un *unparser) visitCallBinary(expr *exprpb.Expr) error {
-	c := expr.GetCallExpr()
-	fun := c.GetFunction()
-	args := c.GetArgs()
+func (un *unparser) visitCallBinary(expr ast.Expr) error {
+	c := expr.AsCall()
+	fun := c.FunctionName()
+	args := c.Args()
 	lhs := args[0]
 	// add parens if the current operator is lower precedence than the lhs expr operator.
 	lhsParen := isComplexOperatorWithRespectTo(fun, lhs)
@@ -168,9 +170,9 @@ func (un *unparser) visitCallBinary(expr *exprpb.Expr) error {
 	return un.visitMaybeNested(rhs, rhsParen)
 }
 
-func (un *unparser) visitCallConditional(expr *exprpb.Expr) error {
-	c := expr.GetCallExpr()
-	args := c.GetArgs()
+func (un *unparser) visitCallConditional(expr ast.Expr) error {
+	c := expr.AsCall()
+	args := c.Args()
 	// add parens if operand is a conditional itself.
 	nested := isSamePrecedence(operators.Conditional, args[0]) ||
 		isComplexOperator(args[0])
@@ -196,13 +198,13 @@ func (un *unparser) visitCallConditional(expr *exprpb.Expr) error {
 	return un.visitMaybeNested(args[2], nested)
 }
 
-func (un *unparser) visitCallFunc(expr *exprpb.Expr) error {
-	c := expr.GetCallExpr()
-	fun := c.GetFunction()
-	args := c.GetArgs()
-	if c.GetTarget() != nil {
-		nested := isBinaryOrTernaryOperator(c.GetTarget())
-		err := un.visitMaybeNested(c.GetTarget(), nested)
+func (un *unparser) visitCallFunc(expr ast.Expr) error {
+	c := expr.AsCall()
+	fun := c.FunctionName()
+	args := c.Args()
+	if c.IsMemberFunction() {
+		nested := isBinaryOrTernaryOperator(c.Target())
+		err := un.visitMaybeNested(c.Target(), nested)
 		if err != nil {
 			return err
 		}
@@ -223,17 +225,17 @@ func (un *unparser) visitCallFunc(expr *exprpb.Expr) error {
 	return nil
 }
 
-func (un *unparser) visitCallIndex(expr *exprpb.Expr) error {
+func (un *unparser) visitCallIndex(expr ast.Expr) error {
 	return un.visitCallIndexInternal(expr, "[")
 }
 
-func (un *unparser) visitCallOptIndex(expr *exprpb.Expr) error {
+func (un *unparser) visitCallOptIndex(expr ast.Expr) error {
 	return un.visitCallIndexInternal(expr, "[?")
 }
 
-func (un *unparser) visitCallIndexInternal(expr *exprpb.Expr, op string) error {
-	c := expr.GetCallExpr()
-	args := c.GetArgs()
+func (un *unparser) visitCallIndexInternal(expr ast.Expr, op string) error {
+	c := expr.AsCall()
+	args := c.Args()
 	nested := isBinaryOrTernaryOperator(args[0])
 	err := un.visitMaybeNested(args[0], nested)
 	if err != nil {
@@ -248,10 +250,10 @@ func (un *unparser) visitCallIndexInternal(expr *exprpb.Expr, op string) error {
 	return nil
 }
 
-func (un *unparser) visitCallUnary(expr *exprpb.Expr) error {
-	c := expr.GetCallExpr()
-	fun := c.GetFunction()
-	args := c.GetArgs()
+func (un *unparser) visitCallUnary(expr ast.Expr) error {
+	c := expr.AsCall()
+	fun := c.FunctionName()
+	args := c.Args()
 	unmangled, found := operators.FindReverse(fun)
 	if !found {
 		return fmt.Errorf("cannot unmangle operator: %s", fun)
@@ -261,35 +263,34 @@ func (un *unparser) visitCallUnary(expr *exprpb.Expr) error {
 	return un.visitMaybeNested(args[0], nested)
 }
 
-func (un *unparser) visitConst(expr *exprpb.Expr) error {
-	c := expr.GetConstExpr()
-	switch c.GetConstantKind().(type) {
-	case *exprpb.Constant_BoolValue:
-		un.str.WriteString(strconv.FormatBool(c.GetBoolValue()))
-	case *exprpb.Constant_BytesValue:
+func (un *unparser) visitConst(expr ast.Expr) error {
+	val := expr.AsLiteral()
+	switch val := val.(type) {
+	case types.Bool:
+		un.str.WriteString(strconv.FormatBool(bool(val)))
+	case types.Bytes:
 		// bytes constants are surrounded with b"<bytes>"
-		b := c.GetBytesValue()
 		un.str.WriteString(`b"`)
-		un.str.WriteString(bytesToOctets(b))
+		un.str.WriteString(bytesToOctets([]byte(val)))
 		un.str.WriteString(`"`)
-	case *exprpb.Constant_DoubleValue:
+	case types.Double:
 		// represent the float using the minimum required digits
-		d := strconv.FormatFloat(c.GetDoubleValue(), 'g', -1, 64)
+		d := strconv.FormatFloat(float64(val), 'g', -1, 64)
 		un.str.WriteString(d)
 		if !strings.Contains(d, ".") {
 			un.str.WriteString(".0")
 		}
-	case *exprpb.Constant_Int64Value:
-		i := strconv.FormatInt(c.GetInt64Value(), 10)
+	case types.Int:
+		i := strconv.FormatInt(int64(val), 10)
 		un.str.WriteString(i)
-	case *exprpb.Constant_NullValue:
+	case types.Null:
 		un.str.WriteString("null")
-	case *exprpb.Constant_StringValue:
+	case types.String:
 		// strings will be double quoted with quotes escaped.
-		un.str.WriteString(strconv.Quote(c.GetStringValue()))
-	case *exprpb.Constant_Uint64Value:
+		un.str.WriteString(strconv.Quote(string(val)))
+	case types.Uint:
 		// uint literals have a 'u' suffix.
-		ui := strconv.FormatUint(c.GetUint64Value(), 10)
+		ui := strconv.FormatUint(uint64(val), 10)
 		un.str.WriteString(ui)
 		un.str.WriteString("u")
 	default:
@@ -298,16 +299,16 @@ func (un *unparser) visitConst(expr *exprpb.Expr) error {
 	return nil
 }
 
-func (un *unparser) visitIdent(expr *exprpb.Expr) error {
-	un.str.WriteString(expr.GetIdentExpr().GetName())
+func (un *unparser) visitIdent(expr ast.Expr) error {
+	un.str.WriteString(expr.AsIdent())
 	return nil
 }
 
-func (un *unparser) visitList(expr *exprpb.Expr) error {
-	l := expr.GetListExpr()
-	elems := l.GetElements()
+func (un *unparser) visitList(expr ast.Expr) error {
+	l := expr.AsList()
+	elems := l.Elements()
 	optIndices := make(map[int]bool, len(elems))
-	for _, idx := range l.GetOptionalIndices() {
+	for _, idx := range l.OptionalIndices() {
 		optIndices[int(idx)] = true
 	}
 	un.str.WriteString("[")
@@ -327,20 +328,20 @@ func (un *unparser) visitList(expr *exprpb.Expr) error {
 	return nil
 }
 
-func (un *unparser) visitOptSelect(expr *exprpb.Expr) error {
-	c := expr.GetCallExpr()
-	args := c.GetArgs()
+func (un *unparser) visitOptSelect(expr ast.Expr) error {
+	c := expr.AsCall()
+	args := c.Args()
 	operand := args[0]
-	field := args[1].GetConstExpr().GetStringValue()
-	return un.visitSelectInternal(operand, false, ".?", field)
+	field := args[1].AsLiteral().(types.String)
+	return un.visitSelectInternal(operand, false, ".?", string(field))
 }
 
-func (un *unparser) visitSelect(expr *exprpb.Expr) error {
-	sel := expr.GetSelectExpr()
-	return un.visitSelectInternal(sel.GetOperand(), sel.GetTestOnly(), ".", sel.GetField())
+func (un *unparser) visitSelect(expr ast.Expr) error {
+	sel := expr.AsSelect()
+	return un.visitSelectInternal(sel.Operand(), sel.IsTestOnly(), ".", sel.FieldName())
 }
 
-func (un *unparser) visitSelectInternal(operand *exprpb.Expr, testOnly bool, op string, field string) error {
+func (un *unparser) visitSelectInternal(operand ast.Expr, testOnly bool, op string, field string) error {
 	// handle the case when the select expression was generated by the has() macro.
 	if testOnly {
 		un.str.WriteString("has(")
@@ -358,34 +359,25 @@ func (un *unparser) visitSelectInternal(operand *exprpb.Expr, testOnly bool, op 
 	return nil
 }
 
-func (un *unparser) visitStruct(expr *exprpb.Expr) error {
-	s := expr.GetStructExpr()
-	// If the message name is non-empty, then this should be treated as message construction.
-	if s.GetMessageName() != "" {
-		return un.visitStructMsg(expr)
-	}
-	// Otherwise, build a map.
-	return un.visitStructMap(expr)
-}
-
-func (un *unparser) visitStructMsg(expr *exprpb.Expr) error {
-	m := expr.GetStructExpr()
-	entries := m.GetEntries()
-	un.str.WriteString(m.GetMessageName())
+func (un *unparser) visitStructMsg(expr ast.Expr) error {
+	m := expr.AsStruct()
+	fields := m.Fields()
+	un.str.WriteString(m.TypeName())
 	un.str.WriteString("{")
-	for i, entry := range entries {
-		f := entry.GetFieldKey()
-		if entry.GetOptionalEntry() {
+	for i, f := range fields {
+		field := f.AsStructField()
+		f := field.Name()
+		if field.IsOptional() {
 			un.str.WriteString("?")
 		}
 		un.str.WriteString(f)
 		un.str.WriteString(": ")
-		v := entry.GetValue()
+		v := field.Value()
 		err := un.visit(v)
 		if err != nil {
 			return err
 		}
-		if i < len(entries)-1 {
+		if i < len(fields)-1 {
 			un.str.WriteString(", ")
 		}
 	}
@@ -393,13 +385,14 @@ func (un *unparser) visitStructMsg(expr *exprpb.Expr) error {
 	return nil
 }
 
-func (un *unparser) visitStructMap(expr *exprpb.Expr) error {
-	m := expr.GetStructExpr()
-	entries := m.GetEntries()
+func (un *unparser) visitStructMap(expr ast.Expr) error {
+	m := expr.AsMap()
+	entries := m.Entries()
 	un.str.WriteString("{")
-	for i, entry := range entries {
-		k := entry.GetMapKey()
-		if entry.GetOptionalEntry() {
+	for i, e := range entries {
+		entry := e.AsMapEntry()
+		k := entry.Key()
+		if entry.IsOptional() {
 			un.str.WriteString("?")
 		}
 		err := un.visit(k)
@@ -407,7 +400,7 @@ func (un *unparser) visitStructMap(expr *exprpb.Expr) error {
 			return err
 		}
 		un.str.WriteString(": ")
-		v := entry.GetValue()
+		v := entry.Value()
 		err = un.visit(v)
 		if err != nil {
 			return err
@@ -420,16 +413,15 @@ func (un *unparser) visitStructMap(expr *exprpb.Expr) error {
 	return nil
 }
 
-func (un *unparser) visitMaybeMacroCall(expr *exprpb.Expr) (bool, error) {
-	macroCalls := un.info.GetMacroCalls()
-	call, found := macroCalls[expr.GetId()]
+func (un *unparser) visitMaybeMacroCall(expr ast.Expr) (bool, error) {
+	call, found := un.info.GetMacroCall(expr.ID())
 	if !found {
 		return false, nil
 	}
 	return true, un.visit(call)
 }
 
-func (un *unparser) visitMaybeNested(expr *exprpb.Expr, nested bool) error {
+func (un *unparser) visitMaybeNested(expr ast.Expr, nested bool) error {
 	if nested {
 		un.str.WriteString("(")
 	}
@@ -453,12 +445,12 @@ func isLeftRecursive(op string) bool {
 // precedence of the (possible) operation represented in the input Expr.
 //
 // If the expr is not a Call, the result is false.
-func isSamePrecedence(op string, expr *exprpb.Expr) bool {
-	if expr.GetCallExpr() == nil {
+func isSamePrecedence(op string, expr ast.Expr) bool {
+	if expr.Kind() != ast.CallKind {
 		return false
 	}
-	c := expr.GetCallExpr()
-	other := c.GetFunction()
+	c := expr.AsCall()
+	other := c.FunctionName()
 	return operators.Precedence(op) == operators.Precedence(other)
 }
 
@@ -466,16 +458,16 @@ func isSamePrecedence(op string, expr *exprpb.Expr) bool {
 // than the (possible) operation represented in the input Expr.
 //
 // If the expr is not a Call, the result is false.
-func isLowerPrecedence(op string, expr *exprpb.Expr) bool {
-	c := expr.GetCallExpr()
-	other := c.GetFunction()
+func isLowerPrecedence(op string, expr ast.Expr) bool {
+	c := expr.AsCall()
+	other := c.FunctionName()
 	return operators.Precedence(op) < operators.Precedence(other)
 }
 
 // Indicates whether the expr is a complex operator, i.e., a call expression
 // with 2 or more arguments.
-func isComplexOperator(expr *exprpb.Expr) bool {
-	if expr.GetCallExpr() != nil && len(expr.GetCallExpr().GetArgs()) >= 2 {
+func isComplexOperator(expr ast.Expr) bool {
+	if expr.Kind() == ast.CallKind && len(expr.AsCall().Args()) >= 2 {
 		return true
 	}
 	return false
@@ -484,19 +476,19 @@ func isComplexOperator(expr *exprpb.Expr) bool {
 // Indicates whether it is a complex operation compared to another.
 // expr is *not* considered complex if it is not a call expression or has
 // less than two arguments, or if it has a higher precedence than op.
-func isComplexOperatorWithRespectTo(op string, expr *exprpb.Expr) bool {
-	if expr.GetCallExpr() == nil || len(expr.GetCallExpr().GetArgs()) < 2 {
+func isComplexOperatorWithRespectTo(op string, expr ast.Expr) bool {
+	if expr.Kind() != ast.CallKind || len(expr.AsCall().Args()) < 2 {
 		return false
 	}
 	return isLowerPrecedence(op, expr)
 }
 
 // Indicate whether this is a binary or ternary operator.
-func isBinaryOrTernaryOperator(expr *exprpb.Expr) bool {
-	if expr.GetCallExpr() == nil || len(expr.GetCallExpr().GetArgs()) < 2 {
+func isBinaryOrTernaryOperator(expr ast.Expr) bool {
+	if expr.Kind() != ast.CallKind || len(expr.AsCall().Args()) < 2 {
 		return false
 	}
-	_, isBinaryOp := operators.FindReverseBinaryOperator(expr.GetCallExpr().GetFunction())
+	_, isBinaryOp := operators.FindReverseBinaryOperator(expr.AsCall().FunctionName())
 	return isBinaryOp || isSamePrecedence(operators.Conditional, expr)
 }
 

@@ -21,10 +21,10 @@ import (
 
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common"
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.
@@ -255,8 +255,13 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			// Worst case size is where is that a separator of "" is used, and each char is returned as a list element.
 			max := sz.Max
 			if len(args) > 1 {
-				if c := args[1].Expr().GetConstExpr(); c != nil {
-					max = uint64(c.GetInt64Value())
+				expr := args[1].Expr()
+				if expr.Kind() == ast.LiteralKind {
+					// If the separator is a constant, we can estimate the size of the result.
+					if c := expr.AsLiteral(); c != nil {
+						val := c.ConvertToType(types.UintType)
+						max = val.Value().(uint64)
+					}
 				}
 			}
 			// Cost is the traversal plus the construction of the result.
@@ -425,7 +430,7 @@ func (l *CostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 type itemsNode struct {
 	path []string
 	t    *types.Type
-	expr *exprpb.Expr
+	expr ast.Expr
 }
 
 func (i *itemsNode) Path() []string {
@@ -436,7 +441,7 @@ func (i *itemsNode) Type() *types.Type {
 	return i.t
 }
 
-func (i *itemsNode) Expr() *exprpb.Expr {
+func (i *itemsNode) Expr() ast.Expr {
 	return i.expr
 }
 

@@ -70,6 +70,15 @@ func (p *TypeProvider) FindStructFieldType(structType, fieldName string) (*types
 	return p.underlyingTypeProvider.FindStructFieldType(structType, fieldName)
 }
 
+// FindStructFieldNames returns the field names for a checked type value.
+func (p *TypeProvider) FindStructFieldNames(structType string) ([]string, bool) {
+	t, ok := p.typeResolver.Resolve(structType)
+	if ok {
+		return t.FieldNames()
+	}
+	return p.underlyingTypeProvider.FindStructFieldNames(structType)
+}
+
 // NewValue creates a new type value from a qualified name and map of fields.
 func (p *TypeProvider) NewValue(structType string, fields map[string]ref.Val) ref.Val {
 	t, ok := p.typeResolver.Resolve(structType)

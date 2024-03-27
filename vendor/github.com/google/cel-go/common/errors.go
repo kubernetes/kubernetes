@@ -64,7 +64,7 @@ func (e *Errors) GetErrors() []*Error {
 // Append creates a new Errors object with the current and input errors.
 func (e *Errors) Append(errs []*Error) *Errors {
 	return &Errors{
-		errors:            append(e.errors, errs...),
+		errors:            append(e.errors[:], errs...),
 		source:            e.source,
 		numErrors:         e.numErrors + len(errs),
 		maxErrorsToReport: e.maxErrorsToReport,

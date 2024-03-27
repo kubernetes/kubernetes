@@ -19,11 +19,10 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // Math returns a cel.EnvOption to configure namespaced math helper macros and
@@ -111,9 +110,9 @@ func (mathLib) CompileOptions() []cel.EnvOption {
 	return []cel.EnvOption{
 		cel.Macros(
 			// math.least(num, ...)
-			cel.NewReceiverVarArgMacro(leastMacro, mathLeast),
+			cel.ReceiverVarArgMacro(leastMacro, mathLeast),
 			// math.greatest(num, ...)
-			cel.NewReceiverVarArgMacro(greatestMacro, mathGreatest),
+			cel.ReceiverVarArgMacro(greatestMacro, mathGreatest),
 		),
 		cel.Function(minFunc,
 			cel.Overload("math_@min_double", []*cel.Type{cel.DoubleType}, cel.DoubleType,
@@ -187,57 +186,57 @@ func (mathLib) ProgramOptions() []cel.ProgramOption {
 	return []cel.ProgramOption{}
 }
 
-func mathLeast(meh cel.MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *cel.Error) {
+func mathLeast(meh cel.MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *cel.Error) {
 	if !macroTargetMatchesNamespace(mathNamespace, target) {
 		return nil, nil
 	}
 	switch len(args) {
 	case 0:
-		return nil, meh.NewError(target.GetId(), "math.least() requires at least one argument")
+		return nil, meh.NewError(target.ID(), "math.least() requires at least one argument")
 	case 1:
 		if isListLiteralWithValidArgs(args[0]) || isValidArgType(args[0]) {
-			return meh.GlobalCall(minFunc, args[0]), nil
+			return meh.NewCall(minFunc, args[0]), nil
 		}
-		return nil, meh.NewError(args[0].GetId(), "math.least() invalid single argument value")
+		return nil, meh.NewError(args[0].ID(), "math.least() invalid single argument value")
 	case 2:
 		err := checkInvalidArgs(meh, "math.least()", args)
 		if err != nil {
 			return nil, err
 		}
-		return meh.GlobalCall(minFunc, args...), nil
+		return meh.NewCall(minFunc, args...), nil
 	default:
 		err := checkInvalidArgs(meh, "math.least()", args)
 		if err != nil {
 			return nil, err
 		}
-		return meh.GlobalCall(minFunc, meh.NewList(args...)), nil
+		return meh.NewCall(minFunc, meh.NewList(args...)), nil
 	}
 }
 
-func mathGreatest(meh cel.MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *cel.Error) {
+func mathGreatest(mef cel.MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *cel.Error) {
 	if !macroTargetMatchesNamespace(mathNamespace, target) {
 		return nil, nil
 	}
 	switch len(args) {
 	case 0:
-		return nil, meh.NewError(target.GetId(), "math.greatest() requires at least one argument")
+		return nil, mef.NewError(target.ID(), "math.greatest() requires at least one argument")
 	case 1:
 		if isListLiteralWithValidArgs(args[0]) || isValidArgType(args[0]) {
-			return meh.GlobalCall(maxFunc, args[0]), nil
+			return mef.NewCall(maxFunc, args[0]), nil
 		}
-		return nil, meh.NewError(args[0].GetId(), "math.greatest() invalid single argument value")
+		return nil, mef.NewError(args[0].ID(), "math.greatest() invalid single argument value")
 	case 2:
-		err := checkInvalidArgs(meh, "math.greatest()", args)
+		err := checkInvalidArgs(mef, "math.greatest()", args)
 		if err != nil {
 			return nil, err
 		}
-		return meh.GlobalCall(maxFunc, args...), nil
+		return mef.NewCall(maxFunc, args...), nil
 	default:
-		err := checkInvalidArgs(meh, "math.greatest()", args)
+		err := checkInvalidArgs(mef, "math.greatest()", args)
 		if err != nil {
 			return nil, err
 		}
-		return meh.GlobalCall(maxFunc, meh.NewList(args...)), nil
+		return mef.NewCall(maxFunc, mef.NewList(args...)), nil
 	}
 }
 
@@ -311,48 +310,48 @@ func maxList(numList ref.Val) ref.Val {
 	}
 }
 
-func checkInvalidArgs(meh cel.MacroExprHelper, funcName string, args []*exprpb.Expr) *cel.Error {
+func checkInvalidArgs(meh cel.MacroExprFactory, funcName string, args []ast.Expr) *cel.Error {
 	for _, arg := range args {
 		err := checkInvalidArgLiteral(funcName, arg)
 		if err != nil {
-			return meh.NewError(arg.GetId(), err.Error())
+			return meh.NewError(arg.ID(), err.Error())
 		}
 	}
 	return nil
 }
 
-func checkInvalidArgLiteral(funcName string, arg *exprpb.Expr) error {
+func checkInvalidArgLiteral(funcName string, arg ast.Expr) error {
 	if !isValidArgType(arg) {
 		return fmt.Errorf("%s simple literal arguments must be numeric", funcName)
 	}
 	return nil
 }
 
-func isValidArgType(arg *exprpb.Expr) bool {
-	switch arg.GetExprKind().(type) {
-	case *exprpb.Expr_ConstExpr:
-		c := arg.GetConstExpr()
-		switch c.GetConstantKind().(type) {
-		case *exprpb.Constant_DoubleValue, *exprpb.Constant_Int64Value, *exprpb.Constant_Uint64Value:
+func isValidArgType(arg ast.Expr) bool {
+	switch arg.Kind() {
+	case ast.LiteralKind:
+		c := ref.Val(arg.AsLiteral())
+		switch c.(type) {
+		case types.Double, types.Int, types.Uint:
 			return true
 		default:
 			return false
 		}
-	case *exprpb.Expr_ListExpr, *exprpb.Expr_StructExpr:
+	case ast.ListKind, ast.MapKind, ast.StructKind:
 		return false
 	default:
 		return true
 	}
 }
 
-func isListLiteralWithValidArgs(arg *exprpb.Expr) bool {
-	switch arg.GetExprKind().(type) {
-	case *exprpb.Expr_ListExpr:
-		list := arg.GetListExpr()
-		if len(list.GetElements()) == 0 {
+func isListLiteralWithValidArgs(arg ast.Expr) bool {
+	switch arg.Kind() {
+	case ast.ListKind:
+		list := arg.AsList()
+		if list.Size() == 0 {
 			return false
 		}
-		for _, e := range list.GetElements() {
+		for _, e := range list.Elements() {
 			if !isValidArgType(e) {
 				return false
 			}

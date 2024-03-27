@@ -60,7 +60,6 @@ go_test(
         "//test:go_default_library",
         "//test/proto2pb:go_default_library",
         "//test/proto3pb:go_default_library",
-        "@com_github_antlr_antlr4_runtime_go_antlr_v4//:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
     ],
 )

@@ -56,6 +56,11 @@ func (r *TypeRef) Field(name string) (*types.FieldType, bool) {
 	return NewFieldType(name), true
 }
 
+// FieldNames returns the names of the fields.
+func (r *TypeRef) FieldNames() ([]string, bool) {
+	return []string{}, false
+}
+
 // NewTypeRef creates a TypeRef by the given field name.
 func NewTypeRef(name string) *TypeRef {
 	objectType := types.NewObjectType(name, common.ObjectTraits)

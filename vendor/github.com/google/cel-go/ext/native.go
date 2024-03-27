@@ -151,6 +151,24 @@ func (tp *nativeTypeProvider) FindStructType(typeName string) (*types.Type, bool
 	return tp.baseProvider.FindStructType(typeName)
 }
 
+// FindStructFieldNames looks up the type definition first from the native types, then from
+// the backing provider type set. If found, a set of field names corresponding to the type
+// will be returned.
+func (tp *nativeTypeProvider) FindStructFieldNames(typeName string) ([]string, bool) {
+	if t, found := tp.nativeTypes[typeName]; found {
+		fieldCount := t.refType.NumField()
+		fields := make([]string, fieldCount)
+		for i := 0; i < fieldCount; i++ {
+			fields[i] = t.refType.Field(i).Name
+		}
+		return fields, true
+	}
+	if celTypeFields, found := tp.baseProvider.FindStructFieldNames(typeName); found {
+		return celTypeFields, true
+	}
+	return tp.baseProvider.FindStructFieldNames(typeName)
+}
+
 // FindStructFieldType looks up a native type's field definition, and if the type name is not a native
 // type then proxies to the composed types.Provider
 func (tp *nativeTypeProvider) FindStructFieldType(typeName, fieldName string) (*types.FieldType, bool) {

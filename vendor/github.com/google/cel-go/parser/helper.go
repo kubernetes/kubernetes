@@ -17,284 +17,209 @@ package parser
 import (
 	"sync"
 
-	antlr "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	antlr "github.com/antlr4-go/antlr/v4"
 
 	"github.com/google/cel-go/common"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"github.com/google/cel-go/common/ast"
+	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
 )
 
 type parserHelper struct {
-	source     common.Source
-	nextID     int64
-	positions  map[int64]int32
-	macroCalls map[int64]*exprpb.Expr
+	exprFactory ast.ExprFactory
+	source      common.Source
+	sourceInfo  *ast.SourceInfo
+	nextID      int64
 }
 
-func newParserHelper(source common.Source) *parserHelper {
+func newParserHelper(source common.Source, fac ast.ExprFactory) *parserHelper {
 	return &parserHelper{
-		source:     source,
-		nextID:     1,
-		positions:  make(map[int64]int32),
-		macroCalls: make(map[int64]*exprpb.Expr),
+		exprFactory: fac,
+		source:      source,
+		sourceInfo:  ast.NewSourceInfo(source),
+		nextID:      1,
 	}
 }
 
-func (p *parserHelper) getSourceInfo() *exprpb.SourceInfo {
-	return &exprpb.SourceInfo{
-		Location:    p.source.Description(),
-		Positions:   p.positions,
-		LineOffsets: p.source.LineOffsets(),
-		MacroCalls:  p.macroCalls}
+func (p *parserHelper) getSourceInfo() *ast.SourceInfo {
+	return p.sourceInfo
 }
 
-func (p *parserHelper) newLiteral(ctx any, value *exprpb.Constant) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_ConstExpr{ConstExpr: value}
-	return exprNode
+func (p *parserHelper) newLiteral(ctx any, value ref.Val) ast.Expr {
+	return p.exprFactory.NewLiteral(p.newID(ctx), value)
 }
 
-func (p *parserHelper) newLiteralBool(ctx any, value bool) *exprpb.Expr {
-	return p.newLiteral(ctx,
-		&exprpb.Constant{ConstantKind: &exprpb.Constant_BoolValue{BoolValue: value}})
+func (p *parserHelper) newLiteralBool(ctx any, value bool) ast.Expr {
+	return p.newLiteral(ctx, types.Bool(value))
 }
 
-func (p *parserHelper) newLiteralString(ctx any, value string) *exprpb.Expr {
-	return p.newLiteral(ctx,
-		&exprpb.Constant{ConstantKind: &exprpb.Constant_StringValue{StringValue: value}})
+func (p *parserHelper) newLiteralString(ctx any, value string) ast.Expr {
+	return p.newLiteral(ctx, types.String(value))
 }
 
-func (p *parserHelper) newLiteralBytes(ctx any, value []byte) *exprpb.Expr {
-	return p.newLiteral(ctx,
-		&exprpb.Constant{ConstantKind: &exprpb.Constant_BytesValue{BytesValue: value}})
+func (p *parserHelper) newLiteralBytes(ctx any, value []byte) ast.Expr {
+	return p.newLiteral(ctx, types.Bytes(value))
 }
 
-func (p *parserHelper) newLiteralInt(ctx any, value int64) *exprpb.Expr {
-	return p.newLiteral(ctx,
-		&exprpb.Constant{ConstantKind: &exprpb.Constant_Int64Value{Int64Value: value}})
+func (p *parserHelper) newLiteralInt(ctx any, value int64) ast.Expr {
+	return p.newLiteral(ctx, types.Int(value))
 }
 
-func (p *parserHelper) newLiteralUint(ctx any, value uint64) *exprpb.Expr {
-	return p.newLiteral(ctx, &exprpb.Constant{ConstantKind: &exprpb.Constant_Uint64Value{Uint64Value: value}})
+func (p *parserHelper) newLiteralUint(ctx any, value uint64) ast.Expr {
+	return p.newLiteral(ctx, types.Uint(value))
 }
 
-func (p *parserHelper) newLiteralDouble(ctx any, value float64) *exprpb.Expr {
-	return p.newLiteral(ctx,
-		&exprpb.Constant{ConstantKind: &exprpb.Constant_DoubleValue{DoubleValue: value}})
+func (p *parserHelper) newLiteralDouble(ctx any, value float64) ast.Expr {
+	return p.newLiteral(ctx, types.Double(value))
 }
 
-func (p *parserHelper) newIdent(ctx any, name string) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_IdentExpr{IdentExpr: &exprpb.Expr_Ident{Name: name}}
-	return exprNode
+func (p *parserHelper) newIdent(ctx any, name string) ast.Expr {
+	return p.exprFactory.NewIdent(p.newID(ctx), name)
 }
 
-func (p *parserHelper) newSelect(ctx any, operand *exprpb.Expr, field string) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_SelectExpr{
-		SelectExpr: &exprpb.Expr_Select{Operand: operand, Field: field}}
-	return exprNode
+func (p *parserHelper) newSelect(ctx any, operand ast.Expr, field string) ast.Expr {
+	return p.exprFactory.NewSelect(p.newID(ctx), operand, field)
 }
 
-func (p *parserHelper) newPresenceTest(ctx any, operand *exprpb.Expr, field string) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_SelectExpr{
-		SelectExpr: &exprpb.Expr_Select{Operand: operand, Field: field, TestOnly: true}}
-	return exprNode
+func (p *parserHelper) newPresenceTest(ctx any, operand ast.Expr, field string) ast.Expr {
+	return p.exprFactory.NewPresenceTest(p.newID(ctx), operand, field)
 }
 
-func (p *parserHelper) newGlobalCall(ctx any, function string, args ...*exprpb.Expr) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_CallExpr{
-		CallExpr: &exprpb.Expr_Call{Function: function, Args: args}}
-	return exprNode
+func (p *parserHelper) newGlobalCall(ctx any, function string, args ...ast.Expr) ast.Expr {
+	return p.exprFactory.NewCall(p.newID(ctx), function, args...)
 }
 
-func (p *parserHelper) newReceiverCall(ctx any, function string, target *exprpb.Expr, args ...*exprpb.Expr) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_CallExpr{
-		CallExpr: &exprpb.Expr_Call{Function: function, Target: target, Args: args}}
-	return exprNode
+func (p *parserHelper) newReceiverCall(ctx any, function string, target ast.Expr, args ...ast.Expr) ast.Expr {
+	return p.exprFactory.NewMemberCall(p.newID(ctx), function, target, args...)
 }
 
-func (p *parserHelper) newList(ctx any, elements []*exprpb.Expr, optionals ...int32) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_ListExpr{
-		ListExpr: &exprpb.Expr_CreateList{
-			Elements:        elements,
-			OptionalIndices: optionals,
-		}}
-	return exprNode
+func (p *parserHelper) newList(ctx any, elements []ast.Expr, optionals ...int32) ast.Expr {
+	return p.exprFactory.NewList(p.newID(ctx), elements, optionals)
 }
 
-func (p *parserHelper) newMap(ctx any, entries ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_StructExpr{
-		StructExpr: &exprpb.Expr_CreateStruct{Entries: entries}}
-	return exprNode
+func (p *parserHelper) newMap(ctx any, entries ...ast.EntryExpr) ast.Expr {
+	return p.exprFactory.NewMap(p.newID(ctx), entries)
 }
 
-func (p *parserHelper) newMapEntry(entryID int64, key *exprpb.Expr, value *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry {
-	return &exprpb.Expr_CreateStruct_Entry{
-		Id:            entryID,
-		KeyKind:       &exprpb.Expr_CreateStruct_Entry_MapKey{MapKey: key},
-		Value:         value,
-		OptionalEntry: optional,
-	}
+func (p *parserHelper) newMapEntry(entryID int64, key ast.Expr, value ast.Expr, optional bool) ast.EntryExpr {
+	return p.exprFactory.NewMapEntry(entryID, key, value, optional)
 }
 
-func (p *parserHelper) newObject(ctx any, typeName string, entries ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_StructExpr{
-		StructExpr: &exprpb.Expr_CreateStruct{
-			MessageName: typeName,
-			Entries:     entries,
-		},
-	}
-	return exprNode
+func (p *parserHelper) newObject(ctx any, typeName string, fields ...ast.EntryExpr) ast.Expr {
+	return p.exprFactory.NewStruct(p.newID(ctx), typeName, fields)
 }
 
-func (p *parserHelper) newObjectField(fieldID int64, field string, value *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry {
-	return &exprpb.Expr_CreateStruct_Entry{
-		Id:            fieldID,
-		KeyKind:       &exprpb.Expr_CreateStruct_Entry_FieldKey{FieldKey: field},
-		Value:         value,
-		OptionalEntry: optional,
-	}
+func (p *parserHelper) newObjectField(fieldID int64, field string, value ast.Expr, optional bool) ast.EntryExpr {
+	return p.exprFactory.NewStructField(fieldID, field, value, optional)
 }
 
-func (p *parserHelper) newComprehension(ctx any, iterVar string,
-	iterRange *exprpb.Expr,
+func (p *parserHelper) newComprehension(ctx any,
+	iterRange ast.Expr,
+	iterVar string,
 	accuVar string,
-	accuInit *exprpb.Expr,
-	condition *exprpb.Expr,
-	step *exprpb.Expr,
-	result *exprpb.Expr) *exprpb.Expr {
-	exprNode := p.newExpr(ctx)
-	exprNode.ExprKind = &exprpb.Expr_ComprehensionExpr{
-		ComprehensionExpr: &exprpb.Expr_Comprehension{
-			AccuVar:       accuVar,
-			AccuInit:      accuInit,
-			IterVar:       iterVar,
-			IterRange:     iterRange,
-			LoopCondition: condition,
-			LoopStep:      step,
-			Result:        result}}
-	return exprNode
+	accuInit ast.Expr,
+	condition ast.Expr,
+	step ast.Expr,
+	result ast.Expr) ast.Expr {
+	return p.exprFactory.NewComprehension(
+		p.newID(ctx), iterRange, iterVar, accuVar, accuInit, condition, step, result)
 }
 
-func (p *parserHelper) newExpr(ctx any) *exprpb.Expr {
-	id, isID := ctx.(int64)
-	if isID {
-		return &exprpb.Expr{Id: id}
+func (p *parserHelper) newID(ctx any) int64 {
+	if id, isID := ctx.(int64); isID {
+		return id
 	}
-	return &exprpb.Expr{Id: p.id(ctx)}
+	return p.id(ctx)
+}
+
+func (p *parserHelper) newExpr(ctx any) ast.Expr {
+	return p.exprFactory.NewUnspecifiedExpr(p.newID(ctx))
 }
 
 func (p *parserHelper) id(ctx any) int64 {
-	var location common.Location
+	var offset ast.OffsetRange
 	switch c := ctx.(type) {
 	case antlr.ParserRuleContext:
-		token := c.GetStart()
-		location = p.source.NewLocation(token.GetLine(), token.GetColumn())
+		start, stop := c.GetStart(), c.GetStop()
+		if stop == nil {
+			stop = start
+		}
+		offset.Start = p.sourceInfo.ComputeOffset(int32(start.GetLine()), int32(start.GetColumn()))
+		offset.Stop = p.sourceInfo.ComputeOffset(int32(stop.GetLine()), int32(stop.GetColumn()))
 	case antlr.Token:
-		token := c
-		location = p.source.NewLocation(token.GetLine(), token.GetColumn())
+		offset.Start = p.sourceInfo.ComputeOffset(int32(c.GetLine()), int32(c.GetColumn()))
+		offset.Stop = offset.Start
 	case common.Location:
-		location = c
+		offset.Start = p.sourceInfo.ComputeOffset(int32(c.Line()), int32(c.Column()))
+		offset.Stop = offset.Start
+	case ast.OffsetRange:
+		offset = c
 	default:
 		// This should only happen if the ctx is nil
 		return -1
 	}
 	id := p.nextID
-	p.positions[id], _ = p.source.LocationOffset(location)
+	p.sourceInfo.SetOffsetRange(id, offset)
 	p.nextID++
 	return id
 }
 
 func (p *parserHelper) getLocation(id int64) common.Location {
-	characterOffset := p.positions[id]
-	location, _ := p.source.OffsetLocation(characterOffset)
-	return location
+	return p.sourceInfo.GetStartLocation(id)
 }
 
 // buildMacroCallArg iterates the expression and returns a new expression
 // where all macros have been replaced by their IDs in MacroCalls
-func (p *parserHelper) buildMacroCallArg(expr *exprpb.Expr) *exprpb.Expr {
-	if _, found := p.macroCalls[expr.GetId()]; found {
-		return &exprpb.Expr{Id: expr.GetId()}
+func (p *parserHelper) buildMacroCallArg(expr ast.Expr) ast.Expr {
+	if _, found := p.sourceInfo.GetMacroCall(expr.ID()); found {
+		return p.exprFactory.NewUnspecifiedExpr(expr.ID())
 	}
 
-	switch expr.GetExprKind().(type) {
-	case *exprpb.Expr_CallExpr:
+	switch expr.Kind() {
+	case ast.CallKind:
 		// Iterate the AST from `expr` recursively looking for macros. Because we are at most
 		// starting from the top level macro, this recursion is bounded by the size of the AST. This
 		// means that the depth check on the AST during parsing will catch recursion overflows
 		// before we get to here.
-		macroTarget := expr.GetCallExpr().GetTarget()
-		if macroTarget != nil {
-			macroTarget = p.buildMacroCallArg(macroTarget)
-		}
-		macroArgs := make([]*exprpb.Expr, len(expr.GetCallExpr().GetArgs()))
-		for index, arg := range expr.GetCallExpr().GetArgs() {
+		call := expr.AsCall()
+		macroArgs := make([]ast.Expr, len(call.Args()))
+		for index, arg := range call.Args() {
 			macroArgs[index] = p.buildMacroCallArg(arg)
 		}
-		return &exprpb.Expr{
-			Id: expr.GetId(),
-			ExprKind: &exprpb.Expr_CallExpr{
-				CallExpr: &exprpb.Expr_Call{
-					Target:   macroTarget,
-					Function: expr.GetCallExpr().GetFunction(),
-					Args:     macroArgs,
-				},
-			},
+		if !call.IsMemberFunction() {
+			return p.exprFactory.NewCall(expr.ID(), call.FunctionName(), macroArgs...)
 		}
-	case *exprpb.Expr_ListExpr:
-		listExpr := expr.GetListExpr()
-		macroListArgs := make([]*exprpb.Expr, len(listExpr.GetElements()))
-		for i, elem := range listExpr.GetElements() {
+		macroTarget := p.buildMacroCallArg(call.Target())
+		return p.exprFactory.NewMemberCall(expr.ID(), call.FunctionName(), macroTarget, macroArgs...)
+	case ast.ListKind:
+		list := expr.AsList()
+		macroListArgs := make([]ast.Expr, list.Size())
+		for i, elem := range list.Elements() {
 			macroListArgs[i] = p.buildMacroCallArg(elem)
 		}
-		return &exprpb.Expr{
-			Id: expr.GetId(),
-			ExprKind: &exprpb.Expr_ListExpr{
-				ListExpr: &exprpb.Expr_CreateList{
-					Elements:        macroListArgs,
-					OptionalIndices: listExpr.GetOptionalIndices(),
-				},
-			},
-		}
+		return p.exprFactory.NewList(expr.ID(), macroListArgs, list.OptionalIndices())
 	}
-
 	return expr
 }
 
 // addMacroCall adds the macro the the MacroCalls map in source info. If a macro has args/subargs/target
 // that are macros, their ID will be stored instead for later self-lookups.
-func (p *parserHelper) addMacroCall(exprID int64, function string, target *exprpb.Expr, args ...*exprpb.Expr) {
-	macroTarget := target
-	if target != nil {
-		if _, found := p.macroCalls[target.GetId()]; found {
-			macroTarget = &exprpb.Expr{Id: target.GetId()}
-		} else {
-			macroTarget = p.buildMacroCallArg(target)
-		}
-	}
-
-	macroArgs := make([]*exprpb.Expr, len(args))
+func (p *parserHelper) addMacroCall(exprID int64, function string, target ast.Expr, args ...ast.Expr) {
+	macroArgs := make([]ast.Expr, len(args))
 	for index, arg := range args {
 		macroArgs[index] = p.buildMacroCallArg(arg)
 	}
-
-	p.macroCalls[exprID] = &exprpb.Expr{
-		ExprKind: &exprpb.Expr_CallExpr{
-			CallExpr: &exprpb.Expr_Call{
-				Target:   macroTarget,
-				Function: function,
-				Args:     macroArgs,
-			},
-		},
+	if target == nil {
+		p.sourceInfo.SetMacroCall(exprID, p.exprFactory.NewCall(0, function, macroArgs...))
+		return
 	}
+	macroTarget := target
+	if _, found := p.sourceInfo.GetMacroCall(target.ID()); found {
+		macroTarget = p.exprFactory.NewUnspecifiedExpr(target.ID())
+	} else {
+		macroTarget = p.buildMacroCallArg(target)
+	}
+	p.sourceInfo.SetMacroCall(exprID, p.exprFactory.NewMemberCall(0, function, macroTarget, macroArgs...))
 }
 
 // logicManager compacts logical trees into a more efficient structure which is semantically
@@ -309,71 +234,71 @@ func (p *parserHelper) addMacroCall(exprID int64, function string, target *exprp
 // controversial choice as it alters the traditional order of execution assumptions present in most
 // expressions.
 type logicManager struct {
-	helper       *parserHelper
+	exprFactory  ast.ExprFactory
 	function     string
-	terms        []*exprpb.Expr
+	terms        []ast.Expr
 	ops          []int64
 	variadicASTs bool
 }
 
 // newVariadicLogicManager creates a logic manager instance bound to a specific function and its first term.
-func newVariadicLogicManager(h *parserHelper, function string, term *exprpb.Expr) *logicManager {
+func newVariadicLogicManager(fac ast.ExprFactory, function string, term ast.Expr) *logicManager {
 	return &logicManager{
-		helper:       h,
+		exprFactory:  fac,
 		function:     function,
-		terms:        []*exprpb.Expr{term},
+		terms:        []ast.Expr{term},
 		ops:          []int64{},
 		variadicASTs: true,
 	}
 }
 
 // newBalancingLogicManager creates a logic manager instance bound to a specific function and its first term.
-func newBalancingLogicManager(h *parserHelper, function string, term *exprpb.Expr) *logicManager {
+func newBalancingLogicManager(fac ast.ExprFactory, function string, term ast.Expr) *logicManager {
 	return &logicManager{
-		helper:       h,
+		exprFactory:  fac,
 		function:     function,
-		terms:        []*exprpb.Expr{term},
+		terms:        []ast.Expr{term},
 		ops:          []int64{},
 		variadicASTs: false,
 	}
 }
 
 // addTerm adds an operation identifier and term to the set of terms to be balanced.
-func (l *logicManager) addTerm(op int64, term *exprpb.Expr) {
+func (l *logicManager) addTerm(op int64, term ast.Expr) {
 	l.terms = append(l.terms, term)
 	l.ops = append(l.ops, op)
 }
 
 // toExpr renders the logic graph into an Expr value, either balancing a tree of logical
 // operations or creating a variadic representation of the logical operator.
-func (l *logicManager) toExpr() *exprpb.Expr {
+func (l *logicManager) toExpr() ast.Expr {
 	if len(l.terms) == 1 {
 		return l.terms[0]
 	}
 	if l.variadicASTs {
-		return l.helper.newGlobalCall(l.ops[0], l.function, l.terms...)
+		return l.exprFactory.NewCall(l.ops[0], l.function, l.terms...)
 	}
 	return l.balancedTree(0, len(l.ops)-1)
 }
 
 // balancedTree recursively balances the terms provided to a commutative operator.
-func (l *logicManager) balancedTree(lo, hi int) *exprpb.Expr {
+func (l *logicManager) balancedTree(lo, hi int) ast.Expr {
 	mid := (lo + hi + 1) / 2
 
-	var left *exprpb.Expr
+	var left ast.Expr
 	if mid == lo {
 		left = l.terms[mid]
 	} else {
 		left = l.balancedTree(lo, mid-1)
 	}
 
-	var right *exprpb.Expr
+	var right ast.Expr
 	if mid == hi {
 		right = l.terms[mid+1]
 	} else {
 		right = l.balancedTree(mid+1, hi)
 	}
-	return l.helper.newGlobalCall(l.ops[mid], l.function, left, right)
+	return l.exprFactory.NewCall(l.ops[mid], l.function, left, right)
 }
 
 type exprHelper struct {
@@ -387,202 +312,151 @@ func (e *exprHelper) nextMacroID() int64 {
 
 // Copy implements the ExprHelper interface method by producing a copy of the input Expr value
 // with a fresh set of numeric identifiers the Expr and all its descendants.
-func (e *exprHelper) Copy(expr *exprpb.Expr) *exprpb.Expr {
-	copy := e.parserHelper.newExpr(e.parserHelper.getLocation(expr.GetId()))
-	switch expr.GetExprKind().(type) {
-	case *exprpb.Expr_ConstExpr:
-		copy.ExprKind = &exprpb.Expr_ConstExpr{ConstExpr: expr.GetConstExpr()}
-	case *exprpb.Expr_IdentExpr:
-		copy.ExprKind = &exprpb.Expr_IdentExpr{IdentExpr: expr.GetIdentExpr()}
-	case *exprpb.Expr_SelectExpr:
-		op := expr.GetSelectExpr().GetOperand()
-		copy.ExprKind = &exprpb.Expr_SelectExpr{SelectExpr: &exprpb.Expr_Select{
-			Operand:  e.Copy(op),
-			Field:    expr.GetSelectExpr().GetField(),
-			TestOnly: expr.GetSelectExpr().GetTestOnly(),
-		}}
-	case *exprpb.Expr_CallExpr:
-		call := expr.GetCallExpr()
-		target := call.GetTarget()
-		if target != nil {
-			target = e.Copy(target)
+func (e *exprHelper) Copy(expr ast.Expr) ast.Expr {
+	offsetRange, _ := e.parserHelper.sourceInfo.GetOffsetRange(expr.ID())
+	copyID := e.parserHelper.newID(offsetRange)
+	switch expr.Kind() {
+	case ast.LiteralKind:
+		return e.exprFactory.NewLiteral(copyID, expr.AsLiteral())
+	case ast.IdentKind:
+		return e.exprFactory.NewIdent(copyID, expr.AsIdent())
+	case ast.SelectKind:
+		sel := expr.AsSelect()
+		op := e.Copy(sel.Operand())
+		if sel.IsTestOnly() {
+			return e.exprFactory.NewPresenceTest(copyID, op, sel.FieldName())
 		}
-		args := call.GetArgs()
-		argsCopy := make([]*exprpb.Expr, len(args))
+		return e.exprFactory.NewSelect(copyID, op, sel.FieldName())
+	case ast.CallKind:
+		call := expr.AsCall()
+		args := call.Args()
+		argsCopy := make([]ast.Expr, len(args))
 		for i, arg := range args {
 			argsCopy[i] = e.Copy(arg)
 		}
-		copy.ExprKind = &exprpb.Expr_CallExpr{
-			CallExpr: &exprpb.Expr_Call{
-				Function: call.GetFunction(),
-				Target:   target,
-				Args:     argsCopy,
-			},
+		if !call.IsMemberFunction() {
+			return e.exprFactory.NewCall(copyID, call.FunctionName(), argsCopy...)
 		}
-	case *exprpb.Expr_ListExpr:
-		elems := expr.GetListExpr().GetElements()
-		elemsCopy := make([]*exprpb.Expr, len(elems))
+		return e.exprFactory.NewMemberCall(copyID, call.FunctionName(), e.Copy(call.Target()), argsCopy...)
+	case ast.ListKind:
+		list := expr.AsList()
+		elems := list.Elements()
+		elemsCopy := make([]ast.Expr, len(elems))
 		for i, elem := range elems {
 			elemsCopy[i] = e.Copy(elem)
 		}
-		copy.ExprKind = &exprpb.Expr_ListExpr{
-			ListExpr: &exprpb.Expr_CreateList{Elements: elemsCopy},
+		return e.exprFactory.NewList(copyID, elemsCopy, list.OptionalIndices())
+	case ast.MapKind:
+		m := expr.AsMap()
+		entries := m.Entries()
+		entriesCopy := make([]ast.EntryExpr, len(entries))
+		for i, en := range entries {
+			entry := en.AsMapEntry()
+			entryID := e.nextMacroID()
+			entriesCopy[i] = e.exprFactory.NewMapEntry(entryID,
+				e.Copy(entry.Key()), e.Copy(entry.Value()), entry.IsOptional())
 		}
-	case *exprpb.Expr_StructExpr:
-		entries := expr.GetStructExpr().GetEntries()
-		entriesCopy := make([]*exprpb.Expr_CreateStruct_Entry, len(entries))
-		for i, entry := range entries {
-			entryCopy := &exprpb.Expr_CreateStruct_Entry{}
-			entryCopy.Id = e.nextMacroID()
-			switch entry.GetKeyKind().(type) {
-			case *exprpb.Expr_CreateStruct_Entry_FieldKey:
-				entryCopy.KeyKind = &exprpb.Expr_CreateStruct_Entry_FieldKey{
-					FieldKey: entry.GetFieldKey(),
-				}
-			case *exprpb.Expr_CreateStruct_Entry_MapKey:
-				entryCopy.KeyKind = &exprpb.Expr_CreateStruct_Entry_MapKey{
-					MapKey: e.Copy(entry.GetMapKey()),
-				}
-			}
-			entryCopy.Value = e.Copy(entry.GetValue())
-			entriesCopy[i] = entryCopy
+		return e.exprFactory.NewMap(copyID, entriesCopy)
+	case ast.StructKind:
+		s := expr.AsStruct()
+		fields := s.Fields()
+		fieldsCopy := make([]ast.EntryExpr, len(fields))
+		for i, f := range fields {
+			field := f.AsStructField()
+			fieldID := e.nextMacroID()
+			fieldsCopy[i] = e.exprFactory.NewStructField(fieldID,
+				field.Name(), e.Copy(field.Value()), field.IsOptional())
 		}
-		copy.ExprKind = &exprpb.Expr_StructExpr{
-			StructExpr: &exprpb.Expr_CreateStruct{
-				MessageName: expr.GetStructExpr().GetMessageName(),
-				Entries:     entriesCopy,
-			},
-		}
-	case *exprpb.Expr_ComprehensionExpr:
-		iterRange := e.Copy(expr.GetComprehensionExpr().GetIterRange())
-		accuInit := e.Copy(expr.GetComprehensionExpr().GetAccuInit())
-		cond := e.Copy(expr.GetComprehensionExpr().GetLoopCondition())
-		step := e.Copy(expr.GetComprehensionExpr().GetLoopStep())
-		result := e.Copy(expr.GetComprehensionExpr().GetResult())
-		copy.ExprKind = &exprpb.Expr_ComprehensionExpr{
-			ComprehensionExpr: &exprpb.Expr_Comprehension{
-				IterRange:     iterRange,
-				IterVar:       expr.GetComprehensionExpr().GetIterVar(),
-				AccuInit:      accuInit,
-				AccuVar:       expr.GetComprehensionExpr().GetAccuVar(),
-				LoopCondition: cond,
-				LoopStep:      step,
-				Result:        result,
-			},
-		}
+		return e.exprFactory.NewStruct(copyID, s.TypeName(), fieldsCopy)
+	case ast.ComprehensionKind:
+		compre := expr.AsComprehension()
+		iterRange := e.Copy(compre.IterRange())
+		accuInit := e.Copy(compre.AccuInit())
+		cond := e.Copy(compre.LoopCondition())
+		step := e.Copy(compre.LoopStep())
+		result := e.Copy(compre.Result())
+		return e.exprFactory.NewComprehension(copyID,
+			iterRange, compre.IterVar(), compre.AccuVar(), accuInit, cond, step, result)
 	}
-	return copy
+	return e.exprFactory.NewUnspecifiedExpr(copyID)
 }
 
-// LiteralBool implements the ExprHelper interface method.
-func (e *exprHelper) LiteralBool(value bool) *exprpb.Expr {
-	return e.parserHelper.newLiteralBool(e.nextMacroID(), value)
-}
-
-// LiteralBytes implements the ExprHelper interface method.
-func (e *exprHelper) LiteralBytes(value []byte) *exprpb.Expr {
-	return e.parserHelper.newLiteralBytes(e.nextMacroID(), value)
-}
-
-// LiteralDouble implements the ExprHelper interface method.
-func (e *exprHelper) LiteralDouble(value float64) *exprpb.Expr {
-	return e.parserHelper.newLiteralDouble(e.nextMacroID(), value)
-}
-
-// LiteralInt implements the ExprHelper interface method.
-func (e *exprHelper) LiteralInt(value int64) *exprpb.Expr {
-	return e.parserHelper.newLiteralInt(e.nextMacroID(), value)
-}
-
-// LiteralString implements the ExprHelper interface method.
-func (e *exprHelper) LiteralString(value string) *exprpb.Expr {
-	return e.parserHelper.newLiteralString(e.nextMacroID(), value)
-}
-
-// LiteralUint implements the ExprHelper interface method.
-func (e *exprHelper) LiteralUint(value uint64) *exprpb.Expr {
-	return e.parserHelper.newLiteralUint(e.nextMacroID(), value)
+// NewLiteral implements the ExprHelper interface method.
+func (e *exprHelper) NewLiteral(value ref.Val) ast.Expr {
+	return e.exprFactory.NewLiteral(e.nextMacroID(), value)
 }
 
 // NewList implements the ExprHelper interface method.
-func (e *exprHelper) NewList(elems ...*exprpb.Expr) *exprpb.Expr {
-	return e.parserHelper.newList(e.nextMacroID(), elems)
+func (e *exprHelper) NewList(elems ...ast.Expr) ast.Expr {
+	return e.exprFactory.NewList(e.nextMacroID(), elems, []int32{})
 }
 
 // NewMap implements the ExprHelper interface method.
-func (e *exprHelper) NewMap(entries ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr {
-	return e.parserHelper.newMap(e.nextMacroID(), entries...)
+func (e *exprHelper) NewMap(entries ...ast.EntryExpr) ast.Expr {
+	return e.exprFactory.NewMap(e.nextMacroID(), entries)
 }
 
 // NewMapEntry implements the ExprHelper interface method.
-func (e *exprHelper) NewMapEntry(key *exprpb.Expr, val *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry {
-	return e.parserHelper.newMapEntry(e.nextMacroID(), key, val, optional)
+func (e *exprHelper) NewMapEntry(key ast.Expr, val ast.Expr, optional bool) ast.EntryExpr {
+	return e.exprFactory.NewMapEntry(e.nextMacroID(), key, val, optional)
 }
 
-// NewObject implements the ExprHelper interface method.
-func (e *exprHelper) NewObject(typeName string, fieldInits ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr {
-	return e.parserHelper.newObject(e.nextMacroID(), typeName, fieldInits...)
+// NewStruct implements the ExprHelper interface method.
+func (e *exprHelper) NewStruct(typeName string, fieldInits ...ast.EntryExpr) ast.Expr {
+	return e.exprFactory.NewStruct(e.nextMacroID(), typeName, fieldInits)
 }
 
-// NewObjectFieldInit implements the ExprHelper interface method.
-func (e *exprHelper) NewObjectFieldInit(field string, init *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry {
-	return e.parserHelper.newObjectField(e.nextMacroID(), field, init, optional)
+// NewStructField implements the ExprHelper interface method.
+func (e *exprHelper) NewStructField(field string, init ast.Expr, optional bool) ast.EntryExpr {
+	return e.exprFactory.NewStructField(e.nextMacroID(), field, init, optional)
 }
 
-// Fold implements the ExprHelper interface method.
-func (e *exprHelper) Fold(iterVar string,
-	iterRange *exprpb.Expr,
+// NewComprehension implements the ExprHelper interface method.
+func (e *exprHelper) NewComprehension(
+	iterRange ast.Expr,
+	iterVar string,
 	accuVar string,
-	accuInit *exprpb.Expr,
-	condition *exprpb.Expr,
-	step *exprpb.Expr,
-	result *exprpb.Expr) *exprpb.Expr {
-	return e.parserHelper.newComprehension(
-		e.nextMacroID(), iterVar, iterRange, accuVar, accuInit, condition, step, result)
+	accuInit ast.Expr,
+	condition ast.Expr,
+	step ast.Expr,
+	result ast.Expr) ast.Expr {
+	return e.exprFactory.NewComprehension(
+		e.nextMacroID(), iterRange, iterVar, accuVar, accuInit, condition, step, result)
 }
 
-// Ident implements the ExprHelper interface method.
-func (e *exprHelper) Ident(name string) *exprpb.Expr {
-	return e.parserHelper.newIdent(e.nextMacroID(), name)
+// NewIdent implements the ExprHelper interface method.
+func (e *exprHelper) NewIdent(name string) ast.Expr {
+	return e.exprFactory.NewIdent(e.nextMacroID(), name)
 }
 
-// AccuIdent implements the ExprHelper interface method.
-func (e *exprHelper) AccuIdent() *exprpb.Expr {
-	return e.parserHelper.newIdent(e.nextMacroID(), AccumulatorName)
+// NewAccuIdent implements the ExprHelper interface method.
+func (e *exprHelper) NewAccuIdent() ast.Expr {
+	return e.exprFactory.NewAccuIdent(e.nextMacroID())
 }
 
-// GlobalCall implements the ExprHelper interface method.
-func (e *exprHelper) GlobalCall(function string, args ...*exprpb.Expr) *exprpb.Expr {
-	return e.parserHelper.newGlobalCall(e.nextMacroID(), function, args...)
+// NewGlobalCall implements the ExprHelper interface method.
+func (e *exprHelper) NewCall(function string, args ...ast.Expr) ast.Expr {
+	return e.exprFactory.NewCall(e.nextMacroID(), function, args...)
 }
 
-// ReceiverCall implements the ExprHelper interface method.
-func (e *exprHelper) ReceiverCall(function string,
-	target *exprpb.Expr, args ...*exprpb.Expr) *exprpb.Expr {
-	return e.parserHelper.newReceiverCall(e.nextMacroID(), function, target, args...)
+// NewMemberCall implements the ExprHelper interface method.
+func (e *exprHelper) NewMemberCall(function string, target ast.Expr, args ...ast.Expr) ast.Expr {
+	return e.exprFactory.NewMemberCall(e.nextMacroID(), function, target, args...)
 }
 
-// PresenceTest implements the ExprHelper interface method.
-func (e *exprHelper) PresenceTest(operand *exprpb.Expr, field string) *exprpb.Expr {
-	return e.parserHelper.newPresenceTest(e.nextMacroID(), operand, field)
+// NewPresenceTest implements the ExprHelper interface method.
+func (e *exprHelper) NewPresenceTest(operand ast.Expr, field string) ast.Expr {
+	return e.exprFactory.NewPresenceTest(e.nextMacroID(), operand, field)
 }
 
-// Select implements the ExprHelper interface method.
-func (e *exprHelper) Select(operand *exprpb.Expr, field string) *exprpb.Expr {
-	return e.parserHelper.newSelect(e.nextMacroID(), operand, field)
+// NewSelect implements the ExprHelper interface method.
+func (e *exprHelper) NewSelect(operand ast.Expr, field string) ast.Expr {
+	return e.exprFactory.NewSelect(e.nextMacroID(), operand, field)
 }
 
 // OffsetLocation implements the ExprHelper interface method.
 func (e *exprHelper) OffsetLocation(exprID int64) common.Location {
-	offset, found := e.parserHelper.positions[exprID]
-	if !found {
-		return common.NoLocation
-	}
-	location, found := e.parserHelper.source.OffsetLocation(offset)
-	if !found {
-		return common.NoLocation
-	}
-	return location
+	return e.parserHelper.sourceInfo.GetStartLocation(exprID)
 }
 
 // NewError associates an error message with a given expression id, populating the source offset location of the error if possible.
