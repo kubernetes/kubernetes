@@ -107,13 +107,6 @@ type CIDRAllocatorParams struct {
 	NodeCIDRMaskSizes []int
 }
 
-// CIDRs are reserved, then node resource is patched with them.
-// nodeReservedCIDRs holds the reservation info for a node.
-type nodeReservedCIDRs struct {
-	allocatedCIDRs []*net.IPNet
-	nodeName       string
-}
-
 // New creates a new CIDR range allocator.
 func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
 	logger := klog.FromContext(ctx)
