@@ -57,7 +57,7 @@ type PersistentVolumeRecyclerConfiguration struct {
 // are then passed to the appropriate plugin. The ControllerManager binary is the only part
 // of the code which knows what plugins are supported and which flags correspond to each plugin.
 type VolumeConfiguration struct {
-	// enableHostPathProvisioning enables HostPath PV provisioning when running without a
+	// Deprecated: enableHostPathProvisioning enables HostPath PV provisioning when running without a
 	// cloud provider. This allows testing and development of provisioning features. HostPath
 	// provisioning is not supported in any way, won't work in a multi-node cluster, and
 	// should not be used for anything other than testing or development.
