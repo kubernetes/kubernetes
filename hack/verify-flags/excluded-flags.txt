@@ -2,6 +2,7 @@ check_leaked_resources
 check_node_count
 check_version_skew
 concurrent_rc_syncs
+env_metadata_whitelist
 file_content
 file_mode
 file_owner
