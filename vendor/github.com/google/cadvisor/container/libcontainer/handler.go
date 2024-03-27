@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path"
 	"regexp"
@@ -299,8 +300,9 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 		}
 	}
 
+	processCount := readUInt64(cgroupPath, "pids.current")
 	processStats := info.ProcessStats{
-		ProcessCount: uint64(len(pids)),
+		ProcessCount: processCount,
 		FdCount:      fdCount,
 		SocketCount:  socketCount,
 	}
@@ -933,4 +935,37 @@ func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics co
 		setNetworkStats(libcontainerStats, ret)
 	}
 	return ret
+}
+
+func readUInt64(dirpath string, file string) uint64 {
+	out := readString(dirpath, file)
+	if out == "max" {
+		return math.MaxUint64
+	}
+	if out == "" {
+		return 0
+	}
+
+	val, err := strconv.ParseUint(out, 10, 64)
+	if err != nil {
+		klog.Errorf("readUInt64: Failed to parse int %q from file %q: %s", out, path.Join(dirpath, file), err)
+		return 0
+	}
+
+	return val
+}
+
+func readString(dirpath string, file string) string {
+	cgroupFile := path.Join(dirpath, file)
+
+	// Read
+	out, err := os.ReadFile(cgroupFile)
+	if err != nil {
+		// Ignore non-existent files
+		if !os.IsNotExist(err) {
+			klog.Warningf("readString: Failed to read %q: %s", cgroupFile, err)
+		}
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
