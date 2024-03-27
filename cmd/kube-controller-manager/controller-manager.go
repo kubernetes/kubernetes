@@ -21,6 +21,8 @@ limitations under the License.
 package main
 
 import (
+	clientfeatures "k8s.io/client-go/features"
+	"k8s.io/utils/featuregates"
 	"os"
 	_ "time/tzdata" // for CronJob Time Zone support
 
@@ -32,6 +34,8 @@ import (
 )
 
 func main() {
+	clientfeatures.WatchListClient2.(featuregates.MutableFeatureGate).OverrideDefaultValue(true)
+
 	command := app.NewControllerManagerCommand()
 	code := cli.Run(command)
 	os.Exit(code)

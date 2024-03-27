@@ -411,7 +411,7 @@ func (v *dummyController) HasSynced() bool {
 }
 
 func (v *dummyController) LastSyncResourceVersion() string {
-	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
+	if clientgofeaturegate.InformerResourceVersion2.Enabled() {
 		return v.informer.LastSyncResourceVersion()
 	}
 
