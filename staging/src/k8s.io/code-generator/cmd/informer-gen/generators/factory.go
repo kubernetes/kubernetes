@@ -104,6 +104,7 @@ var sharedInformerFactoryStruct = `
 type SharedInformerOption func(*sharedInformerFactory) *sharedInformerFactory
 
 type sharedInformerFactory struct {
+	factoryName string
 	client {{.clientSetInterface|raw}}
 	namespace string
 	tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}
@@ -137,6 +138,14 @@ func WithCustomResyncConfig(resyncConfig map[{{.object|raw}}]{{.timeDuration|raw
 func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.tweakListOptions = tweakListOptions
+		return factory
+	}
+}
+
+// WithFactoryName sets the name of the factory
+func WithFactoryName(name string) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.factoryName = name
 		return factory
 	}
 }
@@ -187,6 +196,10 @@ func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, def
 	}
 
 	return factory
+}
+
+func (f *sharedInformerFactory) Name() string {
+	return f.factoryName
 }
 
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
