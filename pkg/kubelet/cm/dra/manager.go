@@ -373,6 +373,9 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			// General error unrelated to any particular claim.
 			return fmt.Errorf("NodeUnprepareResources failed: %v", err)
 		}
+		if response == nil {
+			continue
+		}
 
 		for claimUID, result := range response.Claims {
 			reqClaim := lookupClaimRequest(claims, claimUID)
