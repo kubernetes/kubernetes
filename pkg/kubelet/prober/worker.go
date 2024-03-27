@@ -178,7 +178,10 @@ probeLoop:
 		case <-w.stopCh:
 			break probeLoop
 		case <-probeTicker.C:
+			klog.V(3).InfoS("Triggerd Probe by periodSeconds", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
+			// continue
 		case <-w.manualTriggerCh:
+			klog.V(3).InfoS("Triggerd Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
 			// continue
 		}
 	}
