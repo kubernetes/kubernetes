@@ -195,7 +195,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		}
 	}
 
-	imageRef, msg, err := m.imagePuller.EnsureImageExists(ctx, pod, container, pullSecrets, podSandboxConfig, podRuntimeHandler)
+	imageRef, msg, err := m.imagePullSecretEnsurer.EnsureImageExists(ctx, pod, container, pullSecrets, podSandboxConfig, podRuntimeHandler)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())

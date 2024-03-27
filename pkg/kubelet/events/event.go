@@ -43,6 +43,7 @@ const (
 	FailedToPullImage       = "Failed"
 	FailedToInspectImage    = "InspectFailed"
 	ErrImageNeverPullPolicy = "ErrImageNeverPull"
+	ErrImageNotEnsured      = "ErrImageNotEnsured"
 	BackOffPullImage        = "BackOff"
 )
 
