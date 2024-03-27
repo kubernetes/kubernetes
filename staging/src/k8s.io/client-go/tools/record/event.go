@@ -295,6 +295,7 @@ func (e *eventBroadcasterImpl) recordToSink(sink EventSink, event *v1.Event, eve
 		utilruntime.HandleError(err)
 	}
 	if result.Skip {
+		klog.FromContext(e.cancelationCtx).V(5).Info("Event skipped", "object", klog.KRef(event.InvolvedObject.Namespace, event.InvolvedObject.Name), "fieldPath", event.InvolvedObject.FieldPath, "kind", event.InvolvedObject.Kind, "apiVersion", event.InvolvedObject.APIVersion, "type", event.Type, "reason", event.Reason, "message", event.Message)
 		return
 	}
 	tries := 0

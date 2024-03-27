@@ -169,6 +169,7 @@ func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 		event.InvolvedObject.Kind,
 		event.InvolvedObject.Namespace,
 		event.InvolvedObject.Name,
+		event.InvolvedObject.FieldPath,
 		string(event.InvolvedObject.UID),
 		event.InvolvedObject.APIVersion,
 		event.Type,
