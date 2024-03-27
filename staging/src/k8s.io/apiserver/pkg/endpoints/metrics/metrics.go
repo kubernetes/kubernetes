@@ -28,6 +28,8 @@ import (
 
 	restful "github.com/emicklei/go-restful/v3"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -432,11 +434,37 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 }
 
 func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration) {
-	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
+	var exemplarLabels prometheus.Labels
+	maybeSpanCtx := trace.SpanContextFromContext(ctx)
+	if maybeSpanCtx.IsValid() {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": maybeSpanCtx.TraceID().String(),
+			"span_id":  maybeSpanCtx.SpanID().String(),
+		}
+	} else {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": "xxxx",
+			"span_id":  "xxxx",
+		}
+	}
+	requestFilterDuration.WithContext(ctx).WithLabelValues(name).(prometheus.ExemplarObserver).ObserveWithExemplar(elapsed.Seconds(), exemplarLabels)
 }
 
-func RecordTimestampComparisonLatency(codePath string, elapsed time.Duration) {
-	requestTimestampComparisonDuration.WithLabelValues(codePath).Observe(elapsed.Seconds())
+func RecordTimestampComparisonLatency(ctx context.Context, codePath string, elapsed time.Duration) {
+	var exemplarLabels prometheus.Labels
+	maybeSpanCtx := trace.SpanContextFromContext(ctx)
+	if maybeSpanCtx.IsValid() {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": maybeSpanCtx.TraceID().String(),
+			"span_id":  maybeSpanCtx.SpanID().String(),
+		}
+	} else {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": "xxxx",
+			"span_id":  "xxxx",
+		}
+	}
+	requestTimestampComparisonDuration.WithLabelValues(codePath).(prometheus.ExemplarObserver).ObserveWithExemplar(elapsed.Seconds(), exemplarLabels)
 }
 
 func RecordRequestPostTimeout(source string, status string) {
@@ -537,7 +565,20 @@ func RecordWatchListLatency(ctx context.Context, gvr schema.GroupVersionResource
 	}
 	elapsedSeconds := time.Since(requestReceivedTimestamp).Seconds()
 
-	watchListLatencies.WithContext(ctx).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource, metricsScope).Observe(elapsedSeconds)
+	var exemplarLabels prometheus.Labels
+	maybeSpanCtx := trace.SpanContextFromContext(ctx)
+	if maybeSpanCtx.IsValid() {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": maybeSpanCtx.TraceID().String(),
+			"span_id":  maybeSpanCtx.SpanID().String(),
+		}
+	} else {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": "xxxx",
+			"span_id":  "xxxx",
+		}
+	}
+	watchListLatencies.WithContext(ctx).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource, metricsScope).(prometheus.ExemplarObserver).ObserveWithExemplar(elapsedSeconds, exemplarLabels)
 }
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
@@ -568,18 +609,32 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 			audit.AddAuditAnnotation(req.Context(), removedReleaseAnnotationKey, removedRelease)
 		}
 	}
-	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+
+	var exemplarLabels prometheus.Labels
+	maybeSpanCtx := trace.SpanContextFromContext(req.Context())
+	if maybeSpanCtx.IsValid() {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": maybeSpanCtx.TraceID().String(),
+			"span_id":  maybeSpanCtx.SpanID().String(),
+		}
+	} else {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": "xxxx",
+			"span_id":  "xxxx",
+		}
+	}
+	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).(prometheus.ExemplarObserver).ObserveWithExemplar(elapsedSeconds, exemplarLabels)
 	fieldValidation := cleanFieldValidation(req.URL)
 	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation)
 
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
 		sliLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency() + wd.APFQueueWaitTracker.GetLatency()).Seconds()
-		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
-		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
+		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).(prometheus.ExemplarObserver).ObserveWithExemplar(sliLatency, exemplarLabels)
+		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).(prometheus.ExemplarObserver).ObserveWithExemplar(sliLatency, exemplarLabels)
 	}
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
-		responseSizes.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
+		responseSizes.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).(prometheus.ExemplarObserver).ObserveWithExemplar(float64(respSize), exemplarLabels)
 	}
 }
 

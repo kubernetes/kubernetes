@@ -221,15 +221,16 @@ var noop = &noopMetric{}
 
 type noopMetric struct{}
 
-func (noopMetric) Inc()                              {}
-func (noopMetric) Add(float64)                       {}
-func (noopMetric) Dec()                              {}
-func (noopMetric) Set(float64)                       {}
-func (noopMetric) Sub(float64)                       {}
-func (noopMetric) Observe(float64)                   {}
-func (noopMetric) ObserveWithWeight(float64, uint64) {}
-func (noopMetric) SetToCurrentTime()                 {}
-func (noopMetric) Desc() *prometheus.Desc            { return nil }
-func (noopMetric) Write(*dto.Metric) error           { return nil }
-func (noopMetric) Describe(chan<- *prometheus.Desc)  {}
-func (noopMetric) Collect(chan<- prometheus.Metric)  {}
+func (noopMetric) Inc()                                           {}
+func (noopMetric) Add(float64)                                    {}
+func (noopMetric) Dec()                                           {}
+func (noopMetric) Set(float64)                                    {}
+func (noopMetric) Sub(float64)                                    {}
+func (noopMetric) Observe(float64)                                {}
+func (noopMetric) ObserveWithExemplar(float64, prometheus.Labels) {}
+func (noopMetric) ObserveWithWeight(float64, uint64)              {}
+func (noopMetric) SetToCurrentTime()                              {}
+func (noopMetric) Desc() *prometheus.Desc                         { return nil }
+func (noopMetric) Write(*dto.Metric) error                        { return nil }
+func (noopMetric) Describe(chan<- *prometheus.Desc)               {}
+func (noopMetric) Collect(chan<- prometheus.Metric)               {}

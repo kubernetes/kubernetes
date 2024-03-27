@@ -73,7 +73,7 @@ func getAvoidTimestampEqualities() conversion.Equalities {
 // IgnoreManagedFieldsTimestampsTransformer reverts timestamp updates
 // if the non-managed parts of the object are equivalent
 func IgnoreManagedFieldsTimestampsTransformer(
-	_ context.Context,
+	ctx context.Context,
 	newObj runtime.Object,
 	oldObj runtime.Object,
 ) (res runtime.Object, err error) {
@@ -92,7 +92,7 @@ func IgnoreManagedFieldsTimestampsTransformer(
 			outcome = "error"
 		}
 
-		metrics.RecordTimestampComparisonLatency(outcome, time.Since(start))
+		metrics.RecordTimestampComparisonLatency(ctx, outcome, time.Since(start))
 	}()
 
 	// If managedFields modulo timestamps are unchanged

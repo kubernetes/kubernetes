@@ -26,6 +26,7 @@ import (
 // Histogram is our internal representation for our wrapping struct around prometheus
 // histograms. Summary implements both kubeCollector and ObserverMetric
 type Histogram struct {
+	ctx context.Context
 	ObserverMetric
 	*HistogramOpts
 	lazyMetric
@@ -74,6 +75,7 @@ func (h *Histogram) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
 func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
+	h.ctx = ctx
 	return h.ObserverMetric
 }
 
