@@ -59,6 +59,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 	var dialOpts []grpc.DialOption
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithAuthority("localhost"),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
