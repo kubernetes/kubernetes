@@ -21,6 +21,8 @@ import (
 	"path"
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -42,6 +44,8 @@ type genFakeForType struct {
 }
 
 var _ generator.Generator = &genFakeForType{}
+
+var titler = cases.Title(language.Und)
 
 // Filter ignores all but one type because we're making a single file per type.
 func (g *genFakeForType) Filter(c *generator.Context, t *types.Type) bool { return t == g.typeToMatch }
@@ -299,9 +303,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
-	//nolint:staticcheck
-	// TODO: convert this to use golang.org/x/text/cases
-	return strings.ReplaceAll(template, " "+strings.Title(verbType), " "+name)
+	return strings.ReplaceAll(template, " "+titler.String(verbType), " "+name)
 }
 
 // template for the struct that implements the type's interface
