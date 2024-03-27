@@ -5243,6 +5243,7 @@ Spec:
   Allowing ingress traffic:
     To Port: 80/TCP
     To Port: 82/TCP
+    To Ports: 10443-10445/UDP
     From:
       NamespaceSelector: id=ns1,id2=ns2
       PodSelector: id=pod1,id2=pod2
@@ -5265,7 +5266,10 @@ Spec:
 
 	port80 := intstr.FromInt32(80)
 	port82 := intstr.FromInt32(82)
+	port10443 := intstr.FromInt32(10443)
+	var endPort10445 int32 = 10445
 	protoTCP := corev1.ProtocolTCP
+	protoUDP := corev1.ProtocolUDP
 
 	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -5289,6 +5293,7 @@ Spec:
 					Ports: []networkingv1.NetworkPolicyPort{
 						{Port: &port80},
 						{Port: &port82, Protocol: &protoTCP},
+						{Port: &port10443, EndPort: &endPort10445, Protocol: &protoUDP},
 					},
 					From: []networkingv1.NetworkPolicyPeer{
 						{
@@ -5370,6 +5375,7 @@ Spec:
   Allowing ingress traffic:
     To Port: 80/TCP
     To Port: 82/TCP
+    To Ports: 10443-10445/UDP
     From:
       NamespaceSelector: id=ns1,id2=ns2
       PodSelector: id=pod1,id2=pod2
@@ -5393,7 +5399,10 @@ Spec:
 
 	port80 := intstr.FromInt32(80)
 	port82 := intstr.FromInt32(82)
+	port10443 := intstr.FromInt32(10443)
+	var endPort10445 int32 = 10445
 	protoTCP := corev1.ProtocolTCP
+	protoUDP := corev1.ProtocolUDP
 
 	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -5417,6 +5426,7 @@ Spec:
 					Ports: []networkingv1.NetworkPolicyPort{
 						{Port: &port80},
 						{Port: &port82, Protocol: &protoTCP},
+						{Port: &port10443, EndPort: &endPort10445, Protocol: &protoUDP},
 					},
 					From: []networkingv1.NetworkPolicyPeer{
 						{
