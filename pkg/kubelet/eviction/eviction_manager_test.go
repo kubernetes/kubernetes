@@ -18,6 +18,7 @@ package eviction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -25,6 +26,10 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,6 +59,7 @@ type mockPodKiller struct {
 	evict               bool
 	statusFn            func(*v1.PodStatus)
 	gracePeriodOverride *int64
+	evictFailed         bool
 }
 
 // killPodNow records the pod that was killed
@@ -62,6 +68,9 @@ func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride 
 	m.statusFn = statusFn
 	m.evict = evict
 	m.gracePeriodOverride = gracePeriodOverride
+	if m.evictFailed {
+		return errors.New("kill pod failed")
+	}
 	return nil
 }
 
@@ -328,6 +337,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					},
 				}
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+
 				manager := &managerImpl{
 					clock:                        fakeClock,
 					killPodFunc:                  podKiller.killPodNow,
@@ -339,6 +349,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+					tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 				}
 
 				// synchronize to detect the memory pressure
@@ -624,6 +635,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+					tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 				}
 
 				// synchronize
@@ -728,6 +740,7 @@ func TestMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// create a best effort pod to test admission
@@ -1376,6 +1389,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 			}
 
 			// create a best effort pod to test admission
@@ -1613,6 +1627,7 @@ func TestMinReclaim(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// synchronize
@@ -1898,6 +1913,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 			}
 
 			// synchronize
@@ -2355,6 +2371,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 			}
 
 			// create a best effort pod to test admission
@@ -2589,6 +2606,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	fakeClock.Step(1 * time.Minute)
@@ -2720,6 +2738,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// create a best effort pod to test admission
@@ -2889,6 +2908,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 		thresholdNotifiers:           []ThresholdNotifier{thresholdNotifier},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// The UpdateThreshold method should have been called once, since this is the first run.
@@ -2984,6 +3004,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 		nodeRef:                       nodeRef,
 		localStorageCapacityIsolation: true,
 		dedicatedImageFs:              diskInfoProvider.dedicatedImageFs,
+		tracer:                        oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	activePodsFunc := func() []*v1.Pod {
@@ -3002,4 +3023,145 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 	if diff := cmp.Diff(pods, evictedPods); diff != "" {
 		t.Fatalf("Unexpected evicted pod (-want,+got):\n%s", diff)
 	}
+}
+
+func TestEvictionSuccessSpan(t *testing.T) {
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "below-requests", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "above-requests", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "700Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+
+	fakeRecorder := tracetest.NewSpanRecorder()
+	oteltracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer(instrumentationScope)
+
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltracer,
+	}
+
+	// synchronize to detect the memory pressure
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have error but got %v", err)
+	}
+
+	output := fakeRecorder.Ended()
+
+	assert.Equal(t, 1, len(output), "Manager should output 1 span")
+	assert.Equal(t, "Eviction/EvictPod", output[0].Name(), "Manager should output 1 span with name 'Eviction/EvictPod'")
+	assert.Equal(t, 4, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
+	assert.Equal(t, 0, len(output[0].Events()), "Manager should output 1 span with 0 events")
+}
+
+func TestEvictionFailSpan(t *testing.T) {
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "below-requests", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "above-requests", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "700Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{
+		evictFailed: true,
+	}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+
+	fakeRecorder := tracetest.NewSpanRecorder()
+	oteltracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer(instrumentationScope)
+
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltracer,
+	}
+
+	// synchronize to detect the memory pressure
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have error but got %v", err)
+	}
+
+	output := fakeRecorder.Ended()
+
+	assert.Equal(t, 1, len(output), "Manager should output 1 span")
+	assert.Equal(t, "Eviction/EvictPod", output[0].Name(), "Manager should output 1 span with name 'Eviction/EvictPod'")
+	assert.Equal(t, 4, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
+	assert.Equal(t, 1, len(output[0].Events()), "Manager should output 1 span with 2 events")
+	assert.Equal(t, 5, len(output[0].Events()[0].Attributes), "Manager should output second event with 5 attributes, if eviction is failed, k8s.pod.id, k8s.pod.name, k8s.namespace.name, exception.type, exception.message")
 }

@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -57,6 +60,8 @@ const (
 	// signalEmptyDirFsLimit is amount of storage available on filesystem requested by an emptyDir
 	signalEmptyDirFsLimit string = "emptydirfs.limit"
 )
+
+const instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/eviction"
 
 // managerImpl implements Manager
 type managerImpl struct {
@@ -102,6 +107,8 @@ type managerImpl struct {
 	thresholdsLastUpdated time.Time
 	// whether can support local storage capacity isolation
 	localStorageCapacityIsolation bool
+	// OpenTelemetry Tracer
+	tracer trace.Tracer
 }
 
 // ensure it implements the required interface
@@ -118,7 +125,9 @@ func NewManager(
 	nodeRef *v1.ObjectReference,
 	clock clock.WithTicker,
 	localStorageCapacityIsolation bool,
+	tracerProvider trace.TracerProvider,
 ) (Manager, lifecycle.PodAdmitHandler) {
+	tracer := tracerProvider.Tracer(instrumentationScope)
 	manager := &managerImpl{
 		clock:                         clock,
 		killPodFunc:                   killPodFunc,
@@ -134,6 +143,7 @@ func NewManager(
 		splitContainerImageFs:         nil,
 		thresholdNotifiers:            []ThresholdNotifier{},
 		localStorageCapacityIsolation: localStorageCapacityIsolation,
+		tracer:                        tracer,
 	}
 	return manager, manager
 }
@@ -419,7 +429,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 				Message: message,
 			}
 		}
-		if m.evictPod(pod, gracePeriodOverride, message, annotations, condition) {
+		if m.evictPod(ctx, pod, gracePeriodOverride, message, annotations, condition) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
 			return []*v1.Pod{pod}, nil
 		}
@@ -525,7 +535,7 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				if m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil) {
+				if m.evictPod(context.Background(), pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil) {
 					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
 					return true
 				}
@@ -553,7 +563,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
 		message := fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String())
-		if m.evictPod(pod, 0, message, nil, nil) {
+		if m.evictPod(context.Background(), pod, 0, message, nil, nil) {
 			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
 			return true
 		}
@@ -579,7 +589,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				if m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil, nil) {
+				if m.evictPod(context.Background(), pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil, nil) {
 					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
 					return true
 				}
@@ -590,7 +600,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 	return false
 }
 
-func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition) bool {
+func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition) bool {
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
@@ -602,6 +612,13 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
+	_, otelSpan := m.tracer.Start(ctx, "Eviction/EvictPod", trace.WithAttributes(
+		semconv.K8SPodUIDKey.String(string(pod.UID)),
+		semconv.K8SPodNameKey.String(pod.Name),
+		semconv.K8SNamespaceNameKey.String(pod.Namespace),
+		attribute.String("k8s.eviction.message", evictMsg),
+	))
+	defer otelSpan.End()
 	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
 		status.Phase = v1.PodFailed
 		status.Reason = Reason
@@ -612,6 +629,11 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	})
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
+		otelSpan.RecordError(fmt.Errorf("pod failed to evict: %w", err), trace.WithAttributes(
+			semconv.K8SPodUIDKey.String(string(pod.UID)),
+			semconv.K8SPodNameKey.String(pod.Name),
+			semconv.K8SNamespaceNameKey.String(pod.Namespace),
+		))
 	} else {
 		klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
 	}
