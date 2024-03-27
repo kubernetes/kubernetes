@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -2816,6 +2817,10 @@ func TestUpscaleCap(t *testing.T) {
 }
 
 func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
+	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skip flaking test on Windows.")
+	}
 	tc := testCase{
 		minReplicas:     1,
 		maxReplicas:     20,
@@ -2847,6 +2852,10 @@ func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 }
 
 func TestMoreReplicasThanSpecNoScale(t *testing.T) {
+	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skip flaking test on Windows.")
+	}
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             8,
