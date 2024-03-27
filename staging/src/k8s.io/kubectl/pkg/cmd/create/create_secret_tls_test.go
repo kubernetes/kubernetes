@@ -18,7 +18,7 @@ package create
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -197,8 +197,8 @@ func write(path, contents string, t *testing.T) {
 }
 
 func writeKeyPair(tmpDirPath, key, cert string, t *testing.T) (keyPath, certPath string) {
-	keyPath = path.Join(tmpDirPath, "tls.key")
-	certPath = path.Join(tmpDirPath, "tls.cert")
+	keyPath = filepath.Join(tmpDirPath, "tls.key")
+	certPath = filepath.Join(tmpDirPath, "tls.cert")
 	write(keyPath, key, t)
 	write(certPath, cert, t)
 	return
