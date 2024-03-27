@@ -39,7 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/controller/job"
+	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -715,7 +715,7 @@ func waitForAnyFinishedJob(ctx context.Context, c clientset.Interface, ns string
 			return false, err
 		}
 		for i := range jobs.Items {
-			if job.IsJobFinished(&jobs.Items[i]) {
+			if jobutil.IsJobFinished(&jobs.Items[i]) {
 				return true, nil
 			}
 		}
@@ -761,7 +761,7 @@ func filterNotDeletedJobs(jobs *batchv1.JobList) []*batchv1.Job {
 func filterActiveJobs(jobs *batchv1.JobList) (active []*batchv1.Job, finished []*batchv1.Job) {
 	for i := range jobs.Items {
 		j := jobs.Items[i]
-		if !job.IsJobFinished(&j) {
+		if !jobutil.IsJobFinished(&j) {
 			active = append(active, &j)
 		} else {
 			finished = append(finished, &j)
