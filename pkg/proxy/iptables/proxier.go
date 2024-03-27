@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
+	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
@@ -166,6 +167,7 @@ type Proxier struct {
 	masqueradeAll  bool
 	masqueradeMark string
 	conntrack      conntrack.Interface
+	nfacct         nfacct.Interface
 	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
@@ -205,6 +207,9 @@ type Proxier struct {
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer proxyutil.NetworkInterfacer
+
+	// nfAcctCounters can be used to determine if a counter exist in the nfacct subsystem.
+	nfAcctCounters map[string]bool
 }
 
 // Proxier implements proxy.Provider
@@ -266,6 +271,10 @@ func NewProxier(ipFamily v1.IPFamily,
 	klog.V(2).InfoS("Using iptables mark for masquerade", "ipFamily", ipt.Protocol(), "mark", masqueradeMark)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+	nfacctRunner, err := nfacct.New()
+	if err != nil {
+		klog.ErrorS(err, "Failed to create nfacct runner")
+	}
 
 	proxier := &Proxier{
 		ipFamily:                 ipFamily,
@@ -279,6 +288,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
 		conntrack:                conntrack.NewExec(exec),
+		nfacct:                   nfacctRunner,
 		localDetector:            localDetector,
 		hostname:                 hostname,
 		nodeIP:                   nodeIP,
@@ -296,6 +306,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        proxyutil.RealNetwork{},
 		conntrackTCPLiberal:      conntrackTCPLiberal,
+		nfAcctCounters:           map[string]bool{metrics.IptablesCTStateInvalidDroppedNFAcctCounter: false},
 	}
 
 	burstSyncs := 2
@@ -844,6 +855,18 @@ func (proxier *Proxier) syncProxyRules() {
 			if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
 				klog.ErrorS(err, "Failed to ensure chain jumps", "table", jump.table, "srcChain", jump.srcChain, "dstChain", jump.dstChain)
 				return
+			}
+		}
+
+		// ensure the nfacct counters
+		if proxier.nfacct != nil {
+			for name := range proxier.nfAcctCounters {
+				if err := proxier.nfacct.Ensure(name); err != nil {
+					proxier.nfAcctCounters[name] = false
+					klog.ErrorS(err, "Failed to create nfacct counter; the corresponding metric will not be updated", "counter", name)
+				} else {
+					proxier.nfAcctCounters[name] = true
+				}
 			}
 		}
 	}
@@ -1447,12 +1470,20 @@ func (proxier *Proxier) syncProxyRules() {
 	// Ref: https://github.com/kubernetes/kubernetes/issues/74839
 	// Ref: https://github.com/kubernetes/kubernetes/issues/117924
 	if !proxier.conntrackTCPLiberal {
-		proxier.filterRules.Write(
+		rule := []string{
 			"-A", string(kubeForwardChain),
 			"-m", "conntrack",
 			"--ctstate", "INVALID",
+		}
+		if proxier.nfAcctCounters[metrics.IptablesCTStateInvalidDroppedNFAcctCounter] {
+			rule = append(rule,
+				"-m", "nfacct", "--nfacct-name", metrics.IptablesCTStateInvalidDroppedNFAcctCounter,
+			)
+		}
+		rule = append(rule,
 			"-j", "DROP",
 		)
+		proxier.filterRules.Write(rule)
 	}
 
 	// If the masqueradeMark has been added then we want to forward that same

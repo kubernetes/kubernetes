@@ -2543,22 +2543,43 @@ func TestHealthCheckNodePort(t *testing.T) {
 }
 
 func TestDropInvalidRule(t *testing.T) {
-	for _, tcpLiberal := range []bool{false, true} {
-		t.Run(fmt.Sprintf("tcpLiberal %t", tcpLiberal), func(t *testing.T) {
-			ipt := iptablestest.NewFake()
-			fp := NewFakeProxier(ipt)
-			fp.conntrackTCPLiberal = tcpLiberal
-			fp.syncProxyRules()
-
-			var expected string
-			if !tcpLiberal {
-				expected = "-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP"
-			}
-			expected += dedent.Dedent(`
+	kubeForwardChainRules := dedent.Dedent(`
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-				`)
+	`)
 
+	testCases := []struct {
+		nfacctEnsured  bool
+		tcpLiberal     bool
+		dropRule       string
+		nfAcctCounters map[string]bool
+	}{
+		{
+			nfacctEnsured: false,
+			tcpLiberal:    false,
+			dropRule:      "-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP",
+		},
+		{
+			nfacctEnsured: true,
+			tcpLiberal:    false,
+			nfAcctCounters: map[string]bool{
+				metrics.IptablesCTStateInvalidDroppedNFAcctCounter: true,
+			},
+			dropRule: fmt.Sprintf("-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name %s -j DROP", metrics.IptablesCTStateInvalidDroppedNFAcctCounter),
+		},
+		{
+			tcpLiberal: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("tcpLiberal is %t and nfacctEnsured is %t", tc.tcpLiberal, tc.nfacctEnsured), func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.conntrackTCPLiberal = tc.tcpLiberal
+			fp.nfAcctCounters = tc.nfAcctCounters
+			fp.syncProxyRules()
+
+			expected := tc.dropRule + kubeForwardChainRules
 			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
 		})
 	}

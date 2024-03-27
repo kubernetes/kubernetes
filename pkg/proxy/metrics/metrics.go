@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
 )
 
 const kubeProxySubsystem = "kubeproxy"
@@ -138,6 +140,14 @@ var (
 		},
 	)
 
+	// iptablesCTStateInvalidDroppedPacketsDescription describe the metrics for the number of packets dropped
+	// by iptables which were marked INVALID by conntrack.
+	iptablesCTStateInvalidDroppedPacketsDescription = metrics.NewDesc(
+		"kubeproxy_iptables_ct_state_invalid_dropped_packets",
+		"packets dropped by iptables to work around conntrack problems",
+		nil, nil, metrics.ALPHA, "")
+	IptablesCTStateInvalidDroppedNFAcctCounter = "ct_state_invalid_dropped_pkts"
+
 	// IptablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
 	// seen.
 	IptablesRestoreFailuresTotal = metrics.NewCounter(
@@ -248,6 +258,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(EndpointChangesTotal)
 		legacyregistry.MustRegister(ServiceChangesPending)
 		legacyregistry.MustRegister(ServiceChangesTotal)
+		legacyregistry.CustomMustRegister(newCTStateInvalidPacketsCollector())
 		legacyregistry.MustRegister(IptablesRulesTotal)
 		legacyregistry.MustRegister(IptablesRulesLastSync)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
@@ -263,4 +274,41 @@ func RegisterMetrics() {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+var _ metrics.StableCollector = &ctStateInvalidPacketsCollector{}
+
+func newCTStateInvalidPacketsCollector() *ctStateInvalidPacketsCollector {
+	client, err := nfacct.New()
+	if err != nil {
+		klog.ErrorS(err, "failed to initialize nfacct client")
+	}
+	return &ctStateInvalidPacketsCollector{client: client}
+}
+
+type ctStateInvalidPacketsCollector struct {
+	metrics.BaseStableCollector
+	client nfacct.Interface
+}
+
+// DescribeWithStability implements the metrics.StableCollector interface.
+func (c *ctStateInvalidPacketsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- iptablesCTStateInvalidDroppedPacketsDescription
+}
+
+// CollectWithStability implements the metrics.StableCollector interface.
+func (c *ctStateInvalidPacketsCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	if c.client != nil {
+		counter, err := c.client.Get(IptablesCTStateInvalidDroppedNFAcctCounter)
+		if err != nil {
+			klog.ErrorS(err, "failed to collect nfacct counter")
+		} else {
+			metric, err := metrics.NewConstMetric(iptablesCTStateInvalidDroppedPacketsDescription, metrics.CounterValue, float64(counter.Packets))
+			if err != nil {
+				klog.ErrorS(err, "failed to create constant metric")
+			} else {
+				ch <- metric
+			}
+		}
+	}
 }
