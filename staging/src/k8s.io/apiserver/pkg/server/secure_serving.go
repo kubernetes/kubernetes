@@ -17,8 +17,11 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
@@ -76,6 +79,56 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		// Populate PeerCertificates in requests, but don't reject connections without certificates
 		// This allows certificates to be validated by authenticators, while still allowing other auth types
 		tlsConfig.ClientAuth = tls.RequestClientCert
+	}
+
+	if s.CertificateRevocationList != "" {
+		prevVerify := tlsConfig.VerifyConnection
+		tlsConfig.VerifyConnection = func(state tls.ConnectionState) error {
+			if prevVerify != nil {
+				if err := prevVerify(state); err != nil {
+					return err
+				}
+			}
+
+			certs := state.PeerCertificates
+			if len(certs) == 0 {
+				return nil
+			}
+
+			// Load CRL
+			crlBytes, err := os.ReadFile(s.CertificateRevocationList)
+			if err != nil {
+				return err
+			}
+
+			// Decode PEM if present
+			if bytes.HasPrefix(crlBytes, []byte("-----BEGIN X509 CRL")) {
+				block, _ := pem.Decode(crlBytes)
+				if block != nil && block.Type == "X509 CRL" {
+					crlBytes = block.Bytes
+				}
+			}
+
+			crl, err := x509.ParseRevocationList(crlBytes)
+			if err != nil {
+				return err
+			}
+			revokedSerials := make(map[string]struct{})
+			for _, rc := range crl.RevokedCertificateEntries {
+				revokedSerials[string(rc.SerialNumber.Bytes())] = struct{}{}
+			}
+
+			// Check peer certificates against CRL
+			for _, c := range certs {
+				serial := string(c.SerialNumber.Bytes())
+				if _, ok := revokedSerials[serial]; ok {
+					klog.Infof("certificate serial %x is revoked", serial)
+					return fmt.Errorf("certificate serial %x is revoked", serial)
+				}
+			}
+
+			return nil
+		}
 	}
 
 	if s.ClientCA != nil || s.Cert != nil || len(s.SNICerts) > 0 {
