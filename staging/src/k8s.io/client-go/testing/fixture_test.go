@@ -408,3 +408,35 @@ func Test_resourceCovers(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteWithFinalizer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "PersistentVolumeClaim"}
+	pvc := getArbitraryResource(gvr, "pvc", "test-ns")
+	assert.Nil(t, o.Add(pvc))
+
+	// Add finalizer
+	pvc.SetFinalizers([]string{"test-finalizer"})
+	assert.Nil(t, o.Create(gvr, pvc, "test-ns"))
+
+	// Delete with finalizer
+	assert.Nil(t, o.Delete(gvr, "test-ns", "pvc"))
+
+	// Verify PVC is still present
+	obj, err := o.Get(gvr, "test-ns", "pvc")
+	pvc = obj.(*unstructured.Unstructured)
+	assert.NoError(t, err)
+	assert.NotNil(t, pvc.GetDeletionTimestamp())
+
+	// Clear finalizer
+	pvc.SetFinalizers([]string{})
+	err = o.Update(gvr, pvc, "test-ns")
+	assert.NoError(t, err)
+
+	// Verify PVC is deleted
+	_, err = o.Get(gvr, "test-ns", "pvc")
+	assert.True(t, errors.IsNotFound(err))
+}
