@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
+	"k8s.io/apiextensions-apiserver/pkg/storageversion"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,8 +71,10 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/scale"
@@ -125,6 +129,9 @@ type crdHandler struct {
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	// storageVersionManager manages CRD StorageVersion updates.
+	storageVersionManager *storageversion.Manager
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -176,7 +183,8 @@ func NewCustomResourceDefinitionHandler(
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
 	staticOpenAPISpec map[string]*spec.Schema,
-	maxRequestBodyBytes int64) (*crdHandler, error) {
+	maxRequestBodyBytes int64,
+	storageVersionManager *storageversion.Manager) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -192,13 +200,12 @@ func NewCustomResourceDefinitionHandler(
 		minRequestTimeout:       minRequestTimeout,
 		staticOpenAPISpec:       staticOpenAPISpec,
 		maxRequestBodyBytes:     maxRequestBodyBytes,
+		storageVersionManager:   storageVersionManager,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    ret.createCustomResourceDefinition,
 		UpdateFunc: ret.updateCustomResourceDefinition,
-		DeleteFunc: func(obj interface{}) {
-			ret.removeDeadStorage()
-		},
+		DeleteFunc: ret.deleteCustomResourceDefinition,
 	})
 	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
 	if err != nil {
@@ -207,7 +214,6 @@ func NewCustomResourceDefinitionHandler(
 	ret.converterFactory = crConverterFactory
 
 	ret.customStorage.Store(crdStorageMap{})
-
 	return ret, nil
 }
 
@@ -290,8 +296,6 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
-
 	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
@@ -337,11 +341,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	switch {
 	case subresource == "status" && subresources != nil && subresources.Status != nil:
-		handlerFunc = r.serveStatus(w, req, requestInfo, crdInfo, terminating, supportedTypes)
+		handlerFunc = r.serveStatus(w, req, requestInfo, crdInfo, supportedTypes, crd)
 	case subresource == "scale" && subresources != nil && subresources.Scale != nil:
-		handlerFunc = r.serveScale(w, req, requestInfo, crdInfo, terminating, supportedTypes)
+		handlerFunc = r.serveScale(w, req, requestInfo, crdInfo, supportedTypes, crd)
 	case len(subresource) == 0:
-		handlerFunc = r.serveResource(w, req, requestInfo, crdInfo, crd, terminating, supportedTypes)
+		handlerFunc = r.serveResource(w, req, requestInfo, crdInfo, crd, supportedTypes, crd.UID, crd.Name)
 	default:
 		responsewriters.ErrorNegotiated(
 			apierrors.NewNotFound(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Name),
@@ -357,7 +361,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, crd *apiextensionsv1.CustomResourceDefinition, terminating bool, supportedTypes []string) http.HandlerFunc {
+func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, crd *apiextensionsv1.CustomResourceDefinition, supportedTypes []string, crdUID types.UID, crdName string) http.HandlerFunc {
 	requestScope := crdInfo.requestScopes[requestInfo.APIVersion]
 	storage := crdInfo.storages[requestInfo.APIVersion].CustomResource
 
@@ -378,21 +382,37 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 		if justCreated {
 			time.Sleep(2 * time.Second)
 		}
-		if terminating {
+		if apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating) {
 			err := apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb)
 			err.ErrStatus.Message = fmt.Sprintf("%v not allowed while custom resource definition is terminating", requestInfo.Verb)
 			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
 			return nil
 		}
+
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		return handlers.CreateResource(storage, requestScope, r.admission)
 	case "update":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	case "delete":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		allowsOptions := true
 		return handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
 	case "deletecollection":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		checkBody := true
 		return handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
 	default:
@@ -404,7 +424,7 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 	}
 }
 
-func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, terminating bool, supportedTypes []string) http.HandlerFunc {
+func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, supportedTypes []string, crd *apiextensionsv1.CustomResourceDefinition) http.HandlerFunc {
 	requestScope := crdInfo.statusRequestScopes[requestInfo.APIVersion]
 	storage := crdInfo.storages[requestInfo.APIVersion].Status
 
@@ -412,8 +432,14 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	case "get":
 		return handlers.GetResource(storage, requestScope)
 	case "update":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		responsewriters.ErrorNegotiated(
@@ -424,7 +450,7 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	}
 }
 
-func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, terminating bool, supportedTypes []string) http.HandlerFunc {
+func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, supportedTypes []string, crd *apiextensionsv1.CustomResourceDefinition) http.HandlerFunc {
 	requestScope := crdInfo.scaleRequestScopes[requestInfo.APIVersion]
 	storage := crdInfo.storages[requestInfo.APIVersion].Scale
 
@@ -432,8 +458,14 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	case "get":
 		return handlers.GetResource(storage, requestScope)
 	case "update":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if err := waitForStorageVersionUpdate(req.Context(), r, crd, requestInfo, w, req); err != nil {
+			return nil
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		responsewriters.ErrorNegotiated(
@@ -442,6 +474,22 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 		)
 		return nil
 	}
+}
+
+func waitForStorageVersionUpdate(ctx context.Context, crdHandler *crdHandler, crd *apiextensionsv1.CustomResourceDefinition, requestInfo *apirequest.RequestInfo, w http.ResponseWriter, req *http.Request) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		klog.V(2).Infof("Skipped waiting for storage version to finish updating since StorageVersionAPI and/or APIServerIdentity feature are disabled.")
+		return nil
+	}
+
+	err := crdHandler.storageVersionManager.WaitForStorageVersionUpdate(ctx, crd)
+	if err != nil {
+		err := apierrors.NewServiceUnavailable(err.Error())
+		responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+	}
+
+	return err
 }
 
 // createCustomResourceDefinition removes potentially stale storage so it gets re-created
@@ -452,15 +500,22 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	// this could happen if the create event is merged from create-update events
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	oldInfo, found := storageMap[crd.UID]
-	if !found {
-		return
+
+	var tearDownFinishedCh <-chan struct{}
+	if found {
+		if apiequality.Semantic.DeepEqual(&crd.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&crd.Status.AcceptedNames, oldInfo.acceptedNames) {
+			klog.V(6).Infof("Ignoring customresourcedefinition %s create event because a storage with the same spec and accepted names exists",
+				crd.Name)
+			return
+		}
+		// Update storage version with the latest info in the watch event
+		tearDownFinishedCh = r.removeStorageLocked(crd.UID)
 	}
-	if apiequality.Semantic.DeepEqual(&crd.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&crd.Status.AcceptedNames, oldInfo.acceptedNames) {
-		klog.V(6).Infof("Ignoring customresourcedefinition %s create event because a storage with the same spec and accepted names exists",
-			crd.Name)
-		return
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		r.storageVersionManager.Enqueue(crd, tearDownFinishedCh, 0)
 	}
-	r.removeStorage_locked(crd.UID)
 }
 
 // updateCustomResourceDefinition removes potentially stale storage so it gets re-created
@@ -485,27 +540,40 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	}
 
 	if oldCRD.UID != newCRD.UID {
-		r.removeStorage_locked(oldCRD.UID)
+		r.removeStorageLocked(oldCRD.UID)
 	}
 
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	oldInfo, found := storageMap[newCRD.UID]
-	if !found {
-		return
-	}
-	if apiequality.Semantic.DeepEqual(&newCRD.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&newCRD.Status.AcceptedNames, oldInfo.acceptedNames) {
-		klog.V(6).Infof("Ignoring customresourcedefinition %s update because neither spec, nor accepted names changed", oldCRD.Name)
-		return
+
+	var tearDownFinishedCh <-chan struct{}
+	if found {
+		if apiequality.Semantic.DeepEqual(&newCRD.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&newCRD.Status.AcceptedNames, oldInfo.acceptedNames) {
+			klog.V(6).Infof("Ignoring customresourcedefinition %s update because neither spec, nor accepted names changed", oldCRD.Name)
+			return
+		}
+		// Tear down the old storage
+		klog.V(4).Infof("Updating customresourcedefinition %s", newCRD.Name)
+		tearDownFinishedCh = r.removeStorageLocked(newCRD.UID)
 	}
 
-	klog.V(4).Infof("Updating customresourcedefinition %s", newCRD.Name)
-	r.removeStorage_locked(newCRD.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		r.storageVersionManager.Enqueue(newCRD, tearDownFinishedCh, 0)
+	}
 }
 
-// removeStorage_locked removes the cached storage with the given uid as key from the storage map. This function
-// updates r.customStorage with the cleaned-up storageMap and tears down the old storage.
+func (r *crdHandler) deleteCustomResourceDefinition(obj interface{}) {
+	r.removeDeadStorage()
+}
+
+// removeStorageLocked removes the cached storage with the given uid as key from the storage map
+// and returns a channel which is closed when the teardown of the storage is finished.
+// This function updates r.customStorage with the cleaned-up storageMap and tears down
+// the old storage.
 // NOTE: Caller MUST hold r.customStorageLock to write r.customStorage thread-safely.
-func (r *crdHandler) removeStorage_locked(uid types.UID) {
+func (r *crdHandler) removeStorageLocked(uid types.UID) <-chan struct{} {
+	tearDownFinishedCh := make(chan struct{})
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if oldInfo, ok := storageMap[uid]; ok {
 		// Copy because we cannot write to storageMap without a race
@@ -517,8 +585,11 @@ func (r *crdHandler) removeStorage_locked(uid types.UID) {
 		r.customStorage.Store(storageMap2)
 
 		// Tear down the old storage
-		go r.tearDown(oldInfo)
+		go r.tearDown(oldInfo, tearDownFinishedCh)
+	} else {
+		close(tearDownFinishedCh)
 	}
+	return tearDownFinishedCh
 }
 
 // removeDeadStorage removes REST storage that isn't being used
@@ -544,14 +615,22 @@ func (r *crdHandler) removeDeadStorage() {
 
 	for uid, crdInfo := range storageMap {
 		if _, ok := storageMap2[uid]; !ok {
+			tearDownFinishedCh := make(chan struct{})
 			klog.V(4).Infof("Removing dead CRD storage for %s/%s", crdInfo.spec.Group, crdInfo.spec.Names.Kind)
-			go r.tearDown(crdInfo)
+			go r.tearDown(crdInfo, tearDownFinishedCh)
+			if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+				utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+				r.storageVersionManager.DeleteSVUpdateInfo(uid, tearDownFinishedCh)
+			}
 		}
 	}
 }
 
 // Wait up to a minute for requests to drain, then tear down storage
-func (r *crdHandler) tearDown(oldInfo *crdInfo) {
+func (r *crdHandler) tearDown(oldInfo *crdInfo, finishedCh chan<- struct{}) {
+	if finishedCh != nil {
+		defer close(finishedCh)
+	}
 	requestsDrained := make(chan struct{})
 	go func() {
 		defer close(requestsDrained)

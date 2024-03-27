@@ -17,6 +17,7 @@ limitations under the License.
 package storageversion
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -55,7 +56,7 @@ type Manager interface {
 	// AddResourceInfo records resources whose StorageVersions need updates
 	AddResourceInfo(resources ...*ResourceInfo)
 	// UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-	UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, apiserverID string)
+	UpdateStorageVersions(ctx context.Context, kubeAPIServerClientConfig *rest.Config, apiserverID string)
 	// PendingUpdate returns true if the StorageVersion of the given resource is still pending update.
 	PendingUpdate(gr schema.GroupResource) bool
 	// LastUpdateError returns the last error hit when updating the storage version of the given resource.
@@ -115,7 +116,7 @@ func (s *defaultManager) addPendingManagedStatusLocked(r *ResourceInfo) {
 }
 
 // UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, serverID string) {
+func (s *defaultManager) UpdateStorageVersions(ctx context.Context, kubeAPIServerClientConfig *rest.Config, serverID string) {
 	clientset, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to get clientset: %v", err))
@@ -150,7 +151,7 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 
 		servedVersions := r.ServedVersions
 
-		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions); err != nil {
+		if err := UpdateStorageVersionFor(ctx, sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions, nil); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
 			hasFailure = true
