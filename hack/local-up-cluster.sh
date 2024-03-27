@@ -1287,9 +1287,9 @@ EOF
 }
 
 function install_cni_if_needed {
-  echo "Checking CNI Installation at /opt/cni/bin"
-  if ! command -v /opt/cni/bin/loopback &> /dev/null ; then
-    echo "CNI Installation not found at /opt/cni/bin"
+  echo "Checking CNI Installation at /opt/cni/bin and Bridge networking config file for containerd containers at '/etc/cni/net.d/10-containerd-net.conflist"
+  if ! command -v /opt/cni/bin/loopback &> /dev/null && ! command -v /etc/cni/net.d/10-containerd-net.conflist &> /dev/null; then
+    echo "CNI Installation not found at /opt/cni/bin and/or Bridge networking for containerd containers config file '10-containerd-net.conflist' not found at /etc/cni/net.d/ "
     install_cni
   fi
 }
