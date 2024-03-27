@@ -127,6 +127,7 @@ linters-settings: # please keep this alphabetized
           # The following packages have been migrated to contextual logging.
           # Packages matched here do not have to be listed above because
           # "contextual" implies "structured".
+          contextual k8s.io/apimachinery/pkg/util/runtime/.*
           contextual k8s.io/client-go/metadata/.*
           contextual k8s.io/client-go/tools/events/.*
           contextual k8s.io/client-go/tools/record/.*
