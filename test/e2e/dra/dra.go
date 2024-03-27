@@ -128,8 +128,25 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				// arbitrary types we can simply fake somthing here.
 				claim := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
 				b.create(ctx, claim)
+
 				claim, err := f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "get claim")
+
+				claim.Finalizers = append(claim.Finalizers, "e2e.test/delete-protection")
+				claim, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Update(ctx, claim, metav1.UpdateOptions{})
+				framework.ExpectNoError(err, "add claim finalizer")
+
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					claim.Status.Allocation = nil
+					claim.Status.ReservedFor = nil
+					claim, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+					framework.ExpectNoError(err, "update claim")
+
+					claim.Finalizers = nil
+					_, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Update(ctx, claim, metav1.UpdateOptions{})
+					framework.ExpectNoError(err, "remove claim finalizer")
+				})
+
 				claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
 				claim.Status.DriverName = driver.Name
 				claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{
@@ -138,7 +155,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					Name:     "thing",
 					UID:      "12345",
 				})
-				_, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+				claim, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 				framework.ExpectNoError(err, "update claim")
 
 				pod := b.podExternal()
@@ -925,7 +942,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 							"NodeName":   gomega.Equal(nodeName),
 							"DriverName": gomega.Equal(driver.Name),
 							"ResourceModel": gomega.Equal(resourcev1alpha2.ResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{
-								Instances: []resourcev1alpha2.NamedResourcesInstance{{Name: "instance-0"}},
+								Instances: []resourcev1alpha2.NamedResourcesInstance{{Name: "instance-00"}},
 							}}),
 						}),
 					)
