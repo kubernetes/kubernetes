@@ -188,7 +188,7 @@ type ResourceHandle struct {
 	// plugin should be invoked to process this ResourceHandle's data once it
 	// lands on a node. This may differ from the DriverName set in
 	// ResourceClaimStatus this ResourceHandle is embedded in.
-	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+	DriverName string `json:"driverName" protobuf:"bytes,1,name=driverName"`
 
 	// Data contains the opaque data associated with this ResourceHandle. It is
 	// set by the controller component of the resource driver whose name

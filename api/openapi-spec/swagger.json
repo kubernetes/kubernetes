@@ -15792,6 +15792,9 @@
           "description": "If StructuredData is set, then it needs to be used instead of Data."
         }
       },
+      "required": [
+        "driverName"
+      ],
       "type": "object"
     },
     "io.k8s.api.resource.v1alpha2.ResourceRequest": {

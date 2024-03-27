@@ -46488,6 +46488,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceHandle(ref common.ReferenceCallb
 					"driverName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DriverName specifies the name of the resource driver whose kubelet plugin should be invoked to process this ResourceHandle's data once it lands on a node. This may differ from the DriverName set in ResourceClaimStatus this ResourceHandle is embedded in.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -46506,6 +46507,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceHandle(ref common.ReferenceCallb
 						},
 					},
 				},
+				Required: []string{"driverName"},
 			},
 		},
 		Dependencies: []string{
