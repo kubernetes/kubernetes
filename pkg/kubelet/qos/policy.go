@@ -17,6 +17,8 @@ limitations under the License.
 package qos
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -40,18 +42,22 @@ const (
 // multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
-func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
+func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) (int, error) {
+	if memoryCapacity <= 0 {
+		return 0, fmt.Errorf("memory capacity %d for the host should not less than or equal to zero", memoryCapacity)
+	}
+
 	if types.IsNodeCriticalPod(pod) {
 		// Only node critical pod should be the last to get killed.
-		return guaranteedOOMScoreAdj
+		return guaranteedOOMScoreAdj, nil
 	}
 
 	switch v1qos.GetPodQOS(pod) {
 	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.
-		return guaranteedOOMScoreAdj
+		return guaranteedOOMScoreAdj, nil
 	case v1.PodQOSBestEffort:
-		return besteffortOOMScoreAdj
+		return besteffortOOMScoreAdj, nil
 	}
 
 	// Burstable containers are a middle tier, between Guaranteed and Best-Effort. Ideally,
@@ -72,11 +78,11 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
 	// that burstable pods have a higher OOM score adjustment.
 	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
-		return (1000 + guaranteedOOMScoreAdj)
+		return (1000 + guaranteedOOMScoreAdj), nil
 	}
 	// Give burstable pods a higher chance of survival over besteffort pods.
 	if int(oomScoreAdjust) == besteffortOOMScoreAdj {
-		return int(oomScoreAdjust - 1)
+		return int(oomScoreAdjust - 1), nil
 	}
-	return int(oomScoreAdjust)
+	return int(oomScoreAdjust), nil
 }

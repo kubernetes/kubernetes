@@ -41,10 +41,10 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 }
 
 // generateContainerResources generates platform specific (windows) container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) (*runtimeapi.ContainerResources, error) {
 	return &runtimeapi.ContainerResources{
 		Windows: m.generateWindowsContainerResources(pod, container),
-	}
+	}, nil
 }
 
 // generateWindowsContainerResources generates windows container resources config for runtime
