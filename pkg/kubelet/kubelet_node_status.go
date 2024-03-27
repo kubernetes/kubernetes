@@ -750,6 +750,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
+		nodestatus.ImageGCRunningCondition(kl.clock.Now, kl.imageManager.IsGCRunning, kl.recordNodeStatusEvent),
 		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors,
 			kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.recordNodeStatusEvent, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
@@ -760,6 +761,29 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		kl.recordNodeSchedulableEvent,
 	)
 	return setters
+}
+
+// updateNodeCondition returns a function for update a specefic node condition.
+// It holds the same lock as syncNodeStatus to prevent a race in setting node condition.
+func (kl *Kubelet) updateNodeCondition(conditionType v1.NodeConditionType) func(status bool, reason, message string) error {
+	return func(status bool, reason, message string) error {
+		kl.syncNodeStatusMux.Lock()
+		defer kl.syncNodeStatusMux.Unlock()
+		if kl.kubeClient == nil {
+			return nil
+		}
+		condition := v1.ConditionFalse
+		if status {
+			condition = v1.ConditionTrue
+		}
+		return nodeutil.SetNodeCondition(kl.kubeClient, kl.nodeName, v1.NodeCondition{
+			Type:               conditionType,
+			Status:             condition,
+			Reason:             reason,
+			Message:            message,
+			LastTransitionTime: metav1.NewTime(kl.clock.Now()),
+		})
+	}
 }
 
 // Validate given node IP belongs to the current host

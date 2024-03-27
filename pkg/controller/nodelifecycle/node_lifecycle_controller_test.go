@@ -1059,6 +1059,14 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								LastTransitionTime: fakeNow,
 							},
+							{
+								Type:               v1.NodeImageGCRunning,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								LastTransitionTime: fakeNow,
+							},
 						},
 					},
 				},
@@ -1163,6 +1171,14 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 							},
 							{
 								Type:               v1.NodePIDPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC), // should default to node creation time if condition was never updated
+								LastTransitionTime: metav1.Time{Time: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeImageGCRunning,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
 								Message:            "Kubelet never posted node status.",
@@ -1376,6 +1392,14 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 								LastHeartbeatTime:  nodeCreationTime,
 								LastTransitionTime: fakeNow,
 							},
+							{
+								Type:               v1.NodeImageGCRunning,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: fakeNow,
+							},
 						},
 					},
 				},
@@ -1464,6 +1488,14 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 							},
 							{
 								Type:               v1.NodePIDPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeImageGCRunning,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
 								Message:            "Kubelet never posted node status.",
@@ -1738,6 +1770,14 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 							},
 							{
 								Type:               v1.NodePIDPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime, // should default to node creation time if condition was never updated
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeImageGCRunning,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
 								Message:            "Kubelet never posted node status.",

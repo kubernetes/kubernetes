@@ -101,6 +101,9 @@ var (
 		v1.NodePIDPressure: {
 			v1.ConditionTrue: v1.TaintNodePIDPressure,
 		},
+		v1.NodeImageGCRunning: {
+			v1.ConditionTrue: v1.TaintNodeImageGCRunning,
+		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
@@ -110,6 +113,7 @@ var (
 		v1.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		v1.TaintNodeDiskPressure:       v1.NodeDiskPressure,
 		v1.TaintNodePIDPressure:        v1.NodePIDPressure,
+		v1.TaintNodeImageGCRunning:     v1.NodeImageGCRunning,
 	}
 )
 
@@ -937,6 +941,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
 			v1.NodePIDPressure,
+			v1.NodeImageGCRunning,
 			// We don't change 'NodeNetworkUnavailable' condition, as it's managed on a control plane level.
 			// v1.NodeNetworkUnavailable,
 		}
