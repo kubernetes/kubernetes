@@ -372,7 +372,6 @@ func startPersistentVolumeAttachDetachController(ctx context.Context, controller
 		return nil, true, fmt.Errorf("failed to probe volume plugins when starting attach/detach controller: %v", err)
 	}
 
-	ctx = klog.NewContext(ctx, logger)
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx,
