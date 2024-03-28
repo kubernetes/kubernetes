@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -88,7 +89,7 @@ func NewFake(family Family, table string) *Fake {
 var _ Interface = &Fake{}
 
 // List is part of Interface.
-func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error) {
+func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 	if fake.Table == nil {
 		return nil, notFoundError("no such table %q", fake.table)
 	}
@@ -117,7 +118,7 @@ func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error)
 }
 
 // ListRules is part of Interface
-func (fake *Fake) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
+func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
 	if fake.Table == nil {
 		return nil, notFoundError("no such chain %q", chain)
 	}
@@ -129,7 +130,7 @@ func (fake *Fake) ListRules(ctx context.Context, chain string) ([]*Rule, error) 
 }
 
 // ListElements is part of Interface
-func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
+func (fake *Fake) ListElements(_ context.Context, objectType, name string) ([]*Element, error) {
 	if fake.Table == nil {
 		return nil, notFoundError("no such %s %q", objectType, name)
 	}
@@ -153,7 +154,7 @@ func (fake *Fake) NewTransaction() *Transaction {
 }
 
 // Run is part of Interface
-func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
+func (fake *Fake) Run(_ context.Context, tx *Transaction) error {
 	updatedTable, err := fake.run(tx)
 	if err == nil {
 		fake.Table = updatedTable
@@ -162,7 +163,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 }
 
 // Check is part of Interface
-func (fake *Fake) Check(ctx context.Context, tx *Transaction) error {
+func (fake *Fake) Check(_ context.Context, tx *Transaction) error {
 	_, err := fake.run(tx)
 	return err
 }
@@ -519,6 +520,59 @@ func (fake *Fake) Dump() string {
 	return buf.String()
 }
 
+// ParseDump can parse a dump for a given nft instance.
+// It expects fake's table name and family in all rules.
+// The best way to verify that everything important was properly parsed is to
+// compare given data with nft.Dump() output.
+func (fake *Fake) ParseDump(data string) (err error) {
+	lines := strings.Split(data, "\n")
+	var i int
+	var line string
+	parsingDone := false
+	defer func() {
+		if err != nil && !parsingDone {
+			err = fmt.Errorf("%w (at line %v: %s", err, i+1, line)
+		}
+	}()
+	tx := fake.NewTransaction()
+	commonRegexp := regexp.MustCompile(fmt.Sprintf(`add %s %s %s (.*)`, noSpaceGroup, fake.family, fake.table))
+
+	for i, line = range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		match := commonRegexp.FindStringSubmatch(line)
+		if match == nil {
+			return fmt.Errorf("could not parse, or wrong table/family")
+		}
+		var obj Object
+		switch match[1] {
+		case "table":
+			obj = &Table{}
+		case "chain":
+			obj = &Chain{}
+		case "rule":
+			obj = &Rule{}
+		case "map":
+			obj = &Map{}
+		case "set":
+			obj = &Set{}
+		case "element":
+			obj = &Element{}
+		default:
+			return fmt.Errorf("unknown object %s", match[1])
+		}
+		err = obj.parse(match[2])
+		if err != nil {
+			return err
+		}
+		tx.Add(obj)
+	}
+	parsingDone = true
+	return fake.Run(context.Background(), tx)
+}
+
 func sortKeys[K ~string, V any](m map[K]V) []K {
 	keys := make([]K, 0, len(m))
 	for key := range m {
@@ -553,32 +607,32 @@ func (table *FakeTable) copy() *FakeTable {
 		return nil
 	}
 
-	copy := &FakeTable{
+	tcopy := &FakeTable{
 		Table:  table.Table,
 		Chains: make(map[string]*FakeChain),
 		Sets:   make(map[string]*FakeSet),
 		Maps:   make(map[string]*FakeMap),
 	}
 	for name, chain := range table.Chains {
-		copy.Chains[name] = &FakeChain{
+		tcopy.Chains[name] = &FakeChain{
 			Chain: chain.Chain,
 			Rules: append([]*Rule{}, chain.Rules...),
 		}
 	}
 	for name, set := range table.Sets {
-		copy.Sets[name] = &FakeSet{
+		tcopy.Sets[name] = &FakeSet{
 			Set:      set.Set,
 			Elements: append([]*Element{}, set.Elements...),
 		}
 	}
 	for name, mapObj := range table.Maps {
-		copy.Maps[name] = &FakeMap{
+		tcopy.Maps[name] = &FakeMap{
 			Map:      mapObj.Map,
 			Elements: append([]*Element{}, mapObj.Elements...),
 		}
 	}
 
-	return copy
+	return tcopy
 }
 
 // FindElement finds an element of the set with the given key. If there is no matching
