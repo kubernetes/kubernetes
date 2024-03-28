@@ -295,7 +295,11 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
-	defer f.Close()
+	// Let the closure capture the variable f, so it can close the last opened file.
+	defer func() {
+		//nolint:errcheck
+		f.Close()
+	}()
 
 	// Search start point based on tail line.
 	start, err := tail.FindTailLineStartIndex(f, opts.tail)
@@ -367,7 +371,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
-					defer newF.Close()
+
 					f.Close()
 					f = newF
 					r = bufio.NewReader(f)
