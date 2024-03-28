@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -111,6 +112,10 @@ type Reflector struct {
 	//
 	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList *bool
+	// metrics tracks basic metric information about the reflector.
+	// To avoid memory leaks, it should be cleaned up when reflector is stopped.
+	// struct Reflector is exposed, the Reflector instance metrics may be nil.
+	metrics *reflectorMetrics
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to
@@ -196,6 +201,9 @@ type ReflectorOptions struct {
 
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
+
+	// EnableMetrics allows to expose reflector metrics
+	EnableMetrics bool
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -230,6 +238,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 
 	if r.name == "" {
 		r.name = naming.GetNameFromCallsite(internalPackages...)
+	}
+	if options.EnableMetrics {
+		r.metrics = newReflectorMetrics(fmt.Sprintf("reflector_" + options.Name))
 	}
 
 	if r.typeDescription == "" {
@@ -294,6 +305,8 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
 	klog.V(3).Infof("Starting reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
+	r.metrics.loadMetrics()
+	defer r.metrics.cleanUpMetrics()
 	wait.BackoffUntil(func() {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
@@ -336,6 +349,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	fallbackToList := !useWatchList
 
 	if useWatchList {
+		r.metrics.numberOfWatchListsInc()
 		w, err = r.watchList(stopCh)
 		if w == nil && err == nil {
 			// stopCh was closed
@@ -350,10 +364,13 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	}
 
 	if fallbackToList {
+		r.metrics.numberOfListsInc()
+		start := r.clock.Now()
 		err = r.list(stopCh)
 		if err != nil {
 			return err
 		}
+		r.metrics.listDurationObserve(r.clock.Since(start).Seconds())
 	}
 
 	klog.V(2).Infof("Caches populated for %v from %s", r.typeDescription, r.name)
@@ -427,6 +444,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 				AllowWatchBookmarks: true,
 			}
 
+			r.metrics.numberOfWatchesInc()
 			w, err = r.listerWatcher.Watch(options)
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
@@ -442,7 +460,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			}
 		}
 
-		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
+		err = r.watchHandler(start, w, r.store, r.setLastSyncResourceVersion, nil, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
 		w = nil
@@ -574,6 +592,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
 	initTrace.Step("Objects extracted")
+	r.metrics.numberOfItemsInListObserve(float64(len(items)))
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
 	}
@@ -660,10 +679,10 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 			return nil, err
 		}
 		bookmarkReceived := pointer.Bool(false)
-		err = watchHandler(start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+		err = r.watchHandler(start, w, temporaryStore,
 			func(rv string) { resourceVersion = rv },
 			bookmarkReceived,
-			r.clock, make(chan error), stopCh)
+			make(chan error), stopCh)
 		if err != nil {
 			w.Stop() // stop and retry with clean state
 			if err == errorStopRequested {
@@ -707,16 +726,11 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 }
 
 // watchHandler watches w and sets setLastSyncResourceVersion
-func watchHandler(start time.Time,
+func (r *Reflector) watchHandler(start time.Time,
 	w watch.Interface,
 	store Store,
-	expectedType reflect.Type,
-	expectedGVK *schema.GroupVersionKind,
-	name string,
-	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
 	exitOnInitialEventsEndBookmark *bool,
-	clock clock.Clock,
 	errc chan error,
 	stopCh <-chan struct{},
 ) error {
@@ -726,6 +740,12 @@ func watchHandler(start time.Time,
 		// made it positive
 		*exitOnInitialEventsEndBookmark = false
 	}
+
+	// update metrics
+	defer func() {
+		r.metrics.numberOfItemsInWatchObserve(float64(eventCount))
+		r.metrics.watchDurationObserve(r.clock.Since(start).Seconds())
+	}()
 
 loop:
 	for {
@@ -741,21 +761,21 @@ loop:
 			if event.Type == watch.Error {
 				return apierrors.FromObject(event.Object)
 			}
-			if expectedType != nil {
-				if e, a := expectedType, reflect.TypeOf(event.Object); e != a {
-					utilruntime.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", name, e, a))
+			if r.expectedType != nil {
+				if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
+					utilruntime.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", r.name, e, a))
 					continue
 				}
 			}
-			if expectedGVK != nil {
-				if e, a := *expectedGVK, event.Object.GetObjectKind().GroupVersionKind(); e != a {
-					utilruntime.HandleError(fmt.Errorf("%s: expected gvk %v, but watch event object had gvk %v", name, e, a))
+			if r.expectedGVK != nil {
+				if e, a := *r.expectedGVK, event.Object.GetObjectKind().GroupVersionKind(); e != a {
+					utilruntime.HandleError(fmt.Errorf("%s: expected gvk %v, but watch event object had gvk %v", r.name, e, a))
 					continue
 				}
 			}
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", name, event))
+				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 				continue
 			}
 			resourceVersion := meta.GetResourceVersion()
@@ -763,12 +783,12 @@ loop:
 			case watch.Added:
 				err := store.Add(event.Object)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("%s: unable to add watch event object (%#v) to store: %v", name, event.Object, err))
+					utilruntime.HandleError(fmt.Errorf("%s: unable to add watch event object (%#v) to store: %v", r.name, event.Object, err))
 				}
 			case watch.Modified:
 				err := store.Update(event.Object)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("%s: unable to update watch event object (%#v) to store: %v", name, event.Object, err))
+					utilruntime.HandleError(fmt.Errorf("%s: unable to update watch event object (%#v) to store: %v", r.name, event.Object, err))
 				}
 			case watch.Deleted:
 				// TODO: Will any consumers need access to the "last known
@@ -776,7 +796,7 @@ loop:
 				// to change this.
 				err := store.Delete(event.Object)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("%s: unable to delete watch event object (%#v) from store: %v", name, event.Object, err))
+					utilruntime.HandleError(fmt.Errorf("%s: unable to delete watch event object (%#v) from store: %v", r.name, event.Object, err))
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
@@ -786,7 +806,7 @@ loop:
 					}
 				}
 			default:
-				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", name, event))
+				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 			}
 			setLastSyncResourceVersion(resourceVersion)
 			if rvu, ok := store.(ResourceVersionUpdater); ok {
@@ -794,18 +814,19 @@ loop:
 			}
 			eventCount++
 			if exitOnInitialEventsEndBookmark != nil && *exitOnInitialEventsEndBookmark {
-				watchDuration := clock.Since(start)
-				klog.V(4).Infof("exiting %v Watch because received the bookmark that marks the end of initial events stream, total %v items received in %v", name, eventCount, watchDuration)
+				watchDuration := r.clock.Since(start)
+				klog.V(4).Infof("exiting %v Watch because received the bookmark that marks the end of initial events stream, total %v items received in %v", r.name, eventCount, watchDuration)
 				return nil
 			}
 		}
 	}
 
-	watchDuration := clock.Since(start)
+	watchDuration := r.clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
-		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
+		r.metrics.numberOfShortWatchesInc()
+		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", r.name)
 	}
-	klog.V(4).Infof("%s: Watch close - %v total %v items received", name, expectedTypeName, eventCount)
+	klog.V(4).Infof("%s: Watch close - %v total %v items received", r.name, r.typeDescription, eventCount)
 	return nil
 }
 
@@ -821,6 +842,10 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.lastSyncResourceVersion = v
+	rv, err := strconv.Atoi(v)
+	if err == nil {
+		r.metrics.setLastResourceVersion(float64(rv))
+	}
 }
 
 // relistResourceVersion determines the resource version the reflector should list or relist from.

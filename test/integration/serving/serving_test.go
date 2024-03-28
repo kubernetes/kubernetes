@@ -17,64 +17,23 @@ limitations under the License.
 package serving
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io"
+	"k8s.io/kubernetes/test/integration/util"
 	"net/http"
 	"os"
 	"path"
 	"strings"
 	"testing"
 
-	"k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/server/options"
 	cloudprovider "k8s.io/cloud-provider"
-	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
 	"k8s.io/cloud-provider/fake"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
-	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
-
-type componentTester interface {
-	StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error)
-}
-
-type kubeControllerManagerTester struct{}
-
-func (kubeControllerManagerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
-	// avoid starting any controller loops, we're just testing serving
-	customFlags = append([]string{"--controllers="}, customFlags...)
-	gotResult, err := kubectrlmgrtesting.StartTestServer(ctx, customFlags)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
-}
-
-type cloudControllerManagerTester struct{}
-
-func (cloudControllerManagerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
-	gotResult, err := cloudctrlmgrtesting.StartTestServer(ctx, customFlags)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
-}
-
-type kubeSchedulerTester struct{}
-
-func (kubeSchedulerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
-	gotResult, err := kubeschedulertesting.StartTestServer(ctx, customFlags)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
-}
 
 func TestComponentSecureServingAndAuth(t *testing.T) {
 	if !cloudprovider.IsCloudProvider("fake") {
@@ -159,12 +118,12 @@ users:
 
 	tests := []struct {
 		name       string
-		tester     componentTester
+		tester     util.ComponentTester
 		extraFlags []string
 	}{
-		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
-		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake", "--webhook-secure-port=0"}},
-		{"kube-scheduler", kubeSchedulerTester{}, nil},
+		{"kube-controller-manager", util.NewKubeControllerManagerTester(""), nil},
+		{"cloud-controller-manager", util.NewCloudControllerManagerTester(), []string{"--cloud-provider=fake", "--webhook-secure-port=0"}},
+		{"kube-scheduler", util.NewKubeSchedulerTester(), nil},
 	}
 
 	for _, tt := range tests {
@@ -174,7 +133,7 @@ users:
 	}
 }
 
-func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
+func testComponentWithSecureServing(t *testing.T, tester util.ComponentTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
 	tests := []struct {
 		name           string
 		flags          []string

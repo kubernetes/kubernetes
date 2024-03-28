@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache/synctrack"
@@ -214,6 +215,11 @@ type SharedInformer interface {
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
 	IsStopped() bool
+
+	// SetEnableMetrics specifies whether to expose informer metrics.
+	//
+	// This function should be called before informer Run
+	SetEnableMetrics(enableMetrics bool)
 }
 
 // Opaque interface representing the registration of ResourceEventHandler for
@@ -268,7 +274,9 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 
+	informerName := naming.GetNameFromCallsite(internalPackages...)
 	return &sharedIndexInformer{
+		name:                            informerName,
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
 		listerWatcher:                   lw,
@@ -356,6 +364,9 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 // sharedProcessor, which is responsible for relaying those
 // notifications to each of the informer's clients.
 type sharedIndexInformer struct {
+	// name identifies this reflector. By default it will be a file:line if possible.
+	name string
+
 	indexer    Indexer
 	controller Controller
 
@@ -392,6 +403,13 @@ type sharedIndexInformer struct {
 	watchErrorHandler WatchErrorHandler
 
 	transform TransformFunc
+
+	// enableMetrics allows to expose informer metrics
+	enableMetrics bool
+}
+
+func (s *sharedIndexInformer) SetEnableMetrics(enableMetrics bool) {
+	s.enableMetrics = enableMetrics
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -485,6 +503,8 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 			Process:           s.HandleDeltas,
 			WatchErrorHandler: s.watchErrorHandler,
+			ReflectorName:     s.name,
+			EnableMetrics:     s.enableMetrics,
 		}
 
 		s.controller = New(cfg)
