@@ -19,53 +19,76 @@ package runtime
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type notRegisteredErr struct {
-	schemeName string
-	gvk        schema.GroupVersionKind
-	target     GroupVersioner
-	t          reflect.Type
+	context fmt.Stringer
+	gvk     schema.GroupVersionKind
+	target  GroupVersioner
+	t       reflect.Type
 }
 
 func NewNotRegisteredErrForKind(schemeName string, gvk schema.GroupVersionKind) error {
-	return &notRegisteredErr{schemeName: schemeName, gvk: gvk}
+	return &notRegisteredErr{context: schemeContext(schemeName), gvk: gvk}
 }
 
 func NewNotRegisteredErrForType(schemeName string, t reflect.Type) error {
-	return &notRegisteredErr{schemeName: schemeName, t: t}
+	return &notRegisteredErr{context: schemeContext(schemeName), t: t}
 }
 
 func NewNotRegisteredErrForTarget(schemeName string, t reflect.Type, target GroupVersioner) error {
-	return &notRegisteredErr{schemeName: schemeName, t: t, target: target}
+	return &notRegisteredErr{context: schemeContext(schemeName), t: t, target: target}
 }
 
 func NewNotRegisteredGVKErrForTarget(schemeName string, gvk schema.GroupVersionKind, target GroupVersioner) error {
-	return &notRegisteredErr{schemeName: schemeName, gvk: gvk, target: target}
+	return &notRegisteredErr{context: schemeContext(schemeName), gvk: gvk, target: target}
+}
+
+func NewNotRegisteredGVKErrForTargetWithContext(context string, gvk schema.GroupVersionKind, target GroupVersioner) error {
+	return &notRegisteredErr{context: genericContext(context), gvk: gvk, target: target}
+}
+
+type schemeContext string
+
+func (s schemeContext) String() string {
+	if len(s) == 0 {
+		return ""
+	}
+	return " in scheme " + strconv.Quote(string(s))
+}
+
+type genericContext string
+
+func (s genericContext) String() string {
+	if len(s) == 0 {
+		return ""
+	}
+	return " " + string(s)
 }
 
 func (k *notRegisteredErr) Error() string {
 	if k.t != nil && k.target != nil {
-		return fmt.Sprintf("%v is not suitable for converting to %q in scheme %q", k.t, k.target, k.schemeName)
+		return fmt.Sprintf("%v is not suitable for converting to %q%s", k.t, k.target, k.context)
 	}
 	nullGVK := schema.GroupVersionKind{}
 	if k.gvk != nullGVK && k.target != nil {
-		return fmt.Sprintf("%q is not suitable for converting to %q in scheme %q", k.gvk.GroupVersion(), k.target, k.schemeName)
+		return fmt.Sprintf("%q is not suitable for converting to %q%s", k.gvk.GroupVersion(), k.target, k.context)
 	}
 	if k.t != nil {
-		return fmt.Sprintf("no kind is registered for the type %v in scheme %q", k.t, k.schemeName)
+		return fmt.Sprintf("no kind is registered for the type %v%s", k.t, k.context)
 	}
 	if len(k.gvk.Kind) == 0 {
-		return fmt.Sprintf("no version %q has been registered in scheme %q", k.gvk.GroupVersion(), k.schemeName)
+		return fmt.Sprintf("no version %q has been registered%s", k.gvk.GroupVersion(), k.context)
 	}
 	if k.gvk.Version == APIVersionInternal {
-		return fmt.Sprintf("no kind %q is registered for the internal version of group %q in scheme %q", k.gvk.Kind, k.gvk.Group, k.schemeName)
+		return fmt.Sprintf("no kind %q is registered for the internal version of group %q%s", k.gvk.Kind, k.gvk.Group, k.context)
 	}
 
-	return fmt.Sprintf("no kind %q is registered for version %q in scheme %q", k.gvk.Kind, k.gvk.GroupVersion(), k.schemeName)
+	return fmt.Sprintf("no kind %q is registered for version %q%s", k.gvk.Kind, k.gvk.GroupVersion(), k.context)
 }
 
 // IsNotRegisteredError returns true if the error indicates the provided
