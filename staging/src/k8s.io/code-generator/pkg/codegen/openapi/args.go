@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main // import "k8s.io/code-generator"
+package openapi
+
+// Args are the arguments for the openapi generator.
+type Args struct {
+	InputDir string `doc:"The root directory under which to search for Go files which request openapi to be generated.  This must be a local path, not a Go package."`
+
+	// TODO: mirror the arguments from kube::codegen::gen_openapi function
+}
