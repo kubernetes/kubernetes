@@ -676,7 +676,7 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1\n    2\n    3"),
+				checkEquals("ENUM:\n    0\n    1\n    2\n    3\n"),
 			},
 		},
 		{
@@ -729,7 +729,7 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1, ...."),
+				checkEquals("ENUM:\n    0\n    1, ....\n"),
 			},
 		},
 		{
@@ -745,7 +745,55 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
+				checkEquals("ENUM:\n    Block\n    File\n    \"\"\n"),
+			},
+		},
+		{
+			// show that extractMergeStrategy can skip empty merge strategy
+			Name:        "empytMergeStrategyEmpty",
+			Subtemplate: "extractMergeStrategy",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":                         "object",
+					"x-kubernetes-patch-merge-key": "",
+					"x-kubernetes-patch-strategy":  "",
+					"description":                  "a description that should not be printed",
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// show that extractMergeStrategy can skip if one of the keys(merge key, strategy) are empty
+			Name:        "empytMergeStrategyEmpty",
+			Subtemplate: "extractMergeStrategy",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":                         "object",
+					"x-kubernetes-patch-merge-key": "name",
+					"x-kubernetes-patch-strategy":  "",
+					"description":                  "a description that should not be printed",
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// show that extractMergeStrategy can print merge strategy
+			Name:        "empytMergeStrategyPrint",
+			Subtemplate: "extractMergeStrategy",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":                         "object",
+					"x-kubernetes-patch-merge-key": "name",
+					"x-kubernetes-patch-strategy":  "merge,retainKeys",
+					"description":                  "a description that should not be printed",
+				},
+			},
+			Checks: []check{
+				checkEquals("PATCH_MARGE_KEY: name\nPATCH_STRATEGY: merge,retainKeys\n"),
 			},
 		},
 	}
