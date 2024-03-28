@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
 "Report-Msgid-Bugs-To: EMAIL\n"
 "POT-Creation-Date: 2021-07-07 20:15+0200\n"
-"PO-Revision-Date: 2022-07-04 18:54+0800\n"
+"PO-Revision-Date: 2023-06-08 20:26+0800\n"
 "Last-Translator: zhengjiajin <zhengjiajin@caicloud.io>\n"
 "Language-Team: \n"
 "Language: zh\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
-"X-Generator: Poedit 3.0.1\n"
+"X-Generator: Poedit 3.3.1\n"
 "X-Poedit-SourceCharset: UTF-8\n"
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/top/top_node.go:62
@@ -60,7 +60,7 @@ msgid ""
 "\t\tkubectl options"
 msgstr ""
 "\n"
-"\t\t# 输出所有命令继承的 flags\n"
+"\t\t# 输出所有命令继承的参数\n"
 "\t\tkubectl options"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/version.go#L39
@@ -100,16 +100,16 @@ msgid ""
 "\t\tkubectl top pod -l name=myLabel"
 msgstr ""
 "\n"
-"\t\t# 显示 default 命名空间下所有 Pods 的指标\n"
+"\t\t# 显示 default 命名空间下所有 Pod 的指标\n"
 "\t\tkubectl top pod\n"
 "\n"
-"\t\t# 显示指定命名空间下所有 Pods 的指标\n"
+"\t\t# 显示指定命名空间下所有 Pod 的指标\n"
 "\t\tkubectl top pod --namespace=NAMESPACE\n"
 "\n"
-"\t\t# 显示指定 Pod 和它的容器的 metrics\n"
+"\t\t# 显示指定 Pod 及其容器的指标\n"
 "\t\tkubectl top pod POD_NAME --containers\n"
 "\n"
-"\t\t# 显示指定 label 为 name=myLabel 的 Pods 的 metrics\n"
+"\t\t# 显示指定 label 为 name=myLabel 的 Pod 的指标\n"
 "\t\tkubectl top pod -l name=myLabel"
 
 #: pkg/kubectl/cmd/convert/convert.go:40
@@ -132,7 +132,7 @@ msgstr ""
 "\t\t在不同的 API 版本之间转换配置文件。接受 YAML\n"
 "\t\t和 JSON 格式。\n"
 "\n"
-"\t\t这个命令以文件名, 目录, 或者 URL 作为输入，并通过 —output-version 参数\n"
+"\t\t这个命令以文件名、目录或者 URL 作为输入，并通过 --output-version 参数\n"
 "\t\t 转换到指定版本的格式。如果没有指定目标版本或者所指定版本\n"
 "\t\t不支持, 则转换为最新版本。\n"
 "\n"
@@ -372,12 +372,12 @@ msgstr ""
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_clusterrolebinding.go#L55
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:101
 msgid "ClusterRole this ClusterRoleBinding should reference"
-msgstr "ClusterRoleBinding 应该指定 ClusterRole"
+msgstr "ClusterRoleBinding 应该引用的 ClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_rolebinding.go#L55
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:104
 msgid "ClusterRole this RoleBinding should reference"
-msgstr "RoleBinding 应该指定 ClusterRole"
+msgstr "RoleBinding 应该引用的 ClusterRole"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/convert.go#L67
 #: pkg/kubectl/cmd/convert/convert.go:95
@@ -392,7 +392,7 @@ msgstr "将文件和目录复制到容器中或从容器中复制出来。"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L214
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:94
 msgid "Create a TLS secret"
-msgstr "创建一个 TLS secret"
+msgstr "创建一个 TLS Secret"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_namespace.go#L44
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:83
@@ -402,7 +402,7 @@ msgstr "用指定的名称创建一个命名空间"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L143
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:134
 msgid "Create a secret for use with a Docker registry"
-msgstr "创建一个给 Docker registry 使用的 Secret"
+msgstr "创建一个给 Docker 镜像库使用的 Secret"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L34
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:49
@@ -492,8 +492,8 @@ msgid ""
 "If non-empty, the annotation update will only succeed if this is the current "
 "resource-version for the object. Only valid when specifying a single resource."
 msgstr ""
-"如果非空，则只有当所给值是对象的当前资源版本时，注解更新才会成功。 仅在指定单"
-"个资源时有效。"
+"如果非空，则只有所给值是对象的当前资源版本时，注解更新才会成功。仅在指定单个资"
+"源时有效。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L132
 #: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:154
@@ -550,7 +550,7 @@ msgstr ""
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
 #: staging/src/k8s.io/kubectl/pkg/cmd/completion/completion.go:112
 msgid "Output shell completion code for the specified shell (bash or zsh)"
-msgstr "为指定的 Shell(Bash 或 zsh) 输出 Shell 补全代码。"
+msgstr "为指定的 Shell (Bash 或 zsh) 输出 Shell 补全代码。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L157
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:151
@@ -583,7 +583,7 @@ msgstr "输出客户端和服务端的版本信息"
 #: staging/src/k8s.io/kubectl/pkg/cmd/options/options.go:38
 #: staging/src/k8s.io/kubectl/pkg/cmd/options/options.go:39
 msgid "Print the list of flags inherited by all commands"
-msgstr "输出所有命令的层级关系"
+msgstr "输出由所有命令继承的参数的列表"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L86
 #: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:152
@@ -650,7 +650,7 @@ msgstr "指定容器要运行的镜像."
 msgid ""
 "The image pull policy for the container. If left empty, this value will not "
 "be specified by the client and defaulted by the server"
-msgstr "容器的镜像拉取策略。如果留空，该值将不由客户端指定，由服务器默认设置"
+msgstr "容器的镜像拉取策略。如果留空，该值将不由客户端指定，默认由服务器设置"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_pdb.go#L62
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:111
@@ -677,8 +677,8 @@ msgid ""
 "is named 'default', while it is left unnamed in v2. Default is 'service/v2'."
 msgstr ""
 "要使用的 API 生成器的名称。有两个生成器。'service/v1' 和 'service/v2'。它们之"
-"间唯一的区别是，v1 中的服务端口被命名为 'default'，如果在 v2 中没有指定名称。"
-"默认是 'service/v2'。"
+"间唯一的区别是：v1 中的服务端口被命名为 'default'，而在 v2 中没有指定名称。默"
+"认是 'service/v2'。"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L99
 #: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:148
@@ -715,7 +715,7 @@ msgstr ""
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:155
 msgid "The type of secret to create"
-msgstr "要创建的 Secret 类型"
+msgstr "要创建的 Secret 的类型"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollout/rollout_undo.go#L71
 #: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_undo.go:87
