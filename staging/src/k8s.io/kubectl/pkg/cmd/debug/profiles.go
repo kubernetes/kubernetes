@@ -64,55 +64,56 @@ type ProfileApplier interface {
 }
 
 // NewProfileApplier returns a new Options for the given profile name.
-func NewProfileApplier(profile string) (ProfileApplier, error) {
+func NewProfileApplier(profile string, keeps *keepFields) (ProfileApplier, error) {
 	switch profile {
 	case ProfileLegacy:
-		return &legacyProfile{}, nil
+		return &legacyProfile{keeps}, nil
 	case ProfileGeneral:
-		return &generalProfile{}, nil
+		return &generalProfile{keeps}, nil
 	case ProfileBaseline:
-		return &baselineProfile{}, nil
+		return &baselineProfile{keeps}, nil
 	case ProfileRestricted:
-		return &restrictedProfile{}, nil
+		return &restrictedProfile{keeps}, nil
 	case ProfileNetadmin:
-		return &netadminProfile{}, nil
+		return &netadminProfile{keeps}, nil
 	case ProfileSysadmin:
-		return &sysadminProfile{}, nil
+		return &sysadminProfile{keeps}, nil
 	}
 
 	return nil, fmt.Errorf("unknown profile: %s", profile)
 }
 
 type legacyProfile struct {
+	keeps *keepFields
 }
 
 type generalProfile struct {
+	keeps *keepFields
 }
 
 type baselineProfile struct {
+	keeps *keepFields
 }
 
 type restrictedProfile struct {
+	keeps *keepFields
 }
 
 type netadminProfile struct {
+	keeps *keepFields
 }
 
 type sysadminProfile struct {
+	keeps *keepFields
 }
 
-func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	switch target.(type) {
-	case *corev1.Pod:
-		// do nothing to the copied pod
-		return nil
-	case *corev1.Node:
-		mountRootPartition(pod, containerName)
-		useHostNamespaces(pod)
-		return nil
-	default:
-		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileLegacy, target)
-	}
+type keepFields struct {
+	labels         bool
+	annotations    bool
+	liveness       bool
+	readiness      bool
+	startup        bool
+	initContainers bool
 }
 
 func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
@@ -130,10 +131,34 @@ func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
 	return unsupported, fmt.Errorf("objects of type %T are not supported", target)
 }
 
+func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("legacy profile: %w", err)
+	}
+
+	switch style {
+	case node:
+		mountRootPartition(pod, containerName)
+		useHostNamespaces(pod)
+
+	case podCopy:
+		p.keeps.removeLabels(pod)
+		p.keeps.removeAnnotations(pod)
+		p.keeps.removeProbes(pod)
+		p.keeps.removeInitContainers(pod)
+
+	case ephemeral:
+		// do nothing to the copied pod
+	}
+
+	return nil
+}
+
 func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
-		return fmt.Errorf("general profile: %s", err)
+		return fmt.Errorf("general profile: %w", err)
 	}
 
 	switch style {
@@ -143,7 +168,10 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 		useHostNamespaces(pod)
 
 	case podCopy:
-		removeLabelsAndProbes(pod)
+		p.keeps.removeLabels(pod)
+		p.keeps.removeAnnotations(pod)
+		p.keeps.removeProbes(pod)
+		p.keeps.removeInitContainers(pod)
 		allowProcessTracing(pod, containerName)
 		shareProcessNamespace(pod)
 
@@ -157,14 +185,17 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
-		return fmt.Errorf("baseline profile: %s", err)
+		return fmt.Errorf("baseline profile: %w", err)
 	}
 
 	clearSecurityContext(pod, containerName)
 
 	switch style {
 	case podCopy:
-		removeLabelsAndProbes(pod)
+		p.keeps.removeLabels(pod)
+		p.keeps.removeAnnotations(pod)
+		p.keeps.removeProbes(pod)
+		p.keeps.removeInitContainers(pod)
 		shareProcessNamespace(pod)
 
 	case ephemeral, node:
@@ -177,7 +208,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
-		return fmt.Errorf("restricted profile: %s", err)
+		return fmt.Errorf("restricted profile: %w", err)
 	}
 
 	clearSecurityContext(pod, containerName)
@@ -188,6 +219,10 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 
 	switch style {
 	case podCopy:
+		p.keeps.removeLabels(pod)
+		p.keeps.removeAnnotations(pod)
+		p.keeps.removeProbes(pod)
+		p.keeps.removeInitContainers(pod)
 		shareProcessNamespace(pod)
 
 	case ephemeral, node:
@@ -200,7 +235,7 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
-		return fmt.Errorf("netadmin profile: %s", err)
+		return fmt.Errorf("netadmin profile: %w", err)
 	}
 
 	allowNetadminCapability(pod, containerName)
@@ -210,6 +245,10 @@ func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		useHostNamespaces(pod)
 
 	case podCopy:
+		p.keeps.removeLabels(pod)
+		p.keeps.removeAnnotations(pod)
+		p.keeps.removeProbes(pod)
+		p.keeps.removeInitContainers(pod)
 		shareProcessNamespace(pod)
 
 	case ephemeral:
@@ -222,7 +261,7 @@ func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
 	style, err := getDebugStyle(pod, target)
 	if err != nil {
-		return fmt.Errorf("sysadmin profile: %s", err)
+		return fmt.Errorf("sysadmin profile: %w", err)
 	}
 
 	setPrivileged(pod, containerName)
@@ -234,6 +273,10 @@ func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 
 	case podCopy:
 		// to mimic general, default and baseline
+		p.keeps.removeLabels(pod)
+		p.keeps.removeAnnotations(pod)
+		p.keeps.removeProbes(pod)
+		p.keeps.removeInitContainers(pod)
 		shareProcessNamespace(pod)
 	case ephemeral:
 		// no additional modifications needed
@@ -242,14 +285,39 @@ func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	return nil
 }
 
-// removeLabelsAndProbes removes labels from the pod and remove probes
-// from all containers of the pod.
-func removeLabelsAndProbes(p *corev1.Pod) {
-	p.Labels = nil
+// removeLabels removes labels from the pod.
+func (keeps *keepFields) removeLabels(p *corev1.Pod) {
+	if !keeps.labels {
+		p.Labels = nil
+	}
+}
+
+// removeAnnotations remove annotations from the pod.
+func (keeps *keepFields) removeAnnotations(p *corev1.Pod) {
+	if !keeps.annotations {
+		p.Annotations = nil
+	}
+}
+
+// removeProbes remove probes from all containers of the pod.
+func (keeps *keepFields) removeProbes(p *corev1.Pod) {
 	for i := range p.Spec.Containers {
-		p.Spec.Containers[i].LivenessProbe = nil
-		p.Spec.Containers[i].ReadinessProbe = nil
-		p.Spec.Containers[i].StartupProbe = nil
+		if !keeps.liveness {
+			p.Spec.Containers[i].LivenessProbe = nil
+		}
+		if !keeps.readiness {
+			p.Spec.Containers[i].ReadinessProbe = nil
+		}
+		if !keeps.startup {
+			p.Spec.Containers[i].StartupProbe = nil
+		}
+	}
+}
+
+// removeInitContainers remove initContainers from the pod.
+func (keeps *keepFields) removeInitContainers(p *corev1.Pod) {
+	if !keeps.initContainers {
+		p.Spec.InitContainers = nil
 	}
 }
 
