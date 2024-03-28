@@ -1,4 +1,4 @@
-linux/amd64=registry.k8s.io/build-image/debian-base-amd64:bookworm-v1.0.1
-linux/arm=registry.k8s.io/build-image/debian-base-arm:bookworm-v1.0.1
-linux/arm64=registry.k8s.io/build-image/debian-base-arm64:bookworm-v1.0.1
-linux/ppc64le=registry.k8s.io/build-image/debian-base-ppc64le:bookworm-v1.0.1
+linux/amd64=registry.k8s.io/build-image/debian-base-amd64:bookworm-v1.0.2
+linux/arm=registry.k8s.io/build-image/debian-base-arm:bookworm-v1.0.2
+linux/arm64=registry.k8s.io/build-image/debian-base-arm64:bookworm-v1.0.2
+linux/ppc64le=registry.k8s.io/build-image/debian-base-ppc64le:bookworm-v1.0.2
