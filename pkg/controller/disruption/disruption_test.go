@@ -173,6 +173,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 		informerFactory.Apps().V1().ReplicaSets(),
 		informerFactory.Apps().V1().Deployments(),
 		informerFactory.Apps().V1().StatefulSets(),
+		informerFactory.Batch().V1().Jobs(),
 		coreClient,
 		testrestmapper.TestOnlyStaticRESTMapper(scheme),
 		fakeScaleClient,
