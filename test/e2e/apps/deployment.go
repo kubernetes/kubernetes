@@ -395,6 +395,9 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("patching the DeploymentStatus")
+		// fetch new deploymentsList.ResourceVersion before patching the DeploymentStatus
+		deploymentsList, err = f.ClientSet.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
+		framework.ExpectNoError(err, "failed to list Deployments")
 		deploymentStatusPatch, err := json.Marshal(map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"labels": map[string]string{"test-deployment": "patched-status"},
