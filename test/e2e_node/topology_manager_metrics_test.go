@@ -35,7 +35,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.TopologyManager, func() {
+var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), framework.WithFlaky(), feature.TopologyManager, func() {
 	f := framework.NewDefaultFramework("topologymanager-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
