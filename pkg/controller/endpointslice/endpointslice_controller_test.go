@@ -558,11 +558,12 @@ func TestSyncService(t *testing.T) {
 	deletionTimestamp := metav1.Now()
 
 	testcases := []struct {
-		name                  string
-		service               *v1.Service
-		pods                  []*v1.Pod
-		expectedEndpointPorts []discovery.EndpointPort
-		expectedEndpoints     []discovery.Endpoint
+		name                        string
+		service                     *v1.Service
+		pods                        []*v1.Pod
+		shouldNotHaveEndpointSlices bool
+		expectedEndpointPorts       []discovery.EndpointPort
+		expectedEndpoints           []discovery.Endpoint
 	}{
 		{
 			name: "pods with multiple IPs and Service with ipFamilies=ipv4",
@@ -1280,6 +1281,85 @@ func TestSyncService(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "service without selector labels",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foobar",
+					Namespace:         "default",
+					CreationTimestamp: creationTimestamp,
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{Name: "tcp-example", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP},
+						{Name: "udp-example", TargetPort: intstr.FromInt32(161), Protocol: v1.ProtocolUDP},
+						{Name: "sctp-example", TargetPort: intstr.FromInt32(3456), Protocol: v1.ProtocolSCTP},
+					},
+					Selector:   nil,
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "default",
+						Name:              "pod0",
+						Labels:            map[string]string{"foo": "bar"},
+						DeletionTimestamp: nil,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name: "container-1",
+						}},
+						NodeName: "node-1",
+					},
+					Status: v1.PodStatus{
+						PodIP: "10.0.0.1",
+						PodIPs: []v1.PodIP{{
+							IP: "10.0.0.1",
+						}},
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodReady,
+								Status: v1.ConditionTrue,
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "default",
+						Name:              "pod1",
+						Labels:            map[string]string{"foo": "bar"},
+						DeletionTimestamp: nil,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name: "container-1",
+						}},
+						NodeName: "node-1",
+					},
+					Status: v1.PodStatus{
+						PodIP: "10.0.0.2",
+						PodIPs: []v1.PodIP{
+							{
+								IP: "10.0.0.2",
+							},
+							{
+								IP: "fd08::5678:0000:0000:9abc:def0",
+							},
+						},
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodReady,
+								Status: v1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			shouldNotHaveEndpointSlices: true,
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -1297,11 +1377,16 @@ func TestSyncService(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			err = esController.syncService(logger, fmt.Sprintf("%s/%s", testcase.service.Namespace, testcase.service.Name))
 			assert.Nil(t, err)
-
-			// last action should be to create endpoint slice
-			expectActions(t, client.Actions(), 1, "create", "endpointslices")
+			if !testcase.shouldNotHaveEndpointSlices {
+				// last action should be to create endpoint slice
+				expectActions(t, client.Actions(), 1, "create", "endpointslices")
+			}
 			sliceList, err := client.DiscoveryV1().EndpointSlices(testcase.service.Namespace).List(context.TODO(), metav1.ListOptions{})
 			assert.Nil(t, err, "Expected no error fetching endpoint slices")
+			if testcase.shouldNotHaveEndpointSlices {
+				assert.Len(t, sliceList.Items, 0, "Expected 0 endpoint slices")
+				return
+			}
 			assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 
 			// ensure all attributes of endpoint slice match expected state
