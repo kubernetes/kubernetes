@@ -699,8 +699,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			PodUID:              volumeToMount.Pod.UID,
 			VolumeName:          volumeToMount.VolumeName,
 			Mounter:             volumeMounter,
-			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeGIDVolume:     volumeToMount.VolumeGIDValue,
 			VolumeSpec:          volumeToMount.VolumeSpec,
 			VolumeMountState:    VolumeMounted,
 			SELinuxMountContext: volumeToMount.SELinuxLabel,
@@ -865,13 +864,12 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		if unmountErr != nil {
 			// Mark the volume as uncertain, so SetUp is called for new pods. Teardown may be already in progress.
 			opts := MarkVolumeOpts{
-				PodName:             volumeToUnmount.PodName,
-				PodUID:              volumeToUnmount.PodUID,
-				VolumeName:          volumeToUnmount.VolumeName,
-				OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
-				VolumeGidVolume:     volumeToUnmount.VolumeGidValue,
-				VolumeSpec:          volumeToUnmount.VolumeSpec,
-				VolumeMountState:    VolumeMountUncertain,
+				PodName:          volumeToUnmount.PodName,
+				PodUID:           volumeToUnmount.PodUID,
+				VolumeName:       volumeToUnmount.VolumeName,
+				VolumeGIDVolume:  volumeToUnmount.VolumeGIDValue,
+				VolumeSpec:       volumeToUnmount.VolumeSpec,
+				VolumeMountState: VolumeMountUncertain,
 			}
 			markMountUncertainErr := actualStateOfWorld.MarkVolumeMountAsUncertain(opts)
 			if markMountUncertainErr != nil {
@@ -885,14 +883,13 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		}
 
 		klog.Infof(
-			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
+			"UnmountVolume.TearDown succeeded for volume %q pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
 			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			volumeToUnmount.InnerVolumeSpecName,
 			volumeToUnmount.PluginName,
-			volumeToUnmount.VolumeGidValue)
+			volumeToUnmount.VolumeGIDValue)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsUnmounted(
@@ -1132,14 +1129,13 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		}
 
 		markVolumeOpts := MarkVolumeOpts{
-			PodName:             volumeToMount.PodName,
-			PodUID:              volumeToMount.Pod.UID,
-			VolumeName:          volumeToMount.VolumeName,
-			BlockVolumeMapper:   blockVolumeMapper,
-			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToMount.VolumeGidValue,
-			VolumeSpec:          volumeToMount.VolumeSpec,
-			VolumeMountState:    VolumeMounted,
+			PodName:           volumeToMount.PodName,
+			PodUID:            volumeToMount.Pod.UID,
+			VolumeName:        volumeToMount.VolumeName,
+			BlockVolumeMapper: blockVolumeMapper,
+			VolumeGIDVolume:   volumeToMount.VolumeGIDValue,
+			VolumeSpec:        volumeToMount.VolumeSpec,
+			VolumeMountState:  VolumeMounted,
 		}
 
 		// Call MapPodDevice if blockVolumeMapper implements CustomBlockVolumeMapper
@@ -1306,13 +1302,12 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		// cases below. The volume is marked as fully un-mapped at the end of this function, when everything
 		// succeeds.
 		markVolumeOpts := MarkVolumeOpts{
-			PodName:             volumeToUnmount.PodName,
-			PodUID:              volumeToUnmount.PodUID,
-			VolumeName:          volumeToUnmount.VolumeName,
-			OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToUnmount.VolumeGidValue,
-			VolumeSpec:          volumeToUnmount.VolumeSpec,
-			VolumeMountState:    VolumeMountUncertain,
+			PodName:          volumeToUnmount.PodName,
+			PodUID:           volumeToUnmount.PodUID,
+			VolumeName:       volumeToUnmount.VolumeName,
+			VolumeGIDVolume:  volumeToUnmount.VolumeGIDValue,
+			VolumeSpec:       volumeToUnmount.VolumeSpec,
+			VolumeMountState: VolumeMountUncertain,
 		}
 		markVolumeUncertainErr := actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts)
 		if markVolumeUncertainErr != nil {
@@ -1341,14 +1336,13 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		}
 
 		klog.Infof(
-			"UnmapVolume succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
+			"UnmapVolume succeeded for volume %q pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
 			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			volumeToUnmount.InnerVolumeSpecName,
 			volumeToUnmount.PluginName,
-			volumeToUnmount.VolumeGidValue)
+			volumeToUnmount.VolumeGIDValue)
 
 		// Update actual state of world
 		markVolUnmountedErr := actualStateOfWorld.MarkVolumeAsUnmounted(

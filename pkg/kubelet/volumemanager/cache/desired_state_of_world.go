@@ -22,6 +22,7 @@ package cache
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -61,7 +62,7 @@ type DesiredStateOfWorld interface {
 	// added.
 	// If a pod with the same unique name already exists under the specified
 	// volume, this is a no-op.
-	AddPodToVolume(podName types.UniquePodName, pod *v1.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGidValue string, seLinuxContainerContexts []*v1.SELinuxOptions) (v1.UniqueVolumeName, error)
+	AddPodToVolume(podName types.UniquePodName, pod *v1.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGIDValue string, seLinuxContainerContexts []*v1.SELinuxOptions) (v1.UniqueVolumeName, error)
 
 	// MarkVolumesReportedInUse sets the ReportedInUse value to true for the
 	// reportedVolumes. For volumes not in the reportedVolumes list, the
@@ -193,8 +194,8 @@ type volumeToMount struct {
 	// the volume.DeviceMounter interface
 	pluginIsDeviceMountable bool
 
-	// volumeGidValue contains the value of the GID annotation, if present.
-	volumeGidValue string
+	// volumeGIDValue contains the value of the GID annotation, if present.
+	volumeGIDValue string
 
 	// reportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
@@ -242,11 +243,8 @@ type podToMount struct {
 	// PVC volumes it is from the dereferenced PV object.
 	volumeSpec *volume.Spec
 
-	// outerVolumeSpecName is the volume.Spec.Name() of the volume as referenced
-	// directly in the pod. If the volume was referenced through a persistent
-	// volume claim, this contains the volume.Spec.Name() of the persistent
-	// volume claim
-	outerVolumeSpecName string
+	// outerVolumeSpecNames are the podSpec.Volume[x].Name of the volume.
+	outerVolumeSpecNames []string
 	// mountRequestTime stores time at which mount was requested
 	mountRequestTime time.Time
 }
@@ -262,7 +260,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	pod *v1.Pod,
 	volumeSpec *volume.Spec,
 	outerVolumeSpecName string,
-	volumeGidValue string,
+	volumeGIDValue string,
 	seLinuxContainerContexts []*v1.SELinuxOptions) (v1.UniqueVolumeName, error) {
 	dsw.Lock()
 	defer dsw.Unlock()
@@ -336,7 +334,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			podsToMount:                    make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable:             attachable,
 			pluginIsDeviceMountable:        deviceMountable,
-			volumeGidValue:                 volumeGidValue,
+			volumeGIDValue:                 volumeGIDValue,
 			reportedInUse:                  false,
 			desiredSizeLimit:               sizeLimit,
 			effectiveSELinuxMountFileLabel: effectiveSELinuxMountLabel,
@@ -355,8 +353,15 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 
 	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
 	mountRequestTime := time.Now()
-	if ok && !volumePlugin.RequiresRemount(volumeSpec) {
-		mountRequestTime = oldPodMount.mountRequestTime
+	var outerVolumeSpecNames []string
+	if ok {
+		if !volumePlugin.RequiresRemount(volumeSpec) {
+			mountRequestTime = oldPodMount.mountRequestTime
+		}
+		outerVolumeSpecNames = oldPodMount.outerVolumeSpecNames
+	}
+	if !slices.Contains(outerVolumeSpecNames, outerVolumeSpecName) {
+		outerVolumeSpecNames = append(outerVolumeSpecNames, outerVolumeSpecName)
 	}
 
 	if !ok {
@@ -383,11 +388,11 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	// updated values (this is required for volumes that require remounting on
 	// pod update, like Downward API volumes).
 	dsw.volumesToMount[volumeName].podsToMount[podName] = podToMount{
-		podName:             podName,
-		pod:                 pod,
-		volumeSpec:          volumeSpec,
-		outerVolumeSpecName: outerVolumeSpecName,
-		mountRequestTime:    mountRequestTime,
+		podName:              podName,
+		pod:                  pod,
+		volumeSpec:           volumeSpec,
+		outerVolumeSpecNames: outerVolumeSpecNames,
+		mountRequestTime:     mountRequestTime,
 	}
 	return volumeName, nil
 }
@@ -602,8 +607,8 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 					VolumeSpec:              podObj.volumeSpec,
 					PluginIsAttachable:      volumeObj.pluginIsAttachable,
 					PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
-					OuterVolumeSpecName:     podObj.outerVolumeSpecName,
-					VolumeGidValue:          volumeObj.volumeGidValue,
+					OuterVolumeSpecNames:    podObj.outerVolumeSpecNames,
+					VolumeGIDValue:          volumeObj.volumeGIDValue,
 					ReportedInUse:           volumeObj.reportedInUse,
 					MountRequestTime:        podObj.mountRequestTime,
 					DesiredSizeLimit:        volumeObj.desiredSizeLimit,
