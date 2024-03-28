@@ -135,6 +135,10 @@ import (
 // state, except that its ResourceVersion is replaced with a
 // ResourceVersion in which the object is actually absent.
 type SharedInformer interface {
+	// SetName can be called before Run to modify the name of the informer.
+	// Returns true on success, false if called after Run.
+	SetName(string) bool
+
 	// AddEventHandler adds an event handler to the shared informer using
 	// the shared informer's resync period.  Events to a single handler are
 	// delivered sequentially, but there is no coordination between
@@ -269,6 +273,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 	realClock := &clock.RealClock{}
 
 	return &sharedIndexInformer{
+		name:                            options.InformerName,
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
 		listerWatcher:                   lw,
@@ -293,6 +298,11 @@ type SharedIndexInformerOptions struct {
 	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
 	// underlying Reflector's type description.
 	ObjectDescription string
+
+	// InformerName identifies the informer.
+	// This may be empty, in which case it defaults to the closest source_file.go:line
+	// in the call stack that is outside this package
+	InformerName string
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -356,6 +366,7 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 // sharedProcessor, which is responsible for relaying those
 // notifications to each of the informer's clients.
 type sharedIndexInformer struct {
+	name       string
 	indexer    Indexer
 	controller Controller
 
@@ -456,6 +467,16 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	return nil
 }
 
+func (s *sharedIndexInformer) SetName(name string) bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	if s.started {
+		return false
+	}
+	s.name = name
+	return true
+}
+
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
@@ -485,6 +506,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 			Process:           s.HandleDeltas,
 			WatchErrorHandler: s.watchErrorHandler,
+			Name:              s.name,
 		}
 
 		s.controller = New(cfg)
