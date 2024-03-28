@@ -69,7 +69,56 @@ func TestSimpleQueue(t *testing.T) {
 	}
 }
 
-func TestDeduping(t *testing.T) {
+func TestDegenerateAddAfter(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	q.AddAfter("one", 0*time.Second)
+	if expected, actual := 1, q.Len(); expected != actual {
+		t.Fatalf("Expected Len %d, got %d", expected, actual)
+	}
+	time.Sleep(10 * time.Second)
+	if expected, actual := 1, q.Len(); expected != actual {
+		t.Fatalf("Expected Len %d, got %d", expected, actual)
+	}
+	q.AddAfter("two", -time.Second)
+	if expected, actual := 2, q.Len(); expected != actual {
+		t.Fatalf("Expected Len %d, got %d", expected, actual)
+	}
+	time.Sleep(10 * time.Second)
+	if expected, actual := 2, q.Len(); expected != actual {
+		t.Fatalf("Expected Len %d, got %d", expected, actual)
+	}
+}
+
+// TestDedupInFIFO tests dedup between items given in calls to Add
+func TestDedupInFIFO(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+
+	first := "foo"
+	second := "bar"
+
+	q.Add(first)
+	q.Add(second)
+	q.Add(first)
+	if q.Len() != 2 {
+		t.Errorf("Expected Len to be 2, actual is %d", q.Len())
+	}
+
+	item, _ := q.Get()
+	q.Done(item)
+	if item != first {
+		t.Errorf("Expected to dequeue %#v but got %#v", first, item)
+	}
+	item, _ = q.Get()
+	q.Done(item)
+	if item != second {
+		t.Errorf("Expected to dequeue %#v but got %#v", first, item)
+	}
+}
+
+// TestDedupWaiting tests dedup between items given in calls to AddAfter
+func TestDedupWaiting(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
 
@@ -122,6 +171,48 @@ func TestDeduping(t *testing.T) {
 	fakeClock.Step(20 * time.Millisecond)
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
+	}
+}
+
+// TestCrossDedup tests dedup between calls to Add and AddAfter
+func TestCrossDedup(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	addFirst := "foo"
+	waitFirst := "bar"
+	q.Add(addFirst)
+	q.AddAfter(addFirst, 100*time.Millisecond)
+	q.AddAfter(waitFirst, 50*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if q.Len() != 1 {
+		t.Fatalf("Expected Len 1, got %d", q.Len())
+	}
+	q.Add(waitFirst)
+	if q.Len() != 2 {
+		t.Fatalf("Expected Len 2, got %d", q.Len())
+	}
+
+	item, _ := q.Get()
+	q.Done(item)
+	if item != addFirst {
+		t.Fatalf("Expected %#v, got %#v", addFirst, item)
+	}
+	item, _ = q.Get()
+	q.Done(item)
+	if item != waitFirst {
+		t.Fatalf("Expected %#v, got %#v", waitFirst, item)
+	}
+	fakeClock.Step(60 * time.Millisecond)
+	time.Sleep(10 * time.Second)
+	if q.Len() != 0 {
+		t.Fatalf("Expected Len 0, got %d", q.Len())
+	}
+	fakeClock.Step(60 * time.Millisecond)
+	time.Sleep(10 * time.Second)
+	if q.Len() != 0 {
+		t.Fatalf("Expected Len 0, got %d", q.Len())
 	}
 }
 

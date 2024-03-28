@@ -29,8 +29,21 @@ import (
 // requeue items after failures without ending up in a hot-loop.
 type DelayingInterface interface {
 	Interface
-	// AddAfter adds an item to the workqueue after the indicated duration has passed
+	// AddAfter adds an item to the workqueue after the indicated duration has passed.
+	// If the item is already scheduled for an earlier add then nothing more is scheduled.
+	// If the item is already scheduled for a later add then the scheduled add is moved up
+	// to the requested time.
+	// If the item is already in the FIFO then no addition is scheduled.
 	AddAfter(item interface{}, duration time.Duration)
+}
+
+type DelayingPeekableQueue interface {
+	PeekableQueue
+	DelayingInterface
+
+	// Has reveals whether the given item is either present in either the FIFO
+	// or waiting for a specific time to be added to the FIFO
+	Has(item interface{}) bool
 }
 
 // DelayingQueueConfig specifies optional configurations to customize a DelayingInterface.
@@ -46,19 +59,19 @@ type DelayingQueueConfig struct {
 	Clock clock.WithTicker
 
 	// Queue optionally allows injecting custom queue Interface instead of the default one.
-	Queue Interface
+	Queue PeekableQueue
 }
 
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability.
 // NewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewDelayingQueueWithConfig instead and specify a name.
-func NewDelayingQueue() DelayingInterface {
+func NewDelayingQueue() DelayingPeekableQueue {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{})
 }
 
 // NewDelayingQueueWithConfig constructs a new workqueue with options to
 // customize different properties.
-func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingInterface {
+func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingPeekableQueue {
 	if config.Clock == nil {
 		config.Clock = clock.RealClock{}
 	}
@@ -77,7 +90,7 @@ func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingInterface {
 // NewDelayingQueueWithCustomQueue constructs a new workqueue with ability to
 // inject custom queue Interface instead of the default one
 // Deprecated: Use NewDelayingQueueWithConfig instead.
-func NewDelayingQueueWithCustomQueue(q Interface, name string) DelayingInterface {
+func NewDelayingQueueWithCustomQueue(q PeekableQueue, name string) DelayingPeekableQueue {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{
 		Name:  name,
 		Queue: q,
@@ -86,37 +99,42 @@ func NewDelayingQueueWithCustomQueue(q Interface, name string) DelayingInterface
 
 // NewNamedDelayingQueue constructs a new named workqueue with delayed queuing ability.
 // Deprecated: Use NewDelayingQueueWithConfig instead.
-func NewNamedDelayingQueue(name string) DelayingInterface {
+func NewNamedDelayingQueue(name string) DelayingPeekableQueue {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{Name: name})
 }
 
 // NewDelayingQueueWithCustomClock constructs a new named workqueue
 // with ability to inject real or fake clock for testing purposes.
 // Deprecated: Use NewDelayingQueueWithConfig instead.
-func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) DelayingInterface {
+func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) DelayingPeekableQueue {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{
 		Name:  name,
 		Clock: clock,
 	})
 }
 
-func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) *delayingType {
-	ret := &delayingType{
-		Interface:       q,
-		clock:           clock,
-		heartbeat:       clock.NewTicker(maxWait),
-		stopCh:          make(chan struct{}),
-		waitingForAddCh: make(chan *waitFor, 1000),
-		metrics:         newRetryMetrics(name, provider),
-	}
-
+func newDelayingQueue(clock clock.WithTicker, q PeekableQueue, name string, provider MetricsProvider) *delayingType {
+	ret := createDelayingQueue(clock, q, name, provider)
 	go ret.waitingLoop()
+	return ret
+}
+
+func createDelayingQueue(clock clock.WithTicker, q PeekableQueue, name string, provider MetricsProvider) *delayingType {
+	ret := &delayingType{
+		PeekableQueue:            q,
+		clock:                    clock,
+		heartbeat:                clock.NewTicker(maxWait),
+		stopCh:                   make(chan struct{}),
+		waitingForAddCh:          make(chan *waitFor, 1000),
+		waitingEntryByDataLocked: map[t]*waitFor{},
+		metrics:                  newRetryMetrics(name, provider),
+	}
 	return ret
 }
 
 // delayingType wraps an Interface and provides delayed re-enquing
 type delayingType struct {
-	Interface
+	PeekableQueue
 
 	// clock tracks time for delayed firing
 	clock clock.Clock
@@ -129,8 +147,12 @@ type delayingType struct {
 	// heartbeat ensures we wait no more than maxWait before firing
 	heartbeat clock.Ticker
 
-	// waitingForAddCh is a buffered channel that feeds waitingForAdd
+	// waitingForAddCh is a buffered channel that feeds waitingForQueue
 	waitingForAddCh chan *waitFor
+
+	// waitingEntryByDataLocked is an index into waitingForQueue.
+	// Access only while holding the PeekableQueue's lock.
+	waitingEntryByDataLocked map[t]*waitFor
 
 	// metrics counts the number of retries
 	metrics retryMetrics
@@ -142,6 +164,10 @@ type waitFor struct {
 	readyAt time.Time
 	// index in the priority queue (heap)
 	index int
+
+	// deletedLocked indicates that this should NOT actually be added.
+	// Access only while holding the PeekableQueue's lock.
+	deletedLocked bool
 }
 
 // waitForPriorityQueue implements a priority queue for waitFor items.
@@ -195,24 +221,60 @@ func (pq waitForPriorityQueue) Peek() interface{} {
 // on Get() will be true. This method may be invoked more than once.
 func (q *delayingType) ShutDown() {
 	q.stopOnce.Do(func() {
-		q.Interface.ShutDown()
+		q.PeekableQueue.ShutDown()
 		close(q.stopCh)
 		q.heartbeat.Stop()
 	})
 }
 
+func (q *delayingType) Has(item interface{}) bool {
+	var had bool
+	q.PeekableQueue.ConditionalAdd(item, func(shuttingDown, queueHas bool) bool {
+		had = queueHas
+		if !had {
+			_, had = q.waitingEntryByDataLocked[item]
+
+		}
+		return false
+	})
+	return had
+}
+
+func (q *delayingType) Add(item interface{}) {
+	q.ConditionalAdd(item, func(bool, bool) bool { return true })
+}
+
+func (q *delayingType) ConditionalAdd(item interface{}, wantAddLocked func(shuttingDown, has bool) bool) {
+	q.PeekableQueue.ConditionalAdd(item, func(shuttingDown, queueHas bool) bool {
+		addToQueue := wantAddLocked(shuttingDown, queueHas)
+		if addToQueue {
+			waitEntry, isWaiting := q.waitingEntryByDataLocked[item]
+			if isWaiting {
+				waitEntry.deletedLocked = true
+			}
+		}
+		return addToQueue
+	})
+}
+
 // AddAfter adds the given item to the work queue after the given delay
 func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
+	var wasShuttingDown, had, added bool
+	q.PeekableQueue.ConditionalAdd(item, func(shuttingDown, has bool) bool {
+		wasShuttingDown = shuttingDown
+		had = has
+		added = (!has) && (!shuttingDown) && duration <= 0
+		return added
+	})
 	// don't add if we're already shutting down
-	if q.ShuttingDown() {
+	if wasShuttingDown {
 		return
 	}
 
 	q.metrics.retry()
 
 	// immediately add things with no delay
-	if duration <= 0 {
-		q.Add(item)
+	if had || added {
 		return
 	}
 
@@ -241,10 +303,20 @@ func (q *delayingType) waitingLoop() {
 	waitingForQueue := &waitForPriorityQueue{}
 	heap.Init(waitingForQueue)
 
-	waitingEntryByData := map[t]*waitFor{}
-
+	addWaitFor := func(waitEntry *waitFor) {
+		q.PeekableQueue.ConditionalAdd(waitEntry.data, func(shuttingDown, has bool) bool {
+			if shuttingDown || has {
+				return false
+			}
+			if waitEntry.readyAt.After(q.clock.Now()) {
+				insert(waitingForQueue, q.waitingEntryByDataLocked, waitEntry)
+				return false
+			}
+			return true
+		})
+	}
 	for {
-		if q.Interface.ShuttingDown() {
+		if q.PeekableQueue.ShuttingDown() {
 			return
 		}
 
@@ -258,8 +330,10 @@ func (q *delayingType) waitingLoop() {
 			}
 
 			entry = heap.Pop(waitingForQueue).(*waitFor)
-			q.Add(entry.data)
-			delete(waitingEntryByData, entry.data)
+			q.PeekableQueue.ConditionalAdd(entry.data, func(shuttingDown bool, has bool) bool {
+				delete(q.waitingEntryByDataLocked, entry.data)
+				return !entry.deletedLocked
+			})
 		}
 
 		// Set up a wait for the first item's readyAt (if one exists)
@@ -284,21 +358,13 @@ func (q *delayingType) waitingLoop() {
 			// continue the loop, which will add ready items
 
 		case waitEntry := <-q.waitingForAddCh:
-			if waitEntry.readyAt.After(q.clock.Now()) {
-				insert(waitingForQueue, waitingEntryByData, waitEntry)
-			} else {
-				q.Add(waitEntry.data)
-			}
+			addWaitFor(waitEntry)
 
 			drained := false
 			for !drained {
 				select {
 				case waitEntry := <-q.waitingForAddCh:
-					if waitEntry.readyAt.After(q.clock.Now()) {
-						insert(waitingForQueue, waitingEntryByData, waitEntry)
-					} else {
-						q.Add(waitEntry.data)
-					}
+					addWaitFor(waitEntry)
 				default:
 					drained = true
 				}
@@ -307,7 +373,8 @@ func (q *delayingType) waitingLoop() {
 	}
 }
 
-// insert adds the entry to the priority queue, or updates the readyAt if it already exists in the queue
+// insert adds the entry to the priority queue, or updates the readyAt if it already exists in the queue.
+// Call this ONLY from the goroutine running q.waitingLoop.
 func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) {
 	// if the entry already exists, update the time only if it would cause the item to be queued sooner
 	existing, exists := knownEntries[entry.data]
