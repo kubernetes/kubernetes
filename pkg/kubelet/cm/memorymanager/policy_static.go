@@ -129,7 +129,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 	machineState := s.GetMachineState()
 	bestHint := &hint
-	// topology manager returned the hint with NUMA affinity nil
+	// topology manager returned the hint with NUMA affinity nil.
 	// we should use the default NUMA affinity calculated the same way as for the topology manager
 	if hint.NUMANodeAffinity == nil {
 		defaultHint, err := p.getDefaultHint(machineState, pod, requestedResources)
@@ -143,19 +143,17 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		bestHint = defaultHint
 	}
 
-	// topology manager returns the hint that does not satisfy completely the container request
-	// we should extend this hint to the one who will satisfy the request and include the current hint
-	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) {
-		extendedHint, err := p.extendTopologyManagerHint(machineState, pod, requestedResources, bestHint.NUMANodeAffinity)
-		if err != nil {
-			return err
-		}
-
-		if !extendedHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
-		}
-		bestHint = extendedHint
+	// topology manager returns the hint that does not satisfy completely the container request and numa node grouping rules
+	// we should extend this hint to the one who will satisfy all requirements above and include the current hint
+	extendedHint, err := p.extendTopologyManagerHint(machineState, pod, requestedResources, bestHint.NUMANodeAffinity)
+	if err != nil {
+		return err
 	}
+
+	if !extendedHint.Preferred && bestHint.Preferred {
+		return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
+	}
+	bestHint = extendedHint
 
 	var containerBlocks []state.Block
 	maskBits := bestHint.NUMANodeAffinity.GetBits()
@@ -758,27 +756,6 @@ func (p *staticPolicy) getDefaultHint(machineState state.NUMANodeMap, pod *v1.Po
 
 	// hints for all memory types should be the same, so we will check hints only for regular memory type
 	return findBestHint(hints[string(v1.ResourceMemory)]), nil
-}
-
-func isAffinitySatisfyRequest(machineState state.NUMANodeMap, mask bitmask.BitMask, requestedResources map[v1.ResourceName]uint64) bool {
-	totalFreeSize := map[v1.ResourceName]uint64{}
-	for _, nodeID := range mask.GetBits() {
-		for resourceName := range requestedResources {
-			if _, ok := totalFreeSize[resourceName]; !ok {
-				totalFreeSize[resourceName] = 0
-			}
-			totalFreeSize[resourceName] += machineState[nodeID].MemoryMap[resourceName].Free
-		}
-	}
-
-	// verify that for all memory types the node mask has enough resources
-	for resourceName, requestedSize := range requestedResources {
-		if totalFreeSize[resourceName] < requestedSize {
-			return false
-		}
-	}
-
-	return true
 }
 
 // extendTopologyManagerHint extends the topology manager hint, in case when it does not satisfy to the container request
