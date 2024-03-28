@@ -232,7 +232,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings, nil)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	if !nodePortAddresses.ContainsIPv4Loopback() {
 		localhostNodePorts = false

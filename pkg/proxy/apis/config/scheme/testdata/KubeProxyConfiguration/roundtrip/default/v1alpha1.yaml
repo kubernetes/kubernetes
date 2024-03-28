@@ -57,6 +57,7 @@ nftables:
   minSyncPeriod: 1s
   syncPeriod: 30s
 nodePortAddresses: null
+nodePortAddressesPrimary: false
 oomScoreAdj: -999
 portRange: ""
 showHiddenMetricsForVersion: ""

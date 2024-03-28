@@ -666,7 +666,7 @@ func NewProxier(
 	}
 
 	// windows listens to all node addresses
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil, nil)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	var healthzPort int

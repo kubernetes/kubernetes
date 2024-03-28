@@ -211,8 +211,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings, nodeIP)
-
 	if initOnly {
 		klog.InfoS("System initialized and --init-only specified")
 		return nil, nil
@@ -222,6 +220,8 @@ func NewProxier(ipFamily v1.IPFamily,
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	klog.V(2).InfoS("Using nftables mark for masquerade", "ipFamily", ipFamily, "mark", masqueradeMark)
+
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 

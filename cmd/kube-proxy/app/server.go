@@ -197,7 +197,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
-		"A list of CIDR ranges that contain valid node IPs. If set, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If unset, NodePort connections will be accepted on all local IPs. This parameter is ignored if a config file is specified by --config.")
+		"A list of CIDR ranges that contain valid node IPs. If set, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If this is unset and --nodeport-addresses-primary is true, then NodePort connections will be accepted only on the node's primary IP(s). If this is unset and --nodeport-addresses-primary is false, then NodePort connections will be accepted on all local IPs. This parameter is ignored if a config file is specified by --config.")
+	fs.BoolVar(&o.config.NodePortAddressesPrimary, "nodeport-addresses-primary", o.config.NodePortAddressesPrimary, "Indicates that NodePort service connections should only be accepted on the node's primary IP(s) as indicated by the Node object. This must be false if --node-port-addresses is non-empty. This parameter is ignored if a config file is specified by --config.")
 
 	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", ptr.Deref(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]. This parameter is ignored if a config file is specified by --config.")
 	fs.Int32Var(o.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
@@ -631,6 +632,17 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 	rawNodeIPs := getNodeIPs(logger, s.Client, s.Hostname)
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(logger, rawNodeIPs, config.BindAddress)
 
+	if config.NodePortAddressesPrimary {
+		var nodePortAddresses []string
+		if nodeIP := s.NodeIPs[v1.IPv4Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
+			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/32", nodeIP.String()))
+		}
+		if nodeIP := s.NodeIPs[v1.IPv6Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
+			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/128", nodeIP.String()))
+		}
+		config.NodePortAddresses = nodePortAddresses
+	}
+
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")
 
@@ -650,6 +662,11 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 		return nil, err
 	}
 
+	err = checkBadConfig(s)
+	if err != nil {
+		logger.Error(err, "Kube-proxy configuration may be incomplete or incorrect")
+	}
+
 	ipv4Supported, ipv6Supported, dualStackSupported, err := s.platformCheckSupported()
 	if err != nil {
 		return nil, err
@@ -661,7 +678,7 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 		logger.Info("kube-proxy running in single-stack mode", "ipFamily", s.PrimaryIPFamily)
 	}
 
-	err, fatal := checkIPConfig(s, dualStackSupported)
+	err, fatal := checkBadIPConfig(s, dualStackSupported)
 	if err != nil {
 		if fatal {
 			return nil, fmt.Errorf("kube-proxy configuration is incorrect: %v", err)
@@ -677,8 +694,38 @@ func newProxyServer(logger klog.Logger, config *kubeproxyconfig.KubeProxyConfigu
 	return s, nil
 }
 
-// checkIPConfig confirms that s has proper configuration for its primary IP family.
-func checkIPConfig(s *ProxyServer, dualStackSupported bool) (error, bool) {
+// checkBadConfig checks for bad/deprecated configuation
+func checkBadConfig(s *ProxyServer) error {
+	var errors []error
+
+	clusterCIDRs := strings.Split(s.Config.ClusterCIDR, ",")
+	anyDualStackConfig := false
+	for _, config := range [][]string{clusterCIDRs, s.Config.NodePortAddresses, s.Config.IPVS.ExcludeCIDRs} {
+		if dual, _ := netutils.IsDualStackCIDRStrings(config); dual {
+			anyDualStackConfig = true
+			break
+		}
+	}
+
+	if !s.Config.NodePortAddressesPrimary {
+		cidrsByFamily := proxyutil.MapCIDRsByIPFamily(s.Config.NodePortAddresses)
+		if len(s.Config.NodePortAddresses) == 0 {
+			errors = append(errors, fmt.Errorf("nodePortAddresses and nodePortAddressesPrimary are both unset; NodePort connections will be accepted on all local IPs. Consider using `--nodeport-addresses-primary`"))
+		} else if anyDualStackConfig && len(cidrsByFamily[s.PrimaryIPFamily]) == len(s.Config.NodePortAddresses) {
+			errors = append(errors, fmt.Errorf("cluster appears to be dual-stack but nodePortAddresses contains only %s addresses; NodePort connections will be accepted on all local %s IPs", s.PrimaryIPFamily, proxyutil.OtherIPFamily(s.PrimaryIPFamily)))
+		}
+		// checkBadIPConfig() will warn if NodePortAddresses only has IPs of the
+		// non-primary family.
+	}
+
+	return utilerrors.NewAggregate(errors)
+}
+
+// checkBadIPConfig checks for bad configuration relative to s.PrimaryIPFamily.
+// Historically, we did not check most of the config options, so we cannot retroactively
+// make IP family mismatches in those options be fatal. When we add new options to check
+// here, we should make problems with those options be fatal.
+func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal bool) {
 	var errors []error
 	var badFamily netutils.IPFamily
 
@@ -694,11 +741,6 @@ func checkIPConfig(s *ProxyServer, dualStackSupported bool) (error, bool) {
 	} else {
 		clusterType = fmt.Sprintf("%s-only", s.PrimaryIPFamily)
 	}
-
-	// Historically, we did not check most of the config options, so we cannot
-	// retroactively make IP family mismatches in those options be fatal. When we add
-	// new options to check here, we should make problems with those options be fatal.
-	fatal := false
 
 	if s.Config.ClusterCIDR != "" {
 		clusterCIDRs := strings.Split(s.Config.ClusterCIDR, ",")

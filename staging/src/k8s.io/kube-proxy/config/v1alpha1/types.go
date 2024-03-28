@@ -226,9 +226,16 @@ type KubeProxyConfiguration struct {
 
 	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set,
 	// connections to NodePort services will only be accepted on node IPs in one of
-	// the indicated ranges. If unset, NodePort connections will be accepted on all
-	// local IPs.
+	// the indicated ranges. If this is unset and nodePortAddressesPrimary is true,
+	// then NodePort connections will be accepted only on the node's primary IP(s). If
+	// this is unset and nodePortAddressesPrimary is false, then NodePort connections
+	// will be accepted on all local IPs.
 	NodePortAddresses []string `json:"nodePortAddresses"`
+
+	// nodePortAddressesPrimary indicates that NodePort service connections should
+	// only be accepted on the node's primary IP(s) as indicated by the Node object.
+	// This must be false if nodePortAddresses is non-empty.
+	NodePortAddressesPrimary bool `json:"nodePortAddressesPrimary"`
 
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
 	// the range [-1000, 1000]

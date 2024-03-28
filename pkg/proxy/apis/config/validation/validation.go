@@ -98,7 +98,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("PortRange"), config.PortRange, "must be a valid port range (e.g. 300-2000)"))
 	}
 
-	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
+	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, config.NodePortAddressesPrimary, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
 
 	allErrs = append(allErrs, validateDetectLocalMode(config.DetectLocalMode, newPath.Child("DetectLocalMode"))...)
@@ -293,8 +293,15 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field.Path) field.ErrorList {
+func validateKubeProxyNodePortAddress(nodePortAddresses []string, nodePortAddressesPrimary bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if nodePortAddressesPrimary {
+		if len(nodePortAddresses) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, nodePortAddresses, "must not be set when nodePortAddressesPrimary is true"))
+		}
+		return allErrs
+	}
 
 	for i := range nodePortAddresses {
 		if _, _, err := netutils.ParseCIDRSloppy(nodePortAddresses[i]); err != nil {

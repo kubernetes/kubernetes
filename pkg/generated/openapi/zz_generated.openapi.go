@@ -59048,7 +59048,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 					},
 					"nodePortAddresses": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If unset, NodePort connections will be accepted on all local IPs.",
+							Description: "nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If this is unset and nodePortAddressesPrimary is true, then NodePort connections will be accepted only on the node's primary IP(s). If this is unset and nodePortAddressesPrimary is false, then NodePort connections will be accepted on all local IPs.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -59059,6 +59059,14 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 									},
 								},
 							},
+						},
+					},
+					"nodePortAddressesPrimary": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodePortAddressesPrimary indicates that NodePort service connections should only be accepted on the node's primary IP(s) as indicated by the Node object. This must be false if nodePortAddresses is non-empty.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"oomScoreAdj": {
@@ -59090,7 +59098,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 						},
 					},
 				},
-				Required: []string{"clientConnection", "hostnameOverride", "bindAddress", "healthzBindAddress", "metricsBindAddress", "bindAddressHardFail", "enableProfiling", "showHiddenMetricsForVersion", "mode", "iptables", "ipvs", "nftables", "winkernel", "detectLocalMode", "detectLocal", "clusterCIDR", "nodePortAddresses", "oomScoreAdj", "conntrack", "configSyncPeriod", "portRange"},
+				Required: []string{"clientConnection", "hostnameOverride", "bindAddress", "healthzBindAddress", "metricsBindAddress", "bindAddressHardFail", "enableProfiling", "showHiddenMetricsForVersion", "mode", "iptables", "ipvs", "nftables", "winkernel", "detectLocalMode", "detectLocal", "clusterCIDR", "nodePortAddresses", "nodePortAddressesPrimary", "oomScoreAdj", "conntrack", "configSyncPeriod", "portRange"},
 			},
 		},
 		Dependencies: []string{
