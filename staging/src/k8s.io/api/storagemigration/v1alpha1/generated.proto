@@ -51,7 +51,7 @@ message MigrationCondition {
 
   // The last time this condition was updated.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -68,7 +68,7 @@ message StorageVersionMigration {
   // Standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the migration.
   // +optional
@@ -84,7 +84,7 @@ message StorageVersionMigrationList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of StorageVersionMigration
   // +patchMergeKey=type

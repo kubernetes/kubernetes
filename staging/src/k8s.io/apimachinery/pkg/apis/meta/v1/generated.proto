@@ -460,7 +460,7 @@ message List {
   optional ListMeta metadata = 1;
 
   // List of objects
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension items = 2;
+  repeated .k8s.io.apimachinery.pkg.runtime.RawExtension items = 2;
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and
@@ -1209,6 +1209,6 @@ message WatchEvent {
   //  * If Type is Deleted: the state of the object immediately before deletion.
   //  * If Type is Error: *Status is recommended; other types may make sense
   //    depending on context.
-  optional k8s.io.apimachinery.pkg.runtime.RawExtension object = 2;
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension object = 2;
 }
 

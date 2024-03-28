@@ -33,7 +33,7 @@ message Pod {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -62,11 +62,11 @@ message PodCondition {
 
   // Last time we probed the condition.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // Last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // Unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
@@ -82,7 +82,7 @@ message PodList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pods.
   // More info: http://kubernetes.io/docs/user-guide/pods
@@ -206,6 +206,6 @@ message PodStatus {
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
 }
 

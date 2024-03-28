@@ -34,7 +34,7 @@ option go_package = "k8s.io/api/node/v1alpha1";
 message Overhead {
   // podFixed represents the fixed resource overhead associated with running a pod.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> podFixed = 1;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> podFixed = 1;
 }
 
 // RuntimeClass defines a class of container runtime supported in the cluster.
@@ -47,7 +47,7 @@ message Overhead {
 message RuntimeClass {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents specification of the RuntimeClass
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -59,7 +59,7 @@ message RuntimeClassList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of schema objects.
   repeated RuntimeClass items = 2;
@@ -113,6 +113,6 @@ message Scheduling {
   // tolerated by the pod and the RuntimeClass.
   // +optional
   // +listType=atomic
-  repeated k8s.io.api.core.v1.Toleration tolerations = 2;
+  repeated .k8s.io.api.core.v1.Toleration tolerations = 2;
 }
 
