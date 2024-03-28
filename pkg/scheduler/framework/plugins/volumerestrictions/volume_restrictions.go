@@ -325,8 +325,7 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHin
 		// A new Node may make a pod schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
-		// This PVC is required to exist to check its access modes.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
 	}
 }
 
