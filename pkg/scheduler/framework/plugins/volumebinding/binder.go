@@ -884,6 +884,12 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 			return false, true, err
 		}
 
+		err = volume.CheckCSINodeDriverAffinity(csiNode, pv)
+		if err != nil {
+			logger.V(4).Info("PersistentVolume and csinode driver mismatch for pod", "PV", klog.KRef("", pvName), "csinode", klog.KObj(csiNode), "pod", klog.KObj(pod), "err", err)
+			return false, true, nil
+		}
+
 		err = volume.CheckNodeAffinity(pv, node.Labels)
 		if err != nil {
 			logger.V(4).Info("PersistentVolume and node mismatch for pod", "PV", klog.KRef("", pvName), "node", klog.KObj(node), "pod", klog.KObj(pod), "err", err)
