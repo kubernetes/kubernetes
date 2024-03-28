@@ -80,8 +80,8 @@ func NewRetryParams(interval, timeout time.Duration) *RetryParams {
 }
 
 // ScaleCondition is a closure around Scale that facilitates retries via util.wait
-func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name string, count uint, updatedResourceVersion *string, gvr schema.GroupVersionResource, dryRun bool) wait.ConditionFunc {
-	return func() (bool, error) {
+func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name string, count uint, updatedResourceVersion *string, gvr schema.GroupVersionResource, dryRun bool) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		rv, err := r.ScaleSimple(namespace, name, precondition, count, gvr, dryRun)
 		if updatedResourceVersion != nil {
 			*updatedResourceVersion = rv
@@ -171,7 +171,7 @@ func (s *genericScaler) Scale(namespace, resourceName string, newSize uint, prec
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(s, preconditions, namespace, resourceName, newSize, nil, gvr, dryRun)
-	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollUntilContextTimeout(context.TODO(), retry.Interval, retry.Timeout, true, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
@@ -182,8 +182,8 @@ func (s *genericScaler) Scale(namespace, resourceName string, newSize uint, prec
 
 // scaleHasDesiredReplicas returns a condition that will be true if and only if the desired replica
 // count for a scale (Spec) equals its updated replicas count (Status)
-func scaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupResource, resourceName string, namespace string, desiredReplicas int32) wait.ConditionFunc {
-	return func() (bool, error) {
+func scaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupResource, resourceName string, namespace string, desiredReplicas int32) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
 		actualScale, err := sClient.Scales(namespace).Get(context.TODO(), gr, resourceName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -203,9 +203,10 @@ func WaitForScaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.
 	if waitForReplicas == nil {
 		return fmt.Errorf("waitForReplicas parameter cannot be nil")
 	}
-	err := wait.PollImmediate(
+	err := wait.PollUntilContextTimeout(context.TODO(),
 		waitForReplicas.Interval,
 		waitForReplicas.Timeout,
+		true,
 		scaleHasDesiredReplicas(sClient, gr, resourceName, namespace, int32(newSize)))
 	if err == wait.ErrWaitTimeout {
 		return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
