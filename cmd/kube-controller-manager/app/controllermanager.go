@@ -552,6 +552,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newClusterRoleAggregrationControllerDescriptor())
 	register(newPersistentVolumeClaimProtectionControllerDescriptor())
 	register(newPersistentVolumeProtectionControllerDescriptor())
+	register(newVolumeAttributesClassProtectionControllerDescriptor())
 	register(newTTLAfterFinishedControllerDescriptor())
 	register(newRootCACertificatePublisherControllerDescriptor())
 	register(newEphemeralVolumeControllerDescriptor())
