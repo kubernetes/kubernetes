@@ -23,8 +23,10 @@ import (
 	"k8s.io/utils/clock"
 )
 
+// Interface defines the minimal requirements to implement a workqueue.
 type Interface interface {
 	Add(item interface{})
+	IsAdded(item interface{}) bool
 	Len() int
 	Get() (item interface{}, shutdown bool)
 	Done(item interface{})
@@ -179,6 +181,15 @@ func (q *Type) Add(item interface{}) {
 
 	q.queue = append(q.queue, item)
 	q.cond.Signal()
+}
+
+// IsAdded returns a bool to indicate whether `item` is added to the queue and ready to be processed.
+// The result is only valid for the moment of call, i.e. the item could subsequently be processed and
+// removed from the queue before the client acts on the result.
+func (q *Type) IsAdded(item interface{}) bool {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	return q.dirty.has(item)
 }
 
 // Len returns the current queue length, for informational purposes only. You
