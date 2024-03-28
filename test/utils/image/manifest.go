@@ -67,15 +67,15 @@ func (i *Config) SetVersion(version string) {
 	i.version = version
 }
 
-func Init(repoList string) {
-	registry, imageConfigs, originalImageConfigs = readRepoList(repoList)
+func Init(repoList, imageRepository string) {
+	registry, imageConfigs, originalImageConfigs = readRepoList(repoList, imageRepository)
 }
 
-func readRepoList(repoList string) (RegistryList, map[ImageID]Config, map[ImageID]Config) {
+func readRepoList(repoList, imageRepository string) (RegistryList, map[ImageID]Config, map[ImageID]Config) {
 	registry := initRegistry
 
 	if repoList == "" {
-		imageConfigs, originalImageConfigs := initImageConfigs(registry)
+		imageConfigs, originalImageConfigs := initImageConfigs(registry, imageRepository)
 		return registry, imageConfigs, originalImageConfigs
 	}
 
@@ -100,7 +100,7 @@ func readRepoList(repoList string) (RegistryList, map[ImageID]Config, map[ImageI
 		panic(fmt.Errorf("error unmarshalling '%v' YAML file: %v", repoList, err))
 	}
 
-	imageConfigs, originalImageConfigs := initImageConfigs(registry)
+	imageConfigs, originalImageConfigs := initImageConfigs(registry, imageRepository)
 
 	return registry, imageConfigs, originalImageConfigs
 
@@ -141,7 +141,7 @@ var (
 		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
 
-	registry, imageConfigs, originalImageConfigs = readRepoList(os.Getenv("KUBE_TEST_REPO_LIST"))
+	registry, imageConfigs, originalImageConfigs = readRepoList(os.Getenv("KUBE_TEST_REPO_LIST"), os.Getenv("KUBE_TEST_REPO"))
 )
 
 type ImageID int
@@ -226,7 +226,7 @@ const (
 	VolumeRBDServer
 )
 
-func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
+func initImageConfigs(list RegistryList, imageRepository string) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
 	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.47"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
@@ -274,8 +274,8 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 
 	// if requested, map all the SHAs into a known format based on the input
 	originalImageConfigs := configs
-	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
-		configs = GetMappedImageConfigs(originalImageConfigs, repo)
+	if len(imageRepository) > 0 {
+		configs = GetMappedImageConfigs(originalImageConfigs, imageRepository)
 	}
 
 	return configs, originalImageConfigs
