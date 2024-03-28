@@ -154,7 +154,7 @@ func (p *plugin) NodePrepareResources(
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.clientTimeout)
 	defer cancel()
 
 	version := p.getVersion()
@@ -183,7 +183,7 @@ func (p *plugin) NodeUnprepareResources(
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.clientTimeout)
 	defer cancel()
 
 	version := p.getVersion()
