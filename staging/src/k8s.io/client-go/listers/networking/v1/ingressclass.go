@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type IngressClassLister interface {
 
 // ingressClassLister implements the IngressClassLister interface.
 type ingressClassLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.IngressClass]
 }
 
 // NewIngressClassLister returns a new IngressClassLister.
 func NewIngressClassLister(indexer cache.Indexer) IngressClassLister {
-	return &ingressClassLister{indexer: indexer}
-}
-
-// List lists all IngressClasses in the indexer.
-func (s *ingressClassLister) List(selector labels.Selector) (ret []*v1.IngressClass, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.IngressClass))
-	})
-	return ret, err
-}
-
-// Get retrieves the IngressClass from the index for a given name.
-func (s *ingressClassLister) Get(name string) (*v1.IngressClass, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("ingressclass"), name)
-	}
-	return obj.(*v1.IngressClass), nil
+	return &ingressClassLister{listers.New[*v1.IngressClass](indexer, v1.Resource("ingressclass"))}
 }
