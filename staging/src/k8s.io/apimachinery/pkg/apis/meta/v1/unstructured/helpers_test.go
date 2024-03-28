@@ -225,3 +225,80 @@ func TestSetNestedMap(t *testing.T) {
 	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
 	assert.Equal(t, obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"], "bar")
 }
+
+func TestNestedValueNoCopy(t *testing.T) {
+	type fooStruct struct {
+		Foo int
+		Bar bool
+	}
+
+	obj := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": 1,
+			"c": "c",
+			"d": []any{1, 2, 3},
+			"e": map[string]any{"foo": "bar"},
+			"f": fooStruct{Foo: 1, Bar: false},
+		},
+	}
+
+	var res any
+
+	res, exists, err := NestedValueNoCopy[int](obj, "a", "b")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, res)
+
+	res, exists, err = NestedValueNoCopy[string](obj, "a", "c")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, "c", res)
+
+	res, exists, err = NestedValueNoCopy[[]any](obj, "a", "d")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, []any{1, 2, 3}, res)
+
+	res, exists, err = NestedValueNoCopy[map[string]any](obj, "a", "e")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]any{"foo": "bar"}, res)
+
+	res, exists, err = NestedValueNoCopy[fooStruct](obj, "a", "f")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, fooStruct{Foo: 1, Bar: false}, res)
+}
+
+func TestNestedValueCopy(t *testing.T) {
+	obj := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": int64(1),
+			"c": "c",
+			"d": []any{int64(1), int64(2), int64(3)},
+			"e": map[string]any{"foo": "bar"},
+		},
+	}
+
+	var res any
+
+	res, exists, err := NestedValueCopy[int64](obj, "a", "b")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), res)
+
+	res, exists, err = NestedValueCopy[string](obj, "a", "c")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, "c", res)
+
+	res, exists, err = NestedValueCopy[[]any](obj, "a", "d")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, []any{int64(1), int64(2), int64(3)}, res)
+
+	res, exists, err = NestedValueCopy[map[string]any](obj, "a", "e")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]any{"foo": "bar"}, res)
+}
