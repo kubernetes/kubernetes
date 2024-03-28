@@ -83,6 +83,32 @@ type APIServiceSpec struct {
 	// version, then minor version. An example sorted list of versions:
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	VersionPriority int32
+
+	// ScopedResources declares a range of scoped resources to tell what resources to provide by the APIService. there can be more resources provided
+	// by the servicebackend. k8s aggregator focuses on the resources declared by ScopedResources, if it is defined.
+	ScopedResources []ScopedResource 
+}
+
+type ResourceScope string
+
+const (
+	ResourceScopeCluster   ResourceScope = "Cluster"
+	ResourceScopeNamespace ResourceScope = "Namespace"
+)
+
+type ScopedResource struct {
+	ResourceScope ResourceScope 
+	// plural is the plural name of the resource to serve.
+	// The custom resources are served under `/apis/<group>/<version>/.../<plural>`.
+	// Must match the name of the CustomResourceDefinition (in the form `<names.plural>.<group>`).
+	// Must be all lowercase.
+	Plural string 
+	// singular is the singular name of the resource. It must be all lowercase. Defaults to lowercased `kind`.
+	// +optional
+	Singular string 
+	// kind is the serialized kind of the resource. It is normally CamelCase and singular.
+	// kube aggregator will use this value as the `kind` attribute in API calls.
+	Kind string 
 }
 
 // ConditionStatus indicates the status of a condition (true, false, or unknown).
