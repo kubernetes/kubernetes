@@ -52,6 +52,20 @@ func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 	return m.recorder
 }
 
+// HasSynced mocks base method.
+func (m *MockManager) HasSynced() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasSynced")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasSynced indicates an expected call of HasSynced.
+func (mr *MockManagerMockRecorder) HasSynced() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasSynced", reflect.TypeOf((*MockManager)(nil).HasSynced))
+}
+
 // IsUnderDiskPressure mocks base method.
 func (m *MockManager) IsUnderDiskPressure() bool {
 	m.ctrl.T.Helper()
