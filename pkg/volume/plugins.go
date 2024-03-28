@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -449,6 +450,8 @@ type VolumeHost interface {
 
 	// Returns an interface that should be used to execute subpath operations
 	GetSubpather() subpath.Interface
+
+	GetTracerProvider() trace.TracerProvider
 }
 
 // VolumePluginMgr tracks registered plugins.

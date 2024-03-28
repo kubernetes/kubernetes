@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,8 +51,8 @@ type csiAttacher struct {
 	plugin       *csiPlugin
 	k8s          kubernetes.Interface
 	watchTimeout time.Duration
-
-	csiClient csiClient
+	tp           trace.TracerProvider
+	csiClient    csiClient
 }
 
 type verifyAttachDetachStatus func(attach *storage.VolumeAttachment, volumeHandle string) (bool, error)
@@ -286,7 +287,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// lets check if node/unstage is supported
 	if c.csiClient == nil {
-		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
+		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver), c.tp)
 		if err != nil {
 			// Treat the absence of the CSI driver as a transient error
 			// See https://github.com/kubernetes/kubernetes/issues/120268
@@ -609,7 +610,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	if c.csiClient == nil {
-		c.csiClient, err = newCsiDriverClient(csiDriverName(driverName))
+		c.csiClient, err = newCsiDriverClient(csiDriverName(driverName), c.tp)
 		if err != nil {
 			// Treat the absence of the CSI driver as a transient error
 			// See https://github.com/kubernetes/kubernetes/issues/120268

@@ -28,6 +28,7 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/trace"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -431,7 +432,7 @@ func TestClientNodeGetInfo(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{
@@ -502,7 +503,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				return nodeClient, fakeCloser, nil
 			},
 		}
@@ -560,7 +561,7 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -614,7 +615,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				return nodeClient, fakeCloser, nil
 			},
 		}
@@ -670,7 +671,7 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -748,7 +749,7 @@ func testClientNodeSupportsCapabilities(
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := nodeClientGenerator(tc.capable)
 				return nodeClient, fakeCloser, nil
 			},
@@ -806,7 +807,7 @@ func TestNodeExpandVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -1075,7 +1076,7 @@ func TestAccessModeMapping(t *testing.T) {
 			fakeCloser := fake.NewCloser(t)
 			client := &csiDriverClient{
 				driverName: "Fake Driver Name",
-				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 					nodeClient := fake.NewNodeClientWithSingleNodeMultiWriter(tc.singleNodeMultiWriterSet)
 					return nodeClient, fakeCloser, nil
 				},

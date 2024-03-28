@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -249,6 +250,10 @@ func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
 		defer f.mux.Unlock()
 		return f.kubeletErr == nil, nil
 	})
+}
+
+func (f *fakeVolumeHost) GetTracerProvider() trace.TracerProvider {
+	return trace.NewNoopTracerProvider()
 }
 
 type fakeAttachDetachVolumeHost struct {

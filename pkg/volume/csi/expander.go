@@ -42,7 +42,7 @@ func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, er
 		return false, errors.New(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
 	}
 
-	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver))
+	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver), c.host.GetTracerProvider())
 	if err != nil {
 		// Treat the absence of the CSI driver as a transient error
 		// See https://github.com/kubernetes/kubernetes/issues/120268
