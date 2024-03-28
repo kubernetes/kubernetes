@@ -123,7 +123,31 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return v.Object, nil
+	escaped, err := escapeObject(v.Object)
+	if err != nil {
+		return nil, err
+	}
+	return escaped, nil
+}
+
+func escapeObject(obj interface{}) (interface{}, error) {
+	mapObj, isMap := obj.(map[string]interface{})
+	if isMap {
+		escapedMap := make(map[string]interface{})
+		for k, v := range mapObj {
+			escapedKey, keyOk := cel.Escape(k)
+			if !keyOk {
+				return nil, fmt.Errorf("failed to escape key %q", k)
+			}
+			escapedValue, err := escapeObject(v)
+			if err != nil {
+				return nil, err
+			}
+			escapedMap[escapedKey] = escapedValue
+		}
+		return escapedMap, nil
+	}
+	return obj, nil
 }
 
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
