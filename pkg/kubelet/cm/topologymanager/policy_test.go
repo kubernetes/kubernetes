@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
@@ -35,7 +35,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Two providers, 1 hint each, same mask, both preferred 1/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -45,7 +45,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -64,7 +64,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Two providers, 1 hint each, same mask, both preferred 2/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -74,7 +74,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -93,8 +93,8 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Two providers, 1 no hints, 1 single hint preferred 1/2",
 			hp: []HintProvider{
-				&mockHintProvider{},
-				&mockHintProvider{
+				&fakeResourceAllocator{},
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -113,8 +113,8 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Two providers, 1 no hints, 1 single hint preferred 2/2",
 			hp: []HintProvider{
-				&mockHintProvider{},
-				&mockHintProvider{
+				&fakeResourceAllocator{},
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -133,7 +133,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Two providers, 1 with 2 hints, 1 with single hint matching 1/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -147,7 +147,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -166,7 +166,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Two providers, 1 with 2 hints, 1 with single hint matching 2/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -180,7 +180,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -199,7 +199,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Two providers, both with 2 hints, matching narrower preferred hint from both",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -213,7 +213,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -236,7 +236,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Ensure less narrow preferred hints are chosen over narrower non-preferred hints",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -250,7 +250,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -277,7 +277,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 		{
 			name: "Multiple resources, same provider",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -319,7 +319,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Two providers, 2 hints each, same mask (some with different bits), same preferred",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -333,7 +333,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -364,7 +364,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -376,7 +376,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
@@ -389,7 +389,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		},
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint from provider", hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {},
 					},
@@ -403,7 +403,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Single TopologyHint with Preferred as true and NUMANodeAffinity as nil",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -422,7 +422,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Single TopologyHint with Preferred as false and NUMANodeAffinity as nil",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -441,7 +441,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Two providers, 1 hint each, no common mask",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -451,7 +451,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -470,7 +470,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 1/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -480,7 +480,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -499,7 +499,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 2/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -509,7 +509,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -528,7 +528,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -538,7 +538,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -557,7 +557,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Two providers, 1 with 2 hints, 1 with single non-preferred hint matching",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -571,7 +571,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -590,7 +590,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "Two providers, 1 hint each, 1 wider mask, both preferred 2/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -600,7 +600,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -619,7 +619,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "bestNonPreferredAffinityCount (1)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -633,7 +633,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -652,7 +652,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "bestNonPreferredAffinityCount (2)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -666,7 +666,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -685,7 +685,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "bestNonPreferredAffinityCount (3)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -699,7 +699,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -718,7 +718,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 		{
 			name: "bestNonPreferredAffinityCount (4)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -732,7 +732,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -756,7 +756,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 		{
 			name: "bestNonPreferredAffinityCount (5)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -770,7 +770,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -793,7 +793,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 		{
 			name: "bestNonPreferredAffinityCount (6)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -807,7 +807,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -843,7 +843,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 		{
 			name: "Two providers, 2 hints each, same mask (some with different bits), same preferred",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -857,7 +857,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -880,7 +880,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 		{
 			name: "Two providers, 2 hints each, different mask",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -894,7 +894,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -917,7 +917,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 		{
 			name: "bestNonPreferredAffinityCount (5)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -931,7 +931,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -954,7 +954,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 		{
 			name: "bestNonPreferredAffinityCount (6)",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -968,7 +968,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -1012,7 +1012,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -1024,7 +1024,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
@@ -1037,7 +1037,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		},
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint from provider", hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {},
 					},
@@ -1051,7 +1051,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "Single TopologyHint with Preferred as true and NUMANodeAffinity as nil",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -1070,7 +1070,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "Single TopologyHint with Preferred as false and NUMANodeAffinity as nil",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -1089,7 +1089,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "Two providers, 1 hint each, no common mask",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -1099,7 +1099,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -1118,7 +1118,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 1/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -1128,7 +1128,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -1147,7 +1147,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 2/2",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -1157,7 +1157,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -1176,7 +1176,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "Two providers, 1 with 2 hints, 1 with single non-preferred hint matching",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -1190,7 +1190,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {
 							{
@@ -1209,7 +1209,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "Single NUMA hint generation",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -1242,7 +1242,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 		{
 			name: "One no-preference provider",
 			hp: []HintProvider{
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {
 							{
@@ -1260,7 +1260,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					nil,
 				},
 			},

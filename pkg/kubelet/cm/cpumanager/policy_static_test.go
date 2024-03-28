@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -621,8 +622,17 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 		defaultCPUSet: testCase.stDefaultCPUSet,
 	}
 
+	// special case, because this is the only specific and concrete error type we had
+	smtErr := SMTAlignmentError{}
 	container := &testCase.pod.Spec.Containers[0]
 	err := policy.Allocate(st, testCase.pod, container)
+	if err != nil {
+		if errors.As(err, &smtErr) {
+			err = smtErr
+		} else {
+			err = errors.Unwrap(err)
+		}
+	}
 	if !reflect.DeepEqual(err, testCase.expErr) {
 		t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %q but got: %q",
 			testCase.description, testCase.expErr, err)
@@ -1068,8 +1078,18 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 			defaultCPUSet: testCase.stDefaultCPUSet,
 		}
 
+		// special case, because this is the only specific and concrete error type we had
+		smtErr := SMTAlignmentError{}
 		container := &testCase.pod.Spec.Containers[0]
 		err := policy.Allocate(st, testCase.pod, container)
+		if err != nil {
+			if errors.As(err, &smtErr) {
+				err = smtErr
+			} else {
+				err = errors.Unwrap(err)
+			}
+		}
+
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)

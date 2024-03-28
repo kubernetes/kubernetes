@@ -18,6 +18,7 @@ package memorymanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -69,6 +70,7 @@ type testMemoryManager struct {
 	podAllocate                *v1.Pod
 	firstPod                   *v1.Pod
 	activePods                 []*v1.Pod
+	unwrapAllocateError        bool
 }
 
 func returnPolicyByName(testCase testMemoryManager) Policy {
@@ -1353,6 +1355,7 @@ func TestAddContainer(t *testing.T) {
 				},
 			},
 			expectedAllocateError:     fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"),
+			unwrapAllocateError:       true,
 			expectedAddContainerError: nil,
 			podAllocate: getPod("fakePod2", "fakeContainer2", &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -1405,6 +1408,9 @@ func TestAddContainer(t *testing.T) {
 			pod := testCase.podAllocate
 			container := &pod.Spec.Containers[0]
 			err := mgr.Allocate(pod, container)
+			if testCase.unwrapAllocateError {
+				err = errors.Unwrap(err)
+			}
 			if !reflect.DeepEqual(err, testCase.expectedAllocateError) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)

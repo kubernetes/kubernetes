@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -64,8 +64,8 @@ func (m *fakeManager) GetPolicy() Policy {
 	return m.policy
 }
 
-func (m *fakeManager) AddHintProvider(h HintProvider) {
-	klog.InfoS("AddHintProvider", "hintProvider", h)
+func (m *fakeManager) RegisterProvider(ra ResourceAllocator) {
+	klog.InfoS("RegisterProvider", "resourceAllocator", ra)
 }
 
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {

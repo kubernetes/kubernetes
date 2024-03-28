@@ -21,7 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
@@ -141,7 +142,7 @@ func TestNewManager(t *testing.T) {
 	for _, tc := range tcases {
 		topology := tc.topology
 
-		mngr, err := NewManager(topology, tc.policyName, "container", tc.policyOptions)
+		mngr, err := NewManager(&record.FakeRecorder{}, topology, tc.policyName, "container", tc.policyOptions)
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
 				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
@@ -186,7 +187,7 @@ func TestManagerScope(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr, err := NewManager(nil, "best-effort", tc.scopeName, nil)
+		mngr, err := NewManager(&record.FakeRecorder{}, nil, "best-effort", tc.scopeName, nil)
 
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
@@ -201,23 +202,28 @@ func TestManagerScope(t *testing.T) {
 	}
 }
 
-type mockHintProvider struct {
+type fakeResourceAllocator struct {
 	th map[string][]TopologyHint
 	//TODO: Add this field and add some tests to make sure things error out
 	//appropriately on allocation errors.
 	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
-	return m.th
+func (ra *fakeResourceAllocator) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
+	return ra.th
 }
 
-func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint {
-	return m.th
+func (ra *fakeResourceAllocator) GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint {
+	return ra.th
 }
 
-func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (ra *fakeResourceAllocator) Allocate(pod *v1.Pod, container *v1.Container) error {
 	//return allocateError
+	return nil
+}
+
+func (ra *fakeResourceAllocator) GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string {
+	//TODO: add a field and use it
 	return nil
 }
 
@@ -231,27 +237,27 @@ func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (Topology
 	return TopologyHint{}, true
 }
 
-func TestAddHintProvider(t *testing.T) {
+func TestRegisterProvider(t *testing.T) {
 	tcases := []struct {
 		name string
-		hp   []HintProvider
+		prov []ResourceAllocator
 	}{
 		{
-			name: "Add HintProvider",
-			hp: []HintProvider{
-				&mockHintProvider{},
-				&mockHintProvider{},
-				&mockHintProvider{},
+			name: "RegisterProvider",
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{},
+				&fakeResourceAllocator{},
+				&fakeResourceAllocator{},
 			},
 		},
 	}
 	mngr := manager{}
-	mngr.scope = NewContainerScope(NewNonePolicy())
+	mngr.scope = NewContainerScope(NewNonePolicy(), &record.FakeRecorder{})
 	for _, tc := range tcases {
-		for _, hp := range tc.hp {
-			mngr.AddHintProvider(hp)
+		for _, prov := range tc.prov {
+			mngr.RegisterProvider(prov)
 		}
-		if len(tc.hp) != len(mngr.scope.(*containerScope).hintProviders) {
+		if len(tc.prov) != len(mngr.scope.(*containerScope).providers) {
 			t.Errorf("error")
 		}
 	}
@@ -276,29 +282,29 @@ func TestAdmit(t *testing.T) {
 		result   lifecycle.PodAdmitResult
 		qosClass v1.PodQOSClass
 		policy   Policy
-		hp       []HintProvider
+		prov     []ResourceAllocator
 		expected bool
 	}{
 		{
 			name:     "QOSClass set as BestEffort. None Policy. No Hints.",
 			qosClass: v1.PodQOSBestEffort,
 			policy:   NewNonePolicy(),
-			hp:       []HintProvider{},
+			prov:     []ResourceAllocator{},
 			expected: true,
 		},
 		{
 			name:     "QOSClass set as Guaranteed. None Policy. No Hints.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   NewNonePolicy(),
-			hp:       []HintProvider{},
+			prov:     []ResourceAllocator{},
 			expected: true,
 		},
 		{
 			name:     "QOSClass set as BestEffort. single-numa-node Policy. No Hints.",
 			qosClass: v1.PodQOSBestEffort,
 			policy:   singleNumaPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{},
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{},
 			},
 			expected: true,
 		},
@@ -306,8 +312,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as BestEffort. Restricted Policy. No Hints.",
 			qosClass: v1.PodQOSBestEffort,
 			policy:   restrictedPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{},
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{},
 			},
 			expected: true,
 		},
@@ -315,8 +321,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   bePolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -337,8 +343,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. More than one Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   bePolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -363,8 +369,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Burstable. BestEffort Policy. More than one Preferred Affinity.",
 			qosClass: v1.PodQOSBurstable,
 			policy:   bePolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -389,8 +395,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. No Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   bePolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -407,8 +413,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Guaranteed. Restricted Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   restrictedPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -429,8 +435,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Burstable. Restricted Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSBurstable,
 			policy:   restrictedPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -443,16 +449,15 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
-				},
-			},
+				}},
 			expected: true,
 		},
 		{
 			name:     "QOSClass set as Guaranteed. Restricted Policy. More than one Preferred affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   restrictedPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -477,8 +482,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Burstable. Restricted Policy. More than one Preferred affinity.",
 			qosClass: v1.PodQOSBurstable,
 			policy:   restrictedPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -503,8 +508,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Guaranteed. Restricted Policy. No Preferred affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   restrictedPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -521,8 +526,8 @@ func TestAdmit(t *testing.T) {
 			name:     "QOSClass set as Burstable. Restricted Policy. No Preferred affinity.",
 			qosClass: v1.PodQOSBurstable,
 			policy:   restrictedPolicy,
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": {
 							{
@@ -538,12 +543,12 @@ func TestAdmit(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		ctnScopeManager := manager{}
-		ctnScopeManager.scope = NewContainerScope(tc.policy)
-		ctnScopeManager.scope.(*containerScope).hintProviders = tc.hp
+		ctnScopeManager.scope = NewContainerScope(tc.policy, &record.FakeRecorder{})
+		ctnScopeManager.scope.(*containerScope).providers = tc.prov
 
 		podScopeManager := manager{}
-		podScopeManager.scope = NewPodScope(tc.policy)
-		podScopeManager.scope.(*podScope).hintProviders = tc.hp
+		podScopeManager.scope = NewPodScope(tc.policy, &record.FakeRecorder{})
+		podScopeManager.scope.(*podScope).providers = tc.prov
 
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{

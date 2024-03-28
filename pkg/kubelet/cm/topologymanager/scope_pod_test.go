@@ -26,18 +26,18 @@ import (
 func TestPodCalculateAffinity(t *testing.T) {
 	tcases := []struct {
 		name     string
-		hp       []HintProvider
+		prov     []ResourceAllocator
 		expected []map[string][]TopologyHint
 	}{
 		{
 			name:     "No hint providers",
-			hp:       []HintProvider{},
+			prov:     []ResourceAllocator{},
 			expected: ([]map[string][]TopologyHint)(nil),
 		},
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -47,8 +47,8 @@ func TestPodCalculateAffinity(t *testing.T) {
 		},
 		{
 			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
@@ -62,8 +62,8 @@ func TestPodCalculateAffinity(t *testing.T) {
 		},
 		{
 			name: "Assorted HintProviders",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource-1/A": {
 							{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
@@ -75,7 +75,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource-2/A": {
 							{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
@@ -87,7 +87,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 						},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource-3": nil,
 					},
@@ -124,9 +124,9 @@ func TestPodCalculateAffinity(t *testing.T) {
 	for _, tc := range tcases {
 		podScope := &podScope{
 			scope{
-				hintProviders: tc.hp,
-				policy:        &mockPolicy{},
-				name:          podTopologyScope,
+				providers: tc.prov,
+				policy:    &mockPolicy{},
+				name:      podTopologyScope,
 			},
 		}
 
@@ -142,18 +142,18 @@ func TestPodCalculateAffinity(t *testing.T) {
 func TestPodAccumulateProvidersHints(t *testing.T) {
 	tcases := []struct {
 		name     string
-		hp       []HintProvider
+		prov     []ResourceAllocator
 		expected []map[string][]TopologyHint
 	}{
 		{
 			name:     "TopologyHint not set",
-			hp:       []HintProvider{},
+			prov:     []ResourceAllocator{},
 			expected: nil,
 		},
 		{
 			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -163,8 +163,8 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 		},
 		{
 			name: "HintProvider returns - nil map[string][]TopologyHint from provider",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
@@ -178,13 +178,13 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 		},
 		{
 			name: "2 HintProviders with 1 resource returns hints",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource2": {TopologyHint{}},
 					},
@@ -201,13 +201,13 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 		},
 		{
 			name: "2 HintProviders 1 with 1 resource 1 with nil hints",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
 				},
-				&mockHintProvider{nil},
+				&fakeResourceAllocator{nil},
 			},
 			expected: []map[string][]TopologyHint{
 				{
@@ -218,13 +218,13 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 		},
 		{
 			name: "2 HintProviders 1 with 1 resource 1 empty hints",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
 				},
-				&mockHintProvider{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{},
 				},
 			},
@@ -237,8 +237,8 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 		},
 		{
 			name: "HintProvider with 2 resources returns hints",
-			hp: []HintProvider{
-				&mockHintProvider{
+			prov: []ResourceAllocator{
+				&fakeResourceAllocator{
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 						"resource2": {TopologyHint{}},
@@ -257,7 +257,7 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 	for _, tc := range tcases {
 		pScope := podScope{
 			scope{
-				hintProviders: tc.hp,
+				providers: tc.prov,
 			},
 		}
 		actual := pScope.accumulateProvidersHints(&v1.Pod{})

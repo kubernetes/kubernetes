@@ -22,6 +22,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -43,10 +44,20 @@ const (
 )
 
 // TopologyAffinityError represents an resource alignment error
-type TopologyAffinityError struct{}
+type TopologyAffinityError struct {
+	ContainerName string
+	Hint          string
+}
 
 func (e TopologyAffinityError) Error() string {
-	return "Resources cannot be allocated with Topology locality"
+	msg := "Resources cannot be allocated with Topology locality"
+	if e.ContainerName != "" {
+		msg += " container=" + e.ContainerName
+	}
+	if e.Hint != "" {
+		msg += " hint=" + e.Hint
+	}
+	return msg
 }
 
 func (e TopologyAffinityError) Type() string {
@@ -57,9 +68,10 @@ func (e TopologyAffinityError) Type() string {
 type Manager interface {
 	// PodAdmitHandler is implemented by Manager
 	lifecycle.PodAdmitHandler
-	// AddHintProvider adds a hint provider to manager to indicate the hint provider
-	// wants to be consulted with when making topology hints
-	AddHintProvider(HintProvider)
+	// RegisterProvider adds a hint provider to manager to indicate the hint provider
+	// wants to be consulted with when making topology hints, and is authoritative
+	// about the current resource allocation.
+	RegisterProvider(ra ResourceAllocator)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
@@ -94,10 +106,24 @@ type HintProvider interface {
 	Allocate(pod *v1.Pod, container *v1.Container) error
 }
 
+// ResourceAllocator is an interface for components which manage concrete resources,
+// which can allocate resources, provide allocation hints.
+type ResourceAllocator interface {
+	HintProvider
+	AllocationInfoProvider
+}
+
 // Store interface is to allow Hint Providers to retrieve pod affinity
 type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 	GetPolicy() Policy
+}
+
+type AllocationInfoProvider interface {
+	// GetExclusiveResources returns a list of resource names whose instances were
+	// esclusively allocated to this container. This is used by the orchestrator to
+	// check if a container got exclusive (vs shared) resources or not.
+	GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string
 }
 
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container
@@ -119,6 +145,14 @@ func (th *TopologyHint) IsEqual(topologyHint TopologyHint) bool {
 	return false
 }
 
+func (th TopologyHint) String() string {
+	aff := "N/A"
+	if th.NUMANodeAffinity != nil {
+		aff = th.NUMANodeAffinity.String()
+	}
+	return fmt.Sprintf("[affinity=%s preferred=%v]", aff, th.Preferred)
+}
+
 // LessThan checks if TopologyHint `a` is less than TopologyHint `b`
 // this means that either `a` is a preferred hint and `b` is not
 // or `a` NUMANodeAffinity attribute is narrower than `b` NUMANodeAffinity attribute.
@@ -132,11 +166,11 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
-func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
+func NewManager(recorder record.EventRecorder, topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
 		klog.InfoS("Creating topology manager with none policy")
-		return &manager{scope: NewNoneScope()}, nil
+		return &manager{scope: NewNoneScope(recorder)}, nil
 	}
 
 	opts, err := NewPolicyOptions(topologyPolicyOptions)
@@ -175,10 +209,10 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	switch topologyScopeName {
 
 	case containerTopologyScope:
-		scope = NewContainerScope(policy)
+		scope = NewContainerScope(policy, recorder)
 
 	case podTopologyScope:
-		scope = NewPodScope(policy)
+		scope = NewPodScope(policy, recorder)
 
 	default:
 		return nil, fmt.Errorf("unknown scope: \"%s\"", topologyScopeName)
@@ -199,8 +233,8 @@ func (m *manager) GetPolicy() Policy {
 	return m.scope.GetPolicy()
 }
 
-func (m *manager) AddHintProvider(h HintProvider) {
-	m.scope.AddHintProvider(h)
+func (m *manager) RegisterProvider(ra ResourceAllocator) {
+	m.scope.RegisterProvider(ra)
 }
 
 func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {

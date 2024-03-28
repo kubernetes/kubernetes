@@ -36,11 +36,13 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -813,6 +815,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	contName := container.Name
 	allocatedDevicesUpdated := false
 	needsUpdateCheckpoint := false
+	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
 	// Extended resources are not allowed to be overcommitted.
 	// Since device plugin advertises extended resources,
 	// therefore Requests must be equal to Limits and iterating
@@ -832,7 +835,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		}
 		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
-			return err
+			return admission.MakeResourceAllocationError(events.FailedAllocationDevice, resource, needed, hint.NUMANodeAffinity, err)
 		}
 		if allocDevices == nil || len(allocDevices) <= 0 {
 			continue
@@ -860,7 +863,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
 			m.mutex.Unlock()
-			return fmt.Errorf("unknown Device Plugin %s", resource)
+			return admission.MakeResourceAllocationError(events.FailedAllocationDevice, resource, needed, hint.NUMANodeAffinity, fmt.Errorf("unknown Device Plugin %s", resource))
 		}
 
 		devs := allocDevices.UnsortedList()
@@ -875,11 +878,11 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
 			m.mutex.Unlock()
-			return err
+			return admission.MakeResourceAllocationError(events.FailedAllocationDevice, resource, needed, hint.NUMANodeAffinity, err)
 		}
 
 		if len(resp.ContainerResponses) == 0 {
-			return fmt.Errorf("no containers return in allocation response %v", resp)
+			return admission.MakeResourceAllocationError(events.FailedAllocationDevice, resource, needed, hint.NUMANodeAffinity, fmt.Errorf("no containers return in allocation response %v", resp))
 		}
 
 		allocDevicesWithNUMA := checkpoint.NewDevicesPerNUMA()
@@ -1071,6 +1074,17 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 // GetDevices returns the devices used by the specified container
 func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceInstances {
 	return m.podDevices.getContainerDevices(podUID, containerName)
+}
+
+// GetExclusiveResources returns a list of resource names whose instances were esclusively
+// allocated to this container.
+func (m *ManagerImpl) GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string {
+	var res []string
+	devs := m.podDevices.getContainerDevices(string(pod.UID), container.Name)
+	for resName := range devs {
+		res = append(res, resName)
+	}
+	return res
 }
 
 // ShouldResetExtendedResourceCapacity returns whether the extended resources should be zeroed or not,

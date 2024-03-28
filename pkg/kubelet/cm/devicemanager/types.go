@@ -81,6 +81,10 @@ type Manager interface {
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
+
+	// GetExclusiveResources returns a list of resource names whose instances were esclusively
+	// allocated to this container.
+	GetExclusiveResources(pod *v1.Pod, container *v1.Container) []string
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

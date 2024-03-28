@@ -75,6 +75,10 @@ const (
 	FailedStatusPodSandBox               = "FailedPodSandBoxStatus"
 	FailedMountOnFilesystemMismatch      = "FailedMountOnFilesystemMismatch"
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
+	FailedAllocationCPU                  = "FailedAllocationCPU"
+	FailedAllocationMemory               = "FailedAllocationMemory"
+	FailedAllocationDevice               = "FailedAllocationDevice"
+	AllocatedResources                   = "Allocated"
 )
 
 // Image manager event reason list

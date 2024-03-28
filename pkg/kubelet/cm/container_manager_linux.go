@@ -288,6 +288,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 
 	cm.topologyManager, err = topologymanager.NewManager(
+		recorder,
 		machineInfo.Topology,
 		nodeConfig.TopologyManagerPolicy,
 		nodeConfig.TopologyManagerScope,
@@ -303,7 +304,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.deviceManager)
+	cm.topologyManager.RegisterProvider(cm.deviceManager)
 
 	// initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
@@ -329,7 +330,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		klog.ErrorS(err, "Failed to initialize cpu manager")
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.cpuManager)
+	cm.topologyManager.RegisterProvider(cm.cpuManager)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryManager) {
 		cm.memoryManager, err = memorymanager.NewManager(
@@ -344,7 +345,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			klog.ErrorS(err, "Failed to initialize memory manager")
 			return nil, err
 		}
-		cm.topologyManager.AddHintProvider(cm.memoryManager)
+		cm.topologyManager.RegisterProvider(cm.memoryManager)
 	}
 
 	return cm, nil
