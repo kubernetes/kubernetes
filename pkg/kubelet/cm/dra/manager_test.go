@@ -220,6 +220,7 @@ func TestGetResources(t *testing.T) {
 					},
 					Namespace: "test-namespace",
 				},
+				prepared: true,
 			},
 		},
 		{
@@ -256,6 +257,7 @@ func TestGetResources(t *testing.T) {
 					},
 					Namespace: "test-namespace",
 				},
+				prepared: true,
 			},
 		},
 		{
