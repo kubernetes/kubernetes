@@ -150,9 +150,84 @@ func TestClientCache(t *testing.T) {
 	assertCacheLen(t, cache, 2)
 }
 
+func TestNewClient(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       map[string]string
+		wantErr      string
+	}{
+		{
+			name:         "no issuer",
+			config:       map[string]string{},
+			wantErr:      "Must provide idp-issuer-url",
+		},
+		{
+			name: "no client id",
+			config: map[string]string{
+				cfgIssuerURL: "https://issuer",
+			},
+			wantErr:      "Must provide client-id",
+		},
+		{
+			name: "invalid ca data",
+			config: map[string]string{
+				cfgIssuerURL:                "https://issuer",
+				cfgClientID:                 "client",
+				cfgCertificateAuthorityData: "fake",
+				cfgExtraScopes:              "fake",
+			},
+			wantErr:      "unable to load root certificates: unable to parse bytes as PEM block",
+		},
+		{
+			name: "valid config",
+			config: map[string]string{
+				cfgIssuerURL: "https://issuer",
+				cfgClientID:  "client",
+			},
+			wantErr:      "",
+		},
+		{
+			name: "exist client",
+			config: map[string]string{
+				cfgIssuerURL: "https://issuer",
+				cfgClientID:  "client",
+			},
+			wantErr:      "",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := newOIDCAuthProvider("", test.config, nil)
+			if test.wantErr != "" && !stringInSlice(errString(err), test.wantErr){
+				t.Errorf("unexpected error want '%s', but got %v", test.wantErr, err)
+			} else if test.wantErr == "" && err != nil {
+				t.Errorf("unexpected error: %v, no error wanted", err)
+			}
+		})
+	}
+}
+
 func assertCacheLen(t *testing.T, cache *clientCache, length int) {
 	t.Helper()
 	if len(cache.cache) != length {
 		t.Errorf("expected cache length %d got %d", length, len(cache.cache))
 	}
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// stringInSlice returns true if s is in list
+func stringInSlice(s string, list ...string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+
+	return false
 }
