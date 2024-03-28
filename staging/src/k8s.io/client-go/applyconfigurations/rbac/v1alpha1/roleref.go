@@ -55,3 +55,8 @@ func (b *RoleRefApplyConfiguration) WithName(value string) *RoleRefApplyConfigur
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RoleRefApplyConfiguration) GetName() *string {
+	return b.Name
+}

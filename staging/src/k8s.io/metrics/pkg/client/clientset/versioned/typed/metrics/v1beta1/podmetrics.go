@@ -19,12 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
-	"time"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	generic "k8s.io/client-go/generic"
 	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
@@ -37,67 +32,26 @@ type PodMetricsesGetter interface {
 
 // PodMetricsInterface has methods to work with PodMetrics resources.
 type PodMetricsInterface interface {
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.PodMetrics, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodMetricsList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	generic.Getter[*v1beta1.PodMetrics]
+	generic.Lister[*v1beta1.PodMetrics, *v1beta1.PodMetricsList]
+	generic.Watcher
 	PodMetricsExpansion
 }
 
 // podMetricses implements PodMetricsInterface
 type podMetricses struct {
-	client rest.Interface
-	ns     string
+	*generic.TypeClientWithList[*v1beta1.PodMetrics, *v1beta1.PodMetricsList]
 }
 
 // newPodMetricses returns a PodMetricses
 func newPodMetricses(c *MetricsV1beta1Client, namespace string) *podMetricses {
 	return &podMetricses{
-		client: c.RESTClient(),
-		ns:     namespace,
+		generic.NewNamespacedWithList[*v1beta1.PodMetrics, *v1beta1.PodMetricsList](
+			"pods",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1beta1.PodMetrics { return &v1beta1.PodMetrics{} },
+			func() *v1beta1.PodMetricsList { return &v1beta1.PodMetricsList{} }),
 	}
-}
-
-// Get takes name of the podMetrics, and returns the corresponding podMetrics object, and an error if there is any.
-func (c *podMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodMetrics, err error) {
-	result = &v1beta1.PodMetrics{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PodMetricses that match those selectors.
-func (c *podMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodMetricsList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1beta1.PodMetricsList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested podMetricses.
-func (c *podMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
 }

@@ -19,12 +19,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
-
 	v1beta1 "k8s.io/api/authorization/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	generic "k8s.io/client-go/generic"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // SelfSubjectAccessReviewsGetter has a method to return a SelfSubjectAccessReviewInterface.
@@ -35,30 +32,22 @@ type SelfSubjectAccessReviewsGetter interface {
 
 // SelfSubjectAccessReviewInterface has methods to work with SelfSubjectAccessReview resources.
 type SelfSubjectAccessReviewInterface interface {
-	Create(ctx context.Context, selfSubjectAccessReview *v1beta1.SelfSubjectAccessReview, opts v1.CreateOptions) (*v1beta1.SelfSubjectAccessReview, error)
+	generic.Creator[*v1beta1.SelfSubjectAccessReview]
 	SelfSubjectAccessReviewExpansion
 }
 
 // selfSubjectAccessReviews implements SelfSubjectAccessReviewInterface
 type selfSubjectAccessReviews struct {
-	client rest.Interface
+	*generic.TypeClient[*v1beta1.SelfSubjectAccessReview]
 }
 
 // newSelfSubjectAccessReviews returns a SelfSubjectAccessReviews
 func newSelfSubjectAccessReviews(c *AuthorizationV1beta1Client) *selfSubjectAccessReviews {
 	return &selfSubjectAccessReviews{
-		client: c.RESTClient(),
+		generic.NewNonNamespaced[*v1beta1.SelfSubjectAccessReview](
+			"selfsubjectaccessreviews",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			func() *v1beta1.SelfSubjectAccessReview { return &v1beta1.SelfSubjectAccessReview{} }),
 	}
-}
-
-// Create takes the representation of a selfSubjectAccessReview and creates it.  Returns the server's representation of the selfSubjectAccessReview, and an error, if there is any.
-func (c *selfSubjectAccessReviews) Create(ctx context.Context, selfSubjectAccessReview *v1beta1.SelfSubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.SelfSubjectAccessReview, err error) {
-	result = &v1beta1.SelfSubjectAccessReview{}
-	err = c.client.Post().
-		Resource("selfsubjectaccessreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(selfSubjectAccessReview).
-		Do(ctx).
-		Into(result)
-	return
 }

@@ -37,3 +37,8 @@ func (b *PodSchedulingGateApplyConfiguration) WithName(value string) *PodSchedul
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *PodSchedulingGateApplyConfiguration) GetName() *string {
+	return b.Name
+}

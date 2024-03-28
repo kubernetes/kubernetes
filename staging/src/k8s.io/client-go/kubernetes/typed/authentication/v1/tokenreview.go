@@ -19,12 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-
 	v1 "k8s.io/api/authentication/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	generic "k8s.io/client-go/generic"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // TokenReviewsGetter has a method to return a TokenReviewInterface.
@@ -35,30 +32,22 @@ type TokenReviewsGetter interface {
 
 // TokenReviewInterface has methods to work with TokenReview resources.
 type TokenReviewInterface interface {
-	Create(ctx context.Context, tokenReview *v1.TokenReview, opts metav1.CreateOptions) (*v1.TokenReview, error)
+	generic.Creator[*v1.TokenReview]
 	TokenReviewExpansion
 }
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	client rest.Interface
+	*generic.TypeClient[*v1.TokenReview]
 }
 
 // newTokenReviews returns a TokenReviews
 func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
 	return &tokenReviews{
-		client: c.RESTClient(),
+		generic.NewNonNamespaced[*v1.TokenReview](
+			"tokenreviews",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			func() *v1.TokenReview { return &v1.TokenReview{} }),
 	}
-}
-
-// Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
-func (c *tokenReviews) Create(ctx context.Context, tokenReview *v1.TokenReview, opts metav1.CreateOptions) (result *v1.TokenReview, err error) {
-	result = &v1.TokenReview{}
-	err = c.client.Post().
-		Resource("tokenreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(tokenReview).
-		Do(ctx).
-		Into(result)
-	return
 }

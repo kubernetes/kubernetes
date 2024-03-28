@@ -19,12 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-
 	v1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	generic "k8s.io/client-go/generic"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // SubjectAccessReviewsGetter has a method to return a SubjectAccessReviewInterface.
@@ -35,30 +32,22 @@ type SubjectAccessReviewsGetter interface {
 
 // SubjectAccessReviewInterface has methods to work with SubjectAccessReview resources.
 type SubjectAccessReviewInterface interface {
-	Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (*v1.SubjectAccessReview, error)
+	generic.Creator[*v1.SubjectAccessReview]
 	SubjectAccessReviewExpansion
 }
 
 // subjectAccessReviews implements SubjectAccessReviewInterface
 type subjectAccessReviews struct {
-	client rest.Interface
+	*generic.TypeClient[*v1.SubjectAccessReview]
 }
 
 // newSubjectAccessReviews returns a SubjectAccessReviews
 func newSubjectAccessReviews(c *AuthorizationV1Client) *subjectAccessReviews {
 	return &subjectAccessReviews{
-		client: c.RESTClient(),
+		generic.NewNonNamespaced[*v1.SubjectAccessReview](
+			"subjectaccessreviews",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			func() *v1.SubjectAccessReview { return &v1.SubjectAccessReview{} }),
 	}
-}
-
-// Create takes the representation of a subjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReview, and an error, if there is any.
-func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (result *v1.SubjectAccessReview, err error) {
-	result = &v1.SubjectAccessReview{}
-	err = c.client.Post().
-		Resource("subjectaccessreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(subjectAccessReview).
-		Do(ctx).
-		Into(result)
-	return
 }

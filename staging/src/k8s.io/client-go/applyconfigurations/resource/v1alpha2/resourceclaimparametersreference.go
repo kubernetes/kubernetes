@@ -55,3 +55,8 @@ func (b *ResourceClaimParametersReferenceApplyConfiguration) WithName(value stri
 	b.Name = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ResourceClaimParametersReferenceApplyConfiguration) GetName() *string {
+	return b.Name
+}

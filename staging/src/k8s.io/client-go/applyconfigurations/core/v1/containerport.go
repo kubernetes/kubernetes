@@ -46,6 +46,11 @@ func (b *ContainerPortApplyConfiguration) WithName(value string) *ContainerPortA
 	return b
 }
 
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ContainerPortApplyConfiguration) GetName() *string {
+	return b.Name
+}
+
 // WithHostPort sets the HostPort field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HostPort field is set to the value of the last call.

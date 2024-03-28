@@ -40,6 +40,11 @@ func (b *SecretKeySelectorApplyConfiguration) WithName(value string) *SecretKeyS
 	return b
 }
 
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *SecretKeySelectorApplyConfiguration) GetName() *string {
+	return b.Name
+}
+
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Key field is set to the value of the last call.
