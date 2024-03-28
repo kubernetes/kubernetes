@@ -338,6 +338,10 @@ type SecureServingInfo struct {
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	MinTLSVersion uint16
 
+	// MaxTLSVersion optionally overrides the maxiumum TLS version supported.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	MaxTLSVersion uint16
+
 	// CipherSuites optionally overrides the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []uint16

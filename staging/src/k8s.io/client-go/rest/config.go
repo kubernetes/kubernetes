@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -242,6 +243,13 @@ type TLSClientConfig struct {
 	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
+	// Ciphers is a list of ciphers to use when negotiating the TLS session
+	// See https://pkg.go.dev/crypto/tls#pkg-constants for a list of available options
+	CipherSuites []uint16
+	// Minimum TLS version to negotiate with (defaults is tls.VersionTLS12)
+	MinVersion uint16
+	// Maximum TLS version to negotiate with (defaults is tls.VersionTLS13)
+	MaxVersion uint16
 }
 
 var _ fmt.Stringer = TLSClientConfig{}
@@ -259,15 +267,18 @@ func (c TLSClientConfig) GoString() string {
 // TLSClientConfig to prevent accidental leaking via logs.
 func (c TLSClientConfig) String() string {
 	cc := sanitizedTLSClientConfig{
-		Insecure:   c.Insecure,
-		ServerName: c.ServerName,
-		CertFile:   c.CertFile,
-		KeyFile:    c.KeyFile,
-		CAFile:     c.CAFile,
-		CertData:   c.CertData,
-		KeyData:    c.KeyData,
-		CAData:     c.CAData,
-		NextProtos: c.NextProtos,
+		Insecure:     c.Insecure,
+		ServerName:   c.ServerName,
+		CertFile:     c.CertFile,
+		KeyFile:      c.KeyFile,
+		CAFile:       c.CAFile,
+		CertData:     c.CertData,
+		KeyData:      c.KeyData,
+		CAData:       c.CAData,
+		NextProtos:   c.NextProtos,
+		CipherSuites: c.CipherSuites,
+		MinVersion:   c.MinVersion,
+		MaxVersion:   c.MaxVersion,
 	}
 	// Explicitly mark non-empty credential fields as redacted.
 	if len(cc.CertData) != 0 {
@@ -275,6 +286,12 @@ func (c TLSClientConfig) String() string {
 	}
 	if len(cc.KeyData) != 0 {
 		cc.KeyData = []byte("--- REDACTED ---")
+	}
+	if cc.MinVersion == 0 {
+		cc.MinVersion = tls.VersionTLS12
+	}
+	if cc.MaxVersion == 0 {
+		cc.MaxVersion = tls.VersionTLS13
 	}
 	return fmt.Sprintf("%#v", cc)
 }
@@ -604,11 +621,14 @@ func AnonymousClientConfig(config *Config) *Config {
 		APIPath:       config.APIPath,
 		ContentConfig: config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
-			Insecure:   config.Insecure,
-			ServerName: config.ServerName,
-			CAFile:     config.TLSClientConfig.CAFile,
-			CAData:     config.TLSClientConfig.CAData,
-			NextProtos: config.TLSClientConfig.NextProtos,
+			Insecure:     config.Insecure,
+			ServerName:   config.ServerName,
+			CAFile:       config.TLSClientConfig.CAFile,
+			CAData:       config.TLSClientConfig.CAData,
+			NextProtos:   config.TLSClientConfig.NextProtos,
+			CipherSuites: config.TLSClientConfig.CipherSuites,
+			MinVersion:   config.TLSClientConfig.MinVersion,
+			MaxVersion:   config.TLSClientConfig.MaxVersion,
 		},
 		RateLimiter:        config.RateLimiter,
 		WarningHandler:     config.WarningHandler,
@@ -642,15 +662,18 @@ func CopyConfig(config *Config) *Config {
 		AuthConfigPersister: config.AuthConfigPersister,
 		ExecProvider:        config.ExecProvider,
 		TLSClientConfig: TLSClientConfig{
-			Insecure:   config.TLSClientConfig.Insecure,
-			ServerName: config.TLSClientConfig.ServerName,
-			CertFile:   config.TLSClientConfig.CertFile,
-			KeyFile:    config.TLSClientConfig.KeyFile,
-			CAFile:     config.TLSClientConfig.CAFile,
-			CertData:   config.TLSClientConfig.CertData,
-			KeyData:    config.TLSClientConfig.KeyData,
-			CAData:     config.TLSClientConfig.CAData,
-			NextProtos: config.TLSClientConfig.NextProtos,
+			Insecure:     config.TLSClientConfig.Insecure,
+			ServerName:   config.TLSClientConfig.ServerName,
+			CertFile:     config.TLSClientConfig.CertFile,
+			KeyFile:      config.TLSClientConfig.KeyFile,
+			CAFile:       config.TLSClientConfig.CAFile,
+			CertData:     config.TLSClientConfig.CertData,
+			KeyData:      config.TLSClientConfig.KeyData,
+			CAData:       config.TLSClientConfig.CAData,
+			NextProtos:   config.TLSClientConfig.NextProtos,
+			CipherSuites: config.TLSClientConfig.CipherSuites,
+			MinVersion:   config.TLSClientConfig.MinVersion,
+			MaxVersion:   config.TLSClientConfig.MaxVersion,
 		},
 		UserAgent:          config.UserAgent,
 		DisableCompression: config.DisableCompression,

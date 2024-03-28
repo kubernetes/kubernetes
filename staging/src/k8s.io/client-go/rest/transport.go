@@ -97,6 +97,8 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			KeyFile:    c.KeyFile,
 			KeyData:    c.KeyData,
 			NextProtos: c.NextProtos,
+			MinVersion: c.MinVersion,
+			MaxVersion: c.MaxVersion,
 		},
 		Username:        c.Username,
 		Password:        c.Password,
