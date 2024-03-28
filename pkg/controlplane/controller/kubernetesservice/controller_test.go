@@ -17,16 +17,25 @@ limitations under the License.
 package kubernetesservice
 
 import (
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	netutils "k8s.io/utils/net"
@@ -460,4 +469,134 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateKubernetesService(t *testing.T) {
+	var healthy atomic.Bool
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if healthy.Load() {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "OK")
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprint(w, "NOOK")
+		}
+	}))
+	ts.EnableHTTP2 = true
+	ts.StartTLS()
+	defer ts.Close()
+	transport, ok := ts.Client().Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("failed to assert *http.Transport")
+	}
+	restConfig := &rest.Config{
+		Host:      ts.URL,
+		Transport: utilnet.SetTransportDefaults(transport),
+		// These fields are required to create a REST client.
+		ContentConfig: rest.ContentConfig{
+			GroupVersion:         &schema.GroupVersion{},
+			NegotiatedSerializer: &serializer.CodecFactory{},
+		},
+	}
+	restClient, err := rest.RESTClientFor(restConfig)
+	if err != nil {
+		t.Fatalf("failed to create REST client: %v", err)
+	}
+
+	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	err = serviceStore.Add(&corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubernetesServiceName,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{Name: "foo", Port: 1000, Protocol: "TCP", TargetPort: intstr.FromInt32(1000)},
+			},
+			Selector:        nil,
+			ClusterIP:       "1.2.3.4",
+			SessionAffinity: corev1.ServiceAffinityNone,
+			Type:            corev1.ServiceTypeClusterIP,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error adding service to the store: %v", err)
+	}
+	reconciler := &fakeReconciler{actions: make([]string, 0)}
+	config := Config{
+		EndpointReconciler: reconciler,
+	}
+	master := Controller{
+		Config:        config,
+		client:        fakeClient,
+		restClient:    restClient,
+		serviceLister: v1listers.NewServiceLister(serviceStore),
+	}
+
+	// healthy should ReconcileEndpoints
+	healthy.Store(true)
+	err = master.UpdateKubernetesService(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lastReconcileAction := reconciler.actions[len(reconciler.actions)-1]
+	if lastReconcileAction != "ReconcileEndpoints" {
+		t.Fatalf("expected the reconciler to Reconcile endpoints, got %s ", lastReconcileAction)
+	}
+	// unhealthy should RemoveEndpoints
+	healthy.Store(false)
+	err = master.UpdateKubernetesService(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lastReconcileAction = reconciler.actions[len(reconciler.actions)-1]
+	if lastReconcileAction != "RemoveEndpoints" {
+		t.Fatalf("expected the reconciler to Remove endpoints, got %s ", lastReconcileAction)
+	}
+
+	// healthy should ReconcileEndpoints
+	healthy.Store(true)
+	err = master.UpdateKubernetesService(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lastReconcileAction = reconciler.actions[len(reconciler.actions)-1]
+	if lastReconcileAction != "ReconcileEndpoints" {
+		t.Fatalf("expected the reconciler to Reconcile endpoints, got %s ", lastReconcileAction)
+	}
+
+	// endpoint down should RemoveEndpoints
+	ts.Close()
+	err = master.UpdateKubernetesService(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lastReconcileAction = reconciler.actions[len(reconciler.actions)-1]
+	if lastReconcileAction != "RemoveEndpoints" {
+		t.Fatalf("expected the reconciler to Remove endpoints, got %s ", lastReconcileAction)
+	}
+
+}
+
+type fakeReconciler struct {
+	actions []string
+}
+
+func (r *fakeReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+	r.actions = append(r.actions, "ReconcileEndpoints")
+	return nil
+}
+
+func (r *fakeReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+	r.actions = append(r.actions, "RemoveEndpoints")
+	return nil
+}
+
+func (r *fakeReconciler) StopReconciling() {
+	r.actions = append(r.actions, "StopReconciling")
+}
+
+func (r *fakeReconciler) Destroy() {
+	r.actions = append(r.actions, "Destroy")
 }
