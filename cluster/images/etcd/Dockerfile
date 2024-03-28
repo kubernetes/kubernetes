@@ -29,9 +29,14 @@ RUN cp /bin/bash-static /sh
 FROM ${RUNNERIMAGE}
 WORKDIR /
 
+#Setting an environment variable for demonstration purposes
+ENV ENV_VAR=""
+ 
 COPY --from=builder /sh /bin/
 
 EXPOSE 2379 2380 4001 7001
+
+HEALTHCHECK CMD ["/usr/local/bin/etcdctl", "--endpoint=http://localhost:2379", "endpoint"] INTERVAL=10s TIMEOUT=5s
 # etcdctl is used by etcd.manifest for livenessProbe.
 COPY etcd* etcdctl* /usr/local/bin/
 COPY migrate-if-needed.sh migrate /usr/local/bin/
