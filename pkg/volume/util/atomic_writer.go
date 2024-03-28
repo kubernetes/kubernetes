@@ -146,41 +146,41 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 
 	// (2)
 	dataDirPath := filepath.Join(w.targetDir, dataDirName)
-	oldTsDir, err := os.Readlink(dataDirPath)
+	oldTSDir, err := os.Readlink(dataDirPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			klog.Errorf("%s: error reading link for data directory: %v", w.logContext, err)
 			return err
 		}
 		// although Readlink() returns "" on err, don't be fragile by relying on it (since it's not specified in docs)
-		// empty oldTsDir indicates that it didn't exist
-		oldTsDir = ""
+		// empty oldTSDir indicates that it didn't exist
+		oldTSDir = ""
 	}
-	oldTsPath := filepath.Join(w.targetDir, oldTsDir)
+	oldTSPath := filepath.Join(w.targetDir, oldTSDir)
 
 	var pathsToRemove sets.String
 	shouldWrite := true
 	// if there was no old version, there's nothing to remove
-	if len(oldTsDir) != 0 {
+	if len(oldTSDir) != 0 {
 		// (3)
-		pathsToRemove, err = w.pathsToRemove(cleanPayload, oldTsPath)
+		pathsToRemove, err = w.pathsToRemove(cleanPayload, oldTSPath)
 		if err != nil {
 			klog.Errorf("%s: error determining user-visible files to remove: %v", w.logContext, err)
 			return err
 		}
 
 		// (4)
-		if should, err := shouldWritePayload(cleanPayload, oldTsPath); err != nil {
+		if should, err := shouldWritePayload(cleanPayload, oldTSPath); err != nil {
 			klog.Errorf("%s: error determining whether payload should be written to disk: %v", w.logContext, err)
 			return err
 		} else if !should && len(pathsToRemove) == 0 {
-			klog.V(4).Infof("%s: write not required for data directory %v", w.logContext, oldTsDir)
+			klog.V(4).Infof("%s: write not required for data directory %v", w.logContext, oldTSDir)
 			// data directory is already up to date, but we need to make sure that
 			// the user-visible symlinks are created.
 			// See https://github.com/kubernetes/kubernetes/issues/121472 for more details.
-			// Reset oldTsDir to empty string to avoid removing the data directory.
+			// Reset oldTSDir to empty string to avoid removing the data directory.
 			shouldWrite = false
-			oldTsDir = ""
+			oldTSDir = ""
 		} else {
 			klog.V(4).Infof("%s: write required for target directory %v", w.logContext, w.targetDir)
 		}
@@ -257,9 +257,9 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 	}
 
 	// (12)
-	if len(oldTsDir) > 0 {
-		if err = os.RemoveAll(oldTsPath); err != nil {
-			klog.Errorf("%s: error removing old data directory %s: %v", w.logContext, oldTsDir, err)
+	if len(oldTSDir) > 0 {
+		if err = os.RemoveAll(oldTSPath); err != nil {
+			klog.Errorf("%s: error removing old data directory %s: %v", w.logContext, oldTSDir, err)
 			return err
 		}
 	}
@@ -322,9 +322,9 @@ func validatePath(targetPath string) error {
 }
 
 // shouldWritePayload returns whether the payload should be written to disk.
-func shouldWritePayload(payload map[string]FileProjection, oldTsDir string) (bool, error) {
+func shouldWritePayload(payload map[string]FileProjection, oldTSDir string) (bool, error) {
 	for userVisiblePath, fileProjection := range payload {
-		shouldWrite, err := shouldWriteFile(filepath.Join(oldTsDir, userVisiblePath), fileProjection.Data)
+		shouldWrite, err := shouldWriteFile(filepath.Join(oldTSDir, userVisiblePath), fileProjection.Data)
 		if err != nil {
 			return false, err
 		}
@@ -355,10 +355,10 @@ func shouldWriteFile(path string, content []byte) (bool, error) {
 // pathsToRemove walks the current version of the data directory and
 // determines which paths should be removed (if any) after the payload is
 // written to the target directory.
-func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir string) (sets.String, error) {
+func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTSDir string) (sets.String, error) {
 	paths := sets.NewString()
 	visitor := func(path string, info os.FileInfo, err error) error {
-		relativePath := strings.TrimPrefix(path, oldTsDir)
+		relativePath := strings.TrimPrefix(path, oldTSDir)
 		relativePath = strings.TrimPrefix(relativePath, string(os.PathSeparator))
 		if relativePath == "" {
 			return nil
@@ -368,7 +368,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 		return nil
 	}
 
-	err := filepath.Walk(oldTsDir, visitor)
+	err := filepath.Walk(oldTSDir, visitor)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
