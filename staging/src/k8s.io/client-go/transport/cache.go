@@ -115,6 +115,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 
 	// If we use are reloading files, we need to handle certificate rotation properly
 	// TODO(jackkleeman): We can also add rotation here when config.HasCertCallback() is true
+	// TODO: pass a controller that will react to updates on the RootCAs
 	if config.TLS.ReloadTLSFiles && tlsConfig != nil && tlsConfig.GetClientCertificate != nil {
 		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
 		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
@@ -127,12 +128,19 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		proxy = config.Proxy
 	}
 
+	// TODO: what about TLSHandshakeTimeout ?
+	// TODO: this must be gated
+	//       wrap it only when the RootCA can be reloaded
+	dial = newTLSDialerFor(dial, tlsConfig).DialContext
+
+	// TODO: do we hav to pass TLSCfg and TLSHandshakeTimeout ?
+	// TODO: does setTransportDefaults changes the tlsConfig ?
 	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
-		DialContext:         dial,
+		DialTLSContext:      dial,
 		DisableCompression:  config.DisableCompression,
 	})
 
