@@ -45,6 +45,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
+	"k8s.io/kubernetes/test/images"
 	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
@@ -493,6 +494,17 @@ func AfterReadingAllFlags(t *TestContextType) {
 		image.Init(t.KubeTestRepoList)
 	}
 
+	var usedImages []string
+	for _, v := range image.GetImageConfigs() {
+		usedImages = append(usedImages, v.GetE2EImage())
+	}
+	if err := images.VerifyImages(usedImages...); err != nil {
+		RecordBug(Bug{
+			FileName:   err.File,
+			LineNumber: err.Line,
+			Message:    err.Error(),
+		})
+	}
 	if t.ListImages {
 		for _, v := range image.GetImageConfigs() {
 			fmt.Println(v.GetE2EImage())
