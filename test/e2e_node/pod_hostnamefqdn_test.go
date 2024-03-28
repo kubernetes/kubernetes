@@ -119,7 +119,10 @@ var _ = SIGDescribe("Hostname of Pod", framework.WithNodeConformance(), func() {
 		// Set PodSpec subdomain field to generate FQDN for pod
 		pod.Spec.Subdomain = subdomain
 		// Expected Pod FQDN
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc", pod.ObjectMeta.Name, subdomain, f.Namespace.Name)
+		if framework.TestContext.ClusterDNSDomain != "" {
+			hostFQDN += fmt.Sprintf(".%s", framework.TestContext.ClusterDNSDomain)
+		}
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, hostFQDN)}
 		// Create Pod
 		e2eoutput.TestContainerOutput(ctx, f, "shortname and fqdn", pod, 0, output)
@@ -141,7 +144,10 @@ var _ = SIGDescribe("Hostname of Pod", framework.WithNodeConformance(), func() {
 		setHostnameAsFQDN := true
 		pod.Spec.SetHostnameAsFQDN = &setHostnameAsFQDN
 		// Expected Pod FQDN
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc", pod.ObjectMeta.Name, subdomain, f.Namespace.Name)
+		if framework.TestContext.ClusterDNSDomain != "" {
+			hostFQDN += fmt.Sprintf(".%s", framework.TestContext.ClusterDNSDomain)
+		}
 		// Fail if FQDN is longer than 64 characters, otherwise the Pod will remain pending until test timeout.
 		// In Linux, 64 characters is the limit of the hostname kernel field, which this test sets to the pod FQDN.
 		gomega.Expect(len(hostFQDN)).Should(gomega.BeNumerically("<=", 64), "The FQDN of the Pod cannot be longer than 64 characters, requested %s which is %d characters long.", hostFQDN, len(hostFQDN))
