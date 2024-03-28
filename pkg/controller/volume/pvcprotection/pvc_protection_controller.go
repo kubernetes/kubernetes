@@ -75,7 +75,7 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 	e.podLister = podInformer.Lister()
 	e.podListerSynced = podInformer.Informer().HasSynced
 	e.podIndexer = podInformer.Informer().GetIndexer()
-	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc()); err != nil {
+	if err := common.AddPodPVCIndexerIfNotPresent(e.podIndexer); err != nil {
 		return nil, fmt.Errorf("could not initialize pvc protection controller: %w", err)
 	}
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
