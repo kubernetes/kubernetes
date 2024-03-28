@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

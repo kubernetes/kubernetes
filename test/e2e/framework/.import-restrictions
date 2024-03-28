@@ -36,9 +36,9 @@ rules:
     allowedPrefixes: [
       "gopkg.in/inf.v0",
       "gopkg.in/yaml.v2",
+      "gopkg.in/evanphx/json-patch.v4",
       "github.com/blang/semver/",
       "github.com/davecgh/go-spew/spew",
-      "github.com/evanphx/json-patch",
       "github.com/go-logr/logr",
       "github.com/gogo/protobuf/proto",
       "github.com/gogo/protobuf/sortkeys",

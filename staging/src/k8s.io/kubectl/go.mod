@@ -9,7 +9,6 @@ require (
 	github.com/chai2010/gettext-go v1.0.2
 	github.com/daviddengcn/go-colortext v1.0.0
 	github.com/distribution/reference v0.5.0
-	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v1.0.0
 	github.com/fvbommel/sortorder v1.1.0
@@ -29,6 +28,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sys v0.17.0
+	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -51,6 +51,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
+	github.com/evanphx/json-patch v4.11.0+incompatible // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect

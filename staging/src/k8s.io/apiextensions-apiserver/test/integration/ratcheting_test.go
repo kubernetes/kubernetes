@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

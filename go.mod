@@ -27,7 +27,6 @@ require (
 	github.com/distribution/reference v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.11.0
-	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-logr/logr v1.4.1
 	github.com/godbus/dbus/v5 v5.1.0
@@ -85,6 +84,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d
 	google.golang.org/grpc v1.58.3
 	google.golang.org/protobuf v1.33.0
+	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -147,6 +147,7 @@ require (
 	github.com/daviddengcn/go-colortext v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/euank/go-kmsg-parser v2.0.0+incompatible // indirect
+	github.com/evanphx/json-patch v4.11.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
