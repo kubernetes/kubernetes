@@ -14,66 +14,125 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumebinding
+package assumecache
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
 
 	"k8s.io/klog/v2"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
 )
 
 // AssumeCache is a cache on top of the informer that allows for updating
 // objects outside of informer events and also restoring the informer
-// cache's version of the object.  Objects are assumed to be
-// Kubernetes API objects that implement meta.Interface
+// cache's version of the object. Objects are assumed to be
+// Kubernetes API objects that are supported by [meta.Accessor].
+//
+// Objects can referenced via their key, with [cache.MetaNamespaceKeyFunc]
+// as key function.
 type AssumeCache interface {
-	// Assume updates the object in-memory only
+	// Assume updates the object in-memory only.
+	//
+	// The version of the object must be greater or equal to
+	// the current object, otherwise an error is returned.
+	//
+	// Storing an object with the same version is supported
+	// by the assume cache, but suffers from a race: if an
+	// update is received via the informer while such an
+	// object is assumed, it gets dropped in favor of the
+	// newer object from the apiserver.
+	//
+	// Only assuming objects that were returned by an apiserver
+	// operation (Update, Patch) is safe.
 	Assume(obj interface{}) error
 
-	// Restore the informer cache's version of the object
-	Restore(objName string)
+	// Restore the informer cache's version of the object.
+	Restore(key string)
 
-	// Get the object by name
-	Get(objName string) (interface{}, error)
+	// Get the object by its key.
+	Get(key string) (interface{}, error)
 
-	// GetAPIObj gets the API object by name
-	GetAPIObj(objName string) (interface{}, error)
+	// GetAPIObj gets the informer cache's version by its key.
+	GetAPIObj(key string) (interface{}, error)
 
-	// List all the objects in the cache
+	// List all the objects in the cache.
 	List(indexObj interface{}) []interface{}
+
+	// getImplementation is used internally by [AddTestObject], [UpdateTestObject], [DeleteTestObject].
+	getImplementation() *assumeCache
 }
 
-type errWrongType struct {
-	typeName string
-	object   interface{}
+// Informer is the subset of [cache.SharedInformer] that NewAssumeCache depends upon.
+type Informer interface {
+	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
 }
 
-func (e *errWrongType) Error() string {
-	return fmt.Sprintf("could not convert object to type %v: %+v", e.typeName, e.object)
+// AddTestObject adds an object to the assume cache.
+// Only use this for unit testing!
+func AddTestObject(cache AssumeCache, obj interface{}) {
+	cache.getImplementation().add(obj)
 }
 
-type errNotFound struct {
-	typeName   string
-	objectName string
+// UpdateTestObject updates an object in the assume cache.
+// Only use this for unit testing!
+func UpdateTestObject(cache AssumeCache, obj interface{}) {
+	cache.getImplementation().update(nil, obj)
 }
 
-func (e *errNotFound) Error() string {
-	return fmt.Sprintf("could not find %v %q", e.typeName, e.objectName)
+// DeleteTestObject deletes object in the assume cache.
+// Only use this for unit testing!
+func DeleteTestObject(cache AssumeCache, obj interface{}) {
+	cache.getImplementation().delete(obj)
 }
 
-type errObjectName struct {
-	detailedErr error
+// Sentinel errors that can be checked for with errors.Is.
+var (
+	ErrWrongType  = errors.New("object has wrong type")
+	ErrNotFound   = errors.New("object not found")
+	ErrObjectName = errors.New("cannot determine object name")
+)
+
+type WrongTypeError struct {
+	TypeName string
+	Object   interface{}
 }
 
-func (e *errObjectName) Error() string {
-	return fmt.Sprintf("failed to get object name: %v", e.detailedErr)
+func (e WrongTypeError) Error() string {
+	return fmt.Sprintf("could not convert object to type %v: %+v", e.TypeName, e.Object)
+}
+
+func (e WrongTypeError) Is(err error) bool {
+	return err == ErrWrongType
+}
+
+type NotFoundError struct {
+	TypeName  string
+	ObjectKey string
+}
+
+func (e NotFoundError) Error() string {
+	return fmt.Sprintf("could not find %v %q", e.TypeName, e.ObjectKey)
+}
+
+func (e NotFoundError) Is(err error) bool {
+	return err == ErrNotFound
+}
+
+type ObjectNameError struct {
+	DetailedErr error
+}
+
+func (e ObjectNameError) Error() string {
+	return fmt.Sprintf("failed to get object name: %v", e.DetailedErr)
+}
+
+func (e ObjectNameError) Is(err error) bool {
+	return err == ErrObjectName
 }
 
 // assumeCache stores two pointers to represent a single object:
@@ -119,7 +178,7 @@ type objInfo struct {
 func objInfoKeyFunc(obj interface{}) (string, error) {
 	objInfo, ok := obj.(*objInfo)
 	if !ok {
-		return "", &errWrongType{"objInfo", obj}
+		return "", &WrongTypeError{TypeName: "objInfo", Object: obj}
 	}
 	return objInfo.name, nil
 }
@@ -127,13 +186,13 @@ func objInfoKeyFunc(obj interface{}) (string, error) {
 func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 	objInfo, ok := obj.(*objInfo)
 	if !ok {
-		return []string{""}, &errWrongType{"objInfo", obj}
+		return []string{""}, &WrongTypeError{TypeName: "objInfo", Object: obj}
 	}
 	return c.indexFunc(objInfo.latestObj)
 }
 
 // NewAssumeCache creates an assume cache for general objects.
-func NewAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer, description, indexName string, indexFunc cache.IndexFunc) AssumeCache {
+func NewAssumeCache(logger klog.Logger, informer Informer, description, indexName string, indexFunc cache.IndexFunc) AssumeCache {
 	c := &assumeCache{
 		logger:      logger,
 		description: description,
@@ -148,7 +207,8 @@ func NewAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer, desc
 
 	// Unit tests don't use informers
 	if informer != nil {
-		informer.AddEventHandler(
+		// Cannot fail in practice?! No-one bothers checking the error.
+		_, _ = informer.AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    c.add,
 				UpdateFunc: c.update,
@@ -159,6 +219,10 @@ func NewAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer, desc
 	return c
 }
 
+func (c *assumeCache) getImplementation() *assumeCache {
+	return c
+}
+
 func (c *assumeCache) add(obj interface{}) {
 	if obj == nil {
 		return
@@ -166,7 +230,7 @@ func (c *assumeCache) add(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		c.logger.Error(&errObjectName{err}, "Add failed")
+		c.logger.Error(&ObjectNameError{err}, "Add failed")
 		return
 	}
 
@@ -213,7 +277,7 @@ func (c *assumeCache) delete(obj interface{}) {
 
 	name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		c.logger.Error(&errObjectName{err}, "Failed to delete")
+		c.logger.Error(&ObjectNameError{err}, "Failed to delete")
 		return
 	}
 
@@ -235,43 +299,44 @@ func (c *assumeCache) getObjVersion(name string, obj interface{}) (int64, error)
 
 	objResourceVersion, err := strconv.ParseInt(objAccessor.GetResourceVersion(), 10, 64)
 	if err != nil {
-		return -1, fmt.Errorf("error parsing ResourceVersion %q for %v %q: %s", objAccessor.GetResourceVersion(), c.description, name, err)
+		//nolint:errorlint // Intentionally not wrapping the error, the underlying error is an implementation detail.
+		return -1, fmt.Errorf("error parsing ResourceVersion %q for %v %q: %v", objAccessor.GetResourceVersion(), c.description, name, err)
 	}
 	return objResourceVersion, nil
 }
 
-func (c *assumeCache) getObjInfo(name string) (*objInfo, error) {
-	obj, ok, err := c.store.GetByKey(name)
+func (c *assumeCache) getObjInfo(key string) (*objInfo, error) {
+	obj, ok, err := c.store.GetByKey(key)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return nil, &errNotFound{c.description, name}
+		return nil, &NotFoundError{TypeName: c.description, ObjectKey: key}
 	}
 
 	objInfo, ok := obj.(*objInfo)
 	if !ok {
-		return nil, &errWrongType{"objInfo", obj}
+		return nil, &WrongTypeError{"objInfo", obj}
 	}
 	return objInfo, nil
 }
 
-func (c *assumeCache) Get(objName string) (interface{}, error) {
+func (c *assumeCache) Get(key string) (interface{}, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
-	objInfo, err := c.getObjInfo(objName)
+	objInfo, err := c.getObjInfo(key)
 	if err != nil {
 		return nil, err
 	}
 	return objInfo.latestObj, nil
 }
 
-func (c *assumeCache) GetAPIObj(objName string) (interface{}, error) {
+func (c *assumeCache) GetAPIObj(key string) (interface{}, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
-	objInfo, err := c.getObjInfo(objName)
+	objInfo, err := c.getObjInfo(key)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +363,7 @@ func (c *assumeCache) List(indexObj interface{}) []interface{} {
 	for _, obj := range objs {
 		objInfo, ok := obj.(*objInfo)
 		if !ok {
-			c.logger.Error(&errWrongType{"objInfo", obj}, "List error")
+			c.logger.Error(&WrongTypeError{TypeName: "objInfo", Object: obj}, "List error")
 			continue
 		}
 		allObjs = append(allObjs, objInfo.latestObj)
@@ -309,7 +374,7 @@ func (c *assumeCache) List(indexObj interface{}) []interface{} {
 func (c *assumeCache) Assume(obj interface{}) error {
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		return &errObjectName{err}
+		return &ObjectNameError{err}
 	}
 
 	c.rwMutex.Lock()
@@ -352,126 +417,4 @@ func (c *assumeCache) Restore(objName string) {
 		objInfo.latestObj = objInfo.apiObj
 		c.logger.V(4).Info("Restored object", "description", c.description, "cacheKey", objName)
 	}
-}
-
-// PVAssumeCache is a AssumeCache for PersistentVolume objects
-type PVAssumeCache interface {
-	AssumeCache
-
-	GetPV(pvName string) (*v1.PersistentVolume, error)
-	GetAPIPV(pvName string) (*v1.PersistentVolume, error)
-	ListPVs(storageClassName string) []*v1.PersistentVolume
-}
-
-type pvAssumeCache struct {
-	AssumeCache
-	logger klog.Logger
-}
-
-func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
-	if pv, ok := obj.(*v1.PersistentVolume); ok {
-		return []string{storagehelpers.GetPersistentVolumeClass(pv)}, nil
-	}
-	return []string{""}, fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
-}
-
-// NewPVAssumeCache creates a PV assume cache.
-func NewPVAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer) PVAssumeCache {
-	logger = klog.LoggerWithName(logger, "PV Cache")
-	return &pvAssumeCache{
-		AssumeCache: NewAssumeCache(logger, informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc),
-		logger:      logger,
-	}
-}
-
-func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
-	obj, err := c.Get(pvName)
-	if err != nil {
-		return nil, err
-	}
-
-	pv, ok := obj.(*v1.PersistentVolume)
-	if !ok {
-		return nil, &errWrongType{"v1.PersistentVolume", obj}
-	}
-	return pv, nil
-}
-
-func (c *pvAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
-	obj, err := c.GetAPIObj(pvName)
-	if err != nil {
-		return nil, err
-	}
-	pv, ok := obj.(*v1.PersistentVolume)
-	if !ok {
-		return nil, &errWrongType{"v1.PersistentVolume", obj}
-	}
-	return pv, nil
-}
-
-func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
-	objs := c.List(&v1.PersistentVolume{
-		Spec: v1.PersistentVolumeSpec{
-			StorageClassName: storageClassName,
-		},
-	})
-	pvs := []*v1.PersistentVolume{}
-	for _, obj := range objs {
-		pv, ok := obj.(*v1.PersistentVolume)
-		if !ok {
-			c.logger.Error(&errWrongType{"v1.PersistentVolume", obj}, "ListPVs")
-			continue
-		}
-		pvs = append(pvs, pv)
-	}
-	return pvs
-}
-
-// PVCAssumeCache is a AssumeCache for PersistentVolumeClaim objects
-type PVCAssumeCache interface {
-	AssumeCache
-
-	// GetPVC returns the PVC from the cache with given pvcKey.
-	// pvcKey is the result of MetaNamespaceKeyFunc on PVC obj
-	GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
-	GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
-}
-
-type pvcAssumeCache struct {
-	AssumeCache
-	logger klog.Logger
-}
-
-// NewPVCAssumeCache creates a PVC assume cache.
-func NewPVCAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer) PVCAssumeCache {
-	logger = klog.LoggerWithName(logger, "PVC Cache")
-	return &pvcAssumeCache{
-		AssumeCache: NewAssumeCache(logger, informer, "v1.PersistentVolumeClaim", "", nil),
-		logger:      logger,
-	}
-}
-
-func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
-	obj, err := c.Get(pvcKey)
-	if err != nil {
-		return nil, err
-	}
-
-	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}
-	}
-	return pvc, nil
-}
-
-func (c *pvcAssumeCache) GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
-	obj, err := c.GetAPIObj(pvcKey)
-	if err != nil {
-		return nil, err
-	}
-	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}
-	}
-	return pvc, nil
 }

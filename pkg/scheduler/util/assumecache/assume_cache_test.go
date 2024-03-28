@@ -14,457 +14,314 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumebinding
+package assumecache
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-helpers/storage/volume"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
-	pvList := cache.ListPVs(storageClassName)
-	if len(pvList) != len(expectedPVs) {
-		t.Errorf("ListPVs() returned %v PVs, expected %v", len(pvList), len(expectedPVs))
+// testInformer implements [Informer] and can be used to feed changes into an assume
+// cache during unit testing. Only a single event handler is supported, which is
+// sufficient for one assume cache.
+type testInformer struct {
+	handler cache.ResourceEventHandler
+}
+
+func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	i.handler = handler
+	return nil, nil
+}
+
+func (i *testInformer) add(obj interface{}) {
+	if i.handler == nil {
+		return
 	}
-	for _, pv := range pvList {
-		expectedPV, ok := expectedPVs[pv.Name]
-		if !ok {
-			t.Errorf("ListPVs() returned unexpected PV %q", pv.Name)
-		}
-		if expectedPV != pv {
-			t.Errorf("ListPVs() returned PV %p, expected %p", pv, expectedPV)
-		}
+	i.handler.OnAdd(obj, false)
+}
+
+func (i *testInformer) update(obj interface{}) {
+	if i.handler == nil {
+		return
+	}
+	i.handler.OnUpdate(nil, obj)
+}
+
+func (i *testInformer) delete(obj interface{}) {
+	if i.handler == nil {
+		return
+	}
+	i.handler.OnDelete(obj)
+}
+
+func makeObj(name, version, namespace string) metav1.Object {
+	return &metav1.ObjectMeta{
+		Name:            name,
+		Namespace:       namespace,
+		ResourceVersion: version,
 	}
 }
 
-func verifyPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
-	pv, err := cache.GetPV(name)
+func newTest(t *testing.T) (ktesting.TContext, AssumeCache, *testInformer) {
+	return newTestWithIndexer(t, "", nil)
+}
+
+func newTestWithIndexer(t *testing.T, indexName string, indexFunc cache.IndexFunc) (ktesting.TContext, AssumeCache, *testInformer) {
+	tCtx := ktesting.Init(t)
+	informer := new(testInformer)
+	cache := NewAssumeCache(tCtx.Logger(), informer, "TestObject", indexName, indexFunc)
+	return tCtx, cache, informer
+}
+
+func verify(tCtx ktesting.TContext, cache AssumeCache, key string, expectedObject, expectedAPIObject interface{}) {
+	tCtx.Helper()
+	actualObject, err := cache.Get(key)
 	if err != nil {
-		return err
+		tCtx.Fatalf("unexpected error retrieving object for key %s: %v", key, err)
 	}
-	if pv != expectedPV {
-		return fmt.Errorf("GetPV() returned %p, expected %p", pv, expectedPV)
+	if actualObject != expectedObject {
+		tCtx.Fatalf("Get() returned %v, expected %v", actualObject, expectedObject)
 	}
-	return nil
+	actualAPIObject, err := cache.GetAPIObj(key)
+	if err != nil {
+		tCtx.Fatalf("unexpected error retrieving API object for key %s: %v", key, err)
+	}
+	if actualAPIObject != expectedAPIObject {
+		tCtx.Fatalf("GetAPIObject() returned %v, expected %v", actualAPIObject, expectedAPIObject)
+	}
 }
 
-func TestAssumePV(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+func verifyList(tCtx ktesting.TContext, assumeCache AssumeCache, expectedObjs []interface{}, indexObj interface{}) {
+	actualObjs := assumeCache.List(indexObj)
+	diff := cmp.Diff(expectedObjs, actualObjs, cmpopts.SortSlices(func(x, y interface{}) bool {
+		xKey, err := cache.MetaNamespaceKeyFunc(x)
+		if err != nil {
+			tCtx.Fatalf("unexpected error determining key for %v: %v", x, err)
+		}
+		yKey, err := cache.MetaNamespaceKeyFunc(y)
+		if err != nil {
+			tCtx.Fatalf("unexpected error determining key for %v: %v", y, err)
+		}
+		return xKey < yKey
+	}))
+	if diff != "" {
+		tCtx.Fatalf("List() result differs (- expected, + actual):\n%s", diff)
+	}
+}
+
+func TestAssume(t *testing.T) {
 	scenarios := map[string]struct {
-		oldPV         *v1.PersistentVolume
-		newPV         *v1.PersistentVolume
-		shouldSucceed bool
+		oldObj    metav1.Object
+		newObj    interface{}
+		expectErr error
 	}{
 		"success-same-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			shouldSucceed: true,
-		},
-		"success-storageclass-same-version": {
-			oldPV:         makePV("pv1", "class1").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "class1").withVersion("5").PersistentVolume,
-			shouldSucceed: true,
+			oldObj: makeObj("pvc1", "5", ""),
+			newObj: makeObj("pvc1", "5", ""),
 		},
 		"success-new-higher-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("6").PersistentVolume,
-			shouldSucceed: true,
+			oldObj: makeObj("pvc1", "5", ""),
+			newObj: makeObj("pvc1", "6", ""),
 		},
 		"fail-old-not-found": {
-			oldPV:         makePV("pv2", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			shouldSucceed: false,
+			oldObj:    makeObj("pvc2", "5", ""),
+			newObj:    makeObj("pvc1", "5", ""),
+			expectErr: ErrNotFound,
 		},
 		"fail-new-lower-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("4").PersistentVolume,
-			shouldSucceed: false,
+			oldObj:    makeObj("pvc1", "5", ""),
+			newObj:    makeObj("pvc1", "4", ""),
+			expectErr: cmpopts.AnyError,
 		},
 		"fail-new-bad-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("a").PersistentVolume,
-			shouldSucceed: false,
+			oldObj:    makeObj("pvc1", "5", ""),
+			newObj:    makeObj("pvc1", "a", ""),
+			expectErr: cmpopts.AnyError,
 		},
 		"fail-old-bad-version": {
-			oldPV:         makePV("pv1", "").withVersion("a").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			shouldSucceed: false,
+			oldObj:    makeObj("pvc1", "a", ""),
+			newObj:    makeObj("pvc1", "5", ""),
+			expectErr: cmpopts.AnyError,
+		},
+		"fail-new-bad-object": {
+			oldObj:    makeObj("pvc1", "5", ""),
+			newObj:    1,
+			expectErr: ErrObjectName,
 		},
 	}
 
 	for name, scenario := range scenarios {
-		cache := NewPVAssumeCache(logger, nil)
-		internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-		if !ok {
-			t.Fatalf("Failed to get internal cache")
-		}
+		t.Run(name, func(t *testing.T) {
+			tCtx, cache, informer := newTest(t)
 
-		// Add oldPV to cache
-		internalCache.add(scenario.oldPV)
-		if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
-			t.Errorf("Failed to GetPV() after initial update: %v", err)
-			continue
-		}
+			// Add old object to cache.
+			informer.add(scenario.oldObj)
+			verify(tCtx, cache, scenario.oldObj.GetName(), scenario.oldObj, scenario.oldObj)
 
-		// Assume newPV
-		err := cache.Assume(scenario.newPV)
-		if scenario.shouldSucceed && err != nil {
-			t.Errorf("Test %q failed: Assume() returned error %v", name, err)
-		}
-		if !scenario.shouldSucceed && err == nil {
-			t.Errorf("Test %q failed: Assume() returned success but expected error", name)
-		}
+			// Assume new object.
+			err := cache.Assume(scenario.newObj)
+			if diff := cmp.Diff(scenario.expectErr, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("Assume() returned error: %v\ndiff (- expected, + actual):\n%s", err, diff)
+			}
 
-		// Check that GetPV returns correct PV
-		expectedPV := scenario.newPV
-		if !scenario.shouldSucceed {
-			expectedPV = scenario.oldPV
-		}
-		if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
-			t.Errorf("Failed to GetPV() after initial update: %v", err)
-		}
+			// Check that Get returns correct object.
+			expectedObj := scenario.newObj
+			if scenario.expectErr != nil {
+				expectedObj = scenario.oldObj
+			}
+			verify(tCtx, cache, scenario.oldObj.GetName(), expectedObj, scenario.oldObj)
+		})
 	}
 }
 
-func TestRestorePV(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	cache := NewPVAssumeCache(logger, nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+func TestRestore(t *testing.T) {
+	tCtx, cache, informer := newTest(t)
 
-	oldPV := makePV("pv1", "").withVersion("5").PersistentVolume
-	newPV := makePV("pv1", "").withVersion("5").PersistentVolume
+	// This test assumes an object with the same version as the API object.
+	// The assume cache supports that, but doing so in real code suffers from
+	// a race: if an unrelated update is received from the apiserver while
+	// such an object is assumed, the local modification gets dropped.
+	oldObj := makeObj("pvc1", "5", "")
+	newObj := makeObj("pvc1", "5", "")
 
-	// Restore PV that doesn't exist
+	// Restore object that doesn't exist
 	cache.Restore("nothing")
 
-	// Add oldPV to cache
-	internalCache.add(oldPV)
-	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
-		t.Fatalf("Failed to GetPV() after initial update: %v", err)
-	}
+	// Add old object to cache.
+	informer.add(oldObj)
+	verify(ktesting.WithStep(tCtx, "after initial update"), cache, oldObj.GetName(), oldObj, oldObj)
 
-	// Restore PV
-	cache.Restore(oldPV.Name)
-	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
-		t.Fatalf("Failed to GetPV() after initial restore: %v", err)
-	}
+	// Restore object.
+	cache.Restore(oldObj.GetName())
+	verify(ktesting.WithStep(tCtx, "after initial Restore"), cache, oldObj.GetName(), oldObj, oldObj)
 
-	// Assume newPV
-	if err := cache.Assume(newPV); err != nil {
+	// Assume new object.
+	if err := cache.Assume(newObj); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
-	if err := verifyPV(cache, oldPV.Name, newPV); err != nil {
-		t.Fatalf("Failed to GetPV() after Assume: %v", err)
-	}
+	verify(ktesting.WithStep(tCtx, "after Assume"), cache, oldObj.GetName(), newObj, oldObj)
 
-	// Restore PV
-	cache.Restore(oldPV.Name)
-	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
-		t.Fatalf("Failed to GetPV() after restore: %v", err)
+	// Restore object.
+	cache.Restore(oldObj.GetName())
+	verify(ktesting.WithStep(tCtx, "after second Restore"), cache, oldObj.GetName(), oldObj, oldObj)
+}
+
+func TestEvents(t *testing.T) {
+	tCtx, cache, informer := newTest(t)
+
+	oldObj := makeObj("pvc1", "5", "")
+	newObj := makeObj("pvc1", "6", "")
+	key := oldObj.GetName()
+
+	// Add old object to cache.
+	informer.add(oldObj)
+	verify(ktesting.WithStep(tCtx, "after initial update"), cache, key, oldObj, oldObj)
+
+	// Update object.
+	informer.update(newObj)
+	verify(ktesting.WithStep(tCtx, "after initial update"), cache, key, newObj, newObj)
+
+	// Some error cases (don't occur in practice).
+	informer.add(1)
+	verify(ktesting.WithStep(tCtx, "after nop add"), cache, key, newObj, newObj)
+	informer.add(nil)
+	verify(ktesting.WithStep(tCtx, "after nil add"), cache, key, newObj, newObj)
+	informer.update(oldObj)
+	verify(ktesting.WithStep(tCtx, "after nop update"), cache, key, newObj, newObj)
+	informer.update(nil)
+	verify(ktesting.WithStep(tCtx, "after nil update"), cache, key, newObj, newObj)
+	informer.delete(nil)
+	verify(ktesting.WithStep(tCtx, "after nop delete"), cache, key, newObj, newObj)
+
+	// Delete object.
+	informer.delete(oldObj)
+	_, err := cache.Get(key)
+	if diff := cmp.Diff(ErrNotFound, err, cmpopts.EquateErrors()); diff != "" {
+		t.Errorf("Get did not return expected error: %v\ndiff (- expected, + actual):\n%s", err, diff)
 	}
 }
 
-func TestBasicPVCache(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	cache := NewPVAssumeCache(logger, nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+func TestListNoIndexer(t *testing.T) {
+	tCtx, cache, informer := newTest(t)
 
-	// Get object that doesn't exist
-	pv, err := cache.GetPV("nothere")
-	if err == nil {
-		t.Errorf("GetPV() returned unexpected success")
-	}
-	if pv != nil {
-		t.Errorf("GetPV() returned unexpected PV %q", pv.Name)
-	}
-
-	// Add a bunch of PVs
-	pvs := map[string]*v1.PersistentVolume{}
+	// Add a bunch of objects.
+	objs := make([]interface{}, 0, 10)
 	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test-pv%v", i), "").withVersion("1").PersistentVolume
-		pvs[pv.Name] = pv
-		internalCache.add(pv)
+		obj := makeObj(fmt.Sprintf("test-pvc%v", i), "1", "")
+		objs = append(objs, obj)
+		informer.add(obj)
 	}
 
 	// List them
-	verifyListPVs(t, cache, pvs, "")
+	verifyList(ktesting.WithStep(tCtx, "after add"), cache, objs, "")
 
-	// Update a PV
-	updatedPV := makePV("test-pv3", "").withVersion("2").PersistentVolume
-	pvs[updatedPV.Name] = updatedPV
-	internalCache.update(nil, updatedPV)
+	// Update an object.
+	updatedObj := makeObj("test-pvc3", "2", "")
+	objs[3] = updatedObj
+	informer.update(updatedObj)
 
 	// List them
-	verifyListPVs(t, cache, pvs, "")
+	verifyList(ktesting.WithStep(tCtx, "after update"), cache, objs, "")
 
 	// Delete a PV
-	deletedPV := pvs["test-pv7"]
-	delete(pvs, deletedPV.Name)
-	internalCache.delete(deletedPV)
+	deletedObj := objs[7]
+	objs = slices.Delete(objs, 7, 8)
+	informer.delete(deletedObj)
 
 	// List them
-	verifyListPVs(t, cache, pvs, "")
+	verifyList(ktesting.WithStep(tCtx, "after delete"), cache, objs, "")
 }
 
-func TestPVCacheWithStorageClasses(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	cache := NewPVAssumeCache(logger, nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
+func TestListWithIndexer(t *testing.T) {
+	namespaceIndexer := func(obj interface{}) ([]string, error) {
+		objAccessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		return []string{objAccessor.GetNamespace()}, nil
+	}
+	tCtx, cache, informer := newTestWithIndexer(t, "myNamespace", namespaceIndexer)
+
+	// Add a bunch of objects.
+	ns := "ns1"
+	objs := make([]interface{}, 0, 10)
+	for i := 0; i < 10; i++ {
+		obj := makeObj(fmt.Sprintf("test-pvc%v", i), "1", ns)
+		objs = append(objs, obj)
+		informer.add(obj)
 	}
 
-	// Add a bunch of PVs
-	pvs1 := map[string]*v1.PersistentVolume{}
+	// Add a bunch of other objects.
 	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test-pv%v", i), "class1").withVersion("1").PersistentVolume
-		pvs1[pv.Name] = pv
-		internalCache.add(pv)
-	}
-
-	// Add a bunch of PVs
-	pvs2 := map[string]*v1.PersistentVolume{}
-	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test2-pv%v", i), "class2").withVersion("1").PersistentVolume
-		pvs2[pv.Name] = pv
-		internalCache.add(pv)
+		obj := makeObj(fmt.Sprintf("test-pvc%v", i), "1", "ns2")
+		informer.add(obj)
 	}
 
 	// List them
-	verifyListPVs(t, cache, pvs1, "class1")
-	verifyListPVs(t, cache, pvs2, "class2")
+	verifyList(ktesting.WithStep(tCtx, "after add"), cache, objs, objs[0])
 
-	// Update a PV
-	updatedPV := makePV("test-pv3", "class1").withVersion("2").PersistentVolume
-	pvs1[updatedPV.Name] = updatedPV
-	internalCache.update(nil, updatedPV)
+	// Update an object.
+	updatedObj := makeObj("test-pvc3", "2", ns)
+	objs[3] = updatedObj
+	informer.update(updatedObj)
 
 	// List them
-	verifyListPVs(t, cache, pvs1, "class1")
-	verifyListPVs(t, cache, pvs2, "class2")
+	verifyList(ktesting.WithStep(tCtx, "after update"), cache, objs, objs[0])
 
 	// Delete a PV
-	deletedPV := pvs1["test-pv7"]
-	delete(pvs1, deletedPV.Name)
-	internalCache.delete(deletedPV)
+	deletedObj := objs[7]
+	objs = slices.Delete(objs, 7, 8)
+	informer.delete(deletedObj)
 
 	// List them
-	verifyListPVs(t, cache, pvs1, "class1")
-	verifyListPVs(t, cache, pvs2, "class2")
-}
-
-func TestAssumeUpdatePVCache(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	cache := NewPVAssumeCache(logger, nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
-
-	pvName := "test-pv0"
-
-	// Add a PV
-	pv := makePV(pvName, "").withVersion("1").PersistentVolume
-	internalCache.add(pv)
-	if err := verifyPV(cache, pvName, pv); err != nil {
-		t.Fatalf("failed to get PV: %v", err)
-	}
-
-	// Assume PV
-	newPV := pv.DeepCopy()
-	newPV.Spec.ClaimRef = &v1.ObjectReference{Name: "test-claim"}
-	if err := cache.Assume(newPV); err != nil {
-		t.Fatalf("failed to assume PV: %v", err)
-	}
-	if err := verifyPV(cache, pvName, newPV); err != nil {
-		t.Fatalf("failed to get PV after assume: %v", err)
-	}
-
-	// Add old PV
-	internalCache.add(pv)
-	if err := verifyPV(cache, pvName, newPV); err != nil {
-		t.Fatalf("failed to get PV after old PV added: %v", err)
-	}
-}
-
-func makeClaim(name, version, namespace string) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       namespace,
-			ResourceVersion: version,
-			Annotations:     map[string]string{},
-		},
-	}
-}
-
-func verifyPVC(cache PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVolumeClaim) error {
-	pvc, err := cache.GetPVC(pvcKey)
-	if err != nil {
-		return err
-	}
-	if pvc != expectedPVC {
-		return fmt.Errorf("GetPVC() returned %p, expected %p", pvc, expectedPVC)
-	}
-	return nil
-}
-
-func TestAssumePVC(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	scenarios := map[string]struct {
-		oldPVC        *v1.PersistentVolumeClaim
-		newPVC        *v1.PersistentVolumeClaim
-		shouldSucceed bool
-	}{
-		"success-same-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "5", "ns1"),
-			shouldSucceed: true,
-		},
-		"success-new-higher-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "6", "ns1"),
-			shouldSucceed: true,
-		},
-		"fail-old-not-found": {
-			oldPVC:        makeClaim("pvc2", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "5", "ns1"),
-			shouldSucceed: false,
-		},
-		"fail-new-lower-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "4", "ns1"),
-			shouldSucceed: false,
-		},
-		"fail-new-bad-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "a", "ns1"),
-			shouldSucceed: false,
-		},
-		"fail-old-bad-version": {
-			oldPVC:        makeClaim("pvc1", "a", "ns1"),
-			newPVC:        makeClaim("pvc1", "5", "ns1"),
-			shouldSucceed: false,
-		},
-	}
-
-	for name, scenario := range scenarios {
-		cache := NewPVCAssumeCache(logger, nil)
-		internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-		if !ok {
-			t.Fatalf("Failed to get internal cache")
-		}
-
-		// Add oldPVC to cache
-		internalCache.add(scenario.oldPVC)
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
-			t.Errorf("Failed to GetPVC() after initial update: %v", err)
-			continue
-		}
-
-		// Assume newPVC
-		err := cache.Assume(scenario.newPVC)
-		if scenario.shouldSucceed && err != nil {
-			t.Errorf("Test %q failed: Assume() returned error %v", name, err)
-		}
-		if !scenario.shouldSucceed && err == nil {
-			t.Errorf("Test %q failed: Assume() returned success but expected error", name)
-		}
-
-		// Check that GetPVC returns correct PVC
-		expectedPV := scenario.newPVC
-		if !scenario.shouldSucceed {
-			expectedPV = scenario.oldPVC
-		}
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), expectedPV); err != nil {
-			t.Errorf("Failed to GetPVC() after initial update: %v", err)
-		}
-	}
-}
-
-func TestRestorePVC(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	cache := NewPVCAssumeCache(logger, nil)
-	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
-
-	oldPVC := makeClaim("pvc1", "5", "ns1")
-	newPVC := makeClaim("pvc1", "5", "ns1")
-
-	// Restore PVC that doesn't exist
-	cache.Restore("nothing")
-
-	// Add oldPVC to cache
-	internalCache.add(oldPVC)
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
-		t.Fatalf("Failed to GetPVC() after initial update: %v", err)
-	}
-
-	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
-		t.Fatalf("Failed to GetPVC() after initial restore: %v", err)
-	}
-
-	// Assume newPVC
-	if err := cache.Assume(newPVC); err != nil {
-		t.Fatalf("Assume() returned error %v", err)
-	}
-	if err := verifyPVC(cache, getPVCName(oldPVC), newPVC); err != nil {
-		t.Fatalf("Failed to GetPVC() after Assume: %v", err)
-	}
-
-	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
-		t.Fatalf("Failed to GetPVC() after restore: %v", err)
-	}
-}
-
-func TestAssumeUpdatePVCCache(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	cache := NewPVCAssumeCache(logger, nil)
-	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
-
-	pvcName := "test-pvc0"
-	pvcNamespace := "test-ns"
-
-	// Add a PVC
-	pvc := makeClaim(pvcName, "1", pvcNamespace)
-	internalCache.add(pvc)
-	if err := verifyPVC(cache, getPVCName(pvc), pvc); err != nil {
-		t.Fatalf("failed to get PVC: %v", err)
-	}
-
-	// Assume PVC
-	newPVC := pvc.DeepCopy()
-	newPVC.Annotations[volume.AnnSelectedNode] = "test-node"
-	if err := cache.Assume(newPVC); err != nil {
-		t.Fatalf("failed to assume PVC: %v", err)
-	}
-	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
-		t.Fatalf("failed to get PVC after assume: %v", err)
-	}
-
-	// Add old PVC
-	internalCache.add(pvc)
-	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
-		t.Fatalf("failed to get PVC after old PVC added: %v", err)
-	}
+	verifyList(ktesting.WithStep(tCtx, "after delete"), cache, objs, objs[0])
 }
