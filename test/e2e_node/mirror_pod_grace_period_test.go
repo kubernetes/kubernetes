@@ -73,6 +73,12 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running for grace period")
+
+			// Just for debugging
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunningWithUID(ctx, f.ClientSet, mirrorPodName, ns, uid)
+			}, 1*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
+
 			gomega.Consistently(ctx, func(ctx context.Context) error {
 				return checkMirrorPodRunningWithUID(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())

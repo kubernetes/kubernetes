@@ -640,13 +640,13 @@ func TestUpdatePod(t *testing.T) {
 				startedAt:          time.Unix(3, 0),
 				terminatingAt:      time.Unix(3, 0),
 				terminatedAt:       time.Unix(6, 0),
-				gracePeriod:        30,
+				gracePeriod:        1,
 				startedTerminating: true,
 				restartRequested:   true, // because we received a create during termination
 				finished:           true,
 				activeUpdate: &UpdatePodOptions{
 					Pod:            newNamedPod("1", "ns", "running-pod", false),
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(30)},
+					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(1)},
 				},
 			}),
 			expectKnownTerminated: true,
@@ -717,14 +717,14 @@ func TestUpdatePod(t *testing.T) {
 				startedAt:          time.Unix(3, 0),
 				terminatingAt:      time.Unix(3, 0),
 				terminatedAt:       time.Unix(5, 0),
-				gracePeriod:        30,
+				gracePeriod:        1,
 				startedTerminating: true,
 				finished:           true,
 				evicted:            true,
 				activeUpdate: &UpdatePodOptions{
 					Pod: newNamedPod("1", "ns", "running-pod", false),
 					KillPodOptions: &KillPodOptions{
-						PodTerminationGracePeriodSecondsOverride: intp(30),
+						PodTerminationGracePeriodSecondsOverride: intp(1),
 						Evict:                                    true,
 					},
 				},
@@ -745,9 +745,9 @@ func TestUpdatePod(t *testing.T) {
 				terminatedAt:  time.Unix(3, 0),
 				activeUpdate: &UpdatePodOptions{
 					Pod:            newPodWithPhase("1", "done-pod", v1.PodSucceeded),
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(30)},
+					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(1)},
 				},
-				gracePeriod:        30,
+				gracePeriod:        1,
 				startedTerminating: true,
 				finished:           true,
 			}),
@@ -966,7 +966,7 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 		// we buffer pending updates and the pod worker may compress the create and kill
 		syncPodRecords := processed[uid]
 		var match bool
-		grace := int64(30)
+		grace := int64(1)
 		for _, possible := range [][]syncPodRecord{
 			{{name: string(uid), updateType: kubetypes.SyncPodKill, gracePeriod: &grace}, {name: string(uid), terminated: true}},
 			{{name: string(uid), updateType: kubetypes.SyncPodCreate}, {name: string(uid), updateType: kubetypes.SyncPodKill, gracePeriod: &grace}, {name: string(uid), terminated: true}},
