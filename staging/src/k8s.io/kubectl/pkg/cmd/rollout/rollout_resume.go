@@ -135,7 +135,7 @@ func (o *ResumeOptions) Validate() error {
 }
 
 // RunResume performs the execution of 'rollout resume' sub command
-func (o ResumeOptions) RunResume() error {
+func (o *ResumeOptions) RunResume() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
