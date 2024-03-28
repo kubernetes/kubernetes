@@ -270,12 +270,15 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 		},
 		{
-			name: "deleted PVC with finalizer + pod with the PVC finished but is not deleted -> finalizer is not removed",
+			name: "deleted PVC with finalizer + pod with the PVC finished but is not deleted -> finalizer is removed",
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVC:      deleted(withProtectionFinalizer(pvc())),
-			expectedActions: []clienttesting.Action{},
+			updatedPVC: deleted(withProtectionFinalizer(pvc())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+			},
 		},
 		{
 			name: "deleted PVC with finalizer + pod with the PVC exists but is not in the Informer's cache yet -> finalizer is not removed",
@@ -300,12 +303,15 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{},
 		},
 		{
-			name: "updated finished Pod -> finalizer is not removed",
+			name: "updated finished Pod -> finalizer is removed",
 			initialObjects: []runtime.Object{
 				deleted(withProtectionFinalizer(pvc())),
 			},
-			updatedPod:      withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
-			expectedActions: []clienttesting.Action{},
+			updatedPod: withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+			},
 		},
 		{
 			name: "updated unscheduled Pod -> finalizer is removed",
