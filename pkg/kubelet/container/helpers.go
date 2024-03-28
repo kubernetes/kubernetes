@@ -86,10 +86,17 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	if status.State == ContainerStateRunning {
 		return false
 	}
-	// Always restart container in the unknown, or in the created state.
-	if status.State == ContainerStateUnknown || status.State == ContainerStateCreated {
+	// Always restart container in the unknown state
+	if status.State == ContainerStateUnknown {
 		return true
 	}
+	// if status.State == ContainerStateCreated {
+	// 	klog.V(4).InfoS("Container state is Created, and it will be decided whether to restart based on the specific situation.", "pod", klog.KObj(pod), "containerName", container.Name, "restartOnCreatedState", restartOnCreatedState)
+	// 	// we don't retart the container directly as the CREATED event will always be triggered
+	// 	// but for next syncpod, we should handle the containers failed to be started which is in CREATED state.
+	// 	return restartOnCreatedState
+	// }
+
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
 		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
