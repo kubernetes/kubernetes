@@ -22,6 +22,7 @@ const (
 	KubernetesPodNamespaceLabel  = "io.kubernetes.pod.namespace"
 	KubernetesPodUIDLabel        = "io.kubernetes.pod.uid"
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	KubernetesContainerTypeLabel = "io.kubernetes.container.type"
 )
 
 // Label value constants
@@ -29,6 +30,9 @@ const (
 	// PodInfraContainerName is the KubernetesPodNameLabel value for infra
 	// containers.
 	PodInfraContainerName = "POD"
+	PodSandboxContainer   = "PodSandbox"
+	PodInitContainer      = "InitContainer"
+	PodContainer          = "Container"
 )
 
 // GetContainerName returns the value of the KubernetesContainerNameLabel.

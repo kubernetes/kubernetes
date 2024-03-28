@@ -75,8 +75,8 @@ type annotatedContainerInfo struct {
 	ContainerPorts            []v1.ContainerPort
 }
 
-// newPodLabels creates pod labels from v1.Pod.
-func newPodLabels(pod *v1.Pod) map[string]string {
+// newSandboxLabels creates sandbox labels from v1.Pod.
+func newSandboxLabels(pod *v1.Pod) map[string]string {
 	labels := map[string]string{}
 
 	// Get labels from v1.Pod
@@ -87,12 +87,13 @@ func newPodLabels(pod *v1.Pod) map[string]string {
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
+	labels[types.KubernetesContainerTypeLabel] = types.PodSandboxContainer
 
 	return labels
 }
 
-// newPodAnnotations creates pod annotations from v1.Pod.
-func newPodAnnotations(pod *v1.Pod) map[string]string {
+// newSandboxAnnotations creates sandbox annotations from v1.Pod.
+func newSandboxAnnotations(pod *v1.Pod) map[string]string {
 	return pod.Annotations
 }
 
@@ -103,6 +104,14 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
+
+	containerType := types.PodContainer
+	for _, c := range pod.Spec.InitContainers {
+		if c.Name == container.Name {
+			containerType = types.PodInitContainer
+		}
+	}
+	labels[types.KubernetesContainerTypeLabel] = containerType
 
 	return labels
 }

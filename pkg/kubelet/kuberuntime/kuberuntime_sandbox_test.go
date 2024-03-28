@@ -46,9 +46,10 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 
 	expectedLogDirectory := filepath.Join(testPodLogsDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
 	expectedLabels := map[string]string{
-		"io.kubernetes.pod.name":      pod.Name,
-		"io.kubernetes.pod.namespace": pod.Namespace,
-		"io.kubernetes.pod.uid":       string(pod.UID),
+		"io.kubernetes.pod.name":       pod.Name,
+		"io.kubernetes.pod.namespace":  pod.Namespace,
+		"io.kubernetes.pod.uid":        string(pod.UID),
+		"io.kubernetes.container.type": "PodSandbox",
 	}
 	expectedMetadata := &runtimeapi.PodSandboxMetadata{
 		Name:      pod.Name,
