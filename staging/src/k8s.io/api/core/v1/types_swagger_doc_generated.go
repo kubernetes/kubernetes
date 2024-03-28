@@ -402,7 +402,7 @@ func (ContainerImage) SwaggerDoc() map[string]string {
 
 var map_ContainerPort = map[string]string{
 	"":              "ContainerPort represents a network port in a single container.",
-	"name":          "If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.",
+	"name":          "If specified, this must be an IANA_SVC_NAME. Each named port in a pod must have a unique name, otherwise, if there are duplicate names, only the first port name referred to by services will be chosen.",
 	"hostPort":      "Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.",
 	"containerPort": "Number of port to expose on the pod's IP address. This must be a valid port number, 0 < x < 65536.",
 	"protocol":      "Protocol for port. Must be UDP, TCP, or SCTP. Defaults to \"TCP\".",

@@ -1059,6 +1059,78 @@ func TestWarnings(t *testing.T) {
 				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
 			},
 		},
+		{
+			name: "create duplicate container ports name in two containers",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, Name: "test"},
+							{ContainerPort: 180, HostPort: 180, Protocol: api.ProtocolUDP},
+							{ContainerPort: 8080, HostPort: 8080, Protocol: api.ProtocolUDP, Name: "test"},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 8090, HostPort: 8090, Protocol: api.ProtocolUDP, Name: "test"},
+							{ContainerPort: 8091, HostPort: 8091, Protocol: api.ProtocolUDP, Name: "test"},
+						},
+					}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[2]: duplicate port name "test" with spec.containers[0].ports[0], services and probes that select ports by name will use spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port name "test" with spec.containers[0].ports[0], services and probes that select ports by name will use spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port name "test" with spec.containers[0].ports[0], services and probes that select ports by name will use spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "update duplicate container ports name in two containers",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, Name: "test"},
+							{ContainerPort: 180, HostPort: 180, Protocol: api.ProtocolUDP},
+							{ContainerPort: 8080, HostPort: 8080, Protocol: api.ProtocolUDP, Name: "test"},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 8090, HostPort: 8090, Protocol: api.ProtocolUDP, Name: "test"},
+							{ContainerPort: 8091, HostPort: 8091, Protocol: api.ProtocolUDP, Name: "test"},
+							{ContainerPort: 8092, HostPort: 8092, Protocol: api.ProtocolUDP},
+						},
+					}},
+			}},
+			oldTemplate: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, Name: "test1"},
+							{ContainerPort: 180, HostPort: 180, Protocol: api.ProtocolUDP},
+							{ContainerPort: 8080, HostPort: 8080, Protocol: api.ProtocolUDP, Name: "test2"},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 8090, HostPort: 8090, Protocol: api.ProtocolUDP, Name: "test3"},
+							{ContainerPort: 8091, HostPort: 8091, Protocol: api.ProtocolUDP, Name: "test4"},
+							{ContainerPort: 8092, HostPort: 8092, Protocol: api.ProtocolUDP},
+						},
+					}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[2]: duplicate port name "test" with spec.containers[0].ports[0], services and probes that select ports by name will use spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port name "test" with spec.containers[0].ports[0], services and probes that select ports by name will use spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port name "test" with spec.containers[0].ports[0], services and probes that select ports by name will use spec.containers[0].ports[0]`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {

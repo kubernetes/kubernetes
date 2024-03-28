@@ -289,6 +289,8 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 	// Accumulate ports across all containers
 	allPorts := map[string][]portBlock{}
+	// Accumulate port names of all containers
+	allPortsNames := map[string]*field.Path{}
 	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, fldPath *field.Path) bool {
 		for i, port := range c.Ports {
 			if port.HostIP != "" && port.HostPort == 0 {
@@ -313,6 +315,13 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 				allPorts[k] = append(allPorts[k], portBlock{field: fldPath.Child("ports").Index(i), port: port})
 			} else {
 				allPorts[k] = []portBlock{{field: fldPath.Child("ports").Index(i), port: port}}
+			}
+			if port.Name != "" {
+				if other, found := allPortsNames[port.Name]; found {
+					warnings = append(warnings, fmt.Sprintf("%s: duplicate port name %q with %s, services and probes that select ports by name will use %s", fldPath.Child("ports").Index(i), port.Name, other, other))
+				} else {
+					allPortsNames[port.Name] = fldPath.Child("ports").Index(i)
+				}
 			}
 		}
 		return true
