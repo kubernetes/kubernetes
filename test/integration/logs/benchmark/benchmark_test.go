@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,6 +30,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/logs/json/register"
@@ -93,6 +96,43 @@ func BenchmarkEncoding(b *testing.B) {
 					b.Fatalf("Unexpected error configuring logging: %v", err)
 				}
 				logger := klog.Background()
+
+				// Edit and run with this if branch enabled to use slog instead of zapr for JSON.
+				if format == "json" && false {
+					var level slog.LevelVar
+					level.Set(slog.Level(-3)) // hack
+					logger = logr.FromSlogHandler(slog.NewJSONHandler(output, &slog.HandlerOptions{
+						AddSource: true,
+						Level:     &level,
+						ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+							switch a.Key {
+							case slog.TimeKey:
+								// Could be user-supplied "time".
+								if a.Value.Kind() == slog.KindTime {
+									return slog.Float64("ts", float64(a.Value.Time().UnixMicro())/1000)
+								}
+							case slog.LevelKey:
+								level := a.Value.Any().(slog.Level)
+								if level >= slog.LevelError {
+									// No verbosity on errors.
+									return slog.Attr{}
+								}
+								if level >= 0 {
+									return slog.Int("v", 0)
+								}
+								return slog.Int("v", int(-level))
+							case slog.SourceKey:
+								caller := zapcore.EntryCaller{
+									Defined: true,
+									File:    a.Value.String(),
+								}
+								return slog.String("caller", caller.TrimmedPath())
+							}
+							return a
+						},
+					}))
+				}
+
 				b.ResetTimer()
 				start := time.Now()
 				total := int64(0)
