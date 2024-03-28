@@ -17,16 +17,19 @@ limitations under the License.
 package fixtures
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"path"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -49,11 +52,17 @@ func CreateCRDUsingRemovedAPIWatchUnsafe(etcdClient *clientv3.Client, etcdStorag
 	apiextensionsv1beta1.SetDefaults_CustomResourceDefinition(betaCRD)
 	betaCRD.Kind = "CustomResourceDefinition"
 	betaCRD.APIVersion = apiextensionsv1beta1.SchemeGroupVersion.Group + "/" + apiextensionsv1beta1.SchemeGroupVersion.Version
+	rest.FillObjectMetaSystemFields(betaCRD)
+
+	protoSerializer := protobuf.NewSerializer(scheme.Scheme, scheme.Scheme)
+	buffer := bytes.NewBuffer(nil)
+	if err := protoSerializer.Encode(betaCRD, buffer); err != nil {
+		return nil, err
+	}
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
 	key := path.Join("/", etcdStoragePrefix, "apiextensions.k8s.io", "customresourcedefinitions", betaCRD.Name)
-	val, _ := json.Marshal(betaCRD)
-	if _, err := etcdClient.Put(ctx, key, string(val)); err != nil {
+	if _, err := etcdClient.Put(ctx, key, buffer.String()); err != nil {
 		return nil, err
 	}
 
