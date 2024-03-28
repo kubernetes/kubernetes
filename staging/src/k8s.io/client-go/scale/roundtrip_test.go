@@ -17,9 +17,16 @@ limitations under the License.
 package scale
 
 import (
+	"sort"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/sets"
+
+	fuzz "github.com/google/gofuzz"
 )
 
 // NB: this can't be in the scheme package, because importing'
@@ -28,7 +35,33 @@ import (
 
 func TestRoundTrip(t *testing.T) {
 	scheme := NewScaleConverter().Scheme()
-	// we don't actually need any custom fuzzer funcs ATM -- the defaults
-	// will do just fine
-	roundtrip.RoundTripTestForScheme(t, scheme, nil)
+	roundtrip.RoundTripTestForScheme(t, scheme, func(codecs serializer.CodecFactory) []interface{} {
+		// Find the existing metav1.LabelSelector fuzz func, to be applied first, before
+		// applying the invariants needed to roundtrip through the textual label selector
+		// format.
+		lsfuzz := func(j *metav1.LabelSelector, c fuzz.Continue) {}
+		for _, i := range metafuzzer.Funcs(codecs) {
+			if fn, ok := i.(func(*metav1.LabelSelector, fuzz.Continue)); ok {
+				lsfuzz = fn
+			}
+		}
+
+		return []interface{}{
+			// NB: the label selector parser code sorts match expressions by key, and
+			// sorts and deduplicates the values, so we need to make sure ours are
+			// sorted as well here to preserve round-trip comparison.  In practice, not
+			// sorting doesn't hurt anything...
+			func(j *metav1.LabelSelector, c fuzz.Continue) {
+				lsfuzz(j, c)
+
+				for i, req := range j.MatchExpressions {
+					if req.Operator == metav1.LabelSelectorOpIn || req.Operator == metav1.LabelSelectorOpNotIn {
+						req.Values = sets.List(sets.New(req.Values...)) // sort and deduplicate
+					}
+					j.MatchExpressions[i] = req
+				}
+				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
+			},
+		}
+	})
 }

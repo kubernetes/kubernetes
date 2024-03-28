@@ -19,11 +19,8 @@ package fuzzer
 import (
 	"fmt"
 	"math/rand"
-	"sort"
 	"strconv"
 	"strings"
-
-	fuzz "github.com/google/gofuzz"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -33,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+
+	fuzz "github.com/google/gofuzz"
 )
 
 func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
@@ -248,32 +247,23 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				metav1.LabelSelectorOpDoesNotExist,
 			}
 
-			if j.MatchExpressions != nil {
-				// NB: the label selector parser code sorts match expressions by key, and sorts the values,
-				// so we need to make sure ours are sorted as well here to preserve round-trip comparison.
-				// In practice, not sorting doesn't hurt anything...
-
-				for i := range j.MatchExpressions {
-					req := metav1.LabelSelectorRequirement{}
-					c.Fuzz(&req)
-					req.Key = randomLabelKey(c)
-					req.Operator = validOperators[c.Rand.Intn(len(validOperators))]
-					if req.Operator == metav1.LabelSelectorOpIn || req.Operator == metav1.LabelSelectorOpNotIn {
-						if len(req.Values) == 0 {
-							// we must have some values here, so randomly choose a short length
-							req.Values = make([]string, c.Rand.Intn(2)+1)
-						}
-						for i := range req.Values {
-							req.Values[i] = randomLabelPart(c, true)
-						}
-						sort.Strings(req.Values)
-					} else {
-						req.Values = nil
+			for i := range j.MatchExpressions {
+				req := metav1.LabelSelectorRequirement{}
+				c.Fuzz(&req)
+				req.Key = randomLabelKey(c)
+				req.Operator = validOperators[c.Rand.Intn(len(validOperators))]
+				if req.Operator == metav1.LabelSelectorOpIn || req.Operator == metav1.LabelSelectorOpNotIn {
+					if len(req.Values) == 0 {
+						// we must have some values here, so randomly choose a short length
+						req.Values = make([]string, c.Rand.Intn(2)+1)
 					}
-					j.MatchExpressions[i] = req
+					for i := range req.Values {
+						req.Values[i] = randomLabelPart(c, true)
+					}
+				} else {
+					req.Values = nil
 				}
-
-				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
+				j.MatchExpressions[i] = req
 			}
 		},
 		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
