@@ -19,12 +19,8 @@ limitations under the License.
 
 package nodeshutdown
 
-import (
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-)
-
 // NewManager returns a fake node shutdown manager for non linux platforms.
-func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
+func NewManager(conf *Config) Manager {
 	m := managerStub{}
-	return m, m
+	return m
 }
