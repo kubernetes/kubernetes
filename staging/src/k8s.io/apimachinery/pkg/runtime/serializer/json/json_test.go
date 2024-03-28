@@ -17,6 +17,7 @@ limitations under the License.
 package json_test
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -29,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type testDecodable struct {
@@ -932,4 +935,69 @@ func (t *mockTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, 
 
 func (t *mockTyper) Recognizes(_ schema.GroupVersionKind) bool {
 	return false
+}
+
+type testEncodableDuplicateTag struct {
+	metav1.TypeMeta `json:",inline"`
+
+	A1 int `json:"a"`
+	A2 int `json:"a"` //nolint:govet // This is intentional to test that the encoder will not encode two map entries with the same key.
+}
+
+func (testEncodableDuplicateTag) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+type testEncodableTagMatchesUntaggedName struct {
+	metav1.TypeMeta `json:",inline"`
+
+	A       int
+	TaggedA int `json:"A"`
+}
+
+func (testEncodableTagMatchesUntaggedName) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+func TestEncode(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   runtime.Object
+		want []byte
+	}{
+		// The Go visibility rules for struct fields are amended for JSON when deciding
+		// which field to marshal or unmarshal. If there are multiple fields at the same
+		// level, and that level is the least nested (and would therefore be the nesting
+		// level selected by the usual Go rules), the following extra rules apply:
+
+		// 1) Of those fields, if any are JSON-tagged, only tagged fields are considered,
+		//    even if there are multiple untagged fields that would otherwise conflict.
+		{
+			name: "only tagged field is considered if any are tagged",
+			in: &testEncodableTagMatchesUntaggedName{
+				A:       1,
+				TaggedA: 2,
+			},
+			want: []byte("{\"A\":2}\n"),
+		},
+		// 2) If there is exactly one field (tagged or not according to the first rule),
+		//    that is selected.
+		// 3) Otherwise there are multiple fields, and all are ignored; no error occurs.
+		{
+			name: "all duplicate fields are ignored",
+			in:   &testEncodableDuplicateTag{},
+			want: []byte("{}\n"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var dst bytes.Buffer
+			s := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
+			if err := s.Encode(tc.in, &dst); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.want, dst.Bytes()); diff != "" {
+				t.Errorf("unexpected output:\n%s", diff)
+			}
+		})
+	}
 }
