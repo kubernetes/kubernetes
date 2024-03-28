@@ -904,6 +904,12 @@ const (
 	// Allows kube-proxy to run in Overlay mode for Windows
 	WinOverlay featuregate.Feature = "WinOverlay"
 
+	// owner: @princepereira
+	// alpha: v1.27
+	//
+	// Allows windows kube-proxy to switch between old and new windows networking stack
+	WinProxyEbpfMode featuregate.Feature = "WinProxyEbpfMode"
+
 	// owner: @marosset
 	// kep: https://kep.k8s.io/3503
 	// alpha: v1.26
@@ -1233,6 +1239,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinDSR: {Default: false, PreRelease: featuregate.Alpha},
 
 	WinOverlay: {Default: true, PreRelease: featuregate.Beta},
+
+	WinProxyEbpfMode: {Default: false, PreRelease: featuregate.Alpha},
 
 	WindowsHostNetwork: {Default: true, PreRelease: featuregate.Alpha},
 

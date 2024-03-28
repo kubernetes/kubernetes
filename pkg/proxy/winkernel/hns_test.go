@@ -364,7 +364,7 @@ func TestGetLoadBalancerExisting(t *testing.T) {
 	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsHash: hash}
 	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
 
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
+	lb, err := hns.getOrCreateLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 
 	if err != nil {
 		t.Error(err)
@@ -414,7 +414,7 @@ func TestGetLoadBalancerNew(t *testing.T) {
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
+	lb, err := hns.getOrCreateLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
 	}
