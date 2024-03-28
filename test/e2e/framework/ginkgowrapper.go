@@ -577,3 +577,16 @@ func TagsEqual(a, b interface{}) bool {
 	}
 	return slices.Equal(al.parts, bl.parts)
 }
+
+func WithSwapConformance() interface{} {
+	return withSwapConformance()
+}
+
+// WithSwapConformance is a shorthand for the corresponding package function.
+func (f *Framework) WithSwapConformance() interface{} {
+	return WithSwapConformance()
+}
+
+func withSwapConformance() interface{} {
+	return newLabel("SwapConformance")
+}
