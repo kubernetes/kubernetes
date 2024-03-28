@@ -188,27 +188,42 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		checks = append(checks, electionChecker)
 	}
 
+	var gracefulShutdownWebhookSecureServer func()
 	if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.CloudControllerManagerWebhook) {
 		if len(webhooks) > 0 {
 			klog.Info("Webhook Handlers enabled: ", webhooks)
 			handler := newHandler(webhooks)
-			if _, _, err := c.WebhookSecureServing.Serve(handler, 0, stopCh); err != nil {
+			stoppedCh, listenerStoppedCh, err := c.WebhookSecureServing.Serve(handler, 0, stopCh)
+			if err != nil {
 				return err
+			}
+			gracefulShutdownWebhookSecureServer = func() {
+				<-listenerStoppedCh
+				klog.Info("[graceful-termination] webhook secure server has stopped listening")
+				<-stoppedCh
+				klog.Info("[graceful-termination] webhook secure server is exiting")
 			}
 		}
 	}
 
 	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
 	// Start the controller manager HTTP server
+	var gracefulShutdownSecureServer func()
 	if c.SecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		stoppedCh, listenerStoppedCh, err := c.SecureServing.Serve(handler, 0, stopCh)
+		if err != nil {
 			return err
+		}
+		gracefulShutdownSecureServer = func() {
+			<-listenerStoppedCh
+			klog.Info("[graceful-termination] secure server has stopped listening")
+			<-stoppedCh
+			klog.Info("[graceful-termination] secure server is exiting")
 		}
 	}
 
@@ -229,6 +244,12 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		ctx := wait.ContextForChannel(stopCh)
 		run(ctx, controllerInitializers)
 		<-stopCh
+		if gracefulShutdownWebhookSecureServer != nil {
+			gracefulShutdownWebhookSecureServer()
+		}
+		if gracefulShutdownSecureServer != nil {
+			gracefulShutdownSecureServer()
+		}
 		return nil
 	}
 
@@ -271,8 +292,12 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 				run(ctx, initializers)
 			},
 			OnStoppedLeading: func() {
-				klog.ErrorS(nil, "leaderelection lost")
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				select {
+				case <-stopCh:
+				default:
+					klog.ErrorS(nil, "leaderelection lost")
+					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				}
 			},
 		})
 
@@ -291,13 +316,23 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 					run(ctx, filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
-					klog.ErrorS(nil, "migration leaderelection lost")
-					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					select {
+					case <-stopCh:
+					default:
+						klog.ErrorS(nil, "migration leaderelection lost")
+						klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					}
 				},
 			})
 	}
 
 	<-stopCh
+	if gracefulShutdownWebhookSecureServer != nil {
+		gracefulShutdownWebhookSecureServer()
+	}
+	if gracefulShutdownSecureServer != nil {
+		gracefulShutdownSecureServer()
+	}
 	return nil
 }
 
@@ -542,8 +577,6 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 		WatchDog:      electionChecker,
 		Name:          leaseName,
 	})
-
-	panic("unreachable")
 }
 
 // filterInitializers returns initializers that has filterFunc(name) == expected.
