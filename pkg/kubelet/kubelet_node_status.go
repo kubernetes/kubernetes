@@ -537,7 +537,7 @@ func (kl *Kubelet) syncNodeStatus() {
 func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 	klog.V(5).InfoS("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(ctx, i); err != nil {
+		if err := kl.tryUpdateNodeStatus(ctx, i == 0 /* firstTry */, i == nodeStatusUpdateRetry-1 /* lastTry */); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
@@ -551,7 +551,7 @@ func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error {
+func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, firstTry bool, lastTry bool) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
@@ -559,11 +559,15 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
-	if tryNumber == 0 {
+	if firstTry {
 		util.FromApiserverCache(&opts)
 	}
 	originalNode, err := kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	if err != nil {
+		if lastTry && apierrors.IsNotFound(err) {
+			kl.registrationCompleted = false
+			return fmt.Errorf("error getting node %q, registration is necessary", kl.nodeName)
+		}
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
 	if originalNode == nil {
