@@ -18,6 +18,7 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -290,16 +291,45 @@ users:
 }
 
 func TestLoadRESTClientConfig(t *testing.T) {
+	file, err := os.CreateTemp("", "my.ca")
+	if err != nil {
+		t.Fatalf("could not create tempfile: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, file)
+
+	caCert := `-----BEGIN CERTIFICATE-----
+MIICyDCCAbCgAwIBAgIBADANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDEwprdWJl
+cm5ldGVzMB4XDTE5MTEyMDAwNDk0MloXDTI5MTExNzAwNDk0MlowFTETMBEGA1UE
+AxMKa3ViZXJuZXRlczCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMqQ
+ctECzA8yFSuVYupOUYgrTmfQeKe/9BaDWagaq7ow9+I2IvsfWFvlrD8QQr8sea6q
+xjq7TV67Vb4RxBaoYDA+yI5vIcujWUxULun64lu3Q6iC1sj2UnmUpIdgazRXXEkZ
+vxA6EbAnoxA0+lBOn1CZWl23IQ4s70o2hZ7wIp/vevB88RRRjqtvgc5elsjsbmDF
+LS7L1Zuye8c6gS93bR+VjVmSIfr1IEq0748tIIyXjAVCWPVCvuP41MlfPc/JVpZD
+uD2+pO6ZYREcdAnOf2eD4/eLOMKko4L1dSFy9JKM5PLnOC0Zk0AYOd1vS8DTAfxj
+XPEIY8OBYFhlsxf4TE8CAwEAAaMjMCEwDgYDVR0PAQH/BAQDAgKkMA8GA1UdEwEB
+/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAH/OYq8zyl1+zSTmuow3yI/15PL1
+dl8hB7IKnZNWmC/LTdm/+noh3Sb1IdRv6HkKg/GUn0UMuRUngLhju3EO4ozJPQcX
+quaxzgmTKNWJ6ErDvRvWhGX0ZcbdBfZv+dowyRqzd5nlJ49hC+NrtFFQq6P05BYn
+7SemguqeXmXwIj2Sa+1DeR6lRm9o8shAYjnyThUFqaMn18kI3SANJ5vk/3DFrPEO
+CKC9EzFku2kuxg2dM12PbRGZQ2o0K6HEZgrrIKTPOy3ocb8r9M0aSFhjOV/NqGA4
+SaupXSW6XfvIi/UHoIbU3pNcsnUJGnQfQvip95XKk/gqcUr+m50vxgumxtA=
+-----END CERTIFICATE-----`
+	if _, err := file.Write([]byte(caCert)); err != nil {
+		t.Fatalf("could not write to tempfile my.ca: %v", err)
+	}
+
+	encodedCAData := base64.StdEncoding.EncodeToString([]byte(caCert))
+
 	testData := []byte(`
 apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    certificate-authority: ca-a.crt
+    certificate-authority: ` + file.Name() + `
     server: https://cluster-a.com
   name: cluster-a
 - cluster:
-    certificate-authority-data: VGVzdA==
+    certificate-authority-data: ` + encodedCAData + `
     server: https://cluster-b.com
   name: cluster-b
 contexts:
@@ -326,7 +356,7 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer utiltesting.CloseAndRemove(t, f)
+	// defer utiltesting.CloseAndRemove(t, f)
 	f.Write(testData)
 
 	config, err := loadRESTClientConfig(f.Name())
@@ -337,7 +367,7 @@ users:
 	expectedConfig := &restclient.Config{
 		Host: "https://cluster-b.com",
 		TLSClientConfig: restclient.TLSClientConfig{
-			CAData: []byte(`Test`),
+			CAData: []byte(caCert),
 		},
 		BearerToken: "mytoken-b",
 	}

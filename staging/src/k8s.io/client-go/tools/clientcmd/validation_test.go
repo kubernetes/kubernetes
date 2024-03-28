@@ -297,8 +297,12 @@ func TestValidateCleanClusterInfo(t *testing.T) {
 }
 
 func TestValidateCleanWithCAClusterInfo(t *testing.T) {
-	tempFile, _ := os.CreateTemp("", "")
+	tempFile, _ := os.CreateTemp("", "my.ca")
 	defer utiltesting.CloseAndRemove(t, tempFile)
+
+	if _, err := tempFile.Write([]byte(caCert)); err != nil {
+		t.Fatalf("could not write to tempfile my.ca: %v", err)
+	}
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
@@ -360,13 +364,25 @@ func TestValidateCertDataOverridesFiles(t *testing.T) {
 }
 
 func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
-	tempFile, _ := os.CreateTemp("", "")
-	defer utiltesting.CloseAndRemove(t, tempFile)
+	tempCertFile, _ := os.CreateTemp("", "cert")
+	defer utiltesting.CloseAndRemove(t, tempCertFile)
 
+	if _, err := tempCertFile.Write([]byte(cert)); err != nil {
+		t.Fatalf("could not write to tempfile %s: %v", tempCertFile.Name(), err)
+	}
+
+	tempKeyFile, _ := os.CreateTemp("", "key")
+	defer utiltesting.CloseAndRemove(t, tempKeyFile)
+
+	if _, err := tempKeyFile.Write([]byte(key)); err != nil {
+		t.Fatalf("could not write to tempfile %s: %v", tempKeyFile.Name(), err)
+	}
+
+	// TODO:SSN
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
-		ClientCertificate: tempFile.Name(),
-		ClientKey:         tempFile.Name(),
+		ClientCertificate: tempCertFile.Name(),
+		ClientKey:         tempKeyFile.Name(),
 	}
 	test := configValidationTest{
 		config: config,
