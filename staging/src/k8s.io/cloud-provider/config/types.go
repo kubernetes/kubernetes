@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
@@ -100,4 +101,15 @@ type WebhookConfiguration struct {
 	// '-foo' means "disable 'foo'"
 	// first item for a particular name wins
 	Webhooks []string
+	// WebhookPort is the port that the controller-manager's webhook service runs on.
+	WebhookPort int32
+	// WebhookAddress is the IP address to serve on.
+	WebhookAddress string
+	// CaBundle is the ca certs to be used by apiserver for validating the webhook server certs.
+	CaBundle string
+	// ValidatingWebhookConfiguration is the config used for creating validation webhook config object.
+	ValidatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration
+
+	// MutatingWebhookConfiguration is the config used for creating mutating webhook config object.
+	MutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration
 }

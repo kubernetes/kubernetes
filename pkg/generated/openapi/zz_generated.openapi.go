@@ -56694,10 +56694,48 @@ func schema_k8sio_cloud_provider_config_v1alpha1_WebhookConfiguration(ref common
 							},
 						},
 					},
+					"WebhookPort": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WebhookPort is the port that the controller-manager's webhook service runs on.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"WebhookAddress": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WebhookAddress is the IP address to serve on.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"CaBundle": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CaBundle is the ca certs to be used by apiserver for validating the webhook server certs.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"ValidatingWebhookConfiguration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidatingWebhookConfiguration is the config used for creating validation webhook config object.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1.ValidatingWebhookConfiguration"),
+						},
+					},
+					"MutatingWebhookConfiguration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MutatingWebhookConfiguration is the config used for creating mutating webhook config object.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1.MutatingWebhookConfiguration"),
+						},
+					},
 				},
-				Required: []string{"Webhooks"},
+				Required: []string{"Webhooks", "WebhookPort", "WebhookAddress", "CaBundle", "ValidatingWebhookConfiguration", "MutatingWebhookConfiguration"},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1.MutatingWebhookConfiguration", "k8s.io/api/admissionregistration/v1.ValidatingWebhookConfiguration"},
 	}
 }
 

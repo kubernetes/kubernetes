@@ -24,6 +24,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -187,6 +188,11 @@ func autoConvert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudShared
 
 func autoConvert_v1alpha1_WebhookConfiguration_To_config_WebhookConfiguration(in *WebhookConfiguration, out *config.WebhookConfiguration, s conversion.Scope) error {
 	out.Webhooks = *(*[]string)(unsafe.Pointer(&in.Webhooks))
+	out.WebhookPort = in.WebhookPort
+	out.WebhookAddress = in.WebhookAddress
+	out.CaBundle = in.CaBundle
+	out.ValidatingWebhookConfiguration = (*admissionregistrationv1.ValidatingWebhookConfiguration)(unsafe.Pointer(in.ValidatingWebhookConfiguration))
+	out.MutatingWebhookConfiguration = (*admissionregistrationv1.MutatingWebhookConfiguration)(unsafe.Pointer(in.MutatingWebhookConfiguration))
 	return nil
 }
 
@@ -197,6 +203,11 @@ func Convert_v1alpha1_WebhookConfiguration_To_config_WebhookConfiguration(in *We
 
 func autoConvert_config_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(in *config.WebhookConfiguration, out *WebhookConfiguration, s conversion.Scope) error {
 	out.Webhooks = *(*[]string)(unsafe.Pointer(&in.Webhooks))
+	out.WebhookPort = in.WebhookPort
+	out.WebhookAddress = in.WebhookAddress
+	out.CaBundle = in.CaBundle
+	out.ValidatingWebhookConfiguration = (*admissionregistrationv1.ValidatingWebhookConfiguration)(unsafe.Pointer(in.ValidatingWebhookConfiguration))
+	out.MutatingWebhookConfiguration = (*admissionregistrationv1.MutatingWebhookConfiguration)(unsafe.Pointer(in.MutatingWebhookConfiguration))
 	return nil
 }
 
