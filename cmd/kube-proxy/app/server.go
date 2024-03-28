@@ -278,6 +278,7 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 	}
 
 	o.platformApplyDefaults(o.config)
+	o.setDefaultAddresses(o.config)
 
 	if err := o.processHostnameOverrideFlag(); err != nil {
 		return err
@@ -1062,4 +1063,29 @@ func getNodeIPs(logger klog.Logger, client clientset.Interface, name string) []n
 		logger.Info("Successfully retrieved node IP(s)", "IPs", nodeIPs)
 	}
 	return nodeIPs
+}
+
+func (o *Options) setDefaultAddresses(config *kubeproxyconfig.KubeProxyConfiguration) {
+	defaultHealthzAddress, defaultMetricsAddress := getDefaultAddresses(config.BindAddress)
+
+	if config.HealthzBindAddress == "" {
+		config.HealthzBindAddress = fmt.Sprintf("%s:%v", defaultHealthzAddress, ports.ProxyHealthzPort)
+	} else {
+		config.HealthzBindAddress = proxyutil.AppendPortIfNeeded(config.HealthzBindAddress, ports.ProxyHealthzPort)
+	}
+	if config.MetricsBindAddress == "" {
+		config.MetricsBindAddress = fmt.Sprintf("%s:%v", defaultMetricsAddress, ports.ProxyStatusPort)
+	} else {
+		config.MetricsBindAddress = proxyutil.AppendPortIfNeeded(config.MetricsBindAddress, ports.ProxyStatusPort)
+	}
+}
+
+// getDefaultAddresses returns default address of healthz and metrics server
+// based on the given bind address. IPv6 addresses are enclosed in square
+// brackets for appending port.
+func getDefaultAddresses(bindAddress string) (defaultHealthzAddress, defaultMetricsAddress string) {
+	if netutils.ParseIPSloppy(bindAddress).To4() != nil {
+		return "0.0.0.0", "127.0.0.1"
+	}
+	return "[::]", "[::1]"
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,10 +24,7 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 
 	logsapi "k8s.io/component-base/logs/api/v1"
-	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -40,19 +36,6 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
-	}
-
-	defaultHealthzAddress, defaultMetricsAddress := getDefaultAddresses(obj.BindAddress)
-
-	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = fmt.Sprintf("%s:%v", defaultHealthzAddress, ports.ProxyHealthzPort)
-	} else {
-		obj.HealthzBindAddress = proxyutil.AppendPortIfNeeded(obj.HealthzBindAddress, ports.ProxyHealthzPort)
-	}
-	if obj.MetricsBindAddress == "" {
-		obj.MetricsBindAddress = fmt.Sprintf("%s:%v", defaultMetricsAddress, ports.ProxyStatusPort)
-	} else {
-		obj.MetricsBindAddress = proxyutil.AppendPortIfNeeded(obj.MetricsBindAddress, ports.ProxyStatusPort)
 	}
 
 	if obj.OOMScoreAdj == nil {
@@ -137,14 +120,4 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	}
 	// Use the Default LoggingConfiguration option
 	logsapi.SetRecommendedLoggingConfiguration(&obj.Logging)
-}
-
-// getDefaultAddresses returns default address of healthz and metrics server
-// based on the given bind address. IPv6 addresses are enclosed in square
-// brackets for appending port.
-func getDefaultAddresses(bindAddress string) (defaultHealthzAddress, defaultMetricsAddress string) {
-	if netutils.ParseIPSloppy(bindAddress).To4() != nil {
-		return "0.0.0.0", "127.0.0.1"
-	}
-	return "[::]", "[::1]"
 }

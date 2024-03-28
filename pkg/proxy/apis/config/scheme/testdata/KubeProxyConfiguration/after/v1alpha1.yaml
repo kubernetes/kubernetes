@@ -22,7 +22,7 @@ detectLocal:
   interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
-healthzBindAddress: 0.0.0.0:10256
+healthzBindAddress: ""
 hostnameOverride: ""
 iptables:
   localhostNodePorts: true
@@ -49,7 +49,7 @@ logging:
     text:
       infoBufferSize: "0"
   verbosity: 0
-metricsBindAddress: 127.0.0.1:10249
+metricsBindAddress: ""
 mode: ""
 nftables:
   masqueradeAll: false
