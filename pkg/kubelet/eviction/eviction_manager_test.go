@@ -19,6 +19,7 @@ package eviction
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"testing"
 	"time"
 
@@ -339,7 +340,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
-					podsEvicted:                  map[string]bool{},
+					podsEvicted:                  sets.Set[string]{},
 				}
 
 				// synchronize to detect the memory pressure
@@ -442,7 +443,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
-					podsEvicted:                  map[string]bool{},
+					podsEvicted:                  sets.Set[string]{},
 				}
 
 				// synchronize to detect the PID pressure
@@ -626,7 +627,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
-					podsEvicted:                  map[string]bool{},
+					podsEvicted:                  sets.Set[string]{},
 				}
 
 				// synchronize
@@ -731,7 +732,7 @@ func TestMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		podsEvicted:                  map[string]bool{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// create a best effort pod to test admission
@@ -1003,7 +1004,7 @@ func TestPIDPressure(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
-				podsEvicted:                  map[string]bool{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// create a pod to test admission
@@ -1381,7 +1382,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
-				podsEvicted:                  map[string]bool{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// create a best effort pod to test admission
@@ -1620,7 +1621,7 @@ func TestMinReclaim(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		podsEvicted:                  map[string]bool{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// synchronize
@@ -1906,7 +1907,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
-				podsEvicted:                  map[string]bool{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// synchronize
@@ -2364,7 +2365,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
-				podsEvicted:                  map[string]bool{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// create a best effort pod to test admission
@@ -2599,7 +2600,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		podsEvicted:                  map[string]bool{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	fakeClock.Step(1 * time.Minute)
@@ -2836,7 +2837,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		podsEvicted:                  map[string]bool{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// create a best effort pod to test admission
@@ -3006,7 +3007,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 		thresholdNotifiers:           []ThresholdNotifier{thresholdNotifier},
-		podsEvicted:                  map[string]bool{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// The UpdateThreshold method should have been called once, since this is the first run.
@@ -3102,7 +3103,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 		nodeRef:                       nodeRef,
 		localStorageCapacityIsolation: true,
 		dedicatedImageFs:              diskInfoProvider.dedicatedImageFs,
-		podsEvicted:                   map[string]bool{},
+		podsEvicted:                   sets.Set[string]{},
 	}
 
 	activePodsFunc := func() []*v1.Pod {
@@ -3177,7 +3178,7 @@ func TestSoftEvictOthersWhileWaitingForPodGracefulShutdown(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		podsEvicted:                  map[string]bool{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// synchronize
