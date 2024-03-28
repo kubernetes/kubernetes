@@ -143,7 +143,9 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	// Don't allow duplicates in the applied object.
 	patchObjTyped, err := f.typeConverter.ObjectToTyped(patchObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create typed patch object (%v): %v", objectGVKNN(patchObj), err)
+		return nil, nil, errors.NewBadRequest(
+			fmt.Sprintf("failed to create typed patch object (%v): %v", objectGVKNN(patchObj), err))
+
 	}
 
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned, typed.AllowDuplicates)
