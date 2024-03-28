@@ -189,7 +189,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	}
 	result.HugePageLimit = hugePageLimits
 
-	if enforceMemoryQoS {
+	if enforceMemoryQoS || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling) {
 		memoryMin := int64(0)
 		if request, found := reqs[v1.ResourceMemory]; found {
 			memoryMin = request.Value()

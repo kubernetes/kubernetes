@@ -633,18 +633,41 @@ func getCgroupCpuConfig(cgroupPath string) (*ResourceConfig, error) {
 }
 
 func getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {
-	memLimitFile := "memory.limit_in_bytes"
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
-		memLimitFile = "memory.max"
+		return getCgroupv2MemoryConfig(cgroupPath)
+	} else {
+		return getCgroupv1MemoryConfig(cgroupPath)
 	}
-	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, memLimitFile)
+}
+
+func getCgroupv2MemoryConfig(cgroupPath string) (*ResourceConfig, error) {
+	var resourceConfig ResourceConfig
+
+	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, "memory.max")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", "memory.max", cgroupPath, err)
 	}
 	mLim := int64(memLimit)
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
-	return &ResourceConfig{Memory: &mLim}, nil
+	resourceConfig.Memory = &mLim
 
+	memRequest, err := fscommon.GetCgroupParamUint(cgroupPath, "memory.min")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", "memory.min", cgroupPath, err)
+	}
+	if memRequest != 0 {
+		resourceConfig.Unified = make(map[string]string)
+		resourceConfig.Unified[Cgroup2MemoryMin] = strconv.FormatUint(memRequest, 10)
+	}
+	return &resourceConfig, nil
+}
+
+func getCgroupv1MemoryConfig(cgroupPath string) (*ResourceConfig, error) {
+	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, "memory.limit_in_bytes")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", "memory.limit_in_bytes", cgroupPath, err)
+	}
+	mLim := int64(memLimit)
+	return &ResourceConfig{Memory: &mLim}, nil
 }
 
 // Get the resource config values applied to the cgroup for specified resource type
@@ -720,15 +743,33 @@ func setCgroupCpuConfig(cgroupPath string, resourceConfig *ResourceConfig) error
 }
 
 func setCgroupMemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	memLimitFile := "memory.limit_in_bytes"
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
-		memLimitFile = "memory.max"
+		return setCgroupv2MemoryConfig(cgroupPath, resourceConfig)
+	} else {
+		return setCgroupv1MemoryConfig(cgroupPath, resourceConfig)
 	}
+}
+
+func setCgroupv1MemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
 	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)
-	if err := os.WriteFile(filepath.Join(cgroupPath, memLimitFile), []byte(memLimit), 0700); err != nil {
-		return fmt.Errorf("failed to write %v to %v/%v: %v", memLimit, cgroupPath, memLimitFile, err)
+	if err := os.WriteFile(filepath.Join(cgroupPath, "memory.limit_in_bytes"), []byte(memLimit), 0700); err != nil {
+		return fmt.Errorf("failed to write %v to %v/%v: %v", memLimit, cgroupPath, "memory.limit_in_bytes", err)
 	}
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
+	return nil
+}
+
+func setCgroupv2MemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
+	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)
+	if err := os.WriteFile(filepath.Join(cgroupPath, "memory.max"), []byte(memLimit), 0700); err != nil {
+		return fmt.Errorf("failed to write %v to %v/%v: %v", memLimit, cgroupPath, "memory.max", err)
+	}
+	if resourceConfig.Unified != nil {
+		if memoryMin, memoryMinExists := resourceConfig.Unified[Cgroup2MemoryMin]; memoryMinExists {
+			if err := os.WriteFile(filepath.Join(cgroupPath, "memory.min"), []byte(memoryMin), 0700); err != nil {
+				return fmt.Errorf("failed to write %v to %v/%v: %v", memLimit, cgroupPath, "memory.min", err)
+			}
+		}
+	}
 	return nil
 }
 
