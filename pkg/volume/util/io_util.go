@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -40,8 +40,8 @@ func NewIOHandler() IoUtil {
 func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
-func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+func (handler *osIOHandler) ReadDir(dirname string) ([]fs.DirEntry, error) {
+	return os.ReadDir(dirname)
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)

@@ -20,7 +20,6 @@ limitations under the License.
 package iscsi
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -442,10 +441,7 @@ func TestGetVolCount(t *testing.T) {
 }
 
 func createFakePluginDirs() (string, error) {
-	dir, err := ioutil.TempDir("", "refcounter")
-	if err != nil {
-		return "", err
-	}
+	dir := os.TempDir()
 
 	subdirs := []string{
 		"iface-127.0.0.1:3260:pv1/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3",
@@ -461,5 +457,5 @@ func createFakePluginDirs() (string, error) {
 		}
 	}
 
-	return dir, err
+	return dir, nil
 }
