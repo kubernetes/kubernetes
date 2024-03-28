@@ -236,6 +236,86 @@ func TestWarnings(t *testing.T) {
 			expected: []string{`spec.volumes[0].rbd: deprecated in v1.28, non-functional in v1.31+`},
 		},
 		{
+			name: "duplicated path in projected volumes - secret and service account token",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "t",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{Secret: &api.SecretProjection{Items: []api.KeyToPath{{Path: "/test-path", Key: "test"}}}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
+								}},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				"spec.volumes[0].projected.sources.secrets[0]: has duplicated path with ServiceAccountToken \"/test-path\"",
+			},
+		},
+		{
+			name: "duplicated path in projected volumes - configMap and service account token",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "t",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{ConfigMap: &api.ConfigMapProjection{Items: []api.KeyToPath{{Path: "/test-path", Key: "test"}}}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
+								}},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				"spec.volumes[0].projected.sources.configMap[0]: has duplicated path with ServiceAccountToken \"/test-path\"",
+			},
+		},
+		{
+			name: "duplicated path in projected volumes - downwardAPI and service account token",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "t",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "/test-path"}}}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
+								}},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				"spec.volumes[0].projected.sources.downwardAPI[0]: has duplicated path with ServiceAccountToken \"/test-path\"",
+			},
+		},
+		{
+			name: "duplicated path in projected volumes - ClusterTrustBundle and service account token",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "t",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{ClusterTrustBundle: &api.ClusterTrustBundleProjection{Path: "/test-path"}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
+								}},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				"spec.volumes[0].projected.sources.ClusterTrustBundle: has duplicated path with ServiceAccountToken \"/test-path\"",
+			},
+		},
+		{
 			name: "duplicate hostAlias",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				HostAliases: []api.HostAlias{
