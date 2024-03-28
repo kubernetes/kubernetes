@@ -18,40 +18,69 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sync"
 )
 
 // callSet represents a set of expected calls, indexed by receiver and method
 // name.
 type callSet struct {
 	// Calls that are still expected.
-	expected map[callSetKey][]*Call
+	expected   map[callSetKey][]*Call
+	expectedMu *sync.Mutex
 	// Calls that have been exhausted.
 	exhausted map[callSetKey][]*Call
+	// when set to true, existing call expectations are overridden when new call expectations are made
+	allowOverride bool
 }
 
 // callSetKey is the key in the maps in callSet
 type callSetKey struct {
-	receiver interface{}
+	receiver any
 	fname    string
 }
 
 func newCallSet() *callSet {
-	return &callSet{make(map[callSetKey][]*Call), make(map[callSetKey][]*Call)}
+	return &callSet{
+		expected:   make(map[callSetKey][]*Call),
+		expectedMu: &sync.Mutex{},
+		exhausted:  make(map[callSetKey][]*Call),
+	}
+}
+
+func newOverridableCallSet() *callSet {
+	return &callSet{
+		expected:      make(map[callSetKey][]*Call),
+		expectedMu:    &sync.Mutex{},
+		exhausted:     make(map[callSetKey][]*Call),
+		allowOverride: true,
+	}
 }
 
 // Add adds a new expected call.
 func (cs callSet) Add(call *Call) {
 	key := callSetKey{call.receiver, call.method}
+
+	cs.expectedMu.Lock()
+	defer cs.expectedMu.Unlock()
+
 	m := cs.expected
 	if call.exhausted() {
 		m = cs.exhausted
 	}
+	if cs.allowOverride {
+		m[key] = make([]*Call, 0)
+	}
+
 	m[key] = append(m[key], call)
 }
 
 // Remove removes an expected call.
 func (cs callSet) Remove(call *Call) {
 	key := callSetKey{call.receiver, call.method}
+
+	cs.expectedMu.Lock()
+	defer cs.expectedMu.Unlock()
+
 	calls := cs.expected[key]
 	for i, c := range calls {
 		if c == call {
@@ -64,8 +93,11 @@ func (cs callSet) Remove(call *Call) {
 }
 
 // FindMatch searches for a matching call. Returns error with explanation message if no call matched.
-func (cs callSet) FindMatch(receiver interface{}, method string, args []interface{}) (*Call, error) {
+func (cs callSet) FindMatch(receiver any, method string, args []any) (*Call, error) {
 	key := callSetKey{receiver, method}
+
+	cs.expectedMu.Lock()
+	defer cs.expectedMu.Unlock()
 
 	// Search through the expected calls.
 	expected := cs.expected[key]
@@ -101,6 +133,9 @@ func (cs callSet) FindMatch(receiver interface{}, method string, args []interfac
 
 // Failures returns the calls that are not satisfied.
 func (cs callSet) Failures() []*Call {
+	cs.expectedMu.Lock()
+	defer cs.expectedMu.Unlock()
+
 	failures := make([]*Call, 0, len(cs.expected))
 	for _, calls := range cs.expected {
 		for _, call := range calls {
@@ -110,4 +145,20 @@ func (cs callSet) Failures() []*Call {
 		}
 	}
 	return failures
+}
+
+// Satisfied returns true in case all expected calls in this callSet are satisfied.
+func (cs callSet) Satisfied() bool {
+	cs.expectedMu.Lock()
+	defer cs.expectedMu.Unlock()
+
+	for _, calls := range cs.expected {
+		for _, call := range calls {
+			if !call.satisfied() {
+				return false
+			}
+		}
+	}
+
+	return true
 }
