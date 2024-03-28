@@ -17,9 +17,10 @@ limitations under the License.
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"strings"
 
 	"github.com/emicklei/go-restful/v3"
 )
@@ -41,8 +42,11 @@ func (l Logs) Install(c *restful.Container) {
 }
 
 func logFileHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
-	actual := path.Join(logdir, req.PathParameter("logpath"))
+	actual, err := prepareLogPath(req.PathParameter("logpath"))
+	if err != nil {
+		http.Error(resp, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// check filename length first, return 404 if it's oversize.
 	if logFileNameIsTooLong(actual) {
@@ -67,4 +71,28 @@ func logFileNameIsTooLong(filePath string) bool {
 		}
 	}
 	return false
+}
+
+func prepareLogPath(logPath string) (string, error) {
+	if logPath == ".." ||
+		strings.HasPrefix(logPath, "../") ||
+		strings.HasSuffix(logPath, "/..") ||
+		strings.Contains(logPath, "/../") {
+		return "", fmt.Errorf("invalid path: %q", logPath)
+	}
+	if logPath == "." ||
+		strings.HasPrefix(logPath, "./") ||
+		strings.HasSuffix(logPath, "/.") ||
+		strings.Contains(logPath, "/./") {
+		return "", fmt.Errorf("invalid path: %q", logPath)
+	}
+	if logPath == "" || logPath == "/" {
+		return "", fmt.Errorf("empty path: %q", logPath)
+	}
+	// we ensure that the prefix ends in '/' in below, so skip any leading '/' in the log path now
+	startIndex := 0
+	if logPath[0] == '/' {
+		startIndex = 1
+	}
+	return "/var/log/" + logPath[startIndex:], nil
 }
