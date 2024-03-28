@@ -68,7 +68,7 @@ var (
 		kubectl replace --force -f ./pod.json`))
 )
 
-var supportedSubresources = []string{"status", "scale"}
+var supportedSubresources = []string{"status", "scale", "ephemeralcontainers"}
 
 type ReplaceOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
