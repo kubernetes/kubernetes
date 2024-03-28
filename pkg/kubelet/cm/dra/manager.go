@@ -171,6 +171,9 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			if reqClaim == nil {
 				return fmt.Errorf("NodePrepareResources returned result for unknown claim UID %s", claimUID)
 			}
+			if result == nil {
+				return fmt.Errorf("NodePrepareResources returned nil result for claim %s/%s", reqClaim.Namespace, reqClaim.Name)
+			}
 			if result.Error != "" {
 				return fmt.Errorf("NodePrepareResources failed for claim %s/%s: %s", reqClaim.Namespace, reqClaim.Name, result.Error)
 			}
@@ -379,7 +382,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			if reqClaim == nil {
 				return fmt.Errorf("NodeUnprepareResources returned result for unknown claim UID %s", claimUID)
 			}
-			if result.Error != "" {
+			if result != nil && result.Error != "" {
 				return fmt.Errorf("NodeUnprepareResources failed for claim %s/%s: %s", reqClaim.Namespace, reqClaim.Name, result.Error)
 			}
 
