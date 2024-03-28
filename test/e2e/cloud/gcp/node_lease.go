@@ -44,6 +44,7 @@ var _ = SIGDescribe(framework.WithDisruptive(), "NodeLease", func() {
 	var group string
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		systemPods, err := e2epod.GetPodsInNamespace(ctx, c, ns, map[string]string{})
