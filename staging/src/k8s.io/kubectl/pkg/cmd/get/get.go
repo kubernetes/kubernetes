@@ -686,7 +686,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	intr := interrupt.New(nil, cancel)
+	intr := interrupt.New(nil, cancel).NewLineAfterTermination(true)
 	intr.Run(func() error {
 		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
 			objToPrint := e.Object
