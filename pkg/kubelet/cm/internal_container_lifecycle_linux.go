@@ -34,6 +34,15 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, contain
 		if !allocatedCPUs.IsEmpty() {
 			containerConfig.Linux.Resources.CpusetCpus = allocatedCPUs.String()
 		}
+
+		// Remove CPU quota only for containers that requested exclusive CPUs
+		// The container should have exclusive CPUs only when:
+		// 1. The pod has guaranteed QoS
+		// 2. The container requested whole CPUs
+		exclusiveCPUs := i.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name)
+		if !exclusiveCPUs.IsEmpty() {
+			containerConfig.Linux.Resources.CpuQuota = -1
+		}
 	}
 
 	if i.memoryManager != nil {
