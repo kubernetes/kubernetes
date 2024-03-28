@@ -44031,6 +44031,68 @@
         }
       }
     },
+    "/apis/apps/v1/namespaces/{namespace}/daemonsets/{name}/scale": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read scale of the specified DaemonSet",
+        "operationId": "readAppsV1NamespacedDaemonSetScale",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.autoscaling.v1.Scale"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "apps_v1"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "Scale",
+          "version": "v1"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the Scale",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "description": "object name and auth scope, such as for teams and projects",
+          "in": "path",
+          "name": "namespace",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "description": "If 'true', then the output is pretty printed.",
+          "in": "query",
+          "name": "pretty",
+          "type": "string",
+          "uniqueItems": true
+        }
+      ]
+    },
     "/apis/apps/v1/namespaces/{namespace}/daemonsets/{name}/status": {
       "get": {
         "consumes": [

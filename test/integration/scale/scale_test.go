@@ -19,6 +19,7 @@ package scale
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -65,6 +66,7 @@ func TestScaleSubresources(t *testing.T) {
 		makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "statefulsets/scale"): makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "daemonsets/scale"):   makeGVK("autoscaling", "v1", "Scale"),
 	}
 
 	autoscalingGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
@@ -133,6 +135,29 @@ func TestScaleSubresources(t *testing.T) {
 	if _, err := clientSet.AppsV1().StatefulSets("default").Create(context.TODO(), ssStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := clientSet.AppsV1().DaemonSets("default").Create(context.TODO(), daemonsetStub, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// collect supported verbs per resource
+	resListResp, err := clientSet.Discovery().RESTClient().Get().AbsPath("/apis/apps/v1").Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resourceList, ok := resListResp.(*metav1.APIResourceList)
+	if !ok {
+		t.Fatal("type of resource list response is invalid")
+	}
+
+	supportedVerbs := map[string]map[string]bool{}
+	for _, res := range resourceList.APIResources {
+		supportedVerbs[res.Name] = map[string]bool{}
+
+		for _, verb := range res.Verbs {
+			supportedVerbs[res.Name][verb] = true
+		}
+	}
 
 	// Ensure scale subresources return and accept expected kinds
 	for gvr, gvk := range discoveredScaleSubresources {
@@ -161,6 +186,12 @@ func TestScaleSubresources(t *testing.T) {
 			t.Errorf("expected %#v, got %#v from %s", gvk, obj.GetObjectKind().GroupVersionKind(), urlPath)
 			t.Log(string(getData))
 			continue
+		}
+
+		if verbs, ok := supportedVerbs[fmt.Sprintf("%s/scale", resourceParts[0])]; ok {
+			if _, up := verbs["update"]; !up {
+				continue
+			}
 		}
 
 		updateData, err := clientSet.CoreV1().RESTClient().Put().AbsPath(urlPath).Body(getData).DoRaw(context.TODO())
@@ -199,6 +230,11 @@ var (
 	ssStub = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		Spec:       appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+	}
+
+	daemonsetStub = &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Spec:       appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Template: podStub},
 	}
 )
 

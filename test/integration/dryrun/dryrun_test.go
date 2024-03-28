@@ -18,6 +18,7 @@ package dryrun
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -247,6 +248,26 @@ func TestDryRun(t *testing.T) {
 		dryrunData[resource] = data
 	}
 
+	// collect supported verbs per resource
+	resListResp, err := client.Discovery().RESTClient().Get().AbsPath("/apis/apps/v1").Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resourceList, ok := resListResp.(*metav1.APIResourceList)
+	if !ok {
+		t.Fatal("type of resource list response is invalid")
+	}
+
+	supportedVerbs := map[string]map[string]bool{}
+	for _, res := range resourceList.APIResources {
+		supportedVerbs[res.Name] = map[string]bool{}
+
+		for _, verb := range res.Verbs {
+			supportedVerbs[res.Name][verb] = true
+		}
+	}
+
 	// gather resources to test
 	_, resources, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {
@@ -285,8 +306,16 @@ func TestDryRun(t *testing.T) {
 
 			DryRunUpdateTest(t, rsc, name)
 			DryRunPatchTest(t, rsc, name)
-			DryRunScalePatchTest(t, rsc, name)
-			DryRunScaleUpdateTest(t, rsc, name)
+
+			runScaleTest := true
+			if verbs, ok := supportedVerbs[fmt.Sprintf("%s/scale", gvResource.Resource)]; ok {
+				_, runScaleTest = verbs["update"]
+			}
+			if runScaleTest {
+				DryRunScalePatchTest(t, rsc, name)
+				DryRunScaleUpdateTest(t, rsc, name)
+			}
+
 			if resourceToTest.HasDeleteCollection {
 				DryRunDeleteCollectionTest(t, rsc, name)
 			}
