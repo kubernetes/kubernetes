@@ -575,10 +575,20 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 			currentMemoryLimit = kubeContainerStatus.Resources.MemoryLimit.Value()
 		}
 		if kubeContainerStatus.Resources.CPULimit != nil {
-			currentCPULimit = kubeContainerStatus.Resources.CPULimit.MilliValue()
+			kubeCurrentCPULimit := kubeContainerStatus.Resources.CPULimit.MilliValue()
+			if desiredCPULimit <= 10 && kubeCurrentCPULimit <= 10 {
+				currentCPULimit = desiredCPULimit
+			} else {
+				currentCPULimit = kubeCurrentCPULimit
+			}
 		}
 		if kubeContainerStatus.Resources.CPURequest != nil {
-			currentCPURequest = kubeContainerStatus.Resources.CPURequest.MilliValue()
+			kubeCurrentRequest := kubeContainerStatus.Resources.CPURequest.MilliValue()
+			if desiredCPURequest <= 2 && kubeCurrentRequest <= 2 {
+				currentCPURequest = apiContainerStatus.AllocatedResources.Cpu().MilliValue()
+			} else {
+				currentCPURequest = kubeCurrentRequest
+			}
 		}
 	}
 
