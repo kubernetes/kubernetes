@@ -2812,6 +2812,10 @@ func (t *trackingWorkqueue) Get() (interface{}, bool) {
 	t.dequeue(item)
 	return item, shutdown
 }
+func (t *trackingWorkqueue) IsQueued(item interface{}) bool {
+	_, ok := t.pendingMap[item]
+	return ok
+}
 func (t *trackingWorkqueue) Done(item interface{}) {
 	t.limiter.Done(item)
 }
@@ -2838,6 +2842,18 @@ func (t *trackingWorkqueue) ShutDownWithDrain() {
 }
 func (t *trackingWorkqueue) ShuttingDown() bool {
 	return t.limiter.ShuttingDown()
+}
+func (t *trackingWorkqueue) AddWithOptions(item interface{}, opts workqueue.DelayingOptions) {
+	t.Add(item)
+}
+func (t *trackingWorkqueue) DoneWaiting(item interface{}) {
+	t.limiter.DoneWaiting(item)
+}
+func (t *trackingWorkqueue) IsWaiting(item interface{}) (bool, time.Duration) {
+	return t.limiter.IsWaiting(item)
+}
+func (t *trackingWorkqueue) LenWaiting() int {
+	return t.limiter.LenWaiting()
 }
 
 func (t *trackingWorkqueue) queue(item interface{}) {

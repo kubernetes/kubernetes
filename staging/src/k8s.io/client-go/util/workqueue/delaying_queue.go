@@ -27,11 +27,55 @@ import (
 
 // DelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
 // requeue items after failures without ending up in a hot-loop.
+// A Delaying queue can be thought of two separate queues that work together - an 'active' queue of
+// items which we want to process ASAP and a 'waiting' queue of items which must wait for a period of time
+// to elapse before they are popped from the 'waiting' queue and added to the 'active' queue.
 type DelayingInterface interface {
 	Interface
 	// AddAfter adds an item to the workqueue after the indicated duration has passed
+	// This corresponds to the newer AddWithOptions(item, DelayingOptions{PermitActiveAndWaiting: true, WhenWaiting: TakeShorter, duration: duration})
 	AddAfter(item interface{}, duration time.Duration)
+	// AddWithOptions is newer than AddAfter and allows fuller control over the delaying queue features.
+	AddWithOptions(item interface{}, opts DelayingOptions)
+	// DoneWaiting will remove an item from the 'waiting' queue.
+	// If you want to cancel 'active' queued items you need to call Done().
+	DoneWaiting(item interface{})
+	// IsWaiting returns a bool indicating whether the given item is queued in the 'waiting' queue
+	// and if it is how long it has left to wait.
+	IsWaiting(item interface{}) (bool, time.Duration)
+	// LenWaiting returns the length of the 'waiting' queue.
+	LenWaiting() int
 }
+
+// DelayingOptions toggle implementation specific options for use with AddWithOptions
+type DelayingOptions struct {
+	// Duration specifies for how long this item should be delayed before being added back into the 'active' queue.
+	Duration time.Duration
+	// Waiting specifies how you want the waitingLoop to treat items that are already present in the 'waiting' queue.
+	WhenWaiting AlreadyWaitingBehaviour
+	// PermitActiveAndWaiting overrides the default queue behaviour which ensures that an item is not allowed to be simultaneously
+	// queued in both the 'active' and 'waiting' queues.
+	// Setting PermitActiveAndWaiting to 'true' results in the following: -
+	// 1. A item with a delay (Duration > 0) can be queued to 'waiting' when the same item is in the 'active' queue.
+	// 2. A 'waiting' item will remain queued if the same item is subsequently queued to the 'active' queue with this option set.
+	PermitActiveAndWaiting bool
+	// Synchronous defines whether to wait for an item to be processed into the queue (or be dropped) before returning.
+	Synchronous bool
+}
+
+// AlreadyWaitingBehaviour defines different choices of how to handle a delayed add when there is already the same item in the 'waiting' queue.
+type AlreadyWaitingBehaviour int
+
+const (
+	// TakeShorter will modify the waiting item's wait time only if the incoming item has as shorter delay duration.
+	TakeShorter AlreadyWaitingBehaviour = iota
+	// TakeLonger will modify the waiting item's wait time only if the incoming item has a longer delay duration.
+	TakeLonger
+	// TakeIncoming will always adjust the delay of the waiting item with the delay of the incoming item unless they are equal.
+	TakeIncoming
+	// TakeExisting will never modify the waiting item's wait time, so effectively works as an "add only if the item is not already in the 'waiting' queue."
+	TakeExisting
+)
 
 // DelayingQueueConfig specifies optional configurations to customize a DelayingInterface.
 type DelayingQueueConfig struct {
@@ -102,39 +146,77 @@ func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) Delayi
 
 func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) *delayingType {
 	ret := &delayingType{
-		Interface:       q,
-		clock:           clock,
-		heartbeat:       clock.NewTicker(maxWait),
-		stopCh:          make(chan struct{}),
-		waitingForAddCh: make(chan *waitFor, 1000),
-		metrics:         newRetryMetrics(name, provider),
+		Interface:          q,
+		clock:              clock,
+		nextReadyAtTimerCh: make(<-chan time.Time),
+		heartbeat:          clock.NewTicker(maxWait),
+		stopCh:             make(chan struct{}),
+		waitingForAddCh:    make(chan *waitLoopMessage, 1000),
+		metrics:            newRetryMetrics(name, provider),
 	}
 
 	go ret.waitingLoop()
 	return ret
 }
 
-// delayingType wraps an Interface and provides delayed re-enquing
+// delayingType wraps an Interface and provides delayed re-enqueuing
 type delayingType struct {
 	Interface
+
+	// afterFill - a list of waitFor that require processing after the queue has filled and nextReadyAt
+	// has been re-calculated.
+	afterFill []*waitLoopMessage
 
 	// clock tracks time for delayed firing
 	clock clock.Clock
 
-	// stopCh lets us signal a shutdown to the waiting loop
-	stopCh chan struct{}
-	// stopOnce guarantees we only signal shutdown a single time
-	stopOnce sync.Once
+	// headReadyTime tracks the next time the head of the 'waiting' queue should become active.
+	headReadyTime time.Time
 
 	// heartbeat ensures we wait no more than maxWait before firing
 	heartbeat clock.Ticker
 
-	// waitingForAddCh is a buffered channel that feeds waitingForAdd
-	waitingForAddCh chan *waitFor
-
 	// metrics counts the number of retries
 	metrics retryMetrics
+
+	// nextReadyAtTimer is a timer used to create nextReadyAt signals when an item matures ready
+	// for queuing in the 'active' queue.
+	nextReadyAtTimer clock.Timer
+
+	// nextReadyAtTimerCh is the channel to return the signal from the timer.const
+	// We set it explicitly so that we can set it to 'never' by detaching it from the timer.
+	nextReadyAtTimerCh <-chan time.Time
+
+	// stopCh lets us signal a shutdown to the waitingLoop
+	stopCh chan struct{}
+	// stopOnce guarantees we only signal shutdown a single time
+	stopOnce sync.Once
+
+	// waitingForAddCh is a buffered channel that feeds waitingForAdd
+	waitingForAddCh chan *waitLoopMessage
 }
+
+var _ DelayingInterface = &delayingType{}
+var _ Interface = &delayingType{}
+
+// msgAction defines what we are asking the queue to do (which is usually queue an item but can be other things)
+type msgAction int
+
+const (
+	// msgActionQueue - queue the item in the delaying queue
+	msgActionQueue msgAction = iota
+	// msgActionDoneWaiting - forget the item provided if 'waiting'
+	msgActionDoneWaiting
+	// msgActionIsWaiting - report back on an item existing in the 'waiting' queue.
+	msgActionIsWaiting
+	// msgActionLenWaiting - report back on the waiting queue length
+	msgActionLenWaiting
+	// msgActionNextReady - report back on the next item to be ready.
+	msgActionNextReady
+	// msgActionSyncFill - close return channel when the 'waiting' queue is filled
+	// and the nextReadyAt timer has been updated.
+	msgActionSyncFill
+)
 
 // waitFor holds the data to add and the time it should be added
 type waitFor struct {
@@ -142,6 +224,28 @@ type waitFor struct {
 	readyAt time.Time
 	// index in the priority queue (heap)
 	index int
+}
+
+// waitLoopMessage hold a communication made between client and waitLoop.
+type waitLoopMessage struct {
+	// action defines what we want to do
+	action msgAction
+	// item defines an item to act upon, e.g. queue, forget etc.
+	item *waitFor
+	// options defines how the caller would like the item to behave.
+	options DelayingOptions
+	// returnCh allows the caller to block pending the processing and to also return
+	// a response value which can represent a stat such as existence or 'waiting' queue length.
+	returnCh chan waitingLoopResponse
+}
+
+// waitingLoopResponse describes the message that is returned from the waiting loop when a response
+// is requested/required.  It contains the different answer types that may be in the response.
+type waitingLoopResponse struct {
+	item      interface{}
+	exists    *bool
+	length    *int
+	nextReady *time.Duration
 }
 
 // waitForPriorityQueue implements a priority queue for waitFor items.
@@ -208,8 +312,6 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 		return
 	}
 
-	q.metrics.retry()
-
 	// immediately add things with no delay
 	if duration <= 0 {
 		q.Add(item)
@@ -219,8 +321,109 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	select {
 	case <-q.stopCh:
 		// unblock if ShutDown() is called
-	case q.waitingForAddCh <- &waitFor{data: item, readyAt: q.clock.Now().Add(duration)}:
+	case q.waitingForAddCh <- &waitLoopMessage{
+		action: msgActionQueue,
+		item: &waitFor{
+			data:    item,
+			readyAt: q.clock.Now().Add(duration),
+		},
+		options: DelayingOptions{
+			// Always take the shorter waiting value to maintain backwards compatibility for existing clients.
+			WhenWaiting: TakeShorter,
+			// Set PermitActiveAndWaiting to true so that the "active" and "waiting" queues act in isolation from each other.
+			// This is the original behaviour of waiting queue and we are keeping it for backwards compatibility
+			PermitActiveAndWaiting: true,
+		}}:
 	}
+}
+
+// AddWithOptions gives callers more control over the queueing behaviour.
+// Calls are asynchronous unless option Synchronous is set.
+func (q *delayingType) AddWithOptions(item interface{}, opts DelayingOptions) {
+	q.sendItemToWaitingLoop(item, opts, msgActionQueue)
+}
+
+// DoneWaiting removes an item from the delayed queue, effectively cancelling its future processing.
+func (q *delayingType) DoneWaiting(item interface{}) {
+	q.sendItemToWaitingLoop(item, DelayingOptions{}, msgActionDoneWaiting)
+}
+
+// IsWaiting returns a bool indicating whether the given item is queued in the 'waiting' queue.
+// The client can call IsQueued() in order to determine whether an item is queued in the 'active' queue.
+func (q *delayingType) IsWaiting(item interface{}) (bool, time.Duration) {
+	result := q.sendItemToWaitingLoop(item, DelayingOptions{Synchronous: true}, msgActionIsWaiting)
+	if result.exists != nil && result.nextReady != nil {
+		return *result.exists, *result.nextReady
+	}
+	return false, 0
+}
+
+// LenWaiting returns an int representing the number of items queued in the 'waiting' queue.
+// The client can call Len() in order to determine the number of items in the 'active' queue.
+func (q *delayingType) LenWaiting() int {
+	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, msgActionLenWaiting)
+	if result.length != nil {
+		return *result.length
+	}
+	return 0
+}
+
+// nextReady returns the item at the head of the 'waiting' queue and how long it has left to wait.
+func (q *delayingType) nextReady() (interface{}, time.Duration) {
+	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, msgActionNextReady)
+	if result.nextReady != nil {
+		return result.item, *result.nextReady
+	}
+	return nil, 0
+}
+
+// syncFill blocks until the delaying queue has drained all items from its feeder channel, processed
+// them into their appropriate queue and updated the nextReadyAt time as necessary.
+func (q *delayingType) syncFill() {
+	q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, msgActionSyncFill)
+}
+
+// sendItemToWaitingLoop facilitates the different interface methods and performs the actual add, sending,
+// forgetting an item, by sending an appropriate message through to the waitingLoop.
+func (q *delayingType) sendItemToWaitingLoop(item interface{}, opts DelayingOptions, action msgAction) waitingLoopResponse {
+	var result waitingLoopResponse
+
+	// don't add if we're already shutting down
+	if q.Interface.ShuttingDown() {
+		return result
+	}
+
+	// Add the item into the delaying queue (either the 'active' or 'waiting' queue)
+	waitEntry := &waitLoopMessage{
+		action: action,
+		item: &waitFor{
+			data:    item,
+			readyAt: q.clock.Now().Add(opts.Duration),
+		},
+		options: opts,
+	}
+
+	// For synchronous calls we will create a channel that we can wait to be released (closed).
+	var cb chan waitingLoopResponse
+	if opts.Synchronous {
+		cb = make(chan waitingLoopResponse)
+		waitEntry.returnCh = cb
+	}
+
+	// Send the entry to the waitingLoop...
+	select {
+	case <-q.stopCh:
+		// unblock if ShutDown() is called
+	case q.waitingForAddCh <- waitEntry:
+		// wait for call-back if we asked for one...
+		if opts.Synchronous {
+			select {
+			case <-q.stopCh:
+			case result = <-cb:
+			}
+		}
+	}
+	return result
 }
 
 // maxWait keeps a max bound on the wait time. It's just insurance against weird things happening.
@@ -232,12 +435,6 @@ const maxWait = 10 * time.Second
 func (q *delayingType) waitingLoop() {
 	defer utilruntime.HandleCrash()
 
-	// Make a placeholder channel to use when there are no items in our list
-	never := make(<-chan time.Time)
-
-	// Make a timer that expires when the item at the head of the waiting queue is ready
-	var nextReadyAtTimer clock.Timer
-
 	waitingForQueue := &waitForPriorityQueue{}
 	heap.Init(waitingForQueue)
 
@@ -248,29 +445,29 @@ func (q *delayingType) waitingLoop() {
 			return
 		}
 
-		now := q.clock.Now()
-
 		// Add ready entries
 		for waitingForQueue.Len() > 0 {
 			entry := waitingForQueue.Peek().(*waitFor)
-			if entry.readyAt.After(now) {
+			if entry.readyAt.After(q.clock.Now()) {
 				break
 			}
-
 			entry = heap.Pop(waitingForQueue).(*waitFor)
-			q.Add(entry.data)
+			q.Interface.Add(entry.data)
 			delete(waitingEntryByData, entry.data)
 		}
 
 		// Set up a wait for the first item's readyAt (if one exists)
-		nextReadyAt := never
+		q.calculateNextReadyAt(waitingForQueue)
+		q.handleReportingAndSync(waitingForQueue, waitingEntryByData)
+
+		// This check is to ensure that we are always waiting a positive non-zero duration for the nextReady
+		// signal, otherwise ticking a clock to the ready time before hitting the select would cause the
+		// select nextReadyAtTimerCh not to fire.  This check is as close to the select as we can make it.
 		if waitingForQueue.Len() > 0 {
-			if nextReadyAtTimer != nil {
-				nextReadyAtTimer.Stop()
+			now := q.clock.Now()
+			if q.headReadyTime.Equal(now) || q.headReadyTime.Before(now) {
+				continue
 			}
-			entry := waitingForQueue.Peek().(*waitFor)
-			nextReadyAtTimer = q.clock.NewTimer(entry.readyAt.Sub(now))
-			nextReadyAt = nextReadyAtTimer.C()
 		}
 
 		select {
@@ -280,25 +477,17 @@ func (q *delayingType) waitingLoop() {
 		case <-q.heartbeat.C():
 			// continue the loop, which will add ready items
 
-		case <-nextReadyAt:
+		case <-q.nextReadyAtTimerCh:
 			// continue the loop, which will add ready items
 
-		case waitEntry := <-q.waitingForAddCh:
-			if waitEntry.readyAt.After(q.clock.Now()) {
-				insert(waitingForQueue, waitingEntryByData, waitEntry)
-			} else {
-				q.Add(waitEntry.data)
-			}
+		case msg := <-q.waitingForAddCh:
+			q.processArrivingWaitLoopMessage(waitingForQueue, waitingEntryByData, msg)
 
 			drained := false
 			for !drained {
 				select {
-				case waitEntry := <-q.waitingForAddCh:
-					if waitEntry.readyAt.After(q.clock.Now()) {
-						insert(waitingForQueue, waitingEntryByData, waitEntry)
-					} else {
-						q.Add(waitEntry.data)
-					}
+				case msg := <-q.waitingForAddCh:
+					q.processArrivingWaitLoopMessage(waitingForQueue, waitingEntryByData, msg)
 				default:
 					drained = true
 				}
@@ -307,19 +496,167 @@ func (q *delayingType) waitingLoop() {
 	}
 }
 
-// insert adds the entry to the priority queue, or updates the readyAt if it already exists in the queue
-func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) {
-	// if the entry already exists, update the time only if it would cause the item to be queued sooner
-	existing, exists := knownEntries[entry.data]
+// insert adds the entry to the 'waiting' queue, or updates the readyAt if it already exists in the queue
+// It returns a boolean to indicate that the entry was inserted or not.
+func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, msg *waitLoopMessage) {
+	// if the entry already exists, update the time according to the entry.options.WhenWaiting
+	existing, exists := knownEntries[msg.item.data]
 	if exists {
-		if existing.readyAt.After(entry.readyAt) {
-			existing.readyAt = entry.readyAt
+		var replace bool
+		switch msg.options.WhenWaiting {
+		case TakeShorter:
+			replace = existing.readyAt.After(msg.item.readyAt)
+		case TakeLonger:
+			replace = existing.readyAt.Before(msg.item.readyAt)
+		case TakeIncoming:
+			replace = !existing.readyAt.Equal(msg.item.readyAt)
+		}
+		if replace {
+			existing.readyAt = msg.item.readyAt
 			heap.Fix(q, existing.index)
 		}
-
 		return
 	}
 
-	heap.Push(q, entry)
-	knownEntries[entry.data] = entry
+	heap.Push(q, msg.item)
+	knownEntries[msg.item.data] = msg.item
+}
+
+// calculateNextReadyAt recalculates the nextReadyAtTime as follows:
+// - removes the timer when the 'waiting' queue is empty.
+// - resets the timer when the head 'waiting' item has changed.
+// - creates a new timer when 1+ items are queued to an empty 'waiting' queue.
+func (q *delayingType) calculateNextReadyAt(w *waitForPriorityQueue) {
+	var head *waitFor
+
+	// early escape when the timer has not changed
+	if w.Len() > 0 {
+		head = w.Peek().(*waitFor)
+		if q.headReadyTime.Equal(head.readyAt) {
+			return
+		}
+	}
+
+	// reset timer
+	if q.nextReadyAtTimer != nil {
+		q.nextReadyAtTimerCh = make(<-chan time.Time)
+		q.nextReadyAtTimer.Stop()
+		q.nextReadyAtTimer = nil
+		q.headReadyTime = time.Time{}
+	}
+
+	// create new timer
+	if head != nil {
+		now := q.clock.Now()
+		q.nextReadyAtTimer = q.clock.NewTimer(head.readyAt.Sub(now))
+		q.nextReadyAtTimerCh = q.nextReadyAtTimer.C()
+		q.headReadyTime = head.readyAt
+	}
+}
+
+// handleReportingAndSync loops through the inspection requests and syncs and loops through providing the answers
+// and closing the return channel.
+func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntries map[t]*waitFor) {
+	if len(q.afterFill) == 0 {
+		return
+	}
+
+	for _, req := range q.afterFill {
+		r := waitingLoopResponse{}
+		switch req.action {
+		case msgActionIsWaiting:
+			item, exists := knownEntries[req.item.data]
+			r.exists = &exists
+			if item != nil {
+				nr := item.readyAt.Sub(q.clock.Now())
+				r.nextReady = &nr
+			}
+		case msgActionLenWaiting:
+			l := w.Len()
+			r.length = &l
+		case msgActionNextReady:
+			if w.Len() > 0 {
+				r.item = w.Peek().(*waitFor).data
+				nr := q.headReadyTime.Sub(q.clock.Now())
+				r.nextReady = &nr
+			}
+		case msgActionSyncFill:
+		}
+		req.returnCh <- r
+		close(req.returnCh)
+	}
+	q.afterFill = nil
+}
+
+// processArrivingWaitLoopMessage receives messages received from clients a takes the appropriate queuing based
+// upon the entry.action requested.
+// When performing the msgActionQueue action it behaves as follows:
+//   - An entry is dropped if it is already actively queued (much like Add() on the Interface)
+//   - Delayed items are inserted into the 'waiting' queue according to their Waiting option (TakeShorter by default)
+//   - Immediate items will be dropped when the TakeLonger Waiting option is set and they are already present in 'waiting'.
+//   - Immediate items will pre-empt/remove items in the 'waiting' queue unless the PermitActiveAndWaiting option is set.
+func (q *delayingType) processArrivingWaitLoopMessage(w *waitForPriorityQueue, knownEntries map[t]*waitFor, msg *waitLoopMessage) {
+	// handle the different message actions
+	switch msg.action {
+	case msgActionIsWaiting, msgActionLenWaiting, msgActionNextReady, msgActionSyncFill:
+		// all of these actions are processed in the call handleReportingAndSync()
+		if msg.returnCh == nil {
+			return
+		}
+		q.afterFill = append(q.afterFill, msg)
+		return
+	case msgActionDoneWaiting:
+		// remove entry from the 'waiting' queue
+		existing, exists := knownEntries[msg.item.data]
+		if exists {
+			// remove the item from the 'waiting' queue
+			heap.Remove(w, existing.index)
+			delete(knownEntries, msg.item.data)
+		}
+		return
+	case msgActionQueue:
+		// add entry to either 'active' or 'waiting' queues (dependent on delay and settings)
+		if msg.returnCh != nil {
+			defer close(msg.returnCh)
+		}
+
+		// Perform de-duplication between the 'waiting' queue against items in the 'active' queue unless
+		// disabled by PermitActiveAndWaiting.
+		if !msg.options.PermitActiveAndWaiting && q.Interface.IsQueued(msg.item.data) {
+			return
+		}
+
+		// drop if the incoming item if the caller wishes to keep the existing item if it exists.
+		existing, exists := knownEntries[msg.item.data]
+		if exists && msg.options.WhenWaiting == TakeExisting {
+			return
+		}
+
+		// delayed add (to 'waiting' queue)
+		if msg.item.readyAt.After(q.clock.Now()) {
+			// inform the metrics of the retry (moved from AddAfter())
+			q.metrics.retry()
+
+			// insert the entry into the 'waiting' queue with appropriate insertion strategy defined by options.Waiting
+			insert(w, knownEntries, msg)
+			return
+		}
+
+		// immediate add (to 'active' queue)
+		if exists {
+			// items in the 'waiting' queue must be longer than an immediate add, if we TakeLonger we must drop this add.
+			if msg.options.WhenWaiting == TakeLonger {
+				return
+			}
+			// This covers both the TakeShorter and TakeIncoming cases because this is incoming and must be the shortest
+			// right now too.  We will remove/pre-empt the item in the 'waiting' queue unless disabled.
+			if !msg.options.PermitActiveAndWaiting {
+				heap.Remove(w, existing.index)
+				delete(knownEntries, existing.data)
+			}
+		}
+
+		// Perform the immediate add to the 'active' queue.
+		q.Interface.Add(msg.item.data)
+	}
 }
