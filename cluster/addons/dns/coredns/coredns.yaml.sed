@@ -76,7 +76,9 @@ data:
         prometheus :9153
         forward . /etc/resolv.conf {
             max_concurrent 1000
+            except localhost
         }
+        local
         cache 30
         loop
         reload
