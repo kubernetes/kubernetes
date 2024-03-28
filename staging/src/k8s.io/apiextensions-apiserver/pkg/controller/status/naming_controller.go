@@ -157,6 +157,10 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 			if existingShortNames.Has(shortName) {
 				continue
 			}
+			// Allow usage of shortnames which are already present in acceptedNames singular or plural
+			if acceptedNames.Singular == shortName || acceptedNames.Plural == shortName {
+				continue
+			}
 			if err := equalToAcceptedOrFresh(shortName, "", allResources); err != nil {
 				errs = append(errs, err)
 			}
