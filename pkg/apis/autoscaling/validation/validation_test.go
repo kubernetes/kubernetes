@@ -162,7 +162,8 @@ func TestValidateBehavior(t *testing.T) {
 	}}
 	for _, behavior := range successCases {
 		hpa := prepareHPAWithBehavior(behavior)
-		if errs := ValidateHorizontalPodAutoscaler(&hpa); len(errs) != 0 {
+		opts := ValidationOptionsForHPA(&hpa, nil)
+		if errs := ValidateHorizontalPodAutoscaler(&hpa, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -356,7 +357,8 @@ func TestValidateBehavior(t *testing.T) {
 	}}
 	for _, c := range errorCases {
 		hpa := prepareHPAWithBehavior(c.behavior)
-		if errs := ValidateHorizontalPodAutoscaler(&hpa); len(errs) == 0 {
+		opts := ValidationOptionsForHPA(&hpa, nil)
+		if errs := ValidateHorizontalPodAutoscaler(&hpa, opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
@@ -613,7 +615,8 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 	}}
 	for _, successCase := range successCases {
-		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
+		opts := ValidationOptionsForHPA(&successCase, nil)
+		if errs := ValidateHorizontalPodAutoscaler(&successCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1106,7 +1109,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				}},
 			},
 		},
-		msg: "must set either a target value or averageValue",
+		msg: "must set target value for value metric type",
 	}, {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
@@ -1324,6 +1327,93 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
 					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ObjectMetricSourceType,
+							Object: &autoscaling.ObjectMetricSource{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
+									Kind: "ReplicationController",
+									Name: "myrc",
+								},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "somemetric",
+									Selector: metricLabelSelector,
+								},
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.AverageValueMetricType,
+									Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+			msg: "must not set target value for average value metric type",
+		}, {
+			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					MinReplicas:    utilpointer.Int32(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ObjectMetricSourceType,
+							Object: &autoscaling.ObjectMetricSource{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
+									Kind: "ReplicationController",
+									Name: "myrc",
+								},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "somemetric",
+									Selector: metricLabelSelector,
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.ValueMetricType,
+									AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+			msg: "must set target value for value metric type",
+		}, {
+			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					MinReplicas:    utilpointer.Int32(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ObjectMetricSourceType,
+							Object: &autoscaling.ObjectMetricSource{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
+									Kind: "ReplicationController",
+									Name: "myrc",
+								},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "somemetric",
+									Selector: metricLabelSelector,
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.UtilizationMetricType,
+									AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+			msg: "must not set Utilization type for Object source type",
+		}, {
+			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					MinReplicas:    utilpointer.Int32(1),
+					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
 						Type: autoscaling.ExternalMetricSourceType,
 						External: &autoscaling.ExternalMetricSource{
@@ -1417,7 +1507,8 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}
 
 	for _, c := range errorCases {
-		errs := ValidateHorizontalPodAutoscaler(&c.horizontalPodAutoscaler)
+		opts := ValidationOptionsForHPA(&c.horizontalPodAutoscaler, nil)
+		errs := ValidateHorizontalPodAutoscaler(&c.horizontalPodAutoscaler, opts)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %q", c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {
@@ -1488,7 +1579,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MinReplicas:    utilpointer.Int32(1),
 					MaxReplicas:    5, Metrics: []autoscaling.MetricSpec{spec},
 				},
-			})
+			}, HPAValidationOptions{AllowMismatchedTargetTypeAndValue: false})
 
 			expectedMsg := "must populate information for the given metric source"
 
@@ -1567,13 +1658,275 @@ func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.Hori
 	return minReplicasCases
 }
 
+func prepareMismatchedTargetTypeAndValueCases() []autoscaling.HorizontalPodAutoscaler {
+	mismatchedCases := []autoscaling.HorizontalPodAutoscaler{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+			Labels:          map[string]string{"value": "averageValue"},
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type:         autoscaling.ValueMetricType,
+						AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+			Labels:          map[string]string{"averageValue": "value"},
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type:  autoscaling.AverageValueMetricType,
+						Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}}
+	return mismatchedCases
+}
+
+func prepareMismatchedTargetTypeAndValueCasesUpdate() []autoscaling.HorizontalPodAutoscaler {
+	mismatchedCases := []autoscaling.HorizontalPodAutoscaler{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type:         autoscaling.ValueMetricType,
+						AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type:  autoscaling.AverageValueMetricType,
+						Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}}
+	return mismatchedCases
+}
+func prepareMismatchedTargetTypeAndValueCasesPassValidationPreviously() []autoscaling.HorizontalPodAutoscaler {
+	// Test case for going from mismatched to invalid
+	mismatchedBadCases := []autoscaling.HorizontalPodAutoscaler{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type:         autoscaling.ValueMetricType,
+						AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type:         autoscaling.UtilizationMetricType,
+						AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}}
+	return mismatchedBadCases
+}
+
+func prepareMismatchedTargetTypeAndValueCasesPassValidationPreviouslyUpdate() []autoscaling.HorizontalPodAutoscaler {
+	// Test case for going from mismatched to invalid
+	mismatchedBadCases := []autoscaling.HorizontalPodAutoscaler{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type: autoscaling.ValueMetricType,
+					},
+				},
+			}},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type: autoscaling.ValueMetricType,
+					},
+				},
+			}},
+		},
+	}}
+	return mismatchedBadCases
+}
+
 func TestValidateHorizontalPodAutoscalerScaleToZeroEnabled(t *testing.T) {
 	// Enable HPAScaleToZero feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)()
 
 	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
 	for _, successCase := range zeroMinReplicasCases {
-		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
+		opts := ValidationOptionsForHPA(&successCase, nil)
+		if errs := ValidateHorizontalPodAutoscaler(&successCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1587,7 +1940,8 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
 	errorMsg := "must be greater than or equal to 1"
 
 	for _, errorCase := range zeroMinReplicasCases {
-		errs := ValidateHorizontalPodAutoscaler(&errorCase)
+		opts := ValidationOptionsForHPA(&errorCase, nil)
+		errs := ValidateHorizontalPodAutoscaler(&errorCase, opts)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %q", errorMsg)
 		} else if !strings.Contains(errs[0].Error(), errorMsg) {
@@ -1599,7 +1953,8 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
 
 	for _, successCase := range nonZeroMinReplicasCases {
 		successCase.Spec.MinReplicas = utilpointer.Int32(1)
-		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
+		opts := ValidationOptionsForHPA(&successCase, nil)
+		if errs := ValidateHorizontalPodAutoscaler(&successCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1615,11 +1970,13 @@ func TestValidateHorizontalPodAutoscalerUpdateScaleToZeroEnabled(t *testing.T) {
 	for i, zeroCase := range zeroMinReplicasCases {
 		nonZeroCase := nonZeroMinReplicasCases[i]
 
-		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase); len(errs) != 0 {
+		opts := ValidationOptionsForHPA(&nonZeroCase, &zeroCase)
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 
-		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase); len(errs) != 0 {
+		opts = ValidationOptionsForHPA(&zeroCase, &nonZeroCase)
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -1635,7 +1992,8 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroUpdateDisabled(t *testing.T) 
 
 	for i, zeroCase := range zeroMinReplicasCases {
 		nonZeroCase := nonZeroMinReplicasCases[i]
-		errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase)
+		opts := ValidationOptionsForHPA(&zeroCase, &nonZeroCase)
+		errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase, opts)
 
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %q", errorMsg)
@@ -1643,12 +2001,44 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroUpdateDisabled(t *testing.T) 
 			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
 		}
 
-		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &zeroCase); len(errs) != 0 {
+		opts = ValidationOptionsForHPA(&zeroCase, &zeroCase)
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &zeroCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 
-		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase); len(errs) != 0 {
+		opts = ValidationOptionsForHPA(&nonZeroCase, &zeroCase)
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
+}
+
+func TestValidateHorizontalPodAutoscalerUpdateMismatchedTargetTypeAndValue(t *testing.T) {
+	oldMismatchedHPAs := prepareMismatchedTargetTypeAndValueCases()
+	newMismatchedHPAs := prepareMismatchedTargetTypeAndValueCasesUpdate()
+
+	for i, oldHPA := range oldMismatchedHPAs {
+		newHPA := newMismatchedHPAs[i]
+
+		opts := ValidationOptionsForHPA(&newHPA, &oldHPA)
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&newHPA, &oldHPA, opts); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	// Test for mismatched cases getting updated to fail previous validaiton
+	newHPA, oldHPA := prepareMismatchedTargetTypeAndValueCasesPassValidationPreviouslyUpdate(), prepareMismatchedTargetTypeAndValueCasesPassValidationPreviously()
+
+	for i, old := range oldHPA {
+		newHPA := newHPA[i]
+
+		opts := ValidationOptionsForHPA(&newHPA, &old)
+		errs := ValidateHorizontalPodAutoscalerUpdate(&newHPA, &old, opts)
+		errorMsg := "must set either a target value or averageValue"
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", errorMsg)
+		} else if !strings.Contains(errs[0].Error(), errorMsg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
+		}
+	}
+
 }

@@ -75,7 +75,8 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 // Validate validates a new autoscaler.
 func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
-	return validation.ValidateHorizontalPodAutoscaler(autoscaler)
+	opts := validation.ValidationOptionsForHPA(autoscaler, nil)
+	return validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -102,7 +103,10 @@ func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 
 // ValidateUpdate is the default update validation for an end user.
 func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateHorizontalPodAutoscalerUpdate(obj.(*autoscaling.HorizontalPodAutoscaler), old.(*autoscaling.HorizontalPodAutoscaler))
+	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
+	oldAutoscaler := old.(*autoscaling.HorizontalPodAutoscaler)
+	opts := validation.ValidationOptionsForHPA(autoscaler, oldAutoscaler)
+	return validation.ValidateHorizontalPodAutoscalerUpdate(autoscaler, oldAutoscaler, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
