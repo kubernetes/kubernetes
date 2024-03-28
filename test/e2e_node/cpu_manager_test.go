@@ -346,6 +346,54 @@ func mustParseCPUSet(s string) cpuset.CPUSet {
 	return res
 }
 
+func runAutomaticallyRemoveInactivePodsFromCPUManagerStateFile(ctx context.Context, f *framework.Framework) {
+	var cpu1 int
+	var ctnAttrs []ctnAttribute
+	var pod *v1.Pod
+	var cpuList []int
+	var expAllowedCPUsListRegex string
+	var err error
+	// First running a Gu Pod,
+	// second disable cpu manager in kubelet,
+	// then delete the Gu Pod,
+	// then enable cpu manager in kubelet,
+	// at last wait for the reconcile process cleaned up the state file, if the assignments map is empty,
+	// it proves that the automatic cleanup in the reconcile process is in effect.
+	ginkgo.By("running a Gu pod for test remove")
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container-testremove",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod = makeCPUManagerPod("gu-pod-testremove", ctnAttrs)
+	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	cpu1 = 1
+	if isHTEnabled() {
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
+		cpu1 = cpuList[1]
+	} else if isMultiNUMA() {
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
+		if len(cpuList) > 1 {
+			cpu1 = cpuList[1]
+		}
+	}
+	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	deletePodSyncByName(ctx, f, pod.Name)
+	// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+	// this is in turn needed because we will have an unavoidable (in the current framework) race with the
+	// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
+
+}
+
 func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap int64, cpuAlloc int64) {
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
@@ -574,12 +622,6 @@ func runMultipleGuPods(ctx context.Context, f *framework.Framework) {
 func runCPUManagerTests(f *framework.Framework) {
 	var cpuCap, cpuAlloc int64
 	var oldCfg *kubeletconfig.KubeletConfiguration
-	var expAllowedCPUsListRegex string
-	var cpuList []int
-	var cpu1 int
-	var err error
-	var ctnAttrs []ctnAttribute
-	var pod *v1.Pod
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
@@ -628,44 +670,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		runMultipleGuPods(ctx, f)
 
 		ginkgo.By("test for automatically remove inactive pods from cpumanager state file.")
-		// First running a Gu Pod,
-		// second disable cpu manager in kubelet,
-		// then delete the Gu Pod,
-		// then enable cpu manager in kubelet,
-		// at last wait for the reconcile process cleaned up the state file, if the assignments map is empty,
-		// it proves that the automatic cleanup in the reconcile process is in effect.
-		ginkgo.By("running a Gu pod for test remove")
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "gu-container-testremove",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-		}
-		pod = makeCPUManagerPod("gu-pod-testremove", ctnAttrs)
-		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		cpu1 = 1
-		if isHTEnabled() {
-			cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
-			cpu1 = cpuList[1]
-		} else if isMultiNUMA() {
-			cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
-			if len(cpuList) > 1 {
-				cpu1 = cpuList[1]
-			}
-		}
-		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-		err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod.Spec.Containers[0].Name, pod.Name)
-
-		deletePodSyncByName(ctx, f, pod.Name)
-		// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
-		// this is in turn needed because we will have an unavoidable (in the current framework) race with the
-		// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
-		waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
+		runAutomaticallyRemoveInactivePodsFromCPUManagerStateFile(ctx, f)
 	})
 
 	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func(ctx context.Context) {
