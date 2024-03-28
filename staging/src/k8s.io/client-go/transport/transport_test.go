@@ -375,7 +375,10 @@ func TestNew(t *testing.T) {
 			}
 
 			// We only know how to check TLSConfig on http.Transports
-			transport := rt.(*http.Transport)
+			transport, ok := rt.(*http.Transport)
+			if !ok {
+				transport = rt.(*reloadableTransport).rt.Load()
+			}
 			switch {
 			case testCase.TLS && transport.TLSClientConfig == nil:
 				t.Fatalf("got %#v, expected TLSClientConfig", transport)
