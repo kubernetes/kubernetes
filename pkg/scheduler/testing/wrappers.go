@@ -249,6 +249,12 @@ func (p *PodWrapper) Namespace(s string) *PodWrapper {
 	return p
 }
 
+// NodeName sets `s` as a node name of the inner pod.
+func (p *PodWrapper) NodeName(s string) *PodWrapper {
+	p.Spec.NodeName = s
+	return p
+}
+
 // OwnerReference updates the owning controller of the pod.
 func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *PodWrapper {
 	p.OwnerReferences = []metav1.OwnerReference{

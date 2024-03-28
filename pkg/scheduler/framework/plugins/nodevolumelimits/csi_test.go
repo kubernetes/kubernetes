@@ -641,6 +641,109 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
+func TestCSILimitsQHint(t *testing.T) {
+	podEbs := st.MakePod().PVC("csi-ebs.csi.aws.com-2")
+
+	tests := []struct {
+		newPod                 *v1.Pod
+		deletedPod             *v1.Pod
+		deletedPodNotScheduled bool
+		extraClaims            []v1.PersistentVolumeClaim
+		filterName             string
+		driverNames            []string
+		test                   string
+		limitSource            string
+		wantQHint              framework.QueueingHint
+	}{
+		{
+			newPod:      podEbs.Obj(),
+			deletedPod:  st.MakePod().PVC("not.available").PVC("csi-ebs.csi.aws.com-2").PVC("not.available").Obj(),
+			filterName:  "csi",
+			driverNames: []string{ebsCSIDriverName},
+			test:        "return a Queue when a deleted pod has a PVC from the same driver even if some PVCs that are not available are included.",
+			limitSource: "csinode",
+			wantQHint:   framework.Queue,
+		},
+		{
+			newPod:      podEbs.Obj(),
+			deletedPod:  st.MakePod().Obj(),
+			filterName:  "csi",
+			driverNames: []string{ebsCSIDriverName},
+			test:        "return a QueueSkip when a deleted pod doesn't have any PVC",
+			limitSource: "csinode",
+			wantQHint:   framework.QueueSkip,
+		},
+		{
+			newPod:      podEbs.Obj(),
+			deletedPod:  st.MakePod().PVC("csi-pd.csi.storage.gke.io-1").Obj(),
+			filterName:  "csi",
+			driverNames: []string{ebsCSIDriverName, gceCSIDriverName},
+			test:        "return a QueueSkip when a deleted pod has a PVC from another driver.",
+			limitSource: "csinode",
+			wantQHint:   framework.QueueSkip,
+		},
+		{
+			newPod:      podEbs.Obj(),
+			deletedPod:  st.MakePod().PVC("not.available").Obj(),
+			filterName:  "csi",
+			driverNames: []string{ebsCSIDriverName, gceCSIDriverName},
+			test:        "return a QueueSkip when a PVC is not found.",
+			limitSource: "csinode",
+			wantQHint:   framework.QueueSkip,
+		},
+		{
+			newPod:                 podEbs.Obj(),
+			deletedPod:             st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj(),
+			deletedPodNotScheduled: true,
+			filterName:             "csi",
+			driverNames:            []string{ebsCSIDriverName, gceCSIDriverName},
+			test:                   "return a QueueSkip when a deleted pod is not scheduled.",
+			limitSource:            "csinode",
+			wantQHint:              framework.QueueSkip,
+		},
+		{
+			newPod:      st.MakePod().PVC("not.available").Obj(),
+			deletedPod:  st.MakePod().PVC("not.available").Obj(),
+			filterName:  "csi",
+			driverNames: []string{ebsCSIDriverName},
+			test:        "return a QueueSkip when a PVC newPod has is not found.",
+			limitSource: "csinode",
+			wantQHint:   framework.QueueSkip,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.test, func(t *testing.T) {
+			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, []*v1.Pod{}, 1, test.driverNames...)
+			if csiNode != nil {
+				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
+			}
+			if !test.deletedPodNotScheduled {
+				test.deletedPod.Spec.NodeName = node.Node().Name
+			} else {
+				test.deletedPod.Spec.NodeName = ""
+			}
+
+			p := &CSILimits{
+				csiNodeLister:        getFakeCSINodeLister(csiNode),
+				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
+				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
+				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
+				randomVolumeIDPrefix: rand.String(32),
+				translator:           csitrans.New(),
+			}
+			logger, _ := ktesting.NewTestContext(t)
+			qhint, err := p.isSchedulableAfterPodDeleted(logger, test.newPod, test.deletedPod, nil)
+			if err != nil {
+				t.Errorf("isSchedulableAfterPodDeleted failed: %v", err)
+			}
+			if qhint != test.wantQHint {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
+			}
+		})
+	}
+}
+
 func getFakeCSIPVLister(volumeName string, driverNames ...string) tf.PersistentVolumeLister {
 	pvLister := tf.PersistentVolumeLister{}
 	for _, driver := range driverNames {
@@ -754,6 +857,10 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			Allocatable: v1.ResourceList{},
 		},
 	}
+	for _, pod := range pods {
+		pod.Spec.NodeName = node.Name
+	}
+
 	var csiNode *storagev1.CSINode
 
 	addLimitToNode := func() {

@@ -857,7 +857,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.CSIDriver:             framework.All - framework.Delete,
 				framework.CSIStorageCapacity:    framework.All - framework.Delete,
 				framework.PersistentVolume:      framework.All - framework.Delete,
-				framework.PersistentVolumeClaim: framework.All - framework.Delete,
+				framework.PersistentVolumeClaim: framework.All,
 				framework.StorageClass:          framework.All - framework.Delete,
 			},
 		},
