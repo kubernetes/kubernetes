@@ -18,9 +18,8 @@ package windows
 
 import (
 	"context"
-
-	"time"
-
+	"fmt"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,9 +30,15 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+)
+
+const (
+	pollingDuration   = time.Second * 10
+	timeout           = time.Minute * 2
+	cpuUsageThreshold = .5 * 1.05
 )
 
 var _ = sigDescribe(feature.Windows, "Cpu Resources", framework.WithSerial(), skipUnlessWindows(func() {
@@ -44,64 +49,55 @@ var _ = sigDescribe(feature.Windows, "Cpu Resources", framework.WithSerial(), sk
 	powershellImage := imageutils.GetConfig(imageutils.BusyBox)
 
 	ginkgo.Context("Container limits", func() {
-		ginkgo.It("should not be exceeded after waiting 2 minutes", func(ctx context.Context) {
+		ginkgo.It("should not be exceeded the limit threshold", func(ctx context.Context) {
 			ginkgo.By("Creating one pod with limit set to '0.5'")
-			podsDecimal := newCPUBurnPods(1, powershellImage, "0.5", "1Gi")
-			e2epod.NewPodClient(f).CreateBatch(ctx, podsDecimal)
+			pods := newCPUBurnPods(1, powershellImage, "0.5", "1Gi")
+
 			ginkgo.By("Creating one pod with limit set to '500m'")
-			podsMilli := newCPUBurnPods(1, powershellImage, "500m", "1Gi")
-			e2epod.NewPodClient(f).CreateBatch(ctx, podsMilli)
-			ginkgo.By("Waiting 2 minutes")
-			time.Sleep(2 * time.Minute)
-			ginkgo.By("Ensuring pods are still running")
-			var allPods []*v1.Pod
-			for _, p := range podsDecimal {
-				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
-					ctx,
-					p.Name,
-					metav1.GetOptions{})
-				framework.ExpectNoError(err, "Error retrieving pod")
-				gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
-				allPods = append(allPods, pod)
-			}
-			for _, p := range podsMilli {
-				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
-					ctx,
-					p.Name,
-					metav1.GetOptions{})
-				framework.ExpectNoError(err, "Error retrieving pod")
-				gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
-				allPods = append(allPods, pod)
-			}
-			ginkgo.By("Ensuring cpu doesn't exceed limit by >5%")
-			for _, p := range allPods {
-				ginkgo.By("Gathering node summary stats")
-				nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, p.Spec.NodeName)
-				framework.ExpectNoError(err, "Error grabbing node summary stats")
-				found := false
-				cpuUsage := float64(0)
-				for _, pod := range nodeStats.Pods {
-					if pod.PodRef.Name != p.Name || pod.PodRef.Namespace != p.Namespace {
-						continue
-					}
-					cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
-					found = true
-					break
-				}
-				if !found {
-					framework.Failf("Pod %s/%s not found in the stats summary %+v", p.Namespace, p.Name, allPods)
-				}
-				framework.Logf("Pod %s usage: %v", p.Name, cpuUsage)
-				if cpuUsage <= 0 {
-					framework.Failf("Pod %s/%s reported usage is %v, but it should be greater than 0", p.Namespace, p.Name, cpuUsage)
-				}
-				if cpuUsage >= .5*1.05 {
-					framework.Failf("Pod %s/%s reported usage is %v, but it should not exceed limit by > 5%%", p.Namespace, p.Name, cpuUsage)
-				}
-			}
+			pods = append(pods, newCPUBurnPods(1, powershellImage, "500m", "1Gi")...)
+			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
+
+			ginkgo.By("Ensuring pods are running")
+			err := e2epod.WaitForPodsRunning(f.ClientSet, f.Namespace.Name, 2, framework.PodStartTimeout)
+			framework.ExpectNoError(err, "Error waiting for pods entering on running state.")
+
+			// eventually expect and reinsure both pods have the CPU usage
+			// greater than zero and lower than test threshold, checked within 3 minutes.
+			gomega.Eventually(ctx, checkCPUUsageThreshold, timeout, pollingDuration).WithArguments(ctx, f, pods).ShouldNot(gomega.HaveOccurred())
 		})
 	})
 }))
+
+func checkCPUUsageThreshold(ctx context.Context, f *framework.Framework, pods []*v1.Pod) error {
+	var (
+		err      error
+		cpuUsage = float64(0)
+	)
+
+	for _, pod := range pods {
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.GetName(), metav1.GetOptions{})
+		framework.ExpectNoError(err, "Error retrieving pod.")
+
+		ginkgo.By("Gathering node summary stats")
+		nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, pod.Spec.NodeName)
+		framework.ExpectNoError(err, "Error retrieving node stats summary.")
+		for _, nodePod := range nodeStats.Pods {
+			if nodePod.PodRef.Name != pod.Name || nodePod.PodRef.Namespace != pod.Namespace {
+				continue
+			}
+			cpuUsage = float64(*nodePod.CPU.UsageNanoCores) * 1e-9
+		}
+
+		framework.Logf("Pod %s usage: %v", pod.Name, cpuUsage)
+		if cpuUsage <= 0 {
+			return fmt.Errorf("pod %s/%s reported usage is %v, but it should be greater than 0", pod.Namespace, pod.Name, cpuUsage)
+		}
+		if cpuUsage >= cpuUsageThreshold {
+			return fmt.Errorf("pod %s/%s reported usage is %v, but it should not exceed limit by > 5%%", pod.Namespace, pod.Name, cpuUsage)
+		}
+	}
+	return nil
+}
 
 // newCPUBurnPods creates a list of pods (specification) with a workload that will consume all available CPU resources up to container limit
 func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memoryLimit string) []*v1.Pod {
@@ -114,7 +110,6 @@ func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memor
 	framework.ExpectNoError(err)
 
 	for i := 0; i < numPods; i++ {
-
 		podName := "cpulimittest-" + string(uuid.NewUUID())
 		pod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
