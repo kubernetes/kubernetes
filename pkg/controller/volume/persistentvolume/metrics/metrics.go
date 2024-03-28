@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	metricutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -185,10 +186,11 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 		}
 		pluginName := collector.getPVPluginName(pv)
 		totalCount.add(pluginName, string(*pv.Spec.VolumeMode))
+		scName := storagehelpers.GetPersistentVolumeClass(pv)
 		if pv.Status.Phase == v1.VolumeBound {
-			boundNumberByStorageClass[pv.Spec.StorageClassName]++
+			boundNumberByStorageClass[scName]++
 		} else {
-			unboundNumberByStorageClass[pv.Spec.StorageClassName]++
+			unboundNumberByStorageClass[scName]++
 		}
 	}
 	for storageClassName, number := range boundNumberByStorageClass {
