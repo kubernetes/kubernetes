@@ -23,9 +23,13 @@ import (
 )
 
 const GroupName = "apiserver.config.k8s.io"
+const ConfigGroupName = "apiserver.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
+
+// ConfigSchemeGroupVersion is group version used to register these objects
+var ConfigSchemeGroupVersion = schema.GroupVersion{Group: ConfigGroupName, Version: "v1"}
 
 var (
 	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
@@ -48,6 +52,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&AdmissionConfiguration{},
 		&EncryptionConfiguration{},
+	)
+	scheme.AddKnownTypes(ConfigSchemeGroupVersion,
+		&TracingConfiguration{},
 	)
 	// also register into the v1 group as EncryptionConfig (due to a docs bug)
 	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "EncryptionConfig"}, &EncryptionConfiguration{})
