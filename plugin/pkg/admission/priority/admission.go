@@ -127,10 +127,51 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 			return p.validatePriorityClass(a)
 		}
 		return nil
-
+	case podResource:
+		if operation == admission.Create || operation == admission.Update {
+			return p.validatePod(a)
+		}
+		return nil
 	default:
 		return nil
 	}
+}
+
+// validatePod makes sure that spec.Priority field is consistent with spec.PriorityClassName after calling mutate-webhook.
+func (p *Plugin) validatePod(a admission.Attributes) error {
+	pod, ok := a.GetObject().(*core.Pod)
+	if !ok {
+		return errors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
+	}
+
+	if pod.Spec.Priority == nil {
+		return errors.NewBadRequest("the integer value of priority must be provided in pod spec after calling mutate-webhook")
+	}
+
+	defaultPcName, defaultPriority, _, err := p.getDefaultPriority()
+	if err != nil {
+		return fmt.Errorf("failed to get default priority class: %v", err)
+	}
+
+	if pod.Spec.PriorityClassName == defaultPcName {
+		if *pod.Spec.Priority != defaultPriority {
+			return admission.NewForbidden(a, fmt.Errorf("PriorityClass with name %s get Priority %v, it's not consistent with pod spec.Priority %v", defaultPcName, defaultPriority, *pod.Spec.Priority))
+		}
+	} else {
+		// Try resolving the priority class name.
+		pc, err := p.lister.Get(pod.Spec.PriorityClassName)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", pod.Spec.PriorityClassName))
+			}
+			return fmt.Errorf("failed to get PriorityClass with name %s: %v", pod.Spec.PriorityClassName, err)
+		}
+		if *pod.Spec.Priority != pc.Value {
+			return admission.NewForbidden(a, fmt.Errorf("PriorityClass with name %s get Priority %v, it's not consistent with pod spec.Priority %v", defaultPcName, defaultPriority, *pod.Spec.Priority))
+		}
+	}
+
+	return nil
 }
 
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
