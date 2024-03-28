@@ -18,7 +18,7 @@ spec:
     spec:
       priorityClassName: system-cluster-critical
       containers:
-        - image: registry.k8s.io/cpvpa-amd64:v0.8.3
+        - image: registry.k8s.io/cpvpa-amd64:v0.8.6
           name: autoscaler
           command:
             - /cpvpa
@@ -31,6 +31,7 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/config
+              readOnly=true
       volumes:
         - name: config
           configMap:
