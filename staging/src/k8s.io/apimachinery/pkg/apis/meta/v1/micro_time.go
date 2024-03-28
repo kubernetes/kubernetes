@@ -19,6 +19,8 @@ package v1
 import (
 	"encoding/json"
 	"time"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 const RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
@@ -129,6 +131,24 @@ func (t *MicroTime) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// todo
+func (t *MicroTime) UnmarshalCBOR(b []byte) error {
+	var s *string
+	if err := cbor.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == nil {
+		t.Time = time.Time{}
+		return nil
+	}
+	pt, err := time.Parse(RFC3339Micro, *s)
+	if err != nil {
+		return err
+	}
+	t.Time = pt.Local()
+	return nil
+}
+
 // UnmarshalQueryParameter converts from a URL query parameter value to an object
 func (t *MicroTime) UnmarshalQueryParameter(str string) error {
 	if len(str) == 0 {
@@ -158,6 +178,12 @@ func (t MicroTime) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(t.UTC().Format(RFC3339Micro))
+}
+
+// todo
+func (t MicroTime) MarshalCBOR() ([]byte, error) {
+	s := t.UTC().Format(RFC3339Micro)
+	return cbor.Marshal(s)
 }
 
 // OpenAPISchemaType is used by the kube-openapi generator when constructing
