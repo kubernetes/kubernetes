@@ -24,8 +24,8 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-helpers/storage/volume"
-	"k8s.io/klog/v2/ktesting"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.

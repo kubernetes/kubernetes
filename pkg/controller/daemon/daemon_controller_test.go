@@ -45,7 +45,6 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -481,15 +481,13 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 }
 
 func TestExpectationsOnRecreate(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	client := fake.NewSimpleClientset()
 
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	dsc, err := NewDaemonSetsController(
-		ctx,
+		tCtx,
 		f.Apps().V1().DaemonSets(),
 		f.Apps().V1().ControllerRevisions(),
 		f.Core().V1().Pods(),
@@ -552,8 +550,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Start(ctx.Done())
-	for ty, ok := range f.WaitForCacheSync(ctx.Done()) {
+	f.Start(tCtx.Done())
+	for ty, ok := range f.WaitForCacheSync(tCtx.Done()) {
 		if !ok {
 			t.Fatalf("caches failed to sync: %v", ty)
 		}

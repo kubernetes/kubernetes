@@ -17,7 +17,6 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -37,12 +36,12 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Test the real controller methods (add/update/delete claim/volume) with
@@ -310,8 +309,8 @@ func TestControllerSync(t *testing.T) {
 			},
 		},
 	}
-	logger, ctx := ktesting.NewTestContext(t)
 	doit := func(test controllerTest) {
+		logger, tCtx := ktesting.NewTestContext(t)
 		// Initialize the controller
 		client := &fake.Clientset{}
 
@@ -324,7 +323,7 @@ func TestControllerSync(t *testing.T) {
 		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		ctrl, err := newTestController(ctx, client, informers, true)
+		ctrl, err := newTestController(tCtx, client, informers, true)
 		if err != nil {
 			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
 		}
@@ -341,7 +340,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
-		reactor := newVolumeReactor(ctx, client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
+		reactor := newVolumeReactor(tCtx, client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
 			claim = claim.DeepCopy()
 			reactor.AddClaim(claim)
@@ -358,10 +357,9 @@ func TestControllerSync(t *testing.T) {
 		}
 
 		// Start the controller
-		ctx, cancel := context.WithCancel(context.TODO())
-		informers.Start(ctx.Done())
-		informers.WaitForCacheSync(ctx.Done())
-		go ctrl.Run(ctx)
+		informers.Start(tCtx.Done())
+		informers.WaitForCacheSync(tCtx.Done())
+		go ctrl.Run(tCtx)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -380,15 +378,15 @@ func TestControllerSync(t *testing.T) {
 		}
 		// Simulate a periodic resync, just in case some events arrived in a
 		// wrong order.
-		ctrl.resync(ctx)
+		ctrl.resync(tCtx)
 
 		err = reactor.waitTest(test)
 		if err != nil {
 			t.Errorf("Failed to run test %s: %v", test.name, err)
 		}
-		cancel()
+		tCtx.Cancel("cleaning up")
 
-		evaluateTestResults(ctx, ctrl, reactor.VolumeReactor, test, t)
+		evaluateTestResults(tCtx, ctrl, reactor.VolumeReactor, test, t)
 	}
 
 	for _, test := range tests {

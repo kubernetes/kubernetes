@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
 
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
@@ -1582,12 +1582,10 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+			logger, tCtx := ktesting.NewTestContext(t)
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-			jm, err := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			jm, err := NewControllerV2(tCtx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
@@ -1682,15 +1680,13 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+			tCtx := ktesting.Init(t)
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 			for _, job := range tt.jobs {
 				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
-			jm, err := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			jm, err := NewControllerV2(tCtx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return

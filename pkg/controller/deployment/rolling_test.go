@@ -17,7 +17,6 @@ limitations under the License.
 package deployment
 
 import (
-	"context"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
@@ -25,7 +24,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
@@ -92,10 +91,8 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		_, ctx := ktesting.NewTestContext(t)
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		scaled, err := controller.reconcileNewReplicaSet(ctx, allRSs, newRS, deployment)
+		tCtx := ktesting.Init(t)
+		scaled, err := controller.reconcileNewReplicaSet(tCtx, allRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue

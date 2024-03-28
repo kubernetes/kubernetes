@@ -32,10 +32,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func createClientAndInformers(t *testing.T, server *kubeapiservertesting.TestServer) (*clientset.Clientset, informers.SharedInformerFactory) {
@@ -138,13 +138,12 @@ func TestTTLAnnotations(t *testing.T) {
 
 	testClient, informers := createClientAndInformers(t, server)
 	nodeInformer := informers.Core().V1().Nodes()
-	_, ctx := ktesting.NewTestContext(t)
-	ttlc := ttl.NewTTLController(ctx, nodeInformer, testClient)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	ttlc := ttl.NewTTLController(tCtx, nodeInformer, testClient)
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go nodeInformer.Informer().Run(ctx.Done())
-	go ttlc.Run(ctx, 1)
+	go nodeInformer.Informer().Run(tCtx.Done())
+	go ttlc.Run(tCtx, 1)
 
 	// Create 100 nodes all should have annotation equal to 0.
 	createNodes(t, testClient, 0, 100)
