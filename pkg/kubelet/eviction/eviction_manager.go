@@ -411,7 +411,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	for i := range activePods {
 		pod := activePods[i]
 		if m.podsEvicted.Has(string(pod.UID)) {
-			klog.Warningf("Eviction manager: not evicting pod that we already attempted to evict: %v/%v", pod.Namespace, pod.Name)
+			klog.InfoS("Eviction manager: not evicting pod that we already attempted to evict: ", "namespace", pod.Namespace, "pod", pod.Name)
 			continue
 		}
 		m.podsEvicted.Insert(string(pod.UID))
