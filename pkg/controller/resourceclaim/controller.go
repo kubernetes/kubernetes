@@ -47,6 +47,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -948,7 +949,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 
 func owningPod(claim *resourcev1alpha2.ResourceClaim) (string, types.UID) {
 	for _, owner := range claim.OwnerReferences {
-		if pointer.BoolDeref(owner.Controller, false) &&
+		if ptr.Deref(owner.Controller, false) &&
 			owner.APIVersion == "v1" &&
 			owner.Kind == "Pod" {
 			return owner.Name, owner.UID

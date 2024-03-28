@@ -33,7 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestGetJobFromTemplate2(t *testing.T) {
@@ -141,7 +141,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			}
 
 			scheduledAnnotation := job.ObjectMeta.Annotations[batchv1.CronJobScheduledTimestampAnnotation]
-			timeZoneLocation, err := time.LoadLocation(pointer.StringDeref(tt.timeZone, ""))
+			timeZoneLocation, err := time.LoadLocation(ptr.Deref(tt.timeZone, ""))
 			if err != nil {
 				t.Errorf("Wrong timezone location")
 			}
