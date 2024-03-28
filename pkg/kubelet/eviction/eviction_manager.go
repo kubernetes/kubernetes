@@ -33,6 +33,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/utils/clock"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -102,6 +103,8 @@ type managerImpl struct {
 	thresholdsLastUpdated time.Time
 	// whether can support local storage capacity isolation
 	localStorageCapacityIsolation bool
+	// podsEvicted is the set of pods' uids that we have already tried to evict
+	podsEvicted sets.Set[string]
 }
 
 // ensure it implements the required interface
@@ -134,6 +137,7 @@ func NewManager(
 		splitContainerImageFs:         nil,
 		thresholdNotifiers:            []ThresholdNotifier{},
 		localStorageCapacityIsolation: localStorageCapacityIsolation,
+		podsEvicted:                   sets.Set[string]{},
 	}
 	return manager, manager
 }
@@ -354,6 +358,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	if len(thresholds) == 0 {
 		klog.V(3).InfoS("Eviction manager: no resources are starved")
+		m.podsEvicted = sets.Set[string]{}
 		return nil, nil
 	}
 
@@ -405,6 +410,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
 		pod := activePods[i]
+		if m.podsEvicted.Has(string(pod.UID)) {
+			klog.InfoS("Eviction manager: not evicting pod that we already attempted to evict: ", "namespace", pod.Namespace, "pod", pod.Name)
+			continue
+		}
+		m.podsEvicted.Insert(string(pod.UID))
 		gracePeriodOverride := int64(0)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds

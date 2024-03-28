@@ -19,6 +19,7 @@ package eviction
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"testing"
 	"time"
 
@@ -339,6 +340,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+					podsEvicted:                  sets.Set[string]{},
 				}
 
 				// synchronize to detect the memory pressure
@@ -441,6 +443,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+					podsEvicted:                  sets.Set[string]{},
 				}
 
 				// synchronize to detect the PID pressure
@@ -624,6 +627,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+					podsEvicted:                  sets.Set[string]{},
 				}
 
 				// synchronize
@@ -728,6 +732,7 @@ func TestMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// create a best effort pod to test admission
@@ -999,6 +1004,7 @@ func TestPIDPressure(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// create a pod to test admission
@@ -1376,6 +1382,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// create a best effort pod to test admission
@@ -1575,6 +1582,7 @@ func TestMinReclaim(t *testing.T) {
 		podStats[pod] = podStat
 	}
 	podToEvict := pods[4]
+	nextPodToEvict := pods[2]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -1613,6 +1621,7 @@ func TestMinReclaim(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// synchronize
@@ -1664,8 +1673,8 @@ func TestMinReclaim(t *testing.T) {
 	}
 
 	// check the right pod was killed
-	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	if podKiller.pod != nextPodToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, nextPodToEvict.Name)
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -1898,6 +1907,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// synchronize
@@ -2355,6 +2365,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				podsEvicted:                  sets.Set[string]{},
 			}
 
 			// create a best effort pod to test admission
@@ -2589,6 +2600,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	fakeClock.Step(1 * time.Minute)
@@ -2720,6 +2732,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// create a best effort pod to test admission
@@ -2889,6 +2902,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 		thresholdNotifiers:           []ThresholdNotifier{thresholdNotifier},
+		podsEvicted:                  sets.Set[string]{},
 	}
 
 	// The UpdateThreshold method should have been called once, since this is the first run.
@@ -2984,6 +2998,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 		nodeRef:                       nodeRef,
 		localStorageCapacityIsolation: true,
 		dedicatedImageFs:              diskInfoProvider.dedicatedImageFs,
+		podsEvicted:                   sets.Set[string]{},
 	}
 
 	activePodsFunc := func() []*v1.Pod {
@@ -3002,4 +3017,129 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 	if diff := cmp.Diff(pods, evictedPods); diff != "" {
 		t.Fatalf("Unexpected evicted pod (-want,+got):\n%s", diff)
 	}
+}
+
+// TestSoftEvictOthersWhileWaitingForPodGracefulShutdown verifies that if a pod is taking too long to evict, we
+// proceed to evict others while it shuts down
+func TestSoftEvictOthersWhileWaitingForPodGracefulShutdown(t *testing.T) {
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "first-to-go", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "1Gi"},
+		{name: "second-to-go", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "this-one-stays", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "100Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	podToEvict := pods[0]
+	nextPodToEvict := pods[1]
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("500Mi", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		podsEvicted:                  sets.Set[string]{},
+	}
+
+	// synchronize
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not report any errors")
+	}
+
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have chosen to kill a pod, but did not")
+	}
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	}
+	observedGracePeriod := *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+
+	// pod is taking too long to shut down, we still have memory pressure
+	fakeClock.Step(6 * time.Minute)
+	podKiller.pod = nil
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have an error %v", err)
+	}
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have chosen to kill a pod, but did not")
+	}
+	if podKiller.pod != nextPodToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, nextPodToEvict.Name)
+	}
+	observedGracePeriod = *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+
+	// now we no longer have memory pressure, this will reset who has been evicted (in real life, the pods may have re-joined)
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
+	podKiller.pod = nil
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have an error %v", err)
+	}
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+	}
+
+	// under memory pressure again, should choose the first pod again
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
+	podKiller.pod = nil
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have an error %v", err)
+	}
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have chosen to kill a pod, but did not")
+	}
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	}
+	observedGracePeriod = *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+
 }
