@@ -148,6 +148,7 @@ func TestProxyHandler(t *testing.T) {
 		"proxy with user, insecure": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
@@ -172,6 +173,7 @@ func TestProxyHandler(t *testing.T) {
 				"X-Forwarded-Uri":   {"/request/path"},
 				"X-Forwarded-For":   {"127.0.0.1"},
 				"X-Remote-User":     {"username"},
+				"X-Remote-Uid":      {"6b60d791-1af9-4513-92e5-e4252a1e0a78"},
 				"User-Agent":        {"Go-http-client/1.1"},
 				"Accept-Encoding":   {"gzip"},
 				"X-Remote-Group":    {"one", "two"},
@@ -180,6 +182,7 @@ func TestProxyHandler(t *testing.T) {
 		"proxy with user, cabundle": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
@@ -204,6 +207,7 @@ func TestProxyHandler(t *testing.T) {
 				"X-Forwarded-Uri":   {"/request/path"},
 				"X-Forwarded-For":   {"127.0.0.1"},
 				"X-Remote-User":     {"username"},
+				"X-Remote-Uid":      {"6b60d791-1af9-4513-92e5-e4252a1e0a78"},
 				"User-Agent":        {"Go-http-client/1.1"},
 				"Accept-Encoding":   {"gzip"},
 				"X-Remote-Group":    {"one", "two"},
@@ -212,6 +216,7 @@ func TestProxyHandler(t *testing.T) {
 		"service unavailable": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
@@ -234,6 +239,7 @@ func TestProxyHandler(t *testing.T) {
 		"service unresolveable": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path:            "/request/path",
@@ -257,6 +263,7 @@ func TestProxyHandler(t *testing.T) {
 		"fail on bad serving cert": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
@@ -278,6 +285,7 @@ func TestProxyHandler(t *testing.T) {
 		"fail on bad serving cert w/o SAN and increase SAN error counter metrics": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
@@ -419,6 +427,7 @@ func newBrokenDialerAndSelector() (*mockEgressDialer, *egressselector.EgressSele
 
 func TestProxyUpgrade(t *testing.T) {
 	upgradeUser := "upgradeUser"
+	upgradeUID := "upgradeUser-UID"
 	testcases := map[string]struct {
 		APIService        *apiregistration.APIService
 		NewEgressSelector func() (*mockEgressDialer, *egressselector.EgressSelector)
@@ -528,6 +537,10 @@ func TestProxyUpgrade(t *testing.T) {
 				if user != upgradeUser {
 					t.Errorf("expected user %q, got %q", upgradeUser, user)
 				}
+				uid := req.Header.Get("X-Remote-Uid")
+				if uid != upgradeUID {
+					t.Errorf("expected UID %q, got %q", upgradeUID, uid)
+				}
 				body := make([]byte, 5)
 				ws.Read(body)
 				ws.Write([]byte("hello " + string(body)))
@@ -570,7 +583,7 @@ func TestProxyUpgrade(t *testing.T) {
 			}
 
 			proxyHandler.updateAPIService(tc.APIService)
-			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: upgradeUser}))
+			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: upgradeUser, UID: upgradeUID}))
 			defer aggregator.Close()
 
 			ws, err := websocket.Dial("ws://"+aggregator.Listener.Addr().String()+path, "", "http://127.0.0.1/")
