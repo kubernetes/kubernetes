@@ -38,7 +38,6 @@ var _ = flag.String("runtime-config", "", "The runtime configuration for the API
 var _ = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
 
 func main() {
-	klog.InitFlags(nil)
 	flag.Parse()
 
 	suite, err := remote.GetTestSuite(*testSuite)

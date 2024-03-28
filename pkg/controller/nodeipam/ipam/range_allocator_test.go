@@ -274,9 +274,10 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 	}
 
 	// test function
-	tCtx := ktesting.Init(t)
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			// Initialize the range allocator.
 			fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
 			nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})

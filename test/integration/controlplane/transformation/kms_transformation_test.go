@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -338,7 +339,7 @@ resources:
 			test.cleanUp()
 		}
 	}()
-	ctx := testContext(t)
+	tCtx := testContext(t)
 
 	// the global metrics registry persists across test runs - reset it here so we can make assertions
 	copyConfig := rest.CopyConfig(test.kubeAPIServer.ClientConfig)
@@ -348,7 +349,7 @@ resources:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := rc.Delete().AbsPath("/metrics").Do(ctx).Error(); err != nil {
+	if err := rc.Delete().AbsPath("/metrics").Do(tCtx).Error(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -377,7 +378,7 @@ resources:
 	}
 
 	// test if hot reload controller is healthy
-	mustBeHealthy(t, "/poststarthook/start-encryption-provider-config-automatic-reload", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(tCtx, "/poststarthook/start-encryption-provider-config-automatic-reload", "ok", test.kubeAPIServer.ClientConfig)
 
 	encryptionConfigWithNewProvider := `
 kind: EncryptionConfiguration
@@ -418,7 +419,7 @@ resources:
 	// get secrets
 
 	secretsList, err := test.restClient.CoreV1().Secrets("").List(
-		ctx,
+		tCtx,
 		metav1.ListOptions{},
 	)
 	if err != nil {
@@ -428,7 +429,7 @@ resources:
 	for _, secret := range secretsList.Items {
 		// update secret
 		_, err = test.restClient.CoreV1().Secrets(secret.Namespace).Update(
-			ctx,
+			tCtx,
 			&secret,
 			metav1.UpdateOptions{},
 		)
@@ -439,7 +440,7 @@ resources:
 
 	// get configmaps
 	configmapsList, err := test.restClient.CoreV1().ConfigMaps("").List(
-		ctx,
+		tCtx,
 		metav1.ListOptions{},
 	)
 	if err != nil {
@@ -449,7 +450,7 @@ resources:
 	for _, configmap := range configmapsList.Items {
 		// update configmap
 		_, err = test.restClient.CoreV1().ConfigMaps(configmap.Namespace).Update(
-			ctx,
+			tCtx,
 			&configmap,
 			metav1.UpdateOptions{},
 		)
@@ -526,7 +527,7 @@ resources:
 
 	// confirm that reading secrets still works
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
-		ctx,
+		tCtx,
 		testSecret,
 		metav1.GetOptions{},
 	)
@@ -535,13 +536,13 @@ resources:
 	}
 
 	// make sure cluster wide secrets read still works
-	_, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
+	_, err = test.restClient.CoreV1().Secrets("").List(tCtx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("failed to list secrets, err: %v", err)
 	}
 
 	// make sure cluster wide configmaps read still works
-	_, err = test.restClient.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
+	_, err = test.restClient.CoreV1().ConfigMaps("").List(tCtx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("failed to list configmaps, err: %v", err)
 	}
@@ -557,7 +558,7 @@ resources:
 	defer test.cleanUp()
 
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
-		ctx,
+		tCtx,
 		testSecret,
 		metav1.GetOptions{},
 	)
@@ -566,12 +567,12 @@ resources:
 	}
 
 	// confirm that reading cluster wide secrets still works after restart
-	if _, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{}); err != nil {
+	if _, err = test.restClient.CoreV1().Secrets("").List(tCtx, metav1.ListOptions{}); err != nil {
 		t.Fatalf("failed to list secrets, err: %v", err)
 	}
 
 	// make sure cluster wide configmaps read still works
-	if _, err = test.restClient.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{}); err != nil {
+	if _, err = test.restClient.CoreV1().ConfigMaps("").List(tCtx, metav1.ListOptions{}); err != nil {
 		t.Fatalf("failed to list configmaps, err: %v", err)
 	}
 
@@ -584,7 +585,7 @@ resources:
 		t.Fatal(err)
 	}
 	defer func() {
-		body, err := rc.Get().AbsPath("/metrics").DoRaw(ctx)
+		body, err := rc.Get().AbsPath("/metrics").DoRaw(tCtx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -884,6 +885,7 @@ func TestEncryptionConfigHotReloadFilePolling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -911,7 +913,7 @@ resources:
 			}
 
 			// test if hot reload controller is healthy
-			mustBeHealthy(t, "/poststarthook/start-encryption-provider-config-automatic-reload", "ok", test.kubeAPIServer.ClientConfig)
+			mustBeHealthy(tCtx, "/poststarthook/start-encryption-provider-config-automatic-reload", "ok", test.kubeAPIServer.ClientConfig)
 
 			encryptionConfigWithNewProvider := `
 kind: EncryptionConfiguration
@@ -1092,6 +1094,7 @@ func updateFile(t *testing.T, configDir, filename string, newContent []byte) {
 
 func TestKMSHealthz(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	tCtx := ktesting.Init(t)
 
 	encryptionConfig := `
 kind: EncryptionConfiguration
@@ -1121,36 +1124,36 @@ resources:
 
 	// Stage 1 - Since all kms-plugins are guaranteed to be up, healthz checks for:
 	// healthz/kms-provider-0 and /healthz/kms-provider-1 should be OK.
-	mustBeHealthy(t, "/kms-provider-0", "ok", test.kubeAPIServer.ClientConfig)
-	mustBeHealthy(t, "/kms-provider-1", "ok", test.kubeAPIServer.ClientConfig)
-	mustNotHaveLivez(t, "/kms-provider-0", "404 page not found", test.kubeAPIServer.ClientConfig)
-	mustNotHaveLivez(t, "/kms-provider-1", "404 page not found", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(tCtx, "/kms-provider-0", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(tCtx, "/kms-provider-1", "ok", test.kubeAPIServer.ClientConfig)
+	mustNotHaveLivez(tCtx, "/kms-provider-0", "404 page not found", test.kubeAPIServer.ClientConfig)
+	mustNotHaveLivez(tCtx, "/kms-provider-1", "404 page not found", test.kubeAPIServer.ClientConfig)
 
 	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the healthz check
 	// to fail and report that provider-1 is down
 	pluginMock1.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-provider-0",
+	mustBeUnHealthy(tCtx, "/kms-provider-0",
 		"internal server error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
 		test.kubeAPIServer.ClientConfig)
 
-	mustNotHaveLivez(t, "/kms-provider-0", "404 page not found", test.kubeAPIServer.ClientConfig)
-	mustBeHealthy(t, "/kms-provider-1", "ok", test.kubeAPIServer.ClientConfig)
-	mustNotHaveLivez(t, "/kms-provider-1", "404 page not found", test.kubeAPIServer.ClientConfig)
+	mustNotHaveLivez(tCtx, "/kms-provider-0", "404 page not found", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(tCtx, "/kms-provider-1", "ok", test.kubeAPIServer.ClientConfig)
+	mustNotHaveLivez(tCtx, "/kms-provider-1", "404 page not found", test.kubeAPIServer.ClientConfig)
 	pluginMock1.ExitFailedState()
 
 	// Stage 3 - kms-plugin for provider-1 is now up. Therefore, expect the health check for provider-1
 	// to succeed now, but provider-2 is now down.
 	pluginMock2.EnterFailedState()
-	mustBeHealthy(t, "/kms-provider-0", "ok", test.kubeAPIServer.ClientConfig)
-	mustBeUnHealthy(t, "/kms-provider-1",
+	mustBeHealthy(tCtx, "/kms-provider-0", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeUnHealthy(tCtx, "/kms-provider-1",
 		"internal server error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
 		test.kubeAPIServer.ClientConfig)
 	pluginMock2.ExitFailedState()
 
 	// Stage 4 - All kms-plugins are once again up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-provider-0", "ok", test.kubeAPIServer.ClientConfig)
-	mustBeHealthy(t, "/kms-provider-1", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(tCtx, "/kms-provider-0", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(tCtx, "/kms-provider-1", "ok", test.kubeAPIServer.ClientConfig)
 }
 
 func TestKMSHealthzWithReload(t *testing.T) {
@@ -1184,12 +1187,12 @@ resources:
 
 	// Stage 1 - Since all kms-plugins are guaranteed to be up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(test, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
 
 	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the healthz check
 	// to fail and report that provider-1 is down
 	pluginMock1.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	mustBeUnHealthy(test, "/kms-providers",
 		"internal server error: kms-provider-0: failed to perform encrypt section of the healthz check for KMS Provider provider-1, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
 		test.kubeAPIServer.ClientConfig)
 	pluginMock1.ExitFailedState()
@@ -1197,12 +1200,12 @@ resources:
 	// Stage 3 - kms-plugin for provider-1 is now up. Therefore, expect the health check for provider-1
 	// to succeed now, but provider-2 is now down.
 	pluginMock2.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	mustBeUnHealthy(test, "/kms-providers",
 		"internal server error: kms-provider-1: failed to perform encrypt section of the healthz check for KMS Provider provider-2, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
 		test.kubeAPIServer.ClientConfig)
 	pluginMock2.ExitFailedState()
 
 	// Stage 4 - All kms-plugins are once again up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(test, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
 }

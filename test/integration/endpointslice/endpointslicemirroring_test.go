@@ -578,12 +578,12 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 				}},
 			}
 
-			_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+			_, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating service: %v", err)
 			}
 
-			_, err = client.CoreV1().Endpoints(ns.Name).Create(context.TODO(), customEndpoints, metav1.CreateOptions{})
+			_, err = client.CoreV1().Endpoints(ns.Name).Create(tCtx, customEndpoints, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating endpoints: %v", err)
 			}
@@ -595,7 +595,7 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 			}
 
 			service.Spec.Selector = tc.endingSelector
-			_, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+			_, err = client.CoreV1().Services(ns.Name).Update(tCtx, service, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Error updating service: %v", err)
 			}

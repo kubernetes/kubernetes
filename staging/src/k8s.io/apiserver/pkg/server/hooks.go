@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,6 +25,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -48,8 +50,11 @@ type PreShutdownHookFunc func() error
 type PostStartHookContext struct {
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
-	// StopCh is the channel that will be closed when the server stops
+	// StopCh is the channel that will be closed when the server stops. Alternatively,
+	// Context can be used. StopCh is provided for present for code that hasn't been updated yet.
 	StopCh <-chan struct{}
+	// Context gets cancelled when the server stops.
+	context.Context
 }
 
 // PostStartHookProvider is an interface in addition to provide a post start hook for the api server
@@ -151,15 +156,23 @@ func (s *GenericAPIServer) AddPreShutdownHookOrDie(name string, hook PreShutdown
 	}
 }
 
-// RunPostStartHooks runs the PostStartHooks for the server
+// RunPostStartHooks runs the PostStartHooks for the server.
+// Deprecated: use RunPostStartHooksWithContext instead.
 func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
+	ctx := wait.ContextForChannel(stopCh)
+	s.RunPostStartHooksWithContext(ctx)
+}
+
+// RunPostStartHooksWithContext runs the PostStartHooks for the server.
+func (s *GenericAPIServer) RunPostStartHooksWithContext(ctx context.Context) {
 	s.postStartHookLock.Lock()
 	defer s.postStartHookLock.Unlock()
 	s.postStartHooksCalled = true
 
 	context := PostStartHookContext{
 		LoopbackClientConfig: s.LoopbackClientConfig,
-		StopCh:               stopCh,
+		StopCh:               ctx.Done(),
+		Context:              ctx,
 	}
 
 	for hookName, hookEntry := range s.postStartHooks {

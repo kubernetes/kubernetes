@@ -34,9 +34,15 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestEventCompatibility(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	stopCh := tCtx.Done()
+
+	// TODO: change StartTestServerOrDie to accept a ktesting.TContext as first parameter
+	// and remove the need to call the TearDownFn.
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
@@ -60,9 +66,7 @@ func TestEventCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	oldBroadcaster := record.NewBroadcaster()
+	oldBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
 	defer oldBroadcaster.Shutdown()
 	oldRecorder := oldBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "integration"})
 	oldBroadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: client.CoreV1().Events("")})
