@@ -50,10 +50,15 @@ func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for scheduling gates: %v", gates))
 }
 
-// EventsToRegister returns nil here to indicate that schedulingGates plugin is not
-// interested in any event but its own update.
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
 func (pl *SchedulingGates) EventsToRegister() []framework.ClusterEventWithHint {
-	return nil
+	return []framework.ClusterEventWithHint{
+		// Pods can be more schedulable once it's gates are removed
+		// We don't have QueueingHint intentionally because QueueingHint would be a very similar logic as PreEnqueue,
+		// and it wouldn't add any value to the efficiency.
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
+	}
 }
 
 // New initializes a new plugin and returns it.
