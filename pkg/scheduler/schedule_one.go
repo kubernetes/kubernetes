@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -32,7 +33,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -282,7 +282,7 @@ func (sched *Scheduler) bindingCycle(
 				Pod:         assumedPodInfo.Pod,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: status},
-					UnschedulablePlugins: sets.New(status.Plugin()),
+					UnschedulablePlugins: sets.New(status.Plugin()...),
 				},
 			}
 			return framework.NewStatus(status.Code()).WithError(fitErr)
@@ -450,22 +450,11 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		return nil, diagnosis, err
 	}
 	// Run "prefilter" plugins.
-	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
+	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod, &diagnosis, allNodes)
 	if !s.IsSuccess() {
 		if !s.IsRejected() {
 			return nil, diagnosis, s.AsError()
 		}
-		// All nodes in NodeToStatusMap will have the same status so that they can be handled in the preemption.
-		// Some non trivial refactoring is needed to avoid this copy.
-		for _, n := range allNodes {
-			diagnosis.NodeToStatusMap[n.Node().Name] = s
-		}
-
-		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
-		msg := s.Message()
-		diagnosis.PreFilterMsg = msg
-		logger.V(5).Info("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
-		diagnosis.AddPluginStatus(s)
 		return nil, diagnosis, nil
 	}
 

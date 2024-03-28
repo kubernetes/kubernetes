@@ -676,15 +676,46 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 // When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 // and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 // If a non-success status is returned, then the scheduling cycle is aborted.
-func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
+func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, diagnosis *framework.Diagnosis, allNodes []*framework.NodeInfo) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
+	message := func(plugins []string) string {
+		if len(plugins) == 0 {
+			return ""
+		}
+		msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", plugins)
+		if len(plugins) == 1 {
+			msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", plugins[0])
+		}
+		return msg
+	}
+	preFilterNodeToStatusMap := framework.NodeToStatusMap{}
+	plugins := sets.Set[string]{}
 	defer func() {
 		state.SkipFilterPlugins = skipPlugins
+		var preFilterMsg string
+		for node, pluginStatus := range preFilterNodeToStatusMap {
+			if len(pluginStatus.Reasons()) == 0 {
+				pluginStatus.AppendReason(message(pluginStatus.Plugin()))
+			} else {
+				preFilterMsg = pluginStatus.Message()
+			}
+			plugins.Insert(pluginStatus.Plugin()...)
+			diagnosis.AddPluginStatus(pluginStatus)
+			diagnosis.NodeToStatusMap[node] = pluginStatus
+
+		}
+		if len(preFilterMsg) == 0 {
+			preFilterMsg = message(plugins.UnsortedList())
+		}
+		diagnosis.PreFilterMsg = preFilterMsg
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	nodes := sets.Set[string]{}
+	for _, node := range allNodes {
+		nodes.Insert(node.Node().Name)
+	}
 	var result *framework.PreFilterResult
-	var pluginsWithNodes []string
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
@@ -704,6 +735,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		}
 		if !s.IsSuccess() {
 			s.SetPlugin(pl.Name())
+			f.registerPreFilterPlugins(nodes, sets.Set[string]{}, preFilterNodeToStatusMap, pl, s)
 			if s.Code() == framework.UnschedulableAndUnresolvable {
 				// In this case, the preemption shouldn't happen in this scheduling cycle.
 				// So, no need to execute all PreFilter.
@@ -719,17 +751,12 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name())
 		}
 		if !r.AllNodes() {
-			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
+			f.registerPreFilterPlugins(nodes, r.NodeNames, preFilterNodeToStatusMap, pl, nil)
 		}
 		result = result.Merge(r)
 		if !result.AllNodes() && len(result.NodeNames) == 0 {
-			msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", pluginsWithNodes)
-			if len(pluginsWithNodes) == 1 {
-				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
-			}
-
 			// When PreFilterResult filters out Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
-			return result, framework.NewStatus(framework.UnschedulableAndUnresolvable, msg)
+			return result, framework.NewStatus(framework.UnschedulableAndUnresolvable, message(plugins.UnsortedList()))
 		}
 	}
 	return result, returnStatus
@@ -1502,7 +1529,7 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 		}
 		err := s.AsError()
 		logger.Error(err, "Failed waiting on permit for pod", "pod", klog.KObj(pod))
-		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err)).WithPlugin(s.Plugin())
+		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err)).WithPlugin(s.Plugin()...)
 	}
 	return nil
 }
@@ -1633,4 +1660,20 @@ func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 	return f.parallelizer
+}
+
+func (f *frameworkImpl) registerPreFilterPlugins(nodes sets.Set[string], legalNodes sets.Set[string],
+	nodeToStatusMap framework.NodeToStatusMap, pl framework.PreFilterPlugin, pluginStatus *framework.Status) {
+	filteredNodes := nodes.SymmetricDifference(legalNodes)
+	for _, filteredNode := range filteredNodes.UnsortedList() {
+		if status, ok := nodeToStatusMap[filteredNode]; ok {
+			status.AppendPlugin(pl.Name())
+		} else {
+			newStatus := pluginStatus
+			if newStatus == nil {
+				newStatus = framework.NewStatus(framework.UnschedulableAndUnresolvable).WithPlugin(pl.Name())
+			}
+			nodeToStatusMap[filteredNode] = newStatus
+		}
+	}
 }

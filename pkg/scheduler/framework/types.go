@@ -130,6 +130,8 @@ type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interfa
 
 type QueueingHint int
 
+type PrefilterContextKey string
+
 const (
 	// QueueSkip implies that the cluster event has no impact on
 	// scheduling of the pod.
@@ -352,20 +354,28 @@ const (
 )
 
 func (d *Diagnosis) AddPluginStatus(sts *Status) {
-	if sts.Plugin() == "" {
+	if len(sts.Plugin()) == 0 {
 		return
 	}
 	if sts.IsRejected() {
 		if d.UnschedulablePlugins == nil {
 			d.UnschedulablePlugins = sets.New[string]()
 		}
-		d.UnschedulablePlugins.Insert(sts.Plugin())
+		for _, plugin := range sts.plugins {
+			if !d.UnschedulablePlugins.Has(plugin) {
+				d.UnschedulablePlugins.Insert(plugin)
+			}
+		}
 	}
 	if sts.Code() == Pending {
 		if d.PendingPlugins == nil {
 			d.PendingPlugins = sets.New[string]()
 		}
-		d.PendingPlugins.Insert(sts.Plugin())
+		for _, plugin := range sts.plugins {
+			if !d.PendingPlugins.Has(plugin) {
+				d.PendingPlugins.Insert(plugin)
+			}
+		}
 	}
 }
 

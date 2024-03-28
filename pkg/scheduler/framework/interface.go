@@ -181,9 +181,9 @@ type Status struct {
 	code    Code
 	reasons []string
 	err     error
-	// plugin is an optional field that records the plugin name causes this status.
+	// plugins is an optional field that records the plugins name causes this status.
 	// It's set by the framework when code is Unschedulable, UnschedulableAndUnresolvable or Pending.
-	plugin string
+	plugins []string
 }
 
 func (s *Status) WithError(err error) *Status {
@@ -208,20 +208,29 @@ func (s *Status) Message() string {
 }
 
 // SetPlugin sets the given plugin name to s.plugin.
-func (s *Status) SetPlugin(plugin string) {
-	s.plugin = plugin
+func (s *Status) SetPlugin(plugins ...string) {
+	s.plugins = plugins
 }
 
 // WithPlugin sets the given plugin name to s.plugin,
 // and returns the given status object.
-func (s *Status) WithPlugin(plugin string) *Status {
-	s.SetPlugin(plugin)
+func (s *Status) WithPlugin(plugins ...string) *Status {
+	s.SetPlugin(plugins...)
 	return s
 }
 
+func (s *Status) AppendPlugin(plugin string) {
+	for _, pluginName := range s.plugins {
+		if pluginName == plugin {
+			return
+		}
+	}
+	s.plugins = append(s.plugins, plugin)
+}
+
 // Plugin returns the plugin name which caused this status.
-func (s *Status) Plugin() string {
-	return s.plugin
+func (s *Status) Plugin() []string {
+	return s.plugins
 }
 
 // Reasons returns reasons of the Status.
@@ -285,7 +294,7 @@ func (s *Status) Equal(x *Status) bool {
 	if !cmp.Equal(s.reasons, x.reasons) {
 		return false
 	}
-	return cmp.Equal(s.plugin, x.plugin)
+	return cmp.Equal(s.plugins, x.plugins)
 }
 
 func (s *Status) String() string {
@@ -586,7 +595,7 @@ type Framework interface {
 	// cycle is aborted.
 	// It also returns a PreFilterResult, which may influence what or how many nodes to
 	// evaluate downstream.
-	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (*PreFilterResult, *Status)
+	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, diagnosis *Diagnosis, allNodes []*NodeInfo) (*PreFilterResult, *Status)
 
 	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
 	// PostFilter plugins can either be informational, in which case should be configured
