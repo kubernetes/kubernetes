@@ -74,8 +74,8 @@ func NewRootListAction(resource schema.GroupVersionResource, kind schema.GroupVe
 	action.Verb = "list"
 	action.Resource = resource
 	action.Kind = kind
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector, resourceVersion}
 
 	return action
 }
@@ -86,8 +86,8 @@ func NewListAction(resource schema.GroupVersionResource, kind schema.GroupVersio
 	action.Resource = resource
 	action.Kind = kind
 	action.Namespace = namespace
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector, resourceVersion}
 
 	return action
 }
@@ -275,8 +275,8 @@ func NewRootDeleteCollectionAction(resource schema.GroupVersionResource, opts in
 	action := DeleteCollectionActionImpl{}
 	action.Verb = "delete-collection"
 	action.Resource = resource
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector, resourceVersion}
 
 	return action
 }
@@ -286,8 +286,8 @@ func NewDeleteCollectionAction(resource schema.GroupVersionResource, namespace s
 	action.Verb = "delete-collection"
 	action.Resource = resource
 	action.Namespace = namespace
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector, resourceVersion}
 
 	return action
 }
@@ -352,8 +352,9 @@ func NewProxyGetAction(resource schema.GroupVersionResource, namespace, scheme, 
 }
 
 type ListRestrictions struct {
-	Labels labels.Selector
-	Fields fields.Selector
+	Labels          labels.Selector
+	Fields          fields.Selector
+	ResourceVersion string
 }
 type WatchRestrictions struct {
 	Labels          labels.Selector
@@ -522,8 +523,9 @@ func (a ListActionImpl) DeepCopy() Action {
 		Kind:       a.Kind,
 		Name:       a.Name,
 		ListRestrictions: ListRestrictions{
-			Labels: a.ListRestrictions.Labels.DeepCopySelector(),
-			Fields: a.ListRestrictions.Fields.DeepCopySelector(),
+			Labels:          a.ListRestrictions.Labels.DeepCopySelector(),
+			Fields:          a.ListRestrictions.Fields.DeepCopySelector(),
+			ResourceVersion: a.ListRestrictions.ResourceVersion,
 		},
 	}
 }
@@ -627,8 +629,9 @@ func (a DeleteCollectionActionImpl) DeepCopy() Action {
 	return DeleteCollectionActionImpl{
 		ActionImpl: a.ActionImpl.DeepCopy().(ActionImpl),
 		ListRestrictions: ListRestrictions{
-			Labels: a.ListRestrictions.Labels.DeepCopySelector(),
-			Fields: a.ListRestrictions.Fields.DeepCopySelector(),
+			Labels:          a.ListRestrictions.Labels.DeepCopySelector(),
+			Fields:          a.ListRestrictions.Fields.DeepCopySelector(),
+			ResourceVersion: a.ListRestrictions.ResourceVersion,
 		},
 	}
 }
