@@ -447,6 +447,12 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 	delete(list.Object, "items")
 	list.Items = make([]Unstructured, 0, len(dList.Items))
 	for _, i := range dList.Items {
+		// make sure the data can decode into ObjectMeta before we return,
+		// so we don't silently truncate schema errors in metadata later with accesser get/set calls
+		v := &metadataOnlyObject{}
+		if typedErr := json.Unmarshal([]byte(i), v); typedErr != nil {
+			return typedErr
+		}
 		unstruct := &Unstructured{}
 		if err := s.decodeToUnstructured([]byte(i), unstruct); err != nil {
 			return err
@@ -498,4 +504,9 @@ func (c *jsonFallbackEncoder) Encode(obj runtime.Object, w io.Writer) error {
 // Identifier implements runtime.Encoder interface.
 func (c *jsonFallbackEncoder) Identifier() runtime.Identifier {
 	return c.identifier
+}
+
+type metadataOnlyObject struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
