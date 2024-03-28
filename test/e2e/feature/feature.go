@@ -345,6 +345,21 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ValidatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
 
+	// owning-sig: sig-storage
+	// kep: https://kep.k8s.io/3751
+	// test-infra jobs:
+	// - pull-kubernetes-e2e-storage-kind-alpha-features (need manual trigger)
+	// - ci-kubernetes-e2e-storage-kind-alpha-features
+	//
+	// When this label is added to a test, it means that the cluster must be created
+	// with the feature-gate "VolumeAttributesClass=true" and the storage.k8s.io/v1alpha1
+	// API version must be enabled.
+	//
+	// Once the feature and API version are stable, this label should be removed and
+	// these tests will be run by default on any cluster. The test-infra job also should
+	// be updated to not focus on this feature anymore.
+	VolumeAttributesClass = framework.WithFeature(framework.ValidFeatures.Add("VolumeAttributesClass"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Volumes = framework.WithFeature(framework.ValidFeatures.Add("Volumes"))
 

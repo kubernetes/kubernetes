@@ -30,6 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func testVolumeClaim(name string, namespace string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
@@ -87,11 +88,18 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	validClaimByStorageClassWithNonIntegerStorage := validClaimByStorageClass.DeepCopy()
 	validClaimByStorageClassWithNonIntegerStorage.Spec.Resources.Requests[core.ResourceName(core.ResourceStorage)] = resource.MustParse("1001m")
 
+	validClaimByVolumeAttributesClass := validClaimByStorageClass.DeepCopy()
+	validClaimByVolumeAttributesClass.Spec.VolumeAttributesClassName = &classGold
+
+	validClaimByEmptyVolumeAttributesClass := validClaimByStorageClass.DeepCopy()
+	validClaimByEmptyVolumeAttributesClass.Spec.VolumeAttributesClassName = ptr.To("")
+
 	evaluator := NewPersistentVolumeClaimEvaluator(nil)
 	testCases := map[string]struct {
-		pvc                        *core.PersistentVolumeClaim
-		usage                      corev1.ResourceList
-		enableRecoverFromExpansion bool
+		pvc                         *core.PersistentVolumeClaim
+		usage                       corev1.ResourceList
+		enableRecoverFromExpansion  bool
+		enableVolumeAttributesClass bool
 	}{
 		"pvc-usage": {
 			pvc: validClaim,
@@ -152,10 +160,34 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			},
 			enableRecoverFromExpansion: true,
 		},
+		"pvc-usage-by-empty-volume-attributes-class": {
+			pvc: validClaimByEmptyVolumeAttributesClass,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("10Gi"),
+				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
+				V1ResourceByStorageClass(classGold, corev1.ResourceRequestsStorage):                               resource.MustParse("10Gi"),
+				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+			enableVolumeAttributesClass: true,
+		},
+		"pvc-usage-by-volume-attributes-class": {
+			pvc: validClaimByVolumeAttributesClass,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("10Gi"),
+				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
+				V1ResourceByStorageClass(classGold, corev1.ResourceRequestsStorage):                               resource.MustParse("10Gi"),
+				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
+				V1ResourceByVolumeAttributesClass(classGold, corev1.ResourcePersistentVolumeClaims):               resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+			enableVolumeAttributesClass: true,
+		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, testCase.enableRecoverFromExpansion)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, testCase.enableVolumeAttributesClass)()
 			actual, err := evaluator.Usage(testCase.pvc)
 			if err != nil {
 				t.Errorf("%s unexpected error: %v", testName, err)
@@ -185,8 +217,9 @@ func getPVCWithAllocatedResource(pvcSize, allocatedSize string) *core.Persistent
 func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
 	evaluator := NewPersistentVolumeClaimEvaluator(nil)
 	testCases := map[string]struct {
-		items []corev1.ResourceName
-		want  []corev1.ResourceName
+		items                       []corev1.ResourceName
+		want                        []corev1.ResourceName
+		enableVolumeAttributesClass bool
 	}{
 		"supported-resources": {
 			items: []corev1.ResourceName{
@@ -195,6 +228,7 @@ func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
 				"persistentvolumeclaims",
 				"gold.storageclass.storage.k8s.io/requests.storage",
 				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+				"gold.volumeattributesclass.storage.k8s.io/persistentvolumeclaims",
 			},
 
 			want: []corev1.ResourceName{
@@ -203,7 +237,9 @@ func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
 				"persistentvolumeclaims",
 				"gold.storageclass.storage.k8s.io/requests.storage",
 				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+				"gold.volumeattributesclass.storage.k8s.io/persistentvolumeclaims",
 			},
+			enableVolumeAttributesClass: true,
 		},
 		"unsupported-resources": {
 			items: []corev1.ResourceName{
@@ -214,10 +250,44 @@ func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
 			},
 			want: []corev1.ResourceName{},
 		},
+		// TODO: remove this test case after featuregate VolumeAttributesClass is GAed
+		"supported-resources-on-featuregate-off": {
+			items: []corev1.ResourceName{
+				"count/persistentvolumeclaims",
+				"requests.storage",
+				"persistentvolumeclaims",
+				"gold.storageclass.storage.k8s.io/requests.storage",
+				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+				"gold.volumeattributesclass.storage.k8s.io/persistentvolumeclaims",
+			},
+
+			want: []corev1.ResourceName{
+				"count/persistentvolumeclaims",
+				"requests.storage",
+				"persistentvolumeclaims",
+				"gold.storageclass.storage.k8s.io/requests.storage",
+				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+			},
+		},
+		// TODO: remove this test case after featuregate VolumeAttributesClass is GAed
+		"unsupported-resources-on-featuregate-on": {
+			items: []corev1.ResourceName{
+				"storage",
+				"ephemeral-storage",
+				"bronze.storageclass.storage.k8s.io/storage",
+				"gold.storage.k8s.io/requests.storage",
+				"gold.volumeattributesclass.storage.k8s.io/persistentvolumeclaims",
+			},
+			want: []corev1.ResourceName{
+				"gold.volumeattributesclass.storage.k8s.io/persistentvolumeclaims",
+			},
+			enableVolumeAttributesClass: true,
+		},
 	}
 	for testName, testCase := range testCases {
-		actual := evaluator.MatchingResources(testCase.items)
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, testCase.enableVolumeAttributesClass)()
 
+		actual := evaluator.MatchingResources(testCase.items)
 		if !reflect.DeepEqual(testCase.want, actual) {
 			t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.want, actual)
 		}
