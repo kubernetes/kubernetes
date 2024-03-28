@@ -74,7 +74,12 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 	}
 	location.Path = net.JoinPreservingTrailingSlash(location.Path, proxyOpts.Path)
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
-	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Fix querystring missing on connection upgrade
+		location.RawQuery = req.URL.RawQuery
+		handler := newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder)
+		handler.ServeHTTP(w, req)
+	}), nil
 }
 
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
