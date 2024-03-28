@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
@@ -40,7 +41,7 @@ import (
 )
 
 func main() {
-	ccmOptions, err := options.NewCloudControllerManagerOptions()
+	ccmOptions, err := options.NewCloudControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}

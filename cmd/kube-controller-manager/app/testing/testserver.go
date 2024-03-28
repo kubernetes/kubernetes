@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -92,7 +93,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	s, err := options.NewKubeControllerManagerOptions()
+	s, err := options.NewKubeControllerManagerOptions(utilfeature.DefaultMutableFeatureGate)
 	if err != nil {
 		return TestServer{}, err
 	}
