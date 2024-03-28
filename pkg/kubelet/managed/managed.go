@@ -41,6 +41,7 @@ const (
 
 type WorkloadContainerAnnotation struct {
 	CpuShares uint64 `json:"cpushares"`
+	CpuLimit  int64  `json:"cpulimit,omitempty"`
 }
 
 func NewWorkloadContainerAnnotation(cpushares uint64) WorkloadContainerAnnotation {
@@ -131,6 +132,10 @@ func updateContainers(workloadName string, pod *v1.Pod) error {
 		cpuRequestInMilli := cpuRequest.MilliValue()
 
 		containerAnnotation := NewWorkloadContainerAnnotation(MilliCPUToShares(cpuRequestInMilli))
+		if value, ok := container.Resources.Limits[v1.ResourceCPU]; ok {
+			containerAnnotation.CpuLimit = value.MilliValue()
+		}
+
 		jsonAnnotation, _ := containerAnnotation.Serialize()
 		containerNameKey := fmt.Sprintf("%v%v", ContainerAnnotationPrefix, container.Name)
 
@@ -141,6 +146,7 @@ func updateContainers(workloadName string, pod *v1.Pod) error {
 		container.Resources.Limits[GenerateResourceName(workloadName)] = *newCPURequest
 
 		delete(container.Resources.Requests, v1.ResourceCPU)
+		delete(container.Resources.Limits, v1.ResourceCPU)
 		return nil
 	}
 	for idx := range pod.Spec.Containers {

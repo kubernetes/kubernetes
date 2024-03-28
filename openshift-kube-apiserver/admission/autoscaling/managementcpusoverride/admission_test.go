@@ -192,8 +192,8 @@ func TestAdmit(t *testing.T) {
 			expectedCpuRequest: resource.Quantity{},
 			namespace:          testManagedNamespace(),
 			expectedAnnotations: map[string]string{
-				fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, "test"):                fmt.Sprintf(`{"%s": 256}`, containerResourcesAnnotationValueKeyCPUShares),
-				fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, "initTest"):            fmt.Sprintf(`{"%s": 256}`, containerResourcesAnnotationValueKeyCPUShares),
+				fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, "test"):                fmt.Sprintf(`{"%s":256}`, containerResourcesAnnotationValueKeyCPUShares),
+				fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, "initTest"):            fmt.Sprintf(`{"%s":256}`, containerResourcesAnnotationValueKeyCPUShares),
 				fmt.Sprintf("%s%s", podWorkloadTargetAnnotationPrefix, workloadTypeManagement): fmt.Sprintf(`{"%s":"%s"}`, podWorkloadAnnotationEffect, workloadEffectPreferredDuringScheduling),
 			},
 			nodes: []*corev1.Node{testNodeWithManagementResource()},
@@ -236,12 +236,14 @@ func TestAdmit(t *testing.T) {
 			infra: testClusterSNOInfra(),
 		},
 		{
-			name:               "should ignore pod when one of pod containers have both CPU limit and request",
+			name:               "should not ignore pod when one of pod containers have both CPU limit and request",
 			pod:                testManagedPod("500m", "250m", "500Mi", ""),
-			expectedCpuRequest: resource.MustParse("250m"),
+			expectedCpuRequest: resource.Quantity{},
 			namespace:          testManagedNamespace(),
 			expectedAnnotations: map[string]string{
-				workloadAdmissionWarning: fmt.Sprintf("skip pod CPUs requests modifications because pod container has both CPU limit and request"),
+				fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, "test"):                fmt.Sprintf(`{"%s":256,"cpulimit":500}`, containerResourcesAnnotationValueKeyCPUShares),
+				fmt.Sprintf("%s%s", containerResourcesAnnotationPrefix, "initTest"):            fmt.Sprintf(`{"%s":256,"cpulimit":500}`, containerResourcesAnnotationValueKeyCPUShares),
+				fmt.Sprintf("%s%s", podWorkloadTargetAnnotationPrefix, workloadTypeManagement): fmt.Sprintf(`{"%s":"%s"}`, podWorkloadAnnotationEffect, workloadEffectPreferredDuringScheduling),
 			},
 			nodes: []*corev1.Node{testNodeWithManagementResource()},
 			infra: testClusterSNOInfra(),
@@ -258,12 +260,12 @@ func TestAdmit(t *testing.T) {
 			infra: testClusterSNOInfra(),
 		},
 		{
-			name:               "should not mutate the pod when at least one node does not have management resources",
+			name:               "should not mutate the pod when cpu partitioning is not set to AllNodes",
 			pod:                testManagedPod("500m", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
 			nodes:              []*corev1.Node{testNode()},
-			infra:              testClusterSNOInfra(),
+			infra:              testClusterInfraWithoutWorkloadPartitioning(),
 		},
 		{
 			name:               "should return admission error when the cluster does not have any nodes",
@@ -426,7 +428,7 @@ func TestValidate(t *testing.T) {
 			),
 			namespace:     testManagedNamespace(),
 			nodes:         []*corev1.Node{testNodeWithManagementResource()},
-			expectedError: fmt.Errorf("he pod resource annotation value should have only cpushares key"),
+			expectedError: fmt.Errorf("json: unknown field \"cpuset\""),
 		},
 		{
 			name: "should return invalid error when the pod does not have workload annotation, but has resource annotation",
@@ -466,7 +468,7 @@ func TestValidate(t *testing.T) {
 			),
 			namespace:     testManagedNamespace(),
 			nodes:         []*corev1.Node{testNodeWithManagementResource()},
-			expectedError: fmt.Errorf("the pod can not have workload annotation, when the namespace %q does not allow it", "managed-namespace"),
+			expectedError: fmt.Errorf("the namespace %q does not allow the workload type %s", "managed-namespace", "non-existent"),
 		},
 		{
 			name: "should not return any errors when the pod has workload annotation, but the pod namespace has no annotations",
@@ -699,9 +701,8 @@ func testClusterSNOInfra() *configv1.Infrastructure {
 	}
 }
 
-func testClusterInfraWithoutTopologyFields() *configv1.Infrastructure {
+func testClusterInfraWithoutWorkloadPartitioning() *configv1.Infrastructure {
 	infra := testClusterSNOInfra()
-	infra.Status.ControlPlaneTopology = ""
-	infra.Status.InfrastructureTopology = ""
+	infra.Status.CPUPartitioning = configv1.CPUPartitioningNone
 	return infra
 }
