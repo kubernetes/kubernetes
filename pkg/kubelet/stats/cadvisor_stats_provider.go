@@ -139,6 +139,8 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			}
 			podStats.Containers = append(podStats.Containers, *containerStat)
 		}
+		// Either way, collect process stats
+		podStats.ProcessStats = mergeProcessStats(podStats.ProcessStats, cadvisorInfoToProcessStats(&cinfo))
 	}
 
 	// Add each PodStats to the result.
@@ -154,7 +156,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			podStats.CPU = cpu
 			podStats.Memory = memory
 			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
-			podStats.ProcessStats = cadvisorInfoToProcessStats(podInfo)
+			// ProcessStats were accumulated as the containers were iterated.
 		}
 
 		status, found := p.statusProvider.GetPodStatus(podUID)
