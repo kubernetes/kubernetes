@@ -17,16 +17,69 @@ limitations under the License.
 package routes
 
 import (
-	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/emicklei/go-restful/v3"
 )
+
+func TestLogFileHandler(t *testing.T) {
+	oversizeFileName := strings.Repeat("a", 32768)
+	tests := []struct {
+		logpath      string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			logpath:      oversizeFileName,
+			expectedCode: http.StatusNotFound,
+			expectedBody: "file not found\n",
+		},
+		{
+			logpath:      "..",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "unsupported logpath\n",
+		},
+		{
+			logpath:      "../logger/a",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "unsupported logpath\n",
+		},
+	}
+
+	container := restful.NewContainer()
+	logs := Logs{}
+	logs.Install(container)
+
+	for _, tc := range tests {
+		request := httptest.NewRequest("GET", "/logs/"+tc.logpath, nil)
+		response := httptest.NewRecorder()
+		container.Dispatch(response, request)
+		if response.Code != tc.expectedCode {
+			t.Errorf("LogFileHandle failed expected status code %d actual %d", tc.expectedCode, response.Code)
+		}
+		if response.Body.String() != tc.expectedBody {
+			t.Errorf("LogFileHandle failed expected response body %q actualt %q", tc.expectedBody, response.Body.String())
+		}
+	}
+
+	emptyPath := "a/.."
+	request := httptest.NewRequest("GET", "/logs/"+emptyPath, nil)
+	response := httptest.NewRecorder()
+	container.Dispatch(response, request)
+	if response.Body.String() == "unsupported logpath\n" {
+		t.Errorf("emptyPath should be allowed")
+	}
+}
 
 func TestPreCheckLogFileNameLength(t *testing.T) {
 	// In windows, with long file name support enabled, file names can have up to 32,767 characters.
-	oversizeFileName := fmt.Sprintf("%032768s", "a")
-	normalFileName := fmt.Sprintf("%0255s", "a")
+	oversizeFileName := strings.Repeat("a", 32768)
+	normalFileName := strings.Repeat("a", 255)
 
 	// check file with oversize name.
 	if !logFileNameIsTooLong(oversizeFileName) {

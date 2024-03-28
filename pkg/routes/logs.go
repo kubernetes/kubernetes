@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/emicklei/go-restful/v3"
 )
@@ -43,7 +44,12 @@ func (l Logs) Install(c *restful.Container) {
 func logFileHandler(req *restful.Request, resp *restful.Response) {
 	logdir := "/var/log"
 	actual := path.Join(logdir, req.PathParameter("logpath"))
-
+	// According to NCC-E003660-B4Y. Although http.Server explicitly sanitizes its input,
+	// before using the "actual" path, it should be ensured that it is within the logdir directory.
+	if actual != logdir && (!strings.HasPrefix(actual, logdir) || actual[len(logdir)] != '/') {
+		http.Error(resp, "unsupported logpath", http.StatusBadRequest)
+		return
+	}
 	// check filename length first, return 404 if it's oversize.
 	if logFileNameIsTooLong(actual) {
 		http.Error(resp, "file not found", http.StatusNotFound)
