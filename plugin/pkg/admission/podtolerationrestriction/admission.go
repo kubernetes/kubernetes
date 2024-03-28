@@ -39,6 +39,10 @@ import (
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
 
+// This is deprecated. PodTolerationRestriction will be replaced by CEL admission
+// in the future.
+// See https://github.com/kubernetes/kubernetes/issues/113474 for details.
+
 // PluginName is a string with the name of the plugin
 const PluginName = "PodTolerationRestriction"
 
