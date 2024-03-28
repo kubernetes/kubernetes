@@ -83,9 +83,9 @@ type peerProxyHandler struct {
 }
 
 type serviceableByResponse struct {
-	locallyServiceable            bool
-	errorFetchingAddressFromLease bool
-	peerEndpoints                 []string
+	locallyServiceable             bool
+	isRequestForCRDOrAggregatedAPI bool
+	peerEndpoints                  []string
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
@@ -152,26 +152,16 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		// find servers that are capable of serving this request
 		serviceableByResp, err := h.findServiceableByServers(gvr, h.serverId, h.reconciler)
 		if err != nil {
-			// this means that resource is an aggregated API or a CR since it wasn't found in SV informer cache, pass as it is
-			handler.ServeHTTP(w, r)
-			return
-		}
-		// found the gvr locally, pass request to the next handler in local apiserver
-		if serviceableByResp.locallyServiceable {
-			handler.ServeHTTP(w, r)
-			return
-		}
-
-		gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
-
-		if serviceableByResp.errorFetchingAddressFromLease {
-			klog.ErrorS(err, "error fetching ip and port of remote server while proxying")
+			gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
+			klog.ErrorS(err, "error finding serviceable-by apiservers for the requested resource", "gvr", gvr)
 			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gv, w, r)
 			return
 		}
 
-		// no apiservers were found that could serve the request, pass request to
-		// next handler, that should eventually serve 404
+		if serviceableByResp.isRequestForCRDOrAggregatedAPI || serviceableByResp.locallyServiceable {
+			handler.ServeHTTP(w, r)
+			return
+		}
 
 		// TODO: maintain locally serviceable GVRs somewhere so that we dont have to
 		// consult the storageversion-informed map for those
@@ -195,15 +185,19 @@ func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResou
 
 	// no value found for the requested gvr in svMap
 	if !ok || apiserversi == nil {
-		return serviceableByResponse{}, fmt.Errorf("no StorageVersions found for the GVR: %v", gvr)
+		klog.V(3).Infof("no StorageVersions found for the GVR: %v", gvr)
+		return serviceableByResponse{
+			isRequestForCRDOrAggregatedAPI: true,
+		}, nil
 	}
+
+	var respErr error
 	apiservers := apiserversi.(*sync.Map)
 	response := serviceableByResponse{}
 	var peerServerEndpoints []string
 	apiservers.Range(func(key, value interface{}) bool {
 		apiserverKey := key.(string)
 		if apiserverKey == localAPIServerId {
-			response.errorFetchingAddressFromLease = true
 			response.locallyServiceable = true
 			// stop iteration
 			return false
@@ -211,16 +205,14 @@ func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResou
 
 		hostPort, err := reconciler.GetEndpoint(apiserverKey)
 		if err != nil {
-			response.errorFetchingAddressFromLease = true
-			klog.Errorf("failed to get peer ip from storage lease for server %s", apiserverKey)
+			respErr = fmt.Errorf("failed to get peer ip from storage lease for server %s", apiserverKey)
 			// continue with iteration
 			return true
 		}
 		// check ip format
 		_, _, err = net.SplitHostPort(hostPort)
 		if err != nil {
-			response.errorFetchingAddressFromLease = true
-			klog.Errorf("invalid address found for server %s", apiserverKey)
+			respErr = fmt.Errorf("invalid address found for server %s", apiserverKey)
 			// continue with iteration
 			return true
 		}
@@ -229,8 +221,11 @@ func (h *peerProxyHandler) findServiceableByServers(gvr schema.GroupVersionResou
 		return true
 	})
 
-	response.peerEndpoints = peerServerEndpoints
-	return response, nil
+	if len(peerServerEndpoints) > 0 {
+		respErr = nil
+		response.peerEndpoints = peerServerEndpoints
+	}
+	return response, respErr
 }
 
 func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request, rw http.ResponseWriter, host string) {
