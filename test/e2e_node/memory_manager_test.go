@@ -378,11 +378,7 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 
 		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
 		ginkgo.It("should report memory data during request to pod resources GetAllocatableResources", func(ctx context.Context) {
-			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-			framework.ExpectNoError(err)
-
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err)
+			cli, conn := MustGetPodResourcesClient(context.TODO(), podresourcesDefaultTestTimeout)
 			defer conn.Close()
 
 			resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
