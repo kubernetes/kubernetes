@@ -64,8 +64,8 @@ func (s *OpenIDMetadataServer) Install(c *restful.Container) {
 	cfg := new(restful.WebService).
 		Produces(restful.MIME_JSON)
 
-	cfg.Path(serviceaccount.OpenIDConfigPath).Route(
-		cfg.GET("").
+	cfg.Path(serviceaccount.OpenIDConfigPathPrefix).Route(
+		cfg.GET(serviceaccount.OpenIDConfigPath).
 			To(fromStandard(s.serveConfiguration)).
 			Doc("get service account issuer OpenID configuration, also known as the 'OIDC discovery doc'").
 			Operation("getServiceAccountIssuerOpenIDConfiguration").
@@ -77,8 +77,8 @@ func (s *OpenIDMetadataServer) Install(c *restful.Container) {
 	jwks := new(restful.WebService).
 		Produces(mimeJWKS)
 
-	jwks.Path(serviceaccount.JWKSPath).Route(
-		jwks.GET("").
+	jwks.Path(serviceaccount.JWKSPathPrefix).Route(
+		jwks.GET(serviceaccount.JWKSPath).
 			To(fromStandard(s.serveKeys)).
 			Doc("get service account issuer OpenID JSON Web Key Set (contains public token verification keys)").
 			Operation("getServiceAccountIssuerOpenIDKeyset").
