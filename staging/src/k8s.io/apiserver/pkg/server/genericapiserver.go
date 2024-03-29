@@ -194,6 +194,9 @@ type GenericAPIServer struct {
 	readyzRegistry  healthCheckRegistry
 	livezRegistry   healthCheckRegistry
 
+	// component flags
+	flagzRegistry flagzRegistry
+
 	livezGracePeriod time.Duration
 
 	// auditing. The backend is started before the server starts listening.
@@ -436,6 +439,8 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		klog.Errorf("Failed to install readyz shutdown check %s", err)
 	}
 	s.installReadyz()
+
+	s.installFlagz()
 
 	return preparedGenericAPIServer{s}
 }
