@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -641,6 +642,8 @@ func normalizeScheduling(scheduling []resourcev1alpha2.PodSchedulingContext) []r
 }
 
 func createTestClient(objects ...runtime.Object) *fake.Clientset {
+	typeconverter := managedfields.NewDeducedTypeConverter()
+	fieldManager := managedfieldstest.NewFakeFieldManager(typeconverter, policyGVK)
 	fakeClient := fake.NewSimpleClientset(objects...)
 	fakeClient.PrependReactor("create", "resourceclaims", createResourceClaimReactor())
 	return fakeClient
