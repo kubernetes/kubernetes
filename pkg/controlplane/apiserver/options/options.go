@@ -29,6 +29,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/component-base/cli/flag"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -44,6 +45,7 @@ import (
 // Options define the flags and validation for a generic controlplane. If the
 // structs are nil, the options are not added to the command line and not validated.
 type Options struct {
+	FlagSet                 flag.NamedFlagSets
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
