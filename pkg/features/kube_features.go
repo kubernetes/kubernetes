@@ -1016,19 +1016,19 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ImageMaximumGCAge: {Default: true, PreRelease: featuregate.Beta},
 
-	InTreePluginAWSUnregister: {Default: false, PreRelease: featuregate.Alpha},
+	InTreePluginAWSUnregister: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	InTreePluginAzureDiskUnregister: {Default: false, PreRelease: featuregate.Alpha},
+	InTreePluginAzureDiskUnregister: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	InTreePluginAzureFileUnregister: {Default: false, PreRelease: featuregate.Alpha},
+	InTreePluginAzureFileUnregister: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	InTreePluginGCEUnregister: {Default: false, PreRelease: featuregate.Alpha},
+	InTreePluginGCEUnregister: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	InTreePluginOpenStackUnregister: {Default: false, PreRelease: featuregate.Alpha},
+	InTreePluginOpenStackUnregister: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	InTreePluginPortworxUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
-	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
+	InTreePluginvSphereUnregister: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	JobBackoffLimitPerIndex: {Default: true, PreRelease: featuregate.Beta},
 
