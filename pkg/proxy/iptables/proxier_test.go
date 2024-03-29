@@ -1364,9 +1364,9 @@ func runPacketFlowTests(t *testing.T, line int, ipt *iptablestest.FakeIPTables, 
 	}
 }
 
-// This tests tracePackets against static data, just to make sure we match things in the
+// This tests tracePacket against static data, just to make sure we match things in the
 // way we expect to.
-func TestTracePackets(t *testing.T) {
+func TestTracePacket(t *testing.T) {
 	rules := dedent.Dedent(`
 		*filter
 		:INPUT - [0:0]
