@@ -73,6 +73,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
+	"k8s.io/kubectl/pkg/kuberc"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -361,6 +362,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
+	pref := kuberc.NewPreferences()
+	pref.AddFlags(flags)
+
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags().WithWarningPrinter(o.IOStreams)
@@ -490,6 +494,20 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
+
+	var err error
+	o.Arguments, err = pref.ApplyAliases(cmds, o.Arguments, o.IOStreams.ErrOut)
+	if err != nil {
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying aliases %v\n", err)
+		os.Exit(1)
+	}
+	os.Args = o.Arguments
+	err = pref.ApplyOverrides(cmds, o.Arguments, o.IOStreams.ErrOut)
+	if err != nil {
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying command flag overrides %v\n", err)
+		os.Exit(1)
+	}
+
 	return cmds
 }
 

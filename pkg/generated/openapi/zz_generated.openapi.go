@@ -1181,6 +1181,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-scheduler/config/v1.ScoringStrategy":                                                       schema_k8sio_kube_scheduler_config_v1_ScoringStrategy(ref),
 		"k8s.io/kube-scheduler/config/v1.UtilizationShapePoint":                                                 schema_k8sio_kube_scheduler_config_v1_UtilizationShapePoint(ref),
 		"k8s.io/kube-scheduler/config/v1.VolumeBindingArgs":                                                     schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.Preferences":                                                        schema_kubectl_pkg_config_v1alpha1_Preferences(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesAliasOverride":                                           schema_kubectl_pkg_config_v1alpha1_PreferencesAliasOverride(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverride":                                         schema_kubectl_pkg_config_v1alpha1_PreferencesCommandOverride(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag":                                     schema_kubectl_pkg_config_v1alpha1_PreferencesCommandOverrideFlag(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesSpec":                                                    schema_kubectl_pkg_config_v1alpha1_PreferencesSpec(ref),
 		"k8s.io/kubelet/config/v1.CredentialProvider":                                                           schema_k8sio_kubelet_config_v1_CredentialProvider(ref),
 		"k8s.io/kubelet/config/v1.CredentialProviderConfig":                                                     schema_k8sio_kubelet_config_v1_CredentialProviderConfig(ref),
 		"k8s.io/kubelet/config/v1.ExecEnvVar":                                                                   schema_k8sio_kubelet_config_v1_ExecEnvVar(ref),
@@ -60580,6 +60585,240 @@ func schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref common.Referenc
 		},
 		Dependencies: []string{
 			"k8s.io/kube-scheduler/config/v1.UtilizationShapePoint"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1alpha1_Preferences(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Preferences stores elements of KubeRC configuration file",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec stores the overrides and the other preferences",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kubectl/pkg/config/v1alpha1.PreferencesSpec"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesSpec"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1alpha1_PreferencesAliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PreferencesAliasOverride stores the alias definitions. It is applied in a pre-defined order which is kubectl [ALIAS NAME] expands to kubectl [COMMAND] [ARGUMENTS]",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of alias",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Command is the single or set of commands to execute, such as \"set env\" or \"create\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"args": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Arguments is allocated for the arguments such as resource names, etc.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"flags": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Flag is allocated to store the flag definitions of alias",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "command"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1alpha1_PreferencesCommandOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PreferencesCommandOverride stores the commands and their associated flag's default values.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Command refers to a command whose flag's default value is changed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"flags": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Flags is a list of flags storing different default values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"command", "flags"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1alpha1_PreferencesCommandOverrideFlag(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PreferencesCommandOverrideFlag stores the name and the specified default value of the flag.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Flags name without dashes as prefix.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "In a string format of a default value. It will be parsed by kubectl to the compatible value of the flag.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "default"},
+			},
+		},
+	}
+}
+
+func schema_kubectl_pkg_config_v1alpha1_PreferencesSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PreferencesSpec stores the overrides",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"overrides": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Overrides is used to change the defaults values of flags of commands. This is especially useful, when user doesn't want to explicitly set flags each time.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverride"),
+									},
+								},
+							},
+						},
+					},
+					"aliases": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Aliases stores the alias definitions. If the alias name collides with a built-in command, built-in command always overrides the alias name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.PreferencesAliasOverride"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"overrides", "aliases"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesAliasOverride", "k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverride"},
 	}
 }
 

@@ -431,6 +431,7 @@ const (
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
 	DebugCustomProfile      FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
+	KubeRC                  FeatureGate = "KUBECTL_KUBERC"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
