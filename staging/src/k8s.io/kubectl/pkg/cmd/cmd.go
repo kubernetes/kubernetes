@@ -26,6 +26,8 @@ import (
 	"strings"
 	"syscall"
 
+	"k8s.io/kubectl/pkg/kuberc"
+
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -361,6 +363,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
+	pref := kuberc.NewPreferences()
+	pref.AddFlags(flags)
+
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags().WithWarningPrinter(o.IOStreams)
@@ -490,6 +495,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
+
+	pref.InjectOverrides(cmds, o.Arguments, o.IOStreams.ErrOut)
+
 	return cmds
 }
 

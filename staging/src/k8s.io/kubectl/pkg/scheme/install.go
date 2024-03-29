@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	kubercv1alpha1 "k8s.io/kubectl/pkg/config/v1alpha1"
 )
 
 // Register all groups in the kubectl's registry, but no componentconfig group since it's not in k8s.io/api
@@ -63,6 +64,7 @@ func init() {
 	utilruntime.Must(metav1beta1.AddMetaToScheme(Scheme))
 	utilruntime.Must(metav1.AddMetaToScheme(Scheme))
 	utilruntime.Must(scheme.AddToScheme(Scheme))
+	utilruntime.Must(kubercv1alpha1.AddToScheme(Scheme))
 
 	utilruntime.Must(Scheme.SetVersionPriority(corev1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(admissionv1beta1.SchemeGroupVersion, admissionv1.SchemeGroupVersion))
