@@ -75,11 +75,10 @@ const (
 
 	// updateMaxRetries is the max retries for a failed node
 	updateMaxRetries = 10
-)
 
-// nodePollInterval is used in listing node
-// This is a variable instead of a const to enable testing.
-var nodePollInterval = 10 * time.Second
+	// nodePollInterval is used in listing node
+	nodePollInterval = 10 * time.Second
+)
 
 // CIDRAllocator is an interface implemented by things that know how
 // to allocate/occupy/recycle CIDR for nodes.
@@ -116,8 +115,7 @@ type nodeReservedCIDRs struct {
 
 // New creates a new CIDR range allocator.
 func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
-	logger := klog.FromContext(ctx)
-	nodeList, err := listNodes(logger, kubeClient)
+	nodeList, err := listNodes(ctx, kubeClient)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +130,15 @@ func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovide
 	}
 }
 
-func listNodes(logger klog.Logger, kubeClient clientset.Interface) (*v1.NodeList, error) {
+func listNodes(ctx context.Context, kubeClient clientset.Interface) (*v1.NodeList, error) {
 	var nodeList *v1.NodeList
+	logger := klog.FromContext(ctx)
+
 	// We must poll because apiserver might not be up. This error causes
 	// controller manager to restart.
-	if pollErr := wait.Poll(nodePollInterval, apiserverStartupGracePeriod, func() (bool, error) {
+	if pollErr := wait.PollUntilContextTimeout(ctx, nodePollInterval, apiserverStartupGracePeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
-		nodeList, err = kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		nodeList, err = kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 			FieldSelector: fields.Everything().String(),
 			LabelSelector: labels.Everything().String(),
 		})

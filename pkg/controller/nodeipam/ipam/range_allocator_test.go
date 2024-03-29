@@ -292,13 +292,6 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 }
 
 func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
-	// Non-parallel test (overrides global var)
-	oldNodePollInterval := nodePollInterval
-	nodePollInterval = test.NodePollInterval
-	defer func() {
-		nodePollInterval = oldNodePollInterval
-	}()
-
 	// all tests operate on a single node
 	testCases := []testCase{
 		{
@@ -680,13 +673,6 @@ type releaseTestCase struct {
 }
 
 func TestReleaseCIDRSuccess(t *testing.T) {
-	// Non-parallel test (overrides global var)
-	oldNodePollInterval := nodePollInterval
-	nodePollInterval = test.NodePollInterval
-	defer func() {
-		nodePollInterval = oldNodePollInterval
-	}()
-
 	testCases := []releaseTestCase{
 		{
 			description: "Correctly release preallocated CIDR",
