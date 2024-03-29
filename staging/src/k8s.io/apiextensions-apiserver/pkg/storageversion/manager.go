@@ -19,12 +19,12 @@ package storageversion
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -35,30 +35,13 @@ import (
 	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
+	svinformers "k8s.io/client-go/informers/apiserverinternal/v1alpha1"
 )
 
 var (
-	// If the StorageVersionAPI feature gate is enabled, after a CRD storage
-	// (a.k.a. serving info) is created, the API server will block CR write
-	// requests that hit this storage until the corresponding storage
-	// version update gets processed by the storage version manager.
-	// The API server will fail CR write requests if the storage version
-	// update takes longer than StorageVersionUpdateTimeout after the
-	// storage is created.
-	StorageVersionUpdateTimeout = 15 * time.Second
-	// TeardownFinishedTimeout is the time to wait for teardown of an old storage
-	// to finish while updating storageversion of a CRD. If the teardown of
-	// old storage times out, we return an error for the storageversion update,
-	// and if there are any CR requests blocked on this storgaversion update,
-	// they are served 503.
-	TeardownFinishedTimeout = 1 * time.Minute
-	// WorkerFrequency is the frequency at which the worker for updating storageversion for a CRD
+	// workerFrequency is the frequency at which the worker for updating storageversion for a CRD
 	// will be called.
-	WorkerFrequency = 1 * time.Second
-	// storageversionUpdateFailureThreshold is the maximum number of times we will
-	// requeue the storageversion after the first failure. Once this threshold is crossed,
-	// we will fail the storageversion update and consequently the dependent CR writes.
-	storageversionUpdateFailureThreshold = 3
+	workerFrequency = 1 * time.Second
 )
 
 // Manager maintains necessary structures needed for updating
@@ -70,280 +53,183 @@ type Manager struct {
 	client genericstorageversion.Client
 	// apiserverID is the ID of the apiserver that invokes this manager.
 	apiserverID string
-	// shutdown if set to true, shuts down all per-crd update queues.
-	shutdown chan struct{}
-	// map from crd.UID -> storageVersionUpdateInfoMap to keep
-	// track of the latest storageversion updates for a CRD.
-	storageVersionUpdateInfoMap sync.Map
-}
-
-// storageVersionUpdateInfo holds information about a storage version update,
-// indicating whether the update gets processed or timed-out.
-type storageVersionUpdateInfo struct {
-	crd *apiextensionsv1.CustomResourceDefinition
-
+	crdInformer crdinformers.CustomResourceDefinitionInformer
+	svInformer  svinformers.StorageVersionInformer
 	// workqueue to process storageversion updates for this CRD.
 	queue *workqueue.Type
-
-	// updateChannels contain the channels that indicate whether
-	// a storageversion udpate succeeded or errored out.
-	// CR handler will refer to these to know when to unblock
-	// or fail a CR request.
-	updateChannels *storageVersionUpdateChannels
-
-	// failures keeps track of how many times the storageversion update for this CRD
-	// failed. When past the threshold, we stop requeuing this CRD for storageversion updates
-	// and return error.
-	failures int
-}
-
-type storageVersionUpdateChannels struct {
-	// processedCh is closed by the storage version manager after the
-	// storage version update gets processed successfully.
-	// The API server will unblock and allow CR write requests if this
-	// channel is closed.
-	processedCh chan struct{}
-
-	// errCh is closed by the storage version manager when it
-	// encounters an error while trying to update a storage version.
-	// The API server will block the serve (503) for CR write requests if
-	// this channel is closed.
-	errCh chan struct{}
-
-	// teardownFinishedCh is closed when the teardown of a previous
-	// storageversion completes. This is used by the storageversion manager
-	// to unblock publishing of the latest storageversion.
-	teardownFinishedCh <-chan struct{}
+	// map from crd.Name -> number of active teardowns for this CRD.
+	teardownCountMap sync.Map
 }
 
 // NewManager creates a CRD StorageVersion Manager.
-func NewManager(client genericstorageversion.Client, apiserverID string) *Manager {
+func NewManager(svClient genericstorageversion.Client, apiserverID string,
+	crdInformer crdinformers.CustomResourceDefinitionInformer, svInformer svinformers.StorageVersionInformer) *Manager {
 	return &Manager{
-		client:                      client,
-		apiserverID:                 apiserverID,
-		shutdown:                    make(chan struct{}),
-		storageVersionUpdateInfoMap: sync.Map{},
+		client:           svClient,
+		apiserverID:      apiserverID,
+		crdInformer:      crdInformer,
+		svInformer:       svInformer,
+		queue:            workqueue.NewNamed("storageversion-updater"),
+		teardownCountMap: sync.Map{},
 	}
 }
 
-func (m *Manager) SyncSVOnStartup(crdInformer crdinformers.CustomResourceDefinitionInformer) bool {
-	crds, err := crdInformer.Lister().List(labels.Everything())
-	if err != nil {
-		klog.Errorf("failed to list CRDs from informer while syncing storageversions on server startup : %v", err)
-		return false
-	}
-	for _, crd := range crds {
-		m.Enqueue(crd, nil, 0)
-	}
-
-	return true
-}
-
-// Enqueue records the latest CRD that was updated to process its storageversion update.
-// It will first update the sync.Map with the CRD, prepare updateChannels for its storageversion update.
-// And finally add it to the relevant CRD queue.
-func (m *Manager) Enqueue(crd *apiextensionsv1.CustomResourceDefinition, tearDownFinishedCh <-chan struct{}, failuresSeenSoFar int) {
-	svUpdateInfo := m.recordLatestSVUpdateInfo(crd, tearDownFinishedCh, failuresSeenSoFar)
-	klog.V(4).Infof("queueing crd %s for storageversion update, failuresSeenSoFar: %d", crd.Name, failuresSeenSoFar)
-	svUpdateInfo.queue.Add(crd.UID)
-}
-
-// WaitForStorageVersionUpdate allows CR writes to be blocked till the latest storageversion
-// of a CRD is updated. If the storageversion update fails, we fail CR writes.
-// If the CRD is being deleted, return err and fail the CR write.
-func (m *Manager) WaitForStorageVersionUpdate(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
-	var svUpdateInfo *storageVersionUpdateInfo
-	if apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating) {
-		return fmt.Errorf("CRD %s is being deleted", crd.Name)
-	}
-
-	val, found := m.storageVersionUpdateInfoMap.Load(crd.UID)
-	if !found {
-		// CR write that invoked this call will be served 503.
-		return fmt.Errorf("no entry found in storageVersionUpdateInfo map for CRD: %s", crd.Name)
-	}
-
-	svUpdateInfo = val.(*storageVersionUpdateInfo)
-
-	// NOTE: currently the graceful CRD deletion waits 1s for in-flight requests
-	// to register themselves to the wait group. Ideally the storage version update should
-	// not cause the requests to miss the 1s window; otherwise the requests may
-	// fail ungracefully (e.g. it may happen if the CRD was deleted immediately after the
-	// first CR request establishes the underlying storage).
-	select {
-	case <-svUpdateInfo.updateChannels.errCh:
-		return fmt.Errorf("error while waiting for CRD storage version update")
-	case <-svUpdateInfo.updateChannels.processedCh:
-		return nil
-	case <-ctx.Done():
-		return fmt.Errorf("aborted waiting for CRD storage version update: %w", ctx.Err())
-	case <-time.After(StorageVersionUpdateTimeout):
-		return fmt.Errorf("timeout waiting for CRD storage version update")
-	}
-
-}
-
-// DeleteSVUpdateInfo deletes specified key from the sync.Map.
-func (m *Manager) DeleteSVUpdateInfo(crdUID types.UID, waitCh <-chan struct{}) {
-	// wait for all pending CR writes to drain.
-	if waitCh != nil {
-		done := false
-		for {
-			select {
-			case <-waitCh:
-				done = true
-			case <-time.After(TeardownFinishedTimeout):
-				klog.V(4).Infof("timeout waiting for waitCh to close before proceeding with deleting storageversion for crdUID %v", crdUID)
-				return
-			}
-			if done {
-				break
-			}
-		}
-	}
-	// shutdown storageversion update queue
-	val, ok := m.storageVersionUpdateInfoMap.Load(crdUID)
+// UpdateActiveTeardownsCount updates the teardown count of the CRD in sync.Map.
+func (m *Manager) UpdateActiveTeardownsCount(crdName string, value int) error {
+	val, ok := m.teardownCountMap.Load(crdName)
 	if !ok {
-		klog.V(4).Infof("no entry found in sync.map for crdUID %v", crdUID)
+		return fmt.Errorf("error while trying to update number of teardowns. No entry found in sync.Map for %v", crdName)
+	}
+	newTeardownCount := val.(int) + value
+	m.teardownCountMap.Store(crdName, newTeardownCount)
+	return nil
+}
+
+// Enqueue adds the CRD name to the SV upadte queue.
+func (m *Manager) Enqueue(crdName string) {
+	if crdName == "" {
 		return
 	}
-
-	svUpdateInfo := val.(*storageVersionUpdateInfo)
-	svUpdateInfo.queue.ShutDown()
-	m.storageVersionUpdateInfoMap.Delete(crdUID)
+	klog.V(4).Infof("enqueueing crd %s for storageversion update", crdName)
+	m.queue.Add(crdName)
 }
 
-// Shutdown signals the storageversion manager to shutdown all
-// per-crd storageversion update queues.
-func (m *Manager) Shutdown(stopCh <-chan struct{}) {
-	<-stopCh
-	close(m.shutdown)
+// DeleteTeardownCountInfo deletes specified key from the sync.Map.
+func (m *Manager) DeleteTeardownCountInfo(crdName string) {
+	m.teardownCountMap.Delete(crdName)
 }
 
-// sync runs a goroutine over the provided queue to indefinitely
+// Sync runs a goroutine over the SV updater queue to indefinitely
 // process any queued storageversion updates unless stopCh is invoked.
-func (m *Manager) sync(shutdownQueue <-chan struct{}, queue *workqueue.Type, workerFrequency, teardownFinishedTimeout time.Duration) {
-	defer queue.ShutDownWithDrain()
-	go wait.Until(func() {
-		m.worker(queue, teardownFinishedTimeout)
-	}, workerFrequency, shutdownQueue)
+func (m *Manager) Sync(stopCh <-chan struct{}, workers int) {
+	defer m.queue.ShutDownWithDrain()
+	klog.V(2).Infof("starting storageversion sync loop")
+	for i := 0; i < workers; i++ {
+		go wait.Until(func() {
+			m.worker()
+		}, workerFrequency, stopCh)
+	}
 
-	<-shutdownQueue
+	<-stopCh
 }
 
-func (m *Manager) worker(queue *workqueue.Type, teardownFinishedTimeout time.Duration) {
-	for m.processLatestUpdateFor(queue, teardownFinishedTimeout) {
+func (m *Manager) worker() {
+	for m.processLatestUpdateFor() {
 	}
 }
 
-func (m *Manager) processLatestUpdateFor(queue *workqueue.Type, teardownFinishedTimeout time.Duration) bool {
+func (m *Manager) processLatestUpdateFor() bool {
 	ctx := context.TODO()
-
-	key, quit := queue.Get()
-	defer queue.Done(key)
+	key, quit := m.queue.Get()
+	defer m.queue.Done(key)
 	if quit {
 		return false
 	}
 
-	// Note: since we queue CRDs by UID, if the same CRD is updated multiple times,
-	// the same UID is queued multiple times. We take care to only update the latest queued
-	// entry for this UID, by referring to the sync.Map which is overwritten everytime a
-	// new update is made to the CRD.
-	// Ex: if there were rapid consecutive updates made to a crd like v1 -> v2 -> v3
-	// such that when processLatestUpdateFor() is called for the v1 update, it observes
-	// that the latest entry in the sync.map is for v3 - and updates the version to v3.
-	// When we get to processLatestUpdateFor() for v2 - the latest entry in sync.map is still
-	// v3. We should not process v3 update again.
-	val, ok := m.storageVersionUpdateInfoMap.Load(key)
-	if !ok {
-		klog.V(4).Infof("No pending storageversion update found for crdUID: %s, returning", key)
-		return true
-	}
-	latestSVUpdateInfo := val.(*storageVersionUpdateInfo)
-	select {
-	case <-latestSVUpdateInfo.updateChannels.processedCh:
-		klog.V(4).Infof("Storageversion is already updated to the latest value for crdUID: %s, returning", key)
-		return true
-	case <-latestSVUpdateInfo.updateChannels.errCh:
-		klog.V(4).Infof("Storageversion is already processed for crdUID: %s, but returned an error.", key)
-		return true
-	default:
-		err := m.updateStorageVersion(ctx, latestSVUpdateInfo.crd, latestSVUpdateInfo.updateChannels.teardownFinishedCh, teardownFinishedTimeout)
-		m.processStorageVersionUpdateResponse(err, latestSVUpdateInfo)
-		return true
-	}
-}
+	// Fetch the latest CRD from CRD informer cache to update the storageversion for it.
+	crdName := key.(string)
+	crd, err := m.crdInformer.Lister().Get(crdName)
 
-func (m *Manager) recordLatestSVUpdateInfo(crd *apiextensionsv1.CustomResourceDefinition, tearDownFinishedCh <-chan struct{}, failuresSeenSoFar int) *storageVersionUpdateInfo {
-	latestSVUpdateInfo := &storageVersionUpdateInfo{
-		crd: crd,
-		updateChannels: &storageVersionUpdateChannels{
-			processedCh:        make(chan struct{}),
-			errCh:              make(chan struct{}),
-			teardownFinishedCh: tearDownFinishedCh,
-		},
-		failures: failuresSeenSoFar,
-	}
-
-	val, ok := m.storageVersionUpdateInfoMap.Load(crd.UID)
-	if !ok {
-		// if CRD seen for the first time,
-		// 1. create new update-queue
-		// 2. start the queue
-		// 3. store it in latestSVUpdateInfo
-		// 4. update sync.map and return it
-		queue := workqueue.NewNamed(fmt.Sprintf("%s-storageversion-updater", crd.Name))
-		latestSVUpdateInfo.queue = queue
-		go m.sync(m.shutdown, queue, WorkerFrequency, TeardownFinishedTimeout)
-		m.storageVersionUpdateInfoMap.Store(crd.UID, latestSVUpdateInfo)
-		return latestSVUpdateInfo
-	}
-
-	// overwrite existing SVUpdateInfo in the map only if
-	// 1. there's a new latest update event.
-	// 2. the update event is the same as last seen, but it was re-enqueued
-	// because of some failure in the SV update.
-	existingSVUpdateInfo := val.(*storageVersionUpdateInfo)
-	if crd.ObjectMeta.ResourceVersion >= existingSVUpdateInfo.crd.ObjectMeta.ResourceVersion {
-		updatedSVInfo := &storageVersionUpdateInfo{
-			crd:            latestSVUpdateInfo.crd,
-			updateChannels: latestSVUpdateInfo.updateChannels,
-			failures:       latestSVUpdateInfo.failures,
-			queue:          existingSVUpdateInfo.queue,
+	if err != nil {
+		// No need to update storgaversion if CRD not found.
+		if errors.IsNotFound(err) {
+			klog.V(4).Infof("crd: %s not found in CRD cache, abandoning storageversion update", crdName)
+			return true
 		}
-		m.storageVersionUpdateInfoMap.Store(crd.UID, updatedSVInfo)
-		return updatedSVInfo
+
+		klog.V(4).Infof("error fetching crd: %s from CRD cache, will retry storageversion update", crdName)
+		// TODO: enqueue again?
+		return true
 	}
-	return existingSVUpdateInfo
+
+	skip, reason, err := m.shouldSkipSVUpdate(crd)
+	if err != nil {
+		klog.V(4).Infof("error while checking if storagversion update can be skipped for crd: %s, err: %v", crd.Name, err)
+		// TODO: enqueue again?
+		return true
+	}
+
+	if skip {
+		klog.V(4).Infof("skipping storagversion update for crd: %s, reason: %s ", crd.Name, reason)
+		return true
+	}
+
+	klog.V(4).Infof("starting storageversion update for crd: %s", crd.Name)
+	err = m.updateStorageVersion(ctx, crd)
+	if err == nil {
+		klog.V(4).Infof("successfully updated storage version for %s", crd.Name)
+		return true
+	}
+
+	// TODO: indefinitely requeue on error?
+	m.Enqueue(crd.Name)
+	return true
 }
 
-// updateStorageVersion updates a StorageVersion for the given
-// CRD and returns immediately. Optionally, the caller may specify a
-// non-nil waitCh and/or a non-nil processedCh.
-// A non-nil waitCh will block the StorageVersion update until waitCh is
-// closed.
-// The manager will close the non-nil processedCh if it finished
-// processing the StorageVersion update (note that the update can either
-// succeeded or failed).
-func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition,
-	waitCh <-chan struct{}, teardownFinishedTimeout time.Duration) error {
-	if waitCh != nil {
-		done := false
-		for {
-			select {
-			case <-waitCh:
-				done = true
-			case <-ctx.Done():
-				return fmt.Errorf("aborting storageversion update for %v, context closed", crd)
-			case <-time.After(teardownFinishedTimeout):
-				return fmt.Errorf("timeout waiting for waitCh to close before proceeding with storageversion update for %v", crd)
-			}
-			if done {
-				break
-			}
+func (m *Manager) shouldSkipSVUpdate(crd *apiextensionsv1.CustomResourceDefinition) (bool, string, error) {
+	skip, teardownCount := m.teardownInProgress(crd.Name)
+	if skip {
+		return true, fmt.Sprintf("%d active teardowns", teardownCount), nil
+	}
+
+	skip, err := m.StorageVersionFoundInCacheFor(crd)
+	if err != nil {
+		return true, "error while fetching latest storageversion", err
+	}
+	if skip {
+		return true, "already at latest storageversion", nil
+	}
+
+	return false, "", nil
+}
+
+func (m *Manager) teardownInProgress(crdName string) (bool, int) {
+	val, _ := m.teardownCountMap.LoadOrStore(crdName, 0)
+	activeTeardownsCount := val.(int)
+	if activeTeardownsCount > 0 {
+		return true, activeTeardownsCount
+	}
+
+	return false, activeTeardownsCount
+}
+
+// StorageVersionFoundInCacheFor checks whether the storageversion for the provoded
+// CRD is already processed and reflected in the storageversion cache.
+func (m *Manager) StorageVersionFoundInCacheFor(crd *apiextensionsv1.CustomResourceDefinition) (bool, error) {
+	svOfCRD, err := apiextensionshelpers.GetCRDStorageVersion(crd)
+	if err != nil {
+		return false, fmt.Errorf("error while getting storageversion from CRD for %s: %w", crd.Name, err)
+	}
+
+	svName := fmt.Sprintf("%s.%s", crd.Spec.Group, crd.Spec.Names.Plural)
+	svFromCache, err := m.svInformer.Lister().Get(svName)
+	if err == nil {
+		matches := storageVersionMatches(svOfCRD, svFromCache)
+		if matches {
+			return true, nil
 		}
 	}
 
+	if errors.IsNotFound(err) {
+		return false, nil
+	}
+
+	return false, err
+}
+
+func storageVersionMatches(svOfCRD string, svFromCache *apiserverinternalv1alpha1.StorageVersion) bool {
+	for _, publishedSV := range svFromCache.Status.StorageVersions {
+		publishedEncodingVersion := strings.Split(publishedSV.EncodingVersion, "/")[1]
+		if publishedEncodingVersion == svOfCRD {
+			return true
+		}
+	}
+
+	return false
+}
+
+// updateStorageVersion updates a StorageVersion for the given CRD.
+func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
 	if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
 		return fmt.Errorf("error while updating storage version for crd %v: %w", crd, err)
 	}
@@ -398,21 +284,4 @@ func (m *Manager) updateCRDStorageVersion(ctx context.Context, crd *apiextension
 		decodableVersions,
 		servedVersions,
 		appendOwnerRefFunc)
-}
-
-func (m *Manager) processStorageVersionUpdateResponse(err error, svUpdateInfo *storageVersionUpdateInfo) {
-	if err == nil {
-		klog.V(4).Infof("successfully updated storage version for %s", svUpdateInfo.crd.Name)
-		close(svUpdateInfo.updateChannels.processedCh)
-		return
-	}
-
-	failuresSeenSoFar := svUpdateInfo.failures + 1
-	if failuresSeenSoFar > storageversionUpdateFailureThreshold {
-		klog.V(4).Infof("storageversion update for crd %s has exceeded maximum allowed update errors", svUpdateInfo.crd.Name)
-		close(svUpdateInfo.updateChannels.errCh)
-		return
-	}
-
-	m.Enqueue(svUpdateInfo.crd, svUpdateInfo.updateChannels.teardownFinishedCh, failuresSeenSoFar)
 }

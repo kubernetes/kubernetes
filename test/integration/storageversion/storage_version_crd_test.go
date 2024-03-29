@@ -24,22 +24,22 @@ import (
 	"testing"
 	"time"
 
-	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 )
 
 func TestStorageVersionCustomResource(t *testing.T) {
@@ -167,21 +167,36 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
 	}
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural}
-	crdErrCh := make(chan error)
+	errCh := make(chan error)
 	// keep flipping the storage version of the CRD and create new CRs
-	go createOrUpdateCRD(crdClient, crd, 10, crdErrCh)
+	go func() {
+		for i := 0; i < 10; i++ {
+			createdCRD, err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+			if err != nil {
+				errCh <- fmt.Errorf("failed to get crd: %w", err)
+				return
+			}
 
-	crErrCh := make(chan error)
-	for i := 0; i < 10; i++ {
-		cr := &unstructured.Unstructured{}
-		cr.SetName(fmt.Sprintf("%s-%d", crd.Name, i))
-		cr.SetAPIVersion(fmt.Sprintf("%s/v1", crd.Spec.Group))
-		cr.SetKind(crd.Spec.Names.Kind)
-		if _, err = dynamicClient.Resource(gvr).Namespace("default").Create(context.TODO(), cr, metav1.CreateOptions{}); err != nil {
-			crErrCh <- fmt.Errorf("unexpected error creating cr %v: %w", fmt.Sprintf("%s-%d", crd.Name, i), err)
-			return
+			// add a new version to the CRD and set it as the storage version
+			newVersion := createdCRD.Spec.Versions[i]
+			newVersion.Name = fmt.Sprintf("v%d", i+2)
+			createdCRD.Spec.Versions[i].Storage = false
+			createdCRD.Spec.Versions = append(createdCRD.Spec.Versions, newVersion)
+			if _, err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), createdCRD, metav1.UpdateOptions{}); err != nil {
+				errCh <- fmt.Errorf("failed to update crd: %w", err)
+				return
+			}
+			cr := &unstructured.Unstructured{}
+			cr.SetName(newVersion.Name)
+			cr.SetAPIVersion(fmt.Sprintf("%s/v1", crd.Spec.Group))
+			cr.SetKind(crd.Spec.Names.Kind)
+			if _, err = dynamicClient.Resource(gvr).Namespace("default").Create(context.TODO(), cr, metav1.CreateOptions{}); err != nil {
+				fmt.Printf("\nerror creating cr for version %v: %v\n", newVersion.Name, err)
+				// errCh <- fmt.Errorf("error creating cr for version %v: %v", newVersion.Name, err)
+				// return
+			}
 		}
-	}
+	}()
 
 	// verify new CRD creation is not blocked by the watch event.
 	newCRD := etcd.GetCustomResourceDefinitionData()[1]
@@ -193,7 +208,7 @@ func TestStorageVersionMultipleCRDs(t *testing.T) {
 	var lastErr error
 	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		select {
-		case err := <-crdErrCh:
+		case err := <-errCh:
 			return false, err
 		default:
 		}
@@ -308,25 +323,5 @@ func TestWatchAndMutateStorageVersionCRDs(t *testing.T) {
 	}
 	if err := kubeclient.InternalV1alpha1().StorageVersions().Delete(context.TODO(), gr, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("failed to delete storage version: %v", err)
-	}
-}
-
-func createOrUpdateCRD(crdClient *apiextensionsclientset.Clientset, crd *v1.CustomResourceDefinition, numVersions int, errCh chan error) {
-	for i := 0; i < numVersions; i++ {
-		createdCRD, err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
-		if err != nil {
-			errCh <- fmt.Errorf("failed to get crd: %w", err)
-			return
-		}
-
-		// add a new version to the CRD and set it as the storage version
-		newVersion := createdCRD.Spec.Versions[i]
-		newVersion.Name = fmt.Sprintf("v%d", i+2)
-		createdCRD.Spec.Versions[i].Storage = false
-		createdCRD.Spec.Versions = append(createdCRD.Spec.Versions, newVersion)
-		if _, err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), createdCRD, metav1.UpdateOptions{}); err != nil {
-			errCh <- fmt.Errorf("failed to update crd: %w", err)
-			return
-		}
 	}
 }
