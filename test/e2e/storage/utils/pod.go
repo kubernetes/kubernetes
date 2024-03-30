@@ -138,9 +138,7 @@ func KubeletCommand(ctx context.Context, kOp KubeletOpt, c clientset.Interface, 
 
 	runCmd("start")
 	// Wait for next heartbeat, which must be sent by the new kubelet process.
-	if ok := e2enode.WaitForNodeHeartbeatAfter(ctx, c, pod.Spec.NodeName, heartbeatTime, NodeStateTimeout); !ok {
-		framework.Failf("Node %s failed to send a heartbeat after %v", pod.Spec.NodeName, heartbeatTime)
-	}
+	e2enode.WaitForNodeHeartbeatAfter(ctx, c, pod.Spec.NodeName, heartbeatTime, NodeStateTimeout)
 	// Then wait until Node with new process becomes Ready.
 	if ok := e2enode.WaitForNodeToBeReady(ctx, c, pod.Spec.NodeName, NodeStateTimeout); !ok {
 		framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)

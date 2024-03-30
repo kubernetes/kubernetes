@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -165,20 +166,16 @@ func WaitForNodeSchedulable(ctx context.Context, c clientset.Interface, name str
 //
 // To ensure the node status is posted by a restarted kubelet process,
 // after should be retrieved by [GetNodeHeartbeatTime] while the kubelet is down.
-func WaitForNodeHeartbeatAfter(ctx context.Context, c clientset.Interface, name string, after metav1.Time, timeout time.Duration) bool {
+func WaitForNodeHeartbeatAfter(ctx context.Context, c clientset.Interface, name string, after metav1.Time, timeout time.Duration) {
 	framework.Logf("Waiting up to %v for node %s to send a heartbeat after %v", timeout, name, after)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+	gomega.Eventually(ctx, func() (time.Time, error) {
 		node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Couldn't get node %s", name)
-			continue
+			return time.Time{}, err
 		}
-		if GetNodeHeartbeatTime(node).After(after.Time) {
-			return true
-		}
-	}
-	framework.Logf("Node %s didn't send a heartbeat after %v within %v", name, after, timeout)
-	return false
+		return GetNodeHeartbeatTime(node).Time, nil
+	}, timeout, poll).Should(gomega.BeTemporally(">", after.Time), "Node %s didn't send a heartbeat", name)
 }
 
 // CheckReady waits up to timeout for cluster to has desired size and
