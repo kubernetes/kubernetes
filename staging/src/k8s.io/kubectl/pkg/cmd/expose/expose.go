@@ -225,12 +225,12 @@ func (flags *ExposeServiceFlags) AddFlags(cmd *cobra.Command) {
 }
 
 func (flags *ExposeServiceFlags) ToOptions(cmd *cobra.Command, args []string) (*ExposeServiceOptions, error) {
-	dryRunStratergy, err := cmdutil.GetDryRunStrategy(cmd)
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStratergy)
+	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStrategy)
 	printer, err := flags.PrintFlags.ToPrinter()
 	if err != nil {
 		return nil, err
@@ -243,7 +243,7 @@ func (flags *ExposeServiceFlags) ToOptions(cmd *cobra.Command, args []string) (*
 	}
 
 	e := &ExposeServiceOptions{
-		DryRunStrategy:  dryRunStratergy,
+		DryRunStrategy:  dryRunStrategy,
 		PrintObj:        printer.PrintObj,
 		Recorder:        recorder,
 		IOStreams:       flags.IOStreams,
