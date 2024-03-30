@@ -75,10 +75,10 @@ const (
 
 	// updateMaxRetries is the max retries for a failed node
 	updateMaxRetries = 10
-
-	// nodePollInterval is used in listing node
-	nodePollInterval = 10 * time.Second
 )
+
+// nodePollInterval is used in listing node
+var nodePollInterval = 10 * time.Second
 
 // CIDRAllocator is an interface implemented by things that know how
 // to allocate/occupy/recycle CIDR for nodes.
