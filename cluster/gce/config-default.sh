@@ -200,13 +200,6 @@ elif [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
 fi
 
-# To avoid running Calico on a node that is not configured appropriately,
-# label each Node so that the DaemonSet can run the Pods only on ready Nodes.
-# Windows nodes do not support Calico.
-if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
-	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}projectcalico.org/ds-ready=true"
-fi
-
 # Optional: Enable netd.
 ENABLE_NETD="${KUBE_ENABLE_NETD:-false}"
 export CUSTOM_NETD_YAML="${KUBE_CUSTOM_NETD_YAML:-}"
@@ -382,7 +375,7 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-}
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, kubenet
 
 # Network Policy plugin specific settings.
-NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
+NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}"
 
 export NON_MASQUERADE_CIDR="0.0.0.0/0"
 

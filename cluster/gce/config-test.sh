@@ -273,13 +273,6 @@ fi
 
 export ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
 
-# To avoid running Calico on a node that is not configured appropriately,
-# label each Node so that the DaemonSet can run the Pods only on ready Nodes.
-# Windows nodes do not support Calico.
-if [[ ${NETWORK_POLICY_PROVIDER:-} = 'calico' ]]; then
-  NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}projectcalico.org/ds-ready=true"
-fi
-
 # Enable metadata concealment by firewalling pod traffic to the metadata server
 # and run a proxy daemonset on nodes.
 ENABLE_METADATA_CONCEALMENT=${ENABLE_METADATA_CONCEALMENT:-true} # true, false
@@ -433,7 +426,7 @@ STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-}
 NETWORK_PROVIDER=${NETWORK_PROVIDER:-kubenet} # none, kubenet
 
 # Network Policy plugin specific settings.
-NETWORK_POLICY_PROVIDER=${NETWORK_POLICY_PROVIDER:-none} # calico
+NETWORK_POLICY_PROVIDER=${NETWORK_POLICY_PROVIDER:-none}
 
 export NON_MASQUERADE_CIDR='0.0.0.0/0'
 

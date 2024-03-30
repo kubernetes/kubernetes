@@ -2951,15 +2951,9 @@ EOF
     setup-addon-manifests "admission-controls" "limit-range" "gce"
   fi
   setup-addon-manifests "addons" "admission-resource-quota-critical-pods"
+  # TODO(aojea) use calico temporary for backward compatibility with the test-infra scripts
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
-    setup-addon-manifests "addons" "calico-policy-controller"
-
-    setup-addon-custom-yaml "addons" "calico-policy-controller" "calico-node-daemonset.yaml" "${CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}"
-    setup-addon-custom-yaml "addons" "calico-policy-controller" "typha-deployment.yaml" "${CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
-
-    # Configure Calico CNI directory.
-    local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
-    sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
+    setup-addon-manifests "addons" "kube-network-policies"
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
@@ -3226,7 +3220,7 @@ function setup-containerd {
 }
 EOF
   if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
-    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
+    if [[ "${ENABLE_NETD:-}" == "true" ]]; then
       # Use Kubernetes cni daemonset on node if network policy provider is specified
       # or netd is enabled.
       cni_template_path=""
