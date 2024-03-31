@@ -124,6 +124,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/kubernetes/staging/src/k8s.io/component-base/tracing"
 	"k8s.io/utils/clock"
 )
 
@@ -1721,6 +1722,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // the most accurate information possible about an error situation to aid debugging.
 // Callers should not write an event if this operation returns an error.
 func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, err error) {
+	ctx = tracing.ExtractContext(ctx, pod)
 	ctx, otelSpan := kl.tracer.Start(ctx, "syncPod", trace.WithAttributes(
 		semconv.K8SPodUIDKey.String(string(pod.UID)),
 		attribute.String("k8s.pod", klog.KObj(pod).String()),
