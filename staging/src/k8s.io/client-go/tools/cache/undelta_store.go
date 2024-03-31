@@ -29,7 +29,7 @@ type UndeltaStore struct {
 }
 
 // Assert that it implements the Store interface.
-var _ Store = &UndeltaStore{}
+var _ Store = (*UndeltaStore)(nil)
 
 // Add inserts an object into the store and sends complete state by calling PushFunc.
 // Note about thread safety.  The Store implementation (cache.cache) uses a lock for all methods.

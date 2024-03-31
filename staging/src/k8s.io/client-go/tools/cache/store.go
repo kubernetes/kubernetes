@@ -163,7 +163,7 @@ type cache struct {
 	keyFunc KeyFunc
 }
 
-var _ Store = &cache{}
+var _ Store = (*cache)(nil)
 
 // Add inserts an item into the cache.
 func (c *cache) Add(obj interface{}) error {
