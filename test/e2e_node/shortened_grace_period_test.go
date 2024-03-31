@@ -131,9 +131,6 @@ term() {
     echo "SIGINT 2" >> /dev/termination-log
     sleep 5
     exit 0
-  else
-    echo "SIGINT $COUNT" >> /dev/termination-log
-    exit 1
   fi
   COUNT=$((COUNT + 1))
 }
