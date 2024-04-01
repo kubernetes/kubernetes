@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -71,11 +72,12 @@ type frameworkImpl struct {
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]framework.Plugin
 
-	clientSet       clientset.Interface
-	kubeConfig      *restclient.Config
-	eventRecorder   events.EventRecorder
-	informerFactory informers.SharedInformerFactory
-	logger          klog.Logger
+	clientSet          clientset.Interface
+	kubeConfig         *restclient.Config
+	eventRecorder      events.EventRecorder
+	informerFactory    informers.SharedInformerFactory
+	resourceClaimCache *assumecache.AssumeCache
+	logger             klog.Logger
 
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
@@ -126,6 +128,7 @@ type frameworkOptions struct {
 	kubeConfig             *restclient.Config
 	eventRecorder          events.EventRecorder
 	informerFactory        informers.SharedInformerFactory
+	resourceClaimCache     *assumecache.AssumeCache
 	snapshotSharedLister   framework.SharedLister
 	metricsRecorder        *metrics.MetricAsyncRecorder
 	podNominator           framework.PodNominator
@@ -173,6 +176,13 @@ func WithEventRecorder(recorder events.EventRecorder) Option {
 func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option {
 	return func(o *frameworkOptions) {
 		o.informerFactory = informerFactory
+	}
+}
+
+// WithResourceClaimCache sets the resource claim cache for the scheduling frameworkImpl.
+func WithResourceClaimCache(resourceClaimCache *assumecache.AssumeCache) Option {
+	return func(o *frameworkOptions) {
+		o.resourceClaimCache = resourceClaimCache
 	}
 }
 
@@ -259,6 +269,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		kubeConfig:           options.kubeConfig,
 		eventRecorder:        options.eventRecorder,
 		informerFactory:      options.informerFactory,
+		resourceClaimCache:   options.resourceClaimCache,
 		metricsRecorder:      options.metricsRecorder,
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
@@ -1596,6 +1607,10 @@ func (f *frameworkImpl) EventRecorder() events.EventRecorder {
 // SharedInformerFactory returns a shared informer factory.
 func (f *frameworkImpl) SharedInformerFactory() informers.SharedInformerFactory {
 	return f.informerFactory
+}
+
+func (f *frameworkImpl) ResourceClaimCache() *assumecache.AssumeCache {
+	return f.resourceClaimCache
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {

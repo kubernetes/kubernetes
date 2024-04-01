@@ -48,6 +48,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 const (
@@ -293,11 +294,18 @@ func New(ctx context.Context,
 	snapshot := internalcache.NewEmptySnapshot()
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 
+	var resourceClaimCache *assumecache.AssumeCache
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		resourceClaimInformer := informerFactory.Resource().V1alpha2().ResourceClaims().Informer()
+		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+	}
+
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithKubeConfig(options.kubeConfig),
 		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithResourceClaimCache(resourceClaimCache),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
@@ -356,7 +364,7 @@ func New(ctx context.Context,
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
 
-	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(queueingHintsPerProfile)); err != nil {
+	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, unionedGVKs(queueingHintsPerProfile)); err != nil {
 		return nil, fmt.Errorf("adding event handlers: %w", err)
 	}
 
