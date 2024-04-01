@@ -142,7 +142,11 @@ var (
 
     # Update pod 'foo' by removing an annotation named 'description' if it exists
     # Does not require the --overwrite flag
-    kubectl annotate pods foo description-`))
+    kubectl annotate pods foo description-
+
+    # Update deployment 'nginx' with a 'change-cause' annotation to track the reason for a change
+    # This is useful for maintaining historical records of changes made
+    kubectl annotate deployment nginx kubernetes.io/change-cause='image updated to 1.16.1'`))
 )
 
 // NewCmdAnnotate creates the `annotate` command
