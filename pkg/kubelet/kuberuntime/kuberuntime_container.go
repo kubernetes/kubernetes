@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/opencontainers/selinux/go-selinux"
 	"io"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"net/url"
 	"os"
@@ -35,12 +37,9 @@ import (
 
 	crierror "k8s.io/cri-api/pkg/errors"
 
-	"github.com/opencontainers/selinux/go-selinux"
 	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/armon/circbuf"
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -771,17 +770,22 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 		"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 
 	var err error
-	done := make(chan struct{})
+	done := make(chan error)
 	go func() {
-		defer close(done)
-		err = m.runtimeService.StopContainer(ctx, containerID.ID, gracePeriod)
-
+		if err = m.runtimeService.StopContainer(ctx, containerID.ID, gracePeriod); err != nil {
+			done <- err
+		} else {
+			close(done)
+		}
 	}()
 	select {
 	case <-ctx.Done():
-		err = errors.New("StopContainer request cancelled by caller")
+		err = errors.New("container receives the ctx.Done signal and cancels the deletion")
 		return err
-	case <-done:
+	case readErr, ok := <-done:
+		if ok {
+			return readErr
+		}
 	}
 
 	if err != nil && !crierror.IsNotFound(err) {
