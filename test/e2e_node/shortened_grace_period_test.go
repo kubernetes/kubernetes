@@ -99,7 +99,7 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 				{
 					Name:    name,
 					Image:   busyboxImage,
-					Command: []string{"sh", "-c"},
+					Command: []string{"sh", "-c", "sleep 9999"},
 					Args: []string{`
 term() {
   if [ "$COUNT" -eq 0 ]; then
