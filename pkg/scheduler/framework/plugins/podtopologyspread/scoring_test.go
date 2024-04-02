@@ -253,7 +253,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
 					{
-						MaxSkew:            3,
+						MaxSkew:            1,
 						TopologyKey:        v1.LabelHostname,
 						Selector:           mustConvertLabelSelectorAsSelector(t, fooSelector),
 						MinDomains:         1,
@@ -261,7 +261,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 					{
-						MaxSkew:            5,
+						MaxSkew:            1,
 						TopologyKey:        v1.LabelTopologyZone,
 						Selector:           mustConvertLabelSelectorAsSelector(t, fooSelector),
 						MinDomains:         1,
@@ -819,9 +819,9 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			want: []framework.NodeScore{
 				// Same scores as if we were using one spreading constraint.
-				{Name: "node-a", Score: 44},
-				{Name: "node-b", Score: 66},
-				{Name: "node-c", Score: 77},
+				{Name: "node-a", Score: 28},
+				{Name: "node-b", Score: 57},
+				{Name: "node-c", Score: 71},
 				{Name: "node-d", Score: 100},
 			},
 		},

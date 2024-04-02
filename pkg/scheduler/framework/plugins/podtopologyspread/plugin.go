@@ -48,12 +48,12 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 	{
 		TopologyKey:       v1.LabelHostname,
 		WhenUnsatisfiable: v1.ScheduleAnyway,
-		MaxSkew:           3,
+		MaxSkew:           1,
 	},
 	{
 		TopologyKey:       v1.LabelTopologyZone,
 		WhenUnsatisfiable: v1.ScheduleAnyway,
-		MaxSkew:           5,
+		MaxSkew:           1,
 	},
 }
 
