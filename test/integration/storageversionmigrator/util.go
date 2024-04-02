@@ -773,6 +773,10 @@ func (svm *svmTest) updateCRD(
 		t.Fatalf("Failed to get CRD: %v", err)
 	}
 
+	// TODO: wrap all actions after updateCRD with wait loops so we do not need this sleep
+	//  it is currently necessary because we update the CRD but do not otherwise guarantee that the updated config is active
+	time.Sleep(10 * time.Second)
+
 	return crd
 }
 
