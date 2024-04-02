@@ -2382,3 +2382,52 @@ func Test_allowPodStart(t *testing.T) {
 		})
 	}
 }
+
+func Test_calculateEffectiveGracePeriod(t *testing.T) {
+	zero := int64(0)
+	two := int64(2)
+	five := int64(5)
+	thirty := int64(30)
+	// no overrides, use what's on the spec
+	pod := newNamedPod("1", "ns", "running-pod", false)
+	pod.Spec.TerminationGracePeriodSeconds = &thirty
+	gracePeriod, _ := calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{})
+	expectedGracePeriod := int64(30)
+	if gracePeriod != expectedGracePeriod {
+		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
+	}
+
+	// pod DeletionGracePeriodSeconds is set
+	pod.DeletionGracePeriodSeconds = &five
+	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{})
+	expectedGracePeriod = five
+	if gracePeriod != expectedGracePeriod {
+		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
+	}
+
+	// grace period override
+	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{
+		PodTerminationGracePeriodSecondsOverride: &two,
+	})
+	expectedGracePeriod = two
+	if gracePeriod != expectedGracePeriod {
+		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
+	}
+
+	// pod DeletionGracePeriodSeconds is zero
+	pod.DeletionGracePeriodSeconds = &zero
+	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{})
+	expectedGracePeriod = int64(1)
+	if gracePeriod != expectedGracePeriod {
+		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
+	}
+
+	// grace period override is zero
+	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{
+		PodTerminationGracePeriodSecondsOverride: &zero,
+	})
+	expectedGracePeriod = int64(1)
+	if gracePeriod != expectedGracePeriod {
+		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
+	}
+}
