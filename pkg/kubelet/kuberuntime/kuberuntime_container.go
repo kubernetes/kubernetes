@@ -783,7 +783,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 		err = errors.New("container receives the ctx.Done signal and cancels the deletion")
 		return err
 	case readErr, ok := <-done:
-		if ok {
+		if ok && !crierror.IsNotFound(readErr) {
 			return readErr
 		}
 	}
