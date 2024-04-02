@@ -24,6 +24,22 @@ cd "${KUBE_ROOT}"
 # Files larger than 1MB need to be allowed explicitly.
 maxsize=$((1 * 1024 * 1024))
 
+run_stat() {
+    local file="$1"
+    case "$(uname -s)" in
+        Darwin)
+            stat -f %z "$file" | tr -d '\n'
+            ;;
+        Linux)
+            stat --printf=%s "$file"
+            ;;
+        *)
+            kube::log::error "Unsupported host OS.  Must be Linux or Mac OS X."
+            exit 1
+            ;;
+    esac
+}
+
 # Sorted list of those exceptions.
 allowlist=(
     staging/src/k8s.io/kubectl/images/kubectl-logo-full.png
@@ -42,7 +58,7 @@ largefiles () {
         case "$tree" in
             w/-text)
                 # Only binary files have a size limit.
-                size="$(stat --printf=%s "$file")"
+                size="$(run_stat "$file")"
                 if [ "${size}" -gt "$maxsize" ] &&
                        ! kube::util::array_contains "$file" "${allowlist[@]}"; then
                     echo    "$file is too large ($size bytes)"
