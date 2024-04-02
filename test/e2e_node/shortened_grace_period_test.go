@@ -85,10 +85,7 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 					errInt := errors.New("unexpected SIGINT 1 exit volume")
 					framework.ExpectNoError(errInt, "unexpected container exit code for pod %q.code is %d", podName, exitCode)
 				}
-				if SIGINT2 != 1 {
-					errInt := errors.New("unexpected SIGINT 1 exit volume")
-					framework.ExpectNoError(errInt, "unexpected container exit code for pod %q.code is %d", podName, exitCode)
-				}
+				gomega.Expect(strings.Count("SIGINT 2", podLogs)).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
 				return nil
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
