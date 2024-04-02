@@ -16,7 +16,10 @@ limitations under the License.
 
 package jsonpath
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
 
 // NodeType identifies the type of a parse tree node.
 type NodeType int
@@ -43,6 +46,7 @@ const (
 	NodeRecursive
 	NodeUnion
 	NodeBool
+	NodeRegex
 )
 
 var NodeTypeName = map[NodeType]string{
@@ -58,6 +62,7 @@ var NodeTypeName = map[NodeType]string{
 	NodeRecursive:  "NodeRecursive",
 	NodeUnion:      "NodeUnion",
 	NodeBool:       "NodeBool",
+	NodeRegex:      "NodeRegex",
 }
 
 type Node interface {
@@ -225,6 +230,20 @@ func newRecursive() *RecursiveNode {
 
 func (r *RecursiveNode) String() string {
 	return r.Type().String()
+}
+
+// RegexNode holds Regexp
+type RegexNode struct {
+	NodeType
+	Regex regexp.Regexp
+}
+
+func newRegex(regex regexp.Regexp) *RegexNode {
+	return &RegexNode{NodeType: NodeRegex, Regex: regex}
+}
+
+func (r *RegexNode) String() string {
+	return fmt.Sprintf("%s: %s", r.Type(), &r.Regex)
 }
 
 // UnionNode is union of ListNode
