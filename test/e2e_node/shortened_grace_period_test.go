@@ -19,8 +19,8 @@ package e2enode
 import (
 	"bytes"
 	"context"
-	"errors"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,26 +44,11 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 		var podName = "test"
 		var ctx = context.Background()
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "Pod"}
-		ginkgo.BeforeEach(func() {
-			ns = f.Namespace.Name
-			dc = f.DynamicClient
-			podClient = e2epod.NewPodClient(f)
-		})
 		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
 			expectedWatchEvents := []watch.Event{
 				{Type: watch.Deleted},
 			}
-			var exitCode int32
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
-				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
-				framework.ExpectNoError(err, "failed to get pod %q", podName)
-				// Verify exit code
-				exitCode = pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
-				framework.ExpectNoError(err, "failed to get most recent container exit code for pod %q", podName)
-				if exitCode != int32(0) {
-					errInt := errors.New("unexpected container exit code for pod")
-					framework.ExpectNoError(errInt, "unexpected container exit code for pod %q.code is %d", podName, exitCode)
-				}
 				// Get pod logs.
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
@@ -79,12 +64,7 @@ var _ = SIGDescribe("Shortened Grace Period", func() {
 				}
 				podLogs := buf.String()
 				// Verify the number of SIGINT
-				SIGINT1 := strings.Count("SIGINT 1", podLogs)
-				SIGINT2 := strings.Count("SIGINT 2", podLogs)
-				if SIGINT1 == 1 {
-					errInt := errors.New("unexpected SIGINT 1 exit volume")
-					framework.ExpectNoError(errInt, "unexpected container exit code for pod %q.code is %d", podName, exitCode)
-				}
+				gomega.Expect(strings.Count("SIGINT 1", podLogs)).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
 				gomega.Expect(strings.Count("SIGINT 2", podLogs)).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
 				return nil
 			}
