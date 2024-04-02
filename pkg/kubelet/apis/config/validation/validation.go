@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/cpuset"
 )
@@ -293,7 +294,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podLogsDir was not specified"))
 	}
 
-	if !filepath.IsAbs(kc.PodLogsDir) {
+	if !utilfs.IsAbs(kc.PodLogsDir) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be absolute path", kc.PodLogsDir))
 	}
 

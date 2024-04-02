@@ -37,5 +37,7 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 	return true, nil
 }
 
-// IsAbs is filepath.IsAbs.
-var IsAbs = filepath.IsAbs
+// IsAbs is same as filepath.IsAbs on Unix.
+func IsAbs(path string) bool {
+	return filepath.IsAbs(path)
+}

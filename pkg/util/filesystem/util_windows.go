@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -91,5 +92,5 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 // On Windows, filepath.IsAbs will not return True for paths prefixed with a slash, even
 // though they can be used as absolute paths (https://docs.microsoft.com/en-us/dotnet/standard/io/file-path-formats).
 func IsAbs(path string) bool {
-	return filepath.IsAbs(path) || (len(path) > 0 && (path[0] == '\\' || path[0] == '/'))
+	return filepath.IsAbs(path) || strings.HasPrefix(path, `\`) || strings.HasPrefix(path, `/`)
 }
