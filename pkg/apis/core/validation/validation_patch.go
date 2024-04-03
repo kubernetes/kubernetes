@@ -39,6 +39,7 @@ var (
 		"openshift-kube-apiserver-operator":          {},
 		"openshift-kube-apiserver":                   {},
 		"openshift-kube-controller-manager-operator": {},
+		"openshift-config-managed":                   {},
 	}
 )
 
