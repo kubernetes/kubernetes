@@ -29,6 +29,7 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -51,119 +52,111 @@ import (
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/yaml"
 )
 
 const (
 	secretKey                = "api_key"
 	secretVal                = "086a7ffc-0225-11e8-ba89-0ed5f89f718b" // Fake value for testing.
 	encryptionConfigFileName = "encryption.conf"
-	testNamespace            = "secret-encryption-test"
-	testSecret               = "test-secret"
-	testConfigmap            = "test-configmap"
 	metricsPrefix            = "apiserver_storage_"
 	configMapKey             = "foo"
 	configMapVal             = "bar"
 
-	// precomputed key and secret for use with AES CBC
-	// this looks exactly the same as the AES GCM secret but with a different value
-	oldAESCBCKey = "e0/+tts8FS254BZimFZWtUsOCOUDSkvzB72PyimMlkY="
-	oldSecret    = "azhzAAoMCgJ2MRIGU2VjcmV0En4KXwoLdGVzdC1zZWNyZXQSABoWc2VjcmV0LWVuY3J5cHRpb24tdGVzdCIAKiQ3MmRmZTVjNC0xNDU2LTQyMzktYjFlZC1hZGZmYTJmMWY3YmEyADgAQggI5Jy/7wUQAHoAEhMKB2FwaV9rZXkSCPCfpJfwn5C8GgZPcGFxdWUaACIA"
-	oldSecretVal = "\xf0\x9f\xa4\x97\xf0\x9f\x90\xbc"
+	TestNamespace = "secret-encryption-test"
 )
 
-type unSealSecret func(ctx context.Context, cipherText []byte, dataCtx value.Context, config apiserverv1.ProviderConfiguration) ([]byte, error)
+type UnSealSecret func(ctx context.Context, cipherText []byte, dataCtx value.Context, config apiserverv1.ProviderConfiguration) ([]byte, error)
 
-type transformTest struct {
-	logger            kubeapiservertesting.Logger
-	storageConfig     *storagebackend.Config
-	configDir         string
-	transformerConfig string
-	kubeAPIServer     kubeapiservertesting.TestServer
-	restClient        *kubernetes.Clientset
+type TransformTest struct {
+	Logger            kubeapiservertesting.Logger
+	StorageConfig     *storagebackend.Config
+	ConfigDir         string
+	TransformerConfig string
+	KubeAPIServer     kubeapiservertesting.TestServer
+	RestClient        *kubernetes.Clientset
 	ns                *corev1.Namespace
-	secret            *corev1.Secret
+	Secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+func NewTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*TransformTest, error) {
 	if storageConfig == nil {
 		storageConfig = framework.SharedEtcd()
 	}
-	e := transformTest{
-		logger:            l,
-		transformerConfig: transformerConfigYAML,
-		storageConfig:     storageConfig,
+	e := TransformTest{
+		Logger:            l,
+		TransformerConfig: transformerConfigYAML,
+		StorageConfig:     storageConfig,
 	}
 
 	var err error
 	// create config dir with provided config yaml
 	if transformerConfigYAML != "" && configDir == "" {
-		if e.configDir, err = e.createEncryptionConfig(); err != nil {
-			e.cleanUp()
+		if e.ConfigDir, err = e.createEncryptionConfig(); err != nil {
+			e.CleanUp()
 			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %w", err)
 		}
 	} else {
-		// configDir already exists. api-server must be restarting with existing encryption config
-		e.configDir = configDir
+		// ConfigDir already exists. api-server must be restarting with existing encryption config
+		e.ConfigDir = configDir
 	}
-	configFile := filepath.Join(e.configDir, encryptionConfigFileName)
+	configFile := filepath.Join(e.ConfigDir, encryptionConfigFileName)
 	_, err = os.ReadFile(configFile)
 	if err != nil {
-		e.cleanUp()
+		e.CleanUp()
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
-		e.cleanUp()
+	if e.KubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.StorageConfig); err != nil {
+		e.CleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
 	}
-	klog.Infof("Started kube-apiserver %v", e.kubeAPIServer.ClientConfig.Host)
+	klog.Infof("Started kube-apiserver %v", e.KubeAPIServer.ClientConfig.Host)
 
-	if e.restClient, err = kubernetes.NewForConfig(e.kubeAPIServer.ClientConfig); err != nil {
-		e.cleanUp()
+	if e.RestClient, err = kubernetes.NewForConfig(e.KubeAPIServer.ClientConfig); err != nil {
+		e.CleanUp()
 		return nil, fmt.Errorf("error while creating rest client: %w", err)
 	}
 
-	if e.ns, err = e.createNamespace(testNamespace); err != nil {
-		e.cleanUp()
+	if e.ns, err = e.CreateNamespace(TestNamespace); err != nil {
+		e.CleanUp()
 		return nil, err
 	}
 
 	if transformerConfigYAML != "" && reload {
 		// when reloading is enabled, this healthz endpoint is always present
-		mustBeHealthy(l, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
-		mustNotHaveLivez(l, "/kms-providers", "404 page not found", e.kubeAPIServer.ClientConfig)
+		MustBeHealthy(l, "/kms-providers", "ok", e.KubeAPIServer.ClientConfig)
+		MustNotHaveLivez(l, "/kms-providers", "404 page not found", e.KubeAPIServer.ClientConfig)
 
 		// excluding healthz endpoints even if they do not exist should work
-		mustBeHealthy(l, "", `warn: some health checks cannot be excluded: no matches for "kms-provider-0","kms-provider-1","kms-provider-2","kms-provider-3"`,
-			e.kubeAPIServer.ClientConfig, "kms-provider-0", "kms-provider-1", "kms-provider-2", "kms-provider-3")
+		MustBeHealthy(l, "", `warn: some health checks cannot be excluded: no matches for "kms-provider-0","kms-provider-1","kms-provider-2","kms-provider-3"`,
+			e.KubeAPIServer.ClientConfig, "kms-provider-0", "kms-provider-1", "kms-provider-2", "kms-provider-3")
 	}
 
 	return &e, nil
 }
 
-func (e *transformTest) cleanUp() {
-	if e.configDir != "" {
-		os.RemoveAll(e.configDir)
+func (e *TransformTest) CleanUp() {
+	if e.ConfigDir != "" {
+		_ = os.RemoveAll(e.ConfigDir)
 	}
 
-	if e.kubeAPIServer.ClientConfig != nil {
-		e.shutdownAPIServer()
+	if e.KubeAPIServer.ClientConfig != nil {
+		e.ShutdownAPIServer()
 	}
 }
 
-func (e *transformTest) shutdownAPIServer() {
-	e.kubeAPIServer.TearDownFn()
+func (e *TransformTest) ShutdownAPIServer() {
+	e.KubeAPIServer.TearDownFn()
 }
 
-func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretFunc unSealSecret, expectedEnvelopePrefix,
+func (e *TransformTest) RunResource(l kubeapiservertesting.Logger, unSealSecretFunc UnSealSecret, expectedEnvelopePrefix,
 	group,
 	version,
 	resource,
 	name,
 	namespaceName string,
 ) {
-	response, err := e.readRawRecordFromETCD(e.getETCDPathForResource(e.storageConfig.Prefix, group, resource, name, namespaceName))
+	response, err := e.ReadRawRecordFromETCD(e.GetETCDPathForResource(e.StorageConfig.Prefix, group, resource, name, namespaceName))
 	if err != nil {
 		l.Errorf("failed to read from etcd: %v", err)
 		return
@@ -177,7 +170,7 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
 	ctx := context.Background()
-	dataCtx := value.DefaultContext(e.getETCDPathForResource(e.storageConfig.Prefix, group, resource, name, namespaceName))
+	dataCtx := value.DefaultContext(e.GetETCDPathForResource(e.StorageConfig.Prefix, group, resource, name, namespaceName))
 	// Envelope header precedes the cipherTextPayload
 	sealedData := response.Kvs[0].Value[len(expectedEnvelopePrefix):]
 	transformerConfig, err := e.getEncryptionConfig()
@@ -205,15 +198,15 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 
 	// Data should be un-enveloped on direct reads from Kube API Server.
 	if resource == "secrets" {
-		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), name, metav1.GetOptions{})
+		s, err := e.RestClient.CoreV1().Secrets(TestNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			l.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
+			l.Fatalf("failed to get Secret from %s, err: %v", TestNamespace, err)
 		}
 		if secretVal != string(s.Data[secretKey]) {
 			l.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 		}
 	} else if resource == "configmaps" {
-		s, err := e.restClient.CoreV1().ConfigMaps(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
+		s, err := e.RestClient.CoreV1().ConfigMaps(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			l.Fatalf("failed to get ConfigMap from %s, err: %v", namespaceName, err)
 		}
@@ -221,7 +214,7 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 			l.Errorf("expected %s from KubeAPI, but got %s", configMapVal, string(s.Data[configMapKey]))
 		}
 	} else if resource == "pods" {
-		p, err := e.restClient.CoreV1().Pods(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
+		p, err := e.RestClient.CoreV1().Pods(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			l.Fatalf("failed to get Pod from %s, err: %v", namespaceName, err)
 		}
@@ -231,7 +224,7 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 	} else {
 		l.Logf("Get object with dynamic client")
 		fooResource := schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
-		obj, err := dynamic.NewForConfigOrDie(e.kubeAPIServer.ClientConfig).Resource(fooResource).Namespace(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
+		obj, err := dynamic.NewForConfigOrDie(e.KubeAPIServer.ClientConfig).Resource(fooResource).Namespace(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			l.Fatalf("Failed to get test instance: %v, name: %s", err, name)
 		}
@@ -241,16 +234,16 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 	}
 }
 
-func (e *transformTest) benchmark(b *testing.B) {
+func (e *TransformTest) Benchmark(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, err := e.createSecret(e.secret.Name+strconv.Itoa(i), e.ns.Name)
+		_, err := e.CreateSecret(e.Secret.Name+strconv.Itoa(i), e.ns.Name)
 		if err != nil {
 			b.Fatalf("failed to create a secret: %v", err)
 		}
 	}
 }
 
-func (e *transformTest) getETCDPathForResource(storagePrefix, group, resource, name, namespaceName string) string {
+func (e *TransformTest) GetETCDPathForResource(storagePrefix, group, resource, name, namespaceName string) string {
 	groupResource := resource
 	if group != "" {
 		groupResource = fmt.Sprintf("%s/%s", group, resource)
@@ -261,19 +254,19 @@ func (e *transformTest) getETCDPathForResource(storagePrefix, group, resource, n
 	return fmt.Sprintf("/%s/%s/%s/%s", storagePrefix, groupResource, namespaceName, name)
 }
 
-func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
-	secretETCDPath := e.getETCDPathForResource(e.storageConfig.Prefix, "", "secrets", e.secret.Name, e.secret.Namespace)
-	etcdResponse, err := e.readRawRecordFromETCD(secretETCDPath)
+func (e *TransformTest) GetRawSecretFromETCD() ([]byte, error) {
+	secretETCDPath := e.GetETCDPathForResource(e.StorageConfig.Prefix, "", "secrets", e.Secret.Name, e.Secret.Namespace)
+	etcdResponse, err := e.ReadRawRecordFromETCD(secretETCDPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
 	return etcdResponse.Kvs[0].Value, nil
 }
 
-func (e *transformTest) getEncryptionOptions(reload bool) []string {
-	if e.transformerConfig != "" {
+func (e *TransformTest) getEncryptionOptions(reload bool) []string {
+	if e.TransformerConfig != "" {
 		return []string{
-			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
+			"--encryption-provider-config", filepath.Join(e.ConfigDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
 			"--disable-admission-plugins", "ServiceAccount"}
 	}
@@ -281,7 +274,7 @@ func (e *transformTest) getEncryptionOptions(reload bool) []string {
 	return nil
 }
 
-func (e *transformTest) createEncryptionConfig() (
+func (e *TransformTest) createEncryptionConfig() (
 	filePathForEncryptionConfig string,
 	err error,
 ) {
@@ -290,7 +283,7 @@ func (e *transformTest) createEncryptionConfig() (
 		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}
 
-	if err = os.WriteFile(filepath.Join(tempDir, encryptionConfigFileName), []byte(e.transformerConfig), 0644); err != nil {
+	if err = os.WriteFile(filepath.Join(tempDir, encryptionConfigFileName), []byte(e.TransformerConfig), 0644); err != nil {
 		os.RemoveAll(tempDir)
 		return tempDir, fmt.Errorf("error while writing encryption config: %v", err)
 	}
@@ -298,9 +291,9 @@ func (e *transformTest) createEncryptionConfig() (
 	return tempDir, nil
 }
 
-func (e *transformTest) getEncryptionConfig() (*apiserverv1.ProviderConfiguration, error) {
+func (e *TransformTest) getEncryptionConfig() (*apiserverv1.ProviderConfiguration, error) {
 	var config apiserverv1.EncryptionConfiguration
-	err := yaml.Unmarshal([]byte(e.transformerConfig), &config)
+	err := yaml.Unmarshal([]byte(e.TransformerConfig), &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract transformer key: %v", err)
 	}
@@ -308,16 +301,16 @@ func (e *transformTest) getEncryptionConfig() (*apiserverv1.ProviderConfiguratio
 	return &config.Resources[0].Providers[0], nil
 }
 
-func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) {
+func (e *TransformTest) CreateNamespace(name string) (*corev1.Namespace, error) {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
 
-	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
+	if _, err := e.RestClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
 		if errors.IsAlreadyExists(err) {
-			existingNs, err := e.restClient.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
+			existingNs, err := e.RestClient.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("unable to get testing namespace, err: [%v]", err)
 			}
@@ -329,7 +322,7 @@ func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) 
 	return ns, nil
 }
 
-func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, error) {
+func (e *TransformTest) CreateSecret(name, namespace string) (*corev1.Secret, error) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -339,14 +332,14 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 			secretKey: []byte(secretVal),
 		},
 	}
-	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+	if _, err := e.RestClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("error while writing secret: %v", err)
 	}
 
 	return secret, nil
 }
 
-func (e *transformTest) createConfigMap(name, namespace string) (*corev1.ConfigMap, error) {
+func (e *TransformTest) CreateConfigMap(name, namespace string) (*corev1.ConfigMap, error) {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -356,7 +349,7 @@ func (e *transformTest) createConfigMap(name, namespace string) (*corev1.ConfigM
 			configMapKey: configMapVal,
 		},
 	}
-	if _, err := e.restClient.CoreV1().ConfigMaps(cm.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
+	if _, err := e.RestClient.CoreV1().ConfigMaps(cm.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("error while writing configmap: %v", err)
 	}
 
@@ -364,7 +357,7 @@ func (e *transformTest) createConfigMap(name, namespace string) (*corev1.ConfigM
 }
 
 // create jobs
-func (e *transformTest) createJob(name, namespace string) (*batchv1.Job, error) {
+func (e *TransformTest) CreateJob(name, namespace string) (*batchv1.Job, error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -384,7 +377,7 @@ func (e *transformTest) createJob(name, namespace string) (*batchv1.Job, error) 
 			},
 		},
 	}
-	if _, err := e.restClient.BatchV1().Jobs(job.Namespace).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
+	if _, err := e.RestClient.BatchV1().Jobs(job.Namespace).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("error while creating job: %v", err)
 	}
 
@@ -392,7 +385,7 @@ func (e *transformTest) createJob(name, namespace string) (*batchv1.Job, error) 
 }
 
 // create deployment
-func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deployment, error) {
+func (e *TransformTest) CreateDeployment(name, namespace string) (*appsv1.Deployment, error) {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -429,7 +422,7 @@ func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deploy
 			},
 		},
 	}
-	if _, err := e.restClient.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{}); err != nil {
+	if _, err := e.RestClient.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("error while creating deployment: %v", err)
 	}
 
@@ -454,7 +447,7 @@ func inplaceUpdateResource(client dynamic.Interface, gvr schema.GroupVersionReso
 
 func getStubObj(gvr schema.GroupVersionResource) (*unstructured.Unstructured, error) {
 	stub := ""
-	if data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]; ok {
+	if data, ok := etcd.GetEtcdStorageDataForNamespace(TestNamespace)[gvr]; ok {
 		stub = data.Stub
 	}
 	if len(stub) == 0 {
@@ -468,7 +461,7 @@ func getStubObj(gvr schema.GroupVersionResource) (*unstructured.Unstructured, er
 	return stubObj, nil
 }
 
-func (e *transformTest) createPod(namespace string, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
+func (e *TransformTest) CreatePod(namespace string, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
 	podGVR := gvr("", "v1", "pods")
 	pod, err := createResource(dynamicInterface, podGVR, namespace)
 	if err != nil {
@@ -477,7 +470,7 @@ func (e *transformTest) createPod(namespace string, dynamicInterface dynamic.Int
 	return pod, nil
 }
 
-func (e *transformTest) deletePod(namespace string, dynamicInterface dynamic.Interface) error {
+func (e *TransformTest) DeletePod(namespace string, dynamicInterface dynamic.Interface) error {
 	podGVR := gvr("", "v1", "pods")
 	stubObj, err := getStubObj(podGVR)
 	if err != nil {
@@ -486,7 +479,7 @@ func (e *transformTest) deletePod(namespace string, dynamicInterface dynamic.Int
 	return dynamicInterface.Resource(podGVR).Namespace(namespace).Delete(context.TODO(), stubObj.GetName(), metav1.DeleteOptions{})
 }
 
-func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Unstructured, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
+func (e *TransformTest) InPlaceUpdatePod(namespace string, obj *unstructured.Unstructured, dynamicInterface dynamic.Interface) (*unstructured.Unstructured, error) {
 	podGVR := gvr("", "v1", "pods")
 	pod, err := inplaceUpdateResource(dynamicInterface, podGVR, namespace, obj)
 	if err != nil {
@@ -495,8 +488,8 @@ func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Uns
 	return pod, nil
 }
 
-func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
-	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+func (e *TransformTest) ReadRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
+	rawClient, etcdClient, err := integration.GetEtcdClients(e.KubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}
@@ -512,8 +505,8 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 	return response, nil
 }
 
-func (e *transformTest) writeRawRecordToETCD(path string, data []byte) (*clientv3.PutResponse, error) {
-	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+func (e *TransformTest) WriteRawRecordToETCD(path string, data []byte) (*clientv3.PutResponse, error) {
+	rawClient, etcdClient, err := integration.GetEtcdClients(e.KubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}
@@ -529,8 +522,8 @@ func (e *transformTest) writeRawRecordToETCD(path string, data []byte) (*clientv
 	return response, nil
 }
 
-func (e *transformTest) printMetrics() error {
-	e.logger.Logf("Transformation Metrics:")
+func (e *TransformTest) PrintMetrics() error {
+	e.Logger.Logf("Transformation Metrics:")
 	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		return fmt.Errorf("failed to gather metrics: %s", err)
@@ -538,9 +531,9 @@ func (e *transformTest) printMetrics() error {
 
 	for _, mf := range metrics {
 		if strings.HasPrefix(*mf.Name, metricsPrefix) {
-			e.logger.Logf("%s", *mf.Name)
+			e.Logger.Logf("%s", *mf.Name)
 			for _, metric := range mf.GetMetric() {
-				e.logger.Logf("%v", metric)
+				e.Logger.Logf("%v", metric)
 			}
 		}
 	}
@@ -548,7 +541,7 @@ func (e *transformTest) printMetrics() error {
 	return nil
 }
 
-func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+func MustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
 	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
@@ -569,7 +562,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 	}
 }
 
-func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+func MustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
 	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
@@ -590,7 +583,7 @@ func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains 
 	}
 }
 
-func mustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+func MustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
 	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {

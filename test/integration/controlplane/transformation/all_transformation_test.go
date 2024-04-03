@@ -27,9 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/integration/etcd"
+	utilstransformation "k8s.io/kubernetes/test/utils/transformation"
 )
 
-func createResources(t *testing.T, test *transformTest,
+func createResources(t *testing.T, test *utilstransformation.TransformTest,
 	group,
 	version,
 	kind,
@@ -39,12 +40,12 @@ func createResources(t *testing.T, test *transformTest,
 ) {
 	switch resource {
 	case "pods":
-		_, err := test.createPod(namespace, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
+		_, err := test.CreatePod(namespace, dynamic.NewForConfigOrDie(test.KubeAPIServer.ClientConfig))
 		if err != nil {
 			t.Fatalf("Failed to create test pod, error: %v, name: %s, ns: %s", err, name, namespace)
 		}
 	case "configmaps":
-		_, err := test.createConfigMap(name, namespace)
+		_, err := test.CreateConfigMap(name, namespace)
 		if err != nil {
 			t.Fatalf("Failed to create test configmap, error: %v, name: %s, ns: %s", err, name, namespace)
 		}
@@ -59,7 +60,7 @@ func createResources(t *testing.T, test *transformTest,
 			Resource:         gvr,
 			GroupVersionKind: gvr.GroupVersion().WithKind(kind),
 			Scope:            meta.RESTScopeRoot,
-		}, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
+		}, dynamic.NewForConfigOrDie(test.KubeAPIServer.ClientConfig))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,14 +95,14 @@ resources:
       - name: key1
         secret: c2VjcmV0IGlzIHNlY3VyZQ==
 `
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start Kube API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	t.Cleanup(test.cleanUp)
+	t.Cleanup(test.CleanUp)
 
 	// the storage registry for CRs is dynamic so create one to exercise the wiring
-	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.kubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.KubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
 	for _, tt := range []struct {
 		group     string
@@ -111,18 +112,18 @@ resources:
 		name      string
 		namespace string
 	}{
-		{"", "v1", "ConfigMap", "configmaps", "cm1", testNamespace},
+		{"", "v1", "ConfigMap", "configmaps", "cm1", utilstransformation.TestNamespace},
 		{"apiextensions.k8s.io", "v1", "CustomResourceDefinition", "customresourcedefinitions", "pandas.awesome.bears.com", ""},
 		{"awesome.bears.com", "v1", "Panda", "pandas", "cr3panda", ""},
 		{"apiregistration.k8s.io", "v1", "APIService", "apiservices", "as2.foo.com", ""},
-		{"", "v1", "Pod", "pods", "pod1", testNamespace},
+		{"", "v1", "Pod", "pods", "pod1", utilstransformation.TestNamespace},
 	} {
 		tt := tt
 		t.Run(tt.resource, func(t *testing.T) {
 			t.Parallel()
 
 			createResources(t, test, tt.group, tt.version, tt.kind, tt.resource, tt.name, tt.namespace)
-			test.runResource(t, unSealWithCBCTransformer, aesCBCPrefix, tt.group, tt.version, tt.resource, tt.name, tt.namespace)
+			test.RunResource(t, unSealWithCBCTransformer, aesCBCPrefix, tt.group, tt.version, tt.resource, tt.name, tt.namespace)
 		})
 	}
 }

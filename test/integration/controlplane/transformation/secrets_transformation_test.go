@@ -27,6 +27,7 @@ import (
 	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	utilstransformation "k8s.io/kubernetes/test/utils/transformation"
 )
 
 const (
@@ -78,24 +79,24 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 	var testCases = []struct {
 		transformerConfigContent string
 		transformerPrefix        string
-		unSealFunc               unSealSecret
+		unSealFunc               utilstransformation.UnSealSecret
 	}{
 		{aesGCMConfigYAML, aesGCMPrefix, unSealWithGCMTransformer},
 		{aesCBCConfigYAML, aesCBCPrefix, unSealWithCBCTransformer},
 		// TODO: add secretbox
 	}
 	for _, tt := range testCases {
-		test, err := newTransformTest(t, tt.transformerConfigContent, false, "", nil)
+		test, err := utilstransformation.NewTransformTest(t, tt.transformerConfigContent, false, "", nil)
 		if err != nil {
 			t.Fatalf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
 			continue
 		}
-		test.secret, err = test.createSecret(testSecret, testNamespace)
+		test.Secret, err = test.CreateSecret("test-secret", utilstransformation.TestNamespace)
 		if err != nil {
 			t.Fatalf("Failed to create test secret, error: %v", err)
 		}
-		test.runResource(test.logger, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
-		test.cleanUp()
+		test.RunResource(test.Logger, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.Secret.Name, test.Secret.Namespace)
+		test.CleanUp()
 	}
 }
 
@@ -119,16 +120,16 @@ func BenchmarkAESCBCEnvelopeWrite(b *testing.B) {
 
 func runBenchmark(b *testing.B, transformerConfig string) {
 	b.StopTimer()
-	test, err := newTransformTest(b, transformerConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(b, transformerConfig, false, "", nil)
 	if err != nil {
 		b.Fatalf("failed to setup benchmark for config %s, error was %v", transformerConfig, err)
 	}
-	defer test.cleanUp()
+	defer test.CleanUp()
 
 	b.StartTimer()
-	test.benchmark(b)
+	test.Benchmark(b)
 	b.StopTimer()
-	test.printMetrics()
+	_ = test.PrintMetrics()
 }
 
 func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,

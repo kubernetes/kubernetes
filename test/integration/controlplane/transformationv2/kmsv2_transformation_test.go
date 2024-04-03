@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package transformation
+package transformationv2
 
 import (
 	"bytes"
@@ -75,6 +75,14 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	utilstransformation "k8s.io/kubernetes/test/utils/transformation"
+)
+
+const (
+	secretKey     = "api_key"
+	secretVal     = "086a7ffc-0225-11e8-ba89-0ed5f89f718b" // Fake value for testing.
+	testNamespace = "secret-encryption-test"
+	testSecret    = "test-secret"
 )
 
 type envelopekmsv2 struct {
@@ -189,17 +197,17 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
-	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+	_ = kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	t.Cleanup(test.cleanUp)
+	t.Cleanup(test.CleanUp)
 
-	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(test.KubeAPIServer.ClientConfig)
 	if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
@@ -216,7 +224,7 @@ resources:
 		t.Fatal(err)
 	}
 
-	config := test.kubeAPIServer.ServerOpts.Etcd.StorageConfig
+	config := test.KubeAPIServer.ServerOpts.Etcd.StorageConfig
 	rawClient, etcdClient, err := integration.GetEtcdClients(config.Transport)
 	if err != nil {
 		t.Fatalf("failed to create etcd client: %v", err)
@@ -271,22 +279,22 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
 	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	providerName := "kms-provider"
-	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	defer test.cleanUp()
+	defer test.CleanUp()
 
 	ctx := testContext(t)
 
 	// the global metrics registry persists across test runs - reset it here so we can make assertions
-	copyConfig := rest.CopyConfig(test.kubeAPIServer.ClientConfig)
+	copyConfig := rest.CopyConfig(test.KubeAPIServer.ClientConfig)
 	copyConfig.GroupVersion = &schema.GroupVersion{}
 	copyConfig.NegotiatedSerializer = unstructuredscheme.NewUnstructuredNegotiatedSerializer()
 	rc, err := rest.RESTClientFor(copyConfig)
@@ -330,15 +338,15 @@ resources:
 		}
 	}()
 
-	test.secret, err = test.createSecret(testSecret, testNamespace)
+	test.Secret, err = test.CreateSecret(testSecret, testNamespace)
 	if err != nil {
 		t.Fatalf("Failed to create test secret, error: %v", err)
 	}
 
 	plainTextDEKSource := pluginMock.LastEncryptRequest()
 
-	secretETCDPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", test.secret.Name, test.secret.Namespace)
-	rawEnvelope, err := test.getRawSecretFromETCD()
+	secretETCDPath := test.GetETCDPathForResource(test.StorageConfig.Prefix, "", "secrets", test.Secret.Name, test.Secret.Namespace)
+	rawEnvelope, err := test.GetRawSecretFromETCD()
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
@@ -379,7 +387,7 @@ resources:
 		t.Fatalf("expected %q after decryption, but got %q", secretVal, string(plainSecret))
 	}
 
-	secretClient := test.restClient.CoreV1().Secrets(testNamespace)
+	secretClient := test.RestClient.CoreV1().Secrets(testNamespace)
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
 	s, err := secretClient.Get(ctx, testSecret, metav1.GetOptions{})
 	if err != nil {
@@ -421,26 +429,26 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
-	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	defer test.cleanUp()
+	defer test.CleanUp()
 
-	dynamicClient := dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+	dynamicClient := dynamic.NewForConfigOrDie(test.KubeAPIServer.ClientConfig)
 
-	testPod, err := test.createPod(testNamespace, dynamicClient)
+	testPod, err := test.CreatePod(testNamespace, dynamicClient)
 	if err != nil {
 		t.Fatalf("Failed to create test pod, error: %v, ns: %s", err, testNamespace)
 	}
 	version1 := testPod.GetResourceVersion()
 
 	// 1. no-op update for the test pod should not result in any RV change
-	updatedPod, err := test.inplaceUpdatePod(testNamespace, testPod, dynamicClient)
+	updatedPod, err := test.InPlaceUpdatePod(testNamespace, testPod, dynamicClient)
 	if err != nil {
 		t.Fatalf("Failed to update test pod, error: %v, ns: %s", err, testNamespace)
 	}
@@ -480,7 +488,7 @@ resources:
 			}
 		}
 	}
-	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKSources(ctx, t, test.KubeAPIServer.ServerOpts.Etcd.StorageConfig,
 		1, 1, "k8s:enc:kms:v2:kms-provider:", f,
 	)
 	if len(firstEncryptedDEKSource) == 0 {
@@ -498,7 +506,7 @@ resources:
 	err = wait.Poll(time.Second, time.Minute,
 		func() (bool, error) {
 			t.Log("polling for in-place update rv change")
-			updatedPod, err = test.inplaceUpdatePod(testNamespace, updatedPod, dynamicClient)
+			updatedPod, err = test.InPlaceUpdatePod(testNamespace, updatedPod, dynamicClient)
 			if err != nil {
 				return false, err
 			}
@@ -559,7 +567,7 @@ resources:
 	}
 
 	// 3. no-op update for the updated pod should not result in RV change
-	updatedPod, err = test.inplaceUpdatePod(testNamespace, updatedPod, dynamicClient)
+	updatedPod, err = test.InPlaceUpdatePod(testNamespace, updatedPod, dynamicClient)
 	if err != nil {
 		t.Fatalf("Failed to update test pod, error: %v, ns: %s", err, testNamespace)
 	}
@@ -569,18 +577,18 @@ resources:
 	}
 
 	// delete the pod so that it can be recreated
-	if err := test.deletePod(testNamespace, dynamicClient); err != nil {
+	if err := test.DeletePod(testNamespace, dynamicClient); err != nil {
 		t.Fatalf("failed to delete test pod: %v", err)
 	}
 	wantCount++ // we cannot assert against the counter being 2 since the pod gets deleted
 
 	// 4. when kms-plugin is down, expect creation of new pod and encryption to succeed because the DEK is still valid
 	pluginMock.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	utilstransformation.MustBeUnHealthy(t, "/kms-providers",
 		"internal server error: kms-provider-0: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
-		test.kubeAPIServer.ClientConfig)
+		test.KubeAPIServer.ClientConfig)
 
-	newPod, err := test.createPod(testNamespace, dynamicClient)
+	newPod, err := test.CreatePod(testNamespace, dynamicClient)
 	if err != nil {
 		t.Fatalf("Create test pod should have succeeded due to valid DEK, ns: %s, got: %v", testNamespace, err)
 	}
@@ -588,7 +596,7 @@ resources:
 	version5 := newPod.GetResourceVersion()
 
 	// 5. when kms-plugin is down and DEK is valid, no-op update for a pod should succeed and not result in RV change
-	updatedPod, err = test.inplaceUpdatePod(testNamespace, newPod, dynamicClient)
+	updatedPod, err = test.InPlaceUpdatePod(testNamespace, newPod, dynamicClient)
 	if err != nil {
 		t.Fatalf("Failed to perform no-op update on pod when kms-plugin is down, error: %v, ns: %s", err, testNamespace)
 	}
@@ -603,13 +611,13 @@ resources:
 	kmsv2.NowFunc = func() time.Time { return origNowFunc().Add(5 * time.Minute) }
 
 	// 6. when kms-plugin is down, expect creation of new pod and encryption to fail because the DEK is invalid
-	_, err = test.createPod(testNamespace, dynamicClient)
+	_, err = test.CreatePod(testNamespace, dynamicClient)
 	if err == nil || !strings.Contains(err.Error(), `encryptedDEKSource with keyID hash "sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35" expired at 2`) {
 		t.Fatalf("Create test pod should have failed due to encryption, ns: %s, got: %v", testNamespace, err)
 	}
 
 	// 7. when kms-plugin is down and DEK is invalid, no-op update for a pod should succeed and not result in RV change
-	updatedNewPod, err := test.inplaceUpdatePod(testNamespace, newPod, dynamicClient)
+	updatedNewPod, err := test.InPlaceUpdatePod(testNamespace, newPod, dynamicClient)
 	if err != nil {
 		t.Fatalf("Failed to perform no-op update on pod when kms-plugin is down, error: %v, ns: %s", err, testNamespace)
 	}
@@ -618,7 +626,7 @@ resources:
 		t.Fatalf("Resource version should not have changed again after the initial version updated as a result of the keyID update. old pod: %v, new pod: %v", newPod, updatedNewPod)
 	}
 
-	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKSources(ctx, t, test.KubeAPIServer.ServerOpts.Etcd.StorageConfig,
 		1, 1, "k8s:enc:kms:v2:kms-provider:", checkDEK,
 	)
 
@@ -628,7 +636,7 @@ resources:
 	err = wait.Poll(time.Second, 3*time.Minute,
 		func() (bool, error) {
 			t.Log("polling for plugin to be functional")
-			_, err = test.createDeployment("panda", testNamespace)
+			_, err = test.CreateDeployment("panda", testNamespace)
 			if err != nil {
 				t.Logf("failed to create deployment, plugin is likely still unhealthy: %v", err)
 			}
@@ -639,7 +647,7 @@ resources:
 	}
 
 	// 8. confirm that no-op update for a pod succeeds and still does not result in RV change
-	updatedNewPod2, err := test.inplaceUpdatePod(testNamespace, updatedNewPod, dynamicClient)
+	updatedNewPod2, err := test.InPlaceUpdatePod(testNamespace, updatedNewPod, dynamicClient)
 	if err != nil {
 		t.Fatalf("Failed to perform no-op update on pod when kms-plugin is up, error: %v, ns: %s", err, testNamespace)
 	}
@@ -655,7 +663,7 @@ resources:
 	err = wait.Poll(time.Second, 3*time.Minute,
 		func() (bool, error) {
 			t.Log("polling for in-place update rv change due to KDF config change")
-			updatedNewPod2, err = test.inplaceUpdatePod(testNamespace, updatedNewPod2, dynamicClient)
+			updatedNewPod2, err = test.InPlaceUpdatePod(testNamespace, updatedNewPod2, dynamicClient)
 			if err != nil {
 				return false, err
 			}
@@ -713,17 +721,17 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
-	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+	_ = kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	t.Cleanup(test.cleanUp)
+	t.Cleanup(test.CleanUp)
 
-	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(test.KubeAPIServer.ClientConfig)
 
 	const podCount = 1_000
 
@@ -745,7 +753,7 @@ resources:
 		}
 	}
 
-	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKSources(ctx, t, test.KubeAPIServer.ServerOpts.Etcd.StorageConfig,
 		podCount, 1, // key ID does not change during the test so we should only have a single DEK
 		"k8s:enc:kms:v2:kms-provider:", f,
 	)
@@ -845,56 +853,56 @@ resources:
     - kms:
        apiVersion: v2
        name: provider-1
-       endpoint: unix:///@kms-provider-1.sock
+       endpoint: unix:///@kmsv2-provider-1.sock
     - kms:
        apiVersion: v2
        name: provider-2
-       endpoint: unix:///@kms-provider-2.sock
+       endpoint: unix:///@kmsv2-provider-2.sock
 `
 
-	pluginMock1 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-1.sock")
-	pluginMock2 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-2.sock")
+	pluginMock1 := kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider-1.sock")
+	pluginMock2 := kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}
-	defer test.cleanUp()
+	defer test.CleanUp()
 
 	// Name of the healthz check is always "kms-provider-0" and it covers all kms plugins.
 
 	// Stage 1 - Since all kms-plugins are guaranteed to be up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	utilstransformation.MustBeHealthy(t, "/kms-providers", "ok", test.KubeAPIServer.ClientConfig)
 
 	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the healthz check
 	// to fail and report that provider-1 is down
 	pluginMock1.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	utilstransformation.MustBeUnHealthy(t, "/kms-providers",
 		"internal server error: kms-provider-0: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
-		test.kubeAPIServer.ClientConfig)
+		test.KubeAPIServer.ClientConfig)
 	pluginMock1.ExitFailedState()
 
 	// Stage 3 - kms-plugin for provider-1 is now up. Therefore, expect the health check for provider-1
 	// to succeed now, but provider-2 is now down.
 	pluginMock2.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	utilstransformation.MustBeUnHealthy(t, "/kms-providers",
 		"internal server error: kms-provider-1: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
-		test.kubeAPIServer.ClientConfig)
+		test.KubeAPIServer.ClientConfig)
 	pluginMock2.ExitFailedState()
 
 	// Stage 4 - All kms-plugins are once again up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	utilstransformation.MustBeHealthy(t, "/kms-providers", "ok", test.KubeAPIServer.ClientConfig)
 
 	// Stage 5 - All kms-plugins are unhealthy at the same time and we can observe both failures.
 	pluginMock1.EnterFailedState()
 	pluginMock2.EnterFailedState()
-	mustBeUnHealthy(t, "/kms-providers",
+	utilstransformation.MustBeUnHealthy(t, "/kms-providers",
 		"internal server error: "+
 			"[kms-provider-0: failed to perform status section of the healthz check for KMS Provider provider-1, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled,"+
 			" kms-provider-1: failed to perform status section of the healthz check for KMS Provider provider-2, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled]",
-		test.kubeAPIServer.ClientConfig)
+		test.KubeAPIServer.ClientConfig)
 }
 
 func TestKMSv2SingleService(t *testing.T) {
@@ -928,19 +936,19 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
 
-	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+	_ = kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	t.Cleanup(test.cleanUp)
+	t.Cleanup(test.CleanUp)
 
 	// the storage registry for CRs is dynamic so create one to exercise the wiring
-	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.kubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.KubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
@@ -951,7 +959,7 @@ resources:
 		Resource:         gvr,
 		GroupVersionKind: gvr.GroupVersion().WithKind("Panda"),
 		Scope:            meta.RESTScopeRoot,
-	}, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
+	}, dynamic.NewForConfigOrDie(test.KubeAPIServer.ClientConfig))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -981,22 +989,22 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
 	providerName := "kms-provider"
-	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider.sock")
 	storageConfig := framework.SharedEtcd()
 
 	// KMSv2 is enabled by default. Loading a encryptionConfig with KMSv2 should work
-	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", storageConfig)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
 	defer func() {
-		test.cleanUp()
+		test.CleanUp()
 	}()
 
-	test.secret, err = test.createSecret(testSecret, testNamespace)
+	test.Secret, err = test.CreateSecret(testSecret, testNamespace)
 	if err != nil {
 		t.Fatalf("Failed to create test secret, error: %v", err)
 	}
@@ -1004,8 +1012,8 @@ resources:
 	// Since Data Encryption Key (DEK) is randomly generated, we need to ask KMS Mock for it.
 	plainTextDEKSource := pluginMock.LastEncryptRequest()
 
-	secretETCDPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", test.secret.Name, test.secret.Namespace)
-	rawEnvelope, err := test.getRawSecretFromETCD()
+	secretETCDPath := test.GetETCDPathForResource(test.StorageConfig.Prefix, "", "secrets", test.Secret.Name, test.Secret.Namespace)
+	rawEnvelope, err := test.GetRawSecretFromETCD()
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
@@ -1047,7 +1055,7 @@ resources:
 		t.Fatalf("expected %q after decryption, but got %q", secretVal, string(plainSecret))
 	}
 
-	secretClient := test.restClient.CoreV1().Secrets(testNamespace)
+	secretClient := test.RestClient.CoreV1().Secrets(testNamespace)
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
 	s, err := secretClient.Get(ctx, testSecret, metav1.GetOptions{})
 	if err != nil {
@@ -1056,17 +1064,17 @@ resources:
 	if secretVal != string(s.Data[secretKey]) {
 		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}
-	test.shutdownAPIServer()
+	test.ShutdownAPIServer()
 
 	// After a restart, loading a encryptionConfig with the same KMSv2 plugin before the restart should work, decryption of data encrypted with v2 should work
 
-	test, err = newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err = utilstransformation.NewTransformTest(t, encryptionConfig, false, "", storageConfig)
 	if err != nil {
 		t.Fatalf("Failed to restart api server, error: %v", err)
 	}
 
 	// Getting an old secret that was encrypted by the same plugin should not fail.
-	s, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
+	s, err = test.RestClient.CoreV1().Secrets(testNamespace).Get(
 		ctx,
 		testSecret,
 		metav1.GetOptions{},
@@ -1104,17 +1112,17 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
-	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider.sock")
+	_ = kmsv2mock.NewBase64Plugin(b, "@kmsv2-provider.sock")
 
-	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(b, encryptionConfig, false, "", nil)
 	if err != nil {
 		b.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	b.Cleanup(test.cleanUp)
+	b.Cleanup(test.CleanUp)
 
-	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(test.KubeAPIServer.ClientConfig)
 
 	restOptionsGetter := getRESTOptionsGetterForSecrets(b, test)
 
@@ -1175,10 +1183,10 @@ resources:
 	}
 }
 
-func getRESTOptionsGetterForSecrets(t testing.TB, test *transformTest) generic.RESTOptionsGetter {
+func getRESTOptionsGetterForSecrets(t testing.TB, test *utilstransformation.TransformTest) generic.RESTOptionsGetter {
 	t.Helper()
 
-	s := test.kubeAPIServer.ServerOpts
+	s := test.KubeAPIServer.ServerOpts
 
 	etcdConfigCopy := *s.Etcd
 	etcdConfigCopy.SkipHealthEndpoints = true                     // avoid running health check go routines
@@ -1257,17 +1265,17 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
-	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider.sock")
+	_ = kmsv2mock.NewBase64Plugin(b, "@kmsv2-provider.sock")
 
-	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
+	test, err := utilstransformation.NewTransformTest(b, encryptionConfig, false, "", nil)
 	if err != nil {
 		b.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	b.Cleanup(test.cleanUp)
+	b.Cleanup(test.CleanUp)
 
-	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(test.KubeAPIServer.ClientConfig)
 
 	const dataLen = 1_000
 
@@ -1347,10 +1355,10 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///@kms-provider.sock
+       endpoint: unix:///@kmsv2-provider.sock
 `
 
-	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+	_ = kmsv2mock.NewBase64Plugin(t, "@kmsv2-provider.sock")
 
 	// the value.Context.AuthenticatedData during read is the etcd storage path of the associated resource
 	// thus we need to manually construct the storage config so that we can have a static path
@@ -1359,15 +1367,15 @@ resources:
 	storageConfig := storagebackend.NewDefaultConfig(path.Join(legacyDataEtcdPrefix, "registry"), nil)
 	storageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err := utilstransformation.NewTransformTest(t, encryptionConfig, false, "", storageConfig)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	defer test.cleanUp()
+	defer test.CleanUp()
 
 	const legacyDataNamespace = "kms-v2-legacy-data"
 
-	if _, err := test.createNamespace(legacyDataNamespace); err != nil {
+	if _, err := test.CreateNamespace(legacyDataNamespace); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1375,8 +1383,8 @@ resources:
 	// tag: v1.27.0
 	const dekSourceAESGCMKeyName = "dek-source-aes-gcm-key"
 	const dekSourceAESGCMKeyData = "k8s:enc:kms:v2:kms-provider:\n\x8a\x03\xb0ƙ\xdc\x01ʚ;\x00\x00\x00\x00\x8c\x80\v\xf0\x1dKo{0\v\xb5\xd5Ń\x1a\xb5\x0e\xcf\xd7Ve\xed邸\xdfE\xedMk\xcf!\x15\xc0\v\t\x82Wh \x9e\x8f\x1b\\9\b\xa4\x80\x02m\xf4P\x14z\xee\xf7\x8c\x1a\x84n5\xfdG\x83v#\x0e\xd4\f\x83YwH\xe1\x1c\xbf\x12\xc6\x1b\xba\x8br\b\x82z\xf8\xdb`\xa7]P\xb1\xe6!Lb\x8d\xb8I\x1aEL\xa0\xae+\xbe\x15R\x8e\x9b\x064\xf6P\xb6;\x9f\xa6\x8d\x96\xb2\x01\xa1\x8e\xe4a\xdf/\x90u\xde6\x9a\xc2ͻb\x88+\x16\x98=\xe9\x03\xdd\xd7HvC\n\xe5\x8cv\x05~\n\xabX_N\x9a\x84wp\xa8\x13\x0f\x82Y9x\xed\x89\x15\xb9\xe1ꦐ\xc6`R\n0\x04\xf2\xa6ѥ\x85\nk\xf4\xcf\xe4ul\x1c*[A\x12\xa0\xd9\xf2\xb5!\x82\xe4\x00\xa4L'&\xf5pln\"\xe0=\f[\xe1\xb0U97\x11|\xdaNk\xc3=\xc2\xf2\x85<7\x1e\x01\xb8\xa9\xf4\x89\xdb~\xe1\x8c\xe1\x1f\x05B@WʼS\n聛LY\x86$\xf6\x01ݝ\xcd\x1d\xe9\x02]\xf4i\xda\xfa\xc2\x0eUr\xc5Dʽdb\x13\xbe\xfe\x1c\xc5\xe1\x84\xcc\xdf&\x93j\x1eK\x04\xba\x06\x16\x85\x0e\x1f\xca\b\x90\x06\x11K\x9d[\rV\xe8E\xd5(\x91\fn\xd4\x10\x9cH\x1cܝX\x94ȁ5\x1b\x8c\xbbz\xf9Ho{\x1d\x112\x90F\xe7\xd8h\xa8\xa1\xf6\x8c\x8cvʲ1\xf9#\x82\xa3\xbe7ed\xd9\x14\xf3\x06\xff\xb7߫i\x12\x011\x1a,gafIvwT0ASoKdZ/D1L2SlH73LUMj5qa3hroljfS51wc=\"2\n\x1blocal-kek.kms.kubernetes.io\x12\x13encrypted-local-kek"
-	dekSourceAESGCMKeyPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", dekSourceAESGCMKeyName, legacyDataNamespace)
-	if _, err := test.writeRawRecordToETCD(dekSourceAESGCMKeyPath, []byte(dekSourceAESGCMKeyData)); err != nil {
+	dekSourceAESGCMKeyPath := test.GetETCDPathForResource(test.StorageConfig.Prefix, "", "secrets", dekSourceAESGCMKeyName, legacyDataNamespace)
+	if _, err := test.WriteRawRecordToETCD(dekSourceAESGCMKeyPath, []byte(dekSourceAESGCMKeyData)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1402,8 +1410,8 @@ resources:
 	// tag: v1.28.0
 	const dekSourceHKDFSHA256XNonceAESGCMSeedName = "dek-source-hkdf-sha256-xnonce-aes-gcm-seed"
 	const dekSourceHKDFSHA256XNonceAESGCMSeedData = "k8s:enc:kms:v2:kms-provider:\n\xd1\x03\x12\x0f\x87\xae\xa2\xa2\xf5J\x11\x06о\x8a\x81\xb6\x15\xdf4H\xa3\xb7i\x93^)\xe5i\xe2\x7f\xfdo\xee\"\x170\xb7\n\xa0\v\xec\xe0\xfa\t#\tƖ\xf6ǧw\x01\xb9\xab\xb3\xf4\xdf\xec\x9eJ\x95$&Z=\x8awAc\xa5\xb2;\t\xd5\xf9\x05\xc1E)\x8b\xb8\x14\xc9\xda\x14{I\rV?\xe5:\xf0BM\x9b\xad\xaaHn>W/Q\xa3\xf5\xba\xe7˚\n\xe7\"\xa7\\p\x8c\xba2\xf2\xb0x<Ą\x88\x9a\xf1\xb5:d=z\xe3\xc3&\x03\x99m\x96\xe7\\\xe3\xa3\xd7i\xb2\f\x84g\xf94\xd2\f\xd6~\xed\xac\xf8\x1b\xc6(,[\xd1\xff\xba\x89ȇD\x02):wTM12\xb5\xfdl\xd2\xf2\x85\x120\xd3\xd9aak\xce\xddI֥\x0fk2\xf6I\xd0\xf9\xc2\xda\vŗ\xd7\u05fb\x83\xd6\xf7\x1a\xbf\x13iH\x8f\xe4\xb3#\xf3\xdf\xc8$y\rL(F\\Xt\x86\xbb\xe5K\x88=\x92\xe9\x04\xf70\x1e\t>\xac;\x9e\xe6\xf0+ۙ4\x1d\x1aV9Մ-g\xf3\xc7Z\x00\xf73\x0e\xe7\xa6\xcf\xc4\xfc\xe0\xb2\x1f\xa0\xbb\x1a\x81\xb3\xe4צ\x7f\xc6\b\x94͉\xad@\xac\x81\x015\x0f\xe8A\xe9B\xfb2\x81o\x9c?*\f\x8c\x15\xa8)\"\xe8\xff\x8d8\xd5!O\x17\xc5㍀\x83\xd3´\xca1;\xf7\xb0\xf4\x90x\xa6\x01\x95\x85\xc0\xaf\xf6\x82Qk\xab\xc1\x82<D\x93\xcf\r\xdb\xdf\x1c\x94\x17Q\xfaS\xe6\xcb\xd4Xƿ\x80\x1d\xc4\x1c\x9dP74\x82JK\vy\xe9)\xbchY\xbe\xcc|\xe4\x97\xdd<;3\x90J\a\xee#\xb2y\xe3\t`\xef\xef\x1f\"k\x8b\x96\xa0\x98\xd9\xffs\xde&\xb7\xa6\x0e\xf1\x7f2ͅb\xe3\xda5\"c\\K\xe21\xa2\xec`\x1b\xe5R\xe6j\b@\x187\xe1\xdb\x04\xf6bNO\x0e\x12\x011\x1a,/+WnKXQEM/AhXICYRNBeGk+WSuB+7OBuSYJTbP66Zyc=\"2\n\x1blocal-kek.kms.kubernetes.io\x12\x13encrypted-local-kek(\x01"
-	dekSourceHKDFSHA256XNonceAESGCMSeedPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", dekSourceHKDFSHA256XNonceAESGCMSeedName, legacyDataNamespace)
-	if _, err := test.writeRawRecordToETCD(dekSourceHKDFSHA256XNonceAESGCMSeedPath, []byte(dekSourceHKDFSHA256XNonceAESGCMSeedData)); err != nil {
+	dekSourceHKDFSHA256XNonceAESGCMSeedPath := test.GetETCDPathForResource(test.StorageConfig.Prefix, "", "secrets", dekSourceHKDFSHA256XNonceAESGCMSeedName, legacyDataNamespace)
+	if _, err := test.WriteRawRecordToETCD(dekSourceHKDFSHA256XNonceAESGCMSeedPath, []byte(dekSourceHKDFSHA256XNonceAESGCMSeedData)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1427,7 +1435,7 @@ resources:
 
 	ctx := testContext(t)
 
-	legacySecrets, err := test.restClient.CoreV1().Secrets(legacyDataNamespace).List(ctx, metav1.ListOptions{})
+	legacySecrets, err := test.RestClient.CoreV1().Secrets(legacyDataNamespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
