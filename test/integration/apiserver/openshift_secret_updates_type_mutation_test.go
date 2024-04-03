@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -33,7 +34,12 @@ var whitelistedSecretNamespaces = map[string]struct{}{
 	"openshift-kube-apiserver-operator":          {},
 	"openshift-kube-apiserver":                   {},
 	"openshift-kube-controller-manager-operator": {},
+	"openshift-config-managed":                   {},
 }
+
+// immortalNamespaces cannot be deleted, give the following error:
+// failed to delete namespace: "" is forbidden: this namespace may not be deleted
+var immortalNamespaces = sets.NewString("openshift-config-managed")
 
 func TestOpenShiftValidateWhiteListedSecretTypeMutationUpdateAllowed(t *testing.T) {
 	ctx := context.Background()
@@ -51,7 +57,9 @@ func TestOpenShiftValidateWhiteListedSecretTypeMutationUpdateAllowed(t *testing.
 		_, err := client.CoreV1().Namespaces().Get(ctx, whiteListedSecretNamespace, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			testNamespace := framework.CreateNamespaceOrDie(client, whiteListedSecretNamespace, t)
-			t.Cleanup(func() { framework.DeleteNamespaceOrDie(client, testNamespace, t) })
+			if !immortalNamespaces.Has(testNamespace.Name) {
+				t.Cleanup(func() { framework.DeleteNamespaceOrDie(client, testNamespace, t) })
+			}
 		} else if err != nil {
 			t.Fatal(err)
 		}
