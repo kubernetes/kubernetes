@@ -43,7 +43,11 @@ type recorderImpl struct {
 var _ EventRecorder = &recorderImpl{}
 
 func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
-	recorder.eventf(klog.Background(), regarding, related, eventtype, reason, action, note, args...)
+	recorder.eventf(klog.Background(), regarding, related, nil, eventtype, reason, action, note, args...)
+}
+
+func (recorder *recorderImpl) AnnotatedEventf(regarding runtime.Object, related runtime.Object, annotations map[string]string, eventtype, reason, action, note string, args ...interface{}) {
+	recorder.eventf(klog.Background(), regarding, related, annotations, eventtype, reason, action, note, args...)
 }
 
 type recorderImplLogger struct {
@@ -54,14 +58,18 @@ type recorderImplLogger struct {
 var _ EventRecorderLogger = &recorderImplLogger{}
 
 func (recorder *recorderImplLogger) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
-	recorder.eventf(recorder.logger, regarding, related, eventtype, reason, action, note, args...)
+	recorder.eventf(recorder.logger, regarding, related, nil, eventtype, reason, action, note, args...)
+}
+
+func (recorder *recorderImplLogger) AnnotatedEventf(regarding runtime.Object, related runtime.Object, annotations map[string]string, eventtype, reason, action, note string, args ...interface{}) {
+	recorder.eventf(recorder.logger, regarding, related, annotations, eventtype, reason, action, note, args...)
 }
 
 func (recorder *recorderImplLogger) WithLogger(logger klog.Logger) EventRecorderLogger {
 	return &recorderImplLogger{recorderImpl: recorder.recorderImpl, logger: logger}
 }
 
-func (recorder *recorderImpl) eventf(logger klog.Logger, regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+func (recorder *recorderImpl) eventf(logger klog.Logger, regarding runtime.Object, related runtime.Object, annotations map[string]string, eventtype, reason, action, note string, args ...interface{}) {
 	timestamp := metav1.MicroTime{Time: time.Now()}
 	message := fmt.Sprintf(note, args...)
 	refRegarding, err := reference.GetReference(recorder.scheme, regarding)
@@ -81,14 +89,14 @@ func (recorder *recorderImpl) eventf(logger klog.Logger, regarding runtime.Objec
 		logger.Error(nil, "Unsupported event type", "eventType", eventtype)
 		return
 	}
-	event := recorder.makeEvent(refRegarding, refRelated, timestamp, eventtype, reason, message, recorder.reportingController, recorder.reportingInstance, action)
+	event := recorder.makeEvent(refRegarding, refRelated, timestamp, annotations, eventtype, reason, message, recorder.reportingController, recorder.reportingInstance, action)
 	go func() {
 		defer utilruntime.HandleCrash()
 		recorder.Action(watch.Added, event)
 	}()
 }
 
-func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRelated *v1.ObjectReference, timestamp metav1.MicroTime, eventtype, reason, message string, reportingController string, reportingInstance string, action string) *eventsv1.Event {
+func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRelated *v1.ObjectReference, timestamp metav1.MicroTime, annotations map[string]string, eventtype, reason, message string, reportingController string, reportingInstance string, action string) *eventsv1.Event {
 	t := metav1.Time{Time: recorder.clock.Now()}
 	namespace := refRegarding.Namespace
 	if namespace == "" {
@@ -96,8 +104,9 @@ func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRel
 	}
 	return &eventsv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%v.%x", refRegarding.Name, t.UnixNano()),
-			Namespace: namespace,
+			Name:        fmt.Sprintf("%v.%x", refRegarding.Name, t.UnixNano()),
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
 		EventTime:           timestamp,
 		Series:              nil,
