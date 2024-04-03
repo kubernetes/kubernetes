@@ -126,14 +126,12 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 		Pods                   []v1.Pod
 	}
 
-	// notReady is -1 for any failure other than a timeout.
-	// Otherwise it is the number of pods that we were still
-	// waiting for.
-	notReady := int32(-1)
+	nOk := int32(0)
+	badPods := []v1.Pod{}
+	otherPods := []v1.Pod{}
+	succeededPods := []string{}
 
 	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
-		// Reset notReady at the start of a poll attempt.
-		notReady = -1
 
 		rcList, err := c.CoreV1().ReplicationControllers(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -163,11 +161,10 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			replicaOk += rs.Status.ReadyReplicas
 		}
 
-		nOk := int32(0)
-		notReady = int32(0)
-		failedPods := []v1.Pod{}
-		otherPods := []v1.Pod{}
-		succeededPods := []string{}
+		nOk = 0
+		badPods = []v1.Pod{}
+		otherPods = []v1.Pod{}
+		succeededPods = []string{}
 		for _, pod := range s.Pods {
 			res, err := testutils.PodRunningReady(&pod)
 			switch {
@@ -179,14 +176,13 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			case pod.Status.Phase == v1.PodFailed:
 				// ignore failed pods that are controlled by some controller
 				if metav1.GetControllerOf(&pod) == nil {
-					failedPods = append(failedPods, pod)
+					badPods = append(badPods, pod)
 				}
 			default:
-				notReady++
 				otherPods = append(otherPods, pod)
 			}
 		}
-		done := replicaOk == replicas && nOk >= minPods && (len(failedPods)+len(otherPods)) == 0
+		done := replicaOk == replicas && nOk >= minPods && (len(badPods)+len(otherPods)) == 0
 		if done {
 			return nil, nil
 		}
@@ -200,8 +196,8 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			if len(succeededPods) > 0 {
 				buffer.WriteString(fmt.Sprintf("Pods that completed successfully:\n%s", format.Object(succeededPods, 1)))
 			}
-			if len(failedPods) > 0 {
-				buffer.WriteString(fmt.Sprintf("Pods that failed and were not controlled by some controller:\n%s", format.Object(failedPods, 1)))
+			if len(badPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that failed and were not controlled by some controller:\n%s", format.Object(badPods, 1)))
 			}
 			if len(otherPods) > 0 {
 				buffer.WriteString(fmt.Sprintf("Pods that were neither completed nor running:\n%s", format.Object(otherPods, 1)))
@@ -211,8 +207,10 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 	}))
 
 	// An error might not be fatal.
-	if err != nil && notReady >= 0 && notReady <= allowedNotReadyPods {
-		framework.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
+	if len(badPods) == 0 && nOk < minPods && nOk+allowedNotReadyPods >= minPods {
+		framework.Logf(
+			"Only %d Pods, instead of the expected %d, are Ready, but this exceeds the minimum threshold of %d - %d = %d",
+			nOk, minPods, minPods-allowedNotReadyPods, allowedNotReadyPods, minPods)
 		return nil
 	}
 	return err
