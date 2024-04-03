@@ -96,41 +96,21 @@ package main
 
 import (
 	"flag"
+	"os"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
-	generatorargs "k8s.io/code-generator/cmd/conversion-gen/args"
 	"k8s.io/code-generator/cmd/conversion-gen/generators"
-	"k8s.io/gengo/v2"
-	"k8s.io/gengo/v2/generator"
 )
 
 func main() {
 	klog.InitFlags(nil)
-	args := generatorargs.New()
-
-	args.AddFlags(pflag.CommandLine)
-	flag.Set("logtostderr", "true")
+	_ = flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
-
-	if err := args.Validate(); err != nil {
-		klog.Fatalf("Error: %v", err)
-	}
-
-	myTargets := func(context *generator.Context) []generator.Target {
-		return generators.GetTargets(context, args)
-	}
 
 	// Run it.
-	if err := gengo.Execute(
-		generators.NameSystems(),
-		generators.DefaultNameSystem(),
-		myTargets,
-		gengo.StdBuildTag,
-		pflag.Args(),
-	); err != nil {
+	if err := generators.GenerateConversion(pflag.CommandLine, os.Args[1:]); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
 	klog.V(2).Info("Completed successfully.")

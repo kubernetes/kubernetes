@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main // import "k8s.io/code-generator"
+package execution
+
+import "fmt"
+
+func (v *Vars) Print(i ...any) {
+	_, _ = fmt.Fprint(v.Out, i...)
+}
+
+func (v *Vars) Println(i ...any) {
+	v.Print(fmt.Sprintln(i...))
+}
+
+func (v *Vars) Printf(format string, i ...any) {
+	v.Print(fmt.Sprintf(format, i...))
+}

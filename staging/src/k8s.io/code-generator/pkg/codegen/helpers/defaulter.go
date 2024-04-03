@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main // import "k8s.io/code-generator"
+package helpers
+
+import (
+	"k8s.io/code-generator/cmd/defaulter-gen/generators"
+)
+
+func (g *Generator) generateDefaulter(args *Args) error {
+	return g.generateGen(args, genConf{
+		name:          "defaulter",
+		fileSuffix:    "defaults",
+		genFn:         generators.GenerateDefaults,
+		searchPattern: "+k8s:defaulter-gen=",
+	})
+}

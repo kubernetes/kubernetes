@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main // import "k8s.io/code-generator"
+package fs
+
+import "os"
+
+// WithinDirectory changes the current working directory to dir, and then
+// executes fn. It then changes the current working directory back to the
+// original directory.
+func WithinDirectory(dir string, fn func() error) error {
+	if wd, err := os.Getwd(); err != nil {
+		return err
+	} else {
+		defer func() {
+			_ = os.Chdir(wd)
+		}()
+	}
+	if err := os.Chdir(dir); err != nil {
+		return err
+	}
+	return fn()
+}

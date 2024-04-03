@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main // import "k8s.io/code-generator"
+package golang_test
+
+import (
+	"k8s.io/code-generator/pkg/osbin/golang"
+	"testing"
+)
+
+func TestPackageOf(t *testing.T) {
+	pkg, err := golang.PackageOf(".")
+	if err != nil {
+		t.Errorf("no error expected, got %v", err)
+	}
+	want := "k8s.io/code-generator/pkg/osbin/golang"
+	if pkg != want {
+		t.Errorf("Missmatch\nwant %#v\n got %#v", want, pkg)
+	}
+}
