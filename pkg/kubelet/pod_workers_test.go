@@ -2388,46 +2388,57 @@ func Test_calculateEffectiveGracePeriod(t *testing.T) {
 	two := int64(2)
 	five := int64(5)
 	thirty := int64(30)
-	// no overrides, use what's on the spec
-	pod := newNamedPod("1", "ns", "running-pod", false)
-	pod.Spec.TerminationGracePeriodSeconds = &thirty
-	gracePeriod, _ := calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{})
-	expectedGracePeriod := int64(30)
-	if gracePeriod != expectedGracePeriod {
-		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
+	testCases := []struct {
+		desc                                 string
+		podSpecTerminationGracePeriodSeconds *int64
+		podDeletionGracePeriodSeconds        *int64
+		gracePeriodOverride                  *int64
+		expectedGracePeriod                  int64
+	}{
+		{
+			desc:                                 "use termination grace period from the spec when no overrides",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			expectedGracePeriod:                  thirty,
+		},
+		{
+			desc:                                 "use pod DeletionGracePeriodSeconds when set",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &five,
+			expectedGracePeriod:                  five,
+		},
+		{
+			desc:                                 "use grace period override when set",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &five,
+			gracePeriodOverride:                  &two,
+			expectedGracePeriod:                  two,
+		},
+		{
+			desc:                                 "use 1 when pod DeletionGracePeriodSeconds is zero",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &zero,
+			expectedGracePeriod:                  1,
+		},
+		{
+			desc:                                 "use 1 when grace period override is zero",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &five,
+			gracePeriodOverride:                  &zero,
+			expectedGracePeriod:                  1,
+		},
 	}
 
-	// pod DeletionGracePeriodSeconds is set
-	pod.DeletionGracePeriodSeconds = &five
-	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{})
-	expectedGracePeriod = five
-	if gracePeriod != expectedGracePeriod {
-		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
-	}
-
-	// grace period override
-	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{
-		PodTerminationGracePeriodSecondsOverride: &two,
-	})
-	expectedGracePeriod = two
-	if gracePeriod != expectedGracePeriod {
-		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
-	}
-
-	// pod DeletionGracePeriodSeconds is zero
-	pod.DeletionGracePeriodSeconds = &zero
-	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{})
-	expectedGracePeriod = int64(1)
-	if gracePeriod != expectedGracePeriod {
-		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
-	}
-
-	// grace period override is zero
-	gracePeriod, _ = calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{
-		PodTerminationGracePeriodSecondsOverride: &zero,
-	})
-	expectedGracePeriod = int64(1)
-	if gracePeriod != expectedGracePeriod {
-		t.Errorf("Expected a grace period of %v, but was %v", expectedGracePeriod, gracePeriod)
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			pod := newNamedPod("1", "ns", "running-pod", false)
+			pod.Spec.TerminationGracePeriodSeconds = tc.podSpecTerminationGracePeriodSeconds
+			pod.DeletionGracePeriodSeconds = tc.podDeletionGracePeriodSeconds
+			gracePeriod, _ := calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{
+				PodTerminationGracePeriodSecondsOverride: tc.gracePeriodOverride,
+			})
+			if gracePeriod != tc.expectedGracePeriod {
+				t.Errorf("Expected a grace period of %v, but was %v", tc.expectedGracePeriod, gracePeriod)
+			}
+		})
 	}
 }
