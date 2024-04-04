@@ -910,9 +910,6 @@ func (z *Tokenizer) readTagAttrKey() {
 			return
 		}
 		switch c {
-		case ' ', '\n', '\r', '\t', '\f', '/':
-			z.pendingAttr[0].end = z.raw.end - 1
-			return
 		case '=':
 			if z.pendingAttr[0].start+1 == z.raw.end {
 				// WHATWG 13.2.5.32, if we see an equals sign before the attribute name
@@ -920,7 +917,9 @@ func (z *Tokenizer) readTagAttrKey() {
 				continue
 			}
 			fallthrough
-		case '>':
+		case ' ', '\n', '\r', '\t', '\f', '/', '>':
+			// WHATWG 13.2.5.33 Attribute name state
+			// We need to reconsume the char in the after attribute name state to support the / character
 			z.raw.end--
 			z.pendingAttr[0].end = z.raw.end
 			return
@@ -937,6 +936,11 @@ func (z *Tokenizer) readTagAttrVal() {
 	}
 	c := z.readByte()
 	if z.err != nil {
+		return
+	}
+	if c == '/' {
+		// WHATWG 13.2.5.34 After attribute name state
+		// U+002F SOLIDUS (/) - Switch to the self-closing start tag state.
 		return
 	}
 	if c != '=' {
