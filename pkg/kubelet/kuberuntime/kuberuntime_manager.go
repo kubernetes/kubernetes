@@ -545,6 +545,15 @@ func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
 	return true
 }
 
+func isEphemeralContainerStatusExisted(pod *v1.Pod, name string) bool {
+	for _, c := range pod.Status.EphemeralContainerStatuses {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) bool {
 	container := pod.Spec.Containers[containerIdx]
 	if container.Resources.Limits == nil || len(pod.Status.ContainerStatuses) == 0 {
@@ -892,7 +901,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
 
 		// Ephemeral Containers are never restarted
-		if podStatus.FindContainerStatusByName(c.Name) == nil {
+		// If the ephemeral container status already exists,
+		// it does not need to be created again even if the container is deleted.
+		if podStatus.FindContainerStatusByName(c.Name) == nil && !isEphemeralContainerStatusExisted(pod, c.Name) {
 			changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
 		}
 	}
