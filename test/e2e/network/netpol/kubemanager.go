@@ -193,6 +193,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 	// simply discard it and use probeError, defined outside scope of conditionFunc, for returning the result of probeConnectivity.
 	conditionFunc := func() (bool, error) {
 		_, stderr, probeError = k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
+		framework.Logf("probe #%d :: %s/%s -> %s :: stderr - %s probeError - %v", attempt, args.nsFrom, args.podFrom, args.addrTo, stderr, probeError)
 		// retry should only occur if expected and observed value don't match.
 		if args.expectConnectivity {
 			if probeError != nil {
@@ -255,6 +256,7 @@ func (k *kubeManager) executeRemoteCommand(namespace string, pod string, contain
 		CaptureStdout:      true,
 		CaptureStderr:      true,
 		PreserveWhitespace: false,
+		Timeout:            10 * time.Second,
 	})
 }
 

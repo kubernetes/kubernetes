@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,7 @@ type ExecOptions struct {
 	// If false, whitespace in std{err,out} will be removed.
 	PreserveWhitespace bool
 	Quiet              bool
+	Timeout            time.Duration
 }
 
 // ExecWithOptions executes a command in the specified container,
@@ -77,7 +79,13 @@ func ExecWithOptions(f *framework.Framework, options ExecOptions) (string, strin
 
 	var stdout, stderr bytes.Buffer
 	framework.Logf("ExecWithOptions: execute(POST %s)", req.URL())
-	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
+	var cancel context.CancelFunc
+	ctx := context.Background()
+	if options.Timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, options.Timeout)
+		defer cancel()
+	}
+	err = execute(ctx, "POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
 	if options.PreserveWhitespace {
 		return stdout.String(), stderr.String(), err
 	}
@@ -139,12 +147,12 @@ func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, p
 	return execCommandInPodWithFullOutput(ctx, f, podName, "/bin/sh", "-c", cmd)
 }
 
-func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func execute(ctx context.Context, method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
 	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
-	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  stdin,
 		Stdout: stdout,
 		Stderr: stderr,
