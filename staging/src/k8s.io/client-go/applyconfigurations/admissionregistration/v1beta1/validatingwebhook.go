@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
@@ -27,17 +27,17 @@ import (
 // ValidatingWebhookApplyConfiguration represents an declarative configuration of the ValidatingWebhook type for use
 // with apply.
 type ValidatingWebhookApplyConfiguration struct {
-	Name                    *string                                         `json:"name,omitempty"`
-	ClientConfig            *WebhookClientConfigApplyConfiguration          `json:"clientConfig,omitempty"`
-	Rules                   []v1.RuleWithOperationsApplyConfiguration       `json:"rules,omitempty"`
-	FailurePolicy           *admissionregistrationv1beta1.FailurePolicyType `json:"failurePolicy,omitempty"`
-	MatchPolicy             *admissionregistrationv1beta1.MatchPolicyType   `json:"matchPolicy,omitempty"`
-	NamespaceSelector       *metav1.LabelSelectorApplyConfiguration         `json:"namespaceSelector,omitempty"`
-	ObjectSelector          *metav1.LabelSelectorApplyConfiguration         `json:"objectSelector,omitempty"`
-	SideEffects             *admissionregistrationv1beta1.SideEffectClass   `json:"sideEffects,omitempty"`
-	TimeoutSeconds          *int32                                          `json:"timeoutSeconds,omitempty"`
-	AdmissionReviewVersions []string                                        `json:"admissionReviewVersions,omitempty"`
-	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty"`
+	Name                    *string                                   `json:"name,omitempty"`
+	ClientConfig            *WebhookClientConfigApplyConfiguration    `json:"clientConfig,omitempty"`
+	Rules                   []v1.RuleWithOperationsApplyConfiguration `json:"rules,omitempty"`
+	FailurePolicy           *v1beta1.FailurePolicyType                `json:"failurePolicy,omitempty"`
+	MatchPolicy             *v1beta1.MatchPolicyType                  `json:"matchPolicy,omitempty"`
+	NamespaceSelector       *metav1.LabelSelectorApplyConfiguration   `json:"namespaceSelector,omitempty"`
+	ObjectSelector          *metav1.LabelSelectorApplyConfiguration   `json:"objectSelector,omitempty"`
+	SideEffects             *v1beta1.SideEffectClass                  `json:"sideEffects,omitempty"`
+	TimeoutSeconds          *int32                                    `json:"timeoutSeconds,omitempty"`
+	AdmissionReviewVersions []string                                  `json:"admissionReviewVersions,omitempty"`
+	MatchConditions         []MatchConditionApplyConfiguration        `json:"matchConditions,omitempty"`
 }
 
 // ValidatingWebhookApplyConfiguration constructs an declarative configuration of the ValidatingWebhook type for use with
@@ -78,7 +78,7 @@ func (b *ValidatingWebhookApplyConfiguration) WithRules(values ...*v1.RuleWithOp
 // WithFailurePolicy sets the FailurePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FailurePolicy field is set to the value of the last call.
-func (b *ValidatingWebhookApplyConfiguration) WithFailurePolicy(value admissionregistrationv1beta1.FailurePolicyType) *ValidatingWebhookApplyConfiguration {
+func (b *ValidatingWebhookApplyConfiguration) WithFailurePolicy(value v1beta1.FailurePolicyType) *ValidatingWebhookApplyConfiguration {
 	b.FailurePolicy = &value
 	return b
 }
@@ -86,7 +86,7 @@ func (b *ValidatingWebhookApplyConfiguration) WithFailurePolicy(value admissionr
 // WithMatchPolicy sets the MatchPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MatchPolicy field is set to the value of the last call.
-func (b *ValidatingWebhookApplyConfiguration) WithMatchPolicy(value admissionregistrationv1beta1.MatchPolicyType) *ValidatingWebhookApplyConfiguration {
+func (b *ValidatingWebhookApplyConfiguration) WithMatchPolicy(value v1beta1.MatchPolicyType) *ValidatingWebhookApplyConfiguration {
 	b.MatchPolicy = &value
 	return b
 }
@@ -110,7 +110,7 @@ func (b *ValidatingWebhookApplyConfiguration) WithObjectSelector(value *metav1.L
 // WithSideEffects sets the SideEffects field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SideEffects field is set to the value of the last call.
-func (b *ValidatingWebhookApplyConfiguration) WithSideEffects(value admissionregistrationv1beta1.SideEffectClass) *ValidatingWebhookApplyConfiguration {
+func (b *ValidatingWebhookApplyConfiguration) WithSideEffects(value v1beta1.SideEffectClass) *ValidatingWebhookApplyConfiguration {
 	b.SideEffects = &value
 	return b
 }

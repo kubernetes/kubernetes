@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func PersistentVolume(name string) *PersistentVolumeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPersistentVolume(persistentVolume *apicorev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
+func ExtractPersistentVolume(persistentVolume *corev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
 	return extractPersistentVolume(persistentVolume, fieldManager, "")
 }
 
 // ExtractPersistentVolumeStatus is the same as ExtractPersistentVolume except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPersistentVolumeStatus(persistentVolume *apicorev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
+func ExtractPersistentVolumeStatus(persistentVolume *corev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
 	return extractPersistentVolume(persistentVolume, fieldManager, "status")
 }
 
-func extractPersistentVolume(persistentVolume *apicorev1.PersistentVolume, fieldManager string, subresource string) (*PersistentVolumeApplyConfiguration, error) {
+func extractPersistentVolume(persistentVolume *corev1.PersistentVolume, fieldManager string, subresource string) (*PersistentVolumeApplyConfiguration, error) {
 	b := &PersistentVolumeApplyConfiguration{}
 	err := managedfields.ExtractInto(persistentVolume, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolume"), fieldManager, b, subresource)
 	if err != nil {

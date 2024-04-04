@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	v1alpha1 "k8s.io/api/networking/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func IPAddress(name string) *IPAddressApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractIPAddress(iPAddress *networkingv1alpha1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
+func ExtractIPAddress(iPAddress *v1alpha1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
 	return extractIPAddress(iPAddress, fieldManager, "")
 }
 
 // ExtractIPAddressStatus is the same as ExtractIPAddress except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractIPAddressStatus(iPAddress *networkingv1alpha1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
+func ExtractIPAddressStatus(iPAddress *v1alpha1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
 	return extractIPAddress(iPAddress, fieldManager, "status")
 }
 
-func extractIPAddress(iPAddress *networkingv1alpha1.IPAddress, fieldManager string, subresource string) (*IPAddressApplyConfiguration, error) {
+func extractIPAddress(iPAddress *v1alpha1.IPAddress, fieldManager string, subresource string) (*IPAddressApplyConfiguration, error) {
 	b := &IPAddressApplyConfiguration{}
 	err := managedfields.ExtractInto(iPAddress, internal.Parser().Type("io.k8s.api.networking.v1alpha1.IPAddress"), fieldManager, b, subresource)
 	if err != nil {

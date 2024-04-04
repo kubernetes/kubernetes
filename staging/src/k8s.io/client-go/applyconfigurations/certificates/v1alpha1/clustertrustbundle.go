@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	v1alpha1 "k8s.io/api/certificates/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func ClusterTrustBundle(name string) *ClusterTrustBundleApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
+func ExtractClusterTrustBundle(clusterTrustBundle *v1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
 	return extractClusterTrustBundle(clusterTrustBundle, fieldManager, "")
 }
 
 // ExtractClusterTrustBundleStatus is the same as ExtractClusterTrustBundle except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractClusterTrustBundleStatus(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
+func ExtractClusterTrustBundleStatus(clusterTrustBundle *v1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
 	return extractClusterTrustBundle(clusterTrustBundle, fieldManager, "status")
 }
 
-func extractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string, subresource string) (*ClusterTrustBundleApplyConfiguration, error) {
+func extractClusterTrustBundle(clusterTrustBundle *v1alpha1.ClusterTrustBundle, fieldManager string, subresource string) (*ClusterTrustBundleApplyConfiguration, error) {
 	b := &ClusterTrustBundleApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterTrustBundle, internal.Parser().Type("io.k8s.api.certificates.v1alpha1.ClusterTrustBundle"), fieldManager, b, subresource)
 	if err != nil {

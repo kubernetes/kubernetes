@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func ValidatingAdmissionPolicyBinding(name string) *ValidatingAdmissionPolicyBin
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *v1beta1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
 	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "")
 }
 
 // ExtractValidatingAdmissionPolicyBindingStatus is the same as ExtractValidatingAdmissionPolicyBinding except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractValidatingAdmissionPolicyBindingStatus(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyBindingStatus(validatingAdmissionPolicyBinding *v1beta1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
 	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "status")
 }
 
-func extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+func extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *v1beta1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicyBinding"), fieldManager, b, subresource)
 	if err != nil {

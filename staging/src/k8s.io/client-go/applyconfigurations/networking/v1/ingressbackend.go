@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // IngressBackendApplyConfiguration represents an declarative configuration of the IngressBackend type for use
 // with apply.
 type IngressBackendApplyConfiguration struct {
-	Service  *IngressServiceBackendApplyConfiguration            `json:"service,omitempty"`
-	Resource *corev1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`
+	Service  *IngressServiceBackendApplyConfiguration        `json:"service,omitempty"`
+	Resource *v1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`
 }
 
 // IngressBackendApplyConfiguration constructs an declarative configuration of the IngressBackend type for use with
@@ -46,7 +46,7 @@ func (b *IngressBackendApplyConfiguration) WithService(value *IngressServiceBack
 // WithResource sets the Resource field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Resource field is set to the value of the last call.
-func (b *IngressBackendApplyConfiguration) WithResource(value *corev1.TypedLocalObjectReferenceApplyConfiguration) *IngressBackendApplyConfiguration {
+func (b *IngressBackendApplyConfiguration) WithResource(value *v1.TypedLocalObjectReferenceApplyConfiguration) *IngressBackendApplyConfiguration {
 	b.Resource = value
 	return b
 }

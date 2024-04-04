@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+func ExtractReplicationController(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return extractReplicationController(replicationController, fieldManager, "")
 }
 
 // ExtractReplicationControllerStatus is the same as ExtractReplicationController except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractReplicationControllerStatus(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+func ExtractReplicationControllerStatus(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return extractReplicationController(replicationController, fieldManager, "status")
 }
 
-func extractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
+func extractReplicationController(replicationController *corev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
 	b := &ReplicationControllerApplyConfiguration{}
 	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b, subresource)
 	if err != nil {

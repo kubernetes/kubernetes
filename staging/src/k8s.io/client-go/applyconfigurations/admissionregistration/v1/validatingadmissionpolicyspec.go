@@ -19,19 +19,19 @@ limitations under the License.
 package v1
 
 import (
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 )
 
 // ValidatingAdmissionPolicySpecApplyConfiguration represents an declarative configuration of the ValidatingAdmissionPolicySpec type for use
 // with apply.
 type ValidatingAdmissionPolicySpecApplyConfiguration struct {
-	ParamKind        *ParamKindApplyConfiguration               `json:"paramKind,omitempty"`
-	MatchConstraints *MatchResourcesApplyConfiguration          `json:"matchConstraints,omitempty"`
-	Validations      []ValidationApplyConfiguration             `json:"validations,omitempty"`
-	FailurePolicy    *admissionregistrationv1.FailurePolicyType `json:"failurePolicy,omitempty"`
-	AuditAnnotations []AuditAnnotationApplyConfiguration        `json:"auditAnnotations,omitempty"`
-	MatchConditions  []MatchConditionApplyConfiguration         `json:"matchConditions,omitempty"`
-	Variables        []VariableApplyConfiguration               `json:"variables,omitempty"`
+	ParamKind        *ParamKindApplyConfiguration        `json:"paramKind,omitempty"`
+	MatchConstraints *MatchResourcesApplyConfiguration   `json:"matchConstraints,omitempty"`
+	Validations      []ValidationApplyConfiguration      `json:"validations,omitempty"`
+	FailurePolicy    *v1.FailurePolicyType               `json:"failurePolicy,omitempty"`
+	AuditAnnotations []AuditAnnotationApplyConfiguration `json:"auditAnnotations,omitempty"`
+	MatchConditions  []MatchConditionApplyConfiguration  `json:"matchConditions,omitempty"`
+	Variables        []VariableApplyConfiguration        `json:"variables,omitempty"`
 }
 
 // ValidatingAdmissionPolicySpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicySpec type for use with
@@ -72,7 +72,7 @@ func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithValidations(values
 // WithFailurePolicy sets the FailurePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FailurePolicy field is set to the value of the last call.
-func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithFailurePolicy(value admissionregistrationv1.FailurePolicyType) *ValidatingAdmissionPolicySpecApplyConfiguration {
+func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithFailurePolicy(value v1.FailurePolicyType) *ValidatingAdmissionPolicySpecApplyConfiguration {
 	b.FailurePolicy = &value
 	return b
 }

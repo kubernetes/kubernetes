@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apipolicyv1 "k8s.io/api/policy/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func PodDisruptionBudget(name, namespace string) *PodDisruptionBudgetApplyConfig
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPodDisruptionBudget(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+func ExtractPodDisruptionBudget(podDisruptionBudget *policyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "")
 }
 
 // ExtractPodDisruptionBudgetStatus is the same as ExtractPodDisruptionBudget except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *policyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "status")
 }
 
-func extractPodDisruptionBudget(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
+func extractPodDisruptionBudget(podDisruptionBudget *policyv1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	b := &PodDisruptionBudgetApplyConfiguration{}
 	err := managedfields.ExtractInto(podDisruptionBudget, internal.Parser().Type("io.k8s.api.policy.v1.PodDisruptionBudget"), fieldManager, b, subresource)
 	if err != nil {

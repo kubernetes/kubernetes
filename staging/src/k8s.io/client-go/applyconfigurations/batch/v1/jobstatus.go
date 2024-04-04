@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // JobStatusApplyConfiguration represents an declarative configuration of the JobStatus type for use
 // with apply.
 type JobStatusApplyConfiguration struct {
 	Conditions              []JobConditionApplyConfiguration           `json:"conditions,omitempty"`
-	StartTime               *metav1.Time                               `json:"startTime,omitempty"`
-	CompletionTime          *metav1.Time                               `json:"completionTime,omitempty"`
+	StartTime               *v1.Time                                   `json:"startTime,omitempty"`
+	CompletionTime          *v1.Time                                   `json:"completionTime,omitempty"`
 	Active                  *int32                                     `json:"active,omitempty"`
 	Succeeded               *int32                                     `json:"succeeded,omitempty"`
 	Failed                  *int32                                     `json:"failed,omitempty"`
@@ -60,7 +60,7 @@ func (b *JobStatusApplyConfiguration) WithConditions(values ...*JobConditionAppl
 // WithStartTime sets the StartTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StartTime field is set to the value of the last call.
-func (b *JobStatusApplyConfiguration) WithStartTime(value metav1.Time) *JobStatusApplyConfiguration {
+func (b *JobStatusApplyConfiguration) WithStartTime(value v1.Time) *JobStatusApplyConfiguration {
 	b.StartTime = &value
 	return b
 }
@@ -68,7 +68,7 @@ func (b *JobStatusApplyConfiguration) WithStartTime(value metav1.Time) *JobStatu
 // WithCompletionTime sets the CompletionTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CompletionTime field is set to the value of the last call.
-func (b *JobStatusApplyConfiguration) WithCompletionTime(value metav1.Time) *JobStatusApplyConfiguration {
+func (b *JobStatusApplyConfiguration) WithCompletionTime(value v1.Time) *JobStatusApplyConfiguration {
 	b.CompletionTime = &value
 	return b
 }

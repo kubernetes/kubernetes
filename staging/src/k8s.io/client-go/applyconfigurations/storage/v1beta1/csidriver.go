@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	v1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+func ExtractCSIDriver(cSIDriver *v1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
 	return extractCSIDriver(cSIDriver, fieldManager, "")
 }
 
 // ExtractCSIDriverStatus is the same as ExtractCSIDriver except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCSIDriverStatus(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+func ExtractCSIDriverStatus(cSIDriver *v1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
 	return extractCSIDriver(cSIDriver, fieldManager, "status")
 }
 
-func extractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
+func extractCSIDriver(cSIDriver *v1beta1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
 	b := &CSIDriverApplyConfiguration{}
 	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIDriver"), fieldManager, b, subresource)
 	if err != nil {

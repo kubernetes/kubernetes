@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 )
 
 // NamedRuleWithOperationsApplyConfiguration represents an declarative configuration of the NamedRuleWithOperations type for use
@@ -48,7 +48,7 @@ func (b *NamedRuleWithOperationsApplyConfiguration) WithResourceNames(values ...
 // WithOperations adds the given value to the Operations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Operations field.
-func (b *NamedRuleWithOperationsApplyConfiguration) WithOperations(values ...admissionregistrationv1.OperationType) *NamedRuleWithOperationsApplyConfiguration {
+func (b *NamedRuleWithOperationsApplyConfiguration) WithOperations(values ...v1.OperationType) *NamedRuleWithOperationsApplyConfiguration {
 	for i := range values {
 		b.Operations = append(b.Operations, values[i])
 	}
@@ -88,7 +88,7 @@ func (b *NamedRuleWithOperationsApplyConfiguration) WithResources(values ...stri
 // WithScope sets the Scope field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
-func (b *NamedRuleWithOperationsApplyConfiguration) WithScope(value admissionregistrationv1.ScopeType) *NamedRuleWithOperationsApplyConfiguration {
+func (b *NamedRuleWithOperationsApplyConfiguration) WithScope(value v1.ScopeType) *NamedRuleWithOperationsApplyConfiguration {
 	b.Scope = &value
 	return b
 }

@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -59,18 +59,18 @@ func ResourceClaimParameters(name, namespace string) *ResourceClaimParametersApp
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceClaimParameters(resourceClaimParameters *resourcev1alpha2.ResourceClaimParameters, fieldManager string) (*ResourceClaimParametersApplyConfiguration, error) {
+func ExtractResourceClaimParameters(resourceClaimParameters *v1alpha2.ResourceClaimParameters, fieldManager string) (*ResourceClaimParametersApplyConfiguration, error) {
 	return extractResourceClaimParameters(resourceClaimParameters, fieldManager, "")
 }
 
 // ExtractResourceClaimParametersStatus is the same as ExtractResourceClaimParameters except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceClaimParametersStatus(resourceClaimParameters *resourcev1alpha2.ResourceClaimParameters, fieldManager string) (*ResourceClaimParametersApplyConfiguration, error) {
+func ExtractResourceClaimParametersStatus(resourceClaimParameters *v1alpha2.ResourceClaimParameters, fieldManager string) (*ResourceClaimParametersApplyConfiguration, error) {
 	return extractResourceClaimParameters(resourceClaimParameters, fieldManager, "status")
 }
 
-func extractResourceClaimParameters(resourceClaimParameters *resourcev1alpha2.ResourceClaimParameters, fieldManager string, subresource string) (*ResourceClaimParametersApplyConfiguration, error) {
+func extractResourceClaimParameters(resourceClaimParameters *v1alpha2.ResourceClaimParameters, fieldManager string, subresource string) (*ResourceClaimParametersApplyConfiguration, error) {
 	b := &ResourceClaimParametersApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClaimParameters, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceClaimParameters"), fieldManager, b, subresource)
 	if err != nil {

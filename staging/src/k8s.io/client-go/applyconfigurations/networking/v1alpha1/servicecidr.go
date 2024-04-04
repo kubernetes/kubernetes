@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	v1alpha1 "k8s.io/api/networking/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func ServiceCIDR(name string) *ServiceCIDRApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractServiceCIDR(serviceCIDR *networkingv1alpha1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
+func ExtractServiceCIDR(serviceCIDR *v1alpha1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
 	return extractServiceCIDR(serviceCIDR, fieldManager, "")
 }
 
 // ExtractServiceCIDRStatus is the same as ExtractServiceCIDR except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractServiceCIDRStatus(serviceCIDR *networkingv1alpha1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
+func ExtractServiceCIDRStatus(serviceCIDR *v1alpha1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
 	return extractServiceCIDR(serviceCIDR, fieldManager, "status")
 }
 
-func extractServiceCIDR(serviceCIDR *networkingv1alpha1.ServiceCIDR, fieldManager string, subresource string) (*ServiceCIDRApplyConfiguration, error) {
+func extractServiceCIDR(serviceCIDR *v1alpha1.ServiceCIDR, fieldManager string, subresource string) (*ServiceCIDRApplyConfiguration, error) {
 	b := &ServiceCIDRApplyConfiguration{}
 	err := managedfields.ExtractInto(serviceCIDR, internal.Parser().Type("io.k8s.api.networking.v1alpha1.ServiceCIDR"), fieldManager, b, subresource)
 	if err != nil {

@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractDaemonSet(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+func ExtractDaemonSet(daemonSet *v1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
 	return extractDaemonSet(daemonSet, fieldManager, "")
 }
 
 // ExtractDaemonSetStatus is the same as ExtractDaemonSet except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractDaemonSetStatus(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+func ExtractDaemonSetStatus(daemonSet *v1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
 	return extractDaemonSet(daemonSet, fieldManager, "status")
 }
 
-func extractDaemonSet(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
+func extractDaemonSet(daemonSet *v1beta1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
 	b := &DaemonSetApplyConfiguration{}
 	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.extensions.v1beta1.DaemonSet"), fieldManager, b, subresource)
 	if err != nil {

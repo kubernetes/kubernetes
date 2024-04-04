@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // SecurityContextApplyConfiguration represents an declarative configuration of the SecurityContext type for use
@@ -34,7 +34,7 @@ type SecurityContextApplyConfiguration struct {
 	RunAsNonRoot             *bool                                            `json:"runAsNonRoot,omitempty"`
 	ReadOnlyRootFilesystem   *bool                                            `json:"readOnlyRootFilesystem,omitempty"`
 	AllowPrivilegeEscalation *bool                                            `json:"allowPrivilegeEscalation,omitempty"`
-	ProcMount                *corev1.ProcMountType                            `json:"procMount,omitempty"`
+	ProcMount                *v1.ProcMountType                                `json:"procMount,omitempty"`
 	SeccompProfile           *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty"`
 	AppArmorProfile          *AppArmorProfileApplyConfiguration               `json:"appArmorProfile,omitempty"`
 }
@@ -120,7 +120,7 @@ func (b *SecurityContextApplyConfiguration) WithAllowPrivilegeEscalation(value b
 // WithProcMount sets the ProcMount field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ProcMount field is set to the value of the last call.
-func (b *SecurityContextApplyConfiguration) WithProcMount(value corev1.ProcMountType) *SecurityContextApplyConfiguration {
+func (b *SecurityContextApplyConfiguration) WithProcMount(value v1.ProcMountType) *SecurityContextApplyConfiguration {
 	b.ProcMount = &value
 	return b
 }

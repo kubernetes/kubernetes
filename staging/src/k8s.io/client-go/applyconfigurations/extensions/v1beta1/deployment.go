@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractDeployment(deployment *extensionsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+func ExtractDeployment(deployment *v1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	return extractDeployment(deployment, fieldManager, "")
 }
 
 // ExtractDeploymentStatus is the same as ExtractDeployment except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractDeploymentStatus(deployment *extensionsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+func ExtractDeploymentStatus(deployment *v1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	return extractDeployment(deployment, fieldManager, "status")
 }
 
-func extractDeployment(deployment *extensionsv1beta1.Deployment, fieldManager string, subresource string) (*DeploymentApplyConfiguration, error) {
+func extractDeployment(deployment *v1beta1.Deployment, fieldManager string, subresource string) (*DeploymentApplyConfiguration, error) {
 	b := &DeploymentApplyConfiguration{}
 	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.extensions.v1beta1.Deployment"), fieldManager, b, subresource)
 	if err != nil {

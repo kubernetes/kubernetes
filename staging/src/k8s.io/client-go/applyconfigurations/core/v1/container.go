@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // ContainerApplyConfiguration represents an declarative configuration of the Container type for use
@@ -35,7 +35,7 @@ type ContainerApplyConfiguration struct {
 	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty"`
 	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty"`
 	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
-	RestartPolicy            *corev1.ContainerRestartPolicy            `json:"restartPolicy,omitempty"`
+	RestartPolicy            *v1.ContainerRestartPolicy                `json:"restartPolicy,omitempty"`
 	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty"`
 	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty"`
 	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty"`
@@ -43,8 +43,8 @@ type ContainerApplyConfiguration struct {
 	StartupProbe             *ProbeApplyConfiguration                  `json:"startupProbe,omitempty"`
 	Lifecycle                *LifecycleApplyConfiguration              `json:"lifecycle,omitempty"`
 	TerminationMessagePath   *string                                   `json:"terminationMessagePath,omitempty"`
-	TerminationMessagePolicy *corev1.TerminationMessagePolicy          `json:"terminationMessagePolicy,omitempty"`
-	ImagePullPolicy          *corev1.PullPolicy                        `json:"imagePullPolicy,omitempty"`
+	TerminationMessagePolicy *v1.TerminationMessagePolicy              `json:"terminationMessagePolicy,omitempty"`
+	ImagePullPolicy          *v1.PullPolicy                            `json:"imagePullPolicy,omitempty"`
 	SecurityContext          *SecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
 	Stdin                    *bool                                     `json:"stdin,omitempty"`
 	StdinOnce                *bool                                     `json:"stdinOnce,omitempty"`
@@ -164,7 +164,7 @@ func (b *ContainerApplyConfiguration) WithResizePolicy(values ...*ContainerResiz
 // WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RestartPolicy field is set to the value of the last call.
-func (b *ContainerApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *ContainerApplyConfiguration {
+func (b *ContainerApplyConfiguration) WithRestartPolicy(value v1.ContainerRestartPolicy) *ContainerApplyConfiguration {
 	b.RestartPolicy = &value
 	return b
 }
@@ -238,7 +238,7 @@ func (b *ContainerApplyConfiguration) WithTerminationMessagePath(value string) *
 // WithTerminationMessagePolicy sets the TerminationMessagePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TerminationMessagePolicy field is set to the value of the last call.
-func (b *ContainerApplyConfiguration) WithTerminationMessagePolicy(value corev1.TerminationMessagePolicy) *ContainerApplyConfiguration {
+func (b *ContainerApplyConfiguration) WithTerminationMessagePolicy(value v1.TerminationMessagePolicy) *ContainerApplyConfiguration {
 	b.TerminationMessagePolicy = &value
 	return b
 }
@@ -246,7 +246,7 @@ func (b *ContainerApplyConfiguration) WithTerminationMessagePolicy(value corev1.
 // WithImagePullPolicy sets the ImagePullPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ImagePullPolicy field is set to the value of the last call.
-func (b *ContainerApplyConfiguration) WithImagePullPolicy(value corev1.PullPolicy) *ContainerApplyConfiguration {
+func (b *ContainerApplyConfiguration) WithImagePullPolicy(value v1.PullPolicy) *ContainerApplyConfiguration {
 	b.ImagePullPolicy = &value
 	return b
 }

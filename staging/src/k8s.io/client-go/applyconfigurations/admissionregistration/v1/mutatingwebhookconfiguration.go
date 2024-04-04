@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "")
 }
 
 // ExtractMutatingWebhookConfigurationStatus is the same as ExtractMutatingWebhookConfiguration except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractMutatingWebhookConfigurationStatus(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractMutatingWebhookConfigurationStatus(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "status")
 }
 
-func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	b := &MutatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.MutatingWebhookConfiguration"), fieldManager, b, subresource)
 	if err != nil {

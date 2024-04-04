@@ -21,7 +21,7 @@ package v1
 import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // JobSpecApplyConfiguration represents an declarative configuration of the JobSpec type for use
@@ -35,7 +35,7 @@ type JobSpecApplyConfiguration struct {
 	BackoffLimit            *int32                                    `json:"backoffLimit,omitempty"`
 	BackoffLimitPerIndex    *int32                                    `json:"backoffLimitPerIndex,omitempty"`
 	MaxFailedIndexes        *int32                                    `json:"maxFailedIndexes,omitempty"`
-	Selector                *metav1.LabelSelectorApplyConfiguration   `json:"selector,omitempty"`
+	Selector                *v1.LabelSelectorApplyConfiguration       `json:"selector,omitempty"`
 	ManualSelector          *bool                                     `json:"manualSelector,omitempty"`
 	Template                *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 	TTLSecondsAfterFinished *int32                                    `json:"ttlSecondsAfterFinished,omitempty"`
@@ -118,7 +118,7 @@ func (b *JobSpecApplyConfiguration) WithMaxFailedIndexes(value int32) *JobSpecAp
 // WithSelector sets the Selector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
-func (b *JobSpecApplyConfiguration) WithSelector(value *metav1.LabelSelectorApplyConfiguration) *JobSpecApplyConfiguration {
+func (b *JobSpecApplyConfiguration) WithSelector(value *v1.LabelSelectorApplyConfiguration) *JobSpecApplyConfiguration {
 	b.Selector = value
 	return b
 }

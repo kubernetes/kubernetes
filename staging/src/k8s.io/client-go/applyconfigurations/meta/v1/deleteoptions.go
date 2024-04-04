@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DeleteOptionsApplyConfiguration represents an declarative configuration of the DeleteOptions type for use
@@ -29,7 +29,7 @@ type DeleteOptionsApplyConfiguration struct {
 	GracePeriodSeconds         *int64                           `json:"gracePeriodSeconds,omitempty"`
 	Preconditions              *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
 	OrphanDependents           *bool                            `json:"orphanDependents,omitempty"`
-	PropagationPolicy          *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty"`
+	PropagationPolicy          *v1.DeletionPropagation          `json:"propagationPolicy,omitempty"`
 	DryRun                     []string                         `json:"dryRun,omitempty"`
 }
 
@@ -85,7 +85,7 @@ func (b *DeleteOptionsApplyConfiguration) WithOrphanDependents(value bool) *Dele
 // WithPropagationPolicy sets the PropagationPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PropagationPolicy field is set to the value of the last call.
-func (b *DeleteOptionsApplyConfiguration) WithPropagationPolicy(value metav1.DeletionPropagation) *DeleteOptionsApplyConfiguration {
+func (b *DeleteOptionsApplyConfiguration) WithPropagationPolicy(value v1.DeletionPropagation) *DeleteOptionsApplyConfiguration {
 	b.PropagationPolicy = &value
 	return b
 }

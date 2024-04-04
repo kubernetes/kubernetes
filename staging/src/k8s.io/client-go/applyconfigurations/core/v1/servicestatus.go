@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ServiceStatusApplyConfiguration represents an declarative configuration of the ServiceStatus type for use
 // with apply.
 type ServiceStatusApplyConfiguration struct {
 	LoadBalancer *LoadBalancerStatusApplyConfiguration `json:"loadBalancer,omitempty"`
-	Conditions   []metav1.ConditionApplyConfiguration  `json:"conditions,omitempty"`
+	Conditions   []v1.ConditionApplyConfiguration      `json:"conditions,omitempty"`
 }
 
 // ServiceStatusApplyConfiguration constructs an declarative configuration of the ServiceStatus type for use with
@@ -46,7 +46,7 @@ func (b *ServiceStatusApplyConfiguration) WithLoadBalancer(value *LoadBalancerSt
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *ServiceStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *ServiceStatusApplyConfiguration {
+func (b *ServiceStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *ServiceStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

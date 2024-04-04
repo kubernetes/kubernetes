@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func Node(name string) *NodeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNode(node *apicorev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
+func ExtractNode(node *corev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
 	return extractNode(node, fieldManager, "")
 }
 
 // ExtractNodeStatus is the same as ExtractNode except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractNodeStatus(node *apicorev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
+func ExtractNodeStatus(node *corev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
 	return extractNode(node, fieldManager, "status")
 }
 
-func extractNode(node *apicorev1.Node, fieldManager string, subresource string) (*NodeApplyConfiguration, error) {
+func extractNode(node *corev1.Node, fieldManager string, subresource string) (*NodeApplyConfiguration, error) {
 	b := &NodeApplyConfiguration{}
 	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b, subresource)
 	if err != nil {

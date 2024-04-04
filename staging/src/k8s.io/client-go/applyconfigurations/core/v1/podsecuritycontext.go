@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // PodSecurityContextApplyConfiguration represents an declarative configuration of the PodSecurityContext type for use
@@ -33,7 +33,7 @@ type PodSecurityContextApplyConfiguration struct {
 	SupplementalGroups  []int64                                          `json:"supplementalGroups,omitempty"`
 	FSGroup             *int64                                           `json:"fsGroup,omitempty"`
 	Sysctls             []SysctlApplyConfiguration                       `json:"sysctls,omitempty"`
-	FSGroupChangePolicy *corev1.PodFSGroupChangePolicy                   `json:"fsGroupChangePolicy,omitempty"`
+	FSGroupChangePolicy *v1.PodFSGroupChangePolicy                       `json:"fsGroupChangePolicy,omitempty"`
 	SeccompProfile      *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty"`
 	AppArmorProfile     *AppArmorProfileApplyConfiguration               `json:"appArmorProfile,omitempty"`
 }
@@ -118,7 +118,7 @@ func (b *PodSecurityContextApplyConfiguration) WithSysctls(values ...*SysctlAppl
 // WithFSGroupChangePolicy sets the FSGroupChangePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FSGroupChangePolicy field is set to the value of the last call.
-func (b *PodSecurityContextApplyConfiguration) WithFSGroupChangePolicy(value corev1.PodFSGroupChangePolicy) *PodSecurityContextApplyConfiguration {
+func (b *PodSecurityContextApplyConfiguration) WithFSGroupChangePolicy(value v1.PodFSGroupChangePolicy) *PodSecurityContextApplyConfiguration {
 	b.FSGroupChangePolicy = &value
 	return b
 }

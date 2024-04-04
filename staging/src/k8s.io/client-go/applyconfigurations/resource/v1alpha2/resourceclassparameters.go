@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -59,18 +59,18 @@ func ResourceClassParameters(name, namespace string) *ResourceClassParametersApp
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceClassParameters(resourceClassParameters *resourcev1alpha2.ResourceClassParameters, fieldManager string) (*ResourceClassParametersApplyConfiguration, error) {
+func ExtractResourceClassParameters(resourceClassParameters *v1alpha2.ResourceClassParameters, fieldManager string) (*ResourceClassParametersApplyConfiguration, error) {
 	return extractResourceClassParameters(resourceClassParameters, fieldManager, "")
 }
 
 // ExtractResourceClassParametersStatus is the same as ExtractResourceClassParameters except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceClassParametersStatus(resourceClassParameters *resourcev1alpha2.ResourceClassParameters, fieldManager string) (*ResourceClassParametersApplyConfiguration, error) {
+func ExtractResourceClassParametersStatus(resourceClassParameters *v1alpha2.ResourceClassParameters, fieldManager string) (*ResourceClassParametersApplyConfiguration, error) {
 	return extractResourceClassParameters(resourceClassParameters, fieldManager, "status")
 }
 
-func extractResourceClassParameters(resourceClassParameters *resourcev1alpha2.ResourceClassParameters, fieldManager string, subresource string) (*ResourceClassParametersApplyConfiguration, error) {
+func extractResourceClassParameters(resourceClassParameters *v1alpha2.ResourceClassParameters, fieldManager string, subresource string) (*ResourceClassParametersApplyConfiguration, error) {
 	b := &ResourceClassParametersApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClassParameters, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceClassParameters"), fieldManager, b, subresource)
 	if err != nil {

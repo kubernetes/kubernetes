@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiflowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractFlowSchema(flowSchema *apiflowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
+func ExtractFlowSchema(flowSchema *flowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
 	return extractFlowSchema(flowSchema, fieldManager, "")
 }
 
 // ExtractFlowSchemaStatus is the same as ExtractFlowSchema except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractFlowSchemaStatus(flowSchema *apiflowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
+func ExtractFlowSchemaStatus(flowSchema *flowcontrolv1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
 	return extractFlowSchema(flowSchema, fieldManager, "status")
 }
 
-func extractFlowSchema(flowSchema *apiflowcontrolv1.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
+func extractFlowSchema(flowSchema *flowcontrolv1.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
 	b := &FlowSchemaApplyConfiguration{}
 	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1.FlowSchema"), fieldManager, b, subresource)
 	if err != nil {

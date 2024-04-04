@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
+	v1beta1 "k8s.io/api/coordination/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractLease(lease *coordinationv1beta1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+func ExtractLease(lease *v1beta1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
 	return extractLease(lease, fieldManager, "")
 }
 
 // ExtractLeaseStatus is the same as ExtractLease except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractLeaseStatus(lease *coordinationv1beta1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+func ExtractLeaseStatus(lease *v1beta1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
 	return extractLease(lease, fieldManager, "status")
 }
 
-func extractLease(lease *coordinationv1beta1.Lease, fieldManager string, subresource string) (*LeaseApplyConfiguration, error) {
+func extractLease(lease *v1beta1.Lease, fieldManager string, subresource string) (*LeaseApplyConfiguration, error) {
 	b := &LeaseApplyConfiguration{}
 	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1beta1.Lease"), fieldManager, b, subresource)
 	if err != nil {

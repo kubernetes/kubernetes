@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 )
 
 // ResourceClaimSpecApplyConfiguration represents an declarative configuration of the ResourceClaimSpec type for use
@@ -27,7 +27,7 @@ import (
 type ResourceClaimSpecApplyConfiguration struct {
 	ResourceClassName *string                                             `json:"resourceClassName,omitempty"`
 	ParametersRef     *ResourceClaimParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`
-	AllocationMode    *resourcev1alpha2.AllocationMode                    `json:"allocationMode,omitempty"`
+	AllocationMode    *v1alpha2.AllocationMode                            `json:"allocationMode,omitempty"`
 }
 
 // ResourceClaimSpecApplyConfiguration constructs an declarative configuration of the ResourceClaimSpec type for use with
@@ -55,7 +55,7 @@ func (b *ResourceClaimSpecApplyConfiguration) WithParametersRef(value *ResourceC
 // WithAllocationMode sets the AllocationMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AllocationMode field is set to the value of the last call.
-func (b *ResourceClaimSpecApplyConfiguration) WithAllocationMode(value resourcev1alpha2.AllocationMode) *ResourceClaimSpecApplyConfiguration {
+func (b *ResourceClaimSpecApplyConfiguration) WithAllocationMode(value v1alpha2.AllocationMode) *ResourceClaimSpecApplyConfiguration {
 	b.AllocationMode = &value
 	return b
 }

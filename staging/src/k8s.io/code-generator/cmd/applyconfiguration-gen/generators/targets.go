@@ -187,7 +187,7 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 					outPkgBase:   outputPkgBase,
 					groupVersion: gv,
 					applyConfig:  toGenerate,
-					imports:      generator.NewImportTracker(),
+					imports:      generator.NewImportTrackerForPackage(outputPkg),
 					refGraph:     refs,
 					openAPIType:  openAPIType,
 				})

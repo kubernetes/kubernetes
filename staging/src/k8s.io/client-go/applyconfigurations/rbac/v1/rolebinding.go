@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apirbacv1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRoleBinding(roleBinding *apirbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+func ExtractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
 	return extractRoleBinding(roleBinding, fieldManager, "")
 }
 
 // ExtractRoleBindingStatus is the same as ExtractRoleBinding except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractRoleBindingStatus(roleBinding *apirbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+func ExtractRoleBindingStatus(roleBinding *rbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
 	return extractRoleBinding(roleBinding, fieldManager, "status")
 }
 
-func extractRoleBinding(roleBinding *apirbacv1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
+func extractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
 	b := &RoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.RoleBinding"), fieldManager, b, subresource)
 	if err != nil {

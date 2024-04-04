@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiappsv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicaSet(replicaSet *apiappsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+func ExtractReplicaSet(replicaSet *appsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	return extractReplicaSet(replicaSet, fieldManager, "")
 }
 
 // ExtractReplicaSetStatus is the same as ExtractReplicaSet except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractReplicaSetStatus(replicaSet *apiappsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+func ExtractReplicaSetStatus(replicaSet *appsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	return extractReplicaSet(replicaSet, fieldManager, "status")
 }
 
-func extractReplicaSet(replicaSet *apiappsv1.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
+func extractReplicaSet(replicaSet *appsv1.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
 	b := &ReplicaSetApplyConfiguration{}
 	err := managedfields.ExtractInto(replicaSet, internal.Parser().Type("io.k8s.api.apps.v1.ReplicaSet"), fieldManager, b, subresource)
 	if err != nil {

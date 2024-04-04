@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // EphemeralContainerApplyConfiguration represents an declarative configuration of the EphemeralContainer type for use
@@ -142,7 +142,7 @@ func (b *EphemeralContainerApplyConfiguration) WithResizePolicy(values ...*Conta
 // WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RestartPolicy field is set to the value of the last call.
-func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *EphemeralContainerApplyConfiguration {
+func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value v1.ContainerRestartPolicy) *EphemeralContainerApplyConfiguration {
 	b.RestartPolicy = &value
 	return b
 }
@@ -216,7 +216,7 @@ func (b *EphemeralContainerApplyConfiguration) WithTerminationMessagePath(value 
 // WithTerminationMessagePolicy sets the TerminationMessagePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TerminationMessagePolicy field is set to the value of the last call.
-func (b *EphemeralContainerApplyConfiguration) WithTerminationMessagePolicy(value corev1.TerminationMessagePolicy) *EphemeralContainerApplyConfiguration {
+func (b *EphemeralContainerApplyConfiguration) WithTerminationMessagePolicy(value v1.TerminationMessagePolicy) *EphemeralContainerApplyConfiguration {
 	b.TerminationMessagePolicy = &value
 	return b
 }
@@ -224,7 +224,7 @@ func (b *EphemeralContainerApplyConfiguration) WithTerminationMessagePolicy(valu
 // WithImagePullPolicy sets the ImagePullPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ImagePullPolicy field is set to the value of the last call.
-func (b *EphemeralContainerApplyConfiguration) WithImagePullPolicy(value corev1.PullPolicy) *EphemeralContainerApplyConfiguration {
+func (b *EphemeralContainerApplyConfiguration) WithImagePullPolicy(value v1.PullPolicy) *EphemeralContainerApplyConfiguration {
 	b.ImagePullPolicy = &value
 	return b
 }

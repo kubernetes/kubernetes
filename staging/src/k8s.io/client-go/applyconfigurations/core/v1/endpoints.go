@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+func ExtractEndpoints(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
 	return extractEndpoints(endpoints, fieldManager, "")
 }
 
 // ExtractEndpointsStatus is the same as ExtractEndpoints except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractEndpointsStatus(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+func ExtractEndpointsStatus(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
 	return extractEndpoints(endpoints, fieldManager, "status")
 }
 
-func extractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
+func extractEndpoints(endpoints *corev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
 	b := &EndpointsApplyConfiguration{}
 	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b, subresource)
 	if err != nil {

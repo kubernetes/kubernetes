@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	v1alpha1 "k8s.io/api/node/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+func ExtractRuntimeClass(runtimeClass *v1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
 	return extractRuntimeClass(runtimeClass, fieldManager, "")
 }
 
 // ExtractRuntimeClassStatus is the same as ExtractRuntimeClass except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractRuntimeClassStatus(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+func ExtractRuntimeClassStatus(runtimeClass *v1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
 	return extractRuntimeClass(runtimeClass, fieldManager, "status")
 }
 
-func extractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
+func extractRuntimeClass(runtimeClass *v1alpha1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
 	b := &RuntimeClassApplyConfiguration{}
 	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1alpha1.RuntimeClass"), fieldManager, b, subresource)
 	if err != nil {

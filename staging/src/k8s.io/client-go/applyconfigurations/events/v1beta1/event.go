@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	v1beta1 "k8s.io/api/events/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -71,18 +71,18 @@ func Event(name, namespace string) *EventApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEvent(event *eventsv1beta1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+func ExtractEvent(event *v1beta1.Event, fieldManager string) (*EventApplyConfiguration, error) {
 	return extractEvent(event, fieldManager, "")
 }
 
 // ExtractEventStatus is the same as ExtractEvent except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractEventStatus(event *eventsv1beta1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+func ExtractEventStatus(event *v1beta1.Event, fieldManager string) (*EventApplyConfiguration, error) {
 	return extractEvent(event, fieldManager, "status")
 }
 
-func extractEvent(event *eventsv1beta1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
+func extractEvent(event *v1beta1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
 	b := &EventApplyConfiguration{}
 	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.events.v1beta1.Event"), fieldManager, b, subresource)
 	if err != nil {

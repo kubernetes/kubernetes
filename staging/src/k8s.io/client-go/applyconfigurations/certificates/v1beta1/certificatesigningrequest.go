@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCertificateSigningRequest(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
+func ExtractCertificateSigningRequest(certificateSigningRequest *v1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	return extractCertificateSigningRequest(certificateSigningRequest, fieldManager, "")
 }
 
 // ExtractCertificateSigningRequestStatus is the same as ExtractCertificateSigningRequest except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCertificateSigningRequestStatus(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
+func ExtractCertificateSigningRequestStatus(certificateSigningRequest *v1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	return extractCertificateSigningRequest(certificateSigningRequest, fieldManager, "status")
 }
 
-func extractCertificateSigningRequest(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string, subresource string) (*CertificateSigningRequestApplyConfiguration, error) {
+func extractCertificateSigningRequest(certificateSigningRequest *v1beta1.CertificateSigningRequest, fieldManager string, subresource string) (*CertificateSigningRequestApplyConfiguration, error) {
 	b := &CertificateSigningRequestApplyConfiguration{}
 	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1beta1.CertificateSigningRequest"), fieldManager, b, subresource)
 	if err != nil {

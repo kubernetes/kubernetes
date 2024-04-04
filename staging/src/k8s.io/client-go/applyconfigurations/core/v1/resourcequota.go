@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+func ExtractResourceQuota(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
 	return extractResourceQuota(resourceQuota, fieldManager, "")
 }
 
 // ExtractResourceQuotaStatus is the same as ExtractResourceQuota except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceQuotaStatus(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+func ExtractResourceQuotaStatus(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
 	return extractResourceQuota(resourceQuota, fieldManager, "status")
 }
 
-func extractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string, subresource string) (*ResourceQuotaApplyConfiguration, error) {
+func extractResourceQuota(resourceQuota *corev1.ResourceQuota, fieldManager string, subresource string) (*ResourceQuotaApplyConfiguration, error) {
 	b := &ResourceQuotaApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b, subresource)
 	if err != nil {

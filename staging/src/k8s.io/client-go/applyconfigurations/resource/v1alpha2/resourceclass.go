@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -60,18 +60,18 @@ func ResourceClass(name string) *ResourceClassApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceClass(resourceClass *resourcev1alpha2.ResourceClass, fieldManager string) (*ResourceClassApplyConfiguration, error) {
+func ExtractResourceClass(resourceClass *v1alpha2.ResourceClass, fieldManager string) (*ResourceClassApplyConfiguration, error) {
 	return extractResourceClass(resourceClass, fieldManager, "")
 }
 
 // ExtractResourceClassStatus is the same as ExtractResourceClass except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceClassStatus(resourceClass *resourcev1alpha2.ResourceClass, fieldManager string) (*ResourceClassApplyConfiguration, error) {
+func ExtractResourceClassStatus(resourceClass *v1alpha2.ResourceClass, fieldManager string) (*ResourceClassApplyConfiguration, error) {
 	return extractResourceClass(resourceClass, fieldManager, "status")
 }
 
-func extractResourceClass(resourceClass *resourcev1alpha2.ResourceClass, fieldManager string, subresource string) (*ResourceClassApplyConfiguration, error) {
+func extractResourceClass(resourceClass *v1alpha2.ResourceClass, fieldManager string, subresource string) (*ResourceClassApplyConfiguration, error) {
 	b := &ResourceClassApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClass, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceClass"), fieldManager, b, subresource)
 	if err != nil {

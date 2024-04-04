@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	v1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func StorageVersionMigration(name string) *StorageVersionMigrationApplyConfigura
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractStorageVersionMigration(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
+func ExtractStorageVersionMigration(storageVersionMigration *v1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
 	return extractStorageVersionMigration(storageVersionMigration, fieldManager, "")
 }
 
 // ExtractStorageVersionMigrationStatus is the same as ExtractStorageVersionMigration except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractStorageVersionMigrationStatus(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
+func ExtractStorageVersionMigrationStatus(storageVersionMigration *v1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
 	return extractStorageVersionMigration(storageVersionMigration, fieldManager, "status")
 }
 
-func extractStorageVersionMigration(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string, subresource string) (*StorageVersionMigrationApplyConfiguration, error) {
+func extractStorageVersionMigration(storageVersionMigration *v1alpha1.StorageVersionMigration, fieldManager string, subresource string) (*StorageVersionMigrationApplyConfiguration, error) {
 	b := &StorageVersionMigrationApplyConfiguration{}
 	err := managedfields.ExtractInto(storageVersionMigration, internal.Parser().Type("io.k8s.api.storagemigration.v1alpha1.StorageVersionMigration"), fieldManager, b, subresource)
 	if err != nil {

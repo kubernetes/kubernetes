@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func ResourceClaim(name, namespace string) *ResourceClaimApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceClaim(resourceClaim *resourcev1alpha2.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
+func ExtractResourceClaim(resourceClaim *v1alpha2.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
 	return extractResourceClaim(resourceClaim, fieldManager, "")
 }
 
 // ExtractResourceClaimStatus is the same as ExtractResourceClaim except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceClaimStatus(resourceClaim *resourcev1alpha2.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
+func ExtractResourceClaimStatus(resourceClaim *v1alpha2.ResourceClaim, fieldManager string) (*ResourceClaimApplyConfiguration, error) {
 	return extractResourceClaim(resourceClaim, fieldManager, "status")
 }
 
-func extractResourceClaim(resourceClaim *resourcev1alpha2.ResourceClaim, fieldManager string, subresource string) (*ResourceClaimApplyConfiguration, error) {
+func extractResourceClaim(resourceClaim *v1alpha2.ResourceClaim, fieldManager string, subresource string) (*ResourceClaimApplyConfiguration, error) {
 	b := &ResourceClaimApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClaim, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceClaim"), fieldManager, b, subresource)
 	if err != nil {

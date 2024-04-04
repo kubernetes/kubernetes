@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ValidatingAdmissionPolicyStatusApplyConfiguration represents an declarative configuration of the ValidatingAdmissionPolicyStatus type for use
 // with apply.
 type ValidatingAdmissionPolicyStatusApplyConfiguration struct {
-	ObservedGeneration *int64                               `json:"observedGeneration,omitempty"`
-	TypeChecking       *TypeCheckingApplyConfiguration      `json:"typeChecking,omitempty"`
-	Conditions         []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	ObservedGeneration *int64                           `json:"observedGeneration,omitempty"`
+	TypeChecking       *TypeCheckingApplyConfiguration  `json:"typeChecking,omitempty"`
+	Conditions         []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // ValidatingAdmissionPolicyStatusApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicyStatus type for use with
@@ -55,7 +55,7 @@ func (b *ValidatingAdmissionPolicyStatusApplyConfiguration) WithTypeChecking(val
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *ValidatingAdmissionPolicyStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *ValidatingAdmissionPolicyStatusApplyConfiguration {
+func (b *ValidatingAdmissionPolicyStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *ValidatingAdmissionPolicyStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

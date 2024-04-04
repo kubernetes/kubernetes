@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func PodSchedulingContext(name, namespace string) *PodSchedulingContextApplyConf
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPodSchedulingContext(podSchedulingContext *resourcev1alpha2.PodSchedulingContext, fieldManager string) (*PodSchedulingContextApplyConfiguration, error) {
+func ExtractPodSchedulingContext(podSchedulingContext *v1alpha2.PodSchedulingContext, fieldManager string) (*PodSchedulingContextApplyConfiguration, error) {
 	return extractPodSchedulingContext(podSchedulingContext, fieldManager, "")
 }
 
 // ExtractPodSchedulingContextStatus is the same as ExtractPodSchedulingContext except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPodSchedulingContextStatus(podSchedulingContext *resourcev1alpha2.PodSchedulingContext, fieldManager string) (*PodSchedulingContextApplyConfiguration, error) {
+func ExtractPodSchedulingContextStatus(podSchedulingContext *v1alpha2.PodSchedulingContext, fieldManager string) (*PodSchedulingContextApplyConfiguration, error) {
 	return extractPodSchedulingContext(podSchedulingContext, fieldManager, "status")
 }
 
-func extractPodSchedulingContext(podSchedulingContext *resourcev1alpha2.PodSchedulingContext, fieldManager string, subresource string) (*PodSchedulingContextApplyConfiguration, error) {
+func extractPodSchedulingContext(podSchedulingContext *v1alpha2.PodSchedulingContext, fieldManager string, subresource string) (*PodSchedulingContextApplyConfiguration, error) {
 	b := &PodSchedulingContextApplyConfiguration{}
 	err := managedfields.ExtractInto(podSchedulingContext, internal.Parser().Type("io.k8s.api.resource.v1alpha2.PodSchedulingContext"), fieldManager, b, subresource)
 	if err != nil {

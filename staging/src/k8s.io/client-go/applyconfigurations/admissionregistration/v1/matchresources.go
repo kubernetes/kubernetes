@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -30,7 +30,7 @@ type MatchResourcesApplyConfiguration struct {
 	ObjectSelector       *v1.LabelSelectorApplyConfiguration         `json:"objectSelector,omitempty"`
 	ResourceRules        []NamedRuleWithOperationsApplyConfiguration `json:"resourceRules,omitempty"`
 	ExcludeResourceRules []NamedRuleWithOperationsApplyConfiguration `json:"excludeResourceRules,omitempty"`
-	MatchPolicy          *apiadmissionregistrationv1.MatchPolicyType `json:"matchPolicy,omitempty"`
+	MatchPolicy          *admissionregistrationv1.MatchPolicyType    `json:"matchPolicy,omitempty"`
 }
 
 // MatchResourcesApplyConfiguration constructs an declarative configuration of the MatchResources type for use with
@@ -84,7 +84,7 @@ func (b *MatchResourcesApplyConfiguration) WithExcludeResourceRules(values ...*N
 // WithMatchPolicy sets the MatchPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MatchPolicy field is set to the value of the last call.
-func (b *MatchResourcesApplyConfiguration) WithMatchPolicy(value apiadmissionregistrationv1.MatchPolicyType) *MatchResourcesApplyConfiguration {
+func (b *MatchResourcesApplyConfiguration) WithMatchPolicy(value admissionregistrationv1.MatchPolicyType) *MatchResourcesApplyConfiguration {
 	b.MatchPolicy = &value
 	return b
 }

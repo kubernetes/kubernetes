@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+func ExtractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
 	return extractComponentStatus(componentStatus, fieldManager, "")
 }
 
 // ExtractComponentStatusStatus is the same as ExtractComponentStatus except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractComponentStatusStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+func ExtractComponentStatusStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
 	return extractComponentStatus(componentStatus, fieldManager, "status")
 }
 
-func extractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
+func extractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
 	b := &ComponentStatusApplyConfiguration{}
 	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b, subresource)
 	if err != nil {

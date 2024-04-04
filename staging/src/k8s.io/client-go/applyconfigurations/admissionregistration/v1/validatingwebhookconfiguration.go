@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	return extractValidatingWebhookConfiguration(validatingWebhookConfiguration, fieldManager, "")
 }
 
 // ExtractValidatingWebhookConfigurationStatus is the same as ExtractValidatingWebhookConfiguration except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractValidatingWebhookConfigurationStatus(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractValidatingWebhookConfigurationStatus(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	return extractValidatingWebhookConfiguration(validatingWebhookConfiguration, fieldManager, "status")
 }
 
-func extractValidatingWebhookConfiguration(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string, subresource string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+func extractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string, subresource string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	b := &ValidatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"), fieldManager, b, subresource)
 	if err != nil {

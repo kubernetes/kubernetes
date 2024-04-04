@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func ResourceSlice(name string) *ResourceSliceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceSlice(resourceSlice *resourcev1alpha2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
+func ExtractResourceSlice(resourceSlice *v1alpha2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
 	return extractResourceSlice(resourceSlice, fieldManager, "")
 }
 
 // ExtractResourceSliceStatus is the same as ExtractResourceSlice except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceSliceStatus(resourceSlice *resourcev1alpha2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
+func ExtractResourceSliceStatus(resourceSlice *v1alpha2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
 	return extractResourceSlice(resourceSlice, fieldManager, "status")
 }
 
-func extractResourceSlice(resourceSlice *resourcev1alpha2.ResourceSlice, fieldManager string, subresource string) (*ResourceSliceApplyConfiguration, error) {
+func extractResourceSlice(resourceSlice *v1alpha2.ResourceSlice, fieldManager string, subresource string) (*ResourceSliceApplyConfiguration, error) {
 	b := &ResourceSliceApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceSlice, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceSlice"), fieldManager, b, subresource)
 	if err != nil {

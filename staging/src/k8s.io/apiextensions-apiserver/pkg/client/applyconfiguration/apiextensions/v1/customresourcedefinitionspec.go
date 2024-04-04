@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 // CustomResourceDefinitionSpecApplyConfiguration represents an declarative configuration of the CustomResourceDefinitionSpec type for use
@@ -27,7 +27,7 @@ import (
 type CustomResourceDefinitionSpecApplyConfiguration struct {
 	Group                 *string                                             `json:"group,omitempty"`
 	Names                 *CustomResourceDefinitionNamesApplyConfiguration    `json:"names,omitempty"`
-	Scope                 *apiextensionsv1.ResourceScope                      `json:"scope,omitempty"`
+	Scope                 *v1.ResourceScope                                   `json:"scope,omitempty"`
 	Versions              []CustomResourceDefinitionVersionApplyConfiguration `json:"versions,omitempty"`
 	Conversion            *CustomResourceConversionApplyConfiguration         `json:"conversion,omitempty"`
 	PreserveUnknownFields *bool                                               `json:"preserveUnknownFields,omitempty"`
@@ -58,7 +58,7 @@ func (b *CustomResourceDefinitionSpecApplyConfiguration) WithNames(value *Custom
 // WithScope sets the Scope field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
-func (b *CustomResourceDefinitionSpecApplyConfiguration) WithScope(value apiextensionsv1.ResourceScope) *CustomResourceDefinitionSpecApplyConfiguration {
+func (b *CustomResourceDefinitionSpecApplyConfiguration) WithScope(value v1.ResourceScope) *CustomResourceDefinitionSpecApplyConfiguration {
 	b.Scope = &value
 	return b
 }

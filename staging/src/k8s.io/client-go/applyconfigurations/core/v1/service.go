@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func Service(name, namespace string) *ServiceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractService(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+func ExtractService(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return extractService(service, fieldManager, "")
 }
 
 // ExtractServiceStatus is the same as ExtractService except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractServiceStatus(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+func ExtractServiceStatus(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return extractService(service, fieldManager, "status")
 }
 
-func extractService(service *apicorev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
+func extractService(service *corev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
 	b := &ServiceApplyConfiguration{}
 	err := managedfields.ExtractInto(service, internal.Parser().Type("io.k8s.api.core.v1.Service"), fieldManager, b, subresource)
 	if err != nil {

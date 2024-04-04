@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -59,18 +59,18 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+func ExtractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
 	return extractServiceAccount(serviceAccount, fieldManager, "")
 }
 
 // ExtractServiceAccountStatus is the same as ExtractServiceAccount except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractServiceAccountStatus(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+func ExtractServiceAccountStatus(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
 	return extractServiceAccount(serviceAccount, fieldManager, "status")
 }
 
-func extractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
+func extractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
 	b := &ServiceAccountApplyConfiguration{}
 	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b, subresource)
 	if err != nil {

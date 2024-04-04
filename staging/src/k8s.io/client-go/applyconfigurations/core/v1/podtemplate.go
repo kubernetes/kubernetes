@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func PodTemplate(name, namespace string) *PodTemplateApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPodTemplate(podTemplate *apicorev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
+func ExtractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
 	return extractPodTemplate(podTemplate, fieldManager, "")
 }
 
 // ExtractPodTemplateStatus is the same as ExtractPodTemplate except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPodTemplateStatus(podTemplate *apicorev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
+func ExtractPodTemplateStatus(podTemplate *corev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
 	return extractPodTemplate(podTemplate, fieldManager, "status")
 }
 
-func extractPodTemplate(podTemplate *apicorev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
+func extractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
 	b := &PodTemplateApplyConfiguration{}
 	err := managedfields.ExtractInto(podTemplate, internal.Parser().Type("io.k8s.api.core.v1.PodTemplate"), fieldManager, b, subresource)
 	if err != nil {

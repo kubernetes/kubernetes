@@ -19,20 +19,20 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // EndpointApplyConfiguration represents an declarative configuration of the Endpoint type for use
 // with apply.
 type EndpointApplyConfiguration struct {
-	Addresses          []string                                  `json:"addresses,omitempty"`
-	Conditions         *EndpointConditionsApplyConfiguration     `json:"conditions,omitempty"`
-	Hostname           *string                                   `json:"hostname,omitempty"`
-	TargetRef          *corev1.ObjectReferenceApplyConfiguration `json:"targetRef,omitempty"`
-	DeprecatedTopology map[string]string                         `json:"deprecatedTopology,omitempty"`
-	NodeName           *string                                   `json:"nodeName,omitempty"`
-	Zone               *string                                   `json:"zone,omitempty"`
-	Hints              *EndpointHintsApplyConfiguration          `json:"hints,omitempty"`
+	Addresses          []string                              `json:"addresses,omitempty"`
+	Conditions         *EndpointConditionsApplyConfiguration `json:"conditions,omitempty"`
+	Hostname           *string                               `json:"hostname,omitempty"`
+	TargetRef          *v1.ObjectReferenceApplyConfiguration `json:"targetRef,omitempty"`
+	DeprecatedTopology map[string]string                     `json:"deprecatedTopology,omitempty"`
+	NodeName           *string                               `json:"nodeName,omitempty"`
+	Zone               *string                               `json:"zone,omitempty"`
+	Hints              *EndpointHintsApplyConfiguration      `json:"hints,omitempty"`
 }
 
 // EndpointApplyConfiguration constructs an declarative configuration of the Endpoint type for use with
@@ -70,7 +70,7 @@ func (b *EndpointApplyConfiguration) WithHostname(value string) *EndpointApplyCo
 // WithTargetRef sets the TargetRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TargetRef field is set to the value of the last call.
-func (b *EndpointApplyConfiguration) WithTargetRef(value *corev1.ObjectReferenceApplyConfiguration) *EndpointApplyConfiguration {
+func (b *EndpointApplyConfiguration) WithTargetRef(value *v1.ObjectReferenceApplyConfiguration) *EndpointApplyConfiguration {
 	b.TargetRef = value
 	return b
 }

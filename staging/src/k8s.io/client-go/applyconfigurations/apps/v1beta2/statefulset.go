@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	v1beta2 "k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractStatefulSet(statefulSet *appsv1beta2.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+func ExtractStatefulSet(statefulSet *v1beta2.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
 	return extractStatefulSet(statefulSet, fieldManager, "")
 }
 
 // ExtractStatefulSetStatus is the same as ExtractStatefulSet except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractStatefulSetStatus(statefulSet *appsv1beta2.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+func ExtractStatefulSetStatus(statefulSet *v1beta2.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
 	return extractStatefulSet(statefulSet, fieldManager, "status")
 }
 
-func extractStatefulSet(statefulSet *appsv1beta2.StatefulSet, fieldManager string, subresource string) (*StatefulSetApplyConfiguration, error) {
+func extractStatefulSet(statefulSet *v1beta2.StatefulSet, fieldManager string, subresource string) (*StatefulSetApplyConfiguration, error) {
 	b := &StatefulSetApplyConfiguration{}
 	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.StatefulSet"), fieldManager, b, subresource)
 	if err != nil {

@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractClusterRole(clusterRole *rbacv1alpha1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
+func ExtractClusterRole(clusterRole *v1alpha1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
 	return extractClusterRole(clusterRole, fieldManager, "")
 }
 
 // ExtractClusterRoleStatus is the same as ExtractClusterRole except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractClusterRoleStatus(clusterRole *rbacv1alpha1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
+func ExtractClusterRoleStatus(clusterRole *v1alpha1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
 	return extractClusterRole(clusterRole, fieldManager, "status")
 }
 
-func extractClusterRole(clusterRole *rbacv1alpha1.ClusterRole, fieldManager string, subresource string) (*ClusterRoleApplyConfiguration, error) {
+func extractClusterRole(clusterRole *v1alpha1.ClusterRole, fieldManager string, subresource string) (*ClusterRoleApplyConfiguration, error) {
 	b := &ClusterRoleApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1alpha1.ClusterRole"), fieldManager, b, subresource)
 	if err != nil {

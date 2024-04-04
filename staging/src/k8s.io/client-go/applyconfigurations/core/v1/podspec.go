@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // PodSpecApplyConfiguration represents an declarative configuration of the PodSpec type for use
@@ -29,10 +29,10 @@ type PodSpecApplyConfiguration struct {
 	InitContainers                []ContainerApplyConfiguration                `json:"initContainers,omitempty"`
 	Containers                    []ContainerApplyConfiguration                `json:"containers,omitempty"`
 	EphemeralContainers           []EphemeralContainerApplyConfiguration       `json:"ephemeralContainers,omitempty"`
-	RestartPolicy                 *corev1.RestartPolicy                        `json:"restartPolicy,omitempty"`
+	RestartPolicy                 *v1.RestartPolicy                            `json:"restartPolicy,omitempty"`
 	TerminationGracePeriodSeconds *int64                                       `json:"terminationGracePeriodSeconds,omitempty"`
 	ActiveDeadlineSeconds         *int64                                       `json:"activeDeadlineSeconds,omitempty"`
-	DNSPolicy                     *corev1.DNSPolicy                            `json:"dnsPolicy,omitempty"`
+	DNSPolicy                     *v1.DNSPolicy                                `json:"dnsPolicy,omitempty"`
 	NodeSelector                  map[string]string                            `json:"nodeSelector,omitempty"`
 	ServiceAccountName            *string                                      `json:"serviceAccountName,omitempty"`
 	DeprecatedServiceAccount      *string                                      `json:"serviceAccount,omitempty"`
@@ -56,8 +56,8 @@ type PodSpecApplyConfiguration struct {
 	ReadinessGates                []PodReadinessGateApplyConfiguration         `json:"readinessGates,omitempty"`
 	RuntimeClassName              *string                                      `json:"runtimeClassName,omitempty"`
 	EnableServiceLinks            *bool                                        `json:"enableServiceLinks,omitempty"`
-	PreemptionPolicy              *corev1.PreemptionPolicy                     `json:"preemptionPolicy,omitempty"`
-	Overhead                      *corev1.ResourceList                         `json:"overhead,omitempty"`
+	PreemptionPolicy              *v1.PreemptionPolicy                         `json:"preemptionPolicy,omitempty"`
+	Overhead                      *v1.ResourceList                             `json:"overhead,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraintApplyConfiguration `json:"topologySpreadConstraints,omitempty"`
 	SetHostnameAsFQDN             *bool                                        `json:"setHostnameAsFQDN,omitempty"`
 	OS                            *PodOSApplyConfiguration                     `json:"os,omitempty"`
@@ -127,7 +127,7 @@ func (b *PodSpecApplyConfiguration) WithEphemeralContainers(values ...*Ephemeral
 // WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RestartPolicy field is set to the value of the last call.
-func (b *PodSpecApplyConfiguration) WithRestartPolicy(value corev1.RestartPolicy) *PodSpecApplyConfiguration {
+func (b *PodSpecApplyConfiguration) WithRestartPolicy(value v1.RestartPolicy) *PodSpecApplyConfiguration {
 	b.RestartPolicy = &value
 	return b
 }
@@ -151,7 +151,7 @@ func (b *PodSpecApplyConfiguration) WithActiveDeadlineSeconds(value int64) *PodS
 // WithDNSPolicy sets the DNSPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DNSPolicy field is set to the value of the last call.
-func (b *PodSpecApplyConfiguration) WithDNSPolicy(value corev1.DNSPolicy) *PodSpecApplyConfiguration {
+func (b *PodSpecApplyConfiguration) WithDNSPolicy(value v1.DNSPolicy) *PodSpecApplyConfiguration {
 	b.DNSPolicy = &value
 	return b
 }
@@ -369,7 +369,7 @@ func (b *PodSpecApplyConfiguration) WithEnableServiceLinks(value bool) *PodSpecA
 // WithPreemptionPolicy sets the PreemptionPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PreemptionPolicy field is set to the value of the last call.
-func (b *PodSpecApplyConfiguration) WithPreemptionPolicy(value corev1.PreemptionPolicy) *PodSpecApplyConfiguration {
+func (b *PodSpecApplyConfiguration) WithPreemptionPolicy(value v1.PreemptionPolicy) *PodSpecApplyConfiguration {
 	b.PreemptionPolicy = &value
 	return b
 }
@@ -377,7 +377,7 @@ func (b *PodSpecApplyConfiguration) WithPreemptionPolicy(value corev1.Preemption
 // WithOverhead sets the Overhead field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Overhead field is set to the value of the last call.
-func (b *PodSpecApplyConfiguration) WithOverhead(value corev1.ResourceList) *PodSpecApplyConfiguration {
+func (b *PodSpecApplyConfiguration) WithOverhead(value v1.ResourceList) *PodSpecApplyConfiguration {
 	b.Overhead = &value
 	return b
 }

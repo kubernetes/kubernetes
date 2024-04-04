@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	v1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+func ExtractImageReview(imageReview *v1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
 	return extractImageReview(imageReview, fieldManager, "")
 }
 
 // ExtractImageReviewStatus is the same as ExtractImageReview except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+func ExtractImageReviewStatus(imageReview *v1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
 	return extractImageReview(imageReview, fieldManager, "status")
 }
 
-func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
+func extractImageReview(imageReview *v1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
 	b := &ImageReviewApplyConfiguration{}
 	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
 	if err != nil {

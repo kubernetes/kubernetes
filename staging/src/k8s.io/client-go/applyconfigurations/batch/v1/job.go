@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apibatchv1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func Job(name, namespace string) *JobApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractJob(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+func ExtractJob(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
 	return extractJob(job, fieldManager, "")
 }
 
 // ExtractJobStatus is the same as ExtractJob except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractJobStatus(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+func ExtractJobStatus(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
 	return extractJob(job, fieldManager, "status")
 }
 
-func extractJob(job *apibatchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
+func extractJob(job *batchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
 	b := &JobApplyConfiguration{}
 	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b, subresource)
 	if err != nil {

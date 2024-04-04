@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func ValidatingAdmissionPolicy(name string) *ValidatingAdmissionPolicyApplyConfi
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1beta1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *v1beta1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "")
 }
 
 // ExtractValidatingAdmissionPolicyStatus is the same as ExtractValidatingAdmissionPolicy except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *admissionregistrationv1beta1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *v1beta1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "status")
 }
 
-func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1beta1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *v1beta1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicy, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicy"), fieldManager, b, subresource)
 	if err != nil {

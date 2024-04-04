@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	v1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractClusterRoleBinding(clusterRoleBinding *rbacv1beta1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
+func ExtractClusterRoleBinding(clusterRoleBinding *v1beta1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
 	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "")
 }
 
 // ExtractClusterRoleBindingStatus is the same as ExtractClusterRoleBinding except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractClusterRoleBindingStatus(clusterRoleBinding *rbacv1beta1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
+func ExtractClusterRoleBindingStatus(clusterRoleBinding *v1beta1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
 	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "status")
 }
 
-func extractClusterRoleBinding(clusterRoleBinding *rbacv1beta1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
+func extractClusterRoleBinding(clusterRoleBinding *v1beta1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
 	b := &ClusterRoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterRoleBinding, internal.Parser().Type("io.k8s.api.rbac.v1beta1.ClusterRoleBinding"), fieldManager, b, subresource)
 	if err != nil {

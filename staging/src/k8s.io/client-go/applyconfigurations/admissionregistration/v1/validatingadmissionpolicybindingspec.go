@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 )
 
 // ValidatingAdmissionPolicyBindingSpecApplyConfiguration represents an declarative configuration of the ValidatingAdmissionPolicyBindingSpec type for use
 // with apply.
 type ValidatingAdmissionPolicyBindingSpecApplyConfiguration struct {
-	PolicyName        *string                                    `json:"policyName,omitempty"`
-	ParamRef          *ParamRefApplyConfiguration                `json:"paramRef,omitempty"`
-	MatchResources    *MatchResourcesApplyConfiguration          `json:"matchResources,omitempty"`
-	ValidationActions []admissionregistrationv1.ValidationAction `json:"validationActions,omitempty"`
+	PolicyName        *string                           `json:"policyName,omitempty"`
+	ParamRef          *ParamRefApplyConfiguration       `json:"paramRef,omitempty"`
+	MatchResources    *MatchResourcesApplyConfiguration `json:"matchResources,omitempty"`
+	ValidationActions []v1.ValidationAction             `json:"validationActions,omitempty"`
 }
 
 // ValidatingAdmissionPolicyBindingSpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicyBindingSpec type for use with
@@ -64,7 +64,7 @@ func (b *ValidatingAdmissionPolicyBindingSpecApplyConfiguration) WithMatchResour
 // WithValidationActions adds the given value to the ValidationActions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ValidationActions field.
-func (b *ValidatingAdmissionPolicyBindingSpecApplyConfiguration) WithValidationActions(values ...admissionregistrationv1.ValidationAction) *ValidatingAdmissionPolicyBindingSpecApplyConfiguration {
+func (b *ValidatingAdmissionPolicyBindingSpecApplyConfiguration) WithValidationActions(values ...v1.ValidationAction) *ValidatingAdmissionPolicyBindingSpecApplyConfiguration {
 	for i := range values {
 		b.ValidationActions = append(b.ValidationActions, values[i])
 	}

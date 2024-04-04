@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apistoragev1 "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func VolumeAttachment(name string) *VolumeAttachmentApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+func ExtractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
 	return extractVolumeAttachment(volumeAttachment, fieldManager, "")
 }
 
 // ExtractVolumeAttachmentStatus is the same as ExtractVolumeAttachment except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractVolumeAttachmentStatus(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+func ExtractVolumeAttachmentStatus(volumeAttachment *storagev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
 	return extractVolumeAttachment(volumeAttachment, fieldManager, "status")
 }
 
-func extractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string, subresource string) (*VolumeAttachmentApplyConfiguration, error) {
+func extractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, fieldManager string, subresource string) (*VolumeAttachmentApplyConfiguration, error) {
 	b := &VolumeAttachmentApplyConfiguration{}
 	err := managedfields.ExtractInto(volumeAttachment, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttachment"), fieldManager, b, subresource)
 	if err != nil {

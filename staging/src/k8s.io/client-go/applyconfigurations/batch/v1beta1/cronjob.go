@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	v1beta1 "k8s.io/api/batch/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func CronJob(name, namespace string) *CronJobApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCronJob(cronJob *batchv1beta1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
+func ExtractCronJob(cronJob *v1beta1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
 	return extractCronJob(cronJob, fieldManager, "")
 }
 
 // ExtractCronJobStatus is the same as ExtractCronJob except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCronJobStatus(cronJob *batchv1beta1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
+func ExtractCronJobStatus(cronJob *v1beta1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
 	return extractCronJob(cronJob, fieldManager, "status")
 }
 
-func extractCronJob(cronJob *batchv1beta1.CronJob, fieldManager string, subresource string) (*CronJobApplyConfiguration, error) {
+func extractCronJob(cronJob *v1beta1.CronJob, fieldManager string, subresource string) (*CronJobApplyConfiguration, error) {
 	b := &CronJobApplyConfiguration{}
 	err := managedfields.ExtractInto(cronJob, internal.Parser().Type("io.k8s.api.batch.v1beta1.CronJob"), fieldManager, b, subresource)
 	if err != nil {

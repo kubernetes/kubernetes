@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // ServiceSpecApplyConfiguration represents an declarative configuration of the ServiceSpec type for use
@@ -29,21 +29,21 @@ type ServiceSpecApplyConfiguration struct {
 	Selector                      map[string]string                        `json:"selector,omitempty"`
 	ClusterIP                     *string                                  `json:"clusterIP,omitempty"`
 	ClusterIPs                    []string                                 `json:"clusterIPs,omitempty"`
-	Type                          *corev1.ServiceType                      `json:"type,omitempty"`
+	Type                          *v1.ServiceType                          `json:"type,omitempty"`
 	ExternalIPs                   []string                                 `json:"externalIPs,omitempty"`
-	SessionAffinity               *corev1.ServiceAffinity                  `json:"sessionAffinity,omitempty"`
+	SessionAffinity               *v1.ServiceAffinity                      `json:"sessionAffinity,omitempty"`
 	LoadBalancerIP                *string                                  `json:"loadBalancerIP,omitempty"`
 	LoadBalancerSourceRanges      []string                                 `json:"loadBalancerSourceRanges,omitempty"`
 	ExternalName                  *string                                  `json:"externalName,omitempty"`
-	ExternalTrafficPolicy         *corev1.ServiceExternalTrafficPolicy     `json:"externalTrafficPolicy,omitempty"`
+	ExternalTrafficPolicy         *v1.ServiceExternalTrafficPolicy         `json:"externalTrafficPolicy,omitempty"`
 	HealthCheckNodePort           *int32                                   `json:"healthCheckNodePort,omitempty"`
 	PublishNotReadyAddresses      *bool                                    `json:"publishNotReadyAddresses,omitempty"`
 	SessionAffinityConfig         *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty"`
-	IPFamilies                    []corev1.IPFamily                        `json:"ipFamilies,omitempty"`
-	IPFamilyPolicy                *corev1.IPFamilyPolicy                   `json:"ipFamilyPolicy,omitempty"`
+	IPFamilies                    []v1.IPFamily                            `json:"ipFamilies,omitempty"`
+	IPFamilyPolicy                *v1.IPFamilyPolicy                       `json:"ipFamilyPolicy,omitempty"`
 	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
 	LoadBalancerClass             *string                                  `json:"loadBalancerClass,omitempty"`
-	InternalTrafficPolicy         *corev1.ServiceInternalTrafficPolicy     `json:"internalTrafficPolicy,omitempty"`
+	InternalTrafficPolicy         *v1.ServiceInternalTrafficPolicy         `json:"internalTrafficPolicy,omitempty"`
 	TrafficDistribution           *string                                  `json:"trafficDistribution,omitempty"`
 }
 
@@ -101,7 +101,7 @@ func (b *ServiceSpecApplyConfiguration) WithClusterIPs(values ...string) *Servic
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *ServiceSpecApplyConfiguration) WithType(value corev1.ServiceType) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithType(value v1.ServiceType) *ServiceSpecApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -119,7 +119,7 @@ func (b *ServiceSpecApplyConfiguration) WithExternalIPs(values ...string) *Servi
 // WithSessionAffinity sets the SessionAffinity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SessionAffinity field is set to the value of the last call.
-func (b *ServiceSpecApplyConfiguration) WithSessionAffinity(value corev1.ServiceAffinity) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithSessionAffinity(value v1.ServiceAffinity) *ServiceSpecApplyConfiguration {
 	b.SessionAffinity = &value
 	return b
 }
@@ -153,7 +153,7 @@ func (b *ServiceSpecApplyConfiguration) WithExternalName(value string) *ServiceS
 // WithExternalTrafficPolicy sets the ExternalTrafficPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ExternalTrafficPolicy field is set to the value of the last call.
-func (b *ServiceSpecApplyConfiguration) WithExternalTrafficPolicy(value corev1.ServiceExternalTrafficPolicy) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithExternalTrafficPolicy(value v1.ServiceExternalTrafficPolicy) *ServiceSpecApplyConfiguration {
 	b.ExternalTrafficPolicy = &value
 	return b
 }
@@ -185,7 +185,7 @@ func (b *ServiceSpecApplyConfiguration) WithSessionAffinityConfig(value *Session
 // WithIPFamilies adds the given value to the IPFamilies field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the IPFamilies field.
-func (b *ServiceSpecApplyConfiguration) WithIPFamilies(values ...corev1.IPFamily) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithIPFamilies(values ...v1.IPFamily) *ServiceSpecApplyConfiguration {
 	for i := range values {
 		b.IPFamilies = append(b.IPFamilies, values[i])
 	}
@@ -195,7 +195,7 @@ func (b *ServiceSpecApplyConfiguration) WithIPFamilies(values ...corev1.IPFamily
 // WithIPFamilyPolicy sets the IPFamilyPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the IPFamilyPolicy field is set to the value of the last call.
-func (b *ServiceSpecApplyConfiguration) WithIPFamilyPolicy(value corev1.IPFamilyPolicy) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithIPFamilyPolicy(value v1.IPFamilyPolicy) *ServiceSpecApplyConfiguration {
 	b.IPFamilyPolicy = &value
 	return b
 }
@@ -219,7 +219,7 @@ func (b *ServiceSpecApplyConfiguration) WithLoadBalancerClass(value string) *Ser
 // WithInternalTrafficPolicy sets the InternalTrafficPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the InternalTrafficPolicy field is set to the value of the last call.
-func (b *ServiceSpecApplyConfiguration) WithInternalTrafficPolicy(value corev1.ServiceInternalTrafficPolicy) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithInternalTrafficPolicy(value v1.ServiceInternalTrafficPolicy) *ServiceSpecApplyConfiguration {
 	b.InternalTrafficPolicy = &value
 	return b
 }

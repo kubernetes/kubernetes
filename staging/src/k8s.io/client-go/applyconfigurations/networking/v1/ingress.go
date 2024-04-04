@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apinetworkingv1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -58,18 +58,18 @@ func Ingress(name, namespace string) *IngressApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractIngress(ingress *apinetworkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+func ExtractIngress(ingress *networkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
 	return extractIngress(ingress, fieldManager, "")
 }
 
 // ExtractIngressStatus is the same as ExtractIngress except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractIngressStatus(ingress *apinetworkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+func ExtractIngressStatus(ingress *networkingv1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
 	return extractIngress(ingress, fieldManager, "status")
 }
 
-func extractIngress(ingress *apinetworkingv1.Ingress, fieldManager string, subresource string) (*IngressApplyConfiguration, error) {
+func extractIngress(ingress *networkingv1.Ingress, fieldManager string, subresource string) (*IngressApplyConfiguration, error) {
 	b := &IngressApplyConfiguration{}
 	err := managedfields.ExtractInto(ingress, internal.Parser().Type("io.k8s.api.networking.v1.Ingress"), fieldManager, b, subresource)
 	if err != nil {

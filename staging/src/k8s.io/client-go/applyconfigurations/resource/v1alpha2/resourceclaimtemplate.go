@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func ResourceClaimTemplate(name, namespace string) *ResourceClaimTemplateApplyCo
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceClaimTemplate(resourceClaimTemplate *resourcev1alpha2.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
+func ExtractResourceClaimTemplate(resourceClaimTemplate *v1alpha2.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
 	return extractResourceClaimTemplate(resourceClaimTemplate, fieldManager, "")
 }
 
 // ExtractResourceClaimTemplateStatus is the same as ExtractResourceClaimTemplate except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceClaimTemplateStatus(resourceClaimTemplate *resourcev1alpha2.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
+func ExtractResourceClaimTemplateStatus(resourceClaimTemplate *v1alpha2.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
 	return extractResourceClaimTemplate(resourceClaimTemplate, fieldManager, "status")
 }
 
-func extractResourceClaimTemplate(resourceClaimTemplate *resourcev1alpha2.ResourceClaimTemplate, fieldManager string, subresource string) (*ResourceClaimTemplateApplyConfiguration, error) {
+func extractResourceClaimTemplate(resourceClaimTemplate *v1alpha2.ResourceClaimTemplate, fieldManager string, subresource string) (*ResourceClaimTemplateApplyConfiguration, error) {
 	b := &ResourceClaimTemplateApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClaimTemplate, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"), fieldManager, b, subresource)
 	if err != nil {

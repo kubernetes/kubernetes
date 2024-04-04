@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNetworkPolicy(networkPolicy *extensionsv1beta1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+func ExtractNetworkPolicy(networkPolicy *v1beta1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
 	return extractNetworkPolicy(networkPolicy, fieldManager, "")
 }
 
 // ExtractNetworkPolicyStatus is the same as ExtractNetworkPolicy except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractNetworkPolicyStatus(networkPolicy *extensionsv1beta1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+func ExtractNetworkPolicyStatus(networkPolicy *v1beta1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
 	return extractNetworkPolicy(networkPolicy, fieldManager, "status")
 }
 
-func extractNetworkPolicy(networkPolicy *extensionsv1beta1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
+func extractNetworkPolicy(networkPolicy *v1beta1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
 	b := &NetworkPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.extensions.v1beta1.NetworkPolicy"), fieldManager, b, subresource)
 	if err != nil {

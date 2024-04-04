@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+func ExtractLimitRange(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
 	return extractLimitRange(limitRange, fieldManager, "")
 }
 
 // ExtractLimitRangeStatus is the same as ExtractLimitRange except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractLimitRangeStatus(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+func ExtractLimitRangeStatus(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
 	return extractLimitRange(limitRange, fieldManager, "status")
 }
 
-func extractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
+func extractLimitRange(limitRange *corev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
 	b := &LimitRangeApplyConfiguration{}
 	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b, subresource)
 	if err != nil {

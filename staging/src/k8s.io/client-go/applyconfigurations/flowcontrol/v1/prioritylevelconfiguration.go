@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiflowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *apiflowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "")
 }
 
 // ExtractPriorityLevelConfigurationStatus is the same as ExtractPriorityLevelConfiguration except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *apiflowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "status")
 }
 
-func extractPriorityLevelConfiguration(priorityLevelConfiguration *apiflowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	b := &PriorityLevelConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1.PriorityLevelConfiguration"), fieldManager, b, subresource)
 	if err != nil {

@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // ContainerStatusApplyConfiguration represents an declarative configuration of the ContainerStatus type for use
@@ -34,7 +34,7 @@ type ContainerStatusApplyConfiguration struct {
 	ImageID              *string                                 `json:"imageID,omitempty"`
 	ContainerID          *string                                 `json:"containerID,omitempty"`
 	Started              *bool                                   `json:"started,omitempty"`
-	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
+	AllocatedResources   *v1.ResourceList                        `json:"allocatedResources,omitempty"`
 	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	VolumeMounts         []VolumeMountStatusApplyConfiguration   `json:"volumeMounts,omitempty"`
 }
@@ -120,7 +120,7 @@ func (b *ContainerStatusApplyConfiguration) WithStarted(value bool) *ContainerSt
 // WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AllocatedResources field is set to the value of the last call.
-func (b *ContainerStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *ContainerStatusApplyConfiguration {
+func (b *ContainerStatusApplyConfiguration) WithAllocatedResources(value v1.ResourceList) *ContainerStatusApplyConfiguration {
 	b.AllocatedResources = &value
 	return b
 }

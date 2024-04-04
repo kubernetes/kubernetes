@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	v1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -56,18 +56,18 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+func ExtractCSINode(cSINode *v1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
 	return extractCSINode(cSINode, fieldManager, "")
 }
 
 // ExtractCSINodeStatus is the same as ExtractCSINode except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractCSINodeStatus(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+func ExtractCSINodeStatus(cSINode *v1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
 	return extractCSINode(cSINode, fieldManager, "status")
 }
 
-func extractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
+func extractCSINode(cSINode *v1beta1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
 	b := &CSINodeApplyConfiguration{}
 	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSINode"), fieldManager, b, subresource)
 	if err != nil {

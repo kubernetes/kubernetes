@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
@@ -57,18 +57,18 @@ func Namespace(name string) *NamespaceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNamespace(namespace *apicorev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
+func ExtractNamespace(namespace *corev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
 	return extractNamespace(namespace, fieldManager, "")
 }
 
 // ExtractNamespaceStatus is the same as ExtractNamespace except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractNamespaceStatus(namespace *apicorev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
+func ExtractNamespaceStatus(namespace *corev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
 	return extractNamespace(namespace, fieldManager, "status")
 }
 
-func extractNamespace(namespace *apicorev1.Namespace, fieldManager string, subresource string) (*NamespaceApplyConfiguration, error) {
+func extractNamespace(namespace *corev1.Namespace, fieldManager string, subresource string) (*NamespaceApplyConfiguration, error) {
 	b := &NamespaceApplyConfiguration{}
 	err := managedfields.ExtractInto(namespace, internal.Parser().Type("io.k8s.api.core.v1.Namespace"), fieldManager, b, subresource)
 	if err != nil {

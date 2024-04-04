@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apinetworkingv1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -29,7 +29,7 @@ type NetworkPolicySpecApplyConfiguration struct {
 	PodSelector *v1.LabelSelectorApplyConfiguration          `json:"podSelector,omitempty"`
 	Ingress     []NetworkPolicyIngressRuleApplyConfiguration `json:"ingress,omitempty"`
 	Egress      []NetworkPolicyEgressRuleApplyConfiguration  `json:"egress,omitempty"`
-	PolicyTypes []apinetworkingv1.PolicyType                 `json:"policyTypes,omitempty"`
+	PolicyTypes []networkingv1.PolicyType                    `json:"policyTypes,omitempty"`
 }
 
 // NetworkPolicySpecApplyConfiguration constructs an declarative configuration of the NetworkPolicySpec type for use with
@@ -75,7 +75,7 @@ func (b *NetworkPolicySpecApplyConfiguration) WithEgress(values ...*NetworkPolic
 // WithPolicyTypes adds the given value to the PolicyTypes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the PolicyTypes field.
-func (b *NetworkPolicySpecApplyConfiguration) WithPolicyTypes(values ...apinetworkingv1.PolicyType) *NetworkPolicySpecApplyConfiguration {
+func (b *NetworkPolicySpecApplyConfiguration) WithPolicyTypes(values ...networkingv1.PolicyType) *NetworkPolicySpecApplyConfiguration {
 	for i := range values {
 		b.PolicyTypes = append(b.PolicyTypes, values[i])
 	}

@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
-	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	v1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 )
 
 // FlunderApplyConfiguration represents an declarative configuration of the Flunder type for use
@@ -31,7 +31,7 @@ type FlunderApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *FlunderSpecApplyConfiguration `json:"spec,omitempty"`
-	Status                           *wardlev1beta1.FlunderStatus   `json:"status,omitempty"`
+	Status                           *v1beta1.FlunderStatus         `json:"status,omitempty"`
 }
 
 // Flunder constructs an declarative configuration of the Flunder type for use with
@@ -214,7 +214,7 @@ func (b *FlunderApplyConfiguration) WithSpec(value *FlunderSpecApplyConfiguratio
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *FlunderApplyConfiguration) WithStatus(value wardlev1beta1.FlunderStatus) *FlunderApplyConfiguration {
+func (b *FlunderApplyConfiguration) WithStatus(value v1beta1.FlunderStatus) *FlunderApplyConfiguration {
 	b.Status = &value
 	return b
 }
