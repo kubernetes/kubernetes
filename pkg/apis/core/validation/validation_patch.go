@@ -28,7 +28,7 @@ var (
 	//
 	// thus we make an exception for the secrets in the following namespaces, during update
 	// we allow the secret type to mutate from:
-	//     "SecretTypeTLS" -> "kubernetes.io/tls"
+	//     ["SecretTypeTLS", core.SecretTypeOpaque] -> "kubernetes.io/tls"
 	// some of our operators were accidentally creating secrets of type
 	// "SecretTypeTLS", and this patch enables us to move these secrets
 	// objects to the intended type in a ratcheting manner.
@@ -44,11 +44,25 @@ var (
 )
 
 func openShiftValidateSecretUpdateIsTypeMutationAllowed(newSecret, oldSecret *core.Secret) bool {
-	// we allow "SecretTypeTLS" -> "kubernetes.io/tls" only
-	if oldSecret.Type == "SecretTypeTLS" && newSecret.Type == core.SecretTypeTLS {
+	// initially, this check was stricter.
+	// however, due to the platform's long history (spanning several years)
+	// and the complexity of ensuring that resources were consistently created with only one type,
+	// it is now permissible for (SecretTypeTLS, core.SecretTypeOpaque) type to transition to "kubernetes.io/tls".
+	//
+	// additionally, it should be noted that default values might also be applied in some cases.
+	// (https://github.com/openshift/kubernetes/blob/258f1d5fb6491ba65fd8201c827e179432430627/pkg/apis/core/v1/defaults.go#L280-L284)
+	if isOldSecretTypeMutationAllowed(oldSecret) && newSecret.Type == core.SecretTypeTLS {
 		if _, ok := whitelist[oldSecret.Namespace]; ok {
 			return true
 		}
 	}
 	return false
+}
+
+func isOldSecretTypeMutationAllowed(oldSecret *core.Secret) bool {
+	// core.SecretTypeOpaque seems safe because
+	// https://github.com/kubernetes/kubernetes/blob/8628c3c4da6746b1dc967cc520b189a04ebd78d1/pkg/apis/core/validation/validation.go#L6393
+	//
+	// "SecretTypeTLS" is what kas-o used
+	return oldSecret.Type == core.SecretTypeOpaque || oldSecret.Type == "SecretTypeTLS"
 }

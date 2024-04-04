@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -52,45 +53,46 @@ func TestOpenShiftValidateSecretUpdate(t *testing.T) {
 		}
 	}
 
-	t.Run("verify whitelist", func(t *testing.T) {
+	for _, secretType := range []core.SecretType{"SecretTypeTLS", core.SecretTypeOpaque} {
 		for key := range whitelist {
 			ns, name := key, "foo"
+			t.Run(fmt.Sprintf("verify whitelist, key = %v, secretType = %v", key, secretType), func(t *testing.T) {
+				// exercise a valid type mutation: "secretType" -> "kubernetes.io/tls"
+				oldSecret, newSecret := newSecretFn(ns, name, secretType), newSecretFn(ns, name, core.SecretTypeTLS)
+				if errs := ValidateSecretUpdate(newSecret, oldSecret); len(errs) > 0 {
+					t.Errorf("unexpected error: %v", errs)
+				}
 
-			// exercise a valid type mutation: "SecretTypeTLS" -> "kubernetes.io/tls"
-			oldSecret, newSecret := newSecretFn(ns, name, "SecretTypeTLS"), newSecretFn(ns, name, core.SecretTypeTLS)
-			if errs := ValidateSecretUpdate(newSecret, oldSecret); len(errs) > 0 {
-				t.Errorf("unexpected error: %v", errs)
-			}
+				// the reverse should not be allowed
+				errExpected := invalidTypeErrFn(secretType)
+				oldSecret, newSecret = newSecretFn(ns, name, core.SecretTypeTLS), newSecretFn(ns, name, secretType)
+				if errGot := ValidateSecretUpdate(newSecret, oldSecret); !cmp.Equal(errExpected, errGot) {
+					t.Errorf("expected error: %v, diff: %s", errExpected, cmp.Diff(errExpected, errGot))
+				}
 
-			// the reverse should not be allowed
-			errExpected := invalidTypeErrFn("SecretTypeTLS")
-			oldSecret, newSecret = newSecretFn(ns, name, core.SecretTypeTLS), newSecretFn(ns, name, "SecretTypeTLS")
-			if errGot := ValidateSecretUpdate(newSecret, oldSecret); !cmp.Equal(errExpected, errGot) {
-				t.Errorf("expected error: %v, diff: %s", errExpected, cmp.Diff(errExpected, errGot))
-			}
+				// no type change, no validation failure expected
+				oldSecret, newSecret = newSecretFn(ns, name, core.SecretTypeTLS), newSecretFn(ns, name, core.SecretTypeTLS)
+				if errs := ValidateSecretUpdate(newSecret, oldSecret); len(errs) > 0 {
+					t.Errorf("unexpected error: %v", errs)
+				}
 
-			// no type change, no validation failure expected
-			oldSecret, newSecret = newSecretFn(ns, name, core.SecretTypeTLS), newSecretFn(ns, name, core.SecretTypeTLS)
-			if errs := ValidateSecretUpdate(newSecret, oldSecret); len(errs) > 0 {
-				t.Errorf("unexpected error: %v", errs)
-			}
+				// exercise an invalid type mutation, we expect validation failure
+				errExpected = invalidTypeErrFn(core.SecretTypeTLS)
+				oldSecret, newSecret = newSecretFn(ns, name, "AnyOtherType"), newSecretFn(ns, name, core.SecretTypeTLS)
+				if errGot := ValidateSecretUpdate(newSecret, oldSecret); !cmp.Equal(errExpected, errGot) {
+					t.Errorf("expected error: %v, diff: %s", errExpected, cmp.Diff(errExpected, errGot))
+				}
 
-			// exercise an invalid type mutation, we expect validation failure
-			errExpected = invalidTypeErrFn(core.SecretTypeOpaque)
-			oldSecret, newSecret = newSecretFn(ns, name, "SecretTypeTLS"), newSecretFn(ns, name, core.SecretTypeOpaque)
-			if errGot := ValidateSecretUpdate(newSecret, oldSecret); !cmp.Equal(errExpected, errGot) {
-				t.Errorf("expected error: %v, diff: %s", errExpected, cmp.Diff(errExpected, errGot))
-			}
-
-			// verify that kbernetes.io/tls validation ar enforced
-			errExpected = tlsKeyRequiredErrFn()
-			oldSecret, newSecret = newSecretFn(ns, name, "SecretTypeTLS"), newSecretFn(ns, name, core.SecretTypeTLS)
-			newSecret.Data = nil
-			if errGot := ValidateSecretUpdate(newSecret, oldSecret); !cmp.Equal(errExpected, errGot) {
-				t.Errorf("expected error: %v, diff: %s", errExpected, cmp.Diff(errExpected, errGot))
-			}
+				// verify that kbernetes.io/tls validation are enforced
+				errExpected = tlsKeyRequiredErrFn()
+				oldSecret, newSecret = newSecretFn(ns, name, secretType), newSecretFn(ns, name, core.SecretTypeTLS)
+				newSecret.Data = nil
+				if errGot := ValidateSecretUpdate(newSecret, oldSecret); !cmp.Equal(errExpected, errGot) {
+					t.Errorf("expected error: %v, diff: %s", errExpected, cmp.Diff(errExpected, errGot))
+				}
+			})
 		}
-	})
+	}
 
 	// we must not break secrets that are not in the whitelist
 	tests := []struct {
