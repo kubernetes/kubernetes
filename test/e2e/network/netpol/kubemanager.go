@@ -179,6 +179,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 
 	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
 
+	maxAttempts := 10
 	attempt := 0
 
 	// NOTE: The return value of this function[probeConnectivity] should be true if the probe is successful and false otherwise.
@@ -202,7 +203,10 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 					attempt+1, args.nsFrom, args.podFrom, args.addrTo, stderr,
 				)
 				attempt++
-				return false, nil
+				if attempt < maxAttempts {
+					return false, nil
+				}
+				return false, fmt.Errorf("max attempts reached")
 			} else {
 				// we got the expected results, exit immediately.
 				return true, nil
@@ -219,7 +223,10 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 					attempt+1, args.nsFrom, args.podFrom, args.addrTo,
 				)
 				attempt++
-				return false, nil
+				if attempt < maxAttempts {
+					return false, nil
+				}
+				return false, fmt.Errorf("max attempts reached")
 			}
 		}
 	}
