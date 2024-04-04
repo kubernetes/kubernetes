@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
+	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
@@ -169,6 +170,9 @@ type APIAggregator struct {
 
 	// rejectForwardingRedirects is whether to allow to forward redirect response
 	rejectForwardingRedirects bool
+
+	// tracerProvider is used to wrap the proxy transport and handler with tracing
+	tracerProvider tracing.TracerProvider
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -239,6 +243,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		openAPIV3Config:            c.GenericConfig.OpenAPIV3Config,
 		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
 		rejectForwardingRedirects:  c.ExtraConfig.RejectForwardingRedirects,
+		tracerProvider:             c.GenericConfig.TracerProvider,
 	}
 
 	// used later  to filter the served resource by those that have expired.
@@ -518,6 +523,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyTransportDial:         s.proxyTransportDial,
 		serviceResolver:            s.serviceResolver,
 		rejectForwardingRedirects:  s.rejectForwardingRedirects,
+		tracerProvider:             s.tracerProvider,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {
