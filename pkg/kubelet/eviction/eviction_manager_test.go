@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/utils/clock"
 	"testing"
 	"time"
 
@@ -328,12 +330,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					},
 				}
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
-				manager := newManagerImpl()
-				manager.clock = fakeClock
-				manager.killPodFunc = podKiller.killPodNow
-				manager.config = config
-				manager.summaryProvider = summaryProvider
-				manager.nodeRef = nodeRef
+				manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 
 				// synchronize to detect the memory pressure
 				_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -423,12 +420,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 					},
 				}
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500", "1000", podStats)}
-				manager := newManagerImpl()
-				manager.clock = fakeClock
-				manager.killPodFunc = podKiller.killPodNow
-				manager.config = config
-				manager.summaryProvider = summaryProvider
-				manager.nodeRef = nodeRef
+				manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 
 				// synchronize to detect the PID pressure
 				_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -600,14 +592,9 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 					podStats:                  podStats,
 				}
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStat)}
-				manager := newManagerImpl()
-				manager.clock = fakeClock
-				manager.killPodFunc = podKiller.killPodNow
+				manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 				manager.imageGC = diskGC
 				manager.containerGC = diskGC
-				manager.config = config
-				manager.summaryProvider = summaryProvider
-				manager.nodeRef = nodeRef
 
 				// synchronize
 				pods, synchErr := manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -699,12 +686,7 @@ func TestMemoryPressure(t *testing.T) {
 		},
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
-	manager := newManagerImpl()
-	manager.clock = fakeClock
-	manager.killPodFunc = podKiller.killPodNow
-	manager.config = config
-	manager.summaryProvider = summaryProvider
-	manager.nodeRef = nodeRef
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 
 	// create a best effort pod to test admission
 	bestEffortPodToAdmit, _ := podMaker("best-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi")
@@ -963,12 +945,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)}
-			manager := newManagerImpl()
-			manager.clock = fakeClock
-			manager.killPodFunc = podKiller.killPodNow
-			manager.config = config
-			manager.summaryProvider = summaryProvider
-			manager.nodeRef = nodeRef
+			manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 
 			// create a pod to test admission
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, 50)
@@ -1334,14 +1311,9 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 			diskStatConst := diskStatStart
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStatStart)}
-			manager := newManagerImpl()
-			manager.clock = fakeClock
-			manager.killPodFunc = podKiller.killPodNow
+			manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 			manager.imageGC = diskGC
 			manager.containerGC = diskGC
-			manager.config = config
-			manager.summaryProvider = summaryProvider
-			manager.nodeRef = nodeRef
 
 			// create a best effort pod to test admission
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi", "0Gi", "0Gi", nil)
@@ -1567,12 +1539,7 @@ func TestMinReclaim(t *testing.T) {
 		},
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
-	manager := newManagerImpl()
-	manager.clock = fakeClock
-	manager.killPodFunc = podKiller.killPodNow
-	manager.config = config
-	manager.summaryProvider = summaryProvider
-	manager.nodeRef = nodeRef
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 
 	// synchronize
 	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -1846,14 +1813,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			diskStatConst := diskStatStart
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStatStart)}
 			diskGC := &mockDiskGC{fakeSummaryProvider: summaryProvider, err: nil, readAndWriteSeparate: tc.writeableSeparateFromReadOnly}
-			manager := newManagerImpl()
-			manager.clock = fakeClock
-			manager.killPodFunc = podKiller.killPodNow
+			manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 			manager.imageGC = diskGC
 			manager.containerGC = diskGC
-			manager.config = config
-			manager.summaryProvider = summaryProvider
-			manager.nodeRef = nodeRef
 
 			// synchronize
 			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -2299,14 +2261,9 @@ func TestInodePressureFsInodes(t *testing.T) {
 			startingStatsConst := summaryStatsMaker(tc.nodeFsInodesFree, tc.nodeFsInodes, tc.imageFsInodesFree, tc.imageFsInodes, tc.containerFsInodesFree, tc.containerFsInodes, podStats)
 			startingStatsModified := summaryStatsMaker(tc.nodeFsInodesFree, tc.nodeFsInodes, tc.imageFsInodesFree, tc.imageFsInodes, tc.containerFsInodesFree, tc.containerFsInodes, podStats)
 			summaryProvider := &fakeSummaryProvider{result: startingStatsModified}
-			manager := newManagerImpl()
-			manager.clock = fakeClock
-			manager.killPodFunc = podKiller.killPodNow
+			manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 			manager.imageGC = diskGC
 			manager.containerGC = diskGC
-			manager.config = config
-			manager.summaryProvider = summaryProvider
-			manager.nodeRef = nodeRef
 
 			// create a best effort pod to test admission
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0", "0", "0")
@@ -2528,12 +2485,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		},
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
-	manager := newManagerImpl()
-	manager.clock = fakeClock
-	manager.killPodFunc = podKiller.killPodNow
-	manager.config = config
-	manager.summaryProvider = summaryProvider
-	manager.nodeRef = nodeRef
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
@@ -2757,12 +2709,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		},
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("4Gi", podStats)}
-	manager := newManagerImpl()
-	manager.clock = fakeClock
-	manager.killPodFunc = podKiller.killPodNow
-	manager.config = config
-	manager.summaryProvider = summaryProvider
-	manager.nodeRef = nodeRef
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 
 	// create a best effort pod to test admission
 	bestEffortPodToAdmit, _ := podMaker("best-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi")
@@ -2917,12 +2864,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 
 	thresholdNotifier := NewMockThresholdNotifier(mockCtrl)
 	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(nil).Times(2)
-	manager := newManagerImpl()
-	manager.clock = fakeClock
-	manager.killPodFunc = podKiller.killPodNow
-	manager.config = config
-	manager.summaryProvider = summaryProvider
-	manager.nodeRef = nodeRef
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 	manager.thresholdNotifiers = []ThresholdNotifier{thresholdNotifier}
 
 	// The UpdateThreshold method should have been called once, since this is the first run.
@@ -3005,12 +2947,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
-	manager := newManagerImpl()
-	manager.clock = fakeClock
-	manager.killPodFunc = podKiller.killPodNow
-	manager.config = config
-	manager.summaryProvider = summaryProvider
-	manager.nodeRef = nodeRef
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 	manager.localStorageCapacityIsolation = true
 	manager.dedicatedImageFs = diskInfoProvider.dedicatedImageFs
 
@@ -3074,13 +3011,7 @@ func TestSoftEvictOthersWhileWaitingForPodGracefulShutdown(t *testing.T) {
 		},
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("500Mi", podStats)}
-	manager := newManagerImpl()
-	manager.clock = fakeClock
-	manager.killPodFunc = podKiller.killPodNow
-	manager.config = config
-	manager.summaryProvider = summaryProvider
-	manager.nodeRef = nodeRef
-
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 	// synchronize
 	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 	if err != nil {
@@ -3149,9 +3080,14 @@ func TestSoftEvictOthersWhileWaitingForPodGracefulShutdown(t *testing.T) {
 
 }
 
-func newManagerImpl() *managerImpl {
+func newManagerImpl(clock clock.WithTicker, killPodFunc KillPodFunc, config Config, summaryProvider stats.SummaryProvider, nodeRef *v1.ObjectReference) *managerImpl {
 	diskGC := &mockDiskGC{err: nil}
 	return &managerImpl{
+		clock:                        clock,
+		killPodFunc:                  killPodFunc,
+		config:                       config,
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		recorder:                     &record.FakeRecorder{},
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
