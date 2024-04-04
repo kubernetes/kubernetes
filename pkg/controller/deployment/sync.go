@@ -23,6 +23,9 @@ import (
 	"sort"
 	"strconv"
 
+	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/trace"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/staging/src/k8s.io/component-base/tracing"
 )
 
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
@@ -137,6 +141,14 @@ const (
 // Note that the pod-template-hash will be added to adopted RSes and pods.
 func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.Deployment, rsList, oldRSs []*apps.ReplicaSet, createIfNotExisted bool) (*apps.ReplicaSet, error) {
 	logger := klog.FromContext(ctx)
+
+	ctx = tracing.ExtractContext(ctx, d)
+	ctx, otelSpan := otel.GetTracerProvider().Tracer("deployment-controller").Start(ctx, "deployment.createReplicaSet", trace.WithAttributes(
+		semconv.K8SDeploymentUIDKey.String(string(d.UID)),
+		semconv.K8SDeploymentNameKey.String(d.Name),
+		semconv.K8SNamespaceNameKey.String(d.Namespace),
+	))
+	defer otelSpan.End()
 	existingNewRS := deploymentutil.FindNewReplicaSet(d, rsList)
 
 	// Calculate the max revision number among all old RSes
@@ -221,6 +233,7 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 	// hash collisions. If there is any other error, we need to report it in the status of
 	// the Deployment.
 	alreadyExists := false
+	tracing.InjectContext(ctx, &newRS)
 	createdRS, err := dc.client.AppsV1().ReplicaSets(d.Namespace).Create(ctx, &newRS, metav1.CreateOptions{})
 	switch {
 	// We may end up hitting this due to a slow cache or a fast resync of the Deployment.

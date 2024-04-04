@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/kubernetes/staging/src/k8s.io/component-base/tracing"
 	"k8s.io/utils/clock"
 
 	"k8s.io/klog/v2"
@@ -579,6 +580,7 @@ func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v
 	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
+	tracing.InjectContext(ctx, pod)
 	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		// only send an event if the namespace isn't terminating

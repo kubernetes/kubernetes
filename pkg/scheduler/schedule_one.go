@@ -27,6 +27,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -41,6 +45,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/staging/src/k8s.io/component-base/tracing"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -95,6 +100,14 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	}
 
 	logger.V(3).Info("Attempting to schedule pod", "pod", klog.KObj(pod))
+	ctx = tracing.ExtractContext(ctx, pod)
+	ctx, otelSpan := otel.GetTracerProvider().Tracer("kube-scheduler").Start(ctx, "schedulePod", trace.WithAttributes(
+		semconv.K8SPodUIDKey.String(string(pod.UID)),
+		attribute.String("k8s.pod", klog.KObj(pod).String()),
+		semconv.K8SPodNameKey.String(pod.Name),
+		semconv.K8SNamespaceNameKey.String(pod.Namespace),
+	))
+	defer otelSpan.End()
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()

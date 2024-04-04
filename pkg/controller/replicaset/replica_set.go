@@ -36,6 +36,9 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/trace"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -60,6 +63,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
+	"k8s.io/kubernetes/staging/src/k8s.io/component-base/tracing"
 )
 
 const (
@@ -565,12 +569,22 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 // It will requeue the replica set in case of an error while creating/deleting pods.
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
 	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
+	if diff == 0 {
+		return nil
+	}
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
 		return nil
 	}
 	logger := klog.FromContext(ctx)
+	ctx = tracing.ExtractContext(ctx, rs)
+	ctx, otelSpan := otel.GetTracerProvider().Tracer("replicaset-controller").Start(ctx, "replicaset.ManageReplicas", trace.WithAttributes(
+		semconv.K8SReplicasetUIDKey.String(string(rs.UID)),
+		semconv.K8SReplicasetNameKey.String(rs.Name),
+		semconv.K8SNamespaceNameKey.String(rs.Namespace),
+	))
+	defer otelSpan.End()
 	if diff < 0 {
 		diff *= -1
 		if diff > rsc.burstReplicas {
