@@ -217,16 +217,16 @@ func rewriteHTML(reader io.Reader, writer io.Writer, urlRewriter func(*url.URL) 
 // to the original host to instead refer to the proxy transport.
 func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*http.Response, error) {
 	origBody := resp.Body
-	defer origBody.Close()
 
 	newContent := &bytes.Buffer{}
-	var reader io.Reader = origBody
+	var reader io.ReadCloser = origBody
 	var writer io.Writer = newContent
 	encoding := resp.Header.Get("Content-Encoding")
 	switch encoding {
 	case "gzip":
 		var err error
-		reader, err = gzip.NewReader(reader)
+		reader, err = gzip.NewReader(origBody)
+		defer origBody.Close()
 		if err != nil {
 			return nil, fmt.Errorf("errorf making gzip reader: %v", err)
 		}
@@ -235,7 +235,8 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 		writer = gzw
 	case "deflate":
 		var err error
-		reader = flate.NewReader(reader)
+		reader = flate.NewReader(origBody)
+		defer origBody.Close()
 		flw, err := flate.NewWriter(writer, flate.BestCompression)
 		if err != nil {
 			return nil, fmt.Errorf("errorf making flate writer: %v", err)
@@ -252,6 +253,7 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 		klog.Errorf("Proxy encountered encoding %v for text/html; can't understand this so not fixing links.", encoding)
 		return resp, nil
 	}
+	defer reader.Close()
 
 	urlRewriter := func(targetUrl *url.URL) string {
 		return t.rewriteURL(targetUrl, req.URL, req.Host)
