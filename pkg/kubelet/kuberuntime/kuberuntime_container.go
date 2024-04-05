@@ -775,7 +775,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 		defer close(done)
 		defer utilruntime.HandleCrash()
 		if err = m.runtimeService.StopContainer(ctx, containerID.ID, gracePeriod); err != nil {
-			done <- err	
+			done <- err
 		}
 	}()
 	select {
