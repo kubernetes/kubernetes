@@ -698,7 +698,7 @@ function start_controller_manager {
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
-      --leader-elect=false \
+      --leader-elect=true \
       --cert-dir="${CERT_DIR}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
@@ -726,7 +726,7 @@ function start_cloud_controller_manager {
       --configure-cloud-routes="${CONFIGURE_CLOUD_ROUTES}" \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
-      --leader-elect=false \
+      --leader-elect=true \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
     export CLOUD_CTLRMGR_PID=$!
 }
