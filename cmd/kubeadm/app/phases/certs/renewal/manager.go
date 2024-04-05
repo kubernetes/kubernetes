@@ -297,7 +297,7 @@ func (rm *Manager) CertificateExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCertificateExpirationInfo returns certificate expiration info.
@@ -333,7 +333,7 @@ func (rm *Manager) CAExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCAExpirationInfo returns CA expiration info.
