@@ -10,7 +10,7 @@ require (
 	github.com/golangci/golangci-lint v1.54.1
 	github.com/google/go-flow-levee v0.1.5
 	gotest.tools/gotestsum v1.6.4
-	honnef.co/go/tools v0.4.3
+	honnef.co/go/tools v0.4.6
 	sigs.k8s.io/logtools v0.4.1
 	sigs.k8s.io/zeitgeist v0.2.0
 )
@@ -207,7 +207,7 @@ require (
 	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
-	golang.org/x/tools v0.12.0 // indirect
+	golang.org/x/tools v0.12.1-0.20230825192346-2191a27a6dc5 // indirect
 	golang.org/x/tools/go/pointer v0.1.0-deprecated // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
