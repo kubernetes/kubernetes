@@ -11,7 +11,7 @@ require (
 	github.com/google/go-flow-levee v0.1.5
 	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
-	honnef.co/go/tools v0.4.3
+	honnef.co/go/tools v0.4.6
 	sigs.k8s.io/logtools v0.5.0
 )
 
@@ -187,7 +187,7 @@ require (
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/term v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
-	golang.org/x/tools v0.12.0 // indirect
+	golang.org/x/tools v0.12.1-0.20230825192346-2191a27a6dc5 // indirect
 	golang.org/x/tools/go/pointer v0.1.0-deprecated // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
