@@ -35,6 +35,7 @@ type applyConfigurationGenerator struct {
 	generator.GoGenerator
 	// outPkgBase is the base package, under which the "internal" and GV-specific subdirs live
 	outPkgBase   string // must be a Go import-path
+	localPkg     string
 	groupVersion clientgentypes.GroupVersion
 	applyConfig  applyConfig
 	imports      namer.ImportTracker
@@ -49,9 +50,8 @@ func (g *applyConfigurationGenerator) Filter(_ *generator.Context, t *types.Type
 }
 
 func (g *applyConfigurationGenerator) Namers(*generator.Context) namer.NameSystems {
-	localPkg := path.Join(g.outPkgBase, g.groupVersion.Group.PackageName(), g.groupVersion.Version.PackageName())
 	return namer.NameSystems{
-		"raw":          namer.NewRawNamer(localPkg, g.imports),
+		"raw":          namer.NewRawNamer(g.localPkg, g.imports),
 		"singularKind": namer.NewPublicNamer(0),
 	}
 }
@@ -336,7 +336,7 @@ func (b *$.ApplyConfig.ApplyConfiguration|public$) ensure$.MemberType.Elem|publi
 
 var clientgenTypeConstructorNamespaced = `
 // $.ApplyConfig.Type|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
-// apply. 
+// apply.
 func $.ApplyConfig.Type|public$(name, namespace string) *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
   b.WithName(name)
