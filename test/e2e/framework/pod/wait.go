@@ -171,10 +171,11 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			case res && err == nil:
 				nOk++
 			case pod.Status.Phase == v1.PodSucceeded:
-				// it doesn't make sense to wait for this pod
+				// ignore succeeded pods
 				succeededPods = append(succeededPods, pod.Name)
 			case pod.Status.Phase == v1.PodFailed:
 				// ignore failed pods that are controlled by some controller
+				// failed pods without a controller result in an error
 				if metav1.GetControllerOf(&pod) == nil {
 					badPods = append(badPods, pod)
 				}
@@ -209,10 +210,13 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 	// An error might not be fatal.
 	if len(badPods) == 0 && nOk < minPods && nOk+allowedNotReadyPods >= minPods {
 		framework.Logf(
-			"Only %d Pods, instead of the expected %d, are Ready, but this exceeds the minimum threshold of %d - %d = %d",
+			"Only %d Pods, instead of the expected %d, are Ready, but this exceeds the minimum threshold of %d - %d = %d, so we continue without error.",
 			nOk, minPods, minPods-allowedNotReadyPods, allowedNotReadyPods, minPods)
 		return nil
+	} else if err != nil && len(badPods) != 0 {
+		framework.Logf("Error: %d pods failed and were not controlled by some controller.", len(badPods))
 	}
+
 	return err
 }
 
