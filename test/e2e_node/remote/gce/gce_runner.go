@@ -535,6 +535,10 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 					return "", fmt.Errorf("unable to create temp file %v", err)
 				}
 				defer os.Remove(dataFile.Name()) // clean up
+				if err = dataFile.Close(); err != nil {
+					return "", fmt.Errorf("unable to close temp file %w", err)
+				}
+
 				if err = os.WriteFile(dataFile.Name(), []byte(item.Value), 0666); err != nil {
 					return "", fmt.Errorf("could not write contents of metadata item into file %v", err)
 				}
