@@ -118,7 +118,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 
 	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		annotations[containerHashWithoutResourcesLabel] = strconv.FormatUint(kubecontainer.HashContainerWithoutResources(container), 16)
+		annotations[containerHashWithoutResourcesLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	}
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath

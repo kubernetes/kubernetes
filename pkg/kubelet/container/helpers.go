@@ -110,28 +110,20 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 // Note: remember to update hashValues in container_hash_test.go as well.
 func HashContainer(container *v1.Container) uint64 {
 	hash := fnv.New32a()
-	// Omit nil or empty field when calculating hash value
-	// Please see https://github.com/kubernetes/kubernetes/issues/53644
-	containerJSON, _ := json.Marshal(container)
+	containerJSON, _ := json.Marshal(pickFieldsToHash(container))
 	hashutil.DeepHashObject(hash, containerJSON)
 	return uint64(hash.Sum32())
 }
 
-// HashContainerWithoutResources returns the hash of the container with Resources field zero'd out.
-func HashContainerWithoutResources(container *v1.Container) uint64 {
-	// InPlacePodVerticalScaling enables mutable Resources field.
-	// Changes to this field may not require container restart depending on policy.
-	// Compute hash over fields besides the Resources field
-	// NOTE: This is needed during alpha and beta so that containers using Resources but
-	//       not subject to In-place resize are not unexpectedly restarted when
-	//       InPlacePodVerticalScaling feature-gate is toggled.
-	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashContainerWithoutResources to become Hash.
-	hashWithoutResources := fnv.New32a()
-	containerCopy := container.DeepCopy()
-	containerCopy.Resources = v1.ResourceRequirements{}
-	containerJSON, _ := json.Marshal(containerCopy)
-	hashutil.DeepHashObject(hashWithoutResources, containerJSON)
-	return uint64(hashWithoutResources.Sum32())
+// pickFieldsToHash pick fields that will affect the running status of the container for hash,
+// currently this field range only contains `image` and `name`.
+// Note: this list must be updated if ever kubelet wants to allow mutations to other fields.
+func pickFieldsToHash(container *v1.Container) map[string]string {
+	retval := map[string]string{
+		"name":  container.Name,
+		"image": container.Image,
+	}
+	return retval
 }
 
 // envVarsToMap constructs a map of environment name to value from a slice
