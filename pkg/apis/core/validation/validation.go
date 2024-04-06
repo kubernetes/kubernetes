@@ -5910,7 +5910,7 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fldPath *field.Path
 }
 
 // Validates the given template and ensures that it is in accordance with the desired selector and replicas.
-func ValidatePodTemplateSpecForRC(template, oldTemplate *core.PodTemplateSpec, selectorMap map[string]string, replicas int32, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap map[string]string, replicas int32, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
@@ -5924,14 +5924,6 @@ func ValidatePodTemplateSpecForRC(template, oldTemplate *core.PodTemplateSpec, s
 			}
 		}
 		allErrs = append(allErrs, ValidatePodTemplateSpec(template, fldPath, opts)...)
-		// get rid of apivalidation.ValidateReadOnlyPersistentDisks,stop passing oldTemplate to this function
-		var oldVols []core.Volume
-		if oldTemplate != nil {
-			oldVols = oldTemplate.Spec.Volumes // +k8s:verify-mutation:reason=clone
-		}
-		if replicas > 1 {
-			allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(template.Spec.Volumes, oldVols, fldPath.Child("spec", "volumes"))...)
-		}
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if template.Spec.RestartPolicy != core.RestartPolicyAlways {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "restartPolicy"), template.Spec.RestartPolicy, []core.RestartPolicy{core.RestartPolicyAlways}))
@@ -5949,12 +5941,7 @@ func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationController
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
-	// oldSpec is not empty, pass oldSpec.template.
-	var oldTemplate *core.PodTemplateSpec
-	if oldSpec != nil {
-		oldTemplate = oldSpec.Template // +k8s:verify-mutation:reason=clone
-	}
-	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, oldTemplate, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
+	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
 	return allErrs
 }
 
@@ -5972,33 +5959,6 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec", "ephemeralContainers"), "ephemeral containers not allowed in pod template"))
 	}
 
-	return allErrs
-}
-
-// ValidateReadOnlyPersistentDisks stick this AFTER the short-circuit checks
-func ValidateReadOnlyPersistentDisks(volumes, oldVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.SkipReadOnlyValidationGCE) {
-		return field.ErrorList{}
-	}
-
-	isWriteablePD := func(vol *core.Volume) bool {
-		return vol.GCEPersistentDisk != nil && !vol.GCEPersistentDisk.ReadOnly
-	}
-
-	for i := range oldVolumes {
-		if isWriteablePD(&oldVolumes[i]) {
-			return field.ErrorList{}
-		}
-	}
-
-	for i := range volumes {
-		idxPath := fldPath.Index(i)
-		if isWriteablePD(&volumes[i]) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
-		}
-	}
 	return allErrs
 }
 
