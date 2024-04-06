@@ -99,10 +99,14 @@ func BeInPhase(phase v1.PodPhase) types.GomegaMatcher {
 	}).WithTemplate("Expected Pod {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(phase)
 }
 
-// WaitForPodsRunningReady waits up to timeout to ensure that all pods in
-// namespace ns are either running and ready, or failed but controlled by a
-// controller. Also, it ensures that at least minPods are running and
-// ready. It has separate behavior from other 'wait for' pods functions in
+// WaitForPodsRunningReady waits up to timeout for the following conditions:
+//  1. At least minPods Pods in Namespace ns are Running and Ready
+//  2. No more than allowedNotReadyPods Pods in Namespace ns are not either
+//     Ready, Succeeded, or Failed with a Controller.
+//
+// # An error is returned if either of these conditions are not met within the timeout
+//
+// It has separate behavior from other 'wait for' pods functions in
 // that it requests the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
 // waiting. All pods that are in SUCCESS state are not counted.
@@ -131,7 +135,7 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 	otherPods := []v1.Pod{}
 	succeededPods := []string{}
 
-	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
 
 		rcList, err := c.CoreV1().ReplicationControllers(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -151,15 +155,6 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			Pods:                   podList.Items,
 		}, nil
 	})).WithTimeout(timeout).Should(framework.MakeMatcher(func(s *state) (func() string, error) {
-		replicas, replicaOk := int32(0), int32(0)
-		for _, rc := range s.ReplicationControllers {
-			replicas += *rc.Spec.Replicas
-			replicaOk += rc.Status.ReadyReplicas
-		}
-		for _, rs := range s.ReplicaSets {
-			replicas += *rs.Spec.Replicas
-			replicaOk += rs.Status.ReadyReplicas
-		}
 
 		nOk = 0
 		badPods = []v1.Pod{}
@@ -175,7 +170,8 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 				succeededPods = append(succeededPods, pod.Name)
 			case pod.Status.Phase == v1.PodFailed:
 				// ignore failed pods that are controlled by some controller
-				// failed pods without a controller result in an error
+				// TODO either document why failures with controllers are allowed while
+				// 	failures without controllers are not, or remove this check
 				if metav1.GetControllerOf(&pod) == nil {
 					badPods = append(badPods, pod)
 				}
@@ -183,8 +179,7 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 				otherPods = append(otherPods, pod)
 			}
 		}
-		done := replicaOk == replicas && nOk >= minPods && (len(badPods)+len(otherPods)) == 0
-		if done {
+		if nOk >= minPods && len(badPods)+len(otherPods) <= int(allowedNotReadyPods) {
 			return nil, nil
 		}
 
@@ -193,7 +188,6 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			var buffer strings.Builder
 			buffer.WriteString(fmt.Sprintf("Expected all pods (need at least %d) in namespace %q to be running and ready (except for %d).\n", minPods, ns, allowedNotReadyPods))
 			buffer.WriteString(fmt.Sprintf("%d / %d pods were running and ready.\n", nOk, len(s.Pods)))
-			buffer.WriteString(fmt.Sprintf("Expected %d pod replicas, %d are Running and Ready.\n", replicas, replicaOk))
 			if len(succeededPods) > 0 {
 				buffer.WriteString(fmt.Sprintf("Pods that completed successfully:\n%s", format.Object(succeededPods, 1)))
 			}
@@ -207,17 +201,6 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 		}, nil
 	}))
 
-	// An error might not be fatal.
-	if len(badPods) == 0 && nOk < minPods && nOk+allowedNotReadyPods >= minPods {
-		framework.Logf(
-			"Only %d Pods, instead of the expected %d, are Ready, but this exceeds the minimum threshold of %d - %d = %d, so we continue without error.",
-			nOk, minPods, minPods-allowedNotReadyPods, allowedNotReadyPods, minPods)
-		return nil
-	} else if err != nil && len(badPods) != 0 {
-		framework.Logf("Error: %d pods failed and were not controlled by some controller.", len(badPods))
-	}
-
-	return err
 }
 
 // WaitForPodCondition waits a pods to be matched to the given condition.
