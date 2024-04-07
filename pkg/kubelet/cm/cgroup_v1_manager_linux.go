@@ -19,8 +19,6 @@ package cm
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -140,33 +138,6 @@ func (c *cgroupV1impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, e
 		return nil, fmt.Errorf("failed to read CPU shares for cgroup %v: %w", cgroupPath, errS)
 	}
 	return &ResourceConfig{CPUShares: &cpuShares, CPUQuota: &cpuQuota, CPUPeriod: &cpuPeriod}, nil
-}
-
-func (c *cgroupV1impl) setCgroupCPUConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	var cpuQuotaStr, cpuPeriodStr, cpuSharesStr string
-	if resourceConfig.CPUQuota != nil {
-		cpuQuotaStr = strconv.FormatInt(*resourceConfig.CPUQuota, 10)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.cfs_quota_us"), []byte(cpuQuotaStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuQuotaStr, cgroupPath, err)
-		}
-	}
-	if resourceConfig.CPUPeriod != nil {
-		cpuPeriodStr = strconv.FormatUint(*resourceConfig.CPUPeriod, 10)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.cfs_period_us"), []byte(cpuPeriodStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuPeriodStr, cgroupPath, err)
-		}
-	}
-	if resourceConfig.CPUShares != nil {
-		cpuSharesStr = strconv.FormatUint(*resourceConfig.CPUShares, 10)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.shares"), []byte(cpuSharesStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuSharesStr, cgroupPath, err)
-		}
-	}
-	return nil
-}
-
-func (c *cgroupV1impl) setCgroupMemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	return writeCgroupMemoryLimit(filepath.Join(cgroupPath, cgroupv1MemLimitFile), resourceConfig)
 }
 
 func (c *cgroupV1impl) getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {

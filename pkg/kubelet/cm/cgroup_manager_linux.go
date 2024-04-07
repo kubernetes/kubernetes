@@ -21,7 +21,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -484,13 +483,4 @@ func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceCo
 	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
 	return &ResourceConfig{Memory: &mLim}, nil
 
-}
-
-func writeCgroupMemoryLimit(memoryLimitFileLocation string, resourceConfig *ResourceConfig) error {
-	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)
-	if err := os.WriteFile(memoryLimitFileLocation, []byte(memLimit), 0700); err != nil {
-		return fmt.Errorf("failed to write %v to %v: %w", memLimit, memoryLimitFileLocation, err)
-	}
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
-	return nil
 }
