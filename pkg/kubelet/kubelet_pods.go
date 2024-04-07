@@ -2110,6 +2110,15 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if ephemeralStorage, found := container.Resources.Limits[v1.ResourceEphemeralStorage]; found {
 				limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
+
+			for extendedResourceName, extendedResourceQuantity := range container.Resources.Limits {
+				if extendedResourceName == v1.ResourceCPU || extendedResourceName == v1.ResourceMemory ||
+					extendedResourceName == v1.ResourceStorage || extendedResourceName == v1.ResourceEphemeralStorage {
+					continue
+				}
+
+				limits[extendedResourceName] = extendedResourceQuantity.DeepCopy()
+			}
 		}
 		// Convert Requests
 		if status.AllocatedResources != nil {
@@ -2124,6 +2133,15 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 			if ephemeralStorage, found := status.AllocatedResources[v1.ResourceEphemeralStorage]; found {
 				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
+			}
+
+			for extendedResourceName, extendedResourceQuantity := range status.AllocatedResources {
+				if extendedResourceName == v1.ResourceCPU || extendedResourceName == v1.ResourceMemory ||
+					extendedResourceName == v1.ResourceStorage || extendedResourceName == v1.ResourceEphemeralStorage {
+					continue
+				}
+
+				requests[extendedResourceName] = extendedResourceQuantity.DeepCopy()
 			}
 		}
 		//TODO(vinaykul,derekwaynecarr,InPlacePodVerticalScaling): Update this to include extended resources in
