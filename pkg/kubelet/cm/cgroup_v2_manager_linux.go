@@ -98,22 +98,6 @@ func (c *cgroupV2impl) GetCgroupConfig(name CgroupName, resource v1.ResourceName
 	return nil, fmt.Errorf("unsupported resource %v for cgroup %v", resource, name)
 }
 
-// Set resource config for the specified resource type on the cgroup
-func (c *cgroupV2impl) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
-	cgroupPaths := c.buildCgroupPaths(name)
-	cgroupResourcePath, found := cgroupPaths[string(resource)]
-	if !found {
-		return fmt.Errorf("failed to build %v cgroup fs path for cgroup %v", resource, name)
-	}
-	switch resource {
-	case v1.ResourceCPU:
-		return c.setCgroupCPUConfig(cgroupResourcePath, resourceConfig)
-	case v1.ResourceMemory:
-		return c.setCgroupMemoryConfig(cgroupResourcePath, resourceConfig)
-	}
-	return nil
-}
-
 func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, error) {
 	var cpuLimitStr, cpuPeriodStr string
 	cpuLimitAndPeriod, err := fscommon.GetCgroupParamString(cgroupPath, "cpu.max")
