@@ -1674,6 +1674,8 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo-with-owner-ref", Namespace: "foo-ns",
 					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo-with-owner-ref", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer-with-dff-name-than-cronjob", Controller: &trueRef, Kind: "CronJob", UID: "fooer-uid-1"}}}},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo-with-diff-owner-ref", Namespace: "foo-ns",
 					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: "CustomController"}}}},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo-with-owner-ref-cronjob", Namespace: "foo-ns",
