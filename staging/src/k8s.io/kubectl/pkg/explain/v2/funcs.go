@@ -236,5 +236,19 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 			}
 			return cur
 		},
+		// styleVerboseRecursive creates an string for styling the verboseRecursive based
+		// on if the line is a filed or description/empty line.
+		"styleVerboseRecursive": func(level int, field bool) string {
+			styledString := ""
+			for i := 0; i < level-1; i++ {
+				styledString += "| "
+			}
+			if field {
+				styledString += "* "
+			} else {
+				styledString += "| "
+			}
+			return styledString
+		},
 	})
 }

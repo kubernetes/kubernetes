@@ -336,6 +336,36 @@ func TestFuncs(t *testing.T) {
 			},
 			Expect: `null`,
 		},
+		{
+			Name:     "basic",
+			FuncName: "styleVerboseRecursive",
+			Source:   `{{styleVerboseRecursive 2 false}}`,
+			Expect:   `| | `,
+		},
+		{
+			Name:     "basic",
+			FuncName: "styleVerboseRecursive",
+			Source:   `{{styleVerboseRecursive 0 false}}`,
+			Expect:   `| `,
+		},
+		{
+			Name:     "basic",
+			FuncName: "styleVerboseRecursive",
+			Source:   `{{styleVerboseRecursive 2 true}}`,
+			Expect:   `| * `,
+		},
+		{
+			Name:     "basic",
+			FuncName: "styleVerboseRecursive",
+			Source:   `{{styleVerboseRecursive 0 true}}`,
+			Expect:   `* `,
+		},
+		{
+			Name:     "basic",
+			FuncName: "styleVerboseRecursive",
+			Source:   `{{styleVerboseRecursive 1 true}}`,
+			Expect:   `* `,
+		},
 	}
 
 	for _, tcase := range testcases {

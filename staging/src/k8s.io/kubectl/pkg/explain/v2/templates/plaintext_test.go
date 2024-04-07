@@ -707,7 +707,7 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, 2, 3"),
+				checkEquals("  enum: 0, 1, 2, 3"),
 			},
 		},
 		{
@@ -725,7 +725,7 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, ...."),
+				checkEquals("  enum: 0, 1, ...."),
 			},
 		},
 		{

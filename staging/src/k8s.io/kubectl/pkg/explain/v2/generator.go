@@ -39,16 +39,20 @@ type Generator interface {
 		fieldSelector []string,
 		// Boolean indicating whether the fields should be rendered recursively/deeply
 		recursive bool,
+		// Boolean indicating whether the fields should be rendered recursively/deeply
+		// with detail/description
+		verboseRecursive bool,
 		// Output writer
 		writer io.Writer,
 	) error
 }
 
 type TemplateContext struct {
-	GVR       schema.GroupVersionResource
-	Document  map[string]interface{}
-	Recursive bool
-	FieldPath []string
+	GVR              schema.GroupVersionResource
+	Document         map[string]interface{}
+	Recursive        bool
+	VerboseRecursive bool
+	FieldPath        []string
 }
 
 type generator struct {
@@ -84,6 +88,9 @@ func (g *generator) Render(
 	fieldSelector []string,
 	// Boolean indicating whether the fields should be rendered recursively/deeply
 	recursive bool,
+	// Boolean indicating whether the fields should be rendered recursively/deeply
+	// with detail/description
+	verboseRecursive bool,
 	// Output writer
 	writer io.Writer,
 ) error {
@@ -93,10 +100,11 @@ func (g *generator) Render(
 	}
 
 	err := compiledTemplate.Execute(writer, TemplateContext{
-		Document:  document,
-		Recursive: recursive,
-		FieldPath: fieldSelector,
-		GVR:       gvr,
+		Document:         document,
+		Recursive:        recursive,
+		VerboseRecursive: verboseRecursive,
+		FieldPath:        fieldSelector,
+		GVR:              gvr,
 	})
 	return err
 }

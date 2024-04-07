@@ -36,7 +36,7 @@
     VERSION:    {{ $gvk.version }}{{"\n" -}}
     {{- "\n" -}}
 
-    {{- with include "schema" (dict "gvk" $gvk "Document" $.Document "FieldPath" $.FieldPath "Recursive" $.Recursive) -}}
+    {{- with include "schema" (dict "gvk" $gvk "Document" $.Document "FieldPath" $.FieldPath "Recursive" $.Recursive "VerboseRecursive" $.VerboseRecursive) -}}
         {{- . -}}
     {{- else -}}
         {{- throw "error: GVK %v not found in OpenAPI schema" $gvk -}}
@@ -98,7 +98,8 @@ Takes dictionary as argument with keys:
     {{- if not $.FieldPath -}}
         DESCRIPTION:{{- "\n" -}}
         {{- or (include "description" (dict "schema" $resolved "Document" $.Document)) "<empty>" | wrap 76 | indent 4 -}}{{- "\n" -}}
-        {{- with include "fieldList" (dict "schema" $resolved "level" 1 "Document" $.Document "Recursive" $.Recursive) -}}
+
+        {{- with include "fieldList" (dict "schema" $resolved "level" 1 "Document" $.Document "Recursive" $.Recursive "VerboseRecursive" $.VerboseRecursive) -}}
             FIELDS:{{- "\n" -}}
             {{- . -}}
         {{- end -}}
@@ -161,6 +162,7 @@ Takes dictionary as argument with keys:
     history: map[string]int containing all ref names so far
     Document: entire doc
     Recursive: print recursive
+    VerboseRecursive: print VerboseRecursive
 */ -}}
 {{- define "fieldList" -}}
     {{- /* Resolve schema if it is a ref */}}
@@ -172,9 +174,9 @@ Takes dictionary as argument with keys:
         {{- $nextContext := set $ "history" (set $.history $refString 1) -}}
         {{- $resolved := or (resolveRef $refString $.Document) $.schema -}}
         {{- range $k, $v := $resolved.properties -}}
-            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "short" $.Recursive "level" $.level "Document" $.Document) -}}
-            {{- if $.Recursive -}}
-                {{- /* Check if we already know about this element */}}
+            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "short" $.Recursive "verboseRecursive" $.VerboseRecursive "level" $.level "Document" $.Document) -}}
+            {{- if (or $.Recursive $.VerboseRecursive) -}}
+                {{- /* Check if we already know about this element */ -}}
                 {{- template "fieldList" (set $nextContext "schema" $v "level" (add $.level 1)) -}}
             {{- end -}}
         {{- end -}}
@@ -198,6 +200,7 @@ Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema which contains the field
     name: name of field
     short: limit printing to a single-line summary
+    verboseRecursive: style the line and print everything
     level: indentation amount
     Document: openapi document
 */ -}}
@@ -205,11 +208,29 @@ Takes dictionary as argument with keys:
     {{- $level := or $.level 0 -}}
     {{- $indentAmount := mul $level 2 -}}
     {{- $fieldSchema := index $.schema.properties $.name -}}
-    {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
+    {{- if $.verboseRecursive -}}
+        {{- styleVerboseRecursive $level true -}}
+        {{- $.name -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
+    {{- else -}}
+        {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
+    {{- end -}}
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
-    {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "isLongView" false "limit" 4 "indentAmount" $indentAmount) -}}
     {{- "\n" -}}
-    {{- if not $.short -}}
+    {{- if $.verboseRecursive -}}
+        {{- styleVerboseRecursive $level false -}}
+        {{- if $fieldSchema.enum -}}
+            {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "isLongView" false "limit" 4 "indentAmount" 0) -}}
+            {{- "\n" -}}
+            {{- styleVerboseRecursive $level false -}}
+        {{- end -}}
+        {{- or $fieldSchema.description "<no description>" -}}{{- "\n" -}}
+        {{- styleVerboseRecursive $level false -}}
+        {{- "\n" -}}
+
+    {{- else if not $.short -}}
+        {{- if $fieldSchema.enum -}}
+            {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "isLongView" false "limit" 4 "indentAmount" $indentAmount) -}}
+        {{- end -}}
         {{- or $fieldSchema.description "<no description>" | wrap (sub 78 $indentAmount) | indent (add $indentAmount 2) -}}{{- "\n" -}}
         {{- "\n" -}}
     {{- end -}}
@@ -307,7 +328,6 @@ Takes dictionary as argument with keys:
             {{- $enumLen := len .enum -}}
             {{- $limit := or $.limit -1 -}}
             {{- if eq $.isLongView false -}}
-                {{- "\n" -}}
                 {{- "" | indent $.indentAmount -}}
                 {{- "enum: " -}}
             {{- else -}}
