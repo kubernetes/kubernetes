@@ -18,6 +18,7 @@ import (
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 // Converter is an interface to the conversion logic. The converter
@@ -27,17 +28,50 @@ type Converter interface {
 	IsMissingVersionError(error) bool
 }
 
-// Updater is the object used to compute updated FieldSets and also
-// merge the object on Apply.
-type Updater struct {
+// UpdateBuilder allows you to create a new Updater by exposing all of
+// the options and setting them once.
+type UpdaterBuilder struct {
 	Converter     Converter
 	IgnoredFields map[fieldpath.APIVersion]*fieldpath.Set
 
+	EnableUnions bool
+
+	// Stop comparing the new object with old object after applying.
+	// This was initially used to avoid spurious etcd update, but
+	// since that's vastly inefficient, we've come-up with a better
+	// way of doing that. Create this flag to stop it.
+	// Comparing has become more expensive too now that we're not using
+	// `Compare` but `value.Equals` so this gives an option to avoid it.
+	ReturnInputOnNoop bool
+}
+
+func (u *UpdaterBuilder) BuildUpdater() *Updater {
+	return &Updater{
+		Converter:         u.Converter,
+		IgnoredFields:     u.IgnoredFields,
+		enableUnions:      u.EnableUnions,
+		returnInputOnNoop: u.ReturnInputOnNoop,
+	}
+}
+
+// Updater is the object used to compute updated FieldSets and also
+// merge the object on Apply.
+type Updater struct {
+	// Deprecated: This will eventually become private.
+	Converter Converter
+
+	// Deprecated: This will eventually become private.
+	IgnoredFields map[fieldpath.APIVersion]*fieldpath.Set
+
 	enableUnions bool
+
+	returnInputOnNoop bool
 }
 
 // EnableUnionFeature turns on union handling. It is disabled by default until the
 // feature is complete.
+//
+// Deprecated: Use the builder instead.
 func (s *Updater) EnableUnionFeature() {
 	s.enableUnions = true
 }
@@ -157,8 +191,7 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 
 // Apply should be called when Apply is run, given the current object as
 // well as the configuration that is applied. This will merge the object
-// and return it. If the object hasn't changed, nil is returned (the
-// managers can still have changed though).
+// and return it.
 func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (*typed.TypedValue, fieldpath.ManagedFields, error) {
 	var err error
 	managers, err = s.reconcileManagedFieldsWithSchemaChanges(liveObject, managers)
@@ -200,11 +233,11 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to prune fields: %v", err)
 	}
-	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, force)
+	managers, _, err = s.update(liveObject, newObject, version, managers, manager, force)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}
-	if compare.IsSame() {
+	if !s.returnInputOnNoop && value.EqualsUsing(value.NewFreelistAllocator(), liveObject.AsValue(), newObject.AsValue()) {
 		newObject = nil
 	}
 	return newObject, managers, nil
@@ -218,7 +251,8 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 	if lastSet == nil || lastSet.Set().Empty() {
 		return merged, nil
 	}
-	convertedMerged, err := s.Converter.Convert(merged, lastSet.APIVersion())
+	version := lastSet.APIVersion()
+	convertedMerged, err := s.Converter.Convert(merged, version)
 	if err != nil {
 		if s.Converter.IsMissingVersionError(err) {
 			return merged, nil
@@ -228,7 +262,7 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 
 	sc, tr := convertedMerged.Schema(), convertedMerged.TypeRef()
 	pruned := convertedMerged.RemoveItems(lastSet.Set().EnsureNamedFieldsAreMembers(sc, tr))
-	pruned, err = s.addBackOwnedItems(convertedMerged, pruned, managers, applyingManager)
+	pruned, err = s.addBackOwnedItems(convertedMerged, pruned, version, managers, applyingManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed add back owned items: %v", err)
 	}
@@ -241,7 +275,7 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 
 // addBackOwnedItems adds back any fields, list and map items that were removed by prune,
 // but other appliers or updaters (or the current applier's new config) claim to own.
-func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFields fieldpath.ManagedFields, applyingManager string) (*typed.TypedValue, error) {
+func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, prunedVersion fieldpath.APIVersion, managedFields fieldpath.ManagedFields, applyingManager string) (*typed.TypedValue, error) {
 	var err error
 	managedAtVersion := map[fieldpath.APIVersion]*fieldpath.Set{}
 	for _, managerSet := range managedFields {
@@ -252,7 +286,6 @@ func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFie
 	}
 	// Add back owned items at pruned version first to avoid conversion failure
 	// caused by pruned fields which are required for conversion.
-	prunedVersion := fieldpath.APIVersion(*pruned.TypeRef().NamedType)
 	if managed, ok := managedAtVersion[prunedVersion]; ok {
 		merged, pruned, err = s.addBackOwnedItemsForVersion(merged, pruned, prunedVersion, managed)
 		if err != nil {

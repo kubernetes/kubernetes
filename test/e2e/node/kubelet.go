@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -438,7 +439,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
 					err := e2epod.DeletePodWithWait(ctx, c, pod)
-					framework.ExpectError(err)
+					gomega.Expect(err).To(gomega.HaveOccurred())
 					// pod object is now stale, but is intentionally not nil
 
 					ginkgo.By("Check if pod's host has been cleaned up -- expect not")

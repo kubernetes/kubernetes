@@ -46,6 +46,7 @@ func TestProcessEncryptionConfig(t *testing.T) {
 				testCase.filePath,
 				nil,
 				"",
+				"",
 			)
 
 			_, _, err := d.processEncryptionConfig(ctx)
@@ -109,6 +110,7 @@ func TestWatchEncryptionConfigFile(t *testing.T) {
 				testCase.name,
 				testFilePath,
 				nil,
+				"",
 				"",
 			)
 

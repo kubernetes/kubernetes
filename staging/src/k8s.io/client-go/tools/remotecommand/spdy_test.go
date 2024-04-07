@@ -342,7 +342,7 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	streamExec := exec.(*streamExecutor)
+	streamExec := exec.(*spdyStreamExecutor)
 
 	conn, streamer, err := streamExec.newConnectionAndStream(ctx, options)
 	if err != nil {

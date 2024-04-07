@@ -26,7 +26,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
@@ -56,7 +56,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
 		Profiles: []config.KubeSchedulerProfile{{
 			SchedulerName:            "me",
-			PercentageOfNodesToScore: pointer.Int32(35),
+			PercentageOfNodesToScore: ptr.To[int32](35),
 			Plugins: &config.Plugins{
 				QueueSort: config.PluginSet{
 					Enabled: []config.Plugin{{Name: "CustomSort"}},
@@ -71,7 +71,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			}},
 		}, {
 			SchedulerName:            "other",
-			PercentageOfNodesToScore: pointer.Int32(35),
+			PercentageOfNodesToScore: ptr.To[int32](35),
 			Plugins: &config.Plugins{
 				QueueSort: config.PluginSet{
 					Enabled: []config.Plugin{{Name: "CustomSort"}},
@@ -110,10 +110,10 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
-	percentageOfNodesToScore101.PercentageOfNodesToScore = pointer.Int32(101)
+	percentageOfNodesToScore101.PercentageOfNodesToScore = ptr.To[int32](101)
 
 	percentageOfNodesToScoreNegative := validConfig.DeepCopy()
-	percentageOfNodesToScoreNegative.PercentageOfNodesToScore = pointer.Int32(-1)
+	percentageOfNodesToScoreNegative.PercentageOfNodesToScore = ptr.To[int32](-1)
 
 	schedulerNameNotSet := validConfig.DeepCopy()
 	schedulerNameNotSet.Profiles[1].SchedulerName = ""
@@ -122,10 +122,10 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	repeatedSchedulerName.Profiles[0].SchedulerName = "other"
 
 	profilePercentageOfNodesToScore101 := validConfig.DeepCopy()
-	profilePercentageOfNodesToScore101.Profiles[1].PercentageOfNodesToScore = pointer.Int32(101)
+	profilePercentageOfNodesToScore101.Profiles[1].PercentageOfNodesToScore = ptr.To[int32](101)
 
 	profilePercentageOfNodesToScoreNegative := validConfig.DeepCopy()
-	profilePercentageOfNodesToScoreNegative.Profiles[1].PercentageOfNodesToScore = pointer.Int32(-1)
+	profilePercentageOfNodesToScoreNegative.Profiles[1].PercentageOfNodesToScore = ptr.To[int32](-1)
 
 	differentQueueSort := validConfig.DeepCopy()
 	differentQueueSort.Profiles[1].Plugins.QueueSort.Enabled[0].Name = "AnotherSort"

@@ -467,7 +467,12 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 	} else {
 		// Trigger immediate sync when spec is changed.
 		jm.enqueueSyncJobImmediately(logger, curJob)
+	}
 
+	// The job shouldn't be marked as finished until all pod finalizers are removed.
+	// This is a backup operation in this case.
+	if IsJobFinished(curJob) {
+		jm.cleanupPodFinalizers(curJob)
 	}
 
 	// check if need to add a new rsync for ActiveDeadlineSeconds
@@ -504,18 +509,7 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 			return
 		}
 	}
-	// Listing pods shouldn't really fail, as we are just querying the informer cache.
-	selector, err := metav1.LabelSelectorAsSelector(jobObj.Spec.Selector)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("parsing deleted job selector: %v", err))
-		return
-	}
-	pods, _ := jm.podStore.Pods(jobObj.Namespace).List(selector)
-	for _, pod := range pods {
-		if metav1.IsControlledBy(pod, jobObj) && hasJobTrackingFinalizer(pod) {
-			jm.enqueueOrphanPod(pod)
-		}
-	}
+	jm.cleanupPodFinalizers(jobObj)
 }
 
 // enqueueSyncJobImmediately tells the Job controller to invoke syncJob
@@ -1878,4 +1872,19 @@ func onlyReplaceFailedPods(job *batch.Job) bool {
 		return true
 	}
 	return feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil
+}
+
+func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
+	// Listing pods shouldn't really fail, as we are just querying the informer cache.
+	selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("parsing deleted job selector: %v", err))
+		return
+	}
+	pods, _ := jm.podStore.Pods(job.Namespace).List(selector)
+	for _, pod := range pods {
+		if metav1.IsControlledBy(pod, job) && hasJobTrackingFinalizer(pod) {
+			jm.enqueueOrphanPod(pod)
+		}
+	}
 }

@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -114,7 +115,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			selectorListOpts := metav1.ListOptions{LabelSelector: "e2e-list-test-uuid=" + testUUID}
 			list, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, selectorListOpts)
 			framework.ExpectNoError(err, "listing CustomResourceDefinitions")
-			framework.ExpectEqual(len(list.Items), testListSize)
+			gomega.Expect(list.Items).To(gomega.HaveLen(testListSize))
 			for _, actual := range list.Items {
 				var expected *v1.CustomResourceDefinition
 				for _, e := range crds {
@@ -228,7 +229,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io").Do(ctx).Into(group)
 			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io")
-			framework.ExpectEqual(group.Name, v1.GroupName, "verifying API group name in /apis/apiextensions.k8s.io discovery document")
+			gomega.Expect(group.Name).To(gomega.Equal(v1.GroupName), "verifying API group name in /apis/apiextensions.k8s.io discovery document")
 
 			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis/apiextensions.k8s.io discovery document")
 			var version *metav1.GroupVersionForDiscovery
@@ -246,7 +247,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			apiResourceList := &metav1.APIResourceList{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1").Do(ctx).Into(apiResourceList)
 			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io/v1")
-			framework.ExpectEqual(apiResourceList.GroupVersion, v1.SchemeGroupVersion.String(), "verifying API group/version in /apis/apiextensions.k8s.io/v1 discovery document")
+			gomega.Expect(apiResourceList.GroupVersion).To(gomega.Equal(v1.SchemeGroupVersion.String()), "verifying API group/version in /apis/apiextensions.k8s.io/v1 discovery document")
 
 			ginkgo.By("finding customresourcedefinitions resources in the /apis/apiextensions.k8s.io/v1 discovery document")
 			var crdResource *metav1.APIResource
@@ -344,7 +345,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		if !found {
 			framework.Failf("field `a` should have been defaulted in %+v", u2.Object)
 		}
-		framework.ExpectEqual(v, "A", "\"a\" is defaulted to \"A\"")
+		gomega.Expect(v).To(gomega.Equal("A"), "\"a\" is defaulted to \"A\"")
 
 		// Deleting default for a, adding default "B" for b and waiting for the CR to get defaulted on read for b
 		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(ctx, crd.Name, types.JSONPatchType, []byte(`[

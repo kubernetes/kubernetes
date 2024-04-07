@@ -44,10 +44,11 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	"github.com/onsi/gomega"
 )
 
 // estimateMaximumPods estimates how many pods the cluster can handle
@@ -894,7 +895,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		gomega.Expect(definition.Spec.Versions).To(gomega.HaveLen(1), "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
@@ -1029,7 +1030,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		gomega.Expect(definition.Spec.Versions).To(gomega.HaveLen(1), "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
@@ -1105,7 +1106,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
 			_, err := resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
 			return false, err
-		}); err != nil && err != wait.ErrWaitTimeout {
+		}); err != nil && !wait.Interrupted(err) {
 			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
 		}
 	})

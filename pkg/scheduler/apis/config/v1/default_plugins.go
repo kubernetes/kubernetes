@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // getDefaultPlugins returns the default set of plugins.
@@ -34,10 +34,10 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.PrioritySort},
 				{Name: names.NodeUnschedulable},
 				{Name: names.NodeName},
-				{Name: names.TaintToleration, Weight: pointer.Int32(3)},
-				{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+				{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+				{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 				{Name: names.NodePorts},
-				{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+				{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 				{Name: names.VolumeRestrictions},
 				{Name: names.EBSLimits},
 				{Name: names.GCEPDLimits},
@@ -45,11 +45,11 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.AzureDiskLimits},
 				{Name: names.VolumeBinding},
 				{Name: names.VolumeZone},
-				{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
-				{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
+				{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+				{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 				{Name: names.DefaultPreemption},
-				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
-				{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+				{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+				{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 				{Name: names.DefaultBinder},
 			},
 		},

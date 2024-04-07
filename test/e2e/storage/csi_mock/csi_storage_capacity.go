@@ -367,7 +367,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				if test.expectFailure {
 					switch {
 					case errors.Is(err, context.DeadlineExceeded),
-						errors.Is(err, wait.ErrWaitTimeout),
+						errors.Is(err, wait.ErrorInterrupted(errors.New("timed out waiting for the condition"))),
 						errors.Is(err, errNotEnoughSpace):
 						// Okay, we expected that.
 					case err == nil:

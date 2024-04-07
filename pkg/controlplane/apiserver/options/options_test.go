@@ -243,11 +243,8 @@ func TestAddFlags(t *testing.T) {
 				RetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			},
 			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
-			OIDC: &kubeoptions.OIDCAuthenticationOptions{
-				UsernameClaim: "sub",
-				SigningAlgs:   []string{"RS256"},
-			},
-			RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
+			OIDC:           s.Authentication.OIDC,
+			RequestHeader:  &apiserveroptions.RequestHeaderAuthenticationOptions{},
 			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
 				Lookup:           true,
 				ExtendExpiration: true,
@@ -283,7 +280,10 @@ func TestAddFlags(t *testing.T) {
 		AggregatorRejectForwardingRedirects: true,
 	}
 
+	expected.Authentication.OIDC.UsernameClaim = "sub"
+	expected.Authentication.OIDC.SigningAlgs = []string{"RS256"}
+
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
 	}
 }

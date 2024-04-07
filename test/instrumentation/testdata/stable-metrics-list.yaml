@@ -96,23 +96,6 @@
   labels:
   - name
   - stage
-- name: healthcheck
-  namespace: kubernetes
-  help: This metric records the result of a single healthcheck.
-  type: Gauge
-  stabilityLevel: BETA
-  labels:
-  - name
-  - type
-- name: healthchecks_total
-  namespace: kubernetes
-  help: This metric records the results of all healthcheck.
-  type: Counter
-  stabilityLevel: BETA
-  labels:
-  - name
-  - status
-  - type
 - name: registered_metrics_total
   help: The count of registered metrics broken by stability level and deprecation
     version.
@@ -320,7 +303,8 @@
   - 1e+08
   - 1e+09
 - name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind.
+  help: Number of stored objects at the time of last check split by kind. In case
+    of a fetching error, the value will be -1.
   type: Gauge
   stabilityLevel: STABLE
   labels:
@@ -384,8 +368,6 @@
   - completion_mode
   - result
   buckets:
-  - 0.001
-  - 0.002
   - 0.004
   - 0.008
   - 0.016
@@ -399,6 +381,8 @@
   - 4.096
   - 8.192
   - 16.384
+  - 32.768
+  - 65.536
 - name: job_syncs_total
   subsystem: job_controller
   help: The number of job syncs
@@ -445,6 +429,23 @@
   - priority
   - resource
   - unit
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - status
+  - type
 - name: evictions_total
   subsystem: node_collector
   help: Number of Node evictions that happened since current instance of NodeController

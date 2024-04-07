@@ -36,11 +36,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
-
-func intStrAddr(intOrStr intstr.IntOrString) *intstr.IntOrString {
-	return &intOrStr
-}
 
 type statefulSetTweak func(ss *apps.StatefulSet)
 
@@ -164,7 +161,7 @@ func tweakMaxUnavailable(mu intstr.IntOrString) statefulSetTweak {
 		if ss.Spec.UpdateStrategy.RollingUpdate == nil {
 			ss.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{}
 		}
-		ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = intStrAddr(mu)
+		ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(mu)
 	}
 }
 

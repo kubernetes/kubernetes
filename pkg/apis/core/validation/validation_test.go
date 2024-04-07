@@ -996,6 +996,21 @@ func pvcTemplateWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *
 	}
 }
 
+func pvcWithDataSource(dataSource *core.TypedLocalObjectReference) *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			DataSource: dataSource,
+		},
+	}
+}
+func pvcWithDataSourceRef(ref *core.TypedObjectReference) *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			DataSourceRef: ref,
+		},
+	}
+}
+
 func testLocalVolume(path string, affinity *core.VolumeNodeAffinity) core.PersistentVolumeSpec {
 	return core.PersistentVolumeSpec{
 		Capacity: core.ResourceList{
@@ -1545,6 +1560,7 @@ func testVolumeClaimStorageClassInAnnotationAndNilInSpec(name, namespace, scName
 func testValidatePVC(t *testing.T, ephemeral bool) {
 	invalidClassName := "-invalid-"
 	validClassName := "valid"
+	invalidAPIGroup := "^invalid"
 	invalidMode := core.PersistentVolumeMode("fakeVolumeMode")
 	validMode := core.PersistentVolumeFilesystem
 	goodName := "foo"
@@ -1934,6 +1950,42 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
+		"invaild-apigroup-in-data-source": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+				},
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				DataSource: &core.TypedLocalObjectReference{
+					APIGroup: &invalidAPIGroup,
+					Kind:     "Foo",
+					Name:     "foo1",
+				},
+			}),
+		},
+		"invaild-apigroup-in-data-source-ref": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+				},
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				DataSourceRef: &core.TypedObjectReference{
+					APIGroup: &invalidAPIGroup,
+					Kind:     "Foo",
+					Name:     "foo1",
+				},
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -2057,6 +2109,7 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
+	invaildAPIGroup := "^invalid"
 
 	validClaim := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
@@ -2427,6 +2480,42 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	})
 
+	invalidClaimDataSourceAPIGroup := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+		VolumeMode: &file,
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+		DataSource: &core.TypedLocalObjectReference{
+			APIGroup: &invaildAPIGroup,
+			Kind:     "Foo",
+			Name:     "foo",
+		},
+	})
+
+	invalidClaimDataSourceRefAPIGroup := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+		VolumeMode: &file,
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+		DataSourceRef: &core.TypedObjectReference{
+			APIGroup: &invaildAPIGroup,
+			Kind:     "Foo",
+			Name:     "foo",
+		},
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure          bool
 		oldClaim                   *core.PersistentVolumeClaim
@@ -2631,6 +2720,16 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
+		"allow-update-pvc-when-data-source-used": {
+			oldClaim:          invalidClaimDataSourceAPIGroup,
+			newClaim:          invalidClaimDataSourceAPIGroup,
+			isExpectedFailure: false,
+		},
+		"allow-update-pvc-when-data-source-ref-used": {
+			oldClaim:          invalidClaimDataSourceRefAPIGroup,
+			newClaim:          invalidClaimDataSourceRefAPIGroup,
+			isExpectedFailure: false,
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -2651,6 +2750,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 }
 
 func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
+	invaildAPIGroup := "^invalid"
+
 	tests := map[string]struct {
 		oldPvc                 *core.PersistentVolumeClaim
 		enableReadWriteOncePod bool
@@ -2694,6 +2795,18 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
 				EnableRecoverFromExpansionFailure: false,
+			},
+		},
+		"invaild apiGroup in dataSource allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowInvalidAPIGroupInDataSourceOrRef: true,
+			},
+		},
+		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
 	}

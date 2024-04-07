@@ -29,10 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/utils/pointer"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -129,7 +129,7 @@ func TestEphemeralLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		extraClaims         []v1.PersistentVolumeClaim
 		ephemeralEnabled    bool
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -182,7 +182,7 @@ func TestEphemeralLimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			fts := feature.Features{}
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, filterName)
 			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
@@ -241,7 +241,7 @@ func TestAzureDiskLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		filterName          string
 		driverName          string
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -412,7 +412,7 @@ func TestAzureDiskLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
@@ -476,7 +476,7 @@ func TestEBSLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		filterName          string
 		driverName          string
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -693,7 +693,7 @@ func TestEBSLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
@@ -752,7 +752,7 @@ func TestGCEPDLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		filterName          string
 		driverName          string
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -923,7 +923,7 @@ func TestGCEPDLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
@@ -974,8 +974,8 @@ func TestGetMaxVols(t *testing.T) {
 	}
 }
 
-func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimLister {
-	return fakeframework.PersistentVolumeClaimLister{
+func getFakePVCLister(filterName string) tf.PersistentVolumeClaimLister {
+	return tf.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeClaimSpec{
@@ -1022,21 +1022,21 @@ func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimList
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithDefaultSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: pointer.String("standard-sc"),
+				StorageClassName: ptr.To("standard-sc"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithInvalidSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: pointer.String("invalid-sc"),
+				StorageClassName: ptr.To("invalid-sc"),
 			},
 		},
 	}
 }
 
-func getFakePVLister(filterName string) fakeframework.PersistentVolumeLister {
-	return fakeframework.PersistentVolumeLister{
+func getFakePVLister(filterName string) tf.PersistentVolumeLister {
+	return tf.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeSpec{

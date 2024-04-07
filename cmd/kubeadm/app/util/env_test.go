@@ -22,26 +22,34 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestMergeEnv(t *testing.T) {
-	baseEnv := []v1.EnvVar{}
-	extraEnv := []v1.EnvVar{}
-	MergeEnv(append(baseEnv, extraEnv...))
+func TestMergeKubeadmEnvVars(t *testing.T) {
+	baseEnv := []kubeadmapi.EnvVar{}
+	extraEnv := []kubeadmapi.EnvVar{}
+	MergeKubeadmEnvVars(append(baseEnv, extraEnv...))
 	var tests = []struct {
 		name      string
-		proxyEnv  []v1.EnvVar
-		extraEnv  []v1.EnvVar
+		proxyEnv  []kubeadmapi.EnvVar
+		extraEnv  []kubeadmapi.EnvVar
 		mergedEnv []v1.EnvVar
 	}{
 		{
 			name: "normal case without duplicated env",
-			proxyEnv: []v1.EnvVar{
-				{Name: "Foo1", Value: "Bar1"},
-				{Name: "Foo2", Value: "Bar2"},
+			proxyEnv: []kubeadmapi.EnvVar{
+				{
+					EnvVar: v1.EnvVar{Name: "Foo1", Value: "Bar1"},
+				},
+				{
+					EnvVar: v1.EnvVar{Name: "Foo2", Value: "Bar2"},
+				},
 			},
-			extraEnv: []v1.EnvVar{
-				{Name: "Foo3", Value: "Bar3"},
+			extraEnv: []kubeadmapi.EnvVar{
+				{
+					EnvVar: v1.EnvVar{Name: "Foo3", Value: "Bar3"},
+				},
 			},
 			mergedEnv: []v1.EnvVar{
 				{Name: "Foo1", Value: "Bar1"},
@@ -51,12 +59,18 @@ func TestMergeEnv(t *testing.T) {
 		},
 		{
 			name: "extraEnv env take precedence over the proxyEnv",
-			proxyEnv: []v1.EnvVar{
-				{Name: "Foo1", Value: "Bar1"},
-				{Name: "Foo2", Value: "Bar2"},
+			proxyEnv: []kubeadmapi.EnvVar{
+				{
+					EnvVar: v1.EnvVar{Name: "Foo1", Value: "Bar1"},
+				},
+				{
+					EnvVar: v1.EnvVar{Name: "Foo2", Value: "Bar2"},
+				},
 			},
-			extraEnv: []v1.EnvVar{
-				{Name: "Foo2", Value: "Bar3"},
+			extraEnv: []kubeadmapi.EnvVar{
+				{
+					EnvVar: v1.EnvVar{Name: "Foo2", Value: "Bar3"},
+				},
 			},
 			mergedEnv: []v1.EnvVar{
 				{Name: "Foo1", Value: "Bar1"},
@@ -67,7 +81,7 @@ func TestMergeEnv(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			envs := MergeEnv(test.proxyEnv, test.extraEnv)
+			envs := MergeKubeadmEnvVars(test.proxyEnv, test.extraEnv)
 			if !assert.ElementsMatch(t, envs, test.mergedEnv) {
 				t.Errorf("expected env: %v, got: %v", test.mergedEnv, envs)
 			}

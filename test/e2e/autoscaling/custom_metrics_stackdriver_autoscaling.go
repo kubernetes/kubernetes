@@ -626,7 +626,7 @@ func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace
 		}
 	})
 	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		framework.Logf("Number of replicas was stable over %v", timeout)
 		return
 	}

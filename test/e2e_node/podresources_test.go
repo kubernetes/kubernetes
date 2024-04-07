@@ -577,7 +577,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	expected := []podDesc{}
 	resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
 	podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
-	framework.ExpectError(err, "pod not found")
+	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
 	res := convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
@@ -788,7 +788,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				ginkgo.By("checking Get fail if the feature gate is not enabled")
 				getRes, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "test", PodNamespace: f.Namespace.Name})
 				framework.Logf("Get result: %v, err: %v", getRes, err)
-				framework.ExpectError(err, "With feature gate disabled, the call must fail")
+				gomega.Expect(err).To(gomega.HaveOccurred(), "With feature gate disabled, the call must fail")
 			})
 		})
 	})

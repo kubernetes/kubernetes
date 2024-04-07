@@ -111,7 +111,7 @@ func (kl *Kubelet) runOnce(ctx context.Context, pods []*v1.Pod, retryDelay time.
 	return results, err
 }
 
-// runPod runs a single pod and wait until all containers are running.
+// runPod runs a single pod and waits until all containers are running.
 func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Duration) error {
 	var isTerminal bool
 	delay := retryDelay

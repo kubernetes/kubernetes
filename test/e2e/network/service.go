@@ -210,7 +210,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 		return false, nil
 	}); pollErr != nil {
 		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
-		if pollErr != wait.ErrWaitTimeout {
+		if !wait.Interrupted(pollErr) {
 			checkAffinityFailed(tracker, pollErr.Error())
 			return false
 		}
@@ -1401,7 +1401,7 @@ var _ = common.SIGDescribe("Services", func() {
 		gomega.Expect(nodePortCounts).To(gomega.Equal(2), "updated service should have two Ports but found %d Ports", nodePortCounts)
 
 		for _, port := range nodePortService.Spec.Ports {
-			framework.ExpectNotEqual(port.NodePort, 0, "NodePort service failed to allocate NodePort for Port %s", port.Name)
+			gomega.Expect(port.NodePort).ToNot(gomega.BeZero(), "NodePort service failed to allocate NodePort for Port %s", port.Name)
 			framework.Logf("NodePort service allocates NodePort: %d for Port: %s over Protocol: %s", port.NodePort, port.Name, port.Protocol)
 		}
 	})
@@ -3624,7 +3624,17 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.Logf("Collection of services has been deleted")
 	})
 
-	ginkgo.It("should serve endpoints on same port and different protocols", func(ctx context.Context) {
+	/*
+		Release: v1.29
+		Testname: Service, should serve endpoints on same port and different protocols.
+		Description: Create one service with two ports, same port number and different protocol TCP and UDP.
+		It MUST be able to forward traffic to both ports.
+		Update the Service to expose only the TCP port, it MUST succeed to connect to the TCP port and fail
+		to connect to the UDP port.
+		Update the Service to expose only the UDP port, it MUST succeed to connect to the UDP port and fail
+		to connect to the TCP port.
+	*/
+	framework.ConformanceIt("should serve endpoints on same port and different protocols", func(ctx context.Context) {
 		serviceName := "multiprotocol-test"
 		testLabels := map[string]string{"app": "multiport"}
 		ns := f.Namespace.Name

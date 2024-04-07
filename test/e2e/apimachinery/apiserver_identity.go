@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"golang.org/x/crypto/cryptobyte"
 
 	v1 "k8s.io/api/core/v1"
@@ -120,7 +121,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(leases.Items), len(controlPlaneNodes), "unexpected number of leases")
+		gomega.Expect(leases.Items).To(gomega.HaveLen(len(controlPlaneNodes)), "unexpected number of leases")
 
 		for _, node := range controlPlaneNodes {
 			hostname, err := getControlPlaneHostname(ctx, &node)
@@ -176,6 +177,6 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(leases.Items), len(controlPlaneNodes), "unexpected number of leases")
+		gomega.Expect(leases.Items).To(gomega.HaveLen(len(controlPlaneNodes)), "unexpected number of leases")
 	})
 })

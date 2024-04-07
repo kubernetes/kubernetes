@@ -69,7 +69,7 @@ var (
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_storage_objects",
-			Help:           "Number of stored objects at the time of last check split by kind.",
+			Help:           "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
 			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"resource"},

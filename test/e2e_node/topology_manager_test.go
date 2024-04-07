@@ -944,7 +944,7 @@ func hostPrecheck() (int, int) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Topology Manager [Serial] [NodeFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

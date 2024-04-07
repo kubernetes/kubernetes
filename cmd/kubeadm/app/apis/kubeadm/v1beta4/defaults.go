@@ -205,3 +205,15 @@ func SetDefaults_ResetConfiguration(obj *ResetConfiguration) {
 		obj.CertificatesDir = DefaultCertificatesDir
 	}
 }
+
+// SetDefaults_EnvVar assigns default values for EnvVar.
+// +k8s:defaulter-gen=covers
+func SetDefaults_EnvVar(obj *EnvVar) {
+	if obj.ValueFrom != nil {
+		if obj.ValueFrom.FieldRef != nil {
+			if obj.ValueFrom.FieldRef.APIVersion == "" {
+				obj.ValueFrom.FieldRef.APIVersion = "v1"
+			}
+		}
+	}
+}

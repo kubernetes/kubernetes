@@ -69,6 +69,17 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		})
 	})
 
+	/*
+		Release: v1.29
+		Testname: API Chunking, server should return chunks of results for list calls
+		Description: Create a large number of PodTemplates. Attempt to retrieve the first chunk with limit set;
+		the server MUST return the chunk of the size not exceeding the limit with RemainingItems set in the response.
+		Attempt to retrieve the remaining items by providing the received continuation token and limit;
+		the server MUST return the remaining items in chunks of the size not exceeding the limit, with appropriately
+		set RemainingItems field in the response and with the ResourceVersion returned in the first response.
+		Attempt to list all objects at once without setting the limit; the server MUST return all items in a single
+		response.
+	*/
 	framework.ConformanceIt("should return chunks of results for list calls", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
@@ -90,7 +101,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				if len(lastRV) == 0 {
 					lastRV = list.ResourceVersion
 				}
-				framework.ExpectEqual(list.ResourceVersion, lastRV)
+				gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))
 				if list.GetContinue() == "" {
 					gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
 				} else {
@@ -98,7 +109,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 					gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
 				}
 				for _, item := range list.Items {
-					framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+					gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 					found++
 				}
 				if len(list.Continue) == 0 {
@@ -116,6 +127,20 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		gomega.Expect(list.Items).To(gomega.HaveLen(numberOfTotalResources))
 	})
 
+	/*
+		Release: v1.29
+		Testname: API Chunking, server should support continue listing from the last key even if the original version has been compacted away
+		Description: Create a large number of PodTemplates. Attempt to retrieve the first chunk with limit set;
+		the server MUST return the chunk of the size not exceeding the limit with RemainingItems set in the response.
+		Attempt to retrieve the second page until the continuation token expires; the server MUST return a
+		continuation token for inconsistent list continuation.
+		Attempt to retrieve the second page with the received inconsistent list continuation token; the server
+		MUST return the number of items not exceeding the limit, a new continuation token and appropriately set
+		RemainingItems field in the response.
+		Attempt to retrieve the remaining pages by passing the received continuation token; the server
+		MUST return the remaining items in chunks of the size not exceeding the limit, with appropriately
+		set RemainingItems field in the response and with the ResourceVersion returned as part of the inconsistent list.
+	*/
 	framework.ConformanceIt("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent [Slow]", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
@@ -177,7 +202,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
 		}
 		for _, item := range list.Items {
-			framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+			gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 			found++
 		}
 
@@ -195,9 +220,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			}
 			framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 			gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
-			framework.ExpectEqual(list.ResourceVersion, lastRV)
+			gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))
 			for _, item := range list.Items {
-				framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+				gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 				found++
 			}
 			if len(list.Continue) == 0 {

@@ -96,7 +96,7 @@ func WaitForTotalHealthy(ctx context.Context, c clientset.Interface, timeout tim
 		return len(notReady) == 0 && len(missingPodsPerNode) == 0, nil
 	})
 
-	if err != nil && err != wait.ErrWaitTimeout {
+	if err != nil && !wait.Interrupted(err) {
 		return err
 	}
 

@@ -23,12 +23,18 @@ import (
 
 	"github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+)
+
+const (
+	defaultWebhookName = "default"
 )
 
 // BuiltInAuthorizationOptions contains all build-in authorization options for API Server
@@ -62,7 +68,6 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 		return nil
 	}
 	var allErrors []error
-
 	if len(o.Modes) == 0 {
 		allErrors = append(allErrors, fmt.Errorf("at least one authorization-mode must be passed"))
 	}
@@ -125,15 +130,54 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ToAuthorizationConfig convert BuiltInAuthorizationOptions to authorizer.Config
-func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.Config {
-	return authorizer.Config{
-		AuthorizationModes:          o.Modes,
-		PolicyFile:                  o.PolicyFile,
-		WebhookConfigFile:           o.WebhookConfigFile,
-		WebhookVersion:              o.WebhookVersion,
-		WebhookCacheAuthorizedTTL:   o.WebhookCacheAuthorizedTTL,
-		WebhookCacheUnauthorizedTTL: o.WebhookCacheUnauthorizedTTL,
-		VersionedInformerFactory:    versionedInformerFactory,
-		WebhookRetryBackoff:         o.WebhookRetryBackoff,
+func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) (authorizer.Config, error) {
+
+	authzConfiguration, err := o.buildAuthorizationConfiguration()
+	if err != nil {
+		return authorizer.Config{}, fmt.Errorf("failed to build authorization config: %s", err)
 	}
+
+	return authorizer.Config{
+		PolicyFile:               o.PolicyFile,
+		VersionedInformerFactory: versionedInformerFactory,
+		WebhookRetryBackoff:      o.WebhookRetryBackoff,
+
+		AuthorizationConfiguration: authzConfiguration,
+	}, nil
+}
+
+// buildAuthorizationConfiguration converts existing flags to the AuthorizationConfiguration format
+func (o *BuiltInAuthorizationOptions) buildAuthorizationConfiguration() (*authzconfig.AuthorizationConfiguration, error) {
+	var authorizers []authzconfig.AuthorizerConfiguration
+
+	if len(o.Modes) != sets.NewString(o.Modes...).Len() {
+		return nil, fmt.Errorf("modes should not be repeated in --authorization-mode")
+	}
+
+	for _, mode := range o.Modes {
+		switch mode {
+		case authzmodes.ModeWebhook:
+			authorizers = append(authorizers, authzconfig.AuthorizerConfiguration{
+				Type: authzconfig.TypeWebhook,
+				Webhook: &authzconfig.WebhookConfiguration{
+					Name:            defaultWebhookName,
+					AuthorizedTTL:   metav1.Duration{Duration: o.WebhookCacheAuthorizedTTL},
+					UnauthorizedTTL: metav1.Duration{Duration: o.WebhookCacheUnauthorizedTTL},
+					// Timeout and FailurePolicy are required for the new configuration.
+					// Setting these two implicitly to preserve backward compatibility.
+					Timeout:                    metav1.Duration{Duration: 30 * time.Second},
+					FailurePolicy:              authzconfig.FailurePolicyNoOpinion,
+					SubjectAccessReviewVersion: o.WebhookVersion,
+					ConnectionInfo: authzconfig.WebhookConnectionInfo{
+						Type:           authzconfig.AuthorizationWebhookConnectionInfoTypeKubeConfig,
+						KubeConfigFile: &o.WebhookConfigFile,
+					},
+				},
+			})
+		default:
+			authorizers = append(authorizers, authzconfig.AuthorizerConfiguration{Type: authzconfig.AuthorizerType(mode)})
+		}
+	}
+
+	return &authzconfig.AuthorizationConfiguration{Authorizers: authorizers}, nil
 }

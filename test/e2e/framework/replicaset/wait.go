@@ -37,7 +37,7 @@ func WaitForReadyReplicaSet(ctx context.Context, c clientset.Interface, ns, name
 		}
 		return *(rs.Spec.Replicas) == rs.Status.Replicas && *(rs.Spec.Replicas) == rs.Status.ReadyReplicas, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never became ready", name)
 	}
 	return err
@@ -59,7 +59,7 @@ func WaitForReplicaSetTargetAvailableReplicasWithTimeout(ctx context.Context, c 
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.AvailableReplicas == targetReplicaNum, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of .status.availableReplicas", replicaSet.Name)
 	}
 	return err

@@ -27,14 +27,19 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/apis/apiserver/install"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -45,6 +50,18 @@ import (
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	"k8s.io/utils/pointer"
+)
+
+const (
+	oidcIssuerURLFlag      = "oidc-issuer-url"
+	oidcClientIDFlag       = "oidc-client-id"
+	oidcCAFileFlag         = "oidc-ca-file"
+	oidcUsernameClaimFlag  = "oidc-username-claim"
+	oidcUsernamePrefixFlag = "oidc-username-prefix"
+	oidcGroupsClaimFlag    = "oidc-groups-claim"
+	oidcGroupsPrefixFlag   = "oidc-groups-prefix"
+	oidcSigningAlgsFlag    = "oidc-signing-algs"
+	oidcRequiredClaimFlag  = "oidc-required-claim"
 )
 
 // BuiltInAuthenticationOptions contains all build-in authentication options for API Server
@@ -58,6 +75,8 @@ type BuiltInAuthenticationOptions struct {
 	ServiceAccounts *ServiceAccountAuthenticationOptions
 	TokenFile       *TokenFileAuthenticationOptions
 	WebHook         *WebHookAuthenticationOptions
+
+	AuthenticationConfigFile string
 
 	TokenSuccessCacheTTL time.Duration
 	TokenFailureCacheTTL time.Duration
@@ -84,6 +103,9 @@ type OIDCAuthenticationOptions struct {
 	GroupsPrefix   string
 	SigningAlgs    []string
 	RequiredClaims map[string]string
+
+	// areFlagsConfigured is a function that returns true if any of the oidc-* flags are configured.
+	areFlagsConfigured func() bool
 }
 
 // ServiceAccountAuthenticationOptions contains service account authentication options for API Server
@@ -154,7 +176,7 @@ func (o *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOp
 
 // WithOIDC set default value for OIDC authentication
 func (o *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
-	o.OIDC = &OIDCAuthenticationOptions{}
+	o.OIDC = &OIDCAuthenticationOptions{areFlagsConfigured: func() bool { return false }}
 	return o
 }
 
@@ -190,9 +212,7 @@ func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 func (o *BuiltInAuthenticationOptions) Validate() []error {
 	var allErrors []error
 
-	if o.OIDC != nil && (len(o.OIDC.IssuerURL) > 0) != (len(o.OIDC.ClientID) > 0) {
-		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
-	}
+	allErrors = append(allErrors, o.validateOIDCOptions()...)
 
 	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) > 0 {
 		seen := make(map[string]bool)
@@ -274,45 +294,63 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	if o.OIDC != nil {
-		fs.StringVar(&o.OIDC.IssuerURL, "oidc-issuer-url", o.OIDC.IssuerURL, ""+
+		fs.StringVar(&o.OIDC.IssuerURL, oidcIssuerURLFlag, o.OIDC.IssuerURL, ""+
 			"The URL of the OpenID issuer, only HTTPS scheme will be accepted. "+
 			"If set, it will be used to verify the OIDC JSON Web Token (JWT).")
 
-		fs.StringVar(&o.OIDC.ClientID, "oidc-client-id", o.OIDC.ClientID,
+		fs.StringVar(&o.OIDC.ClientID, oidcClientIDFlag, o.OIDC.ClientID,
 			"The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set.")
 
-		fs.StringVar(&o.OIDC.CAFile, "oidc-ca-file", o.OIDC.CAFile, ""+
+		fs.StringVar(&o.OIDC.CAFile, oidcCAFileFlag, o.OIDC.CAFile, ""+
 			"If set, the OpenID server's certificate will be verified by one of the authorities "+
 			"in the oidc-ca-file, otherwise the host's root CA set will be used.")
 
-		fs.StringVar(&o.OIDC.UsernameClaim, "oidc-username-claim", "sub", ""+
+		fs.StringVar(&o.OIDC.UsernameClaim, oidcUsernameClaimFlag, "sub", ""+
 			"The OpenID claim to use as the user name. Note that claims other than the default ('sub') "+
 			"is not guaranteed to be unique and immutable. This flag is experimental, please see "+
 			"the authentication documentation for further details.")
 
-		fs.StringVar(&o.OIDC.UsernamePrefix, "oidc-username-prefix", "", ""+
+		fs.StringVar(&o.OIDC.UsernamePrefix, oidcUsernamePrefixFlag, "", ""+
 			"If provided, all usernames will be prefixed with this value. If not provided, "+
 			"username claims other than 'email' are prefixed by the issuer URL to avoid "+
 			"clashes. To skip any prefixing, provide the value '-'.")
 
-		fs.StringVar(&o.OIDC.GroupsClaim, "oidc-groups-claim", "", ""+
+		fs.StringVar(&o.OIDC.GroupsClaim, oidcGroupsClaimFlag, "", ""+
 			"If provided, the name of a custom OpenID Connect claim for specifying user groups. "+
 			"The claim value is expected to be a string or array of strings. This flag is experimental, "+
 			"please see the authentication documentation for further details.")
 
-		fs.StringVar(&o.OIDC.GroupsPrefix, "oidc-groups-prefix", "", ""+
+		fs.StringVar(&o.OIDC.GroupsPrefix, oidcGroupsPrefixFlag, "", ""+
 			"If provided, all groups will be prefixed with this value to prevent conflicts with "+
 			"other authentication strategies.")
 
-		fs.StringSliceVar(&o.OIDC.SigningAlgs, "oidc-signing-algs", []string{"RS256"}, ""+
+		fs.StringSliceVar(&o.OIDC.SigningAlgs, oidcSigningAlgsFlag, []string{"RS256"}, ""+
 			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
 			"supported 'alg' header values are: RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 
-		fs.Var(cliflag.NewMapStringStringNoSplit(&o.OIDC.RequiredClaims), "oidc-required-claim", ""+
+		fs.Var(cliflag.NewMapStringStringNoSplit(&o.OIDC.RequiredClaims), oidcRequiredClaimFlag, ""+
 			"A key=value pair that describes a required claim in the ID Token. "+
 			"If set, the claim is verified to be present in the ID Token with a matching value. "+
 			"Repeat this flag to specify multiple claims.")
+
+		fs.StringVar(&o.AuthenticationConfigFile, "authentication-config", o.AuthenticationConfigFile, ""+
+			"File with Authentication Configuration to configure the JWT Token authenticator. "+
+			"Note: This feature is in Alpha since v1.29."+
+			"--feature-gate=StructuredAuthenticationConfiguration=true needs to be set for enabling this feature."+
+			"This feature is mutually exclusive with the oidc-* flags.")
+
+		o.OIDC.areFlagsConfigured = func() bool {
+			return fs.Changed(oidcIssuerURLFlag) ||
+				fs.Changed(oidcClientIDFlag) ||
+				fs.Changed(oidcCAFileFlag) ||
+				fs.Changed(oidcUsernameClaimFlag) ||
+				fs.Changed(oidcUsernamePrefixFlag) ||
+				fs.Changed(oidcGroupsClaimFlag) ||
+				fs.Changed(oidcGroupsPrefixFlag) ||
+				fs.Changed(oidcSigningAlgsFlag) ||
+				fs.Changed(oidcRequiredClaimFlag)
+		}
 	}
 
 	if o.RequestHeader != nil {
@@ -401,7 +439,14 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		}
 	}
 
-	if o.OIDC != nil && len(o.OIDC.IssuerURL) > 0 && len(o.OIDC.ClientID) > 0 {
+	// When the StructuredAuthenticationConfiguration feature is enabled and the authentication config file is provided,
+	// load the authentication config from the file.
+	if len(o.AuthenticationConfigFile) > 0 {
+		var err error
+		if ret.AuthenticationConfig, err = loadAuthenticationConfig(o.AuthenticationConfigFile); err != nil {
+			return kubeauthenticator.Config{}, err
+		}
+	} else if o.OIDC != nil && len(o.OIDC.IssuerURL) > 0 && len(o.OIDC.ClientID) > 0 {
 		usernamePrefix := o.OIDC.UsernamePrefix
 
 		if o.OIDC.UsernamePrefix == "" && o.OIDC.UsernameClaim != "email" {
@@ -458,11 +503,15 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		authConfig := &apiserver.AuthenticationConfiguration{
 			JWT: []apiserver.JWTAuthenticator{jwtAuthenticator},
 		}
-		if err := apiservervalidation.ValidateAuthenticationConfiguration(authConfig).ToAggregate(); err != nil {
-			return kubeauthenticator.Config{}, err
-		}
+
 		ret.AuthenticationConfig = authConfig
 		ret.OIDCSigningAlgs = o.OIDC.SigningAlgs
+	}
+
+	if ret.AuthenticationConfig != nil {
+		if err := apiservervalidation.ValidateAuthenticationConfiguration(ret.AuthenticationConfig).ToAggregate(); err != nil {
+			return kubeauthenticator.Config{}, err
+		}
 	}
 
 	if o.RequestHeader != nil {
@@ -583,4 +632,63 @@ func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltIn
 		klog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
 		o.Anonymous.Allow = false
 	}
+}
+
+func (o *BuiltInAuthenticationOptions) validateOIDCOptions() []error {
+	var allErrors []error
+
+	// Existing validation when jwt authenticator is configured with oidc-* flags
+	if len(o.AuthenticationConfigFile) == 0 {
+		if o.OIDC != nil && o.OIDC.areFlagsConfigured() && (len(o.OIDC.IssuerURL) == 0 || len(o.OIDC.ClientID) == 0) {
+			allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id must be specified together when any oidc-* flags are set"))
+		}
+
+		return allErrors
+	}
+
+	// New validation when authentication config file is provided
+
+	// Authentication config file is only supported when the StructuredAuthenticationConfiguration feature is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
+		allErrors = append(allErrors, fmt.Errorf("set --feature-gates=%s=true to use authentication-config file", genericfeatures.StructuredAuthenticationConfiguration))
+	}
+
+	// Authentication config file and oidc-* flags are mutually exclusive
+	if o.OIDC != nil && o.OIDC.areFlagsConfigured() {
+		allErrors = append(allErrors, fmt.Errorf("authentication-config file and oidc-* flags are mutually exclusive"))
+	}
+
+	return allErrors
+}
+
+var (
+	cfgScheme = runtime.NewScheme()
+	codecs    = serializer.NewCodecFactory(cfgScheme, serializer.EnableStrict)
+)
+
+func init() {
+	install.Install(cfgScheme)
+}
+
+// loadAuthenticationConfig parses the authentication configuration from the given file and returns it.
+func loadAuthenticationConfig(configFilePath string) (*apiserver.AuthenticationConfiguration, error) {
+	// read from file
+	data, err := os.ReadFile(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("empty config file %q", configFilePath)
+	}
+
+	decodedObj, err := runtime.Decode(codecs.UniversalDecoder(), data)
+	if err != nil {
+		return nil, err
+	}
+	configuration, ok := decodedObj.(*apiserver.AuthenticationConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("expected AuthenticationConfiguration, got %T", decodedObj)
+	}
+
+	return configuration, nil
 }

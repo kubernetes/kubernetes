@@ -315,7 +315,7 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 		}
 		return true, nil
 	})
-	if waitErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(waitErr) {
 		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %v", lastUpdateError)
 	}
 	if waitErr != nil {

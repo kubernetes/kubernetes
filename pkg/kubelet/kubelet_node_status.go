@@ -52,6 +52,9 @@ func (kl *Kubelet) registerWithAPIServer() {
 	if kl.registrationCompleted {
 		return
 	}
+
+	kl.nodeStartupLatencyTracker.RecordAttemptRegisterNode()
+
 	step := 100 * time.Millisecond
 
 	for {
@@ -85,6 +88,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	_, err := kl.kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	if err == nil {
+		kl.nodeStartupLatencyTracker.RecordRegisteredNewNode()
 		return true
 	}
 
@@ -633,6 +637,12 @@ func (kl *Kubelet) patchNodeStatus(originalNode, node *v1.Node) (*v1.Node, error
 	}
 	kl.lastStatusReportTime = kl.clock.Now()
 	kl.setLastObservedNodeAddresses(updatedNode.Status.Addresses)
+
+	readyIdx, readyCondition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeReady)
+	if readyIdx >= 0 && readyCondition.Status == v1.ConditionTrue {
+		kl.nodeStartupLatencyTracker.RecordNodeReady()
+	}
+
 	return updatedNode, nil
 }
 

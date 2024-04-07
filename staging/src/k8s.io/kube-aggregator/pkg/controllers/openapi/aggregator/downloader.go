@@ -37,18 +37,18 @@ type cacheableDownloader struct {
 	spec       *spec.Swagger
 }
 
-// Creates a downloader that also returns the etag, making it useful to use as a cached dependency.
-func NewCacheableDownloader(downloader *Downloader, handler http.Handler) cached.Data[*spec.Swagger] {
+// NewCacheableDownloader creates a downloader that also returns the etag, making it useful to use as a cached dependency.
+func NewCacheableDownloader(downloader *Downloader, handler http.Handler) cached.Value[*spec.Swagger] {
 	return &cacheableDownloader{
 		downloader: downloader,
 		handler:    handler,
 	}
 }
 
-func (d *cacheableDownloader) Get() cached.Result[*spec.Swagger] {
+func (d *cacheableDownloader) Get() (*spec.Swagger, string, error) {
 	swagger, etag, status, err := d.downloader.Download(d.handler, d.etag)
 	if err != nil {
-		return cached.NewResultErr[*spec.Swagger](err)
+		return nil, "", err
 	}
 	switch status {
 	case http.StatusNotModified:
@@ -61,11 +61,11 @@ func (d *cacheableDownloader) Get() cached.Result[*spec.Swagger] {
 		}
 		fallthrough
 	case http.StatusNotFound:
-		return cached.NewResultErr[*spec.Swagger](ErrAPIServiceNotFound)
+		return nil, "", ErrAPIServiceNotFound
 	default:
-		return cached.NewResultErr[*spec.Swagger](fmt.Errorf("invalid status code: %v", status))
+		return nil, "", fmt.Errorf("invalid status code: %v", status)
 	}
-	return cached.NewResultOK(d.spec, d.etag)
+	return d.spec, d.etag, nil
 }
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.

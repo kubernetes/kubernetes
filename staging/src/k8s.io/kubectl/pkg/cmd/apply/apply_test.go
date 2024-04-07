@@ -2403,7 +2403,7 @@ kind: Secret
 metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
-    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/contains-group-kinds: ReplicationController
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
@@ -2437,7 +2437,7 @@ kind: Secret
 metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
-    applyset.kubernetes.io/contains-group-resources: replicationcontrollers,services
+    applyset.kubernetes.io/contains-group-kinds: ReplicationController,Service
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
@@ -2472,7 +2472,7 @@ kind: Secret
 metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
-    applyset.kubernetes.io/contains-group-resources: replicationcontrollers,services
+    applyset.kubernetes.io/contains-group-kinds: ReplicationController,Service
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
@@ -2507,7 +2507,7 @@ kind: Secret
 metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
-    applyset.kubernetes.io/contains-group-resources: services
+    applyset.kubernetes.io/contains-group-kinds: Service
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
@@ -2524,60 +2524,60 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 	defer tf.Cleanup()
 
 	type testCase struct {
-		grsAnnotation     string
+		gksAnnotation     string
 		toolingAnnotation string
 		idLabel           string
 		expectErr         string
 	}
 	validIDLabel := "applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1"
 	validToolingAnnotation := "kubectl/v1.27.0"
-	validGrsAnnotation := "deployments.apps,namespaces,secrets"
+	validGksAnnotation := "Deployment.apps,Namespace,Secret"
 
 	for name, test := range map[string]testCase{
 		"group-resources annotation is required": {
-			grsAnnotation:     "",
+			gksAnnotation:     "",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": kubectl requires the \"applyset.kubernetes.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": kubectl requires the \"applyset.kubernetes.io/contains-group-kinds\" annotation to be set on all ApplySet parent objects",
 		},
 		"group-resources annotation should not contain invalid resources": {
-			grsAnnotation:     "does-not-exist",
+			gksAnnotation:     "does-not-exist",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": invalid group resource in \"applyset.kubernetes.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": could not find mapping for kind in \"applyset.kubernetes.io/contains-group-kinds\" annotation: no matches for kind \"does-not-exist\" in group \"\"",
 		},
 		"tooling annotation is required": {
-			grsAnnotation:     validGrsAnnotation,
+			gksAnnotation:     validGksAnnotation,
 			toolingAnnotation: "",
 			idLabel:           validIDLabel,
 			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is missing required annotation \"applyset.kubernetes.io/tooling\"",
 		},
 		"tooling annotation must have kubectl prefix": {
-			grsAnnotation:     validGrsAnnotation,
+			gksAnnotation:     validGksAnnotation,
 			toolingAnnotation: "helm/v3",
 			idLabel:           validIDLabel,
 			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
 		},
 		"tooling annotation with invalid prefix with one segment can be parsed": {
-			grsAnnotation:     validGrsAnnotation,
+			gksAnnotation:     validGksAnnotation,
 			toolingAnnotation: "helm",
 			idLabel:           validIDLabel,
 			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is managed by tooling \"helm\" instead of \"kubectl\"",
 		},
 		"tooling annotation with invalid prefix with many segments can be parsed": {
-			grsAnnotation:     validGrsAnnotation,
+			gksAnnotation:     validGksAnnotation,
 			toolingAnnotation: "example.com/tool/why/v1",
 			idLabel:           validIDLabel,
 			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is managed by tooling \"example.com/tool/why\" instead of \"kubectl\"",
 		},
 		"ID label is required": {
-			grsAnnotation:     validGrsAnnotation,
+			gksAnnotation:     validGksAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "",
 			expectErr:         "error: ApplySet parent object \"secrets./my-set\" exists and does not have required label applyset.kubernetes.io/id",
 		},
 		"ID label must match the ApplySet's real ID": {
-			grsAnnotation:     validGrsAnnotation,
+			gksAnnotation:     validGksAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "somethingelse",
 			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./my-set\" exists and has incorrect value for label \"applyset.kubernetes.io/id\" (got: somethingelse, want: %s)", validIDLabel),
@@ -2596,8 +2596,8 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			secret.SetNamespace("test")
 			annotations := make(map[string]string)
 			labels := make(map[string]string)
-			if test.grsAnnotation != "" {
-				annotations[ApplySetGRsAnnotation] = test.grsAnnotation
+			if test.gksAnnotation != "" {
+				annotations[ApplySetGKsAnnotation] = test.gksAnnotation
 			}
 			if test.toolingAnnotation != "" {
 				annotations[ApplySetToolingAnnotation] = test.toolingAnnotation
@@ -2670,7 +2670,7 @@ kind: ApplySet
 metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: test
-    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/contains-group-kinds: ReplicationController
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:

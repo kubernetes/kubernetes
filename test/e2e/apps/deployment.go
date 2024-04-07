@@ -62,7 +62,7 @@ import (
 	testutil "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -670,11 +670,6 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 	}
 }
 
-func intOrStrP(num int) *intstr.IntOrString {
-	intstr := intstr.FromInt32(int32(num))
-	return &intstr
-}
-
 func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentName string) {
 	deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -737,7 +732,7 @@ func testDeleteDeployment(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 	newRS, err := testutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
-	framework.ExpectNotEqual(newRS, nilRs)
+	gomega.Expect(newRS).NotTo(gomega.Equal(nilRs))
 	stopDeployment(ctx, c, ns, deploymentName)
 }
 
@@ -835,7 +830,7 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	}
 	rsName := "test-cleanup-controller"
 	replicas := int32(1)
-	revisionHistoryLimit := utilpointer.Int32(0)
+	revisionHistoryLimit := ptr.To[int32](0)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -928,8 +923,8 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Creating deployment %q", deploymentName)
 	newDeployment := e2edeployment.NewDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
 	newDeployment.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{
-		MaxUnavailable: intOrStrP(0),
-		MaxSurge:       intOrStrP(1),
+		MaxUnavailable: ptr.To(intstr.FromInt32(0)),
+		MaxSurge:       ptr.To(intstr.FromInt32(1)),
 	}
 	newDeployment.Spec.MinReadySeconds = int32(10)
 	_, err = c.AppsV1().Deployments(ns).Create(ctx, newDeployment, metav1.CreateOptions{})
@@ -1197,8 +1192,8 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 	deploymentName := "webserver-deployment"
 	d := e2edeployment.NewDeployment(deploymentName, replicas, podLabels, WebserverImageName, WebserverImage, appsv1.RollingUpdateDeploymentStrategyType)
 	d.Spec.Strategy.RollingUpdate = new(appsv1.RollingUpdateDeployment)
-	d.Spec.Strategy.RollingUpdate.MaxSurge = intOrStrP(3)
-	d.Spec.Strategy.RollingUpdate.MaxUnavailable = intOrStrP(2)
+	d.Spec.Strategy.RollingUpdate.MaxSurge = ptr.To(intstr.FromInt32(3))
+	d.Spec.Strategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(2))
 
 	framework.Logf("Creating deployment %q", deploymentName)
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
@@ -1380,8 +1375,8 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(ctx context.Context
 	// performing a rollout.
 	setAffinities(d, false)
 	d.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{
-		MaxSurge:       intOrStrP(1),
-		MaxUnavailable: intOrStrP(0),
+		MaxSurge:       ptr.To(intstr.FromInt32(1)),
+		MaxUnavailable: ptr.To(intstr.FromInt32(0)),
 	}
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
 	framework.ExpectNoError(err)

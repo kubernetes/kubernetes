@@ -2022,6 +2022,8 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	EnableRecoverFromExpansionFailure bool
 	// Allow to validate the label value of the label selector
 	AllowInvalidLabelValueInSelector bool
+	// Allow to validate the API group of the data source and data source reference
+	AllowInvalidAPIGroupInDataSourceOrRef bool
 }
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
@@ -2034,6 +2036,10 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 		// If there's no old PVC, use the options based solely on feature enablement
 		return opts
 	}
+
+	// If the old object had an invalid API group in the data source or data source reference, continue to allow it in the new object
+	opts.AllowInvalidAPIGroupInDataSourceOrRef = allowInvalidAPIGroupInDataSourceOrRef(&oldPvc.Spec)
+
 	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
 		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
 	}
@@ -2077,6 +2083,17 @@ func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTe
 	return opts
 }
 
+// allowInvalidAPIGroupInDataSourceOrRef returns true if the spec contains a data source or data source reference with an API group
+func allowInvalidAPIGroupInDataSourceOrRef(spec *core.PersistentVolumeClaimSpec) bool {
+	if spec.DataSource != nil && spec.DataSource.APIGroup != nil {
+		return true
+	}
+	if spec.DataSourceRef != nil && spec.DataSourceRef.APIGroup != nil {
+		return true
+	}
+	return false
+}
+
 // ValidatePersistentVolumeClaim validates a PersistentVolumeClaim
 func ValidatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMeta(&pvc.ObjectMeta, true, ValidatePersistentVolumeName, field.NewPath("metadata"))
@@ -2085,7 +2102,7 @@ func ValidatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim, opts Persist
 }
 
 // validateDataSource validates a DataSource/DataSourceRef in a PersistentVolumeClaimSpec
-func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *field.Path) field.ErrorList {
+func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *field.Path, allowInvalidAPIGroupInDataSourceOrRef bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(dataSource.Name) == 0 {
@@ -2101,12 +2118,17 @@ func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *fie
 	if len(apiGroup) == 0 && dataSource.Kind != "PersistentVolumeClaim" {
 		allErrs = append(allErrs, field.Invalid(fldPath, dataSource.Kind, "must be 'PersistentVolumeClaim' when referencing the default apiGroup"))
 	}
+	if len(apiGroup) > 0 && !allowInvalidAPIGroupInDataSourceOrRef {
+		for _, errString := range validation.IsDNS1123Subdomain(apiGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), apiGroup, errString))
+		}
+	}
 
 	return allErrs
 }
 
 // validateDataSourceRef validates a DataSourceRef in a PersistentVolumeClaimSpec
-func validateDataSourceRef(dataSourceRef *core.TypedObjectReference, fldPath *field.Path) field.ErrorList {
+func validateDataSourceRef(dataSourceRef *core.TypedObjectReference, fldPath *field.Path, allowInvalidAPIGroupInDataSourceOrRef bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(dataSourceRef.Name) == 0 {
@@ -2121,6 +2143,11 @@ func validateDataSourceRef(dataSourceRef *core.TypedObjectReference, fldPath *fi
 	}
 	if len(apiGroup) == 0 && dataSourceRef.Kind != "PersistentVolumeClaim" {
 		allErrs = append(allErrs, field.Invalid(fldPath, dataSourceRef.Kind, "must be 'PersistentVolumeClaim' when referencing the default apiGroup"))
+	}
+	if len(apiGroup) > 0 && !allowInvalidAPIGroupInDataSourceOrRef {
+		for _, errString := range validation.IsDNS1123Subdomain(apiGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), apiGroup, errString))
+		}
 	}
 
 	if dataSourceRef.Namespace != nil && len(*dataSourceRef.Namespace) > 0 {
@@ -2185,10 +2212,10 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	}
 
 	if spec.DataSource != nil {
-		allErrs = append(allErrs, validateDataSource(spec.DataSource, fldPath.Child("dataSource"))...)
+		allErrs = append(allErrs, validateDataSource(spec.DataSource, fldPath.Child("dataSource"), opts.AllowInvalidAPIGroupInDataSourceOrRef)...)
 	}
 	if spec.DataSourceRef != nil {
-		allErrs = append(allErrs, validateDataSourceRef(spec.DataSourceRef, fldPath.Child("dataSourceRef"))...)
+		allErrs = append(allErrs, validateDataSourceRef(spec.DataSourceRef, fldPath.Child("dataSourceRef"), opts.AllowInvalidAPIGroupInDataSourceOrRef)...)
 	}
 	if spec.DataSourceRef != nil && spec.DataSourceRef.Namespace != nil && len(*spec.DataSourceRef.Namespace) > 0 {
 		if spec.DataSource != nil {

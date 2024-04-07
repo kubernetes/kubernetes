@@ -48,7 +48,7 @@ const (
 )
 
 func TestGetNetworkByName(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
 	network, err := hns.getNetworkByName(Network.Name)
@@ -66,7 +66,7 @@ func TestGetNetworkByName(t *testing.T) {
 }
 
 func TestGetAllEndpointsByNetwork(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
 	ipv4Config := &hcn.IpConfig{
@@ -111,7 +111,7 @@ func TestGetAllEndpointsByNetwork(t *testing.T) {
 }
 
 func TestGetEndpointByID(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -150,7 +150,7 @@ func TestGetEndpointByID(t *testing.T) {
 }
 
 func TestGetEndpointByIpAddressAndName(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -200,7 +200,7 @@ func TestGetEndpointByIpAddressAndName(t *testing.T) {
 }
 
 func TestCreateEndpointLocal(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
 	endpoint := &endpointsInfo{
@@ -238,7 +238,7 @@ func TestCreateEndpointLocal(t *testing.T) {
 }
 
 func TestCreateEndpointRemote(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 	providerAddress := epPaAddress
 
@@ -281,7 +281,7 @@ func TestCreateEndpointRemote(t *testing.T) {
 }
 
 func TestDeleteEndpoint(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -316,7 +316,7 @@ func TestDeleteEndpoint(t *testing.T) {
 }
 
 func TestGetLoadBalancerExisting(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
@@ -389,7 +389,7 @@ func TestGetLoadBalancerExisting(t *testing.T) {
 }
 
 func TestGetLoadBalancerNew(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 	// We keep this empty to ensure we test for new load balancer creation.
 	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
@@ -441,7 +441,7 @@ func TestGetLoadBalancerNew(t *testing.T) {
 }
 
 func TestDeleteLoadBalancer(t *testing.T) {
-	hns := hns{}
+	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{

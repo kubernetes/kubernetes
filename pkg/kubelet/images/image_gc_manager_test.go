@@ -48,7 +48,6 @@ func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provide
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
-		sandboxImage:  sandboxImage,
 		tracer:        oteltrace.NewNoopTracerProvider().Tracer(""),
 	}, fakeRuntime
 }
@@ -202,8 +201,9 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
 	fakeRuntime.ImageList = []container.Image{
 		{
-			ID:   sandboxImage,
-			Size: 1024,
+			ID:     sandboxImage,
+			Size:   1024,
+			Pinned: true,
 		},
 	}
 
@@ -233,7 +233,7 @@ func TestDeletePinnedImage(t *testing.T) {
 
 	err := manager.DeleteUnusedImages(ctx)
 	assert := assert.New(t)
-	assert.Len(fakeRuntime.ImageList, 2)
+	assert.Len(fakeRuntime.ImageList, 1)
 	require.NoError(t, err)
 }
 
@@ -719,7 +719,7 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, "", oteltrace.NewNoopTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, oteltrace.NewNoopTracerProvider()); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}

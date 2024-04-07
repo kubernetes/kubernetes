@@ -63,11 +63,11 @@ const (
 type openAPISpecInfo struct {
 	apiService v1.APIService
 	// spec is the cached OpenAPI spec
-	spec cached.Replaceable[*spec.Swagger]
+	spec cached.LastSuccess[*spec.Swagger]
 
 	// The downloader is used only for non-local apiservices to
 	// re-update the spec every so often.
-	downloader cached.Data[*spec.Swagger]
+	downloader cached.Value[*spec.Swagger]
 }
 
 type specAggregator struct {
@@ -88,7 +88,7 @@ func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggr
 		downloader:            downloader,
 		specsByAPIServiceName: map[string]*openAPISpecInfo{},
 	}
-	cachedAggregatorSpec := cached.NewResultOK(aggregatorSpec, "never-changes")
+	cachedAggregatorSpec := cached.Static(aggregatorSpec, "never-changes")
 	s.addLocalSpec(fmt.Sprintf(localDelegateChainNamePattern, 0), cachedAggregatorSpec)
 	for i, handler := range delegationHandlers {
 		name := fmt.Sprintf(localDelegateChainNamePattern, i+1)
@@ -132,55 +132,55 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	return s, nil
 }
 
-func (s *specAggregator) addLocalSpec(name string, spec cached.Data[*spec.Swagger]) {
+func (s *specAggregator) addLocalSpec(name string, cachedSpec cached.Value[*spec.Swagger]) {
 	service := v1.APIService{}
 	service.Name = name
 	info := &openAPISpecInfo{
 		apiService: service,
 	}
-	info.spec.Replace(spec)
+	info.spec.Store(cachedSpec)
 	s.specsByAPIServiceName[name] = info
 }
 
 // buildMergeSpecLocked creates a new cached mergeSpec from the list of cached specs.
-func (s *specAggregator) buildMergeSpecLocked() cached.Data[*spec.Swagger] {
+func (s *specAggregator) buildMergeSpecLocked() cached.Value[*spec.Swagger] {
 	apiServices := make([]*v1.APIService, 0, len(s.specsByAPIServiceName))
 	for k := range s.specsByAPIServiceName {
 		apiServices = append(apiServices, &s.specsByAPIServiceName[k].apiService)
 	}
 	sortByPriority(apiServices)
-	caches := make([]cached.Data[*spec.Swagger], len(apiServices))
+	caches := make([]cached.Value[*spec.Swagger], len(apiServices))
 	for i, apiService := range apiServices {
 		caches[i] = &(s.specsByAPIServiceName[apiService.Name].spec)
 	}
 
-	return cached.NewListMerger(func(results []cached.Result[*spec.Swagger]) cached.Result[*spec.Swagger] {
+	return cached.MergeList(func(results []cached.Result[*spec.Swagger]) (*spec.Swagger, string, error) {
 		var merged *spec.Swagger
 		etags := make([]string, 0, len(results))
 		for _, specInfo := range results {
-			result := specInfo.Get()
-			if result.Err != nil {
+			result, etag, err := specInfo.Get()
+			if err != nil {
 				// APIService name and err message will be included in
 				// the error message as part of decorateError
-				klog.Warning(result.Err)
+				klog.Warning(err)
 				continue
 			}
 			if merged == nil {
 				merged = &spec.Swagger{}
-				*merged = *result.Data
+				*merged = *result
 				// Paths, Definitions and parameters are set by
 				// MergeSpecsIgnorePathConflictRenamingDefinitionsAndParameters
 				merged.Paths = nil
 				merged.Definitions = nil
 				merged.Parameters = nil
 			}
-			etags = append(etags, result.Etag)
-			if err := aggregator.MergeSpecsIgnorePathConflictRenamingDefinitionsAndParameters(merged, result.Data); err != nil {
-				return cached.NewResultErr[*spec.Swagger](fmt.Errorf("failed to build merge specs: %v", err))
+			etags = append(etags, etag)
+			if err := aggregator.MergeSpecsIgnorePathConflictRenamingDefinitionsAndParameters(merged, result); err != nil {
+				return nil, "", fmt.Errorf("failed to build merge specs: %v", err)
 			}
 		}
 		// Printing the etags list is stable because it is sorted.
-		return cached.NewResultOK(merged, fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%#v", etags)))))
+		return merged, fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%#v", etags)))), nil
 	}, caches)
 }
 
@@ -191,15 +191,15 @@ func (s *specAggregator) updateServiceLocked(name string) error {
 	if !exists {
 		return ErrAPIServiceNotFound
 	}
-	result := specInfo.downloader.Get()
-	filteredResult := cached.NewTransformer[*spec.Swagger](func(result cached.Result[*spec.Swagger]) cached.Result[*spec.Swagger] {
-		if result.Err != nil {
-			return result
+	result, etag, err := specInfo.downloader.Get()
+	filteredResult := cached.Transform[*spec.Swagger](func(result *spec.Swagger, etag string, err error) (*spec.Swagger, string, error) {
+		if err != nil {
+			return nil, "", err
 		}
-		return cached.NewResultOK(aggregator.FilterSpecByPathsWithoutSideEffects(result.Data, []string{"/apis/"}), result.Etag)
-	}, result)
-	specInfo.spec.Replace(filteredResult)
-	return result.Err
+		return aggregator.FilterSpecByPathsWithoutSideEffects(result, []string{"/apis/"}), etag, nil
+	}, cached.Result[*spec.Swagger]{Value: result, Etag: etag, Err: err})
+	specInfo.spec.Store(filteredResult)
+	return err
 }
 
 // UpdateAPIServiceSpec updates the api service. It is thread safe.
@@ -246,11 +246,11 @@ func (s *specAggregator) RemoveAPIService(apiServiceName string) {
 
 // decorateError creates a new cache that wraps a downloader
 // cache the name of the apiservice to help with debugging.
-func decorateError(name string, cache cached.Data[*spec.Swagger]) cached.Data[*spec.Swagger] {
-	return cached.NewTransformer(func(result cached.Result[*spec.Swagger]) cached.Result[*spec.Swagger] {
-		if result.Err != nil {
-			return cached.NewResultErr[*spec.Swagger](fmt.Errorf("failed to download %v: %v", name, result.Err))
+func decorateError(name string, cache cached.Value[*spec.Swagger]) cached.Value[*spec.Swagger] {
+	return cached.Transform(func(result *spec.Swagger, etag string, err error) (*spec.Swagger, string, error) {
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to download %v: %v", name, err)
 		}
-		return result
+		return result, etag, err
 	}, cache)
 }

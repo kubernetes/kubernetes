@@ -89,12 +89,6 @@ type Options struct {
 	// Convert to OpenAPI v2.
 	V2 bool
 
-	// Only takes effect if the flag and V2 and both set to true. If the condition is reached,
-	// publish OpenAPI V2 but skip running the spec through ToStructuralOpenAPIV2
-	// This prevents XPreserveUnknownFields:true fields from being cleared
-	// Used only by server side apply
-	SkipFilterSchemaForKubectlOpenAPIV2Validation bool
-
 	// Strip value validation.
 	StripValueValidation bool
 
@@ -385,14 +379,14 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, opts Opti
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
 	// TODO: fix kubectl to understand additionalProperties=true
-	if schema == nil || ((opts.V2 && !opts.SkipFilterSchemaForKubectlOpenAPIV2Validation) && (schema.XPreserveUnknownFields || crdPreserveUnknownFields)) {
+	if schema == nil || (opts.V2 && (schema.XPreserveUnknownFields || crdPreserveUnknownFields)) {
 		ret = &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
 		}
 		// no, we cannot add more properties here, not even TypeMeta/ObjectMeta because kubectl will complain about
 		// unknown fields for anything else.
 	} else {
-		if opts.V2 && !opts.SkipFilterSchemaForKubectlOpenAPIV2Validation {
+		if opts.V2 {
 			schema = openapiv2.ToStructuralOpenAPIV2(schema)
 		}
 
@@ -429,7 +423,7 @@ func addEmbeddedProperties(s *spec.Schema, opts Options) {
 		addEmbeddedProperties(s.AdditionalProperties.Schema, opts)
 	}
 
-	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-preserve-unknown-fields"); ok && isTrue && opts.V2 && !opts.SkipFilterSchemaForKubectlOpenAPIV2Validation {
+	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-preserve-unknown-fields"); ok && isTrue && opts.V2 {
 		// don't add metadata properties if we're publishing to openapi v2 and are allowing unknown fields.
 		// adding these metadata properties makes kubectl refuse to validate unknown fields.
 		return

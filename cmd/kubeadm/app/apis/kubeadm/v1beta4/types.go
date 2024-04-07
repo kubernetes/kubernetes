@@ -58,6 +58,7 @@ type InitConfiguration struct {
 
 	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
 	// a secret in the cluster during the uploadcerts init phase.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	// +optional
 	CertificateKey string `json:"certificateKey,omitempty"`
 
@@ -157,7 +158,7 @@ type ControlPlaneComponent struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []corev1.EnvVar `json:"extraEnvs,omitempty"`
+	ExtraEnvs []EnvVar `json:"extraEnvs,omitempty"`
 }
 
 // APIServer holds settings necessary for API server deployments in the cluster
@@ -295,7 +296,7 @@ type LocalEtcd struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []corev1.EnvVar `json:"extraEnvs,omitempty"`
+	ExtraEnvs []EnvVar `json:"extraEnvs,omitempty"`
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	// +optional
@@ -372,6 +373,7 @@ type JoinControlPlane struct {
 
 	// CertificateKey is the key that is used for decryption of certificates after they are downloaded from the secret
 	// upon joining a new control plane node. The corresponding encryption key is in the InitConfiguration.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	// +optional
 	CertificateKey string `json:"certificateKey,omitempty"`
 }
@@ -505,4 +507,9 @@ type ResetConfiguration struct {
 type Arg struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+// EnvVar represents an environment variable present in a Container.
+type EnvVar struct {
+	corev1.EnvVar `json:",inline"`
 }

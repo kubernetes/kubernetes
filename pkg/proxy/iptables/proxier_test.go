@@ -2565,6 +2565,49 @@ func TestHealthCheckNodePort(t *testing.T) {
 	})
 }
 
+func TestDropInvalidRule(t *testing.T) {
+	for _, testcase := range []bool{false, true} {
+		t.Run(fmt.Sprintf("tcpLiberal %t", testcase), func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.conntrackTCPLiberal = testcase
+			fp.syncProxyRules()
+
+			expected := dedent.Dedent(`
+		*filter
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FIREWALL - [0:0]
+		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
+		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP`)
+			if !testcase {
+				expected += "\n-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP"
+			}
+
+			expected += dedent.Dedent(`
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+		COMMIT
+		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
+		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		COMMIT
+		`)
+
+			assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
+		})
+	}
+}
+
 func TestMasqueradeRule(t *testing.T) {
 	for _, testcase := range []bool{false, true} {
 		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)

@@ -83,7 +83,7 @@ func RunTestCreateWithTTL(ctx context.Context, t *testing.T, store storage.Inter
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckEventType(t, watch.Deleted, w)
+	testCheckEventType(t, w, watch.Deleted)
 }
 
 func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -214,15 +214,8 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 			}
 
 			if tt.expectedAlternatives == nil {
-				ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), tt.expectedOut, out)
+				expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), tt.expectedOut, out)
 			} else {
-				toInterfaceSlice := func(pods []*example.Pod) []interface{} {
-					result := make([]interface{}, 0, len(pods))
-					for i := range pods {
-						result = append(result, pods[i])
-					}
-					return result
-				}
 				ExpectContains(t, fmt.Sprintf("%s: incorrect pod", tt.name), toInterfaceSlice(tt.expectedAlternatives), out)
 			}
 		})
@@ -268,7 +261,7 @@ func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage
 				t.Errorf("expecting resource version to be updated, but get: %s", out.ResourceVersion)
 			}
 			out.ResourceVersion = storedObj.ResourceVersion
-			ExpectNoDiff(t, "incorrect pod:", tt.expectedObj, out)
+			expectNoDiff(t, "incorrect pod:", tt.expectedObj, out)
 		})
 	}
 }
@@ -310,7 +303,7 @@ func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.I
 				t.Errorf("expecting resource version to be updated, but get: %s", out.ResourceVersion)
 			}
 			out.ResourceVersion = storedObj.ResourceVersion
-			ExpectNoDiff(t, "incorrect pod:", storedObj, out)
+			expectNoDiff(t, "incorrect pod:", storedObj, out)
 			obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", UID: "A"}}
 			key, storedObj = testPropagateStore(ctx, t, store, obj)
 		})
@@ -1091,16 +1084,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 
 			if tt.expectedAlternatives == nil {
 				sort.Sort(sortablePodList(tt.expectedOut))
-				ExpectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
+				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 			} else {
-				toInterfaceSlice := func(podLists [][]example.Pod) []interface{} {
-					result := make([]interface{}, 0, len(podLists))
-					for i := range podLists {
-						sort.Sort(sortablePodList(podLists[i]))
-						result = append(result, podLists[i])
-					}
-					return result
-				}
 				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
 			}
 		})
@@ -1174,7 +1159,7 @@ func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.I
 			}
 			for j, wantPod := range tt.expectedOut {
 				getPod := &out.Items[j]
-				ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
+				expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
 			}
 		})
 	}
@@ -1417,15 +1402,8 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 			}
 
 			if tt.expectedAlternatives == nil {
-				ExpectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
+				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 			} else {
-				toInterfaceSlice := func(podLists [][]example.Pod) []interface{} {
-					result := make([]interface{}, 0, len(podLists))
-					for i := range podLists {
-						result = append(result, podLists[i])
-					}
-					return result
-				}
 				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
 			}
 		})
@@ -1498,7 +1476,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
 	if validation != nil {
 		validation(t, 1, 1)
 	}
@@ -1520,7 +1498,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	}
 	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods")
 	t.Logf("continue token was %d %s %v", rv, key, err)
-	ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if validation != nil {
 		validation(t, 0, 2)
 	}
@@ -1538,7 +1516,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
 	if validation != nil {
 		validation(t, 1, 1)
 	}
@@ -1557,7 +1535,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	ExpectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
 	if validation != nil {
 		validation(t, 1, 1)
 	}
@@ -1668,7 +1646,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	if len(out.Continue) == 0 {
 		t.Errorf("No continuation token set")
 	}
-	ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
 	if validation != nil {
 		validation(t, 2, 3)
 	}
@@ -1695,7 +1673,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	if len(out.Continue) != 0 {
 		t.Errorf("Unexpected continuation token set")
 	}
-	ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[3].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[3].storedObj}, out.Items)
 	if validation != nil {
 		validation(t, 2, 1)
 	}
@@ -1770,7 +1748,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
 
 	continueFromSecondItem := out.Continue
 
@@ -1830,7 +1808,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		t.Fatalf("No continuation token set")
 	}
 	validateResourceVersion := resourceVersionNotOlderThan(lastRVString)
-	ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
 	if err := validateResourceVersion(out.ResourceVersion); err != nil {
 		t.Fatal(err)
 	}
@@ -1848,7 +1826,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	ExpectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
+	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
 	if out.ResourceVersion != resolvedResourceVersionFromThirdItem {
 		t.Fatalf("Expected list resource version to be %s, got %s", resolvedResourceVersionFromThirdItem, out.ResourceVersion)
 	}
@@ -1928,7 +1906,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
-	ExpectNoDiff(t, "incorrect lists", result1, result2)
+	expectNoDiff(t, "incorrect lists", result1, result2)
 
 	// Now also verify the  ResourceVersionMatchNotOlderThan.
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
@@ -1946,7 +1924,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
-	ExpectNoDiff(t, "incorrect lists", result3, result4)
+	expectNoDiff(t, "incorrect lists", result3, result4)
 }
 
 func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, validation KeyValidation) {
@@ -2123,7 +2101,7 @@ func RunTestGuaranteedUpdateWithTTL(ctx context.Context, t *testing.T, store sto
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckEventType(t, watch.Deleted, w)
+	testCheckEventType(t, w, watch.Deleted)
 }
 
 func RunTestGuaranteedUpdateChecksStoredData(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {

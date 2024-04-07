@@ -60,6 +60,7 @@ type InitConfiguration struct {
 
 	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
 	// a secret in the cluster during the uploadcerts init phase.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	CertificateKey string
 
 	// SkipPhases is a list of phases to skip during command execution.
@@ -156,7 +157,7 @@ type ControlPlaneComponent struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []v1.EnvVar
+	ExtraEnvs []EnvVar
 }
 
 // APIServer holds settings necessary for API server deployments in the cluster
@@ -274,7 +275,7 @@ type LocalEtcd struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []v1.EnvVar
+	ExtraEnvs []EnvVar
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	ServerCertSANs []string
@@ -337,6 +338,7 @@ type JoinControlPlane struct {
 
 	// CertificateKey is the key that is used for decryption of certificates after they are downloaded from the secret
 	// upon joining a new control plane node. The corresponding encryption key is in the InitConfiguration.
+	// The certificate key is a hex encoded string that is an AES key of size 32 bytes.
 	CertificateKey string
 }
 
@@ -510,4 +512,9 @@ type ComponentConfigMap map[string]ComponentConfig
 type Arg struct {
 	Name  string
 	Value string
+}
+
+// EnvVar represents an environment variable present in a Container.
+type EnvVar struct {
+	v1.EnvVar
 }

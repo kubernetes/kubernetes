@@ -57,7 +57,7 @@ func (n *NodePodCIDRHandler) OnNodeAdd(node *v1.Node) {
 	if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
 		klog.ErrorS(nil, "Using NodeCIDR LocalDetector mode, current PodCIDRs are different than previous PodCIDRs, restarting",
 			"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPodCIDRs", n.podCIDRs)
-		panic("Current Node PodCIDRs are different than previous PodCIDRs, restarting")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 }
 
@@ -75,7 +75,7 @@ func (n *NodePodCIDRHandler) OnNodeUpdate(_, node *v1.Node) {
 	if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
 		klog.ErrorS(nil, "Using NodeCIDR LocalDetector mode, current PodCIDRs are different than previous PodCIDRs, restarting",
 			"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPODCIDRs", n.podCIDRs)
-		panic("Current Node PodCIDRs are different than previous PodCIDRs, restarting")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 }
 

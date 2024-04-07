@@ -19,6 +19,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	goflag "flag"
 	"fmt"
 	"net"
@@ -805,9 +806,8 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 
 	proxyMux := mux.NewPathRecorderMux("kube-proxy")
 	healthz.InstallHandler(proxyMux)
-	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.ComponentSLIs) {
-		slis.SLIMetricsWithReset{}.Install(proxyMux)
-	}
+	slis.SLIMetricsWithReset{}.Install(proxyMux)
+
 	proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -955,30 +955,73 @@ func (s *ProxyServer) birthCry() {
 //
 // The order of precedence is:
 //  1. if bindAddress is not 0.0.0.0 or ::, then it is used as the primary IP.
-//  2. if the Node object can be fetched, then its primary IP is used as the primary IP
-//     (and its secondary IP, if any, is just ignored).
-//  3. otherwise the primary node IP is 127.0.0.1.
-//
-// In all cases, the secondary IP is the zero IP of the other IP family.
+//  2. if the Node object can be fetched, then its address(es) is/are used
+//  3. otherwise the node IPs are 127.0.0.1 and ::1
 func detectNodeIPs(client clientset.Interface, hostname, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
-	nodeIP := netutils.ParseIPSloppy(bindAddress)
-	if nodeIP.IsUnspecified() {
-		nodeIP = utilnode.GetNodeIP(client, hostname)
-	}
-	if nodeIP == nil {
-		klog.InfoS("Can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
-		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
+	primaryFamily := v1.IPv4Protocol
+	nodeIPs := map[v1.IPFamily]net.IP{
+		v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
+		v1.IPv6Protocol: net.IPv6loopback,
 	}
 
-	if netutils.IsIPv4(nodeIP) {
-		return v1.IPv4Protocol, map[v1.IPFamily]net.IP{
-			v1.IPv4Protocol: nodeIP,
-			v1.IPv6Protocol: net.IPv6zero,
+	if ips := getNodeIPs(client, hostname); len(ips) > 0 {
+		if !netutils.IsIPv4(ips[0]) {
+			primaryFamily = v1.IPv6Protocol
 		}
-	} else {
-		return v1.IPv6Protocol, map[v1.IPFamily]net.IP{
-			v1.IPv4Protocol: net.IPv4zero,
-			v1.IPv6Protocol: nodeIP,
+		nodeIPs[primaryFamily] = ips[0]
+		if len(ips) > 1 {
+			// If more than one address is returned, they are guaranteed to be of different families
+			family := v1.IPv4Protocol
+			if !netutils.IsIPv4(ips[1]) {
+				family = v1.IPv6Protocol
+			}
+			nodeIPs[family] = ips[1]
 		}
 	}
+
+	// If a bindAddress is passed, override the primary IP
+	bindIP := netutils.ParseIPSloppy(bindAddress)
+	if bindIP != nil && !bindIP.IsUnspecified() {
+		if netutils.IsIPv4(bindIP) {
+			primaryFamily = v1.IPv4Protocol
+		} else {
+			primaryFamily = v1.IPv6Protocol
+		}
+		nodeIPs[primaryFamily] = bindIP
+	}
+
+	if nodeIPs[primaryFamily].IsLoopback() {
+		klog.InfoS("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
+	}
+	return primaryFamily, nodeIPs
+}
+
+// getNodeIP returns IPs for the node with the provided name.  If
+// required, it will wait for the node to be created.
+func getNodeIPs(client clientset.Interface, name string) []net.IP {
+	var nodeIPs []net.IP
+	backoff := wait.Backoff{
+		Steps:    6,
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.2,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			klog.ErrorS(err, "Failed to retrieve node info")
+			return false, nil
+		}
+		nodeIPs, err = utilnode.GetNodeHostIPs(node)
+		if err != nil {
+			klog.ErrorS(err, "Failed to retrieve node IPs")
+			return false, nil
+		}
+		return true, nil
+	})
+	if err == nil {
+		klog.InfoS("Successfully retrieved node IP(s)", "IPs", nodeIPs)
+	}
+	return nodeIPs
 }

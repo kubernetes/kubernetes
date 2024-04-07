@@ -5,6 +5,7 @@ rules:
       - k8s.io/kubernetes/test/e2e/common
       - k8s.io/kubernetes/test/e2e/dra/test-driver/app
       - k8s.io/kubernetes/test/e2e/framework
+      - k8s.io/kubernetes/test/e2e/storage/utils
       - k8s.io/kubernetes/test/e2e/network/common
       - k8s.io/kubernetes/test/e2e/perftype
       - k8s.io/kubernetes/test/e2e/testing-manifests

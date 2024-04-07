@@ -208,9 +208,27 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				completeTest(ctx, f, c, ns, pv, pvc)
 			})
 
+			// Create new PV without claim, verify it's in Available state and LastPhaseTransitionTime is set.
+			ginkgo.It("create a PV: test phase transition timestamp is set and phase is Available [Feature:PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
+				pvObj := e2epv.MakePersistentVolume(pvConfig)
+				pv, err = e2epv.CreatePV(ctx, c, f.Timeouts, pvObj)
+				framework.ExpectNoError(err)
+
+				// The new PV should transition phase to: Available
+				err = e2epv.WaitForPersistentVolumePhase(ctx, v1.VolumeAvailable, c, pv.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+				framework.ExpectNoError(err)
+
+				// Verify that new PV has phase transition timestamp set.
+				pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				if pv.Status.LastPhaseTransitionTime == nil {
+					framework.Failf("New persistent volume %v should have LastPhaseTransitionTime value set, but it's nil.", pv.GetName())
+				}
+			})
+
 			// Create PV and pre-bound PVC that matches the PV, verify that when PV and PVC bind
 			// the LastPhaseTransitionTime filed of the PV is updated.
-			ginkgo.It("create a PV and a pre-bound PVC: test phase transition timestamp is set [Feature: PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
+			ginkgo.It("create a PV and a pre-bound PVC: test phase transition timestamp is set [Feature:PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
 
@@ -230,7 +248,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Create PV and pre-bound PVC that matches the PV, verify that when PV and PVC bind
 			// the LastPhaseTransitionTime field of the PV is set, then delete the PVC to change PV phase to
 			// released and validate PV LastPhaseTransitionTime correctly updated timestamp.
-			ginkgo.It("create a PV and a pre-bound PVC: test phase transition timestamp multiple updates [Feature: PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
+			ginkgo.It("create a PV and a pre-bound PVC: test phase transition timestamp multiple updates [Feature:PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
 
@@ -393,7 +411,19 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			}
 		})
 
-		ginkgo.It("should run through the lifecycle of a PV and a PVC", func(ctx context.Context) {
+		/*
+			Release: v1.29
+			Testname: PersistentVolumes(Claims), lifecycle
+			Description: Creating PV and PVC MUST succeed. Listing PVs with a labelSelector
+			MUST succeed. Listing PVCs in a namespace MUST succeed. Patching a PV MUST succeed
+			with its new label found. Patching a PVC MUST succeed with its new label found.
+			Reading a PV and PVC MUST succeed with required UID retrieved. Deleting a PVC
+			and PV MUST succeed and it MUST be confirmed. Replacement PV and PVC MUST be created.
+			Updating a PV MUST succeed with its new label found. Updating a PVC MUST succeed
+			with its new label found. Deleting the PVC and PV via deleteCollection MUST succeed
+			and it MUST be confirmed.
+		*/
+		framework.ConformanceIt("should run through the lifecycle of a PV and a PVC", func(ctx context.Context) {
 
 			pvClient := c.CoreV1().PersistentVolumes()
 			pvcClient := c.CoreV1().PersistentVolumeClaims(ns)

@@ -6,6 +6,7 @@
       "cloud.google.com/go/compute": "cloud dependency",
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
       "cloud.google.com/go/storage": "cloud dependency",
+      "github.com/GoogleCloudPlatform/k8s-cloud-provider": "cloud dependency",
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/bketelsen/crypt": "unused, crypto",
@@ -28,7 +29,6 @@
       "github.com/gorilla/mux": "unmaintained, archive mode",
       "github.com/gorilla/rpc": "unmaintained, archive mode",
       "github.com/gorilla/schema": "unmaintained, archive mode",
-      "github.com/gorilla/websocket": "unmaintained, archive mode",
       "github.com/gregjones/httpcache": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/go-grpc-prometheus": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/grpc-gateway": "use github.com/grpc-ecosystem/grpc-gateway/v2",
@@ -94,6 +94,10 @@
       "cloud.google.com/go/storage": [
         "cloud.google.com/go"
       ],
+      "github.com/GoogleCloudPlatform/k8s-cloud-provider": [
+        "k8s.io/kubernetes",
+        "k8s.io/legacy-cloud-providers"
+      ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
@@ -142,11 +146,6 @@
         "cloud.google.com/go/bigquery",
         "cloud.google.com/go/compute",
         "cloud.google.com/go/storage"
-      ],
-      "github.com/gorilla/websocket": [
-        "github.com/moby/spdystream",
-        "github.com/tmc/grpc-websocket-proxy",
-        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
@@ -242,6 +241,26 @@
         "google.golang.org/grpc",
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ]
-    }
+    },
+    "unwantedVendored": [
+      "cloud.google.com/go/compute",
+      "github.com/GoogleCloudPlatform/k8s-cloud-provider",
+      "github.com/gogo/protobuf",
+      "github.com/golang/mock",
+      "github.com/google/shlex",
+      "github.com/googleapis/enterprise-certificate-proxy",
+      "github.com/googleapis/gax-go/v2",
+      "github.com/gregjones/httpcache",
+      "github.com/grpc-ecosystem/go-grpc-prometheus",
+      "github.com/grpc-ecosystem/grpc-gateway",
+      "github.com/json-iterator/go",
+      "github.com/pkg/errors",
+      "github.com/rubiojr/go-vhd",
+      "go.opencensus.io",
+      "golang.org/x/exp",
+      "google.golang.org/api",
+      "google.golang.org/appengine",
+      "google.golang.org/genproto"
+    ]
   }
 }

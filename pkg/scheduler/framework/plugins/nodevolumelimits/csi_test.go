@@ -33,11 +33,11 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -281,7 +281,7 @@ func TestCSILimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		extraClaims         []v1.PersistentVolumeClaim
 		filterName          string
-		maxVols             int
+		maxVols             int32
 		driverNames         []string
 		test                string
 		migrationEnabled    bool
@@ -613,7 +613,7 @@ func TestCSILimits(t *testing.T) {
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
+			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, test.maxVols, test.driverNames...)
 			if csiNode != nil {
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
 			}
@@ -641,8 +641,8 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
-func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.PersistentVolumeLister {
-	pvLister := fakeframework.PersistentVolumeLister{}
+func getFakeCSIPVLister(volumeName string, driverNames ...string) tf.PersistentVolumeLister {
+	pvLister := tf.PersistentVolumeLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			volumeHandle := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -686,8 +686,8 @@ func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.
 	return pvLister
 }
 
-func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) fakeframework.PersistentVolumeClaimLister {
-	pvcLister := fakeframework.PersistentVolumeClaimLister{}
+func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) tf.PersistentVolumeClaimLister {
+	pvcLister := tf.PersistentVolumeClaimLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			v := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -729,8 +729,8 @@ func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
 	csiNode.Annotations = nodeInfoAnnotations
 }
 
-func getFakeCSIStorageClassLister(scName, provisionerName string) fakeframework.StorageClassLister {
-	return fakeframework.StorageClassLister{
+func getFakeCSIStorageClassLister(scName, provisionerName string) tf.StorageClassLister {
+	return tf.StorageClassLister{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: scName},
 			Provisioner: provisionerName,
@@ -738,15 +738,15 @@ func getFakeCSIStorageClassLister(scName, provisionerName string) fakeframework.
 	}
 }
 
-func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakeframework.CSINodeLister {
-	csiNodeLister := fakeframework.CSINodeLister{}
+func getFakeCSINodeLister(csiNode *storagev1.CSINode) tf.CSINodeLister {
+	csiNodeLister := tf.CSINodeLister{}
 	if csiNode != nil {
 		csiNodeLister = append(csiNodeLister, *csiNode.DeepCopy())
 	}
 	return csiNodeLister
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int32, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
 	nodeInfo := framework.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
@@ -758,7 +758,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
-			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
+			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(int64(limit), resource.DecimalSI)
 		}
 	}
 
@@ -780,7 +780,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			}
 			if addLimits {
 				driver.Allocatable = &storagev1.VolumeNodeResources{
-					Count: pointer.Int32(int32(limit)),
+					Count: ptr.To(limit),
 				}
 			}
 			csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, driver)

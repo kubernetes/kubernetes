@@ -445,9 +445,19 @@ func TestCustomResourceEnqueue(t *testing.T) {
 // TestRequeueByBindFailure verify Pods failed by bind plugin are
 // put back to the queue regardless of whether event happens or not.
 func TestRequeueByBindFailure(t *testing.T) {
+	fakeBind := &firstFailBindPlugin{}
 	registry := frameworkruntime.Registry{
-		"firstFailBindPlugin": newFirstFailBindPlugin,
+		"firstFailBindPlugin": func(o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			binder, err := defaultbinder.New(nil, fh)
+			if err != nil {
+				return nil, err
+			}
+
+			fakeBind.defaultBinderPlugin = binder.(framework.BindPlugin)
+			return fakeBind, nil
+		},
 	}
+
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.String(v1.DefaultSchedulerName),
@@ -488,17 +498,18 @@ func TestRequeueByBindFailure(t *testing.T) {
 		t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 	}
 
-	// first binding try should fail.
-	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodSchedulingError(cs, ns, "pod-1"))
+	// 1. first binding try should fail.
+	// 2. The pod should be enqueued to activeQ/backoffQ without any event.
+	// 3. The pod should be scheduled in the second binding try.
+	// Here, waiting until (3).
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
-		t.Fatalf("Expect pod-1 to be rejected by the bind plugin")
+		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin: %v", err)
 	}
 
-	// The pod should be enqueued to activeQ/backoffQ without any event.
-	// The pod should be scheduled in the second binding try.
-	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, "pod-1"))
-	if err != nil {
-		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin in the second binding try")
+	// Make sure the first binding trial was failed, and this pod is scheduled at the second trial.
+	if fakeBind.counter != 1 {
+		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin in the second binding try: %v", err)
 	}
 }
 
@@ -506,17 +517,6 @@ func TestRequeueByBindFailure(t *testing.T) {
 type firstFailBindPlugin struct {
 	counter             int
 	defaultBinderPlugin framework.BindPlugin
-}
-
-func newFirstFailBindPlugin(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
-	binder, err := defaultbinder.New(nil, handle)
-	if err != nil {
-		return nil, err
-	}
-
-	return &firstFailBindPlugin{
-		defaultBinderPlugin: binder.(framework.BindPlugin),
-	}, nil
 }
 
 func (*firstFailBindPlugin) Name() string {

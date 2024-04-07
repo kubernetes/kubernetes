@@ -204,7 +204,7 @@ const (
 )
 
 var (
-	// ContainerLogsDir can be overwrited for testing usage
+	// ContainerLogsDir can be overwritten for testing usage
 	ContainerLogsDir = DefaultContainerLogsDir
 	etcHostsPath     = getContainerEtcHostsPath()
 )
@@ -248,29 +248,30 @@ type Dependencies struct {
 	Options []Option
 
 	// Injected Dependencies
-	Auth                     server.AuthInterface
-	CAdvisorInterface        cadvisor.Interface
-	Cloud                    cloudprovider.Interface
-	ContainerManager         cm.ContainerManager
-	EventClient              v1core.EventsGetter
-	HeartbeatClient          clientset.Interface
-	OnHeartbeatFailure       func()
-	KubeClient               clientset.Interface
-	Mounter                  mount.Interface
-	HostUtil                 hostutil.HostUtils
-	OOMAdjuster              *oom.OOMAdjuster
-	OSInterface              kubecontainer.OSInterface
-	PodConfig                *config.PodConfig
-	ProbeManager             prober.Manager
-	Recorder                 record.EventRecorder
-	Subpather                subpath.Interface
-	TracerProvider           trace.TracerProvider
-	VolumePlugins            []volume.VolumePlugin
-	DynamicPluginProber      volume.DynamicPluginProber
-	TLSOptions               *server.TLSOptions
-	RemoteRuntimeService     internalapi.RuntimeService
-	RemoteImageService       internalapi.ImageManagerService
-	PodStartupLatencyTracker util.PodStartupLatencyTracker
+	Auth                      server.AuthInterface
+	CAdvisorInterface         cadvisor.Interface
+	Cloud                     cloudprovider.Interface
+	ContainerManager          cm.ContainerManager
+	EventClient               v1core.EventsGetter
+	HeartbeatClient           clientset.Interface
+	OnHeartbeatFailure        func()
+	KubeClient                clientset.Interface
+	Mounter                   mount.Interface
+	HostUtil                  hostutil.HostUtils
+	OOMAdjuster               *oom.OOMAdjuster
+	OSInterface               kubecontainer.OSInterface
+	PodConfig                 *config.PodConfig
+	ProbeManager              prober.Manager
+	Recorder                  record.EventRecorder
+	Subpather                 subpath.Interface
+	TracerProvider            trace.TracerProvider
+	VolumePlugins             []volume.VolumePlugin
+	DynamicPluginProber       volume.DynamicPluginProber
+	TLSOptions                *server.TLSOptions
+	RemoteRuntimeService      internalapi.RuntimeService
+	RemoteImageService        internalapi.ImageManagerService
+	PodStartupLatencyTracker  util.PodStartupLatencyTracker
+	NodeStartupLatencyTracker util.NodeStartupLatencyTracker
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
 }
@@ -552,6 +553,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		keepTerminatedPodVolumes:       keepTerminatedPodVolumes,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
+		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
 	}
 
 	if klet.cloud != nil {
@@ -747,7 +749,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage, kubeDeps.TracerProvider)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -1293,6 +1295,9 @@ type Kubelet struct {
 
 	// OpenTelemetry Tracer
 	tracer trace.Tracer
+
+	// Track node startup latencies
+	nodeStartupLatencyTracker util.NodeStartupLatencyTracker
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2235,7 +2240,7 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 }
 
 // rejectPod records an event about the pod with the given reason and message,
-// and updates the pod to the failed phase in the status manage.
+// and updates the pod to the failed phase in the status manager.
 func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
 	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
