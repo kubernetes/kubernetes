@@ -52,6 +52,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 		ctx := req.Context()
 		// For performance tracking purposes.
 		ctx, span := tracing.Start(ctx, "Delete", traceFields(req)...)
+		req = req.WithContext(ctx)
 		defer span.End(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
@@ -172,6 +173,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		ctx, span := tracing.Start(ctx, "Delete", traceFields(req)...)
+		req = req.WithContext(ctx)
 		defer span.End(500 * time.Millisecond)
 
 		namespace, err := scope.Namer.Namespace(req)

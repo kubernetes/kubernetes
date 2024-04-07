@@ -53,6 +53,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		ctx := req.Context()
 		// For performance tracking purposes.
 		ctx, span := tracing.Start(ctx, "Update", traceFields(req)...)
+		req = req.WithContext(ctx)
 		defer span.End(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
