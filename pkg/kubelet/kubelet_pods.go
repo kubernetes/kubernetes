@@ -2094,6 +2094,18 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}
 		}
+
+		convertCustomResources := func(inResources, outResources v1.ResourceList) {
+			for extendedResourceName, extendedResourceQuantity := range inResources {
+				if extendedResourceName == v1.ResourceCPU || extendedResourceName == v1.ResourceMemory ||
+					extendedResourceName == v1.ResourceStorage || extendedResourceName == v1.ResourceEphemeralStorage {
+					continue
+				}
+
+				outResources[extendedResourceName] = extendedResourceQuantity.DeepCopy()
+			}
+		}
+
 		// Convert Limits
 		if container.Resources.Limits != nil {
 			limits = make(v1.ResourceList)
@@ -2111,14 +2123,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
 
-			for extendedResourceName, extendedResourceQuantity := range container.Resources.Limits {
-				if extendedResourceName == v1.ResourceCPU || extendedResourceName == v1.ResourceMemory ||
-					extendedResourceName == v1.ResourceStorage || extendedResourceName == v1.ResourceEphemeralStorage {
-					continue
-				}
-
-				limits[extendedResourceName] = extendedResourceQuantity.DeepCopy()
-			}
+			convertCustomResources(container.Resources.Limits, limits)
 		}
 		// Convert Requests
 		if status.AllocatedResources != nil {
@@ -2135,14 +2140,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
 
-			for extendedResourceName, extendedResourceQuantity := range status.AllocatedResources {
-				if extendedResourceName == v1.ResourceCPU || extendedResourceName == v1.ResourceMemory ||
-					extendedResourceName == v1.ResourceStorage || extendedResourceName == v1.ResourceEphemeralStorage {
-					continue
-				}
-
-				requests[extendedResourceName] = extendedResourceQuantity.DeepCopy()
-			}
+			convertCustomResources(status.AllocatedResources, requests)
 		}
 		//TODO(vinaykul,derekwaynecarr,InPlacePodVerticalScaling): Update this to include extended resources in
 		// addition to CPU, memory, ephemeral storage. Add test case for extended resources.
