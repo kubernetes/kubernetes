@@ -839,14 +839,14 @@ func TestGetUserNSBindMountOptions(t *testing.T) {
 		path := strings.Split(t.Name(), "/")[1]
 		options, _ := getUserNSBindMountOptions(path, statfsMock)
 		sort.Strings(options)
-		optionString := strings.Join(options[:], ",")
+		optionString := strings.Join(options, ",")
 		mountOptions := testCases[path].mountoptions
 		if optionString != mountOptions {
 			t.Fatalf(`Mountoptions differ. Wanted: %s, returned: %s`, mountOptions, optionString)
 		}
 	}
 
-	for k, _ := range testCases {
+	for k := range testCases {
 		t.Run(k, testGetUserNSBindMountOptionsSingleCase)
 	}
 }
