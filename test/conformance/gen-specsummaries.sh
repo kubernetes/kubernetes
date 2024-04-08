@@ -23,7 +23,12 @@ KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd -P)
 cd "${KUBE_ROOT}"
 
 # build ginkgo and e2e.test
-hack/make-rules/build.sh github.com/onsi/ginkgo/v2/ginkgo test/e2e/e2e.test
+#
+# Set DBG=1 to build with embedded filenames as filenames rather than
+# module-relative names (e.g. /src/kube/foo/bar.go vs.
+# k8s.io/kubernetes/foo/bar.go).  These names are used by gingko in
+# `--spec-dump` which is consumed later in conformance verification. 
+DBG=1 hack/make-rules/build.sh github.com/onsi/ginkgo/v2/ginkgo test/e2e/e2e.test
 
 # dump spec
 ./_output/bin/ginkgo --dry-run=true --focus='[Conformance]' ./_output/bin/e2e.test -- --spec-dump "${KUBE_ROOT}/_output/specsummaries.json" > /dev/null
