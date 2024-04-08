@@ -369,6 +369,79 @@ func TestDecoratorShouldNotUseFlush(t *testing.T) {
 	}
 }
 
+func TestHTTP1xResponseWriterInvariant(t *testing.T) {
+	doneCh := make(chan struct{})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(doneCh)
+
+		if r.ProtoMajor != 1 {
+			t.Errorf("expected http/1x")
+		}
+		if _, ok := w.(http.Flusher); !ok {
+			t.Errorf("expected the ResponseWriter object to implement http.Flusher")
+		}
+		if _, ok := w.(interface{ FlushError() error }); !ok {
+			t.Errorf("expected the ResponseWriter object to implement Flusher with error")
+		}
+		if _, ok := w.(http.CloseNotifier); !ok {
+			t.Errorf("expected the http.ResponseWriter object to implement http.CloseNotifier")
+		}
+		if _, ok := w.(http.Hijacker); !ok {
+			t.Errorf("expected the http.ResponseWriter object to implement http.Hijacker")
+		}
+	})
+
+	server := httptest.NewUnstartedServer(handler)
+	defer server.Close()
+	server.StartTLS()
+
+	if _, err := server.Client().Get(server.URL + "/ping"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	select {
+	case <-doneCh:
+	default:
+		t.Errorf("expected the request handler to be invoked")
+	}
+}
+
+func TestHTTP2ResponseWriterInvariant(t *testing.T) {
+	doneCh := make(chan struct{})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(doneCh)
+
+		if r.ProtoMajor != 2 {
+			t.Errorf("expected http/2.0")
+		}
+		if _, ok := w.(http.Flusher); !ok {
+			t.Errorf("expected the ResponseWriter object to implement http.Flusher")
+		}
+
+		if _, ok := w.(interface{ FlushError() error }); !ok {
+			t.Errorf("expected the ResponseWriter object to implement Flusher with error")
+		}
+		if _, ok := w.(http.CloseNotifier); !ok {
+			t.Errorf("expected the http.ResponseWriter object to implement http.CloseNotifier")
+		}
+	})
+
+	server := httptest.NewUnstartedServer(handler)
+	server.EnableHTTP2 = true
+	defer server.Close()
+	server.StartTLS()
+
+	if _, err := server.Client().Get(server.URL + "/ping"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	select {
+	case <-doneCh:
+	default:
+		t.Errorf("expected the request handler to be invoked")
+	}
+}
+
 func newServer(t *testing.T, h http.Handler, http2 bool) *httptest.Server {
 	server := httptest.NewUnstartedServer(h)
 	if http2 {
