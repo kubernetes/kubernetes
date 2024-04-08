@@ -2148,8 +2148,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 
 			convertCustomResources(status.AllocatedResources, requests)
 		}
-		//TODO(vinaykul,derekwaynecarr,InPlacePodVerticalScaling): Update this to include extended resources in
-		// addition to CPU, memory, ephemeral storage. Add test case for extended resources.
+
 		resources := &v1.ResourceRequirements{
 			Limits:   limits,
 			Requests: requests,
