@@ -18,40 +18,37 @@ package server
 
 import (
 	"fmt"
-	"net/http"
 	"sync"
 
 	"k8s.io/apiserver/pkg/server/flagz"
-	"k8s.io/utils/clock"
+	cliflag "k8s.io/component-base/cli/flag"
 )
-
-// healthMux is an interface describing the methods InstallHandler requires.
-type flagzMux interface {
-	Handle(pattern string, handler http.Handler)
-}
 
 type flagzRegistry struct {
 	path           string
 	lock           sync.Mutex
-	flags          []flagz.Flag
+	flags          []cliflag.NamedFlagSets
 	flagsInstalled bool
-	clock          clock.Clock
 }
 
-func (reg *flagzRegistry) addFlag(flags ...flagz.Flag) error {
-	return reg.addFlags(flags...)
+// AddFlags adds component flags to flagz endpoints.
+func (s *GenericAPIServer) AddFlags(flags cliflag.NamedFlagSets) error {
+	return s.flagzRegistry.addFlags(flags)
 }
 
-func (reg *flagzRegistry) addFlags(flags ...flagz.Flag) error {
+func (reg *flagzRegistry) addFlags(flags cliflag.NamedFlagSets) error {
 	reg.lock.Lock()
 	defer reg.lock.Unlock()
 	if reg.flagsInstalled {
 		return fmt.Errorf("unable to add because the %s endpoint has already been created", reg.path)
 	}
-	for _, flag := range flags {
-		reg.flags = append(reg.flags, flag)
-	}
+	reg.flags = append(reg.flags, flags)
 	return nil
+}
+
+// installFlagz creates the flagz endpoint for this server
+func (s *GenericAPIServer) installFlagz() {
+	s.flagzRegistry.installHandler(s.Handler.NonGoRestfulMux)
 }
 
 func (reg *flagzRegistry) installHandler(mux healthMux) {
@@ -59,19 +56,4 @@ func (reg *flagzRegistry) installHandler(mux healthMux) {
 	defer reg.lock.Unlock()
 	reg.flagsInstalled = true
 	flagz.InstallHandler(mux, reg.flags...)
-}
-
-// AddFlags adds component flags to flagz endpoints.
-func (s *GenericAPIServer) AddFlags(checks ...flagz.Flag) error {
-	return s.addFlags(checks...)
-}
-
-// addFlags adds component flags to flagz endpoint.
-func (s *GenericAPIServer) addFlags(flags ...flagz.Flag) error {
-	return s.flagzRegistry.addFlags(flags...)
-}
-
-// installHealthz creates the healthz endpoint for this server
-func (s *GenericAPIServer) installFlagz() {
-	s.flagzRegistry.installHandler(s.Handler.NonGoRestfulMux)
 }

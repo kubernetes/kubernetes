@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,24 +21,16 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	cliflag "k8s.io/component-base/cli/flag"
 )
-
-type Flag struct {
-	name  string
-	value string
-}
-
-// NamedFlag returns a flag name and value.
-func NamedCheck(name string, value string) *Flag {
-	return &Flag{name, value}
-}
 
 // InstallHandler registers handlers for displaying flags on the path
 // "/flagz" to mux. *All handlers* for mux must be specified in
 // exactly one call to InstallHandler. Calling InstallHandler more
 // than once for the same mux will result in a panic.
-func InstallHandler(mux mux, flags ...Flag) {
+func InstallHandler(mux mux, flags ...cliflag.NamedFlagSets) {
 	mux.Handle("/flagz",
 		metrics.InstrumentHandlerFunc("GET",
 			/* group = */ "",
@@ -49,7 +41,7 @@ func InstallHandler(mux mux, flags ...Flag) {
 			/* component = */ "",
 			/* deprecated */ false,
 			/* removedRelease */ "",
-			handleFlags("/flagz", flags...)))
+			handleFlags(flags)))
 }
 
 // mux is an interface describing the methods InstallHandler requires.
@@ -57,26 +49,21 @@ type mux interface {
 	Handle(pattern string, handler http.Handler)
 }
 
-func (c *Flag) Name() string {
-	return c.name
-}
-
-func (c *Flag) Value() string {
-	return c.value
-}
-
 // handleFlags returns an http.HandlerFunc that serves the provided flags.
-func handleFlags(name string, flags ...Flag) http.HandlerFunc {
+func handleFlags(flags []cliflag.NamedFlagSets) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		flagsMap := make(map[string]string)
 		var individualCheckOutput bytes.Buffer
-		for _, flag := range flags {
-			flagsMap[flag.name] = flag.value
-		}
-
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		fmt.Fprint(w, flagsMap)
+		for _, flagset := range flags {
+			for _, fs := range flagset.FlagSets {
+				fs.VisitAll(func(flag *pflag.Flag) {
+					if flag.Value != nil && flag.Value.String() != "" && flag.Value.String() != "[]" {
+						fmt.Fprint(w, flag.Name, "=", flag.Value, "\n")
+					}
+				})
+			}
+		}
 		individualCheckOutput.WriteTo(w)
 	}
 }

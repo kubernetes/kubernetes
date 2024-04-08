@@ -72,6 +72,7 @@ import (
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -183,6 +184,7 @@ type Config struct {
 	LivezChecks []healthz.HealthChecker
 	// The default set of readyz-only checks. There might be more added via AddReadyzChecks dynamically.
 	ReadyzChecks []healthz.HealthChecker
+	Flags        []cliflag.NamedFlagSets
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -807,6 +809,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		healthzRegistry:  healthCheckRegistry{path: "/healthz", checks: c.HealthzChecks},
 		livezRegistry:    healthCheckRegistry{path: "/livez", checks: c.LivezChecks, clock: clock.RealClock{}},
 		readyzRegistry:   healthCheckRegistry{path: "/readyz", checks: c.ReadyzChecks},
+		flagzRegistry:    flagzRegistry{flags: c.Flags},
 		livezGracePeriod: c.LivezGracePeriod,
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
@@ -952,6 +955,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 		s.AddHealthChecks(delegateCheck)
 	}
+
+	for _, delegateFlagSet := range delegationTarget.Flags() {
+		s.AddFlags(delegateFlagSet)
+	}
+
 	s.RegisterDestroyFunc(func() {
 		if err := c.Config.TracerProvider.Shutdown(context.Background()); err != nil {
 			klog.Errorf("failed to shut down tracer provider: %v", err)

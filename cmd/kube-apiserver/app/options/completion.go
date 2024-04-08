@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	cliflag "k8s.io/component-base/cli/flag"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
 	netutils "k8s.io/utils/net"
 
@@ -36,6 +37,7 @@ type completedOptions struct {
 	CloudProvider *kubeoptions.CloudProviderOptions
 
 	Extra
+	Flags cliflag.NamedFlagSets
 }
 
 type CompletedOptions struct {
@@ -66,6 +68,7 @@ func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
 		CloudProvider:    opts.CloudProvider,
 
 		Extra: opts.Extra,
+		Flags: opts.Flags(),
 	}
 
 	completed.PrimaryServiceClusterIPRange = primaryServiceIPRange

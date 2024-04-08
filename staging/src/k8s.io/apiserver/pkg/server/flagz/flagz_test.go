@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/spf13/pflag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 func TestInstallHandler(t *testing.T) {
@@ -45,9 +48,18 @@ func TestInstallHandler(t *testing.T) {
 }
 
 func TestFlags(t *testing.T) {
-	flag := Flag{
-		name:  "test-config",
-		value: "test-value",
+	fs1 := pflag.NewFlagSet("test1-set", pflag.ContinueOnError)
+	flagValue1 := ""
+	fs1.StringVar(&flagValue1, "test1-flag", "test1-value", "test1-usage")
+
+	fs2 := pflag.NewFlagSet("test2-set", pflag.ContinueOnError)
+	flagValue2 := ""
+	fs2.StringVar(&flagValue2, "test2-flag", "test2-value", "test2-usage")
+
+	flagset := cliflag.NamedFlagSets{
+		FlagSets: map[string]*pflag.FlagSet{
+			"test-1": fs1,
+			"test-2": fs2},
 	}
 
 	tests := []struct {
@@ -56,12 +68,12 @@ func TestFlags(t *testing.T) {
 		expectedStatus   int
 		addBadCheck      bool
 	}{
-		{"?verbose", fmt.Sprintf("map[%s:%s]", flag.name, flag.value), http.StatusOK, false},
+		{"?verbose", fmt.Sprintf("%s\n%s", "test1-flag=test1-value", "test2-flag=test2-value\n"), http.StatusOK, false},
 	}
 
 	for i, test := range tests {
 		mux := http.NewServeMux()
-		flags := []Flag{flag}
+		flags := []cliflag.NamedFlagSets{flagset}
 
 		InstallHandler(mux, flags...)
 		path := "/flagz"
