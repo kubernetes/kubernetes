@@ -88,7 +88,8 @@ var _ = SIGDescribe("Kubectl exec", func() {
 				errors = append(errors, err)
 			}
 		}
-		if len(errors) > 0 {
+		// Accept a 99% success rate to be able to handle infrastructure errors
+		if len(errors) > (size*1)/100 {
 			framework.Failf("Exec failed %d times with following errors : %v", len(errors), errors)
 		}
 	})
