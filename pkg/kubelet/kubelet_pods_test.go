@@ -4588,6 +4588,20 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	CPU2AndMem2GAndStorage2G := CPU2AndMem2G.DeepCopy()
 	CPU2AndMem2GAndStorage2G[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
 
+	addExtendedResource := func(list v1.ResourceList) v1.ResourceList {
+		const stubCustomResource = v1.ResourceName("dummy.io/dummy")
+
+		withExtendedResource := list.DeepCopy()
+		for _, resourceName := range []v1.ResourceName{v1.ResourceMemory, v1.ResourceCPU} {
+			if _, exists := withExtendedResource[resourceName]; !exists {
+				withExtendedResource[resourceName] = resource.MustParse("0")
+			}
+		}
+
+		withExtendedResource[stubCustomResource] = resource.MustParse("1")
+		return withExtendedResource
+	}
+
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -4731,6 +4745,75 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					ImageID:     "img1234",
 					State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 					Resources:   &v1.ResourceRequirements{},
+				},
+			},
+		},
+		"BestEffort QoSPod with extended resources": {
+			Resources: []v1.ResourceRequirements{{Requests: addExtendedResource(v1.ResourceList{})}},
+			OldStatus: []v1.ContainerStatus{
+				{
+					Name:      testContainerName,
+					Image:     "img",
+					ImageID:   "img1234",
+					State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					Resources: &v1.ResourceRequirements{},
+				},
+			},
+			Expected: []v1.ContainerStatus{
+				{
+					Name:               testContainerName,
+					ContainerID:        testContainerID.String(),
+					Image:              "img",
+					ImageID:            "img1234",
+					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+					AllocatedResources: addExtendedResource(v1.ResourceList{}),
+					Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(v1.ResourceList{})},
+				},
+			},
+		},
+		"BurstableQoSPod with extended resources": {
+			Resources: []v1.ResourceRequirements{{Requests: addExtendedResource(CPU1AndMem1G)}},
+			OldStatus: []v1.ContainerStatus{
+				{
+					Name:      testContainerName,
+					Image:     "img",
+					ImageID:   "img1234",
+					State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					Resources: &v1.ResourceRequirements{},
+				},
+			},
+			Expected: []v1.ContainerStatus{
+				{
+					Name:               testContainerName,
+					ContainerID:        testContainerID.String(),
+					Image:              "img",
+					ImageID:            "img1234",
+					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+					AllocatedResources: addExtendedResource(CPU1AndMem1G),
+					Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(CPU1AndMem1G)},
+				},
+			},
+		},
+		"GuaranteedQoSPod with extended resources": {
+			Resources: []v1.ResourceRequirements{{Requests: addExtendedResource(CPU1AndMem1G), Limits: addExtendedResource(CPU1AndMem1G)}},
+			OldStatus: []v1.ContainerStatus{
+				{
+					Name:      testContainerName,
+					Image:     "img",
+					ImageID:   "img1234",
+					State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					Resources: &v1.ResourceRequirements{},
+				},
+			},
+			Expected: []v1.ContainerStatus{
+				{
+					Name:               testContainerName,
+					ContainerID:        testContainerID.String(),
+					Image:              "img",
+					ImageID:            "img1234",
+					State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+					AllocatedResources: addExtendedResource(CPU1AndMem1G),
+					Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(CPU1AndMem1G), Limits: addExtendedResource(CPU1AndMem1G)},
 				},
 			},
 		},
