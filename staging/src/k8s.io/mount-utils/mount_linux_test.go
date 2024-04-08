@@ -31,8 +31,8 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/sys/unix"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/unix"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
 )
