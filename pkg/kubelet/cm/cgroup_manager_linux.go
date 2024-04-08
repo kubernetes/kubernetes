@@ -332,24 +332,26 @@ func readUnifiedControllers(path string) (sets.Set[string], error) {
 }
 
 var (
-	availableRootControllersOnce sync.Once
-	availableRootControllers     sets.Set[string]
+	supportedUnifiedControllersOnce sync.Once
+	supportedUnifiedControllers     sets.Set[string]
 )
 
 // getSupportedUnifiedControllers returns a set of supported controllers when running on cgroup v2
 func getSupportedUnifiedControllers() sets.Set[string] {
-	// This is the set of controllers used by the Kubelet
-	supportedControllers := sets.New("cpu", "cpuset", "memory", "hugetlb", "pids")
-	// Memoize the set of controllers that are present in the root cgroup
-	availableRootControllersOnce.Do(func() {
-		var err error
-		availableRootControllers, err = readUnifiedControllers(cmutil.CgroupRoot)
+	supportedUnifiedControllersOnce.Do(func() {
+		// This is the set of controllers used by the Kubelet
+		supportedControllers := sets.New("cpu", "cpuset", "memory", "hugetlb", "pids")
+
+		// Read the set of controllers that are present in the root cgroup
+		availableRootControllers, err := readUnifiedControllers(cmutil.CgroupRoot)
 		if err != nil {
 			panic(fmt.Errorf("cannot read cgroup controllers at %s", cmutil.CgroupRoot))
 		}
+
+		// Select the set of controllers that are supported both by the Kubelet and by the kernel
+		supportedUnifiedControllers = supportedControllers.Intersection(availableRootControllers)
 	})
-	// Return the set of controllers that are supported both by the Kubelet and by the kernel
-	return supportedControllers.Intersection(availableRootControllers)
+	return supportedUnifiedControllers
 }
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
