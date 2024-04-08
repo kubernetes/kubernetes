@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -1220,4 +1222,110 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+// TestParallelPrepareResources calls PrepareResources API in parallel
+func TestParallelPrepareResources(t *testing.T) {
+	// Setup and register fake DRA driver
+	draServerInfo, err := setupFakeDRADriverGRPCServer(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer draServerInfo.teardownFn()
+
+	plg := plugin.NewRegistrationHandler(nil, getFakeNode)
+	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{"1.27"}, nil); err != nil {
+		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
+	}
+	defer plg.DeRegisterPlugin(driverName)
+
+	// Create ClaimInfo cache
+	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+	if err != nil {
+		t.Errorf("failed to newClaimInfoCache, err: %+v", err)
+		return
+	}
+
+	// Create fake Kube client and DRA manager
+	fakeKubeClient := fake.NewSimpleClientset()
+	manager := &ManagerImpl{kubeClient: fakeKubeClient, cache: cache}
+
+	// Call PrepareResources in parallel
+	var wgSync, wgStart sync.WaitGroup // groups to sync goroutines
+	numGoroutines := 100
+	wgSync.Add(numGoroutines)
+	wgStart.Add(1)
+	for i := 0; i < numGoroutines; i++ {
+		go func(t *testing.T) {
+			defer wgSync.Done()
+			wgStart.Wait() // Wait to start all goroutines at the same time
+
+			var err error
+			nameSpace := "test-namespace-parallel"
+			claimName := fmt.Sprintf("test-pod-claim-%d", i)
+			podUID := types.UID(fmt.Sprintf("test-reserved-%d", i))
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("test-pod-%d", i),
+					Namespace: nameSpace,
+					UID:       podUID,
+				},
+				Spec: v1.PodSpec{
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name: claimName,
+							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+								s := claimName
+								return &s
+							}()},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{
+									{
+										Name: claimName,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			resourceClaim := &resourcev1alpha2.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: nameSpace,
+					UID:       types.UID(fmt.Sprintf("claim-%d", i)),
+				},
+				Spec: resourcev1alpha2.ResourceClaimSpec{
+					ResourceClassName: "test-class",
+				},
+				Status: resourcev1alpha2.ResourceClaimStatus{
+					DriverName: driverName,
+					Allocation: &resourcev1alpha2.AllocationResult{
+						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+							{Data: "test-data"},
+						},
+					},
+					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+						{UID: podUID},
+					},
+				},
+			}
+
+			if _, err = fakeKubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Create(context.Background(), resourceClaim, metav1.CreateOptions{}); err != nil {
+				t.Errorf("failed to create ResourceClaim %s: %+v", resourceClaim.Name, err)
+				return
+			}
+
+			if err = manager.PrepareResources(pod); err != nil {
+				t.Errorf("pod: %s: PrepareResources failed: %+v", pod.Name, err)
+				return
+			}
+		}(t)
+	}
+	wgStart.Done() // Start executing goroutines
+	wgSync.Wait()  // Wait for all goroutines to finish
 }
