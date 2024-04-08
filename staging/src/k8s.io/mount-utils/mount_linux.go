@@ -112,6 +112,31 @@ func (mounter *Mounter) hasSystemd() bool {
 	return *mounter.withSystemd
 }
 
+// Map unix.Statfs mount flags ro, nodev, noexec, nosuid, noatime, relatime,
+// nodiratime to mount option flag strings.
+func getUserNSBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_t) (err error)) ([]string, error) {
+	var s unix.Statfs_t
+	var mountOpts []string
+	if err := statfs(path, &s); err != nil {
+		return nil, &os.PathError{Op: "statfs", Path: path, Err: err}
+	}
+	flagMapping := map[int]string{
+		unix.MS_RDONLY:     "ro",
+		unix.MS_NODEV:      "nodev",
+		unix.MS_NOEXEC:     "noexec",
+		unix.MS_NOSUID:     "nosuid",
+		unix.MS_NOATIME:    "noatime",
+		unix.MS_RELATIME:   "relatime",
+		unix.MS_NODIRATIME: "nodiratime",
+	}
+	for k, v := range flagMapping {
+		if int(s.Flags)&k == k {
+			mountOpts = append(mountOpts, v)
+		}
+	}
+	return mountOpts, nil
+}
+
 // Do a bind mount including the needed remount for applying the bind opts.
 // If the remount fails and we are running in a user namespace
 // figure out if the source filesystem has the ro, nodev, noexec, nosuid,
@@ -128,25 +153,12 @@ func (mounter *Mounter) bindMountSensitive(mounterPath string, mountCmd string, 
 		}
 		// Check if the source has ro, nodev, noexec, nosuid, noatime, relatime,
 		// nodiratime flag...
-		var s unix.Statfs_t
-		if err := unix.Statfs(source, &s); err != nil {
+		fixMountOpts, err := getUserNSBindMountOptions(source, unix.Statfs)
+		if err != nil {
 			return &os.PathError{Op: "statfs", Path: source, Err: err}
 		}
 		// ... and retry the mount with flags found above.
-		flagMapping := map[int]string{
-			unix.MS_RDONLY:     "ro",
-			unix.MS_NODEV:      "nodev",
-			unix.MS_NOEXEC:     "noexec",
-			unix.MS_NOSUID:     "nosuid",
-			unix.MS_NOATIME:    "noatime",
-			unix.MS_RELATIME:   "relatime",
-			unix.MS_NODIRATIME: "nodiratime",
-		}
-		for k, v := range flagMapping {
-			if int(s.Flags)&k == k {
-				bindRemountOpts = append(bindRemountOpts, v)
-			}
-		}
+		bindRemountOpts = append(bindRemountOpts, fixMountOpts...)
 		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
 	} else {
 		return err
