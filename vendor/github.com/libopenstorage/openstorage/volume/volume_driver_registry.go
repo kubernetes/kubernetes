@@ -32,9 +32,20 @@ func (v *volumeDriverRegistry) Get(name string) (VolumeDriver, error) {
 }
 
 func (v *volumeDriverRegistry) Add(name string, init func(map[string]string) (VolumeDriver, error)) error {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+
 	v.nameToInitFunc[name] = init
 
 	return nil
+}
+
+func (v *volumeDriverRegistry) Remove(name string) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+
+	delete(v.nameToInitFunc, name)
+	delete(v.nameToVolumeDriver, name)
 }
 
 func (v *volumeDriverRegistry) Register(name string, params map[string]string) error {

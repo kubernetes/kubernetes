@@ -2,14 +2,19 @@ package volume
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/libopenstorage/openstorage/api"
 	"github.com/libopenstorage/openstorage/api/client"
+	ost_errors "github.com/libopenstorage/openstorage/api/errors"
+	"github.com/libopenstorage/openstorage/pkg/correlation"
 	"github.com/libopenstorage/openstorage/volume"
 )
 
@@ -21,11 +26,17 @@ const (
 
 type volumeClient struct {
 	volume.IODriver
+	volume.FilesystemTrimDriver
+	volume.FilesystemCheckDriver
 	c *client.Client
 }
 
 func newVolumeClient(c *client.Client) volume.VolumeDriver {
-	return &volumeClient{volume.IONotSupported, c}
+	return &volumeClient{
+		IODriver:              volume.IONotSupported,
+		FilesystemTrimDriver:  volume.FilesystemTrimNotSupported,
+		FilesystemCheckDriver: volume.FilesystemCheckNotSupported,
+		c:                     c}
 }
 
 // String description of this driver.
@@ -36,6 +47,10 @@ func (v *volumeClient) Name() string {
 func (v *volumeClient) Type() api.DriverType {
 	// Block drivers implement the superset.
 	return api.DriverType_DRIVER_TYPE_BLOCK
+}
+
+func (v *volumeClient) Version() (*api.StorageVersion, error) {
+	return nil, volume.ErrNotSupported
 }
 
 func (v *volumeClient) GraphDriverCreate(id string, parent string) error {
@@ -116,7 +131,7 @@ func (v *volumeClient) GraphDriverDiffSize(id string, parent string) (int, error
 
 // Create a new Vol for the specific volume spev.c.
 // It returns a system generated VolumeID that uniquely identifies the volume
-func (v *volumeClient) Create(locator *api.VolumeLocator, source *api.Source,
+func (v *volumeClient) Create(ctx context.Context, locator *api.VolumeLocator, source *api.Source,
 	spec *api.VolumeSpec) (string, error) {
 	response := &api.VolumeCreateResponse{}
 	request := &api.VolumeCreateRequest{
@@ -157,7 +172,7 @@ func (v *volumeClient) Inspect(ids []string) ([]*api.Volume, error) {
 
 // Delete volume.
 // Errors ErrEnoEnt, ErrVolHasSnaps may be returned.
-func (v *volumeClient) Delete(volumeID string) error {
+func (v *volumeClient) Delete(ctx context.Context, volumeID string) error {
 	response := &api.VolumeResponse{}
 	if err := v.c.Delete().Resource(volumePath).Instance(volumeID).Do().Unmarshal(response); err != nil {
 		return err
@@ -171,17 +186,22 @@ func (v *volumeClient) Delete(volumeID string) error {
 // Snap specified volume. IO to the underlying volume should be quiesced before
 // calling this function.
 // Errors ErrEnoEnt may be returned
-func (v *volumeClient) Snapshot(volumeID string, readonly bool,
-	locator *api.VolumeLocator) (string, error) {
+func (v *volumeClient) Snapshot(volumeID string,
+	readonly bool,
+	locator *api.VolumeLocator,
+	noRetry bool,
+) (string, error) {
 	response := &api.SnapCreateResponse{}
 	request := &api.SnapCreateRequest{
 		Id:       volumeID,
 		Readonly: readonly,
 		Locator:  locator,
+		NoRetry:  noRetry,
 	}
 	if err := v.c.Post().Resource(snapPath).Body(request).Do().Unmarshal(response); err != nil {
 		return "", err
 	}
+
 	// TODO(pedge): this probably should not be embedded in this way
 	if response.VolumeCreateResponse != nil &&
 		response.VolumeCreateResponse.VolumeResponse != nil &&
@@ -253,6 +273,33 @@ func (v *volumeClient) GetActiveRequests() (*api.ActiveRequests, error) {
 	return requests, nil
 }
 
+// CapacityUsage returns exclusive and shared capacity
+// usage of a snapshot/volume
+func (v *volumeClient) CapacityUsage(
+	ID string,
+) (*api.CapacityUsageResponse, error) {
+	requests := &api.CapacityUsageResponse{}
+	resp := v.c.Get().Resource(volumePath + "/usage").Instance(ID).Do()
+
+	if resp.Error() != nil {
+		return nil, resp.FormatError()
+	}
+
+	if err := resp.Unmarshal(requests); err != nil {
+		return nil, err
+	}
+
+	return requests, nil
+}
+
+func (v *volumeClient) VolumeUsageByNode(
+	nodeID string,
+) (*api.VolumeUsageByNode, error) {
+
+	return nil, volume.ErrNotSupported
+
+}
+
 // Shutdown and cleanup.
 func (v *volumeClient) Shutdown() {}
 
@@ -303,8 +350,9 @@ func (v *volumeClient) SnapEnumerate(ids []string,
 // Attach map device to the host.
 // On success the devicePath specifies location where the device is exported
 // Errors ErrEnoEnt, ErrVolAttached may be returned.
-func (v *volumeClient) Attach(volumeID string, attachOptions map[string]string) (string, error) {
+func (v *volumeClient) Attach(ctx context.Context, volumeID string, attachOptions map[string]string) (string, error) {
 	response, err := v.doVolumeSetGetResponse(
+		ctx,
 		volumeID,
 		&api.VolumeSetRequest{
 			Action: &api.VolumeStateAction{
@@ -328,46 +376,51 @@ func (v *volumeClient) Attach(volumeID string, attachOptions map[string]string) 
 
 // Detach device from the host.
 // Errors ErrEnoEnt, ErrVolDetached may be returned.
-func (v *volumeClient) Detach(volumeID string, unmountBeforeDetach bool) error {
+func (v *volumeClient) Detach(ctx context.Context, volumeID string, options map[string]string) error {
 	return v.doVolumeSet(
+		ctx,
 		volumeID,
 		&api.VolumeSetRequest{
 			Action: &api.VolumeStateAction{
-				Attach:              api.VolumeActionParam_VOLUME_ACTION_PARAM_OFF,
-				UnmountBeforeDetach: unmountBeforeDetach,
+				Attach: api.VolumeActionParam_VOLUME_ACTION_PARAM_OFF,
 			},
+			Options: options,
 		},
 	)
 }
 
-func (v *volumeClient) MountedAt(mountPath string) string {
+func (v *volumeClient) MountedAt(ctx context.Context, mountPath string) string {
 	return ""
 }
 
 // Mount volume at specified path
 // Errors ErrEnoEnt, ErrVolDetached may be returned.
-func (v *volumeClient) Mount(volumeID string, mountPath string) error {
+func (v *volumeClient) Mount(ctx context.Context, volumeID string, mountPath string, options map[string]string) error {
 	return v.doVolumeSet(
+		ctx,
 		volumeID,
 		&api.VolumeSetRequest{
 			Action: &api.VolumeStateAction{
 				Mount:     api.VolumeActionParam_VOLUME_ACTION_PARAM_ON,
 				MountPath: mountPath,
 			},
+			Options: options,
 		},
 	)
 }
 
 // Unmount volume at specified path
 // Errors ErrEnoEnt, ErrVolDetached may be returned.
-func (v *volumeClient) Unmount(volumeID string, mountPath string) error {
+func (v *volumeClient) Unmount(ctx context.Context, volumeID string, mountPath string, options map[string]string) error {
 	return v.doVolumeSet(
+		ctx,
 		volumeID,
 		&api.VolumeSetRequest{
 			Action: &api.VolumeStateAction{
 				Mount:     api.VolumeActionParam_VOLUME_ACTION_PARAM_OFF,
 				MountPath: mountPath,
 			},
+			Options: options,
 		},
 	)
 }
@@ -375,7 +428,7 @@ func (v *volumeClient) Unmount(volumeID string, mountPath string) error {
 // Update volume
 func (v *volumeClient) Set(volumeID string, locator *api.VolumeLocator,
 	spec *api.VolumeSpec) error {
-	return v.doVolumeSet(
+	return v.doVolumeSet(correlation.TODO(),
 		volumeID,
 		&api.VolumeSetRequest{
 			Locator: locator,
@@ -384,20 +437,482 @@ func (v *volumeClient) Set(volumeID string, locator *api.VolumeLocator,
 	)
 }
 
-func (v *volumeClient) doVolumeSet(volumeID string,
+func (v *volumeClient) doVolumeSet(ctx context.Context, volumeID string,
 	request *api.VolumeSetRequest) error {
-	_, err := v.doVolumeSetGetResponse(volumeID, request)
+	_, err := v.doVolumeSetGetResponse(ctx, volumeID, request)
 	return err
 }
 
-func (v *volumeClient) doVolumeSetGetResponse(volumeID string,
+func (v *volumeClient) doVolumeSetGetResponse(ctx context.Context, volumeID string,
 	request *api.VolumeSetRequest) (*api.VolumeSetResponse, error) {
 	response := &api.VolumeSetResponse{}
-	if err := v.c.Put().Resource(volumePath).Instance(volumeID).Body(request).Do().Unmarshal(response); err != nil {
+	rc := correlation.RequestContextFromContextValue(ctx)
+	if err := v.c.Put().Resource(volumePath).
+		Instance(volumeID).
+		Body(request).
+		SetHeader(correlation.ContextIDKey, rc.ID).
+		SetHeader(correlation.ContextOriginKey, string(rc.Origin)).
+		Do().
+		Unmarshal(response); err != nil {
 		return nil, err
 	}
 	if response.VolumeResponse != nil && response.VolumeResponse.Error != "" {
 		return nil, errors.New(response.VolumeResponse.Error)
 	}
 	return response, nil
+}
+
+// Quiesce quiesces volume i/o
+func (v *volumeClient) Quiesce(
+	volumeID string,
+	timeoutSec uint64,
+	quiesceID string,
+) error {
+	response := &api.VolumeResponse{}
+	req := v.c.Post().Resource(volumePath + "/quiesce").Instance(volumeID)
+	req.QueryOption(api.OptTimeoutSec, strconv.FormatUint(timeoutSec, 10))
+	req.QueryOption(api.OptQuiesceID, quiesceID)
+	if err := req.Do().Unmarshal(response); err != nil {
+		return err
+	}
+	if response.Error != "" {
+		return errors.New(response.Error)
+	}
+	return nil
+}
+
+// Unquiesce un-quiesces volume i/o
+func (v *volumeClient) Unquiesce(volumeID string) error {
+	response := &api.VolumeResponse{}
+	req := v.c.Post().Resource(volumePath + "/unquiesce").Instance(volumeID)
+	if err := req.Do().Unmarshal(response); err != nil {
+		return err
+	}
+	if response.Error != "" {
+		return errors.New(response.Error)
+	}
+	return nil
+}
+
+// CredsEnumerate enumerates configured credentials in the cluster
+func (v *volumeClient) CredsEnumerate() (map[string]interface{}, error) {
+	creds := make(map[string]interface{}, 0)
+	err := v.c.Get().Resource(api.OsdCredsPath).Do().Unmarshal(&creds)
+	return creds, err
+}
+
+// CredsCreate creates credentials for a given cloud provider
+func (v *volumeClient) CredsCreate(params map[string]string) (string, error) {
+	createResponse := api.CredCreateResponse{}
+	request := &api.CredCreateRequest{
+		InputParams: params,
+	}
+	req := v.c.Post().Resource(api.OsdCredsPath).Body(request)
+	response := req.Do()
+	if response.Error() != nil {
+		return "", response.FormatError()
+	}
+	if err := response.Unmarshal(&createResponse); err != nil {
+		return "", err
+	}
+	return createResponse.UUID, nil
+}
+
+// CredsUpdate updates a previsiously configured credentials
+func (v *volumeClient) CredsUpdate(name string, params map[string]string) error {
+	request := &api.CredUpdateRequest{
+		Name:        name,
+		InputParams: params,
+	}
+	req := v.c.Put().Resource(api.OsdCredsPath).Instance(name).Body(request)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CredsDelete deletes the credential with given UUID
+func (v *volumeClient) CredsDelete(uuid string) error {
+	req := v.c.Delete().Resource(api.OsdCredsPath).Instance(uuid)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CredsValidate validates the credential by accessuing the cloud
+// provider with the given credential
+func (v *volumeClient) CredsValidate(uuid string) error {
+	req := v.c.Put().Resource(api.OsdCredsPath + "/validate").Instance(url.QueryEscape(uuid))
+	response := req.Do()
+	if response.Error() != nil {
+		if response.StatusCode() == http.StatusUnprocessableEntity {
+			return volume.NewCredentialError(response.Error().Error())
+		}
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CredsRemoveReferences removes any references the  credential specified
+// by the Name/Uuid
+func (v *volumeClient) CredsDeleteReferences(uuid string) error {
+	req := v.c.Delete().Resource(api.OsdCredsPath + "/references").Instance(uuid)
+	response := req.Do()
+	if response.Error() != nil {
+		if response.StatusCode() == http.StatusUnprocessableEntity {
+			return volume.NewCredentialError(response.Error().Error())
+		}
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CloudBackupCreate uploads snapshot of a volume to cloud
+func (v *volumeClient) CloudBackupCreate(
+	input *api.CloudBackupCreateRequest,
+) (*api.CloudBackupCreateResponse, error) {
+	createResp := &api.CloudBackupCreateResponse{}
+	req := v.c.Post().Resource(api.OsdBackupPath).Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		if response.StatusCode() == http.StatusConflict {
+			return nil, &ost_errors.ErrExists{
+				Type: "CloudBackupCreate",
+				ID:   input.Name,
+			}
+		}
+		return nil, response.FormatError()
+	}
+	if err := response.Unmarshal(&createResp); err != nil {
+		return nil, err
+	}
+	return createResp, nil
+}
+
+// CloudBackupGroupCreate uploads snapshots of a volume group to cloud
+func (v *volumeClient) CloudBackupGroupCreate(
+	input *api.CloudBackupGroupCreateRequest,
+) (*api.CloudBackupGroupCreateResponse, error) {
+
+	createResp := &api.CloudBackupGroupCreateResponse{}
+	req := v.c.Post().Resource(api.OsdBackupPath + "/group").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&createResp); err != nil {
+		return nil, err
+	}
+
+	return createResp, nil
+}
+
+// CloudBackupRestore downloads a cloud backup to a newly created volume
+func (v *volumeClient) CloudBackupRestore(
+	input *api.CloudBackupRestoreRequest,
+) (*api.CloudBackupRestoreResponse, error) {
+	restoreResponse := &api.CloudBackupRestoreResponse{}
+	req := v.c.Post().Resource(api.OsdBackupPath + "/restore").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		if response.StatusCode() == http.StatusConflict {
+			return nil, &ost_errors.ErrExists{
+				Type: "CloudBackupRestore",
+				ID:   input.Name,
+			}
+		}
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&restoreResponse); err != nil {
+		return nil, err
+	}
+	return restoreResponse, nil
+}
+
+// CloudBackupEnumerate lists the backups for a given cluster/credential/volumeID
+func (v *volumeClient) CloudBackupEnumerate(
+	input *api.CloudBackupEnumerateRequest,
+) (*api.CloudBackupEnumerateResponse, error) {
+	enumerateResponse := &api.CloudBackupEnumerateResponse{}
+	req := v.c.Get().Resource(api.OsdBackupPath).Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&enumerateResponse); err != nil {
+		return nil, err
+	}
+	return enumerateResponse, nil
+}
+
+// CloudBackupDelete deletes the backups in cloud
+func (v *volumeClient) CloudBackupDelete(
+	input *api.CloudBackupDeleteRequest,
+) error {
+	req := v.c.Delete().Resource(api.OsdBackupPath).Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CloudBackupDeleteAll deletes all the backups for a volume in cloud
+func (v *volumeClient) CloudBackupDeleteAll(
+	input *api.CloudBackupDeleteAllRequest,
+) error {
+	req := v.c.Delete().Resource(api.OsdBackupPath + "/all").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CloudBackupStatus gets the most recent status of backup/restores
+func (v *volumeClient) CloudBackupStatus(
+	input *api.CloudBackupStatusRequest,
+) (*api.CloudBackupStatusResponse, error) {
+	statusResponse := &api.CloudBackupStatusResponse{}
+	req := v.c.Get().Resource(api.OsdBackupPath + "/status").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&statusResponse); err != nil {
+		return nil, err
+	}
+	return statusResponse, nil
+}
+
+// CloudBackupCatalog displays listing of backup content
+func (v *volumeClient) CloudBackupCatalog(
+	input *api.CloudBackupCatalogRequest,
+) (*api.CloudBackupCatalogResponse, error) {
+	catalogResponse := &api.CloudBackupCatalogResponse{}
+	req := v.c.Get().Resource(api.OsdBackupPath + "/catalog").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&catalogResponse); err != nil {
+		return nil, err
+	}
+	return catalogResponse, nil
+}
+
+// CloudBackupHistory displays past backup/restore operations in the cluster
+func (v *volumeClient) CloudBackupHistory(
+	input *api.CloudBackupHistoryRequest,
+) (*api.CloudBackupHistoryResponse, error) {
+	historyResponse := &api.CloudBackupHistoryResponse{}
+	req := v.c.Get().Resource(api.OsdBackupPath + "/history").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&historyResponse); err != nil {
+		return nil, err
+	}
+	return historyResponse, nil
+}
+
+// CloudBackupState allows a current backup
+// state transisions(pause/resume/stop)
+func (v *volumeClient) CloudBackupStateChange(
+	input *api.CloudBackupStateChangeRequest,
+) error {
+	req := v.c.Put().Resource(api.OsdBackupPath + "/statechange").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CloudBackupSchedCreate for a volume creates a schedule to backup volume to cloud
+func (v *volumeClient) CloudBackupSchedCreate(
+	input *api.CloudBackupSchedCreateRequest,
+) (*api.CloudBackupSchedCreateResponse, error) {
+	createResponse := &api.CloudBackupSchedCreateResponse{}
+	req := v.c.Post().Resource(api.OsdBackupPath + "/sched").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&createResponse); err != nil {
+		return nil, err
+	}
+	return createResponse, nil
+}
+
+// CloudBackupSchedUpdate for a volume creates a schedule to backup volume to cloud
+func (v *volumeClient) CloudBackupSchedUpdate(
+	input *api.CloudBackupSchedUpdateRequest,
+) error {
+	req := v.c.Put().Resource(api.OsdBackupPath + "/sched").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CloudBackupGroupSchedCreate for a volume group creates a schedule to backup
+// volume group to the cloud
+func (v *volumeClient) CloudBackupGroupSchedCreate(
+	input *api.CloudBackupGroupSchedCreateRequest,
+) (*api.CloudBackupSchedCreateResponse, error) {
+	createResponse := &api.CloudBackupSchedCreateResponse{}
+	req := v.c.Post().Resource(api.OsdBackupPath + "/schedgroup").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+
+	if err := response.Unmarshal(&createResponse); err != nil {
+		return nil, err
+	}
+	return createResponse, nil
+}
+
+// CloudBackupGroupSchedUpdate for a volume group creates a schedule to backup
+// volume group to the cloud
+func (v *volumeClient) CloudBackupGroupSchedUpdate(
+	input *api.CloudBackupGroupSchedUpdateRequest,
+) error {
+	req := v.c.Put().Resource(api.OsdBackupPath + "/schedgroup").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+
+	return nil
+}
+
+// CloudBackupSchedDelete delete a volume's cloud backup-schedule
+func (v *volumeClient) CloudBackupSchedDelete(
+	input *api.CloudBackupSchedDeleteRequest,
+) error {
+	req := v.c.Delete().Resource(api.OsdBackupPath + "/sched").Body(input)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+// CloudBackupSchedEnumerate enumerates the configured backup-schedules in the cluster
+func (v *volumeClient) CloudBackupSchedEnumerate() (*api.CloudBackupSchedEnumerateResponse, error) {
+	enumerateResponse := &api.CloudBackupSchedEnumerateResponse{}
+	req := v.c.Get().Resource(api.OsdBackupPath + "/sched")
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+	if err := response.Unmarshal(enumerateResponse); err != nil {
+		return nil, err
+	}
+	return enumerateResponse, nil
+}
+
+func (v *volumeClient) CloudBackupSize(
+	input *api.SdkCloudBackupSizeRequest,
+) (*api.SdkCloudBackupSizeResponse, error) {
+
+	return nil, volume.ErrNotSupported
+}
+
+func (v *volumeClient) SnapshotGroup(groupID string, labels map[string]string, volumeIDs []string, deleteOnFailure bool) (*api.GroupSnapCreateResponse, error) {
+
+	response := &api.GroupSnapCreateResponse{}
+	request := &api.GroupSnapCreateRequest{
+		Id:              groupID,
+		Labels:          labels,
+		VolumeIds:       volumeIDs,
+		DeleteOnFailure: deleteOnFailure,
+	}
+
+	req := v.c.Post().Resource(snapPath + "/snapshotgroup").Body(request)
+	res := req.Do()
+	if res.Error() != nil {
+		return nil, res.FormatError()
+	}
+
+	if err := res.Unmarshal(&response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (v *volumeClient) CloudMigrateStart(request *api.CloudMigrateStartRequest) (*api.CloudMigrateStartResponse, error) {
+	startResponse := &api.CloudMigrateStartResponse{}
+	req := v.c.Post().Resource(api.OsdMigrateStartPath).Body(request)
+	response := req.Do()
+	if response.Error() != nil {
+		if response.StatusCode() == http.StatusConflict {
+			return nil, &ost_errors.ErrExists{
+				Type: "CloudMigrate",
+				ID:   request.TaskId,
+			}
+		}
+		return nil, response.FormatError()
+	}
+	if err := response.Unmarshal(startResponse); err != nil {
+		return nil, err
+	}
+	return startResponse, nil
+}
+
+func (v *volumeClient) CloudMigrateCancel(request *api.CloudMigrateCancelRequest) error {
+	req := v.c.Post().Resource(api.OsdMigrateCancelPath).Body(request)
+	response := req.Do()
+	if response.Error() != nil {
+		return response.FormatError()
+	}
+	return nil
+}
+
+func (v *volumeClient) CloudMigrateStatus(request *api.CloudMigrateStatusRequest) (*api.CloudMigrateStatusResponse, error) {
+	statusResponse := &api.CloudMigrateStatusResponse{}
+	req := v.c.Get().Resource(api.OsdMigrateStatusPath).Body(request)
+	response := req.Do()
+	if response.Error() != nil {
+		return nil, response.FormatError()
+	}
+	if err := response.Unmarshal(statusResponse); err != nil {
+		return nil, err
+	}
+	return statusResponse, nil
+}
+
+// Du specified volume id and specifically path (if provided)
+func (v *volumeClient) Catalog(id, subfolder, maxDepth string) (api.CatalogResponse, error) {
+	var catalog api.CatalogResponse
+
+	req := v.c.Get().Resource(volumePath + "/catalog").Instance(id)
+	if err := req.QueryOption(api.OptCatalogSubFolder, subfolder).QueryOption(api.OptCatalogMaxDepth, maxDepth).Do().Unmarshal(&catalog); err != nil {
+		return catalog, err
+	}
+
+	return catalog, nil
+}
+
+func (v *volumeClient) VolService(volumeID string, vsreq *api.VolumeServiceRequest) (*api.VolumeServiceResponse, error) {
+	vsresp := &api.VolumeServiceResponse{}
+
+	req := v.c.Post().Resource(volumePath + "/volservice").Instance(volumeID).Body(vsreq)
+	err := req.Do().Unmarshal(&vsresp)
+
+	return vsresp, err
 }

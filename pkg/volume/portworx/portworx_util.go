@@ -53,6 +53,7 @@ type portworxVolumeUtil struct {
 
 // CreateVolume creates a Portworx volume.
 func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (string, int64, map[string]string, error) {
+	ctx := context.Background()
 	driver, err := util.getPortworxDriver(p.plugin.host)
 	if err != nil || driver == nil {
 		klog.Errorf("Failed to get portworx driver. Err: %v", err)
@@ -110,7 +111,7 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 		spec.VolumeLabels[k] = v
 	}
 
-	volumeID, err := driver.Create(locator, source, spec)
+	volumeID, err := driver.Create(ctx, locator, source, spec)
 	if err != nil {
 		klog.Errorf("Error creating Portworx Volume : %v", err)
 		return "", 0, nil, err
@@ -122,13 +123,14 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 // DeleteVolume deletes a Portworx volume
 func (util *portworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
+	ctx := context.Background()
 	driver, err := util.getPortworxDriver(d.plugin.host)
 	if err != nil || driver == nil {
 		klog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return err
 	}
 
-	err = driver.Delete(d.volumeID)
+	err = driver.Delete(ctx, d.volumeID)
 	if err != nil {
 		klog.Errorf("Error deleting Portworx Volume (%v): %v", d.volName, err)
 		return err
@@ -138,13 +140,14 @@ func (util *portworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
 
 // AttachVolume attaches a Portworx Volume
 func (util *portworxVolumeUtil) AttachVolume(m *portworxVolumeMounter, attachOptions map[string]string) (string, error) {
+	ctx := context.Background()
 	driver, err := util.getLocalPortworxDriver(m.plugin.host)
 	if err != nil || driver == nil {
 		klog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return "", err
 	}
 
-	devicePath, err := driver.Attach(m.volName, attachOptions)
+	devicePath, err := driver.Attach(ctx, m.volName, attachOptions)
 	if err != nil {
 		klog.Errorf("Error attaching Portworx Volume (%v): %v", m.volName, err)
 		return "", err
@@ -154,13 +157,14 @@ func (util *portworxVolumeUtil) AttachVolume(m *portworxVolumeMounter, attachOpt
 
 // DetachVolume detaches a Portworx Volume
 func (util *portworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
+	ctx := context.Background()
 	driver, err := util.getLocalPortworxDriver(u.plugin.host)
 	if err != nil || driver == nil {
 		klog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return err
 	}
 
-	err = driver.Detach(u.volName, false /*doNotForceDetach*/)
+	err = driver.Detach(ctx, u.volName, nil /*doNotForceDetach*/)
 	if err != nil {
 		klog.Errorf("Error detaching Portworx Volume (%v): %v", u.volName, err)
 		return err
@@ -170,13 +174,14 @@ func (util *portworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
 
 // MountVolume mounts a Portworx Volume on the specified mountPath
 func (util *portworxVolumeUtil) MountVolume(m *portworxVolumeMounter, mountPath string) error {
+	ctx := context.Background()
 	driver, err := util.getLocalPortworxDriver(m.plugin.host)
 	if err != nil || driver == nil {
 		klog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return err
 	}
 
-	err = driver.Mount(m.volName, mountPath)
+	err = driver.Mount(ctx, m.volName, mountPath, nil)
 	if err != nil {
 		klog.Errorf("Error mounting Portworx Volume (%v) on Path (%v): %v", m.volName, mountPath, err)
 		return err
@@ -186,13 +191,14 @@ func (util *portworxVolumeUtil) MountVolume(m *portworxVolumeMounter, mountPath 
 
 // UnmountVolume unmounts a Portworx Volume
 func (util *portworxVolumeUtil) UnmountVolume(u *portworxVolumeUnmounter, mountPath string) error {
+	ctx := context.Background()
 	driver, err := util.getLocalPortworxDriver(u.plugin.host)
 	if err != nil || driver == nil {
 		klog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return err
 	}
 
-	err = driver.Unmount(u.volName, mountPath)
+	err = driver.Unmount(ctx, u.volName, mountPath, nil)
 	if err != nil {
 		klog.Errorf("Error unmounting Portworx Volume (%v) on Path (%v): %v", u.volName, mountPath, err)
 		return err
