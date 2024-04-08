@@ -381,7 +381,7 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		EnableGarbageCollection:   f.Options.EnableGarbageCollection,
 		ResourcePrefix:            f.StorageFactory.ResourcePrefix(resource),
 		CountMetricPollPeriod:     f.Options.StorageConfig.CountMetricPollPeriod,
-		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
+		StorageObjectCountTracker: storageConfig.StorageObjectCountTracker,
 	}
 
 	if f.Options.EnableWatchCache {
