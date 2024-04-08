@@ -1,0 +1,136 @@
+/*
+Copyright 2023 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+
+syntax = "proto3";
+
+package v1alpha1;
+option go_package = "k8s.io/dynamic-resource-allocation/apis/restproxy/v1alpha1";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+// REST is the the gRPC service on the side which issues REST requests.
+//
+// Because a gRPC server cannot send requests to its client,
+// a stream gets established by the client where each response
+// is a REST request, which then gets handled by the client.
+service REST {
+  // Proxy is called by the REST proxy to enable sending
+  // REST requests. It gets called again after errors.
+  //
+  // Each stream response is a single REST request. The response
+  // is returned by the proxy through one or more Reply
+  // calls.
+  rpc Proxy (ProxyMessage)
+    returns (stream Request) {}
+
+  // Reply provides part of the response for a REST request.
+  rpc Reply (ReplyMessage)
+    returns (ReplyResponse) {}
+
+  // NodeObject is called as soon as kubelet has information
+  // about its node object. It's not called when used elsewhere.
+  rpc NodeObject(NodeObjectRequest)
+    returns (NodeObjectResponse) {}
+}
+
+message ProxyMessage {
+  // Intentionally empty.
+}
+
+message Request {
+  // Id is used as identifier for all response messages for this
+  // request. It is included in all ReplyMessages for this Request.
+  int64 id = 1;
+
+  string method = 2;
+  string path = 3;
+  string rawQuery = 4;
+  map<string, RESTHeader> header = 5;
+
+  // Body contains the entire request body data.
+  bytes body = 6;
+}
+
+message RESTHeader {
+  repeated string values = 1;
+}
+
+// ReplyMessage is one of many replies that are sent
+// by the proxy for each Request. If the error and/or close are set,
+// then the request has failed and no further replies are going to
+// be sent.
+//
+// The proxy waits for the ReplyResponse before sending the next
+// ReplyMessage. This ensures that the gRPC server receives
+// the body chunks in the right order.
+message ReplyMessage {
+  // Id matches the Id in the Request that this reply belongs to.
+  int64 id = 1;
+
+  // Error is set if and only if executing the request encountered a problem.
+  string error = 2;
+
+  // Close indicates that the end of the body has been reached.
+  bool close = 3;
+
+  // Header contains the response from the REST server. It is
+  // set in all reply messages.
+  ResponseHeader header = 4;
+
+  // BodyOffset is the index of the body data in the overall response body.
+  int64 body_offset = 5;
+
+  // Body contains some of the response body data.
+  // The entire data is provided in chunks in multiple
+  // replies. A reply may provide an error, indicate the
+  // end of the response data, and contain some more data.
+  bytes body = 6;
+}
+
+message ResponseHeader {
+  string status = 1; // e.g. "200 OK"
+  int32 status_code = 2;   // e.g. 200
+  string proto = 3; // e.g. "HTTP/1.0"
+  int32 proto_major = 4;    // e.g. 1
+  int32 proto_minor = 5;   // e.g. 0
+  map<string, RESTHeader> header = 6;
+
+  // ContentLength is the total expect length of the response body.
+  int64 content_length = 7;
+}
+
+message ReplyResponse {
+  // Close is true if the client is not interested in receiving more reply data.
+  bool close = 1;
+}
+
+message NodeObjectRequest {
+    string name = 1;
+    string uid = 2;
+}
+
+message NodeObjectResponse {
+}
