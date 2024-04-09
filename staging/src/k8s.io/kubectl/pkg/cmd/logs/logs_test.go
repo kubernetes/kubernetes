@@ -633,7 +633,8 @@ func TestValidateLogOptions(t *testing.T) {
 		{
 			name: "container name combined with --all-containers",
 			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, true, false)
+				o := NewLogsOptions(streams)
+				o.AllContainers = true
 				o.Container = "my-container"
 
 				var err error
