@@ -59,6 +59,12 @@ type Config struct {
 	// FullResyncPeriod is the period at which ShouldResync is considered.
 	FullResyncPeriod time.Duration
 
+	// MinWatchTimeout, if set, will define the minimum timeout for watch requests send
+	// to kube-apiserver. However, values lower than 5m will not be honored to avoid
+	// negative performance impact on controlplane.
+	// Optional - if unset a default value of 5m will be used.
+	MinWatchTimeout time.Duration
+
 	// ShouldResync is periodically used by the reflector to determine
 	// whether to Resync the Queue. If ShouldResync is `nil` or
 	// returns true, it means the reflector should proceed with the
@@ -138,6 +144,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		c.config.Queue,
 		ReflectorOptions{
 			ResyncPeriod:    c.config.FullResyncPeriod,
+			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
 			Clock:           c.clock,
 		},
@@ -366,6 +373,12 @@ type InformerOptions struct {
 	// Optional - if unset, store resyncing is not happening periodically.
 	ResyncPeriod time.Duration
 
+	// MinWatchTimeout, if set, will define the minimum timeout for watch requests send
+	// to kube-apiserver. However, values lower than 5m will not be honored to avoid
+	// negative performance impact on controlplane.
+	// Optional - if unset a default value of 5m will be used.
+	MinWatchTimeout time.Duration
+
 	// Indexers, if set, are the indexers for the received objects to optimize
 	// certain queries.
 	// Optional - if unset no indexes are maintained.
@@ -580,6 +593,7 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		ListerWatcher:    options.ListerWatcher,
 		ObjectType:       options.ObjectType,
 		FullResyncPeriod: options.ResyncPeriod,
+		MinWatchTimeout:  options.MinWatchTimeout,
 		RetryOnError:     false,
 
 		Process: func(obj interface{}, isInInitialList bool) error {
