@@ -91,7 +91,7 @@ func (rc *reconciler) reconstructVolumes() {
 
 	if len(reconstructedVolumes) > 0 {
 		// Add the volumes to ASW
-		rc.updateStatesNew(reconstructedVolumes)
+		rc.updateStates(reconstructedVolumes)
 
 		// The reconstructed volumes are mounted, hence a previous kubelet must have already put it into node.status.volumesInUse.
 		// Remember to update DSW with this information.
@@ -102,7 +102,7 @@ func (rc *reconciler) reconstructVolumes() {
 	klog.V(2).InfoS("Volume reconstruction finished")
 }
 
-func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
+func (rc *reconciler) updateStates(reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
 	for _, gvl := range reconstructedVolumes {
 		err := rc.actualStateOfWorld.AddAttachUncertainReconstructedVolume(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
