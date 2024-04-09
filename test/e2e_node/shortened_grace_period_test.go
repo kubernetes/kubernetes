@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
 	"strings"
 	"time"
 )
@@ -83,6 +84,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				return nil
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 				return err
 			})
 		})
@@ -104,8 +106,18 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:    name,
-					Image:   busyboxImage,
+					Name:  name,
+					Image: busyboxImage,
+					SecurityContext: &v1.SecurityContext{
+						AllowPrivilegeEscalation: pointer.BoolPtr(false),
+						RunAsNonRoot:             pointer.BoolPtr(true),
+						Capabilities: &v1.Capabilities{
+							Drop: []v1.Capability{"ALL"},
+						},
+						SeccompProfile: &v1.SeccompProfile{
+							Type: v1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Command: []string{"sh", "-c"},
 					Args: []string{`
 term() {
