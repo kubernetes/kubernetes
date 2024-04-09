@@ -44,6 +44,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var podName = "test"
 		var ctx = context.Background()
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "Pod"}
+		podClient = e2epod.NewPodClient(f)
 		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
 			expectedWatchEvents := []watch.Event{
 				{Type: watch.Deleted},
