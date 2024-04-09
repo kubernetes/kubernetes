@@ -163,16 +163,18 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	if err != nil {
 		return nil, err
 	}
-	if numPods > 1 && !allPods {
-		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
-	}
-	if numPods > 1 && allPods {
-		pods, err := GetPodList(clientset, namespace, selector.String(), timeout, sortBy)
-		if err != nil {
-			return nil, err
+	var targetObj runtime.Object = pod
+
+	if numPods > 1 {
+		if allPods {
+			targetObj, err = GetPodList(clientset, namespace, selector.String(), timeout, sortBy)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 		}
-		return logsForObjectWithClient(clientset, pods, opts, timeout, allContainers, allPods)
 	}
 
-	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers, allPods)
+	return logsForObjectWithClient(clientset, targetObj, options, timeout, allContainers, allPods)
 }
