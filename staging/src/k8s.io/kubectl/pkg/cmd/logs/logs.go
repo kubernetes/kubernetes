@@ -123,10 +123,11 @@ type LogsOptions struct {
 	MaxFollowConcurrency   int
 	Prefix                 bool
 
-	Object           runtime.Object
-	GetPodTimeout    time.Duration
-	RESTClientGetter genericclioptions.RESTClientGetter
-	LogsForObject    polymorphichelpers.LogsForObjectFunc
+	Object              runtime.Object
+	GetPodTimeout       time.Duration
+	RESTClientGetter    genericclioptions.RESTClientGetter
+	LogsForObject       polymorphichelpers.LogsForObjectFunc
+	AllPodLogsForObject polymorphichelpers.AllPodLogsForObjectFunc
 
 	genericiooptions.IOStreams
 
@@ -266,6 +267,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 
 	o.RESTClientGetter = f
 	o.LogsForObject = polymorphichelpers.LogsForObjectFn
+	o.AllPodLogsForObject = polymorphichelpers.AllPodLogsForObjectFn
 
 	if o.Object == nil {
 		builder := f.NewBuilder().
@@ -331,7 +333,13 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() error {
-	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.AllPods)
+	var requests map[corev1.ObjectReference]rest.ResponseWrapper
+	var err error
+	if o.AllPods {
+		requests, err = o.AllPodLogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.AllPods)
+	} else {
+		requests, err = o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
+	}
 	if err != nil {
 		return err
 	}
