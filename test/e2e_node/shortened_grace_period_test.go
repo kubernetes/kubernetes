@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"strings"
 	"time"
 )
@@ -109,8 +109,8 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 					Name:  name,
 					Image: busyboxImage,
 					SecurityContext: &v1.SecurityContext{
-						AllowPrivilegeEscalation: pointer.BoolPtr(false),
-						RunAsNonRoot:             pointer.BoolPtr(true),
+						AllowPrivilegeEscalation: ptr.To(false),
+						RunAsNonRoot:             ptr.To(true),
 						Capabilities: &v1.Capabilities{
 							Drop: []v1.Capability{"ALL"},
 						},
