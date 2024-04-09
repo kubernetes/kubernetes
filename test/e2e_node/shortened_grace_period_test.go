@@ -30,14 +30,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/ptr"
 	"strings"
 	"time"
 )
 
 var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", func() {
 	f := framework.NewDefaultFramework("shortened-grace-period")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("When repeatedly deleting pods", func() {
 		var podClient *e2epod.PodClient
 		var dc dynamic.Interface
@@ -106,18 +105,8 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  name,
-					Image: busyboxImage,
-					SecurityContext: &v1.SecurityContext{
-						AllowPrivilegeEscalation: ptr.To(false),
-						RunAsNonRoot:             ptr.To(true),
-						Capabilities: &v1.Capabilities{
-							Drop: []v1.Capability{"ALL"},
-						},
-						SeccompProfile: &v1.SeccompProfile{
-							Type: v1.SeccompProfileTypeRuntimeDefault,
-						},
-					},
+					Name:    name,
+					Image:   busyboxImage,
 					Command: []string{"sh", "-c"},
 					Args: []string{`
 term() {
