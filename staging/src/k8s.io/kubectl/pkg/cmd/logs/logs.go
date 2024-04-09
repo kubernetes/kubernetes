@@ -136,11 +136,9 @@ type LogsOptions struct {
 	containerNameFromRefSpecRegexp *regexp.Regexp
 }
 
-func NewLogsOptions(streams genericiooptions.IOStreams, allContainers bool, allPods bool) *LogsOptions {
+func NewLogsOptions(streams genericiooptions.IOStreams) *LogsOptions {
 	return &LogsOptions{
 		IOStreams:            streams,
-		AllContainers:        allContainers,
-		AllPods:              allPods,
 		Tail:                 -1,
 		MaxFollowConcurrency: 5,
 
@@ -150,7 +148,7 @@ func NewLogsOptions(streams genericiooptions.IOStreams, allContainers bool, allP
 
 // NewCmdLogs creates a new pod logs command
 func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := NewLogsOptions(streams, false, false)
+	o := NewLogsOptions(streams)
 
 	cmd := &cobra.Command{
 		Use:                   logsUsageStr,
