@@ -43,7 +43,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var ns string
 		var podName = "test"
 		var ctx = context.Background()
-		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "Pod"}
+		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
 			dc = f.DynamicClient
@@ -104,7 +104,7 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 				{
 					Name:    name,
 					Image:   busyboxImage,
-					Command: []string{"sh", "-c", "sleep 9999"},
+					Command: []string{"sh", "-c"},
 					Args: []string{`
 term() {
   if [ "$COUNT" -eq 0 ]; then
