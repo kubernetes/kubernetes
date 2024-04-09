@@ -19,25 +19,19 @@ package netpol
 import (
 	"context"
 	"fmt"
-	v1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	netutils "k8s.io/utils/net"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	netutils "k8s.io/utils/net"
 )
-
-// defaultPollIntervalSeconds [seconds] is the default value for which the Prober will wait before attempting next attempt.
-const defaultPollIntervalSeconds = 1
-
-// defaultPollTimeoutSeconds [seconds] is the default timeout when polling on probes.
-const defaultPollTimeoutSeconds = 10
 
 // TestPod represents an actual running pod. For each Pod defined by the model,
 // there will be a corresponding TestPod. TestPod includes some runtime info
@@ -117,7 +111,7 @@ func (k *kubeManager) initializeClusterFromModel(ctx context.Context, model *Mod
 	}
 
 	for _, createdPod := range createdPods {
-		err := e2epod.WaitForPodRunningInNamespace(ctx, k.clientSet, createdPod)
+		err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, k.clientSet, createdPod.Name, createdPod.Namespace, framework.PodStartTimeout)
 		if err != nil {
 			return fmt.Errorf("unable to wait for pod %s/%s: %w", createdPod.Namespace, createdPod.Name, err)
 		}
@@ -151,89 +145,27 @@ func (k *kubeManager) getPod(ctx context.Context, ns string, name string) (*v1.P
 	return kubePod, nil
 }
 
-// probeConnectivity execs into a pod and checks its connectivity to another pod.
+// probeConnectivity execs into a pod and checks its connectivity to another pod returning the true if the connectivity state is the expected.
 // Implements the Prober interface.
-func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, string, error) {
+func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, error) {
 	port := strconv.Itoa(args.toPort)
 	if args.addrTo == "" {
-		return false, "no IP provided", fmt.Errorf("empty addrTo field")
+		return false, fmt.Errorf("empty addrTo field")
 	}
-	framework.Logf("Starting probe from pod %v to %v", args.podFrom, args.addrTo)
-	var cmd []string
-	timeout := fmt.Sprintf("--timeout=%vs", args.timeoutSeconds)
-
-	switch args.protocol {
-	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=sctp"}
-	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=tcp"}
-	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=udp"}
-		if framework.NodeOSDistroIs("windows") {
-			framework.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
-		}
-	default:
-		framework.Failf("protocol %s not supported", args.protocol)
+	negative := ""
+	if !args.expectConnectivity {
+		negative = "!"
 	}
 
-	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
-
-	attempt := 0
+	now := time.Now()
+	framework.Logf("Starting probe from pod %v to %v at %v", args.podFrom, args.addrTo, now)
+	cmd := []string{"timeout", "30", "/bin/sh", "-c", fmt.Sprintf(`until %s /agnhost connect --timeout=3s --protocol=%s %s ; do echo "Date: $(date)" ; sleep 1; done`,
+		negative, strings.ToLower(string(args.protocol)), net.JoinHostPort(args.addrTo, port))}
 
 	// NOTE: The return value of this function[probeConnectivity] should be true if the probe is successful and false otherwise.
-
-	// probeError will be the return value of this function[probeConnectivity] call.
-	var probeError error
-	var stderr string
-
-	// Instead of re-running the job on connectivity failure, the following conditionFunc when passed to PollImmediate, reruns
-	// the job when the observed value don't match the expected value, so we don't rely on return value of PollImmediate, we
-	// simply discard it and use probeError, defined outside scope of conditionFunc, for returning the result of probeConnectivity.
-	conditionFunc := func() (bool, error) {
-		_, stderr, probeError = k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
-		// retry should only occur if expected and observed value don't match.
-		if args.expectConnectivity {
-			if probeError != nil {
-				// since we expect connectivity here, we fail the condition for PollImmediate to reattempt the probe.
-				// this happens in the cases where network is congested, we don't have any policy rejecting traffic
-				// from "podFrom" to "podTo" and probes from "podFrom" to "podTo" are failing.
-				framework.Logf("probe #%d :: connectivity expected :: %s/%s -> %s :: stderr - %s",
-					attempt+1, args.nsFrom, args.podFrom, args.addrTo, stderr,
-				)
-				attempt++
-				return false, nil
-			} else {
-				// we got the expected results, exit immediately.
-				return true, nil
-			}
-		} else {
-			if probeError != nil {
-				// we got the expected results, exit immediately.
-				return true, nil
-			} else {
-				// since we don't expect connectivity here, we fail the condition for PollImmediate to reattempt the probe.
-				// this happens in the cases where we have policy rejecting traffic from "podFrom" to "podTo", but CNI takes
-				// time to implement the policy and probe from "podFrom" to "podTo" was successful in that window.
-				framework.Logf(" probe #%d :: connectivity not expected :: %s/%s -> %s",
-					attempt+1, args.nsFrom, args.podFrom, args.addrTo,
-				)
-				attempt++
-				return false, nil
-			}
-		}
-	}
-
-	// ignore the result of PollImmediate, we are only concerned with probeError.
-	_ = wait.PollImmediate(
-		time.Duration(args.pollIntervalSeconds)*time.Second,
-		time.Duration(args.pollTimeoutSeconds)*time.Second,
-		conditionFunc,
-	)
-
-	if probeError != nil {
-		return false, commandDebugString, nil
-	}
-	return true, commandDebugString, nil
+	_, stderr, probeError := k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
+	framework.Logf("probe %s/%s -> %s took %v expected %v :: stderr - %s probeError - %v", args.nsFrom, args.podFrom, args.addrTo, time.Since(now), args.expectConnectivity, stderr, probeError)
+	return probeError == nil, probeError
 }
 
 // executeRemoteCommand executes a remote shell command on the given pod.
@@ -322,31 +254,4 @@ func (k *kubeManager) getNamespace(ctx context.Context, ns string) (*v1.Namespac
 		return nil, fmt.Errorf("unable to get namespace %s: %w", ns, err)
 	}
 	return selectedNameSpace, nil
-}
-
-// getProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
-func getProbeTimeoutSeconds() int {
-	timeoutSeconds := 1
-	if framework.NodeOSDistroIs("windows") {
-		timeoutSeconds = 3
-	}
-	return timeoutSeconds
-}
-
-// getWorkers returns the number of workers suggested to run when testing.
-func getWorkers() int {
-	return 3
-}
-
-// getPollInterval returns the value for which the Prober will wait before attempting next attempt.
-func getPollIntervalSeconds() int {
-	return defaultPollIntervalSeconds
-}
-
-// getPollTimeout returns the timeout for polling on probes, and takes windows heuristics into account, where requests can take longer sometimes.
-func getPollTimeoutSeconds() int {
-	if framework.NodeOSDistroIs("windows") {
-		return defaultPollTimeoutSeconds * 2
-	}
-	return defaultPollTimeoutSeconds
 }

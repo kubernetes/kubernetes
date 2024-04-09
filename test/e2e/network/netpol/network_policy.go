@@ -1450,10 +1450,6 @@ func initializeCluster(ctx context.Context, f *framework.Framework, protocols []
 
 	framework.Logf("finished initializing cluster state")
 
-	if err := waitForHTTPServers(k8s, model); err != nil {
-		return nil, err
-	}
-
 	return k8s, nil
 }
 

@@ -27,21 +27,18 @@ import (
 
 // probeConnectivityArgs is set of arguments for a probeConnectivity
 type probeConnectivityArgs struct {
-	nsFrom              string
-	podFrom             string
-	containerFrom       string
-	addrTo              string
-	protocol            v1.Protocol
-	toPort              int
-	expectConnectivity  bool
-	timeoutSeconds      int
-	pollIntervalSeconds int
-	pollTimeoutSeconds  int
+	nsFrom             string
+	podFrom            string
+	containerFrom      string
+	addrTo             string
+	protocol           v1.Protocol
+	toPort             int
+	expectConnectivity bool
 }
 
 // decouple us from k8smanager.go
 type Prober interface {
-	probeConnectivity(args *probeConnectivityArgs) (bool, string, error)
+	probeConnectivity(args *probeConnectivityArgs) (bool, error)
 }
 
 // ProbeJob packages the data for the input of a pod->pod connectivity probe
@@ -57,10 +54,9 @@ type ProbeJob struct {
 
 // ProbeJobResults packages the data for the results of a pod->pod connectivity probe
 type ProbeJobResults struct {
-	Job         *ProbeJob
-	IsConnected bool
-	Err         error
-	Command     string
+	Job  *ProbeJob
+	IsOK bool
+	Err  error
 }
 
 // ProbePodToPodConnectivity runs a series of probes in kube, and records the results in `testCase.Reachability`
@@ -68,7 +64,7 @@ func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain strin
 	size := len(allPods) * len(allPods)
 	jobs := make(chan *ProbeJob, size)
 	results := make(chan *ProbeJobResults, size)
-	for i := 0; i < getWorkers(); i++ {
+	for i := 0; i < 3; i++ {
 		go probeWorker(prober, jobs, results)
 	}
 	for _, podFrom := range allPods {
@@ -95,15 +91,18 @@ func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain strin
 		if result.Err != nil {
 			framework.Logf("unable to perform probe %s -> %s: %v", job.PodFrom.PodString(), job.PodTo.PodString(), result.Err)
 		}
-		testCase.Reachability.Observe(job.PodFrom.PodString(), job.PodTo.PodString(), result.IsConnected)
+
 		expected := testCase.Reachability.Expected.Get(job.PodFrom.PodString().String(), job.PodTo.PodString().String())
-		if result.IsConnected != expected {
+		isConnected := result.IsOK == expected // if is ok and expected OR if is not ok and not expected
+		testCase.Reachability.Observe(job.PodFrom.PodString(), job.PodTo.PodString(), isConnected)
+
+		if !result.IsOK {
 			framework.Logf("Validation of %s -> %s FAILED !!!", job.PodFrom.PodString(), job.PodTo.PodString())
 			framework.Logf("error %v ", result.Err)
 			if expected {
-				framework.Logf("Expected allowed pod connection was instead BLOCKED --- run '%v'", result.Command)
+				framework.Logf("Expected allowed pod connection was instead BLOCKED --- run '%v'", result.Err)
 			} else {
-				framework.Logf("Expected blocked pod connection was instead ALLOWED --- run '%v'", result.Command)
+				framework.Logf("Expected blocked pod connection was instead ALLOWED --- run '%v'", result.Err)
 			}
 		}
 	}
@@ -118,9 +117,9 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 		// defensive programming: this should not be possible as we already check in initializeClusterFromModel
 		if netutils.ParseIPSloppy(job.PodTo.ServiceIP) == nil {
 			results <- &ProbeJobResults{
-				Job:         job,
-				IsConnected: false,
-				Err:         fmt.Errorf("empty service ip"),
+				Job:  job,
+				IsOK: false,
+				Err:  fmt.Errorf("empty service ip"),
 			}
 		}
 		// note that we can probe a dnsName instead of ServiceIP by using dnsName like so:
@@ -129,23 +128,19 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 		// dnsName := job.PodTo.QualifiedServiceAddress(job.ToPodDNSDomain)
 
 		// TODO make this work on dual-stack clusters...
-		connected, command, err := prober.probeConnectivity(&probeConnectivityArgs{
-			nsFrom:              podFrom.Namespace,
-			podFrom:             podFrom.Name,
-			containerFrom:       podFrom.ContainerName,
-			addrTo:              job.PodTo.ServiceIP,
-			protocol:            job.Protocol,
-			toPort:              job.ToPort,
-			expectConnectivity:  job.ExpectConnectivity,
-			timeoutSeconds:      getProbeTimeoutSeconds(),
-			pollIntervalSeconds: getPollIntervalSeconds(),
-			pollTimeoutSeconds:  getPollTimeoutSeconds(),
+		ok, err := prober.probeConnectivity(&probeConnectivityArgs{
+			nsFrom:             podFrom.Namespace,
+			podFrom:            podFrom.Name,
+			containerFrom:      podFrom.ContainerName,
+			addrTo:             job.PodTo.ServiceIP,
+			protocol:           job.Protocol,
+			toPort:             job.ToPort,
+			expectConnectivity: job.ExpectConnectivity,
 		})
 		result := &ProbeJobResults{
-			Job:         job,
-			IsConnected: connected,
-			Err:         err,
-			Command:     command,
+			Job:  job,
+			IsOK: ok,
+			Err:  err,
 		}
 		results <- result
 	}
