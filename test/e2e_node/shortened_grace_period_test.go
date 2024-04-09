@@ -34,7 +34,7 @@ import (
 	"time"
 )
 
-var _ = SIGDescribe("Shortened Grace Period", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", func() {
 	f := framework.NewDefaultFramework("shortened-grace-period")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("When repeatedly deleting pods", func() {
