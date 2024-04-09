@@ -44,6 +44,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var podName = "test"
 		var ctx = context.Background()
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+		const (
+			gracePeriod      = 10000
+			gracePeriodShort = 30
+		)
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
 			dc = f.DynamicClient
@@ -54,6 +58,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				{Type: watch.Deleted},
 			}
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
+				podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
+				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
+					framework.ExpectNoError(err, "failed to delete pod")
+				}
+				podClient.DeleteSync(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort), gracePeriod*time.Second)
 				// Get pod logs.
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
@@ -74,13 +83,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				return nil
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
-				const (
-					gracePeriod      = 10000
-					gracePeriodShort = 20
-				)
-				podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
-				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
-				podClient.DeleteSync(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort), gracePeriod*time.Second)
 				return err
 			})
 		})
