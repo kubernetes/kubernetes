@@ -18,8 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"path/filepath"
-	"runtime"
 	"time"
 	"unicode"
 
@@ -299,7 +297,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be absolute path", kc.PodLogsDir))
 	}
 
-	if runtime.GOOS != "windows" && filepath.Clean(kc.PodLogsDir) != kc.PodLogsDir {
+	if !utilfs.IsPathClean(kc.PodLogsDir) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be normalized", kc.PodLogsDir))
 	}
 
