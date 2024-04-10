@@ -61,7 +61,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
 					framework.ExpectNoError(err, "failed to delete pod")
 				}
-				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
+				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort)); err != nil {
 					framework.ExpectNoError(err, "failed to delete pod")
 				}
 				// Get pod logs.
@@ -84,7 +84,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				return nil
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
-				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 				return err
 			})
 		})
