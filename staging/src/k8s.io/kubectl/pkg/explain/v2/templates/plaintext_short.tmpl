@@ -111,9 +111,7 @@ Takes dictionary as argument with keys:
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
             FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
-            {{- if $subschema.enum -}}
-                {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1 "isGraphStyle" $.Recursive ) -}}{{"\n"}}
-            {{- end -}}
+            {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1 "isGraphStyle" $.Recursive) -}}{{"\n"}}
             {{- "\n" -}}
         {{- end -}}
 
@@ -121,7 +119,7 @@ Takes dictionary as argument with keys:
     {{- else if $resolved.items -}}
         {{- /* If the schema is an array then traverse the array item fields */ -}}
         {{- template "output" (set $nextContext "schema" $resolved.items) -}}
-    {{- else if and $resolved.additionalProperties (not (eq "bool" (printf "%T" $resolved.additionalProperties))) -}}
+    {{- else if $resolved.additionalProperties -}}
         {{- /* If the schema is a map then traverse the map item fields */ -}}
         {{- template "output" (set $nextContext "schema" $resolved.additionalProperties) -}}
     {{- else -}}
@@ -140,24 +138,18 @@ Takes dictionary as argument with keys:
 Prints list of fields of a given open api schema in following form:
 
 field1 <type> -required-
-    DESCRIPTION
 
 field2 <type> -required-
-    DESCRIPTION
 
 or if Recursive is enabled:
-* field1 <type> -required-
-| DESCRIPTION
-|
-| * subfield1 <type>
-| | enum: type1, type2, ....
-| | DESCRIPTION
-| |
-| | * subsubfield1 <type>
-| | DESCRIPTION
-| |
-| | * subsubfield2 <type>
-| | DESCRIPTION
+field1 <type> -required-
+    subfield1 <type>
+        subsubfield1 <type>
+        subsubfield2 <type>
+    subfield2 <type>
+field2 <type> -required-
+    subfield1 <type>
+    subfield2 <type>
 
 Follows refs for field traversal. If there are cycles in the schema, they are
 detected and traversal ends.
@@ -179,7 +171,7 @@ Takes dictionary as argument with keys:
         {{- $nextContext := set $ "history" (set $.history $refString 1) -}}
         {{- $resolved := or (resolveRef $refString $.Document) $.schema -}}
         {{- range $k, $v := $resolved.properties -}}
-            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "isGraphStyle" $.Recursive "level" $.level "Document" $.Document) -}}
+            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "level" $.level "Document" $.Document) -}}
             {{- if $.Recursive -}}
                 {{- /* Check if we already know about this element */ -}}
                 {{- template "fieldList" (set $nextContext "schema" $v "level" (add $.level 1)) -}}
@@ -189,9 +181,7 @@ Takes dictionary as argument with keys:
             {{- template "fieldList" (set $nextContext "schema" .)}}
         {{- end -}}
         {{- if $resolved.items}}{{- template "fieldList" (set $nextContext "schema" $resolved.items)}}{{end}}
-        {{- if and $resolved.additionalProperties (not (eq "bool" (printf "%T" $resolved.additionalProperties))) -}}
-            {{- template "fieldList" (set $nextContext "schema" $resolved.additionalProperties)}}
-        {{- end -}}
+        {{- if $resolved.additionalProperties}}{{- template "fieldList" (set $nextContext "schema" $resolved.additionalProperties)}}{{end}}
     {{- end -}}
 {{- end -}}
 
@@ -204,32 +194,16 @@ Optionally prints in a one-line style
 Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema which contains the field
     name: name of field
-    isGraphStyle: adds graph style
     level: indentation amount
     Document: openapi document
 */ -}}
 {{- define "fieldDetail" -}}
-    {{- $isGraphStyle := or $.isGraphStyle false -}}
     {{- $level := or $.level 0 -}}
     {{- $indentAmount := mul $level 2 -}}
-    
     {{- $fieldSchema := index $.schema.properties $.name -}}
-    {{- $.name | indent $indentAmount $isGraphStyle true -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
+    {{- $.name | indent $indentAmount false false -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
     {{- "\n" -}}
-    {{- if eq $isGraphStyle false -}}
-        {{- $indentAmount = add $indentAmount 2 -}}
-    {{- end -}}
-    {{- if $fieldSchema.enum -}}
-        {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "isLongView" false "limit" 4 "indentAmount" $indentAmount "isGraphStyle" $isGraphStyle) -}}
-        {{- "\n" -}}
-    {{- end -}}
-    {{- or $fieldSchema.description "<no description>" | wrap (sub 80 $indentAmount) | indent $indentAmount $isGraphStyle false -}}{{- "\n" -}}
-    {{- if $isGraphStyle -}}
-        {{- indent $indentAmount $isGraphStyle false "" -}}
-    {{- end -}}
-    {{- "\n" -}}
-
 {{- end -}}
 
 {{- /*
@@ -254,7 +228,7 @@ Takes dictionary as argument with keys:
         {{- if .items -}}
             {{- template "description" (set $ "schema" .items) -}}
         {{- end -}}
-        {{- if and .additionalProperties (not (eq "bool" (printf "%T" .additionalProperties))) -}}
+        {{- if .additionalProperties -}}
             {{- template "description" (set $ "schema" .additionalProperties) -}}
         {{- end -}}
     {{- end -}}
@@ -275,7 +249,7 @@ Takes dictionary as argument with keys:
     {{- with $.schema -}}
         {{- if .items -}}
             []{{template "typeGuess" (set $ "schema" .items)}}
-        {{- else if and .additionalProperties (not (eq "bool" (printf "%T" .additionalProperties))) -}}
+        {{- else if .additionalProperties -}}
             map[string]{{template "typeGuess" (set $ "schema" .additionalProperties)}}
         {{- else if and .allOf (not .properties) (eq (len .allOf) 1) -}}
             {{- /* If allOf has a single element and there are no direct
@@ -311,52 +285,29 @@ Takes dictionary as argument with keys:
         BlockDevice
         CharDevice
         Directory
-    enum: "", BlockDevice, CharDevice, Directory
 
     Can change the style of enum in future by modifying this function
 
 Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema
     Document: openapi document
-    isLongView: (boolean) Simple view: long list of all fields. Long view: all details of one field
-    limit: (int) truncate the amount of enums that can be printed in simple view, -1 means all items
-    indentAmount: intent of the beginning enum line in longform view
-    isGraphStyle: adds graph style
 */ -}}
 {{- define "extractEnum" -}}
     {{- with $.schema -}}
         {{- if .enum -}}
-            {{- $enumLen := len .enum -}}
-            {{- $limit := or $.limit -1 -}}
-            {{- if eq $.isLongView false -}}
-                {{- "" | indent $.indentAmount $.isGraphStyle false -}}
-                {{- "enum: " -}}
-            {{- else -}}
-                {{- "ENUM:" -}}
-            {{- end -}}
+            {{- "ENUM:" -}}
             {{- range $index, $element := .enum -}}
-                {{- /* Prints , ....  and return the range when it goes over the limit */ -}}
-                {{- if and (gt $limit -1) (ge $index $limit) -}}
-                    {{- ", ...." -}}
-                    {{- break -}}
-                {{- end -}}
                 {{- /* Use to reflect "" when we see empty string */ -}}
                 {{- $elementType := printf "%T" $element -}}
-                {{- /* Print out either `, ` or `\n    ` based of the view */ -}}
-                {{- /* Simple view */ -}}
-                {{- if and (gt $index 0) (eq $.isLongView false) -}}
-                    {{- ", " -}}
                 {{- /* Long view */ -}}
-                {{- else if eq $.isLongView true -}}
-                    {{- "\n" -}}{{- "" | indent 4 false false -}}
-                {{- end -}}
+                {{- "\n" -}}{{- "" | indent 4 false false -}}
                 {{- /* Convert empty string to `""` for more clarification */ -}}
                 {{- if and (eq "string" $elementType) (eq $element "") -}}
                     {{- `""` -}}
                 {{- else -}}
                     {{- $element -}}
                 {{- end -}}
-        {{- end -}}
+            {{- end -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}

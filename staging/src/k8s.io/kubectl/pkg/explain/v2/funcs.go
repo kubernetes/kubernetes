@@ -123,8 +123,21 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 				return nil, fmt.Errorf("last cannot be used on type: %T", list)
 			}
 		},
-		"indent": func(amount int, str string) string {
+		"indent": func(amount int, isGraph bool, isField bool, str string) string {
 			pad := strings.Repeat(" ", amount)
+			if isGraph {
+				styledString := ""
+				// Remove two amount and add it later via isField condition
+				for i := 0; i < amount-2; i += 2 {
+					styledString += "| "
+				}
+				if isField {
+					styledString += "* "
+				} else {
+					styledString += "| "
+				}
+				pad = styledString
+			}
 			return pad + strings.Replace(str, "\n", "\n"+pad, -1)
 		},
 		"dict": func(keysAndValues ...any) (map[string]any, error) {
@@ -235,20 +248,6 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 				cur = next
 			}
 			return cur
-		},
-		// styleVerboseRecursive creates an string for styling the verboseRecursive based
-		// on if the line is a filed or description/empty line.
-		"styleVerboseRecursive": func(level int, field bool) string {
-			styledString := ""
-			for i := 0; i < level-1; i++ {
-				styledString += "| "
-			}
-			if field {
-				styledString += "* "
-			} else {
-				styledString += "| "
-			}
-			return styledString
 		},
 	})
 }

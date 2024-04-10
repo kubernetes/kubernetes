@@ -19,128 +19,21 @@ package templates_test
 import (
 	"bytes"
 	_ "embed"
-	"encoding/json"
-	"fmt"
-	"strings"
 	"testing"
 	"text/template"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	v2 "k8s.io/kubectl/pkg/explain/v2"
 )
 
 var (
-	//go:embed plaintext.tmpl
-	plaintextSource string
-
-	//go:embed apiextensions.k8s.io_v1.json
-	apiextensionsJSON string
-
-	//go:embed batch.k8s.io_v1.json
-	batchJSON string
-
-	apiExtensionsV1OpenAPI map[string]interface{} = func() map[string]interface{} {
-		var res map[string]interface{}
-		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
-		return res
-	}()
-
-	apiExtensionsV1OpenAPIWithoutListVerb map[string]interface{} = func() map[string]interface{} {
-		var res map[string]interface{}
-		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
-		paths := res["paths"].(map[string]interface{})
-		delete(paths, "/apis/apiextensions.k8s.io/v1/customresourcedefinitions")
-		return res
-	}()
-
-	apiExtensionsV1OpenAPISpec spec3.OpenAPI = func() spec3.OpenAPI {
-		var res spec3.OpenAPI
-		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
-		return res
-	}()
-
-	batchV1OpenAPI map[string]interface{} = func() map[string]interface{} {
-		var res map[string]interface{}
-		utilruntime.Must(json.Unmarshal([]byte(batchJSON), &res))
-		return res
-	}()
-
-	batchV1OpenAPIWithoutListVerb map[string]interface{} = func() map[string]interface{} {
-		var res map[string]interface{}
-		utilruntime.Must(json.Unmarshal([]byte(batchJSON), &res))
-		paths := res["paths"].(map[string]interface{})
-		delete(paths, "/apis/batch/v1/jobs")
-		delete(paths, "/apis/batch/v1/namespaces/{namespace}/jobs")
-
-		delete(paths, "/apis/batch/v1/cronjobs")
-		delete(paths, "/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
-		return res
-	}()
+	//go:embed plaintext_short.tmpl
+	plaintextshortSource string
 )
 
-type testCase struct {
-	// test case name
-	Name string
-	// if empty uses main template
-	Subtemplate string
-	// context to render withi
-	Context any
-	// checks to perform on rendered output
-	Checks []check
-}
-
-type check interface {
-	doCheck(output string, err error) error
-}
-
-type checkError string
-
-func (c checkError) doCheck(output string, err error) error {
-	if !strings.Contains(err.Error(), "error: "+string(c)) {
-		return fmt.Errorf("expected error: '%v' in string:\n%v", string(c), err)
-	}
-	return nil
-}
-
-type checkContains string
-
-func (c checkContains) doCheck(output string, err error) error {
-	if !strings.Contains(output, string(c)) {
-		return fmt.Errorf("expected substring: '%v' in string:\n%v", string(c), output)
-	}
-	return nil
-}
-
-type checkEquals string
-
-func (c checkEquals) doCheck(output string, err error) error {
-	if output != string(c) {
-		return fmt.Errorf("output is not equal to expectation:\n%v", cmp.Diff(string(c), output))
-	}
-	return nil
-}
-
-func MapDict[K comparable, V any, N any](accum map[K]V, mapper func(V) N) map[K]N {
-	res := make(map[K]N, len(accum))
-	for k, v := range accum {
-		res[k] = mapper(v)
-	}
-	return res
-}
-
-func ReduceDict[K comparable, V any, N any](val map[K]V, accum N, mapper func(N, K, V) N) N {
-	for k, v := range val {
-		accum = mapper(accum, k, v)
-	}
-	return accum
-}
-
-func TestPlaintext(t *testing.T) {
+func TestPlaintextShort(t *testing.T) {
 	testcases := []testCase{
 		{
 			// Test case where resource being rendered is not found in OpenAPI schema
@@ -359,7 +252,7 @@ func TestPlaintext(t *testing.T) {
 				Recursive: false,
 			},
 			Checks: ReduceDict(apiExtensionsV1OpenAPISpec.Components.Schemas["io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceValidation"].Properties, []check{}, func(checks []check, k string, v spec.Schema) []check {
-				return append(checks, checkContains(k), checkContains(v.Description))
+				return append(checks, checkContains(k))
 			}),
 		},
 		{
@@ -386,20 +279,6 @@ func TestPlaintext(t *testing.T) {
 			Context: map[string]any{
 				"schema": map[string]any{
 					"type": "string",
-				},
-			},
-			Checks: []check{
-				checkEquals("string"),
-			},
-		},
-		{
-			// Shows that the typeguess template works with boolean additionalProperties
-			Name:        "True additionalProperties",
-			Subtemplate: "typeGuess",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":                 "string",
-					"additionalProperties": true,
 				},
 			},
 			Checks: []check{
@@ -596,7 +475,7 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
-			Name:        "Description",
+			Name:        "Required",
 			Subtemplate: "fieldDetail",
 			Context: map[string]any{
 				"schema": map[string]any{
@@ -605,7 +484,7 @@ func TestPlaintext(t *testing.T) {
 					"properties": map[string]any{
 						"thefield": map[string]any{
 							"type":        "string",
-							"description": "a description that should be printed",
+							"description": "a description that should not be printed",
 						},
 					},
 					"required": []string{"thefield"},
@@ -614,11 +493,11 @@ func TestPlaintext(t *testing.T) {
 				"isGraphStyle": false,
 			},
 			Checks: []check{
-				checkEquals("thefield\t<string> -required-\n  a description that should be printed\n\n"),
+				checkEquals("thefield\t<string> -required-\n"),
 			},
 		},
 		{
-			Name:        "Description with style",
+			Name:        "Indent",
 			Subtemplate: "fieldDetail",
 			Context: map[string]any{
 				"schema": map[string]any{
@@ -627,45 +506,17 @@ func TestPlaintext(t *testing.T) {
 					"properties": map[string]any{
 						"thefield": map[string]any{
 							"type":        "string",
-							"description": "a description that should be printed",
+							"description": "a description that should not be printed",
 						},
 					},
 					"required": []string{"thefield"},
 				},
 				"name":         "thefield",
-				"isGraphStyle": true,
+				"isGraphStyle": false,
+				"level":        5,
 			},
 			Checks: []check{
-				checkEquals("* thefield\t<string> -required-\n| a description that should be printed\n| \n"),
-			},
-		},
-		{
-			Name:        "Description with style field list",
-			Subtemplate: "fieldList",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":        "object",
-					"description": "a description that should not be printed",
-					"properties": map[string]any{
-						"thefield": map[string]any{
-							"type":        "string",
-							"description": "a description that should be printed",
-							"properties": map[string]any{
-								"insideField": map[string]any{
-									"type":        "string",
-									"description": "second description that should be printed",
-								},
-							},
-						},
-					},
-					"required": []string{"thefield"},
-				},
-				"name":      "thefield",
-				"level":     1,
-				"Recursive": true,
-			},
-			Checks: []check{
-				checkEquals("* thefield\t<string> -required-\n| a description that should be printed\n| \n| * insideField\t<string>\n| | second description that should be printed\n| | \n"),
+				checkEquals("          thefield\t<string> -required-\n"),
 			},
 		},
 		{
@@ -700,61 +551,6 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
-			// show that extractEnum can extract any enum slice and style it lowercase
-			Name:        "extractEnumLongFormWithIndent",
-			Subtemplate: "extractEnum",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":        "string",
-					"description": "a description that should not be printed",
-					"enum":        []any{0, 1, 2, 3},
-				},
-				"isLongView":   false,
-				"indentAmount": 2,
-				"isGraphStyle": false,
-			},
-			Checks: []check{
-				checkEquals("  enum: 0, 1, 2, 3"),
-			},
-		},
-		{
-			// show that extractEnum can extract any enum slice and style it with truncated enums
-			Name:        "extractEnumLongFormWithLimitAndIndent",
-			Subtemplate: "extractEnum",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":        "string",
-					"description": "a description that should not be printed",
-					"enum":        []any{0, 1, 2, 3},
-				},
-				"isLongView":   false,
-				"limit":        2,
-				"indentAmount": 2,
-				"isGraphStyle": false,
-			},
-			Checks: []check{
-				checkEquals("  enum: 0, 1, ...."),
-			},
-		},
-		{
-			// show that extractEnum can extract any enum slice and style it with truncated enums
-			Name:        "extractEnumSimpleFormWithLimitAndIndent",
-			Subtemplate: "extractEnum",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":        "string",
-					"description": "a description that should not be printed",
-					"enum":        []any{0, 1, 2, 3},
-				},
-				"isLongView":   true,
-				"limit":        2,
-				"indentAmount": 2,
-			},
-			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1, ...."),
-			},
-		},
-		{
 			// show that extractEnum can extract any enum slice and style it with empty string
 			Name:        "extractEnumSimpleFormEmptyString",
 			Subtemplate: "extractEnum",
@@ -770,28 +566,9 @@ func TestPlaintext(t *testing.T) {
 				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
 			},
 		},
-		{
-			// show that extractEnum can extract any enum slice and graph style it with truncated enums
-			Name:        "extractEnumLongFormWithLimitAndIndent",
-			Subtemplate: "extractEnum",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":        "string",
-					"description": "a description that should not be printed",
-					"enum":        []any{0, 1, 2, 3},
-				},
-				"isLongView":   false,
-				"limit":        2,
-				"indentAmount": 4,
-				"isGraphStyle": true,
-			},
-			Checks: []check{
-				checkEquals("| | enum: 0, 1, ...."),
-			},
-		},
 	}
 
-	tmpl, err := v2.WithBuiltinTemplateFuncs(template.New("")).Parse(plaintextSource)
+	tmpl, err := v2.WithBuiltinTemplateFuncs(template.New("")).Parse(plaintextshortSource)
 	require.NoError(t, err)
 
 	for _, tcase := range testcases {

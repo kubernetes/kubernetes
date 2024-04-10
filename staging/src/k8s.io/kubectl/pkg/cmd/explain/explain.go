@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,9 +52,6 @@ var (
 		# Get all the fields in the resource
 		kubectl explain pods --recursive
 
-		# Get all the fields in the resource with their descriptions
-		kubectl explain pods --versobe-recursive
-
 		# Get the explanation for deployment in supported api versions
 		kubectl explain deployments --api-version=apps/v1
 
@@ -70,10 +68,12 @@ var (
 type ExplainOptions struct {
 	genericiooptions.IOStreams
 
-	CmdParent        string
-	APIVersion       string
-	Recursive        bool
-	VerboseRecursive bool
+	CmdParent  string
+	APIVersion string
+	Recursive  bool
+
+	// Flags hold the parsed CLI flags.
+	Flags *pflag.FlagSet
 
 	args []string
 
@@ -100,7 +100,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 	o := NewExplainOptions(parent, streams)
 
 	cmd := &cobra.Command{
-		Use:                   "explain TYPE [--recursive=FALSE|TRUE] [--verbose-recursive=FALSE|TRUE] [--api-version=api-version-group] [--output=plaintext|plaintext-openapiv2]",
+		Use:                   "explain TYPE [--recursive=FALSE|TRUE] [--api-version=api-version-group] [--output=plaintext|plaintext-openapiv2]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Get documentation for a resource"),
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
@@ -111,12 +111,14 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. Otherwise, print the available fields with their description.")
-	cmd.Flags().BoolVar(&o.VerboseRecursive, "verbose-recursive", o.VerboseRecursive, "When true, print the name of all the fields recursively with their description. Otherwise, print the available fields with their description.")
+	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. When false print all fields with their desciprion recursively. Otherwise, print the available fields with their description.")
 	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Use given api-version (group/version) of the resource.")
 
 	// Only enable --output as a valid flag if the feature is enabled
 	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema. Valid values are: (plaintext, plaintext-openapiv2).")
+
+	// To check if field is changed by cmd.
+	o.Flags = cmd.Flags()
 
 	return cmd
 }
@@ -193,13 +195,21 @@ func (o *ExplainOptions) Run() error {
 			fullySpecifiedGVR.Version = apiVersion.Version
 		}
 
+		// Use recursive flag to decide which template to render
+		if o.Flags.Changed("recursive") && !o.Recursive {
+			// Use default long format template
+			o.Recursive = true
+		} else if o.Recursive {
+			// Use short format template
+			o.OutputFormat = "plaintext_short"
+		}
+
 		return openapiv3explain.PrintModelDescription(
 			fieldsPath,
 			o.Out,
 			o.OpenAPIV3Client,
 			fullySpecifiedGVR,
 			o.Recursive,
-			o.VerboseRecursive,
 			o.OutputFormat,
 		)
 	}

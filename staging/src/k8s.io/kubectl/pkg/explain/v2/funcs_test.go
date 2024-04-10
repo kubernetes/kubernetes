@@ -128,16 +128,30 @@ func TestFuncs(t *testing.T) {
 		{
 			Name:     "none",
 			FuncName: "indent",
-			Source:   `{{indent 0 .}}`,
+			Source:   `{{indent 0 false false .}}`,
 			Context:  "this is a string",
 			Expect:   "this is a string",
 		},
 		{
 			Name:     "some",
 			FuncName: "indent",
-			Source:   `{{indent 2 .}}`,
+			Source:   `{{indent 2 false false .}}`,
 			Context:  "this is a string",
 			Expect:   "  this is a string",
+		},
+		{
+			Name:     "some",
+			FuncName: "indent",
+			Source:   `{{indent 4 true false .}}`,
+			Context:  "this is a string",
+			Expect:   "| | this is a string",
+		},
+		{
+			Name:     "some",
+			FuncName: "indent",
+			Source:   `{{indent 2 true true .}}`,
+			Context:  "this is a string",
+			Expect:   "* this is a string",
 		},
 		{
 			Name:     "empty",
@@ -335,36 +349,6 @@ func TestFuncs(t *testing.T) {
 				},
 			},
 			Expect: `null`,
-		},
-		{
-			Name:     "basic",
-			FuncName: "styleVerboseRecursive",
-			Source:   `{{styleVerboseRecursive 2 false}}`,
-			Expect:   `| | `,
-		},
-		{
-			Name:     "basic",
-			FuncName: "styleVerboseRecursive",
-			Source:   `{{styleVerboseRecursive 0 false}}`,
-			Expect:   `| `,
-		},
-		{
-			Name:     "basic",
-			FuncName: "styleVerboseRecursive",
-			Source:   `{{styleVerboseRecursive 2 true}}`,
-			Expect:   `| * `,
-		},
-		{
-			Name:     "basic",
-			FuncName: "styleVerboseRecursive",
-			Source:   `{{styleVerboseRecursive 0 true}}`,
-			Expect:   `* `,
-		},
-		{
-			Name:     "basic",
-			FuncName: "styleVerboseRecursive",
-			Source:   `{{styleVerboseRecursive 1 true}}`,
-			Expect:   `* `,
 		},
 	}
 

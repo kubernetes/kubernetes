@@ -29,14 +29,13 @@ import (
 
 // PrintModelDescription prints the description of a specific model or dot path.
 // If recursive, all components nested within the fields of the schema will be
-// printed. If verboseRecursive all components nested with detail will be printed.
+// printed.
 func PrintModelDescription(
 	fieldsPath []string,
 	w io.Writer,
 	client openapi.Client,
 	gvr schema.GroupVersionResource,
 	recursive bool,
-	verboseRecursive bool,
 	outputFormat string,
 ) error {
 	generator := NewGenerator()
@@ -45,7 +44,7 @@ func PrintModelDescription(
 	}
 
 	return printModelDescriptionWithGenerator(
-		generator, fieldsPath, w, client, gvr, recursive, verboseRecursive, outputFormat)
+		generator, fieldsPath, w, client, gvr, recursive, outputFormat)
 }
 
 // Factored out for testability
@@ -56,7 +55,6 @@ func printModelDescriptionWithGenerator(
 	client openapi.Client,
 	gvr schema.GroupVersionResource,
 	recursive bool,
-	verboseRecursive bool,
 	outputFormat string,
 ) error {
 	paths, err := client.Paths()
@@ -88,7 +86,7 @@ func printModelDescriptionWithGenerator(
 		return fmt.Errorf("failed to parse openapi schema for %s: %w", resourcePath, err)
 	}
 
-	err = generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, verboseRecursive, w)
+	err = generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, w)
 
 	explainErr := explainError("")
 	if errors.As(err, &explainErr) {

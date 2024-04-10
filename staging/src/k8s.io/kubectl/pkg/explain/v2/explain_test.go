@@ -44,12 +44,12 @@ func TestExplainErrors(t *testing.T) {
 		Group:    "test0.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
-	}, false, false, "unknown-format")
+	}, false, "unknown-format")
 	require.ErrorContains(t, err, "couldn't find resource for \"test0.example.com/v1, Resource=doesntmatter\"")
 
 	// Validate error when openapi client returns error.
 	fakeClient.ForcedErr = fmt.Errorf("Always fails")
-	err = PrintModelDescription(nil, &buf, fakeClient, apiGroupsGVR, false, false, "unknown-format")
+	err = PrintModelDescription(nil, &buf, fakeClient, apiGroupsGVR, false, "unknown-format")
 	require.ErrorContains(t, err, "failed to fetch list of groupVersions")
 
 	// Validate error when GroupVersion "Schema()" call returns error.
@@ -60,7 +60,7 @@ func TestExplainErrors(t *testing.T) {
 		Group:    "test1.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
-	}, false, false, "unknown-format")
+	}, false, "unknown-format")
 	require.ErrorContains(t, err, "failed to fetch openapi schema ")
 
 	// Validate error when returned bytes from GroupVersion "Schema" are invalid.
@@ -70,12 +70,12 @@ func TestExplainErrors(t *testing.T) {
 		Group:    "test2.example.com",
 		Version:  "v1",
 		Resource: "doesntmatter",
-	}, false, false, "unknown-format")
+	}, false, "unknown-format")
 	require.ErrorContains(t, err, "failed to parse openapi schema")
 
 	// Validate error when render template is not recognized.
 	client := openapitest.NewEmbeddedFileClient()
-	err = PrintModelDescription(nil, &buf, client, apiGroupsGVR, false, false, "unknown-format")
+	err = PrintModelDescription(nil, &buf, client, apiGroupsGVR, false, "unknown-format")
 	require.ErrorContains(t, err, "unrecognized format: unknown-format")
 }
 
@@ -107,7 +107,7 @@ func TestExplainOpenAPIClient(t *testing.T) {
 		FieldPath: nil,
 	}
 
-	err = printModelDescriptionWithGenerator(gen, nil, &buf, fileClient, apiGroupsGVR, false, false, "Context")
+	err = printModelDescriptionWithGenerator(gen, nil, &buf, fileClient, apiGroupsGVR, false, "Context")
 	require.NoError(t, err)
 
 	var actualContext TemplateContext
