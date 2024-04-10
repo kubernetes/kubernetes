@@ -89,3 +89,12 @@ func TestPendingUnixDomainSocket(t *testing.T) {
 	wg.Wait()
 	unixln.Close()
 }
+
+func TestAbsWithSlash(t *testing.T) {
+	// On Windows, filepath.IsAbs will not return True for paths prefixed with a slash
+	assert.True(t, IsAbs("/test"))
+	assert.True(t, IsAbs("\\test"))
+
+	assert.False(t, IsAbs("./local"))
+	assert.False(t, IsAbs("local"))
+}

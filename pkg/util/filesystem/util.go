@@ -1,8 +1,5 @@
-//go:build freebsd || linux || darwin
-// +build freebsd linux darwin
-
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,24 +17,11 @@ limitations under the License.
 package filesystem
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 )
 
-// IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
-func IsUnixDomainSocket(filePath string) (bool, error) {
-	fi, err := os.Stat(filePath)
-	if err != nil {
-		return false, fmt.Errorf("stat file %s failed: %v", filePath, err)
-	}
-	if fi.Mode()&os.ModeSocket == 0 {
-		return false, nil
-	}
-	return true, nil
-}
-
-// IsAbs is same as filepath.IsAbs on Unix.
-func IsAbs(path string) bool {
-	return filepath.IsAbs(path)
+// IsPathClean will replace slashes to Separator (which is OS-specific).
+// This will make sure that all slashes are the same before comparing.
+func IsPathClean(path string) bool {
+	return filepath.ToSlash(filepath.Clean(path)) == filepath.ToSlash(path)
 }
