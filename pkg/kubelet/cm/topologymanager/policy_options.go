@@ -27,11 +27,14 @@ import (
 
 const (
 	PreferClosestNUMANodes string = "prefer-closest-numa-nodes"
+	MaxAllowableNUMANodes  string = "max-allowable-numa-nodes"
 )
 
 var (
-	alphaOptions = sets.New[string]()
-	betaOptions  = sets.New[string](
+	alphaOptions = sets.New[string](
+		MaxAllowableNUMANodes,
+	)
+	betaOptions = sets.New[string](
 		PreferClosestNUMANodes,
 	)
 	stableOptions = sets.New[string]()
@@ -54,7 +57,8 @@ func CheckPolicyOptionAvailable(option string) error {
 }
 
 type PolicyOptions struct {
-	PreferClosestNUMA bool
+	PreferClosestNUMA     bool
+	MaxAllowableNUMANodes int
 }
 
 func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
@@ -71,11 +75,23 @@ func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.PreferClosestNUMA = optValue
+		case MaxAllowableNUMANodes:
+			optValue, err := strconv.Atoi(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.MaxAllowableNUMANodes = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
 			return opts, fmt.Errorf("unsupported topologymanager option: %q (%s)", name, value)
 		}
+	}
+
+	// if user doesn't specify a new value, make defaultMaxAllowableNUMANodes
+	// is the recommended default.
+	if opts.MaxAllowableNUMANodes == 0 {
+		opts.MaxAllowableNUMANodes = defaultMaxAllowableNUMANodes
 	}
 	return opts, nil
 }
