@@ -890,7 +890,10 @@ func TestEncryptionConfigHotReloadFilePolling(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			socketPath := getSocketPath()
 			encryptionConfig := fmt.Sprintf(`
 kind: EncryptionConfiguration

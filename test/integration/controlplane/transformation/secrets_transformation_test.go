@@ -85,17 +85,20 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 		// TODO: add secretbox
 	}
 	for _, tt := range testCases {
-		test, err := newTransformTest(t, tt.transformerConfigContent, false, "", nil)
-		if err != nil {
-			t.Fatalf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
-			continue
-		}
-		test.secret, err = test.createSecret(testSecret, testNamespace)
-		if err != nil {
-			t.Fatalf("Failed to create test secret, error: %v", err)
-		}
-		test.runResource(test.logger, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
-		test.cleanUp()
+		tt := tt
+		t.Run(tt.transformerPrefix, func(t *testing.T) {
+			t.Parallel()
+			test, err := newTransformTest(t, tt.transformerConfigContent, false, "", nil)
+			if err != nil {
+				t.Fatalf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
+			}
+			test.secret, err = test.createSecret(testSecret, testNamespace)
+			if err != nil {
+				t.Fatalf("Failed to create test secret, error: %v", err)
+			}
+			test.runResource(test.logger, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
+			test.cleanUp()
+		})
 	}
 }
 

@@ -412,6 +412,7 @@ func TestKMSv2ProviderKeyIDStaleness(t *testing.T) {
 }
 
 func testKMSv2ProviderKeyIDStaleness(t *testing.T) {
+	t.Parallel()
 	socketPath := getSocketPath()
 	encryptionConfig := fmt.Sprintf(`
 kind: EncryptionConfiguration
@@ -1347,6 +1348,7 @@ func TestKMSv2ProviderLegacyData(t *testing.T) {
 }
 
 func testKMSv2ProviderLegacyData(t *testing.T) {
+	t.Parallel()
 	socketPath := getSocketPath()
 	encryptionConfig := fmt.Sprintf(`
 kind: EncryptionConfiguration
