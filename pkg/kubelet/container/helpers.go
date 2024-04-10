@@ -261,15 +261,14 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			continue
 		}
 		container := &Container{
-			ID:                   containerStatus.ID,
-			Name:                 containerStatus.Name,
-			Image:                containerStatus.Image,
-			ImageID:              containerStatus.ImageID,
-			ImageRef:             containerStatus.ImageRef,
-			ImageRuntimeHandler:  containerStatus.ImageRuntimeHandler,
-			Hash:                 containerStatus.Hash,
-			HashWithoutResources: containerStatus.HashWithoutResources,
-			State:                containerStatus.State,
+			ID:                  containerStatus.ID,
+			Name:                containerStatus.Name,
+			Image:               containerStatus.Image,
+			ImageID:             containerStatus.ImageID,
+			ImageRef:            containerStatus.ImageRef,
+			ImageRuntimeHandler: containerStatus.ImageRuntimeHandler,
+			Hash:                containerStatus.Hash,
+			State:               containerStatus.State,
 		}
 		runningPod.Containers = append(runningPod.Containers, container)
 	}

@@ -155,7 +155,6 @@ func TestContainerAnnotations(t *testing.T) {
 		PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
 		PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
 		Hash:                      kubecontainer.HashContainer(container),
-		HashWithoutResources:      kubecontainer.HashContainer(container),
 		RestartCount:              restartCount,
 		TerminationMessagePath:    container.TerminationMessagePath,
 		PreStopHandler:            container.Lifecycle.PreStop,
@@ -182,7 +181,6 @@ func TestContainerAnnotations(t *testing.T) {
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
 	expected.Hash = kubecontainer.HashContainer(container)
-	expected.HashWithoutResources = kubecontainer.HashContainer(container)
 	annotations = newContainerAnnotations(container, pod, restartCount, opts)
 	containerInfo = getContainerInfoFromAnnotations(annotations)
 	if !reflect.DeepEqual(containerInfo, expected) {
