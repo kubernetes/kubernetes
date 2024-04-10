@@ -212,8 +212,19 @@ func (rc *reconciler) mountAttachedVolumes(volumeToMount cache.VolumeToMount, po
 		volumeToMount.VolumeToMount,
 		rc.actualStateOfWorld,
 		isRemount)
-	if err != nil && !isExpectedError(err) {
-		klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
+	if err != nil {
+		if !isExpectedError(err) {
+			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
+		}
+		err = rc.actualStateOfWorld.MarkVolumeMountAsUncertain(operationexecutor.MarkVolumeOpts{
+			PodName:    volumeToMount.PodName,
+			PodUID:     volumeToMount.Pod.UID,
+			VolumeName: volumeToMount.VolumeName,
+			VolumeSpec: volumeToMount.VolumeSpec,
+		})
+		if err != nil {
+			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (MarkVolumeMountAsUncertain %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
+		}
 	}
 	if err == nil {
 		if remountingLogStr == "" {
