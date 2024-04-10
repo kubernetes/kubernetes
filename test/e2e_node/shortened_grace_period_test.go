@@ -81,7 +81,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				// Verify the number of SIGINT
 				gomega.Expect(strings.Count("SIGINT 1", podLogs)).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
 				gomega.Expect(strings.Count("SIGINT 2", podLogs)).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
-				return nil
+				return expectedWatchEvents
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
 				return err
