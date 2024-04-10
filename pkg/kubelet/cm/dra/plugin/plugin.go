@@ -38,16 +38,13 @@ const (
 	// DRAPluginName is the name of the in-tree DRA Plugin.
 	DRAPluginName   = "kubernetes.io/dra"
 	v1alpha3Version = "v1alpha3"
-	v1alpha2Version = "v1alpha2"
 )
 
-// Plugin is a description of a DRA Plugin, defined by an endpoint
-// and the highest DRA version supported.
+// Plugin is a description of a DRA Plugin, defined by an endpoint.
 type plugin struct {
 	sync.Mutex
 	conn                    *grpc.ClientConn
 	endpoint                string
-	version                 string
 	highestSupportedVersion *utilversion.Version
 	clientTimeout           time.Duration
 }
@@ -82,18 +79,6 @@ func (p *plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 
 	p.conn = conn
 	return p.conn, nil
-}
-
-func (p *plugin) getVersion() string {
-	p.Lock()
-	defer p.Unlock()
-	return p.version
-}
-
-func (p *plugin) setVersion(version string) {
-	p.Lock()
-	p.version = version
-	p.Unlock()
 }
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
@@ -135,7 +120,6 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	pluginInstance := &plugin{
 		conn:                    nil,
 		endpoint:                endpoint,
-		version:                 v1alpha3Version,
 		highestSupportedVersion: highestSupportedVersion,
 		clientTimeout:           timeout,
 	}
