@@ -570,6 +570,15 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			volume.VolumeOptions{})
 		if newMounterErr != nil {
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
+			err = actualStateOfWorld.MarkVolumeMountAsUncertain(MarkVolumeOpts{
+				PodName:    volumeToMount.PodName,
+				PodUID:     volumeToMount.Pod.UID,
+				VolumeName: volumeToMount.VolumeName,
+				VolumeSpec: volumeToMount.VolumeSpec,
+			})
+			if err != nil {
+				klog.ErrorS(err, "MountVolume.NewMounter MarkVolumeMountAsUncertain", "pod", volumeToMount.PodName, "volume", volumeToMount.VolumeName)
+			}
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
