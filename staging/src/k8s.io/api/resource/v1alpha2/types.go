@@ -394,7 +394,7 @@ type ResourceClass struct {
 	// ParametersRef references an arbitrary separate object that may hold
 	// parameters that will be used by the driver when allocating a
 	// resource that uses this class. A dynamic resource driver can
-	// distinguish between parameters stored here and and those stored in
+	// distinguish between parameters stored here and those stored in
 	// ResourceClaimSpec.
 	// +optional
 	ParametersRef *ResourceClassParametersReference `json:"parametersRef,omitempty" protobuf:"bytes,3,opt,name=parametersRef"`
@@ -411,6 +411,15 @@ type ResourceClass struct {
 	// via structured parameters, then StructuredParameters must be set to true.
 	// +optional
 	StructuredParameters *bool `json:"structuredParameters,omitempty" protobuf:"bytes,5,opt,name=structuredParameters"`
+
+	// DefaultClaimParametersRef is an optional reference to an object that holds parameters
+	// used by the driver as default when allocating a resource associated with this class.
+	// It is the responsibility of the cluster administrator to create this default resource
+	// claim parameter reference when defining the resource class. This field is utilized
+	// only when the ParametersRef of the resource claim is nil. If both ParametersRef
+	// and DefaultClaimParametersRef are nil, the claim cannot be allocated.
+	// +optional
+	DefaultClaimParametersRef *ResourceClassParametersReference `json:"defaultParametersRef,omitempty" protobuf:"bytes,6,opt,name=defaultParametersRef"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
