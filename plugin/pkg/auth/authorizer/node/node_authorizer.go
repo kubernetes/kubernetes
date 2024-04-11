@@ -309,13 +309,21 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 		return authorizer.DecisionNoOpinion, "cannot authorize ResourceSlice subresources", nil
 	}
 
-	// allowed verbs: get, create, update, patch, delete
+	// allowed verbs: get, create, update, patch, delete, watch, list, deletecollection
 	verb := attrs.GetVerb()
 	switch verb {
 	case "get", "create", "update", "patch", "delete":
 		// Okay, but check individual object permission below.
-	case "watch", "list":
-		// Okay. The kubelet is trusted to use a filter for its own objects.
+	case "watch", "list", "deletecollection":
+		// Okay. The kubelet is trusted to use a filter for its own objects in watch and list.
+		// The NodeRestriction admission plugin (plugin/pkg/admission/noderestriction)
+		// ensures that the node is not deleting some ResourceSlice belonging to
+		// some other node.
+		//
+		// TODO (https://github.com/kubernetes/kubernetes/issues/125355):
+		// Once https://github.com/kubernetes/enhancements/pull/4600 is implemented,
+		// this code needs to be extended to verify that the node filter is indeed set.
+		// Then the admission check can be removed.
 		return authorizer.DecisionAllow, "", nil
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
