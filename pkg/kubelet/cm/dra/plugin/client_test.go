@@ -135,10 +135,9 @@ func TestGRPCConnIsReused(t *testing.T) {
 			req := &drapbv1alpha3.NodePrepareResourcesRequest{
 				Claims: []*drapbv1alpha3.Claim{
 					{
-						Namespace:      "dummy-namespace",
-						Uid:            "dummy-uid",
-						Name:           "dummy-claim",
-						ResourceHandle: "dummy-resource",
+						Namespace: "dummy-namespace",
+						Uid:       "dummy-uid",
+						Name:      "dummy-claim",
 					},
 				},
 			}
