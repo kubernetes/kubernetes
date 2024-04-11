@@ -6,7 +6,7 @@ on:
     tags:
     # Push events on datadog tags
     - "*-dd*"
-
+permissions: write-all
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,7 +20,11 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.21
+        go-version: 1.22
+    - name: Set env
+      run: echo SANITIZED_TARGET_PLATFORM=${KUBE_BUILD_PLATFORM/\//-} >> $GITHUB_ENV
+      env:
+        KUBE_BUILD_PLATFORM: ${{ matrix.platform }}
     - name: Cleanup disk space
       run: |
         sudo rm -rf /usr/share/dotnet
@@ -47,9 +51,13 @@ jobs:
         done
     - uses: actions/upload-artifact@v4
       with:
-        name: k8s_output_$TARGET_PLATFORM
+        name: k8s_output_${{ env.SANITIZED_TARGET_PLATFORM }}
         path: _output/release-tars
+      env:
+        SANITIZED_TARGET_PLATFORM: ${{ env.SANITIZED_TARGET_PLATFORM }}
   release:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     needs: build
     outputs:
@@ -64,16 +72,16 @@ jobs:
       if: startsWith(github.ref, 'refs/heads/')
     - name: Create Release for Branch
       id: create_release_branch
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/heads/')
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: branch@${{ steps.extract_branch.outputs.branch  }}
         tag_name: branch@${{ steps.extract_branch.outputs.branch  }}
-        release_name: branch@${{ steps.extract_branch.outputs.branch  }}
         draft: false
         prerelease: false
-
     - name: Extract tags name
       shell: bash
       run: echo "##[set-output name=tags;]$(echo ${GITHUB_REF#refs/tags/})"
@@ -83,11 +91,13 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
     - name: Create Release for Tags
       id: create_release_tags
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: ${{ steps.extract_tags.outputs.tags }}
         tag_name: ${{ steps.extract_tags.outputs.tags }}
         release_name: ${{ steps.extract_tags.outputs.tags }}
         draft: false
@@ -105,10 +115,11 @@ jobs:
         platform: ["linux-arm64","linux-amd64"]
         extension: ["tar.gz", "tar.gz.sha256sum"]
     steps:
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@v4
       with:
         name: k8s_output_${{ matrix.platform }}
         path: _output/release-tars
+        github-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Display structure of downloaded files
       run: ls -R
       working-directory: _output
