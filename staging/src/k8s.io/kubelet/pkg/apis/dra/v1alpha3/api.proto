@@ -22,7 +22,6 @@ package v1alpha3;
 option go_package = "k8s.io/kubelet/pkg/apis/dra/v1alpha3";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-import "k8s.io/api/resource/v1alpha2/generated.proto";
 
 option (gogoproto.goproto_stringer_all) = false;
 option (gogoproto.stringer_all) =  true;
@@ -102,13 +101,4 @@ message Claim {
     // The name of the Resource claim (ResourceClaim.meta.Name)
     // This field is REQUIRED.
     string name = 3;
-    // Resource handle (AllocationResult.ResourceHandles[*].Data)
-    // This field is REQUIRED.
-    string resource_handle = 4;
-    // Structured parameter resource handle (AllocationResult.ResourceHandles[*].StructuredData).
-    // This field is OPTIONAL. If present, it needs to be used
-    // instead of resource_handle. It will only have a single entry.
-    //
-    // Using "repeated" instead of "optional" is a workaround for https://github.com/gogo/protobuf/issues/713.
-    repeated k8s.io.api.resource.v1alpha2.StructuredResourceHandle structured_resource_handle = 5;
 }

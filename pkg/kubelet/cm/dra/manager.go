@@ -224,13 +224,9 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			// Loop through all plugins and prepare for calling NodePrepareResources.
 			for _, resourceHandle := range claimInfo.ResourceHandles {
 				claim := &drapb.Claim{
-					Namespace:      claimInfo.Namespace,
-					Uid:            string(claimInfo.ClaimUID),
-					Name:           claimInfo.ClaimName,
-					ResourceHandle: resourceHandle.Data,
-				}
-				if resourceHandle.StructuredData != nil {
-					claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
+					Namespace: claimInfo.Namespace,
+					Uid:       string(claimInfo.ClaimUID),
+					Name:      claimInfo.ClaimName,
 				}
 				pluginName := resourceHandle.DriverName
 				batches[pluginName] = append(batches[pluginName], claim)
@@ -455,13 +451,9 @@ func (m *ManagerImpl) unprepareResources(podUID types.UID, namespace string, cla
 			// Loop through all plugins and prepare for calling NodeUnprepareResources.
 			for _, resourceHandle := range claimInfo.ResourceHandles {
 				claim := &drapb.Claim{
-					Namespace:      claimInfo.Namespace,
-					Uid:            string(claimInfo.ClaimUID),
-					Name:           claimInfo.ClaimName,
-					ResourceHandle: resourceHandle.Data,
-				}
-				if resourceHandle.StructuredData != nil {
-					claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
+					Namespace: claimInfo.Namespace,
+					Uid:       string(claimInfo.ClaimUID),
+					Name:      claimInfo.ClaimName,
 				}
 				pluginName := resourceHandle.DriverName
 				batches[pluginName] = append(batches[pluginName], claim)
