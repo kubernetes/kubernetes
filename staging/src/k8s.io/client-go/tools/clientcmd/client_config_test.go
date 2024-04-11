@@ -24,7 +24,7 @@ import (
 
 	utiltesting "k8s.io/client-go/util/testing"
 
-	"github.com/imdario/mergo"
+	"dario.cat/mergo"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
