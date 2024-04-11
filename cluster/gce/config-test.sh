@@ -532,8 +532,8 @@ KUBE_PROXY_DAEMONSET=${KUBE_PROXY_DAEMONSET:-false} # true, false
 # as an addon daemonset.
 KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
 
-# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
-KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-iptables}
+# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs, nftables].
+KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-nftables}
 
 # Will be passed into the kube-proxy via `--detect-local-mode`
 DETECT_LOCAL_MODE="${DETECT_LOCAL_MODE:-NodeCIDR}"
