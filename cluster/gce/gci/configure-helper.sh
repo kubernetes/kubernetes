@@ -1770,7 +1770,13 @@ function prepare-kube-proxy-manifest-variables {
       exit 1
     fi
   fi
-  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
+
+  if [[ "${KUBE_PROXY_MODE:-}" == "nftables" ]];then
+    params+=" --proxy-mode=nftables"
+  else
+    params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
+  fi
+
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
