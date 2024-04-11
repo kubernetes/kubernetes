@@ -18,73 +18,29 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net"
 	"strings"
-	"sync"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
-
-const (
-	// DRAPluginName is the name of the in-tree DRA Plugin.
-	DRAPluginName   = "kubernetes.io/dra"
-	v1alpha3Version = "v1alpha3"
-)
-
-// Plugin is a description of a DRA Plugin, defined by an endpoint.
-type plugin struct {
-	sync.Mutex
-	conn                    *grpc.ClientConn
-	endpoint                string
-	highestSupportedVersion *utilversion.Version
-	clientTimeout           time.Duration
-}
-
-func (p *plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
-	p.Lock()
-	defer p.Unlock()
-
-	if p.conn != nil {
-		return p.conn, nil
-	}
-
-	network := "unix"
-	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", p.endpoint)
-	conn, err := grpc.Dial(
-		p.endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, target)
-		}),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
-		return nil, errors.New("timed out waiting for gRPC connection to be ready")
-	}
-
-	p.conn = conn
-	return p.conn, nil
-}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
-	controller *nodeResourcesController
+	ctx        context.Context
+	kubeClient kubernetes.Interface
+	getNode    func() (*v1.Node, error)
 }
+
+var _ cache.PluginHandler = &RegistrationHandler{}
 
 // NewPluginHandler returns new registration handler.
 //
@@ -92,20 +48,81 @@ type RegistrationHandler struct {
 // If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
 func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1.Node, error)) *RegistrationHandler {
-	handler := &RegistrationHandler{}
+	handler := &RegistrationHandler{
+		// The context and thus logger should come from the caller.
+		ctx:        klog.NewContext(context.TODO(), klog.LoggerWithName(klog.TODO(), "DRA registration handler")),
+		kubeClient: kubeClient,
+		getNode:    getNode,
+	}
 
-	// If kubelet ever gets an API for stopping registration handlers, then
-	// that would need to be hooked up with stopping the controller.
-	handler.controller = startNodeResourcesController(context.TODO(), kubeClient, getNode)
+	// When kubelet starts up, no DRA driver has registered yet. None of
+	// the drivers are usable until they come back, which might not happen
+	// at all. Therefore it is better to not advertise any local resources
+	// because pods could get stuck on the node waiting for the driver
+	// to start up.
+	//
+	// This has to run in the background.
+	go handler.wipeResourceSlices("")
 
 	return handler
 }
 
+// wipeResourceSlices deletes ResourceSlices of the node, optionally just for a specific driver.
+func (h *RegistrationHandler) wipeResourceSlices(pluginName string) {
+	if h.kubeClient == nil {
+		return
+	}
+	ctx := h.ctx
+	logger := klog.FromContext(ctx)
+	backoff := wait.Backoff{
+		Duration: time.Second,
+		Factor:   2,
+		Jitter:   0.2,
+		Cap:      5 * time.Minute,
+		Steps:    100,
+	}
+
+	// Error logging is done inside the loop. Context cancellation doesn't get logged.
+	_ = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+		node, err := h.getNode()
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			logger.Error(err, "Unexpected error checking for node")
+		}
+		fieldSelector := fields.Set{"nodeName": node.Name}
+		if pluginName != "" {
+			fieldSelector["driverName"] = pluginName
+		}
+
+		err = h.kubeClient.ResourceV1alpha2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
+		switch {
+		case err == nil:
+			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)
+			return true, nil
+		case apierrors.IsUnauthorized(err):
+			// This can happen while kubelet is still figuring out
+			// its credentials.
+			logger.V(5).Info("Deleting ResourceSlice failed, retrying", "fieldSelector", fieldSelector, "err", err)
+			return false, nil
+		default:
+			// Log and retry for other errors.
+			logger.V(3).Info("Deleting ResourceSlice failed, retrying", "fieldSelector", fieldSelector, "err", err)
+			return false, nil
+		}
+	})
+}
+
 // RegisterPlugin is called when a plugin can be registered.
 func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
-	klog.InfoS("Register new DRA plugin", "name", pluginName, "endpoint", endpoint)
+	ctx := h.ctx
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
+	ctx = klog.NewContext(ctx, logger)
+	logger.V(3).Info("Register new DRA plugin", "endpoint", endpoint)
 
-	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, versions)
+	highestSupportedVersion, err := h.validateVersions("registering", pluginName, versions)
 	if err != nil {
 		return err
 	}
@@ -117,7 +134,11 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		timeout = *pluginClientTimeout
 	}
 
-	pluginInstance := &plugin{
+	ctx, cancel := context.WithCancelCause(ctx)
+
+	pluginInstance := &Plugin{
+		ctx:                     ctx,
+		cancel:                  cancel,
 		conn:                    nil,
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersion,
@@ -126,40 +147,26 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	// By default we assume the supported plugin version is v1alpha3
-	draPlugins.add(pluginName, pluginInstance)
-	h.controller.addPlugin(pluginName, pluginInstance)
+	if draPlugins.add(pluginName, pluginInstance) {
+		logger.V(1).Info("Already registered, previous plugin was replaced")
+	}
 
 	return nil
 }
 
 func (h *RegistrationHandler) validateVersions(
-	callerName string,
+	what string,
 	pluginName string,
 	versions []string,
 ) (*utilversion.Version, error) {
 	if len(versions) == 0 {
-		return nil, errors.New(
-			log(
-				"%s for DRA plugin %q failed. Plugin returned an empty list for supported versions",
-				callerName,
-				pluginName,
-			),
-		)
+		return nil, fmt.Errorf("%s DRA plugin %q: empty list for supported versions", what, pluginName)
 	}
 
 	// Validate version
 	newPluginHighestVersion, err := utilversion.HighestSupportedVersion(versions)
 	if err != nil {
-		return nil, errors.New(
-			log(
-				"%s for DRA plugin %q failed. None of the versions specified %q are supported. err=%v",
-				callerName,
-				pluginName,
-				versions,
-				err,
-			),
-		)
+		return nil, fmt.Errorf("%s DRA plugin %q: none of the versions specified %q are supported: %v", what, pluginName, versions, err)
 	}
 
 	existingPlugin := draPlugins.get(pluginName)
@@ -169,26 +176,26 @@ func (h *RegistrationHandler) validateVersions(
 	if existingPlugin.highestSupportedVersion.LessThan(newPluginHighestVersion) {
 		return newPluginHighestVersion, nil
 	}
-	return nil, errors.New(
-		log(
-			"%s for DRA plugin %q failed. Another plugin with the same name is already registered with a higher supported version: %q",
-			callerName,
-			pluginName,
-			existingPlugin.highestSupportedVersion,
-		),
-	)
-}
-
-func deregisterPlugin(pluginName string) {
-	draPlugins.delete(pluginName)
+	return nil, fmt.Errorf("%s DRA plugin %q: another plugin with the same name is already registered with a higher supported version: %q < %q", what, pluginName, newPluginHighestVersion, existingPlugin.highestSupportedVersion)
 }
 
 // DeRegisterPlugin is called when a plugin has removed its socket,
 // signaling it is no longer available.
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
-	klog.InfoS("DeRegister DRA plugin", "name", pluginName)
-	deregisterPlugin(pluginName)
-	h.controller.removePlugin(pluginName)
+	if p := draPlugins.delete(pluginName); p != nil {
+		logger := klog.FromContext(p.ctx)
+		logger.V(3).Info("Deregister DRA plugin", "endpoint", p.endpoint)
+
+		// Did exist before. Let's clean up ResourceSlices for it because
+		// it might have died without doing that itself and might not
+		// come back.
+		go h.wipeResourceSlices(pluginName)
+
+		return
+	}
+
+	logger := klog.FromContext(h.ctx)
+	logger.V(3).Info("Deregister DRA plugin not necessary, was already removed")
 }
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
@@ -196,15 +203,10 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	klog.InfoS("Validate DRA plugin", "name", pluginName, "endpoint", endpoint, "versions", strings.Join(versions, ","))
 
-	_, err := h.validateVersions("ValidatePlugin", pluginName, versions)
+	_, err := h.validateVersions("validating", pluginName, versions)
 	if err != nil {
-		return fmt.Errorf("validation failed for DRA plugin %s at endpoint %s: %+v", pluginName, endpoint, err)
+		return err
 	}
 
 	return err
-}
-
-// log prepends log string with `kubernetes.io/dra`.
-func log(msg string, parts ...interface{}) string {
-	return fmt.Sprintf(fmt.Sprintf("%s: %s", DRAPluginName, msg), parts...)
 }

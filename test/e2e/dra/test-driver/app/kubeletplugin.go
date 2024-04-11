@@ -28,12 +28,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	resourceapi "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
@@ -111,8 +110,9 @@ type FileOperations struct {
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
 	logger := klog.FromContext(ctx)
+
 	if fileOps.Create == nil {
 		fileOps.Create = func(name string, content []byte) error {
 			return os.WriteFile(name, content, os.FileMode(0644))
@@ -143,16 +143,32 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string
 	}
 
 	opts = append(opts,
-		kubeletplugin.Logger(logger),
 		kubeletplugin.DriverName(driverName),
+		kubeletplugin.NodeName(nodeName),
+		kubeletplugin.KubeClient(kubeClient),
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ex, opts...)
+	d, err := kubeletplugin.Start(ctx, ex, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
 	ex.d = d
+
+	if fileOps.NumResourceInstances >= 0 {
+		instances := make([]resourceapi.NamedResourcesInstance, ex.fileOps.NumResourceInstances)
+		for i := 0; i < ex.fileOps.NumResourceInstances; i++ {
+			instances[i].Name = fmt.Sprintf("instance-%02d", i)
+		}
+		nodeResources := []*resourceapi.ResourceModel{
+			{
+				NamedResources: &resourceapi.NamedResourcesResources{
+					Instances: instances,
+				},
+			},
+		}
+		ex.d.PublishResources(ctx, nodeResources)
+	}
 
 	return ex, nil
 }
@@ -451,39 +467,6 @@ func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv
 		}
 	}
 	return resp, nil
-}
-
-func (ex *ExamplePlugin) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAndWatchResourcesRequest, stream drapbv1alpha3.Node_NodeListAndWatchResourcesServer) error {
-	if ex.fileOps.NumResourceInstances < 0 {
-		ex.logger.Info("Sending no NodeResourcesResponse")
-		return status.New(codes.Unimplemented, "node resource support disabled").Err()
-	}
-
-	instances := make([]resourceapi.NamedResourcesInstance, len(ex.instances))
-	for i, name := range sets.List(ex.instances) {
-		instances[i].Name = name
-	}
-	resp := &drapbv1alpha3.NodeListAndWatchResourcesResponse{
-		Resources: []*resourceapi.ResourceModel{
-			{
-				NamedResources: &resourceapi.NamedResourcesResources{
-					Instances: instances,
-				},
-			},
-		},
-	}
-
-	ex.logger.Info("Sending NodeListAndWatchResourcesResponse", "response", resp)
-	if err := stream.Send(resp); err != nil {
-		return err
-	}
-
-	// Keep the stream open until the test is done.
-	// TODO: test sending more updates later
-	<-ex.stopCh
-	ex.logger.Info("Done sending NodeListAndWatchResourcesResponse, closing stream")
-
-	return nil
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {

@@ -69,14 +69,10 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	var kubeletPlugin, kubeletPlugin1, kubeletPlugin2 *testdriver.ExamplePlugin
-
 	f.Context("Resource Kubelet Plugin", f.WithSerial(), func() {
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			kubeletPlugin = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
-		})
-
 		ginkgo.It("must register after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			oldCalls := kubeletPlugin.GetGRPCCalls()
 			getNewCalls := func() []testdriver.GRPCCall {
 				calls := kubeletPlugin.GetGRPCCalls()
@@ -91,6 +87,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must register after plugin restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			ginkgo.By("restart Kubelet Plugin")
 			kubeletPlugin.Stop()
 			kubeletPlugin = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
@@ -101,6 +99,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		ginkgo.It("must process pod created when kubelet is not running", func(ctx context.Context) {
 			// Stop Kubelet
+			ginkgo.By("stop kubelet")
 			startKubelet := stopKubelet()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 			// Pod must be in pending state
@@ -109,6 +108,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			})
 			framework.ExpectNoError(err)
 			// Start Kubelet
+			ginkgo.By("restart kubelet")
 			startKubelet()
 			// Pod should succeed
 			err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartShortTimeout)
@@ -116,6 +116,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must keep pod in pending state if NodePrepareResources times out", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unblock := kubeletPlugin.BlockNodePrepareResources()
 			defer unblock()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
@@ -134,6 +136,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodePrepareResources fails and then succeeds", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodePrepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
@@ -157,6 +161,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodeUnprepareResources fails and then succeeds", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
@@ -177,6 +183,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must retry NodePrepareResources after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodePrepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
@@ -206,6 +214,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must retry NodeUnprepareResources after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 			ginkgo.By("wait for NodePrepareResources call to succeed")
@@ -231,6 +241,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must call NodeUnprepareResources for deleted pod", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -253,6 +265,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must call NodeUnprepareResources for deleted pod after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -282,6 +296,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must not call NodePrepareResources for deleted pod after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unblock := kubeletPlugin.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -309,6 +325,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	})
 
 	f.Context("Two resource Kubelet Plugins", f.WithSerial(), func() {
+		var kubeletPlugin1, kubeletPlugin2 *testdriver.ExamplePlugin
+
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			kubeletPlugin1 = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), kubeletPlugin1Name)
 			kubeletPlugin2 = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), kubeletPlugin2Name)
@@ -381,6 +399,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodePrepareResources is in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unblock := kubeletPlugin.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
@@ -479,7 +499,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
 
 			ginkgo.By("start plugin and wait for ResourceSlice")
-			kubeletPlugin = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 			gomega.Eventually(ctx, listResources).Should(matchNode, "ResourceSlice from kubelet plugin")
 			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchNode, "ResourceSlice from kubelet plugin")
 
@@ -510,6 +530,7 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 		ctx,
 		cdiDir,
 		pluginName,
+		clientSet,
 		"",
 		testdriver.FileOperations{},
 		kubeletplugin.PluginSocketPath(endpoint),

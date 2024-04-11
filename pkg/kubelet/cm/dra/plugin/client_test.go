@@ -28,6 +28,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	"k8s.io/kubernetes/test/utils/ktesting"
+)
+
+const (
+	v1alpha3Version = "v1alpha3"
 )
 
 type fakeV1alpha3GRPCServer struct {
@@ -43,16 +48,6 @@ func (f *fakeV1alpha3GRPCServer) NodePrepareResources(ctx context.Context, in *d
 func (f *fakeV1alpha3GRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
 
 	return &drapbv1alpha3.NodeUnprepareResourcesResponse{}, nil
-}
-
-func (f *fakeV1alpha3GRPCServer) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAndWatchResourcesRequest, srv drapbv1alpha3.Node_NodeListAndWatchResourcesServer) error {
-	if err := srv.Send(&drapbv1alpha3.NodeListAndWatchResourcesResponse{}); err != nil {
-		return err
-	}
-	if err := srv.Send(&drapbv1alpha3.NodeListAndWatchResourcesResponse{}); err != nil {
-		return err
-	}
-	return nil
 }
 
 type tearDown func()
@@ -95,6 +90,7 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 }
 
 func TestGRPCConnIsReused(t *testing.T) {
+	ctx := ktesting.Init(t)
 	addr, teardown, err := setupFakeGRPCServer(v1alpha3Version)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +101,8 @@ func TestGRPCConnIsReused(t *testing.T) {
 	wg := sync.WaitGroup{}
 	m := sync.Mutex{}
 
-	p := &plugin{
+	p := &Plugin{
+		ctx:      ctx,
 		endpoint: addr,
 	}
 
@@ -147,9 +144,9 @@ func TestGRPCConnIsReused(t *testing.T) {
 			}
 			client.NodePrepareResources(context.TODO(), req)
 
-			client.(*plugin).Lock()
-			conn := client.(*plugin).conn
-			client.(*plugin).Unlock()
+			client.mutex.Lock()
+			conn := client.conn
+			client.mutex.Unlock()
 
 			m.Lock()
 			defer m.Unlock()
@@ -193,7 +190,7 @@ func TestNewDRAPluginClient(t *testing.T) {
 		{
 			description: "plugin exists",
 			setup: func(name string) tearDown {
-				draPlugins.add(name, &plugin{})
+				draPlugins.add(name, &Plugin{})
 				return func() {
 					draPlugins.delete(name)
 				}
@@ -232,13 +229,15 @@ func TestNodeUnprepareResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
+			ctx := ktesting.Init(t)
 			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer teardown()
 
-			p := &plugin{
+			p := &Plugin{
+				ctx:           ctx,
 				endpoint:      addr,
 				clientTimeout: PluginClientTimeout,
 			}
@@ -266,77 +265,6 @@ func TestNodeUnprepareResources(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-		})
-	}
-}
-
-func TestListAndWatchResources(t *testing.T) {
-	for _, test := range []struct {
-		description   string
-		serverSetup   func(string) (string, tearDown, error)
-		serverVersion string
-		request       *drapbv1alpha3.NodeListAndWatchResourcesRequest
-		responses     []*drapbv1alpha3.NodeListAndWatchResourcesResponse
-		expectError   string
-	}{
-		{
-			description:   "server supports NodeResources API",
-			serverSetup:   setupFakeGRPCServer,
-			serverVersion: v1alpha3Version,
-			request:       &drapbv1alpha3.NodeListAndWatchResourcesRequest{},
-			responses: []*drapbv1alpha3.NodeListAndWatchResourcesResponse{
-				{},
-				{},
-			},
-			expectError: "EOF",
-		},
-	} {
-		t.Run(test.description, func(t *testing.T) {
-			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer teardown()
-
-			p := &plugin{
-				endpoint: addr,
-			}
-
-			conn, err := p.getOrCreateGRPCConn()
-			defer func() {
-				err := conn.Close()
-				if err != nil {
-					t.Error(err)
-				}
-			}()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			draPlugins.add("dummy-plugin", p)
-			defer draPlugins.delete("dummy-plugin")
-
-			client, err := NewDRAPluginClient("dummy-plugin")
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			stream, err := client.NodeListAndWatchResources(context.Background(), test.request)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var actualResponses []*drapbv1alpha3.NodeListAndWatchResourcesResponse
-			var actualErr error
-			for {
-				resp, err := stream.Recv()
-				if err != nil {
-					actualErr = err
-					break
-				}
-				actualResponses = append(actualResponses, resp)
-			}
-			assert.Equal(t, test.responses, actualResponses)
-			assert.Contains(t, actualErr.Error(), test.expectError)
 		})
 	}
 }

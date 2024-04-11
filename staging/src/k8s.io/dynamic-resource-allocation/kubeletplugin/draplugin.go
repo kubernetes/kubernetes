@@ -17,13 +17,18 @@ limitations under the License.
 package kubeletplugin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
+	resourceapi "k8s.io/api/resource/v1alpha2"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -39,6 +44,18 @@ type DRAPlugin interface {
 	// received yet.
 	RegistrationStatus() *registerapi.RegistrationStatus
 
+	// PublishResources may be called one or more times to publish
+	// resource information in ResourceSlice objects. If it never gets
+	// called, then the kubelet plugin does not manage any ResourceSlice
+	// objects.
+	//
+	// PublishResources does not block, so it might still take a while
+	// after it returns before all information is actually written
+	// to the API server.
+	//
+	// The caller must not modify the content of the slice.
+	PublishResources(ctx context.Context, nodeResources []*resourceapi.ResourceModel)
+
 	// This unexported method ensures that we can modify the interface
 	// without causing an API break of the package
 	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
@@ -53,14 +70,6 @@ type Option func(o *options) error
 func DriverName(driverName string) Option {
 	return func(o *options) error {
 		o.driverName = driverName
-		return nil
-	}
-}
-
-// Logger overrides the default klog.Background logger.
-func Logger(logger klog.Logger) Option {
-	return func(o *options) error {
-		o.logger = logger
 		return nil
 	}
 }
@@ -162,15 +171,39 @@ func NodeV1alpha3(enabled bool) Option {
 	}
 }
 
+// KubeClient grants the plugin access to the API server. This is needed
+// for syncing ResourceSlice objects. It's the responsibility of the DRA driver
+// developer to ensure that this client has permission to read, write,
+// patch and list such objects. It also needs permission to read node objects.
+// Ideally, a validating admission policy should be used to limit write
+// access to ResourceSlices which belong to the node.
+func KubeClient(kubeClient kubernetes.Interface) Option {
+	return func(o *options) error {
+		o.kubeClient = kubeClient
+		return nil
+	}
+}
+
+// NodeName tells the plugin on which node it is running. This is needed for
+// syncing ResourceSlice objects.
+func NodeName(nodeName string) Option {
+	return func(o *options) error {
+		o.nodeName = nodeName
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
 	driverName                 string
+	nodeName                   string
 	draEndpoint                endpoint
 	draAddress                 string
 	pluginRegistrationEndpoint endpoint
 	unaryInterceptors          []grpc.UnaryServerInterceptor
 	streamInterceptors         []grpc.StreamServerInterceptor
+	kubeClient                 kubernetes.Interface
 
 	nodeV1alpha3 bool
 }
@@ -178,18 +211,34 @@ type options struct {
 // draPlugin combines the kubelet registration service and the DRA node plugin
 // service.
 type draPlugin struct {
-	registrar *nodeRegistrar
-	plugin    *grpcServer
+	ctx        context.Context // For new background activities that are started later.
+	wg         sync.WaitGroup
+	cancel     func(cause error)
+	registrar  *nodeRegistrar
+	plugin     *grpcServer
+	driverName string
+	nodeName   string
+	kubeClient kubernetes.Interface
+
+	// Information about resource publishing changes concurrently and thus
+	// must be protected by the mutex.
+	mutex                   sync.Mutex
+	publishResources        bool
+	nodeResources           []*resourceapi.ResourceModel
+	resourceSliceController *resourceslice.Controller
 }
 
 // Start sets up two gRPC servers (one for registration, one for the DRA node
 // client). By default, all APIs implemented by the nodeServer get registered.
-func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
-	d := &draPlugin{}
-
+//
+// The context and/or DRAPlugin.Stop can be used to stop all background activity.
+// Stop also blocks. A logger can be stored in the context to add values or
+// a name to all log entries.
+func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
+	logger := klog.FromContext(ctx)
 	o := options{
 		logger:        klog.Background(),
-		grpcVerbosity: 4,
+		grpcVerbosity: 6, // Logs requests and responses, which can be large.
 		nodeV1alpha3:  true,
 	}
 	for _, option := range opts {
@@ -212,11 +261,40 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 		return nil, errors.New("a Unix domain socket path and/or listener must be set for the registrar")
 	}
 
+	d := &draPlugin{
+		driverName: o.driverName,
+		nodeName:   o.nodeName,
+		kubeClient: o.kubeClient,
+	}
+
+	// Stop calls cancel and therefore cancellation
+	// and Stop both cause goroutines to stop.
+	d.ctx, d.cancel = context.WithCancelCause(ctx)
+	ctx = d.ctx
+	logger.V(3).Info("Starting")
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		defer logger.V(3).Info("Stopping")
+		<-ctx.Done()
+	}()
+
+	// Clean up if we don't finish succcessfully.
+	defer func() {
+		if r := recover(); r != nil {
+			d.Stop()
+			panic(r)
+		}
+		if finalErr != nil {
+			d.Stop()
+		}
+	}()
+
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	implemented := false
-	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		if nodeServer, ok := nodeServer.(drapbv1alpha3.NodeServer); ok && o.nodeV1alpha3 {
-			o.logger.V(5).Info("registering drapbv1alpha3.NodeServer")
+			logger.V(5).Info("registering drapbv1alpha3.NodeServer")
 			drapbv1alpha3.RegisterNodeServer(grpcServer, nodeServer)
 			implemented = true
 		}
@@ -225,36 +303,78 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 		return nil, fmt.Errorf("start node client: %v", err)
 	}
 	d.plugin = plugin
-	defer func() {
-		// Clean up if we didn't finish succcessfully.
-		if r := recover(); r != nil {
-			plugin.stop()
-			panic(r)
-		}
-		if finalErr != nil {
-			plugin.stop()
-		}
-	}()
 	if !implemented {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
 	}
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}
 	d.registrar = registrar
 
+	// startGRPCServer and startRegistrar don't implement cancellation
+	// themselves, we add that for both here.
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		<-ctx.Done()
+		d.plugin.stop()
+		d.registrar.stop()
+	}()
+
 	return d, nil
+}
+
+func (d *draPlugin) PublishResources(ctx context.Context, nodeResources []*resourceapi.ResourceModel) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	d.publishResources = true
+	d.nodeResources = nodeResources
+	d.updatePublishResources()
+}
+
+// updatePublishResources is called each time something changed that might
+// affect how resources are published.
+func (d *draPlugin) updatePublishResources() {
+	ctx := d.ctx
+	logger := klog.FromContext(ctx)
+	if ctx.Err() != nil {
+		// Already stopped, don't do anything.
+		return
+	}
+
+	if !d.publishResources {
+		// Nothing to publish (yet).
+		return
+	}
+
+	owner := resourceslice.Owner{
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       d.nodeName,
+		// UID will be determined by the controller.
+	}
+	resources := &resourceslice.Resources{NodeResources: d.nodeResources}
+	d.resourceSliceController = resourceslice.StartController(klog.NewContext(ctx, klog.LoggerWithName(logger, "ResourceSlice controller")), d.kubeClient, d.driverName, owner, resources)
 }
 
 func (d *draPlugin) Stop() {
 	if d == nil {
 		return
 	}
+	d.cancel(errors.New("DRA plugin was stopped"))
 	d.registrar.stop()
 	d.plugin.stop()
+
+	// d.resourceSliceController is set concurrently.
+	d.mutex.Lock()
+	d.resourceSliceController.Stop()
+	d.mutex.Unlock()
+
+	d.wg.Wait()
 }
 
 func (d *draPlugin) RegistrationStatus() *registerapi.RegistrationStatus {
