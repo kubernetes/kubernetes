@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -92,7 +93,8 @@ type crdHandler struct {
 	// atomic.Value has a very good read performance compared to sync.RWMutex
 	// see https://gist.github.com/dim/152e6bf80e1384ea72e17ac717a5000a
 	// which is suited for most read and rarely write cases
-	customStorage atomic.Value
+	customStorage         atomic.Value
+	previousCustomStorage sync.Map
 
 	crdLister listers.CustomResourceDefinitionLister
 
@@ -156,6 +158,11 @@ type crdInfo struct {
 	storageVersion string
 
 	waitGroup *utilwaitgroup.SafeWaitGroup
+
+	allowMutation atomic.Bool
+
+	storageVersionUpdateLock sync.Mutex
+	deleted                  bool
 }
 
 // crdStorageMap goes from customresourcedefinition to its storage
@@ -384,15 +391,36 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
 			return nil
 		}
+
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
+
 		return handlers.CreateResource(storage, requestScope, r.admission)
 	case "update":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
+
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
+
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	case "delete":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
+
 		allowsOptions := true
 		return handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
 	case "deletecollection":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
+
 		checkBody := true
 		return handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
 	default:
@@ -412,8 +440,14 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	case "get":
 		return handlers.GetResource(storage, requestScope)
 	case "update":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		responsewriters.ErrorNegotiated(
@@ -432,8 +466,14 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	case "get":
 		return handlers.GetResource(storage, requestScope)
 	case "update":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if !crdInfo.allowMutation.Load() {
+			panic("fail")
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		responsewriters.ErrorNegotiated(
@@ -460,6 +500,11 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 			crd.Name)
 		return
 	}
+
+	// clear whatever existing data we have to ensure we do a write before attempting more storage
+	r.previousCustomStorage.Delete(crd.UID)
+
+	// this function will synchronously remove the old storage, so we KNOW that we'll create a new crdInfo instance
 	r.removeStorage_locked(crd.UID)
 }
 
@@ -498,7 +543,16 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		return
 	}
 
+	// if the previous crdInfo couldn't mutate, clear the previous version to ensure we do a write before allowing mutation
+	if oldInfo.allowMutation.Load() {
+		previousStorageVersion := "vWhatever"
+		r.previousCustomStorage.Store(oldCRD.UID, previousStorageVersion)
+	} else {
+		r.previousCustomStorage.Delete(oldCRD.UID)
+	}
+
 	klog.V(4).Infof("Updating customresourcedefinition %s", newCRD.Name)
+	// this function will synchronously remove the old storage, so we KNOW that we'll create a new crdInfo instance
 	r.removeStorage_locked(newCRD.UID)
 }
 
@@ -508,6 +562,12 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 func (r *crdHandler) removeStorage_locked(uid types.UID) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if oldInfo, ok := storageMap[uid]; ok {
+		// this lock ensures that the previous crdInfo is not trying to update storage version at the same time
+		// that we create a new instance.
+		// The next attempt by the oldInfo to update will be skipped because the instance is deleted
+		oldInfo.storageVersionUpdateLock.Lock()
+		oldInfo.deleted = true
+		oldInfo.storageVersionUpdateLock.Unlock()
 		// Copy because we cannot write to storageMap without a race
 		// as it is used without locking elsewhere.
 		storageMap2 := storageMap.clone()
@@ -543,8 +603,20 @@ func (r *crdHandler) removeDeadStorage() {
 	r.customStorage.Store(storageMap2)
 
 	for uid, crdInfo := range storageMap {
-		if _, ok := storageMap2[uid]; !ok {
+		if oldInfo, ok := storageMap2[uid]; !ok {
 			klog.V(4).Infof("Removing dead CRD storage for %s/%s", crdInfo.spec.Group, crdInfo.spec.Names.Kind)
+
+			// the customStorage.Store call above will remove the crdInfo, so we KNOW a new instance will be created
+			// Delete the existing previous storage info to ensure we do a write of storage version on a recreate
+			r.previousCustomStorage.Delete(uid)
+
+			// this lock ensures that the previous crdInfo is not trying to update storage version at the same time
+			// that we create a new instance.
+			// The next attempt by the oldInfo to update will be skipped because the instance is deleted
+			oldInfo.storageVersionUpdateLock.Lock()
+			oldInfo.deleted = true
+			oldInfo.storageVersionUpdateLock.Unlock()
+
 			go r.tearDown(crdInfo)
 		}
 	}
@@ -1011,6 +1083,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 	}
 
+	// we already have the lock
+
 	ret := &crdInfo{
 		spec:                &crd.Spec,
 		acceptedNames:       &crd.Status.AcceptedNames,
@@ -1024,6 +1098,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
 
+	currentStorageVersion := "vOther"
+	if previousStorageVersion, ok := r.previousCustomStorage.Load(crd.UID); ok && previousStorageVersion == currentStorageVersion {
+		ret.allowMutation.Store(true)
+	} else {
+		// wait for previous handlers to complete, then store, THEN allow mutation
+		go writeStorageVersion(context.TODO(), ret)
+	}
+
 	// Copy because we cannot write to storageMap without a race
 	// as it is used without locking elsewhere.
 	storageMap2 := storageMap.clone()
@@ -1032,6 +1114,29 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	r.customStorage.Store(storageMap2)
 
 	return ret, nil
+}
+
+func writeStorageVersion(ctx context.Context, crdInfo *crdInfo) {
+	// wait for previous handlers to complete
+	time.Sleep(2 * time.Minute) // make this use an old waitgroup or some such
+
+	// now use a client to write the storage version synchronously.
+	// the context is important because we need to ensure that later
+	for i := 0; i < 10000000; i++ {
+		crdInfo.storageVersionUpdateLock.Lock()
+		// if we're deleted stop doing stuff
+		if crdInfo.deleted {
+			return
+		}
+
+		// attempt to write, then unlock
+		crdInfo.storageVersionUpdateLock.Unlock()
+
+		//retry on failure
+		time.Sleep(1 * time.Second)
+	}
+
+	crdInfo.allowMutation.Store(true)
 }
 
 func scopeWithFieldManager(typeConverter managedfields.TypeConverter, reqScope handlers.RequestScope, resetFields map[fieldpath.APIVersion]*fieldpath.Set, subresource string) (handlers.RequestScope, error) {
