@@ -63,6 +63,44 @@ type ClaimInfoState struct {
 	CDIDevices map[string][]string
 }
 
+// DeepCopy performs a deep copy of the ClaimInfoState.
+func (cis ClaimInfoState) DeepCopy() ClaimInfoState {
+	return ClaimInfoState{
+		DriverName:      cis.DriverName,
+		ClassName:       cis.ClassName,
+		ClaimUID:        cis.ClaimUID,
+		ClaimName:       cis.ClaimName,
+		Namespace:       cis.Namespace,
+		PodUIDs:         cis.PodUIDs.Clone(),
+		ResourceHandles: DeepCopyResourceHandles(cis.ResourceHandles),
+		CDIDevices:      DeepCopyCDIDevices(cis.CDIDevices),
+	}
+}
+
+// DeepCopyResourceHandles performs a deep copy of the ResourceHandles slice.
+func DeepCopyResourceHandles(handles []resourcev1alpha2.ResourceHandle) []resourcev1alpha2.ResourceHandle {
+	if handles == nil {
+		return nil
+	}
+	copies := make([]resourcev1alpha2.ResourceHandle, len(handles))
+	for i, handle := range handles {
+		copies[i] = *handle.DeepCopy()
+	}
+	return copies
+}
+
+// DeepCopyCDIDevices performs a deep copy of the CDIDevices map.
+func DeepCopyCDIDevices(devices map[string][]string) map[string][]string {
+	if devices == nil {
+		return nil
+	}
+	copies := make(map[string][]string)
+	for key, value := range devices {
+		copies[key] = append([]string(nil), value...)
+	}
+	return copies
+}
+
 // ClaimInfoStateWithoutResourceHandles is an old implementation of the ClaimInfoState
 // TODO: remove in Beta
 type ClaimInfoStateWithoutResourceHandles struct {

@@ -216,7 +216,10 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 
 	claimInfoStateList := make(state.ClaimInfoStateList, 0, len(cache.claimInfo))
 	for _, infoClaim := range cache.claimInfo {
-		claimInfoStateList = append(claimInfoStateList, infoClaim.ClaimInfoState)
+		infoClaim.Lock()
+		state := infoClaim.ClaimInfoState.DeepCopy()
+		infoClaim.Unlock()
+		claimInfoStateList = append(claimInfoStateList, state)
 	}
 
 	return cache.state.Store(claimInfoStateList)
