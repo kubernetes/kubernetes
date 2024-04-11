@@ -23,7 +23,9 @@ import (
 	"fmt"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
@@ -35,7 +37,8 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 		allErrors = append(allErrors, fmt.Errorf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS))
 	}
 
-	if len(kc.EnforceNodeAllocatable) > 0 {
+	enforceNodeAllocatableWithoutNone := sets.New(kc.EnforceNodeAllocatable...).Delete(kubetypes.NodeAllocatableNoneKey)
+	if len(enforceNodeAllocatableWithoutNone) > 0 {
 		allErrors = append(allErrors, fmt.Errorf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable))
 	}
 
