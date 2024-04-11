@@ -66,8 +66,8 @@ var timeoutForNodePodCIDR = 5 * time.Minute
 // config file, to apply platform-specific default values to config.
 func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
 	if config.Mode == "" {
-		o.logger.Info("Using iptables proxy")
-		config.Mode = proxyconfigapi.ProxyModeIPTables
+		o.logger.Info("Using nftables proxy")
+		config.Mode = proxyconfigapi.ProxyModeNFTables
 	}
 
 	if config.DetectLocalMode == "" {
