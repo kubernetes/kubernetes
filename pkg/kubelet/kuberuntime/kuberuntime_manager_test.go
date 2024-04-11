@@ -922,6 +922,13 @@ func makeBasePodAndStatus() (*v1.Pod, *kubecontainer.PodStatus) {
 	return pod, status
 }
 
+func newContainerStauts(name string, id string, state kubecontainer.State) *kubecontainer.Status {
+	return &kubecontainer.Status{
+		ID:   kubecontainer.ContainerID{ID: id},
+		Name: name, State: state,
+	}
+}
+
 func TestComputePodActions(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
@@ -1167,6 +1174,61 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{1}),
 				ContainersToStart: []int{1},
 			},
+		},
+		"Kill the running container is not in the pod spec": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = append(status.ContainerStatuses, newContainerStauts("foo4", "id4", kubecontainer.ContainerStateRunning))
+			},
+			actions: podActions{
+				SandboxID: baseStatus.SandboxStatuses[0].Id,
+				ContainersToKill: map[kubecontainer.ContainerID]containerToKillInfo{
+					kubecontainer.ContainerID{ID: "id4"}: {
+						container: nil,
+						name:      "foo4",
+					},
+				},
+				ContainersToStart: []int{},
+			},
+		},
+		"Kill the created container is not in the pod spec": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = append(status.ContainerStatuses, newContainerStauts("foo4", "id4", kubecontainer.ContainerStateCreated))
+			},
+			actions: podActions{
+				SandboxID: baseStatus.SandboxStatuses[0].Id,
+				ContainersToKill: map[kubecontainer.ContainerID]containerToKillInfo{
+					kubecontainer.ContainerID{ID: "id4"}: {
+						container: nil,
+						name:      "foo4",
+					},
+				},
+				ContainersToStart: []int{},
+			},
+		},
+		"Kill the unknown container is not in the pod spec": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = append(status.ContainerStatuses, newContainerStauts("foo4", "id4", kubecontainer.ContainerStateUnknown))
+			},
+			actions: podActions{
+				SandboxID: baseStatus.SandboxStatuses[0].Id,
+				ContainersToKill: map[kubecontainer.ContainerID]containerToKillInfo{
+					kubecontainer.ContainerID{ID: "id4"}: {
+						container: nil,
+						name:      "foo4",
+					},
+				},
+				ContainersToStart: []int{},
+			},
+		},
+		"Exited container is not in the pod spec, leave it alone": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = append(status.ContainerStatuses, newContainerStauts("foo4", "id4", kubecontainer.ContainerStateExited))
+			},
+			actions: noAction,
 		},
 	} {
 		pod, status := makeBasePodAndStatus()

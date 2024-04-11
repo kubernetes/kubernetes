@@ -5438,9 +5438,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 		newContainerIndex[newPod.Spec.EphemeralContainers[i].Name] = &newPod.Spec.EphemeralContainers[i]
 	}
 	for _, old := range oldPod.Spec.EphemeralContainers {
-		if new, ok := newContainerIndex[old.Name]; !ok {
-			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be removed\n", old.Name)))
-		} else if !apiequality.Semantic.DeepEqual(old, *new) {
+		if new, ok := newContainerIndex[old.Name]; ok && !apiequality.Semantic.DeepEqual(old, *new) {
 			specDiff := cmp.Diff(old, *new)
 			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be changed\n%v", old.Name, specDiff)))
 		}

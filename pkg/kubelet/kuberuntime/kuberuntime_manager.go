@@ -440,6 +440,7 @@ const (
 	reasonLivenessProbe       containerKillReason = "LivenessProbe"
 	reasonFailedPostStartHook containerKillReason = "FailedPostStartHook"
 	reasonUnknown             containerKillReason = "Unknown"
+	reasonNotDefine           containerKillReason = "NotDefine"
 )
 
 // containerToKillInfo contains necessary information to kill a container.
@@ -1021,6 +1022,22 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			reason:    reason,
 		}
 		klog.V(2).InfoS("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
+	}
+
+	// Traverse all container states.
+	// If the definition is not found in the pod's spec and the container state is not Exited, kill it.
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		containerSpec := kubecontainer.GetContainerSpec(pod, containerStatus.Name)
+		if _, ok := changes.ContainersToKill[containerStatus.ID]; !ok && containerSpec == nil &&
+			containerStatus.State != kubecontainer.ContainerStateExited {
+			// The container is not in the pod spec, kill it.
+			changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+				name:      containerStatus.Name,
+				container: nil,
+				message:   fmt.Sprintf("Container %s is not in the pod spec", containerStatus.Name),
+				reason:    reasonNotDefine,
+			}
+		}
 	}
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {

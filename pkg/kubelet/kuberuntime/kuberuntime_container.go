@@ -733,8 +733,13 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	var containerSpec *v1.Container
 	if pod != nil {
 		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
-			return fmt.Errorf("failed to get containerSpec %q (id=%q) in pod %q when killing container for reason %q",
-				containerName, containerID.String(), format.Pod(pod), message)
+			klog.Warningf("Failed to get containerSpec %q in pod %q when killing container for reason %q, maybe it was deleted in pod spec", containerName, pod.Name, reason)
+			_, restoredContainer, err := m.restoreSpecsFromContainerLabels(ctx, containerID)
+			if err != nil {
+				return fmt.Errorf("failed to get containerSpec %q (id=%q) in pod %q when killing container for reason %q, err: %v",
+					containerName, containerID.String(), format.Pod(pod), message, err)
+			}
+			containerSpec = restoredContainer
 		}
 	} else {
 		// Restore necessary information if one of the specs is nil.
@@ -1322,11 +1327,11 @@ func setTerminationGracePeriod(pod *v1.Pod, containerSpec *v1.Container, contain
 	case pod.Spec.TerminationGracePeriodSeconds != nil:
 		switch reason {
 		case reasonStartupProbe:
-			if isProbeTerminationGracePeriodSecondsSet(pod, containerSpec, containerSpec.StartupProbe, containerName, containerID, "StartupProbe") {
+			if isProbeTerminationGracePeriodSecondsSet(pod, containerSpec.StartupProbe, containerName, containerID, "StartupProbe") {
 				return *containerSpec.StartupProbe.TerminationGracePeriodSeconds
 			}
 		case reasonLivenessProbe:
-			if isProbeTerminationGracePeriodSecondsSet(pod, containerSpec, containerSpec.LivenessProbe, containerName, containerID, "LivenessProbe") {
+			if isProbeTerminationGracePeriodSecondsSet(pod, containerSpec.LivenessProbe, containerName, containerID, "LivenessProbe") {
 				return *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
 			}
 		}
@@ -1335,7 +1340,7 @@ func setTerminationGracePeriod(pod *v1.Pod, containerSpec *v1.Container, contain
 	return gracePeriod
 }
 
-func isProbeTerminationGracePeriodSecondsSet(pod *v1.Pod, containerSpec *v1.Container, probe *v1.Probe, containerName string, containerID kubecontainer.ContainerID, probeType string) bool {
+func isProbeTerminationGracePeriodSecondsSet(pod *v1.Pod, probe *v1.Probe, containerName string, containerID kubecontainer.ContainerID, probeType string) bool {
 	if probe != nil && probe.TerminationGracePeriodSeconds != nil {
 		if *probe.TerminationGracePeriodSeconds > *pod.Spec.TerminationGracePeriodSeconds {
 			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probeType", probeType, "probeGracePeriod", *probe.TerminationGracePeriodSeconds, "podGracePeriod", *pod.Spec.TerminationGracePeriodSeconds)
