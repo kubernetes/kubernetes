@@ -1772,7 +1772,10 @@ function prepare-kube-proxy-manifest-variables {
   fi
 
   if [[ "${KUBE_PROXY_MODE:-}" == "nftables" ]];then
-    params+=" --proxy-mode=nftables"
+    # to avoid the problems caused of adding iptables rules to drop packets with invalid conntrack state
+    # kube-proxy has an option to set the tcpBeLiberal sysctl that solves the problem and is less disruptive
+    # https://github.com/kubernetes/kubernetes/issues/94861ss
+    params+=" --proxy-mode=nftables --conntrack-tcp-be-liberal"
   else
     params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   fi
