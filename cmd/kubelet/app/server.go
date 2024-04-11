@@ -660,6 +660,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return fmt.Errorf("failed to initialize kubelet client: %w", err)
 		}
+		kubeDeps.RestConfig = clientConfig
 
 		// make a separate client for events
 		eventClientConfig := *clientConfig

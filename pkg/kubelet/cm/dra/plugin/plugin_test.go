@@ -30,7 +30,7 @@ func getFakeNode() (*v1.Node, error) {
 
 func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
 	newRegistrationHandler := func() *RegistrationHandler {
-		return NewRegistrationHandler(nil, getFakeNode)
+		return NewRegistrationHandler(nil, nil, getFakeNode)
 	}
 
 	for _, test := range []struct {

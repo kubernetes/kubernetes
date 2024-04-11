@@ -55,9 +55,8 @@ import (
 )
 
 const (
-	NodePrepareResourcesMethod      = "/v1alpha3.Node/NodePrepareResources"
-	NodeUnprepareResourcesMethod    = "/v1alpha3.Node/NodeUnprepareResources"
-	NodeListAndWatchResourcesMethod = "/v1alpha3.Node/NodeListAndWatchResources"
+	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
+	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
 )
 
 type Nodes struct {

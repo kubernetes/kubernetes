@@ -26,15 +26,18 @@ import (
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/dynamic-resource-allocation/restproxy"
 )
 
+var requestID int64
+
 type grpcServer struct {
-	logger        klog.Logger
 	grpcVerbosity int
 	wg            sync.WaitGroup
 	endpoint      endpoint
 	server        *grpc.Server
-	requestID     int64
 }
 
 type registerService func(s *grpc.Server)
@@ -54,9 +57,11 @@ type endpoint struct {
 
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+//
+// The context is only used for additional values, cancellation is ignored.
+func startGRPCServer(valueCtx context.Context, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+	logger := klog.FromContext(valueCtx)
 	s := &grpcServer{
-		logger:        logger,
 		endpoint:      endpoint,
 		grpcVerbosity: grpcVerbosity,
 	}
@@ -79,10 +84,11 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []
 	// Run a gRPC server. It will close the listening socket when
 	// shutting down, so we don't need to do that.
 	var opts []grpc.ServerOption
-	var finalUnaryInterceptors []grpc.UnaryServerInterceptor
-	var finalStreamInterceptors []grpc.StreamServerInterceptor
+	finalUnaryInterceptors := []grpc.UnaryServerInterceptor{restproxy.UnaryContextInterceptor(valueCtx)}
+	finalStreamInterceptors := []grpc.StreamServerInterceptor{restproxy.StreamContextInterceptor(valueCtx)}
 	if grpcVerbosity >= 0 {
 		finalUnaryInterceptors = append(finalUnaryInterceptors, s.interceptor)
+		finalStreamInterceptors = append(finalStreamInterceptors, s.streamInterceptor)
 	}
 	finalUnaryInterceptors = append(finalUnaryInterceptors, unaryInterceptors...)
 	finalStreamInterceptors = append(finalStreamInterceptors, streamInterceptors...)
@@ -103,7 +109,7 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []
 		}
 	}()
 
-	logger.Info("GRPC server started")
+	logger.V(3).Info("GRPC server started")
 	return s, nil
 }
 
@@ -111,8 +117,9 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []
 // sequentially increasing request ID and adds that logger to the context. It
 // also logs request and response.
 func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-	requestID := atomic.AddInt64(&s.requestID, 1)
-	logger := klog.LoggerWithValues(s.logger, "requestID", requestID)
+	requestID := atomic.AddInt64(&requestID, 1)
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger, "requestID", requestID, "method", info.FullMethod)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(s.grpcVerbosity).Info("handling request", "request", req)
 	defer func() {
@@ -123,11 +130,55 @@ func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grp
 	}()
 	resp, err = handler(ctx, req)
 	if err != nil {
-		logger.Error(err, "handling request failed", "request", req)
+		logger.Error(err, "handling request failed")
 	} else {
 		logger.V(s.grpcVerbosity).Info("handling request succeeded", "response", resp)
 	}
 	return
+}
+
+func (s *grpcServer) streamInterceptor(server interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	requestID := atomic.AddInt64(&requestID, 1)
+	ctx := stream.Context()
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger, "requestID", requestID, "method", info.FullMethod)
+	ctx = klog.NewContext(ctx, logger)
+	stream = logStream{
+		ServerStream:  stream,
+		ctx:           ctx,
+		grpcVerbosity: s.grpcVerbosity,
+	}
+	logger.V(s.grpcVerbosity).Info("handling stream")
+	err := handler(server, stream)
+	if err != nil {
+		logger.Error(err, "handling stream failed")
+	} else {
+		logger.V(s.grpcVerbosity).Info("handling stream succeeded")
+	}
+	return err
+
+}
+
+type logStream struct {
+	grpc.ServerStream
+	ctx           context.Context
+	grpcVerbosity int
+}
+
+func (l logStream) Context() context.Context {
+	return l.ctx
+}
+
+func (l logStream) SendMsg(msg interface{}) error {
+	logger := klog.FromContext(l.ctx)
+	logger.V(l.grpcVerbosity).Info("sending stream message", "message", msg)
+	err := l.ServerStream.SendMsg(msg)
+	if err != nil {
+		logger.Error(err, "sending stream message failed")
+	} else {
+		logger.V(l.grpcVerbosity).Info("sending stream message succeeded")
+	}
+	return err
 }
 
 // stop ensures that the server is not running anymore and cleans up all resources.
@@ -143,8 +194,7 @@ func (s *grpcServer) stop() {
 	s.server = nil
 	if s.endpoint.path != "" {
 		if err := os.Remove(s.endpoint.path); err != nil && !os.IsNotExist(err) {
-			s.logger.Error(err, "remove Unix socket")
+			utilruntime.HandleError(fmt.Errorf("remove Unix socket: %v", err))
 		}
 	}
-	s.logger.V(3).Info("GRPC server stopped")
 }

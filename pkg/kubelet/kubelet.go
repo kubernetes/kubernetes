@@ -55,6 +55,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
@@ -258,6 +259,7 @@ type Dependencies struct {
 	HeartbeatClient           clientset.Interface
 	OnHeartbeatFailure        func()
 	KubeClient                clientset.Interface
+	RestConfig                *rest.Config
 	Mounter                   mount.Interface
 	HostUtil                  hostutil.HostUtils
 	OOMAdjuster               *oom.OOMAdjuster
@@ -529,6 +531,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		hostnameOverridden:             hostnameOverridden,
 		nodeName:                       nodeName,
 		kubeClient:                     kubeDeps.KubeClient,
+		restConfig:                     kubeDeps.RestConfig,
 		heartbeatClient:                kubeDeps.HeartbeatClient,
 		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
 		rootDirectory:                  filepath.Clean(rootDirectory),
@@ -961,6 +964,7 @@ type Kubelet struct {
 	nodeName        types.NodeName
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface
+	restConfig      *rest.Config
 	heartbeatClient clientset.Interface
 	// mirrorPodClient is used to create and delete mirror pods in the API for static
 	// pods.
@@ -1560,7 +1564,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler))
 	// Adding Registration Callback function for DRA Plugin
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		kl.pluginManager.AddHandler(pluginwatcherapi.DRAPlugin, plugincache.PluginHandler(draplugin.NewRegistrationHandler(kl.kubeClient, kl.getNodeAnyWay)))
+		kl.pluginManager.AddHandler(pluginwatcherapi.DRAPlugin, plugincache.PluginHandler(draplugin.NewRegistrationHandler(kl.kubeClient, kl.restConfig, kl.getNodeAnyWay)))
 	}
 	// Adding Registration Callback function for Device Manager
 	kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
