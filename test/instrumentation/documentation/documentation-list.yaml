@@ -3071,7 +3071,7 @@
   type: Custom
   stabilityLevel: ALPHA
   labels:
-  - cluster
+  - storage_cluster_id
 - name: terminated_watchers_total
   namespace: apiserver
   help: Counter of watchers closed due to unresponsiveness broken by resource type.
