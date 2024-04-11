@@ -9,6 +9,11 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=consoles,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/486
+// +openshift:file-pattern=cvoRunLevel=0000_50,operatorName=console,operatorOrdering=01
 
 // Console provides a means to configure an operator to manage the console.
 //

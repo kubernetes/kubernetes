@@ -2,6 +2,10 @@
 
 package v1
 
+import (
+	configv1 "github.com/openshift/api/config/v1"
+)
+
 // BareMetalPlatformStatusApplyConfiguration represents an declarative configuration of the BareMetalPlatformStatus type for use
 // with apply.
 type BareMetalPlatformStatusApplyConfiguration struct {
@@ -11,6 +15,7 @@ type BareMetalPlatformStatusApplyConfiguration struct {
 	IngressIPs           []string                                         `json:"ingressIPs,omitempty"`
 	NodeDNSIP            *string                                          `json:"nodeDNSIP,omitempty"`
 	LoadBalancer         *BareMetalPlatformLoadBalancerApplyConfiguration `json:"loadBalancer,omitempty"`
+	MachineNetworks      []configv1.CIDR                                  `json:"machineNetworks,omitempty"`
 }
 
 // BareMetalPlatformStatusApplyConfiguration constructs an declarative configuration of the BareMetalPlatformStatus type for use with
@@ -68,5 +73,15 @@ func (b *BareMetalPlatformStatusApplyConfiguration) WithNodeDNSIP(value string) 
 // If called multiple times, the LoadBalancer field is set to the value of the last call.
 func (b *BareMetalPlatformStatusApplyConfiguration) WithLoadBalancer(value *BareMetalPlatformLoadBalancerApplyConfiguration) *BareMetalPlatformStatusApplyConfiguration {
 	b.LoadBalancer = value
+	return b
+}
+
+// WithMachineNetworks adds the given value to the MachineNetworks field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MachineNetworks field.
+func (b *BareMetalPlatformStatusApplyConfiguration) WithMachineNetworks(values ...configv1.CIDR) *BareMetalPlatformStatusApplyConfiguration {
+	for i := range values {
+		b.MachineNetworks = append(b.MachineNetworks, values[i])
+	}
 	return b
 }

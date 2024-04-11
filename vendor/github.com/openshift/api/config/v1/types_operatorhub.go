@@ -38,9 +38,14 @@ type OperatorHubStatus struct {
 // enabled to disabled and vice versa.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=operatorhubs,scope=Cluster
 // +kubebuilder:subresource:status
 // +genclient
 // +genclient:nonNamespaced
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/470
+// +openshift:file-pattern=cvoRunLevel=0000_03,operatorName=marketplace,operatorOrdering=01
+// +openshift:capability=marketplace
 // +openshift:compatibility-gen:level=1
 type OperatorHub struct {
 	metav1.TypeMeta `json:",inline"`

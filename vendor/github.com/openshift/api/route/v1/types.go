@@ -10,6 +10,12 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:path=routes,scope=Namespaced
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1228
+// +kubebuilder:printcolumn:name=Host,JSONPath=.status.ingress[0].host,type=string
+// +kubebuilder:printcolumn:name=Admitted,JSONPath=.status.ingress[0].conditions[?(@.type=="Admitted")].status,type=string
+// +kubebuilder:printcolumn:name=Service,JSONPath=.spec.to.name,type=string
+// +kubebuilder:printcolumn:name=TLS,JSONPath=.spec.tls.type,type=string
 
 // A route allows developers to expose services through an HTTP(S) aware load balancing and proxy
 // layer via a public DNS entry. The route may further specify TLS options and a certificate, or
@@ -409,7 +415,7 @@ type RouterShard struct {
 // TLSConfig defines config used to secure a route and provide termination
 //
 // +kubebuilder:validation:XValidation:rule="has(self.termination) && has(self.insecureEdgeTerminationPolicy) ? !((self.termination=='passthrough') && (self.insecureEdgeTerminationPolicy=='Allow')) : true", message="cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow"
-// +openshift:validation:FeatureSetAwareXValidation:featureSet=TechPreviewNoUpgrade;CustomNoUpgrade,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=ExternalRouteCertificate,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
 type TLSConfig struct {
 	// termination indicates termination type.
 	//
@@ -454,7 +460,7 @@ type TLSConfig struct {
 	// be present in the same namespace as that of the Route.
 	// Forbidden when `certificate` is set.
 	//
-	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
+	// +openshift:enable:FeatureGate=ExternalRouteCertificate
 	// +optional
 	ExternalCertificate *LocalObjectReference `json:"externalCertificate,omitempty" protobuf:"bytes,7,opt,name=externalCertificate"`
 }

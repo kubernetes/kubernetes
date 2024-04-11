@@ -126,5 +126,5 @@ func HostnameMatchSpecCandidates(hostname string) []string {
 
 // HostnameMatches returns true if the given hostname is matched by the given matchSpec
 func HostnameMatches(hostname string, matchSpec string) bool {
-	return sets.NewString(HostnameMatchSpecCandidates(hostname)...).Has(matchSpec)
+	return sets.New(HostnameMatchSpecCandidates(hostname)...).Has(matchSpec)
 }

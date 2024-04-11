@@ -11,8 +11,6 @@ const (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope="Cluster"
-// +kubebuilder:subresource:status
 // +genclient:nonNamespaced
 // +openshift:compatibility-gen:level=1
 
@@ -20,6 +18,15 @@ const (
 // be of the form `resource.version.group`, matching the resource.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:path=apirequestcounts,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/897
+// +openshift:file-pattern=operatorName=kube-apiserver
+// +kubebuilder:metadata:annotations=include.release.openshift.io/self-managed-high-availability=true
+// +kubebuilder:printcolumn:name=RemovedInRelease,JSONPath=.status.removedInRelease,type=string,description=Release in which an API will be removed.
+// +kubebuilder:printcolumn:name=RequestsInCurrentHour,JSONPath=.status.currentHour.requestCount,type=integer,description=Number of requests in the current hour.
+// +kubebuilder:printcolumn:name=RequestsInLast24h,JSONPath=.status.requestCount,type=integer,description=Number of requests in the last 24h.
 type APIRequestCount struct {
 	metav1.TypeMeta `json:",inline"`
 

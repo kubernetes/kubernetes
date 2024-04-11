@@ -17,10 +17,13 @@ const (
 // when the cluster is brought up for the first time.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +kubebuilder:resource:scope="Cluster"
-// +kubebuilder:printcolumn:name="Cluster Network",type=string,JSONPath=`.network`,description="The primary cluster network CIDR"
-// +kubebuilder:printcolumn:name="Service Network",type=string,JSONPath=`.serviceNetwork`,description="The service network CIDR"
-// +kubebuilder:printcolumn:name="Plugin Name",type=string,JSONPath=`.pluginName`,description="The Openshift SDN network plug-in in use"
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=clusternetworks,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=001
+// +kubebuilder:printcolumn:name="Cluster Network",type=string,JSONPath=.network,description="The primary cluster network CIDR"
+// +kubebuilder:printcolumn:name="Service Network",type=string,JSONPath=.serviceNetwork,description="The service network CIDR"
+// +kubebuilder:printcolumn:name="Plugin Name",type=string,JSONPath=.pluginName,description="The OpenShift SDN network plug-in in use"
 // +openshift:compatibility-gen:level=1
 type ClusterNetwork struct {
 	metav1.TypeMeta `json:",inline"`
@@ -113,11 +116,15 @@ type HostSubnetEgressCIDR string
 // same name as the Node object it corresponds to.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +kubebuilder:printcolumn:name="Host",type=string,JSONPath=`.host`,description="The name of the node"
-// +kubebuilder:printcolumn:name="Host IP",type=string,JSONPath=`.hostIP`,description="The IP address to be used as a VTEP by other nodes in the overlay network"
-// +kubebuilder:printcolumn:name="Subnet",type=string,JSONPath=`.subnet`,description="The CIDR range of the overlay network assigned to the node for its pods"
-// +kubebuilder:printcolumn:name="Egress CIDRs",type=string,JSONPath=`.egressCIDRs`,description="The network egress CIDRs"
-// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=`.egressIPs`,description="The network egress IP addresses"
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=hostsubnets,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=002
+// +kubebuilder:printcolumn:name="Host",type=string,JSONPath=.host,description="The name of the node"
+// +kubebuilder:printcolumn:name="Host IP",type=string,JSONPath=.hostIP,description="The IP address to be used as a VTEP by other nodes in the overlay network"
+// +kubebuilder:printcolumn:name="Subnet",type=string,JSONPath=.subnet,description="The CIDR range of the overlay network assigned to the node for its pods"
+// +kubebuilder:printcolumn:name="Egress CIDRs",type=string,JSONPath=.egressCIDRs,description="The network egress CIDRs"
+// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=.egressIPs,description="The network egress IP addresses"
 // +openshift:compatibility-gen:level=1
 type HostSubnet struct {
 	metav1.TypeMeta `json:",inline"`
@@ -182,8 +189,12 @@ type NetNamespaceEgressIP string
 // (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +kubebuilder:printcolumn:name="NetID",type=integer,JSONPath=`.netid`,description="The network identifier of the network namespace"
-// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=`.egressIPs`,description="The network egress IP addresses"
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=netnamespaces,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=003
+// +kubebuilder:printcolumn:name="NetID",type=integer,JSONPath=.netid,description="The network identifier of the network namespace"
+// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=.egressIPs,description="The network egress IP addresses"
 // +openshift:compatibility-gen:level=1
 type NetNamespace struct {
 	metav1.TypeMeta `json:",inline"`
@@ -270,6 +281,10 @@ type EgressNetworkPolicySpec struct {
 // is present) then the traffic will be allowed by default.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=egressnetworkpolicies,scope=Namespaced
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=004
 // +openshift:compatibility-gen:level=1
 type EgressNetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`

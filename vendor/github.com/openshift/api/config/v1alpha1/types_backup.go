@@ -9,6 +9,12 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // Backup provides configuration for performing backups of the openshift cluster.
 //
 // Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=backups,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1482
+// +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=config-operator,operatorOrdering=01
+// +openshift:enable:FeatureGate=AutomatedEtcdBackup
 // +openshift:compatibility-gen:level=4
 type Backup struct {
 	metav1.TypeMeta `json:",inline"`

@@ -1,7 +1,7 @@
 package helpers
 
 import (
-	"io/ioutil"
+	"os"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -36,7 +36,7 @@ func GetKubeConfigOrInClusterConfig(kubeConfigFile string, overrides configv1.Cl
 }
 
 func GetClientConfig(kubeConfigFile string, overrides configv1.ClientConnectionOverrides) (*rest.Config, error) {
-	kubeConfigBytes, err := ioutil.ReadFile(kubeConfigFile)
+	kubeConfigBytes, err := os.ReadFile(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}

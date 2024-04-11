@@ -180,29 +180,29 @@ func (sm *Prober) refreshTargetsLocked() {
 
 	sm.refreshTargets = false
 	freshTargets := sm.targetProvider.CurrentTargetsList()
-	freshTargetSet := sets.NewString(freshTargets...)
+	freshTargetSet := sets.New(freshTargets...)
 
-	currentTargetsSet := sets.NewString(sm.targetsToMonitor...)
+	currentTargetsSet := sets.New(sm.targetsToMonitor...)
 	newTargetsToMonitorSet := freshTargetSet.Difference(currentTargetsSet)
 	if newTargetsToMonitorSet.Len() > 0 {
-		klog.V(2).Infof("health monitor observed new targets = %v", newTargetsToMonitorSet.List())
+		klog.V(2).Infof("health monitor observed new targets = %v", sets.List(newTargetsToMonitorSet))
 	}
 
 	removedTargetsToMonitorSet := currentTargetsSet.Difference(freshTargetSet)
 	if removedTargetsToMonitorSet.Len() > 0 {
-		klog.V(2).Infof("health monitor will stop checking the following targets targets = %v", removedTargetsToMonitorSet.List())
+		klog.V(2).Infof("health monitor will stop checking the following targets targets = %v", sets.List(removedTargetsToMonitorSet))
 		for targetToRemove := range removedTargetsToMonitorSet {
 			delete(sm.consecutiveSuccessfulProbes, targetToRemove)
 			delete(sm.consecutiveFailedProbes, targetToRemove)
 		}
 
-		healthyTargetsSet := sets.NewString(sm.healthyTargets...)
-		healthyTargetsSet.Delete(removedTargetsToMonitorSet.List()...)
-		sm.healthyTargets = healthyTargetsSet.List()
+		healthyTargetsSet := sets.New(sm.healthyTargets...)
+		healthyTargetsSet.Delete(removedTargetsToMonitorSet.UnsortedList()...)
+		sm.healthyTargets = sets.List(healthyTargetsSet)
 
-		unhealthyTargetsSet := sets.NewString(sm.unhealthyTargets...)
-		unhealthyTargetsSet.Delete(removedTargetsToMonitorSet.List()...)
-		sm.unhealthyTargets = unhealthyTargetsSet.List()
+		unhealthyTargetsSet := sets.New(sm.unhealthyTargets...)
+		unhealthyTargetsSet.Delete(removedTargetsToMonitorSet.UnsortedList()...)
+		sm.unhealthyTargets = sets.List(unhealthyTargetsSet)
 	}
 
 	sm.targetsToMonitor = freshTargets
@@ -266,16 +266,16 @@ func (sm *Prober) updateHealthChecksFor(currentHealthCheckProbes []targetErrTupl
 		}
 	}
 
-	newUnhealthyTargetsSet := sets.NewString(newUnhealthyTargets...)
-	newHealthyTargetsSet := sets.NewString(newHealthyTargets...)
+	newUnhealthyTargetsSet := sets.New(newUnhealthyTargets...)
+	newHealthyTargetsSet := sets.New(newHealthyTargets...)
 	notifyListeners := false
 
 	// detect unhealthy targets
-	previouslyUnhealthyTargetsSet := sets.NewString(sm.unhealthyTargets...)
+	previouslyUnhealthyTargetsSet := sets.New(sm.unhealthyTargets...)
 	currentlyUnhealthyTargetsSet := previouslyUnhealthyTargetsSet.Union(newUnhealthyTargetsSet)
-	currentlyUnhealthyTargetsSet.Delete(newHealthyTargetsSet.List()...)
+	currentlyUnhealthyTargetsSet.Delete(newHealthyTargetsSet.UnsortedList()...)
 	if !currentlyUnhealthyTargetsSet.Equal(previouslyUnhealthyTargetsSet) {
-		sm.unhealthyTargets = currentlyUnhealthyTargetsSet.List()
+		sm.unhealthyTargets = sets.List(currentlyUnhealthyTargetsSet)
 		klog.V(2).Infof("observed the following unhealthy targets %v", sm.unhealthyTargets)
 		logUnhealthyTargets(sm.unhealthyTargets, currentHealthCheckProbes)
 
@@ -289,11 +289,11 @@ func (sm *Prober) updateHealthChecksFor(currentHealthCheckProbes []targetErrTupl
 	}
 
 	// detect healthy targets
-	previouslyHealthyTargetsSet := sets.NewString(sm.healthyTargets...)
+	previouslyHealthyTargetsSet := sets.New(sm.healthyTargets...)
 	currentlyHealthyTargetsSet := previouslyHealthyTargetsSet.Union(newHealthyTargetsSet)
-	currentlyHealthyTargetsSet.Delete(newUnhealthyTargetsSet.List()...)
+	currentlyHealthyTargetsSet.Delete(newUnhealthyTargetsSet.UnsortedList()...)
 	if !currentlyHealthyTargetsSet.Equal(previouslyHealthyTargetsSet) {
-		sm.healthyTargets = currentlyHealthyTargetsSet.List()
+		sm.healthyTargets = sets.List(currentlyHealthyTargetsSet)
 		klog.V(2).Infof("observed the following healthy targets %v", sm.healthyTargets)
 
 		exportedHealthyTargets := make([]string, len(sm.healthyTargets))

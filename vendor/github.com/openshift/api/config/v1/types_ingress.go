@@ -13,6 +13,11 @@ import (
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/470
+// +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=config-operator,operatorOrdering=01
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=ingresses,scope=Cluster
+// +kubebuilder:subresource:status
 type Ingress struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -164,20 +169,20 @@ const (
 // +kubebuilder:validation:MaxLength=512
 type ConsumingUser string
 
-// Hostname is an alias for hostname string validation.
-//
-// The left operand of the | is the original kubebuilder hostname validation format, which is incorrect because it
-// allows upper case letters, disallows hyphen or number in the TLD, and allows labels to start/end in non-alphanumeric
-// characters.  See https://bugzilla.redhat.com/show_bug.cgi?id=2039256.
-// ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$
-//
-// The right operand of the | is a new pattern that mimics the current API route admission validation on hostname,
-// except that it allows hostnames longer than the maximum length:
-// ^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
-//
-// Both operand patterns are made available so that modifications on ingress spec can still happen after an invalid hostname
-// was saved via validation by the incorrect left operand of the | operator.
-//
+// Hostname is a host name as defined by RFC-1123.
+// + ---
+// + The left operand of the | is the original kubebuilder hostname validation format, which is incorrect because it
+// + allows upper case letters, disallows hyphen or number in the TLD, and allows labels to start/end in non-alphanumeric
+// + characters.  See https://bugzilla.redhat.com/show_bug.cgi?id=2039256.
+// + ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$
+// +
+// + The right operand of the | is a new pattern that mimics the current API route admission validation on hostname,
+// + except that it allows hostnames longer than the maximum length:
+// + ^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
+// +
+// + Both operand patterns are made available so that modifications on ingress spec can still happen after an invalid hostname
+// + was saved via validation by the incorrect left operand of the | operator.
+// +
 // +kubebuilder:validation:Pattern=`^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$|^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$`
 type Hostname string
 

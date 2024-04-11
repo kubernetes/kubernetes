@@ -8,7 +8,11 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:path=dnsnameresolvers,scope=Namespaced
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1524
+// +openshift:file-pattern=cvoRunLevel=0000_70,operatorName=dns,operatorOrdering=00
 // +openshift:compatibility-gen:level=4
+// +openshift:enable:FeatureGate=DNSNameResolver
 
 // DNSNameResolver stores the DNS name resolution information of a DNS name. It can be enabled by the TechPreviewNoUpgrade feature set.
 // It can also be enabled by the feature gate DNSNameResolver when using CustomNoUpgrade feature set.
@@ -121,7 +125,6 @@ type DNSNameResolverResolvedAddress struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
 // +openshift:compatibility-gen:level=4
 
 // DNSNameResolverList contains a list of DNSNameResolvers.

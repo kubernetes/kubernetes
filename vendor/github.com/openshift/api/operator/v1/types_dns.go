@@ -12,6 +12,9 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=dnses,scope=Cluster
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/475
+// +openshift:file-pattern=cvoRunLevel=0000_70,operatorName=dns,operatorOrdering=00
 
 // DNS manages the CoreDNS component to provide a name resolution service
 // for pods and services in the cluster.
@@ -291,7 +294,6 @@ type ForwardPlugin struct {
 	// +optional
 	TransportConfig DNSTransportConfig `json:"transportConfig,omitempty"`
 
-
 	// protocolStrategy specifies the protocol to use for upstream DNS
 	// requests.
 	// Valid values for protocolStrategy are "TCP" and omitted.
@@ -373,10 +375,10 @@ type UpstreamResolvers struct {
 
 // Upstream can either be of type SystemResolvConf, or of type Network.
 //
-// * For an Upstream of type SystemResolvConf, no further fields are necessary:
-//   The upstream will be configured to use /etc/resolv.conf.
-// * For an Upstream of type Network, a NetworkResolver field needs to be defined
-//   with an IP address or IP:port if the upstream listens on a port other than 53.
+//   - For an Upstream of type SystemResolvConf, no further fields are necessary:
+//     The upstream will be configured to use /etc/resolv.conf.
+//   - For an Upstream of type Network, a NetworkResolver field needs to be defined
+//     with an IP address or IP:port if the upstream listens on a port other than 53.
 type Upstream struct {
 
 	// Type defines whether this upstream contains an IP/IP:port resolver or the local /etc/resolv.conf.
@@ -512,7 +514,6 @@ type DNSStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
 
 // DNSList contains a list of DNS
 //

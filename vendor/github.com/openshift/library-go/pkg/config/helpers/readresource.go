@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,7 +23,7 @@ func ReadYAMLToInternal(reader io.Reader, schemeFns ...InstallFunc) (runtime.Obj
 	if reader == nil || reflect.ValueOf(reader).IsNil() {
 		return nil, nil
 	}
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +60,7 @@ func ReadYAML(reader io.Reader, schemeFns ...InstallFunc) (runtime.Object, error
 	if reader == nil || reflect.ValueOf(reader).IsNil() {
 		return nil, nil
 	}
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
