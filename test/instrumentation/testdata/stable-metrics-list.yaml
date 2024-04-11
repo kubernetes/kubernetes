@@ -314,7 +314,7 @@
   type: Custom
   stabilityLevel: STABLE
   labels:
-  - cluster
+  - storage_cluster_id
 - name: container_cpu_usage_seconds_total
   help: Cumulative cpu time consumed by the container in core-seconds
   type: Custom
