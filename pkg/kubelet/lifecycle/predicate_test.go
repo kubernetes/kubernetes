@@ -106,6 +106,14 @@ func makeTestPod(requests, limits v1.ResourceList) *v1.Pod {
 					},
 				},
 			},
+			InitContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: requests,
+						Limits:   limits,
+					},
+				},
+			},
 		},
 	}
 }
