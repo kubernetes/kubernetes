@@ -85,7 +85,12 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
 		}
 		if m.podPidsLimit > 0 {
-			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+			if containerConfig.ResourceParameters.PidsLimit != nil && *containerConfig.ResourceParameters.PidsLimit > 0 {
+				pidsLimit :=  min(*containerConfig.ResourceParameters.PidsLimit, m.podPidsLimit)
+				containerConfig.ResourceParameters.PidsLimit = &pidsLimit
+			} else {
+				containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+			}
 		}
 		if enforceMemoryQoS {
 			klog.V(4).InfoS("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)

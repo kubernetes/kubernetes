@@ -6108,6 +6108,8 @@ const (
 	ResourceStorage ResourceName = "storage"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
+	// PIDs
+	ResourcePids ResourceName = "pids"
 )
 
 const (

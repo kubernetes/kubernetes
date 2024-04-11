@@ -145,6 +145,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	cpuRequests := int64(0)
 	cpuLimits := int64(0)
 	memoryLimits := int64(0)
+	pidsLimits := int64(0)
 	if request, found := reqs[v1.ResourceCPU]; found {
 		cpuRequests = request.MilliValue()
 	}
@@ -153,6 +154,9 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	}
 	if limit, found := limits[v1.ResourceMemory]; found {
 		memoryLimits = limit.Value()
+	}
+	if limit, found := limits[v1.ResourcePids]; found {
+		pidsLimits = limit.Value()
 	}
 
 	// convert to CFS values
@@ -188,6 +192,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 		result.CPUShares = &shares
 	}
 	result.HugePageLimit = hugePageLimits
+	result.PidsLimit = &pidsLimits
 
 	if enforceMemoryQoS {
 		memoryMin := int64(0)
