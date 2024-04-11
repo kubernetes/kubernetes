@@ -314,7 +314,7 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 	switch verb {
 	case "get", "create", "update", "patch", "delete":
 		// Okay, but check individual object permission below.
-	case "watch", "list":
+	case "watch", "list", "deletecollection":
 		// Okay. The kubelet is trusted to use a filter for its own objects.
 		return authorizer.DecisionAllow, "", nil
 	default:
