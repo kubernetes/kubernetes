@@ -66,7 +66,7 @@ go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 co
 In yet another:
 ```console
 sudo mkdir -p /var/run/cdi && sudo chmod a+rwx /var/run/cdi /var/lib/kubelet/plugins_registry
-go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 kubelet-plugin
+go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 kubelet-plugin --node-name=127.0.0.1
 ```
 
 And finally:

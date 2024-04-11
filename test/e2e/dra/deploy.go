@@ -55,9 +55,8 @@ import (
 )
 
 const (
-	NodePrepareResourcesMethod      = "/v1alpha3.Node/NodePrepareResources"
-	NodeUnprepareResourcesMethod    = "/v1alpha3.Node/NodeUnprepareResources"
-	NodeListAndWatchResourcesMethod = "/v1alpha3.Node/NodeListAndWatchResources"
+	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
+	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
 )
 
 type Nodes struct {
@@ -314,7 +313,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		nodename := pod.Spec.NodeName
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(ctx, logger)
-		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, nodename,
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, d.f.ClientSet, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
 					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
