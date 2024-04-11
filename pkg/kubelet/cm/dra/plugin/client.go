@@ -18,18 +18,28 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 )
 
 const PluginClientTimeout = 45 * time.Second
 
-func NewDRAPluginClient(pluginName string) (drapb.NodeClient, error) {
+// NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
+// driver kubelet plugin which need to be called by kubelet. The wrapper
+// handles gRPC connection management and logging. Connections are reused
+// across different NewDRAPluginClient calls.
+func NewDRAPluginClient(pluginName string) (*Plugin, error) {
 	if pluginName == "" {
 		return nil, fmt.Errorf("plugin name is empty")
 	}
@@ -42,13 +52,59 @@ func NewDRAPluginClient(pluginName string) (drapb.NodeClient, error) {
 	return existingPlugin, nil
 }
 
-func (p *plugin) NodePrepareResources(
+type Plugin struct {
+	backgroundCtx context.Context
+	cancel        func(cause error)
+
+	mutex                   sync.Mutex
+	conn                    *grpc.ClientConn
+	endpoint                string
+	highestSupportedVersion *utilversion.Version
+	clientTimeout           time.Duration
+}
+
+func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	if p.conn != nil {
+		return p.conn, nil
+	}
+
+	ctx := p.backgroundCtx
+	logger := klog.FromContext(ctx)
+
+	network := "unix"
+	logger.V(4).Info("Creating new gRPC connection", "protocol", network, "endpoint", p.endpoint)
+	conn, err := grpc.Dial(
+		p.endpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, target)
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
+		return nil, errors.New("timed out waiting for gRPC connection to be ready")
+	}
+
+	p.conn = conn
+	return p.conn, nil
+}
+
+func (p *Plugin) NodePrepareResources(
 	ctx context.Context,
 	req *drapb.NodePrepareResourcesRequest,
 	opts ...grpc.CallOption,
 ) (*drapb.NodePrepareResourcesResponse, error) {
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info(log("calling NodePrepareResources rpc"), "request", req)
+	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
 
 	conn, err := p.getOrCreateGRPCConn()
 	if err != nil {
@@ -60,17 +116,17 @@ func (p *plugin) NodePrepareResources(
 
 	nodeClient := drapb.NewNodeClient(conn)
 	response, err := nodeClient.NodePrepareResources(ctx, req)
-	logger.V(4).Info(log("done calling NodePrepareResources rpc"), "response", response, "err", err)
+	logger.V(4).Info("Done calling NodePrepareResources rpc", "response", response, "err", err)
 	return response, err
 }
 
-func (p *plugin) NodeUnprepareResources(
+func (p *Plugin) NodeUnprepareResources(
 	ctx context.Context,
 	req *drapb.NodeUnprepareResourcesRequest,
 	opts ...grpc.CallOption,
 ) (*drapb.NodeUnprepareResourcesResponse, error) {
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info(log("calling NodeUnprepareResource rpc"), "request", req)
+	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
 
 	conn, err := p.getOrCreateGRPCConn()
 	if err != nil {
@@ -82,23 +138,6 @@ func (p *plugin) NodeUnprepareResources(
 
 	nodeClient := drapb.NewNodeClient(conn)
 	response, err := nodeClient.NodeUnprepareResources(ctx, req)
-	logger.V(4).Info(log("done calling NodeUnprepareResources rpc"), "response", response, "err", err)
+	logger.V(4).Info("Done calling NodeUnprepareResources rpc", "response", response, "err", err)
 	return response, err
-}
-
-func (p *plugin) NodeListAndWatchResources(
-	ctx context.Context,
-	req *drapb.NodeListAndWatchResourcesRequest,
-	opts ...grpc.CallOption,
-) (drapb.Node_NodeListAndWatchResourcesClient, error) {
-	logger := klog.FromContext(ctx)
-	logger.V(4).Info(log("calling NodeListAndWatchResources rpc"), "request", req)
-
-	conn, err := p.getOrCreateGRPCConn()
-	if err != nil {
-		return nil, err
-	}
-
-	nodeClient := drapb.NewNodeClient(conn)
-	return nodeClient.NodeListAndWatchResources(ctx, req, opts...)
 }

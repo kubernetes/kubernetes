@@ -892,16 +892,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			driver.parameterMode = parameterModeStructured
 
 			f.It("must manage ResourceSlices", f.WithSlow(), func(ctx context.Context) {
-				nodeName := nodes.NodeNames[0]
 				driverName := driver.Name
-
-				// Check for gRPC call on one node. If that already fails, then
-				// we have a fundamental problem.
-				m := MethodInstance{nodeName, NodeListAndWatchResourcesMethod}
-				ginkgo.By("wait for NodeListAndWatchResources call")
-				gomega.Eventually(ctx, func() int64 {
-					return driver.CallCount(m)
-				}).WithTimeout(podStartTimeout).Should(gomega.BeNumerically(">", int64(0)), "NodeListAndWatchResources call count")
 
 				// Now check for exactly the right set of objects for all nodes.
 				ginkgo.By("check if ResourceSlice object(s) exist on the API server")
