@@ -2538,8 +2538,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		defer kl.podResizeMutex.Unlock()
 	}
 	needToAdmit := func(pod *v1.Pod) bool {
-                return pod.Status.Phase == v1.PodPending && pod.Status.PodIP == ""
-        }
+		return pod.Status.Phase == v1.PodPending && pod.Status.PodIP == ""
+	}
 	for _, pod := range pods {
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
