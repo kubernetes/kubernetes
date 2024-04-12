@@ -68,9 +68,5 @@ func (a *validateCustomResourceWithClient) ValidateInitialization() error {
 		return fmt.Errorf(PluginName + " needs an infrastructureGetter")
 	}
 
-	if initializationValidator, ok := a.ValidationInterface.(admission.InitializationValidator); ok {
-		return initializationValidator.ValidateInitialization()
-	}
-
 	return nil
 }
