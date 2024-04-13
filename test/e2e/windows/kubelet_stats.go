@@ -60,7 +60,7 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", framework.WithSerial(), sk
 
 				ginkgo.By("Waiting up to 3 minutes for pods to be running")
 				timeout := 3 * time.Minute
-				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 10, 0, timeout)
+				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 10, timeout)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Getting kubelet stats 5 times and checking average duration")
@@ -152,7 +152,7 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", skipUnlessWindows(func() {
 
 				ginkgo.By("Waiting up to 3 minutes for pods to be running")
 				timeout := 3 * time.Minute
-				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 3, 0, timeout)
+				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 3, timeout)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Getting kubelet stats 1 time")
