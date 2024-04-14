@@ -78,6 +78,8 @@ type ControllerParameters struct {
 }
 
 // NewController creates a new PersistentVolume controller
+
+//创建PV controller
 func NewController(p ControllerParameters) (*PersistentVolumeController, error) {
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
@@ -109,6 +111,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
 	}
 
+	//PV 增删改事件
 	p.VolumeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
@@ -119,6 +122,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	controller.volumeLister = p.VolumeInformer.Lister()
 	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
 
+	//PVC增删改事件
 	p.ClaimInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
@@ -317,7 +321,9 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	ctrl.initializeCaches(ctrl.volumeLister, ctrl.claimLister)
 
 	go wait.Until(ctrl.resync, ctrl.resyncPeriod, ctx.Done())
+	//PV worker
 	go wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
+	//pvc worker
 	go wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
 
 	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
@@ -407,6 +413,7 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 		}
 	}
 
+	//获取provisioner
 	migratedToDriver := ann[pvutil.AnnMigratedTo]
 	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
 		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)

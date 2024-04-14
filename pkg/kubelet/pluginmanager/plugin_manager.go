@@ -54,8 +54,20 @@ const (
 func NewPluginManager(
 	sockDir string,
 	recorder record.EventRecorder) PluginManager {
+
+	//存储unix socket info map
+	/*
+		type PluginInfo struct {
+			SocketPath string
+			Timestamp  time.Time
+			Handler    PluginHandler
+			Name       string
+		}
+	*/
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()
+
+	//创建plugin 调谐器
 	reconciler := reconciler.NewReconciler(
 		operationexecutor.NewOperationExecutor(
 			operationexecutor.NewOperationGenerator(
@@ -108,10 +120,12 @@ var _ PluginManager = &pluginManager{}
 func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
+	//开始使用fsnotify监测/var/lib/kubelet/pugin_resistry下socket变化
 	pm.desiredStateOfWorldPopulator.Start(stopCh)
 	klog.V(2).InfoS("The desired_state_of_world populator (plugin watcher) starts")
 
 	klog.InfoS("Starting Kubelet Plugin Manager")
+	//启动plugin manager调谐器
 	go pm.reconciler.Run(stopCh)
 
 	metrics.Register(pm.actualStateOfWorld, pm.desiredStateOfWorld)
@@ -119,6 +133,7 @@ func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	klog.InfoS("Shutting down Kubelet Plugin Manager")
 }
 
+//添加回调到reconciler
 func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandler) {
 	pm.reconciler.AddHandler(pluginType, handler)
 }

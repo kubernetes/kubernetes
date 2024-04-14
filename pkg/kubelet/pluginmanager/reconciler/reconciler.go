@@ -71,11 +71,11 @@ func NewReconciler(
 }
 
 type reconciler struct {
-	operationExecutor   operationexecutor.OperationExecutor
+	operationExecutor   operationexecutor.OperationExecutor //负责执行与调解过程相关的操作
 	loopSleepDuration   time.Duration
-	desiredStateOfWorld cache.DesiredStateOfWorld
-	actualStateOfWorld  cache.ActualStateOfWorld
-	handlers            map[string]cache.PluginHandler
+	desiredStateOfWorld cache.DesiredStateOfWorld      //这个缓存存储了 Kubernetes 集群中资源的实际状态。调解器将实际状态与期望状态进行比较，并采取行动来调解任何差异
+	actualStateOfWorld  cache.ActualStateOfWorld       //保存了资源的期望状态, 期望状态由用户或控制器定义，调解器的工作是确保资源的实际状态与此期望状态匹配。
+	handlers            map[string]cache.PluginHandler //plugin 回调
 	sync.RWMutex
 }
 
@@ -89,6 +89,7 @@ func (rc *reconciler) Run(stopCh <-chan struct{}) {
 		stopCh)
 }
 
+//添加plugin 回调到map
 func (rc *reconciler) AddHandler(pluginType string, pluginHandler cache.PluginHandler) {
 	rc.Lock()
 	defer rc.Unlock()
@@ -107,10 +108,12 @@ func (rc *reconciler) getHandlers() map[string]cache.PluginHandler {
 	return copyHandlers
 }
 
+//保集群中插件的注册状态与期望状态保持一致
 func (rc *reconciler) reconcile() {
 	// Unregisterations are triggered before registrations
 
 	// Ensure plugins that should be unregistered are unregistered.
+	//获取已经注册的plugin
 	for _, registeredPlugin := range rc.actualStateOfWorld.GetRegisteredPlugins() {
 		unregisterPlugin := false
 		if !rc.desiredStateOfWorld.PluginExists(registeredPlugin.SocketPath) {
@@ -129,6 +132,7 @@ func (rc *reconciler) reconcile() {
 			}
 		}
 
+		//确保该注册的插件已经注册
 		if unregisterPlugin {
 			klog.V(5).InfoS("Starting operationExecutor.UnregisterPlugin", "plugin", registeredPlugin)
 			err := rc.operationExecutor.UnregisterPlugin(registeredPlugin, rc.actualStateOfWorld)

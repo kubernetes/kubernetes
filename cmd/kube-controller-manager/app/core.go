@@ -282,6 +282,8 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 		EnableDynamicProvisioning: controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
 		FilteredDialOptions:       filteredDialOptions,
 	}
+
+	//创建PV controller
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
 	if volumeControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)

@@ -363,6 +363,8 @@ func TestControllerSync(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		informers.Start(ctx.Done())
 		informers.WaitForCacheSync(ctx.Done())
+
+		//启动PV controller
 		go ctrl.Run(ctx)
 
 		// Wait for the controller to pass initial sync and fill its caches.

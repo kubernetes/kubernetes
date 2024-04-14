@@ -48,6 +48,8 @@ func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *
 }
 
 // Start watches for the creation and deletion of plugin sockets at the path
+
+//使用fsnotify监测 /var/lib/kubelet/plugins_registry 下socket变化
 func (w *Watcher) Start(stopCh <-chan struct{}) error {
 	klog.V(2).InfoS("Plugin Watcher Start", "path", w.path)
 
@@ -73,6 +75,7 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 			select {
 			case event := <-fsWatcher.Events:
 				//TODO: Handle errors by taking corrective measures
+				//目录下有新的socket
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					err := w.handleCreateEvent(event)
 					if err != nil {
@@ -201,6 +204,7 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 	// removed from the desired world cache, so we still need to call AddOrUpdatePlugin
 	// in this case to update the timestamp
 	klog.V(2).InfoS("Adding socket path or updating timestamp to desired state cache", "path", socketPath)
+	//将新增加的plugin socket添加到DesiredStateOfWorld中存储
 	err := w.desiredStateOfWorld.AddOrUpdatePlugin(socketPath)
 	if err != nil {
 		return fmt.Errorf("error adding socket path %s or updating timestamp to desired state cache: %v", socketPath, err)

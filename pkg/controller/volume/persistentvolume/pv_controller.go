@@ -468,6 +468,8 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 
 // syncBoundClaim is the main controller method to decide what to do with a
 // bound claim.
+
+//pvc <-> pv 绑定
 func (ctrl *PersistentVolumeController) syncBoundClaim(claim *v1.PersistentVolumeClaim) error {
 	// HasAnnotation(pvc, pvutil.AnnBindCompleted)
 	// This PVC has previously been bound
@@ -1452,6 +1454,8 @@ func (ctrl *PersistentVolumeController) provisionClaim(ctx context.Context, clai
 	}
 	klog.V(4).Infof("provisionClaim[%s]: started", claimToClaimKey(claim))
 	opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
+
+	//获取csi plugin名字
 	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
 	// findProvisionablePlugin does not return err for external provisioners
 	if err != nil {

@@ -590,7 +590,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	klet.secretManager = secretManager
-	klet.configMapManager = configMapManager
+	klet.configMapManager =
 
 	if klet.experimentalHostUserNamespaceDefaulting {
 		klog.InfoS("Experimental host user namespace defaulting is enabled")
@@ -780,8 +780,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
+	//创建plugin manager
 	klet.pluginManager = pluginmanager.NewPluginManager(
-		klet.getPluginsRegistrationDir(), /* sockDir */
+		klet.getPluginsRegistrationDir(), /* sockDir */ //plugins 组要在/var/lib/kubelet/plugins_registry/目录下创建自己的socket
 		kubeDeps.Recorder,
 	)
 
@@ -1438,11 +1439,14 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// and inform container to reopen log file after log rotation.
 	kl.containerLogManager.Start()
 	// Adding Registration Callback function for CSI Driver
+	//在Plugin增加CSI plugin回调函数
 	kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler))
 	// Adding Registration Callback function for Device Manager
 	kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 	// Start the plugin manager
 	klog.V(4).InfoS("Starting plugin manager")
+
+	//使用一个goroutine 启动plugin manager
 	go kl.pluginManager.Run(kl.sourcesReady, wait.NeverStop)
 
 	err = kl.shutdownManager.Start()

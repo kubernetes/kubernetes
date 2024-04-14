@@ -450,7 +450,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
 		// TODO: volume controller into the IncludeCloudLoops only set.
 	}
-	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
+	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController //向K8S-controller-manager注册PV controller
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
 	controllers["clusterrole-aggregation"] = startClusterRoleAggregrationController
@@ -547,6 +547,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 }
 
 // StartControllers starts a set of controllers with a specified ControllerContext
+//启动各种controller
 func StartControllers(ctx context.Context, controllerCtx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc,
 	unsecuredMux *mux.PathRecorderMux, healthzHandler *controllerhealthz.MutableHealthzHandler) error {
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
@@ -572,7 +573,7 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 		}
 
 		time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
-
+		//启动controlelr
 		klog.V(1).Infof("Starting %q", controllerName)
 		ctrl, started, err := initFn(ctx, controllerCtx)
 		if err != nil {
