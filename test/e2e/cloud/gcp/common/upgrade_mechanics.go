@@ -252,16 +252,18 @@ func checkNodesVersions(ctx context.Context, cs clientset.Interface, want string
 	}
 	for _, n := range l.Items {
 		// We do prefix trimming and then matching because:
-		// want   looks like:  0.19.3-815-g50e67d4
-		// kv/kvp look  like: v0.19.3-815-g50e67d4034e858-dirty
+		// want looks like:  0.19.3-815-g50e67d4
+		// kv 	look  like: v0.19.3-815-g50e67d4034e858-dirty
+		// kpv 	look  like: v0.19.3-815-g50e67d4034e858-dirty or empty value
 		kv, kpv := strings.TrimPrefix(n.Status.NodeInfo.KubeletVersion, "v"),
-			strings.TrimPrefix(n.Status.NodeInfo.KubeProxyVersion, "v")
+			strings.TrimPrefix(n.Status.NodeInfo.KubeProxyVersion, "v") //nolint:staticcheck // Keep testing deprecated KubeProxyVersion field until it's being removed
 		if !strings.HasPrefix(kv, want) {
 			return fmt.Errorf("node %s had kubelet version %s which does not start with %s",
 				n.ObjectMeta.Name, kv, want)
 		}
-		if !strings.HasPrefix(kpv, want) {
-			return fmt.Errorf("node %s had kube-proxy version %s which does not start with %s",
+
+		if len(kpv) != 0 || !strings.HasPrefix(kpv, want) {
+			return fmt.Errorf("node %s had kube-proxy version %s which does not start with %s or is not empty value",
 				n.ObjectMeta.Name, kpv, want)
 		}
 	}

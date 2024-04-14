@@ -1307,7 +1307,7 @@ var map_NodeSystemInfo = map[string]string{
 	"osImage":                 "OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).",
 	"containerRuntimeVersion": "ContainerRuntime Version reported by the node through runtime remote API (e.g. containerd://1.4.2).",
 	"kubeletVersion":          "Kubelet Version reported by the node.",
-	"kubeProxyVersion":        "KubeProxy Version reported by the node.",
+	"kubeProxyVersion":        "Deprecated: KubeProxy Version reported by the node.",
 	"operatingSystem":         "The Operating System reported by the node",
 	"architecture":            "The Architecture reported by the node",
 }
