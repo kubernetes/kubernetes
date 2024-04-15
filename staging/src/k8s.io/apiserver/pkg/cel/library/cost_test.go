@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/ext"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
@@ -1147,6 +1148,8 @@ type testSizeNode struct {
 	size checker.SizeEstimate
 }
 
+var _ checker.AstNode = (*testSizeNode)(nil)
+
 func (t testSizeNode) Path() []string {
 	return nil // not needed
 }
@@ -1155,7 +1158,7 @@ func (t testSizeNode) Type() *types.Type {
 	return nil // not needed
 }
 
-func (t testSizeNode) Expr() *exprpb.Expr {
+func (t testSizeNode) Expr() ast.Expr {
 	return nil // not needed
 }
 
