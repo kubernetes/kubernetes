@@ -969,6 +969,12 @@ const (
 	// Allows namespace indexer for namespace scope resources in apiserver cache to accelerate list operations.
 	StorageNamespaceIndex featuregate.Feature = "StorageNamespaceIndex"
 
+	// owner: @smileusd
+	// alpha: v1.32
+	//
+	// Allows node label indexer for single node scope resources in apiserver cache to accelerate list operations.
+	LocalVolumeNodeIndex featuregate.Feature = "LocalVolumeNodeIndex"
+
 	// owner: @jsafrane
 	// kep: https://kep.k8s.io/1710
 	// alpha: v1.30
@@ -1325,6 +1331,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
 
 	StorageNamespaceIndex: {Default: true, PreRelease: featuregate.Beta},
+
+	LocalVolumeNodeIndex: {Default: false, PreRelease: featuregate.Alpha},
 
 	RecursiveReadOnlyMounts: {Default: false, PreRelease: featuregate.Alpha},
 }

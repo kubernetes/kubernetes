@@ -18,12 +18,15 @@ package storage
 
 import (
 	"context"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/component-helpers/storage/volume"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -54,7 +57,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: persistentvolume.GetAttrs}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc: persistentvolume.GetAttrs,
+		Indexers: persistentvolume.Indexers(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.LocalVolumeNodeIndex) {
+		options.TriggerFunc = map[string]storage.LabelIndex{volume.AnnSelectedNode: persistentvolume.NodeLabelTriggerFunc}
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}

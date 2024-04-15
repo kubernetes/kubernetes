@@ -19,6 +19,8 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,6 +29,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-helpers/storage/volume"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -199,4 +203,27 @@ func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.Persiste
 		"name": persistentvolumeclaim.Name,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+}
+
+// NodeLabelTriggerFunc returns value node label of given object.
+func NodeLabelTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.PersistentVolumeClaim).Labels[volume.AnnSelectedNode]
+}
+
+// Indexers returns the indexers for pvc storage.
+func Indexers() *cache.Indexers {
+	var indexers = make(cache.Indexers)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.LocalVolumeNodeIndex) {
+		indexers[storage.LabelIndex(volume.AnnSelectedNode)] = NodeLabelIndexFunc
+	}
+	return &indexers
+}
+
+// NodeNameIndexFunc return value spec.nodename of given object.
+func NodeLabelIndexFunc(obj interface{}) ([]string, error) {
+	pvc, ok := obj.(*api.PersistentVolumeClaim)
+	if !ok {
+		return nil, fmt.Errorf("not a pvc")
+	}
+	return []string{pvc.Labels[volume.AnnSelectedNode]}, nil
 }

@@ -19,6 +19,8 @@ package persistentvolume
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-helpers/storage/volume"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -199,4 +201,27 @@ func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) 
 		"name": persistentvolume.Name,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+}
+
+// NodeLabelTriggerFunc returns value node label of given object.
+func NodeLabelTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.PersistentVolume).Labels["kubernetes.io/hostname"]
+}
+
+// Indexers returns the indexers for pvc storage.
+func Indexers() *cache.Indexers {
+	var indexers = make(cache.Indexers)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.LocalVolumeNodeIndex) {
+		indexers[storage.LabelIndex("kubernetes.io/hostname")] = NodeLabelIndexFunc
+	}
+	return &indexers
+}
+
+// NodeNameIndexFunc return value spec.nodename of given object.
+func NodeLabelIndexFunc(obj interface{}) ([]string, error) {
+	pv, ok := obj.(*api.PersistentVolume)
+	if !ok {
+		return nil, fmt.Errorf("not a pvc")
+	}
+	return []string{pv.Labels["kubernetes.io/hostname"]}, nil
 }
