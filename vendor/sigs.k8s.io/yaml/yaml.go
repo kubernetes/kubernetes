@@ -100,12 +100,12 @@ func JSONToYAML(j []byte) ([]byte, error) {
 // passing JSON through this method should be a no-op.
 //
 // Things YAML can do that are not supported by JSON:
-//   - In YAML you can have binary and null keys in your maps. These are invalid
-//     in JSON. (int and float keys are converted to strings.)
-//   - Binary data in YAML with the !!binary tag is not supported. If you want to
-//     use binary data with this library, encode the data as base64 as usual but do
-//     not use the !!binary tag in your YAML. This will ensure the original base64
-//     encoded data makes it all the way through to the JSON.
+// * In YAML you can have binary and null keys in your maps. These are invalid
+//   in JSON. (int and float keys are converted to strings.)
+// * Binary data in YAML with the !!binary tag is not supported. If you want to
+//   use binary data with this library, encode the data as base64 as usual but do
+//   not use the !!binary tag in your YAML. This will ensure the original base64
+//   encoded data makes it all the way through to the JSON.
 //
 // For strict decoding of YAML, use YAMLToJSONStrict.
 func YAMLToJSON(y []byte) ([]byte, error) {
@@ -148,7 +148,7 @@ func convertToJSONableObject(yamlObj interface{}, jsonTarget *reflect.Value) (in
 	// string.
 	if jsonTarget != nil {
 		ju, tu, pv := indirect(*jsonTarget, false)
-		// We have a JSON or Text Unmarshaler at this level, so we can't be trying
+		// We have a JSON or Text Umarshaler at this level, so we can't be trying
 		// to decode into a string.
 		if ju != nil || tu != nil {
 			jsonTarget = nil
