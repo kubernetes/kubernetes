@@ -104,7 +104,7 @@ func TestVModule(t *testing.T) {
 	for _, test := range testcases {
 		t.Run(test.arg, func(t *testing.T) {
 			var actual VModuleConfiguration
-			value := VModuleConfigurationPflag(&actual)
+			value := VModuleConfigurationPflag(&actual, nil)
 			err := value.Set(test.arg)
 			if test.expectError != "" {
 				if err == nil {
