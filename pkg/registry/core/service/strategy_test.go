@@ -563,10 +563,10 @@ func TestDropTypeDependentFields(t *testing.T) {
 		}
 	}
 	setAllocateLoadBalancerNodePortsTrue := func(svc *api.Service) {
-		svc.Spec.AllocateLoadBalancerNodePorts = ptr.To[bool](true)
+		svc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 	}
 	setAllocateLoadBalancerNodePortsFalse := func(svc *api.Service) {
-		svc.Spec.AllocateLoadBalancerNodePorts = ptr.To[bool](false)
+		svc.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 	}
 	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
 		svc.Spec.AllocateLoadBalancerNodePorts = nil
