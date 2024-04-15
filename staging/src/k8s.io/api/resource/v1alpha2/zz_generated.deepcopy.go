@@ -756,6 +756,11 @@ func (in *ResourceClass) DeepCopyInto(out *ResourceClass) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.DefaultClaimParametersRef != nil {
+		in, out := &in.DefaultClaimParametersRef, &out.DefaultClaimParametersRef
+		*out = new(ResourceClassParametersReference)
+		**out = **in
+	}
 	return
 }
 

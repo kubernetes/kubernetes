@@ -12330,6 +12330,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: apiVersion
       type:
         scalar: string
+    - name: defaultClaimParametersRef
+      type:
+        namedType: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
     - name: driverName
       type:
         scalar: string

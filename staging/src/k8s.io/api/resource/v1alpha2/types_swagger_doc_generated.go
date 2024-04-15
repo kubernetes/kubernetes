@@ -237,12 +237,13 @@ func (ResourceClaimTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClass = map[string]string{
-	"":                     "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
-	"metadata":             "Standard object metadata",
-	"driverName":           "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
-	"parametersRef":        "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec.",
-	"suitableNodes":        "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates.",
-	"structuredParameters": "If and only if allocation of claims using this class is handled via structured parameters, then StructuredParameters must be set to true.",
+	"":                          "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+	"metadata":                  "Standard object metadata",
+	"driverName":                "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
+	"parametersRef":             "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and those stored in ResourceClaimSpec.",
+	"suitableNodes":             "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates.",
+	"structuredParameters":      "If and only if allocation of claims using this class is handled via structured parameters, then StructuredParameters must be set to true.",
+	"defaultClaimParametersRef": "DefaultClaimParametersRef is an optional reference to an object that holds parameters used by the driver as default when allocating a resource associated with this class. It is the responsibility of the cluster administrator to create this default resource claim parameter reference when defining the resource class. This field is utilized only when the ParametersRef of the resource claim is nil. If both ParametersRef and DefaultClaimParametersRef are nil, the claim cannot be allocated.",
 }
 
 func (ResourceClass) SwaggerDoc() map[string]string {

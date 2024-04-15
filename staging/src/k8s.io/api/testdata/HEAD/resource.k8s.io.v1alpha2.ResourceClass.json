@@ -74,5 +74,11 @@
       }
     ]
   },
-  "structuredParameters": true
+  "structuredParameters": true,
+  "defaultClaimParametersRef": {
+    "apiGroup": "apiGroupValue",
+    "kind": "kindValue",
+    "name": "nameValue",
+    "namespace": "namespaceValue"
+  }
 }

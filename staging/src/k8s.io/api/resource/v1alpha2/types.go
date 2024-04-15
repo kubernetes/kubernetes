@@ -419,7 +419,7 @@ type ResourceClass struct {
 	// only when the ParametersRef of the resource claim is nil. If both ParametersRef
 	// and DefaultClaimParametersRef are nil, the claim cannot be allocated.
 	// +optional
-	DefaultClaimParametersRef *ResourceClassParametersReference `json:"defaultParametersRef,omitempty" protobuf:"bytes,6,opt,name=defaultParametersRef"`
+	DefaultClaimParametersRef *ResourceClassParametersReference `json:"defaultClaimParametersRef,omitempty" protobuf:"bytes,6,opt,name=defaultClaimParametersRef"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
