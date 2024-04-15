@@ -447,7 +447,7 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 
 	// Every object comes through this code path once, so this is a good
 	// place to call the transform func.  If obj is a
-	// DeletedFinalStateUnknown tombstone, then the containted inner object
+	// DeletedFinalStateUnknown tombstone, then the contained inner object
 	// will already have gone through the transformer, but we document that
 	// this can happen. In cases involving Replace(), such an object can
 	// come through multiple times.
@@ -507,9 +507,7 @@ func (f *DeltaFIFO) ListKeys() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	list := make([]string, 0, len(f.queue))
-	for _, key := range f.queue {
-		list = append(list, key)
-	}
+	list = append(list, f.queue...)
 	return list
 }
 
