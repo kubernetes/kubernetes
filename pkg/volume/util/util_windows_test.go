@@ -2,7 +2,7 @@
 // +build windows
 
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,10 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
+	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -29,17 +32,18 @@ import (
 )
 
 func TestWindowsFileMode(t *testing.T) {
-	// Create a temp file and set read only permissions on it.
+	// Create a temp file, and later on remove all permissions from it.
 	f, err := os.CreateTemp("", "permissions_test")
 	require.NoError(t, err)
 
-	// Write a sample string into the file, and then expect to be able to read it later.
+	// Write a sample string into the file.
 	_, err = f.WriteString("hello!")
 	require.NoError(t, err)
 
 	f.Close()
 	defer os.Remove(f.Name())
 
+	// Remove all permissions from the file.
 	err = Chmod(f.Name(), 0000)
 	require.NoError(t, err)
 
@@ -49,14 +53,32 @@ func TestWindowsFileMode(t *testing.T) {
 	assert.Equal(t, 0000, int(mode))
 
 	// Assert that we cannot read the file, as we don't have read permissions.
-	_, err = os.Open(f.Name())
-	expectedErrMsg := "Access is denied."
-	if err == nil || !strings.Contains(err.Error(), expectedErrMsg) {
+	// There shouldn't be any ACEs on the file, so os.Open should end up with a "Access is denied." error.
+	// However, that doesn't happen. Interestingly, it does happen in other languages, or even Powershell.
+	// We test using Powershell instead.
+	cmd := exec.Command("powershell.exe", "-NonInteractive", "cat", f.Name())
+	var errOut bytes.Buffer
+	cmd.Stderr = &errOut
+	err = cmd.Run()
+	expectedErrMsg := fmt.Sprintf("Access to the path '%s' is denied.", f.Name())
+	if err == nil || !strings.Contains(errOut.String(), expectedErrMsg) {
 		t.Fatalf("Unexpected error message while opening the file for reading. Got: %v, expected: %v", err, expectedErrMsg)
 	}
 
+	// We can still open the file in golang and read from it.
+	f, err = os.Open(f.Name())
+	require.NoError(t, err)
+
+	bytes := make([]byte, 64)
+	n, err := f.Read(bytes)
+	require.NoError(t, err)
+	assert.Equal(t, "hello!", string(bytes[:n]))
+
+	f.Close()
+
 	// Assert that we cannot write in the file, as we do not have write permissions.
 	_, err = os.Create(f.Name())
+	expectedErrMsg = "Access is denied."
 	if err == nil || !strings.Contains(err.Error(), expectedErrMsg) {
 		t.Fatalf("Unexpected error message while opening the file for writing. Got: %v, expected: %v", err, expectedErrMsg)
 	}
@@ -83,10 +105,9 @@ func TestWindowsFileMode(t *testing.T) {
 	f, err = os.Open(f.Name())
 	require.NoError(t, err)
 
-	bytes := make([]byte, len(expectedContent))
-	_, err = f.Read(bytes)
+	n, err = f.Read(bytes)
 	require.NoError(t, err)
-	assert.Equal(t, expectedContent, string(bytes))
+	assert.Equal(t, expectedContent, string(bytes[:n]))
 
 	f.Close()
 
