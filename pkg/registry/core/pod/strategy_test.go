@@ -41,7 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	utilpointer "k8s.io/utils/pointer"
+	ptr "k8s.io/utils/ptr"
 
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -418,7 +418,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					NodeName:                      "something",
-					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 				Status: api.PodStatus{},
 			},
@@ -429,7 +429,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := &metav1.DeleteOptions{}
 			if tc.deleteGracePeriod != nil {
-				out.GracePeriodSeconds = utilpointer.Int64(*tc.deleteGracePeriod)
+				out.GracePeriodSeconds = ptr.To[int64](*tc.deleteGracePeriod)
 			}
 			Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.pod, out)
 			if out.GracePeriodSeconds == nil {
