@@ -135,11 +135,7 @@ func (*DefaultRemoteExecutor) Execute(url *url.URL, config *restclient.Config, s
 }
 
 // createExecutor returns the Executor or an error if one occurred.
-func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Executor, error) {
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", url)
-	if err != nil {
-		return nil, err
-	}
+func createExecutor(url *url.URL, config *restclient.Config) (exec remotecommand.Executor, err error) {
 	// Fallback executor is default, unless feature flag is explicitly disabled.
 	if !cmdutil.RemoteCommandWebsockets.IsDisabled() {
 		// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
@@ -151,8 +147,13 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		exec, err = remotecommand.NewSPDYExecutor(config, "POST", url)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return exec, nil
+	return
 }
 
 type StreamOptions struct {
