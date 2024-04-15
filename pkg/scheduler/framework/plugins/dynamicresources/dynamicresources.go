@@ -1016,30 +1016,24 @@ func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *res
 }
 
 func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
-	defaultClaimParameters := resourcev1alpha2.ResourceClaimParameters{
-		Shareable: true,
-		DriverRequests: []resourcev1alpha2.DriverRequests{
-			{
-				DriverName: class.DriverName,
-				Requests: []resourcev1alpha2.ResourceRequest{
-					{
-						ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
-							// TODO: This only works because NamedResources is
-							// the only model currently implemented. We need to
-							// match the default to how the resources of this
-							// class are being advertized in a ResourceSlice.
-							NamedResources: &resourcev1alpha2.NamedResourcesRequest{
-								Selector: "true",
-							},
-						},
-					},
-				},
-			},
-		},
+	if claim.Spec.ParametersRef == nil && class.DefaultClaimParametersRef == nil {
+		return nil, statusError(logger, fmt.Errorf("error allocating claim, either claim's parameter reference or default parameters for resourceclass need to be set"))
 	}
+	if claim.Spec.ParametersRef == nil && class.DefaultClaimParametersRef != nil {
+		// Get the resource class's default parameter and use it
+		if class.DefaultClaimParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
+			class.DefaultClaimParametersRef.Kind == "ResourceClaimParameters" {
+			// Use the parameters which were referenced directly.
+			parameters, err := pl.claimParametersLister.ResourceClaimParameters(class.Namespace).Get(class.DefaultClaimParametersRef.Name)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return nil, statusUnschedulable(logger, fmt.Sprintf("claim parameters %s not found", klog.KRef(class.Namespace, class.DefaultClaimParametersRef.Name)))
+				}
+				return nil, statusError(logger, fmt.Errorf("get claim parameters %s: %v", klog.KRef(class.Namespace, class.DefaultClaimParametersRef.Name), err))
+			}
+			return parameters, nil
 
-	if claim.Spec.ParametersRef == nil {
-		return &defaultClaimParameters, nil
+		}
 	}
 	if claim.Spec.ParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
 		claim.Spec.ParametersRef.Kind == "ResourceClaimParameters" {
@@ -1053,7 +1047,6 @@ func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *res
 		}
 		return parameters, nil
 	}
-
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123731): use an indexer
 	allParameters, err := pl.claimParametersLister.ResourceClaimParameters(claim.Namespace).List(labels.Everything())
 	if err != nil {
