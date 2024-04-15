@@ -7,6 +7,11 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=etcds,scope=Cluster,categories=coreoperators
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/752
+// +openshift:file-pattern=cvoRunLevel=0000_12,operatorName=etcd,operatorOrdering=01
 
 // Etcd provides information to configure an operator to manage etcd.
 //
@@ -35,7 +40,7 @@ type EtcdSpec struct {
 	//	"" means no opinion and the platform is left to choose a reasonable default
 	//	which is subject to change without notice.
 	// +kubebuilder:validation:Optional
-	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
+	// +openshift:enable:FeatureGate=HardwareSpeed
 	// +optional
 	HardwareSpeed ControlPlaneHardwareSpeed `json:"controlPlaneHardwareSpeed"`
 }

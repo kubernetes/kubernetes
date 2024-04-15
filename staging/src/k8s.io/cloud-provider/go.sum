@@ -136,7 +136,6 @@ github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLj
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=
@@ -287,13 +286,13 @@ github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3I
 github.com/opencontainers/image-spec v1.0.2/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/opencontainers/runc v1.1.10/go.mod h1:+/R6+KmDlh+hOO8NkjmgkG9Qzvypzk0yXxAPYYR65+M=
 github.com/opencontainers/selinux v1.11.0/go.mod h1:E5dMC3VPuVvVHDYmi78qvhJp8+M586T4DlDRYpFkyec=
-github.com/openshift/api v0.0.0-20231218131639-7a5aa77cc72d/go.mod h1:RLaNkRn87bQeH3MpTWXCxlSb62qVGBxfQY344jBfVsg=
-github.com/openshift/build-machinery-go v0.0.0-20220913142420-e25cf57ea46d/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
-github.com/openshift/client-go v0.0.0-20231218140158-47f6d749b9d9/go.mod h1:kKmxYRXTMutfF7XzGppFdbLhNGX1brXkRsZx5ID8c7U=
+github.com/openshift/api v0.0.0-20240405095747-3e50337fcaea/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
+github.com/openshift/build-machinery-go v0.0.0-20231128094528-1e9b1b0595c8/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
+github.com/openshift/client-go v0.0.0-20240405120947-c67c8325cdd8/go.mod h1:+VvvaMSTUhOt+rBq7NwRLSNxq06hTeRCBqm0j0PQEq8=
 github.com/openshift/ginkgo/v2 v2.6.1-0.20231031162821-c5e24be53ea7 h1:jUM9Fdf+fT0LTccN58jrypOyzcfQUs1v2UH6f8vdBTA=
 github.com/openshift/ginkgo/v2 v2.6.1-0.20231031162821-c5e24be53ea7/go.mod h1:TE309ZR8s5FsKKpuB1YAQYBzCaAfUgatB/xlT/ETL/o=
-github.com/openshift/library-go v0.0.0-20240207105404-126b47137408 h1:Evg6GEvEuyj9toFX14YenXI6hGRnhLWqYx/rHO7VnQ4=
-github.com/openshift/library-go v0.0.0-20240207105404-126b47137408/go.mod h1:ePlaOqUiPplRc++6aYdMe+2FmXb2xTNS9Nz5laG2YmI=
+github.com/openshift/library-go v0.0.0-20240411091851-558ed29cc1dd h1:svnVGaIsBgNRW/6FRRxIWOyYmpL7jL7LkkRYiYS8OFk=
+github.com/openshift/library-go v0.0.0-20240411091851-558ed29cc1dd/go.mod h1:m/HsttSi90vSixwoy5mPUBHcZid2YRw/QbsLErLxF9s=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

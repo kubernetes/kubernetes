@@ -2,7 +2,7 @@ package apiserverconfig
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,11 +70,11 @@ func (a *personalSARRequestInfoResolver) NewRequestInfo(req *http.Request) (*req
 func isPersonalAccessReviewFromRequest(req *http.Request, requestInfo *request.RequestInfo) (bool, error) {
 	// TODO once we're integrated with the api installer, we should have direct access to the deserialized content
 	// for now, this only happens on subjectaccessreviews with a personal check, pay the double retrieve and decode cost
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return false, err
 	}
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	req.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	defaultGVK := schema.GroupVersionKind{Version: requestInfo.APIVersion, Group: requestInfo.APIGroup}
 	switch requestInfo.Resource {

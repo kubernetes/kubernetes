@@ -5,8 +5,8 @@ package v1alpha1
 // PublicKeyApplyConfiguration represents an declarative configuration of the PublicKey type for use
 // with apply.
 type PublicKeyApplyConfiguration struct {
-	KeyData      *string `json:"keyData,omitempty"`
-	RekorKeyData *string `json:"rekorKeyData,omitempty"`
+	KeyData      []byte `json:"keyData,omitempty"`
+	RekorKeyData []byte `json:"rekorKeyData,omitempty"`
 }
 
 // PublicKeyApplyConfiguration constructs an declarative configuration of the PublicKey type for use with
@@ -15,18 +15,22 @@ func PublicKey() *PublicKeyApplyConfiguration {
 	return &PublicKeyApplyConfiguration{}
 }
 
-// WithKeyData sets the KeyData field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the KeyData field is set to the value of the last call.
-func (b *PublicKeyApplyConfiguration) WithKeyData(value string) *PublicKeyApplyConfiguration {
-	b.KeyData = &value
+// WithKeyData adds the given value to the KeyData field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the KeyData field.
+func (b *PublicKeyApplyConfiguration) WithKeyData(values ...byte) *PublicKeyApplyConfiguration {
+	for i := range values {
+		b.KeyData = append(b.KeyData, values[i])
+	}
 	return b
 }
 
-// WithRekorKeyData sets the RekorKeyData field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RekorKeyData field is set to the value of the last call.
-func (b *PublicKeyApplyConfiguration) WithRekorKeyData(value string) *PublicKeyApplyConfiguration {
-	b.RekorKeyData = &value
+// WithRekorKeyData adds the given value to the RekorKeyData field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the RekorKeyData field.
+func (b *PublicKeyApplyConfiguration) WithRekorKeyData(values ...byte) *PublicKeyApplyConfiguration {
+	for i := range values {
+		b.RekorKeyData = append(b.RekorKeyData, values[i])
+	}
 	return b
 }

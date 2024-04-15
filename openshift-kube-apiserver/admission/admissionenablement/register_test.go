@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -24,7 +25,7 @@ func TestAdmissionRegistration(t *testing.T) {
 	plugins := admission.NewPlugins()
 	registerAllAdmissionPlugins(plugins)
 
-	err := admissionregistrationtesting.AdmissionRegistrationTest(plugins, orderedAdmissionChain, defaultOffPlugins)
+	err := admissionregistrationtesting.AdmissionRegistrationTest(plugins, orderedAdmissionChain, sets.Set[string](defaultOffPlugins))
 	if err != nil {
 		t.Fatal(err)
 	}

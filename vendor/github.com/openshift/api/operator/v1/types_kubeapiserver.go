@@ -7,6 +7,11 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=kubeapiservers,scope=Cluster,categories=coreoperators
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/475
+// +openshift:file-pattern=cvoRunLevel=0000_20,operatorName=kube-apiserver,operatorOrdering=01
 
 // KubeAPIServer provides information to configure an operator to manage kube-apiserver.
 //

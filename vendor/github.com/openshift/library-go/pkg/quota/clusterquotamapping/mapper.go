@@ -49,8 +49,8 @@ type clusterQuotaMapper struct {
 	// completedNamespaceToLabels indicates the latest selectionFields this controller has scanned against cluster quotas
 	completedNamespaceToLabels map[string]SelectionFields
 
-	quotaToNamespaces map[string]sets.String
-	namespaceToQuota  map[string]sets.String
+	quotaToNamespaces map[string]sets.Set[string]
+	namespaceToQuota  map[string]sets.Set[string]
 
 	listeners []MappingChangeListener
 }
@@ -62,8 +62,8 @@ func NewClusterQuotaMapper() *clusterQuotaMapper {
 		completedQuotaToSelector:   map[string]quotav1.ClusterResourceQuotaSelector{},
 		completedNamespaceToLabels: map[string]SelectionFields{},
 
-		quotaToNamespaces: map[string]sets.String{},
-		namespaceToQuota:  map[string]sets.String{},
+		quotaToNamespaces: map[string]sets.Set[string]{},
+		namespaceToQuota:  map[string]sets.Set[string]{},
 	}
 }
 
@@ -75,7 +75,7 @@ func (m *clusterQuotaMapper) GetClusterQuotasFor(namespaceName string) ([]string
 	if !ok {
 		return []string{}, m.completedNamespaceToLabels[namespaceName]
 	}
-	return quotas.List(), m.completedNamespaceToLabels[namespaceName]
+	return sets.List(quotas), m.completedNamespaceToLabels[namespaceName]
 }
 
 func (m *clusterQuotaMapper) GetNamespacesFor(quotaName string) ([]string, quotav1.ClusterResourceQuotaSelector) {
@@ -86,7 +86,7 @@ func (m *clusterQuotaMapper) GetNamespacesFor(quotaName string) ([]string, quota
 	if !ok {
 		return []string{}, m.completedQuotaToSelector[quotaName]
 	}
-	return namespaces.List(), m.completedQuotaToSelector[quotaName]
+	return sets.List(namespaces), m.completedQuotaToSelector[quotaName]
 }
 
 func (m *clusterQuotaMapper) AddListener(listener MappingChangeListener) {
@@ -231,7 +231,7 @@ func (m *clusterQuotaMapper) setMapping(quota *quotav1.ClusterResourceQuota, nam
 
 		namespaces, ok := m.quotaToNamespaces[quota.Name]
 		if !ok {
-			m.quotaToNamespaces[quota.Name] = sets.String{}
+			m.quotaToNamespaces[quota.Name] = sets.Set[string]{}
 		} else {
 			mutated = namespaces.Has(namespace.GetName())
 			namespaces.Delete(namespace.GetName())
@@ -239,7 +239,7 @@ func (m *clusterQuotaMapper) setMapping(quota *quotav1.ClusterResourceQuota, nam
 
 		quotas, ok := m.namespaceToQuota[namespace.GetName()]
 		if !ok {
-			m.namespaceToQuota[namespace.GetName()] = sets.String{}
+			m.namespaceToQuota[namespace.GetName()] = sets.Set[string]{}
 		} else {
 			mutated = mutated || quotas.Has(quota.Name)
 			quotas.Delete(quota.Name)
@@ -259,7 +259,7 @@ func (m *clusterQuotaMapper) setMapping(quota *quotav1.ClusterResourceQuota, nam
 	namespaces, ok := m.quotaToNamespaces[quota.Name]
 	if !ok {
 		mutated = true
-		m.quotaToNamespaces[quota.Name] = sets.NewString(namespace.GetName())
+		m.quotaToNamespaces[quota.Name] = sets.New(namespace.GetName())
 	} else {
 		mutated = !namespaces.Has(namespace.GetName())
 		namespaces.Insert(namespace.GetName())
@@ -268,7 +268,7 @@ func (m *clusterQuotaMapper) setMapping(quota *quotav1.ClusterResourceQuota, nam
 	quotas, ok := m.namespaceToQuota[namespace.GetName()]
 	if !ok {
 		mutated = true
-		m.namespaceToQuota[namespace.GetName()] = sets.NewString(quota.Name)
+		m.namespaceToQuota[namespace.GetName()] = sets.New(quota.Name)
 	} else {
 		mutated = mutated || !quotas.Has(quota.Name)
 		quotas.Insert(quota.Name)

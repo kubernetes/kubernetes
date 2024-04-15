@@ -7,6 +7,12 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=cloudcredentials,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/692
+// +openshift:capability=CloudCredential
+// +openshift:file-pattern=cvoRunLevel=0000_40,operatorName=cloud-credential,operatorOrdering=00
 
 // CloudCredential provides a means to configure an operator to manage CredentialsRequests.
 //

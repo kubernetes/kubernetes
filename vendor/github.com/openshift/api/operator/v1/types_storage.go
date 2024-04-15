@@ -7,6 +7,11 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=storages,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/670
+// +openshift:file-pattern=cvoRunLevel=0000_50,operatorName=storage,operatorOrdering=01
 
 // Storage provides a means to configure an operator to manage the cluster storage operator. `cluster` is the canonical name.
 //
@@ -59,7 +64,6 @@ type StorageStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
 
 // StorageList contains a list of Storages.
 //

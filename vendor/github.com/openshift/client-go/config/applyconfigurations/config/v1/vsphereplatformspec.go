@@ -2,12 +2,19 @@
 
 package v1
 
+import (
+	configv1 "github.com/openshift/api/config/v1"
+)
+
 // VSpherePlatformSpecApplyConfiguration represents an declarative configuration of the VSpherePlatformSpec type for use
 // with apply.
 type VSpherePlatformSpecApplyConfiguration struct {
-	VCenters       []VSpherePlatformVCenterSpecApplyConfiguration       `json:"vcenters,omitempty"`
-	FailureDomains []VSpherePlatformFailureDomainSpecApplyConfiguration `json:"failureDomains,omitempty"`
-	NodeNetworking *VSpherePlatformNodeNetworkingApplyConfiguration     `json:"nodeNetworking,omitempty"`
+	VCenters             []VSpherePlatformVCenterSpecApplyConfiguration       `json:"vcenters,omitempty"`
+	FailureDomains       []VSpherePlatformFailureDomainSpecApplyConfiguration `json:"failureDomains,omitempty"`
+	NodeNetworking       *VSpherePlatformNodeNetworkingApplyConfiguration     `json:"nodeNetworking,omitempty"`
+	APIServerInternalIPs []configv1.IP                                        `json:"apiServerInternalIPs,omitempty"`
+	IngressIPs           []configv1.IP                                        `json:"ingressIPs,omitempty"`
+	MachineNetworks      []configv1.CIDR                                      `json:"machineNetworks,omitempty"`
 }
 
 // VSpherePlatformSpecApplyConfiguration constructs an declarative configuration of the VSpherePlatformSpec type for use with
@@ -47,5 +54,35 @@ func (b *VSpherePlatformSpecApplyConfiguration) WithFailureDomains(values ...*VS
 // If called multiple times, the NodeNetworking field is set to the value of the last call.
 func (b *VSpherePlatformSpecApplyConfiguration) WithNodeNetworking(value *VSpherePlatformNodeNetworkingApplyConfiguration) *VSpherePlatformSpecApplyConfiguration {
 	b.NodeNetworking = value
+	return b
+}
+
+// WithAPIServerInternalIPs adds the given value to the APIServerInternalIPs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the APIServerInternalIPs field.
+func (b *VSpherePlatformSpecApplyConfiguration) WithAPIServerInternalIPs(values ...configv1.IP) *VSpherePlatformSpecApplyConfiguration {
+	for i := range values {
+		b.APIServerInternalIPs = append(b.APIServerInternalIPs, values[i])
+	}
+	return b
+}
+
+// WithIngressIPs adds the given value to the IngressIPs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the IngressIPs field.
+func (b *VSpherePlatformSpecApplyConfiguration) WithIngressIPs(values ...configv1.IP) *VSpherePlatformSpecApplyConfiguration {
+	for i := range values {
+		b.IngressIPs = append(b.IngressIPs, values[i])
+	}
+	return b
+}
+
+// WithMachineNetworks adds the given value to the MachineNetworks field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MachineNetworks field.
+func (b *VSpherePlatformSpecApplyConfiguration) WithMachineNetworks(values ...configv1.CIDR) *VSpherePlatformSpecApplyConfiguration {
+	for i := range values {
+		b.MachineNetworks = append(b.MachineNetworks, values[i])
+	}
 	return b
 }

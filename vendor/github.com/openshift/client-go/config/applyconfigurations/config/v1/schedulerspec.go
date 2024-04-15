@@ -9,10 +9,11 @@ import (
 // SchedulerSpecApplyConfiguration represents an declarative configuration of the SchedulerSpec type for use
 // with apply.
 type SchedulerSpecApplyConfiguration struct {
-	Policy              *ConfigMapNameReferenceApplyConfiguration `json:"policy,omitempty"`
-	Profile             *configv1.SchedulerProfile                `json:"profile,omitempty"`
-	DefaultNodeSelector *string                                   `json:"defaultNodeSelector,omitempty"`
-	MastersSchedulable  *bool                                     `json:"mastersSchedulable,omitempty"`
+	Policy                *ConfigMapNameReferenceApplyConfiguration `json:"policy,omitempty"`
+	Profile               *configv1.SchedulerProfile                `json:"profile,omitempty"`
+	ProfileCustomizations *ProfileCustomizationsApplyConfiguration  `json:"profileCustomizations,omitempty"`
+	DefaultNodeSelector   *string                                   `json:"defaultNodeSelector,omitempty"`
+	MastersSchedulable    *bool                                     `json:"mastersSchedulable,omitempty"`
 }
 
 // SchedulerSpecApplyConfiguration constructs an declarative configuration of the SchedulerSpec type for use with
@@ -34,6 +35,14 @@ func (b *SchedulerSpecApplyConfiguration) WithPolicy(value *ConfigMapNameReferen
 // If called multiple times, the Profile field is set to the value of the last call.
 func (b *SchedulerSpecApplyConfiguration) WithProfile(value configv1.SchedulerProfile) *SchedulerSpecApplyConfiguration {
 	b.Profile = &value
+	return b
+}
+
+// WithProfileCustomizations sets the ProfileCustomizations field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ProfileCustomizations field is set to the value of the last call.
+func (b *SchedulerSpecApplyConfiguration) WithProfileCustomizations(value *ProfileCustomizationsApplyConfiguration) *SchedulerSpecApplyConfiguration {
+	b.ProfileCustomizations = value
 	return b
 }
 

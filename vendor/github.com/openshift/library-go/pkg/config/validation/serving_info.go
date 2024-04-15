@@ -73,7 +73,7 @@ func ValidateServingInfo(info configv1.ServingInfo, certificatesRequired bool, f
 func ValidateNamedCertificates(fldPath *field.Path, namedCertificates []configv1.NamedCertificate) ValidationResults {
 	validationResults := ValidationResults{}
 
-	takenNames := sets.NewString()
+	takenNames := sets.New[string]()
 	for i, namedCertificate := range namedCertificates {
 		idxPath := fldPath.Index(i)
 

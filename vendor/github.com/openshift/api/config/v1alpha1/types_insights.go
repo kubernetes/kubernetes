@@ -9,6 +9,12 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // InsightsDataGather provides data gather configuration options for the the Insights Operator.
 //
 // Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=insightsdatagathers,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1245
+// +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=config-operator,operatorOrdering=01
+// +openshift:enable:FeatureGate=InsightsConfig
 // +openshift:compatibility-gen:level=4
 type InsightsDataGather struct {
 	metav1.TypeMeta `json:",inline"`

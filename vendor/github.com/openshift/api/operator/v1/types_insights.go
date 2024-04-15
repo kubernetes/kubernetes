@@ -7,6 +7,11 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=insightsoperators,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1237
+// +openshift:file-pattern=cvoRunLevel=0000_50,operatorName=insights,operatorOrdering=00
 //
 // InsightsOperator holds cluster-wide information about the Insights Operator.
 //

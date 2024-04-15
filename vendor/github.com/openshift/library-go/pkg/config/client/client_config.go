@@ -1,10 +1,11 @@
 package client
 
 import (
-	"io/ioutil"
+	"net/http"
+	"os"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"net/http"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/library-go/pkg/network"
@@ -35,7 +36,7 @@ func GetKubeConfigOrInClusterConfig(kubeConfigFile string, overrides *ClientConn
 
 // GetClientConfig returns the rest.Config for a kubeconfig file
 func GetClientConfig(kubeConfigFile string, overrides *ClientConnectionOverrides) (*rest.Config, error) {
-	kubeConfigBytes, err := ioutil.ReadFile(kubeConfigFile)
+	kubeConfigBytes, err := os.ReadFile(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}

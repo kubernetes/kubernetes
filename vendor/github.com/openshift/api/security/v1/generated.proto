@@ -195,15 +195,19 @@ message SELinuxContextStrategyOptions {
 // SecurityContextConstraints.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +kubebuilder:printcolumn:name="Priv",type=string,JSONPath=`.allowPrivilegedContainer`,description="Determines if a container can request to be run as privileged"
-// +kubebuilder:printcolumn:name="Caps",type=string,JSONPath=`.allowedCapabilities`,description="A list of capabilities that can be requested to add to the container"
-// +kubebuilder:printcolumn:name="SELinux",type=string,JSONPath=`.seLinuxContext.type`,description="Strategy that will dictate what labels will be set in the SecurityContext"
-// +kubebuilder:printcolumn:name="RunAsUser",type=string,JSONPath=`.runAsUser.type`,description="Strategy that will dictate what RunAsUser is used in the SecurityContext"
-// +kubebuilder:printcolumn:name="FSGroup",type=string,JSONPath=`.fsGroup.type`,description="Strategy that will dictate what fs group is used by the SecurityContext"
-// +kubebuilder:printcolumn:name="SupGroup",type=string,JSONPath=`.supplementalGroups.type`,description="Strategy that will dictate what supplemental groups are used by the SecurityContext"
-// +kubebuilder:printcolumn:name="Priority",type=string,JSONPath=`.priority`,description="Sort order of SCCs"
-// +kubebuilder:printcolumn:name="ReadOnlyRootFS",type=string,JSONPath=`.readOnlyRootFilesystem`,description="Force containers to run with a read only root file system"
-// +kubebuilder:printcolumn:name="Volumes",type=string,JSONPath=`.volumes`,description="White list of allowed volume plugins"
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=securitycontextconstraints,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/470
+// +openshift:file-pattern=cvoRunLevel=0000_03,operatorName=config-operator,operatorOrdering=01
+// +kubebuilder:printcolumn:name="Priv",type=string,JSONPath=.allowPrivilegedContainer,description="Determines if a container can request to be run as privileged"
+// +kubebuilder:printcolumn:name="Caps",type=string,JSONPath=.allowedCapabilities,description="A list of capabilities that can be requested to add to the container"
+// +kubebuilder:printcolumn:name="SELinux",type=string,JSONPath=.seLinuxContext.type,description="Strategy that will dictate what labels will be set in the SecurityContext"
+// +kubebuilder:printcolumn:name="RunAsUser",type=string,JSONPath=.runAsUser.type,description="Strategy that will dictate what RunAsUser is used in the SecurityContext"
+// +kubebuilder:printcolumn:name="FSGroup",type=string,JSONPath=.fsGroup.type,description="Strategy that will dictate what fs group is used by the SecurityContext"
+// +kubebuilder:printcolumn:name="SupGroup",type=string,JSONPath=.supplementalGroups.type,description="Strategy that will dictate what supplemental groups are used by the SecurityContext"
+// +kubebuilder:printcolumn:name="Priority",type=string,JSONPath=.priority,description="Sort order of SCCs"
+// +kubebuilder:printcolumn:name="ReadOnlyRootFS",type=string,JSONPath=.readOnlyRootFilesystem,description="Force containers to run with a read only root file system"
+// +kubebuilder:printcolumn:name="Volumes",type=string,JSONPath=.volumes,description="White list of allowed volume plugins"
 // +kubebuilder:singular=securitycontextconstraint
 // +openshift:compatibility-gen:level=1
 message SecurityContextConstraints {
