@@ -612,7 +612,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	}
 
 	time.Sleep(1 * time.Second)
-	// Volume is added to asw. Because attach operation fails, volume should not be reported as attached to the node.
+	// Volume is added to asw. After 1s, volume should be attached to the node after retry.
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
 	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw, volumeAttachedCheckTimeout)
