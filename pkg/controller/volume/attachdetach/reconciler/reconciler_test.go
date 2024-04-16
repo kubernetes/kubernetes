@@ -530,7 +530,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 	waitForAttachedToNodesCount(t, 1 /* expectedNodeCount */, generatedVolumeName, asw)
 
-	nodesForVolume := asw.GetNodesForAttachedVolume(generatedVolumeName)
+	nodesForVolume := asw.GetPossiblyAttachedNodesForVolume(generatedVolumeName)
 
 	// check if multiattach is marked
 	// at least one volume+node should be marked with multiattach error
@@ -1306,10 +1306,12 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			rc := NewReconciler(
 				reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 
-			nodes := []k8stypes.NodeName{}
+			otherNodes := []k8stypes.NodeName{}
 			for _, n := range test.nodes {
 				dsw.AddNode(n.name)
-				nodes = append(nodes, n.name)
+				if n.name != "node1" {
+					otherNodes = append(otherNodes, n.name)
+				}
 				for _, podName := range n.podNames {
 					volumeName := v1.UniqueVolumeName("volume-name")
 					volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -1329,7 +1331,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			volumes := dsw.GetVolumesToAttach()
 			for _, vol := range volumes {
 				if vol.NodeName == "node1" {
-					rc.(*reconciler).reportMultiAttachError(logger, vol, nodes)
+					rc.(*reconciler).reportMultiAttachError(logger, vol, otherNodes)
 				}
 			}
 
@@ -1581,7 +1583,7 @@ func waitForAttachedToNodesCount(
 	err := retryWithExponentialBackOff(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
-			count := len(asw.GetNodesForAttachedVolume(volumeName))
+			count := len(asw.GetPossiblyAttachedNodesForVolume(volumeName))
 			if count == expectedNodeCount {
 				return true, nil
 			}
@@ -1596,7 +1598,7 @@ func waitForAttachedToNodesCount(
 	)
 
 	if err != nil {
-		count := len(asw.GetNodesForAttachedVolume(volumeName))
+		count := len(asw.GetPossiblyAttachedNodesForVolume(volumeName))
 		t.Fatalf(
 			"Wrong number of nodes having <%v> attached. Expected: <%v> Actual: <%v>",
 			volumeName,
@@ -1723,6 +1725,7 @@ func verifyVolumeAttachedToNode(
 	expectedAttachState cache.AttachState,
 	asw cache.ActualStateOfWorld,
 ) {
+	t.Helper()
 	attachState := asw.GetAttachState(volumeName, nodeName)
 	if attachState != expectedAttachState {
 		t.Fatalf("Check volume <%v> is attached to node <%v>, got %v, expected %v",
