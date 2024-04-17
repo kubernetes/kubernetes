@@ -19,7 +19,6 @@ package storageversion
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,7 +34,6 @@ import (
 	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
-	svinformers "k8s.io/client-go/informers/apiserverinternal/v1alpha1"
 )
 
 var (
@@ -54,34 +52,58 @@ type Manager struct {
 	// apiserverID is the ID of the apiserver that invokes this manager.
 	apiserverID string
 	crdInformer crdinformers.CustomResourceDefinitionInformer
-	svInformer  svinformers.StorageVersionInformer
 	// workqueue to process storageversion updates for this CRD.
 	queue *workqueue.Type
 	// map from crd.Name -> number of active teardowns for this CRD.
-	teardownCountMap sync.Map
+	svUpdateInfoMap sync.Map
+}
+
+type svUpdateInfo struct {
+	teardownCount              int
+	finishedPublishingLatestSV bool
+	latestPublishedSV          string
 }
 
 // NewManager creates a CRD StorageVersion Manager.
 func NewManager(svClient genericstorageversion.Client, apiserverID string,
-	crdInformer crdinformers.CustomResourceDefinitionInformer, svInformer svinformers.StorageVersionInformer) *Manager {
+	crdInformer crdinformers.CustomResourceDefinitionInformer) *Manager {
 	return &Manager{
-		client:           svClient,
-		apiserverID:      apiserverID,
-		crdInformer:      crdInformer,
-		svInformer:       svInformer,
-		queue:            workqueue.NewNamed("storageversion-updater"),
-		teardownCountMap: sync.Map{},
+		client:          svClient,
+		apiserverID:     apiserverID,
+		crdInformer:     crdInformer,
+		queue:           workqueue.NewNamed("storageversion-updater"),
+		svUpdateInfoMap: sync.Map{},
 	}
+}
+
+func (m *Manager) CanServeWrite(crd *apiextensionsv1.CustomResourceDefinition) bool {
+	val, ok := m.svUpdateInfoMap.Load(crd.Name)
+	if !ok {
+		return false
+	}
+
+	svUpdateInfo := val.(*svUpdateInfo)
+	donePublishing := svUpdateInfo.finishedPublishingLatestSV
+	svProcessed, err := m.storageVersionAlreadyPublished(crd, svUpdateInfo)
+	if err != nil {
+		return false
+	}
+
+	return donePublishing && svProcessed
 }
 
 // UpdateActiveTeardownsCount updates the teardown count of the CRD in sync.Map.
 func (m *Manager) UpdateActiveTeardownsCount(crdName string, value int) error {
-	val, ok := m.teardownCountMap.Load(crdName)
+	val, ok := m.svUpdateInfoMap.Load(crdName)
 	if !ok {
 		return fmt.Errorf("error while trying to update number of teardowns. No entry found in sync.Map for %v", crdName)
 	}
-	newTeardownCount := val.(int) + value
-	m.teardownCountMap.Store(crdName, newTeardownCount)
+	svUpdateInfo := val.(*svUpdateInfo)
+	svUpdateInfo.teardownCount += value
+
+	if svUpdateInfo.teardownCount == 0 {
+		svUpdateInfo.finishedPublishingLatestSV = false
+	}
 	return nil
 }
 
@@ -94,9 +116,9 @@ func (m *Manager) Enqueue(crdName string) {
 	m.queue.Add(crdName)
 }
 
-// DeleteTeardownCountInfo deletes specified key from the sync.Map.
-func (m *Manager) DeleteTeardownCountInfo(crdName string) {
-	m.teardownCountMap.Delete(crdName)
+// DeleteSVUpdateInfo deletes specified key from the sync.Map.
+func (m *Manager) DeleteSVUpdateInfo(crdName string) {
+	m.svUpdateInfoMap.Delete(crdName)
 }
 
 // Sync runs a goroutine over the SV updater queue to indefinitely
@@ -111,6 +133,21 @@ func (m *Manager) Sync(stopCh <-chan struct{}, workers int) {
 	}
 
 	<-stopCh
+}
+
+// storageVersionAlreadyPublished checks whether the storageversion for the provided
+// CRD is already published.
+func (m *Manager) storageVersionAlreadyPublished(crd *apiextensionsv1.CustomResourceDefinition, svUpdateInfo *svUpdateInfo) (bool, error) {
+	svOfCRD, err := apiextensionshelpers.GetCRDStorageVersion(crd)
+	if err != nil {
+		return false, fmt.Errorf("error while getting storageversion from CRD for %s: %w", crd.Name, err)
+	}
+
+	if svOfCRD == svUpdateInfo.latestPublishedSV {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (m *Manager) worker() {
@@ -155,6 +192,10 @@ func (m *Manager) processLatestUpdateFor() bool {
 	}
 
 	klog.V(4).Infof("starting storageversion update for crd: %s", crd.Name)
+	m.updateSVUpdateInfoMap(crd.Name, &svUpdateInfo{
+		finishedPublishingLatestSV: false,
+	})
+
 	err = m.updateStorageVersion(ctx, crd)
 	if err == nil {
 		klog.V(4).Infof("successfully updated storage version for %s", crd.Name)
@@ -172,72 +213,20 @@ func (m *Manager) shouldSkipSVUpdate(crd *apiextensionsv1.CustomResourceDefiniti
 		return true, fmt.Sprintf("%d active teardowns", teardownCount), nil
 	}
 
-	skip, err := m.StorageVersionFoundInCacheFor(crd)
-	if err != nil {
-		return true, "error while fetching latest storageversion", err
-	}
-	if skip {
-		return true, "already at latest storageversion", nil
-	}
-
 	return false, "", nil
 }
 
 func (m *Manager) teardownInProgress(crdName string) (bool, int) {
-	val, _ := m.teardownCountMap.LoadOrStore(crdName, 0)
-	activeTeardownsCount := val.(int)
-	if activeTeardownsCount > 0 {
-		return true, activeTeardownsCount
+	val, _ := m.svUpdateInfoMap.LoadOrStore(crdName, &svUpdateInfo{})
+	svUpdateInfo := val.(*svUpdateInfo)
+	if svUpdateInfo.teardownCount > 0 {
+		return true, svUpdateInfo.teardownCount
 	}
 
-	return false, activeTeardownsCount
+	return false, svUpdateInfo.teardownCount
 }
 
-// StorageVersionFoundInCacheFor checks whether the storageversion for the provoded
-// CRD is already processed and reflected in the storageversion cache.
-func (m *Manager) StorageVersionFoundInCacheFor(crd *apiextensionsv1.CustomResourceDefinition) (bool, error) {
-	svOfCRD, err := apiextensionshelpers.GetCRDStorageVersion(crd)
-	if err != nil {
-		return false, fmt.Errorf("error while getting storageversion from CRD for %s: %w", crd.Name, err)
-	}
-
-	svName := fmt.Sprintf("%s.%s", crd.Spec.Group, crd.Spec.Names.Plural)
-	svFromCache, err := m.svInformer.Lister().Get(svName)
-	if err == nil {
-		matches := storageVersionMatches(svOfCRD, svFromCache)
-		if matches {
-			return true, nil
-		}
-	}
-
-	if errors.IsNotFound(err) {
-		return false, nil
-	}
-
-	return false, err
-}
-
-func storageVersionMatches(svOfCRD string, svFromCache *apiserverinternalv1alpha1.StorageVersion) bool {
-	for _, publishedSV := range svFromCache.Status.StorageVersions {
-		publishedEncodingVersion := strings.Split(publishedSV.EncodingVersion, "/")[1]
-		if publishedEncodingVersion == svOfCRD {
-			return true
-		}
-	}
-
-	return false
-}
-
-// updateStorageVersion updates a StorageVersion for the given CRD.
 func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
-	if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
-		return fmt.Errorf("error while updating storage version for crd %v: %w", crd, err)
-	}
-
-	return nil
-}
-
-func (m *Manager) updateCRDStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
 	gr := schema.GroupResource{
 		Group:    crd.Spec.Group,
 		Resource: crd.Spec.Names.Plural,
@@ -275,7 +264,7 @@ func (m *Manager) updateCRDStorageVersion(ctx context.Context, crd *apiextension
 		sv.OwnerReferences = append(sv.OwnerReferences, ref)
 		return nil
 	}
-	return genericstorageversion.UpdateStorageVersionFor(
+	err = genericstorageversion.UpdateStorageVersionFor(
 		ctx,
 		m.client,
 		m.apiserverID,
@@ -284,4 +273,23 @@ func (m *Manager) updateCRDStorageVersion(ctx context.Context, crd *apiextension
 		decodableVersions,
 		servedVersions,
 		appendOwnerRefFunc)
+
+	if err != nil {
+		m.updateSVUpdateInfoMap(crd.Name, &svUpdateInfo{
+			finishedPublishingLatestSV: true,
+			latestPublishedSV:          storageVersion,
+		})
+	}
+	return err
+}
+
+func (m *Manager) updateSVUpdateInfoMap(crdName string, info *svUpdateInfo) {
+	val, ok := m.svUpdateInfoMap.LoadOrStore(crdName, info)
+	if ok {
+		svUpdateInfo := val.(*svUpdateInfo)
+		svUpdateInfo.finishedPublishingLatestSV = info.finishedPublishingLatestSV
+		if info.latestPublishedSV != "" {
+			svUpdateInfo.latestPublishedSV = info.latestPublishedSV
+		}
+	}
 }

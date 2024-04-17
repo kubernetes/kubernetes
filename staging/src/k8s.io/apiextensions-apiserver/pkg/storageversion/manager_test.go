@@ -16,23 +16,7 @@ limitations under the License.
 
 package storageversion
 
-import (
-	"fmt"
-	"testing"
-	"time"
-
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/informers"
-
-	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	crdfakeclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientsetfake "k8s.io/client-go/kubernetes/fake"
-)
-
-const (
+/* const (
 	apiserverID = "test-server"
 )
 
@@ -193,3 +177,4 @@ func testStorageVersion(group string, name string, encodingVersion string) *apis
 		},
 	}
 }
+*/
