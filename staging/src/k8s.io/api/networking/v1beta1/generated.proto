@@ -81,7 +81,7 @@ message Ingress {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the desired state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -102,13 +102,13 @@ message IngressBackend {
 
   // servicePort Specifies the port of the referenced service.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
 
   // resource is an ObjectRef to another Kubernetes resource in the namespace
   // of the Ingress object. If resource is specified, serviceName and servicePort
   // must not be specified.
   // +optional
-  optional k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
+  optional .k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
 }
 
 // IngressClass represents the class of the Ingress, referenced by the Ingress
@@ -120,7 +120,7 @@ message IngressClass {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the desired state of the IngressClass.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -132,7 +132,7 @@ message IngressClass {
 message IngressClassList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of IngressClasses.
   repeated IngressClass items = 2;
@@ -186,7 +186,7 @@ message IngressList {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of Ingress.
   repeated Ingress items = 2;
