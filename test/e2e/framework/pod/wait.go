@@ -226,7 +226,7 @@ func WaitForAlmostAllPodsReady(ctx context.Context, c clientset.Interface, ns st
 
 // WaitForPodsRunningReady waits up to timeout for the following conditions:
 //  1. At least minPods Pods in Namespace ns are Running and Ready
-//  2. No Pods in Namespace ns are not either Ready, Succeeded, or Failed with a Controller
+//  2. No Pods in Namespace ns are Failed and not owned by a controller or Pending
 //
 // An error is returned if either of these conditions are not met within the timeout.
 //
@@ -235,11 +235,6 @@ func WaitForAlmostAllPodsReady(ctx context.Context, c clientset.Interface, ns st
 // example, in cluster startup, because the number of pods increases while
 // waiting. All pods that are in SUCCESS state are not counted.
 func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns string, minPods int, timeout time.Duration) error {
-
-	nOk := 0
-	badPods := []v1.Pod{}
-	otherPods := []v1.Pod{}
-	succeededPods := []string{}
 
 	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) ([]v1.Pod, error) {
 
@@ -250,10 +245,11 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 		return podList.Items, nil
 	})).WithTimeout(timeout).Should(framework.MakeMatcher(func(pods []v1.Pod) (func() string, error) {
 
-		nOk = 0
-		badPods = []v1.Pod{}
-		otherPods = []v1.Pod{}
-		succeededPods = []string{}
+		nOk := 0
+		badPods := []v1.Pod{}
+		otherPods := []v1.Pod{}
+		succeededPods := []string{}
+
 		for _, pod := range pods {
 			res, err := testutils.PodRunningReady(&pod)
 			switch {
@@ -271,7 +267,7 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 				otherPods = append(otherPods, pod)
 			}
 		}
-		if nOk >= minPods && len(badPods)+len(otherPods) <= 0 {
+		if nOk >= minPods && len(badPods)+len(otherPods) == 0 {
 			return nil, nil
 		}
 
