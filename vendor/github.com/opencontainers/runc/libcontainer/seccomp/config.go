@@ -5,7 +5,12 @@ import (
 	"sort"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
+
+// flagTsync is recognized but ignored by runc, and it is not defined
+// in the runtime-spec.
+const flagTsync = "SECCOMP_FILTER_FLAG_TSYNC"
 
 var operators = map[string]configs.Operator{
 	"SCMP_CMP_NE":        configs.NotEqualTo,
@@ -110,4 +115,36 @@ func ConvertStringToArch(in string) (string, error) {
 		return arch, nil
 	}
 	return "", fmt.Errorf("string %s is not a valid arch for seccomp", in)
+}
+
+// List of flags known to this version of runc.
+var flags = []string{
+	flagTsync,
+	string(specs.LinuxSeccompFlagSpecAllow),
+	string(specs.LinuxSeccompFlagLog),
+}
+
+// KnownFlags returns the list of the known filter flags.
+// Used by `runc features`.
+func KnownFlags() []string {
+	return flags
+}
+
+// SupportedFlags returns the list of the supported filter flags.
+// This list may be a subset of one returned by KnownFlags due to
+// some flags not supported by the current kernel and/or libseccomp.
+// Used by `runc features`.
+func SupportedFlags() []string {
+	if !Enabled {
+		return nil
+	}
+
+	var res []string
+	for _, flag := range flags {
+		if FlagSupported(specs.LinuxSeccompFlag(flag)) == nil {
+			res = append(res, flag)
+		}
+	}
+
+	return res
 }

@@ -69,6 +69,9 @@ type Resources struct {
 	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
 	CpuQuota int64 `json:"cpu_quota"`
 
+	// CPU hardcap burst limit (in usecs). Allowed accumulated cpu time additionally for burst in a given period.
+	CpuBurst *uint64 `json:"cpu_burst"` //nolint:revive
+
 	// CPU period to be used for hardcapping (in usecs). 0 to use system default.
 	CpuPeriod uint64 `json:"cpu_period"`
 
@@ -83,6 +86,9 @@ type Resources struct {
 
 	// MEM to use
 	CpusetMems string `json:"cpuset_mems"`
+
+	// cgroup SCHED_IDLE
+	CPUIdle *int64 `json:"cpu_idle,omitempty"`
 
 	// Process limit; set <= `0' to disable limit.
 	PidsLimit int64 `json:"pids_limit"`
@@ -155,4 +161,9 @@ type Resources struct {
 	// during Set() to figure out whether the freeze is required. Those
 	// methods may be relatively slow, thus this flag.
 	SkipFreezeOnSet bool `json:"-"`
+
+	// MemoryCheckBeforeUpdate is a flag for cgroup v2 managers to check
+	// if the new memory limits (Memory and MemorySwap) being set are lower
+	// than the current memory usage, and reject if so.
+	MemoryCheckBeforeUpdate bool `json:"memory_check_before_update"`
 }

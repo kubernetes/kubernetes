@@ -49,6 +49,9 @@ type Process struct {
 	// ExtraFiles specifies additional open files to be inherited by the container
 	ExtraFiles []*os.File
 
+	// open handles to cloned binaries -- see dmz.ClonedBinary for more details
+	clonedExes []*os.File
+
 	// Initial sizings for the console
 	ConsoleWidth  uint16
 	ConsoleHeight uint16
@@ -74,11 +77,17 @@ type Process struct {
 	// ConsoleSocket provides the masterfd console.
 	ConsoleSocket *os.File
 
+	// PidfdSocket provides process file descriptor of it own.
+	PidfdSocket *os.File
+
 	// Init specifies whether the process is the first process in the container.
 	Init bool
 
 	ops processOperations
 
+	// LogLevel is a string containing a numeric representation of the current
+	// log level (i.e. "4", but never "info"). It is passed on to runc init as
+	// _LIBCONTAINER_LOGLEVEL environment variable.
 	LogLevel string
 
 	// SubCgroupPaths specifies sub-cgroups to run the process in.
@@ -89,6 +98,10 @@ type Process struct {
 	//
 	// For cgroup v2, the only key allowed is "".
 	SubCgroupPaths map[string]string
+
+	Scheduler *configs.Scheduler
+
+	IOPriority *configs.IOPriority
 }
 
 // Wait waits for the process to exit.
@@ -116,6 +129,15 @@ func (p Process) Signal(sig os.Signal) error {
 		return errInvalidProcess
 	}
 	return p.ops.signal(sig)
+}
+
+// closeClonedExes cleans up any existing cloned binaries associated with the
+// Process.
+func (p *Process) closeClonedExes() {
+	for _, exe := range p.clonedExes {
+		_ = exe.Close()
+	}
+	p.clonedExes = nil
 }
 
 // IO holds the process's STDIO

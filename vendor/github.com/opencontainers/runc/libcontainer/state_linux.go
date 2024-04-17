@@ -7,7 +7,6 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -35,31 +34,36 @@ type containerState interface {
 	status() Status
 }
 
-func destroy(c *linuxContainer) error {
-	if !c.config.Namespaces.Contains(configs.NEWPID) ||
-		c.config.Namespaces.PathOf(configs.NEWPID) != "" {
-		if err := signalAllProcesses(c.cgroupManager, unix.SIGKILL); err != nil {
-			logrus.Warn(err)
-		}
+func destroy(c *Container) error {
+	// Usually, when a container init is gone, all other processes in its
+	// cgroup are killed by the kernel. This is not the case for a shared
+	// PID namespace container, which may have some processes left after
+	// its init is killed or exited.
+	//
+	// As the container without init process running is considered stopped,
+	// and destroy is supposed to remove all the container resources, we need
+	// to kill those processes here.
+	if !c.config.Namespaces.IsPrivate(configs.NEWPID) {
+		_ = signalAllProcesses(c.cgroupManager, unix.SIGKILL)
 	}
-	err := c.cgroupManager.Destroy()
+	if err := c.cgroupManager.Destroy(); err != nil {
+		return fmt.Errorf("unable to remove container's cgroup: %w", err)
+	}
 	if c.intelRdtManager != nil {
-		if ierr := c.intelRdtManager.Destroy(); err == nil {
-			err = ierr
+		if err := c.intelRdtManager.Destroy(); err != nil {
+			return fmt.Errorf("unable to remove container's IntelRDT group: %w", err)
 		}
 	}
-	if rerr := os.RemoveAll(c.root); err == nil {
-		err = rerr
+	if err := os.RemoveAll(c.stateDir); err != nil {
+		return fmt.Errorf("unable to remove container state dir: %w", err)
 	}
 	c.initProcess = nil
-	if herr := runPoststopHooks(c); err == nil {
-		err = herr
-	}
+	err := runPoststopHooks(c)
 	c.state = &stoppedState{c: c}
 	return err
 }
 
-func runPoststopHooks(c *linuxContainer) error {
+func runPoststopHooks(c *Container) error {
 	hooks := c.config.Hooks
 	if hooks == nil {
 		return nil
@@ -71,16 +75,12 @@ func runPoststopHooks(c *linuxContainer) error {
 	}
 	s.Status = specs.StateStopped
 
-	if err := hooks[configs.Poststop].RunHooks(s); err != nil {
-		return err
-	}
-
-	return nil
+	return hooks.Run(configs.Poststop, s)
 }
 
 // stoppedState represents a container is a stopped/destroyed state.
 type stoppedState struct {
-	c *linuxContainer
+	c *Container
 }
 
 func (b *stoppedState) status() Status {
@@ -104,7 +104,7 @@ func (b *stoppedState) destroy() error {
 
 // runningState represents a container that is currently running.
 type runningState struct {
-	c *linuxContainer
+	c *Container
 }
 
 func (r *runningState) status() Status {
@@ -114,7 +114,7 @@ func (r *runningState) status() Status {
 func (r *runningState) transition(s containerState) error {
 	switch s.(type) {
 	case *stoppedState:
-		if r.c.runType() == Running {
+		if r.c.hasInit() {
 			return ErrRunning
 		}
 		r.c.state = s
@@ -129,14 +129,14 @@ func (r *runningState) transition(s containerState) error {
 }
 
 func (r *runningState) destroy() error {
-	if r.c.runType() == Running {
+	if r.c.hasInit() {
 		return ErrRunning
 	}
 	return destroy(r.c)
 }
 
 type createdState struct {
-	c *linuxContainer
+	c *Container
 }
 
 func (i *createdState) status() Status {
@@ -162,7 +162,7 @@ func (i *createdState) destroy() error {
 // pausedState represents a container that is currently pause.  It cannot be destroyed in a
 // paused state and must transition back to running first.
 type pausedState struct {
-	c *linuxContainer
+	c *Container
 }
 
 func (p *pausedState) status() Status {
@@ -181,21 +181,20 @@ func (p *pausedState) transition(s containerState) error {
 }
 
 func (p *pausedState) destroy() error {
-	t := p.c.runType()
-	if t != Running && t != Created {
-		if err := p.c.cgroupManager.Freeze(configs.Thawed); err != nil {
-			return err
-		}
-		return destroy(p.c)
+	if p.c.hasInit() {
+		return ErrPaused
 	}
-	return ErrPaused
+	if err := p.c.cgroupManager.Freeze(configs.Thawed); err != nil {
+		return err
+	}
+	return destroy(p.c)
 }
 
 // restoredState is the same as the running state but also has associated checkpoint
 // information that maybe need destroyed when the container is stopped and destroy is called.
 type restoredState struct {
 	imageDir string
-	c        *linuxContainer
+	c        *Container
 }
 
 func (r *restoredState) status() Status {
@@ -211,7 +210,7 @@ func (r *restoredState) transition(s containerState) error {
 }
 
 func (r *restoredState) destroy() error {
-	if _, err := os.Stat(filepath.Join(r.c.root, "checkpoint")); err != nil {
+	if _, err := os.Stat(filepath.Join(r.c.stateDir, "checkpoint")); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -222,7 +221,7 @@ func (r *restoredState) destroy() error {
 // loadedState is used whenever a container is restored, loaded, or setting additional
 // processes inside and it should not be destroyed when it is exiting.
 type loadedState struct {
-	c *linuxContainer
+	c *Container
 	s Status
 }
 

@@ -79,8 +79,8 @@ func (p *restoredProcess) forwardChildLogs() chan error {
 }
 
 // nonChildProcess represents a process where the calling process is not
-// the parent process.  This process is created when a factory loads a container from
-// a persisted state.
+// the parent process. This process is created when Load loads a container
+// from a persisted state.
 type nonChildProcess struct {
 	processPid       int
 	processStartTime uint64

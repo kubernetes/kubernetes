@@ -3,14 +3,7 @@
 
 package userns
 
-import (
-	"strings"
-
-	"github.com/opencontainers/runc/libcontainer/user"
-)
-
-func FuzzUIDMap(data []byte) int {
-	uidmap, _ := user.ParseIDMap(strings.NewReader(string(data)))
-	_ = uidMapInUserNS(uidmap)
+func FuzzUIDMap(uidmap []byte) int {
+	_ = uidMapInUserNS(string(uidmap))
 	return 1
 }

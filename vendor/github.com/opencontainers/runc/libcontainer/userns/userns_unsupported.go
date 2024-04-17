@@ -3,8 +3,6 @@
 
 package userns
 
-import "github.com/opencontainers/runc/libcontainer/user"
-
 // runningInUserNS is a stub for non-Linux systems
 // Always returns false
 func runningInUserNS() bool {
@@ -13,6 +11,6 @@ func runningInUserNS() bool {
 
 // uidMapInUserNS is a stub for non-Linux systems
 // Always returns false
-func uidMapInUserNS(uidmap []user.IDMap) bool {
+func uidMapInUserNS(uidMap string) bool {
 	return false
 }

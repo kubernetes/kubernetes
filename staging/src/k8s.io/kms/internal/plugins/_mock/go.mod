@@ -22,3 +22,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace github.com/opencontainers/runc => github.com/kolyshkin/runc v1.0.1-0.20240417220538-4f3319b56d1c

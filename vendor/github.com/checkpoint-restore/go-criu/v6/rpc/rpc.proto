@@ -1,0 +1,248 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto2";
+
+message criu_page_server_info {
+	optional string		address	= 1;
+	optional int32		port	= 2;
+	optional int32		pid	= 3;
+	optional int32		fd	= 4;
+}
+
+message criu_veth_pair {
+	required string		if_in	= 1;
+	required string		if_out	= 2;
+};
+
+message ext_mount_map {
+	required string		key	= 1;
+	required string		val	= 2;
+};
+
+message join_namespace {
+	required string		ns		= 1;
+	required string		ns_file		= 2;
+	optional string		extra_opt	= 3;
+}
+
+message inherit_fd {
+	required string		key	= 1;
+	required int32		fd	= 2;
+};
+
+message cgroup_root {
+	optional string		ctrl	= 1;
+	required string		path	= 2;
+};
+
+message unix_sk {
+	required uint32		inode 	= 1;
+};
+
+enum criu_cg_mode {
+	IGNORE	= 0;
+	CG_NONE	= 1;
+	PROPS	= 2;
+	SOFT	= 3;
+	FULL	= 4;
+	STRICT	= 5;
+	DEFAULT = 6;
+};
+
+enum criu_network_lock_method {
+	IPTABLES = 	1;
+	NFTABLES = 	2;
+};
+
+enum criu_pre_dump_mode {
+	SPLICE = 	1;
+	VM_READ =	2;
+};
+
+message criu_opts {
+	required int32			images_dir_fd	= 1;
+	optional int32			pid		= 2; /* if not set on dump, will dump requesting process */
+
+	optional bool			leave_running	= 3;
+	optional bool			ext_unix_sk	= 4;
+	optional bool			tcp_established	= 5;
+	optional bool			evasive_devices	= 6;
+	optional bool			shell_job	= 7;
+	optional bool			file_locks	= 8;
+	optional int32			log_level	= 9 [default = 2];
+	optional string			log_file	= 10; /* No subdirs are allowed. Consider using work-dir */
+
+	optional criu_page_server_info	ps		= 11;
+
+	optional bool			notify_scripts	= 12;
+
+	optional string			root		= 13;
+	optional string			parent_img	= 14;
+	optional bool			track_mem	= 15;
+	optional bool			auto_dedup	= 16;
+
+	optional int32			work_dir_fd	= 17;
+	optional bool			link_remap	= 18;
+	repeated criu_veth_pair		veths		= 19; /* DEPRECATED, use external instead */
+
+	optional uint32			cpu_cap		= 20 [default = 0xffffffff];
+	optional bool			force_irmap	= 21;
+	repeated string			exec_cmd	= 22;
+
+	repeated ext_mount_map		ext_mnt		= 23; /* DEPRECATED, use external instead */
+	optional bool			manage_cgroups	= 24; /* backward compatibility */
+	repeated cgroup_root		cg_root		= 25;
+
+	optional bool			rst_sibling	= 26; /* swrk only */
+	repeated inherit_fd		inherit_fd	= 27; /* swrk only */
+
+	optional bool			auto_ext_mnt	= 28;
+	optional bool			ext_sharing 	= 29;
+	optional bool			ext_masters	= 30;
+
+	repeated string			skip_mnt	= 31;
+	repeated string			enable_fs	= 32;
+
+	repeated unix_sk                unix_sk_ino     = 33; /* DEPRECATED, use external instead */
+
+	optional criu_cg_mode		manage_cgroups_mode = 34;
+	optional uint32			ghost_limit	= 35 [default = 0x100000];
+	repeated string			irmap_scan_paths = 36;
+	repeated string			external	= 37;
+	optional uint32			empty_ns	= 38;
+	repeated join_namespace		join_ns		= 39;
+
+	optional string			cgroup_props		= 41;
+	optional string			cgroup_props_file	= 42;
+	repeated string			cgroup_dump_controller	= 43;
+
+	optional string			freeze_cgroup		= 44;
+	optional uint32			timeout			= 45;
+	optional bool			tcp_skip_in_flight	= 46;
+	optional bool			weak_sysctls		= 47;
+	optional bool			lazy_pages		= 48;
+	optional int32			status_fd		= 49;
+	optional bool			orphan_pts_master	= 50;
+	optional string			config_file		= 51;
+	optional bool			tcp_close		= 52;
+	optional string			lsm_profile		= 53;
+	optional string			tls_cacert		= 54;
+	optional string			tls_cacrl		= 55;
+	optional string			tls_cert		= 56;
+	optional string			tls_key			= 57;
+	optional bool			tls			= 58;
+	optional bool			tls_no_cn_verify	= 59;
+	optional string			cgroup_yard		= 60;
+	optional criu_pre_dump_mode	pre_dump_mode		= 61 [default = SPLICE];
+	optional int32			pidfd_store_sk		= 62;
+	optional string			lsm_mount_context	= 63;
+	optional criu_network_lock_method	network_lock		= 64 [default = IPTABLES];
+	optional bool			mntns_compat_mode	= 65;
+/*	optional bool			check_mounts		= 128;	*/
+}
+
+message criu_dump_resp {
+	optional bool restored		= 1;
+}
+
+message criu_restore_resp {
+	required int32 pid		= 1;
+}
+
+message criu_notify {
+	optional string script		= 1;
+	optional int32	pid		= 2;
+}
+
+enum criu_req_type {
+	EMPTY		= 0;
+	DUMP		= 1;
+	RESTORE		= 2;
+	CHECK		= 3;
+	PRE_DUMP	= 4;
+	PAGE_SERVER	= 5;
+
+	NOTIFY		= 6;
+
+	CPUINFO_DUMP	= 7;
+	CPUINFO_CHECK	= 8;
+
+	FEATURE_CHECK	= 9;
+
+	VERSION		= 10;
+
+	WAIT_PID	= 11;
+	PAGE_SERVER_CHLD = 12;
+
+	SINGLE_PRE_DUMP = 13;
+}
+
+/*
+ * List of features which can queried via
+ * CRIU_REQ_TYPE__FEATURE_CHECK
+ */
+message criu_features {
+	optional bool			mem_track	= 1;
+	optional bool			lazy_pages	= 2;
+	optional bool			pidfd_store	= 3;
+}
+
+/*
+ * Request -- each type corresponds to must-be-there
+ * request arguments of respective type
+ */
+
+message criu_req {
+	required criu_req_type		type		= 1;
+
+	optional criu_opts		opts		= 2;
+	optional bool			notify_success	= 3;
+
+	/*
+	 * When set service won't close the connection but
+	 * will wait for more req-s to appear. Works not
+	 * for all request types.
+	 */
+	optional bool			keep_open	= 4;
+	/*
+	 * 'features' can be used to query which features
+	 * are supported by the installed criu/kernel
+	 * via RPC.
+	 */
+	optional criu_features		features	= 5;
+
+	/* 'pid' is used for WAIT_PID */
+	optional uint32			pid		= 6;
+}
+
+/*
+ * Response -- it states whether the request was served
+ * and additional request-specific information
+ */
+
+message criu_resp {
+	required criu_req_type		type		= 1;
+	required bool			success		= 2;
+
+	optional criu_dump_resp		dump		= 3;
+	optional criu_restore_resp	restore		= 4;
+	optional criu_notify		notify		= 5;
+	optional criu_page_server_info	ps		= 6;
+
+	optional int32			cr_errno	= 7;
+	optional criu_features		features	= 8;
+	optional string			cr_errmsg	= 9;
+	optional criu_version		version		= 10;
+
+	optional int32			status		= 11;
+}
+
+/* Answer for criu_req_type.VERSION requests */
+message criu_version {
+	required int32			major_number	= 1;
+	required int32			minor_number	= 2;
+	optional string			gitid		= 3;
+	optional int32			sublevel	= 4;
+	optional int32			extra		= 5;
+	optional string			name		= 6;
+}

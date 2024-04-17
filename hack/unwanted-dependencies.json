@@ -188,7 +188,8 @@
       ],
       "golang.org/x/exp": [
         "github.com/antlr/antlr4/runtime/Go/antlr/v4",
-        "github.com/google/cel-go"
+        "github.com/google/cel-go",
+        "github.com/opencontainers/runc"
       ],
       "google.golang.org/api": [
         "cloud.google.com/go/compute",

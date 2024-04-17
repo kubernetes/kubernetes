@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+
+	"golang.org/x/sys/unix"
 )
 
 // GetMountsFromReader retrieves a list of mounts from the
 // reader provided, with an optional filter applied (use nil
 // for no filter). This can be useful in tests or benchmarks
 // that provide fake mountinfo data, or when a source other
-// than /proc/self/mountinfo needs to be read from.
+// than /proc/thread-self/mountinfo needs to be read from.
 //
 // This function is Linux-specific.
 func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
@@ -127,8 +131,40 @@ func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
 	return out, nil
 }
 
-func parseMountTable(filter FilterFunc) ([]*Info, error) {
-	f, err := os.Open("/proc/self/mountinfo")
+var (
+	haveProcThreadSelf     bool
+	haveProcThreadSelfOnce sync.Once
+)
+
+func parseMountTable(filter FilterFunc) (_ []*Info, err error) {
+	haveProcThreadSelfOnce.Do(func() {
+		_, err := os.Stat("/proc/thread-self/mountinfo")
+		haveProcThreadSelf = err == nil
+	})
+
+	// We need to lock ourselves to the current OS thread in order to make sure
+	// that the thread referenced by /proc/thread-self stays alive until we
+	// finish parsing the file.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	var f *os.File
+	if haveProcThreadSelf {
+		f, err = os.Open("/proc/thread-self/mountinfo")
+	} else {
+		// On pre-3.17 kernels (such as CentOS 7), we don't have
+		// /proc/thread-self/ so we need to manually construct
+		// /proc/self/task/<tid>/ as a fallback.
+		f, err = os.Open("/proc/self/task/" + strconv.Itoa(unix.Gettid()) + "/mountinfo")
+		if os.IsNotExist(err) {
+			// If /proc/self/task/... failed, it means that our active pid
+			// namespace doesn't match the pid namespace of the /proc mount. In
+			// this case we just have to make do with /proc/self, since there
+			// is no other way of figuring out our tid in a parent pid
+			// namespace on pre-3.17 kernels.
+			f, err = os.Open("/proc/self/mountinfo")
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -158,10 +194,10 @@ func PidMountInfo(pid int) ([]*Info, error) {
 // A few specific characters in mountinfo path entries (root and mountpoint)
 // are escaped using a backslash followed by a character's ascii code in octal.
 //
-//   space              -- as \040
-//   tab (aka \t)       -- as \011
-//   newline (aka \n)   -- as \012
-//   backslash (aka \\) -- as \134
+//	space              -- as \040
+//	tab (aka \t)       -- as \011
+//	newline (aka \n)   -- as \012
+//	backslash (aka \\) -- as \134
 //
 // This function converts path from mountinfo back, i.e. it unescapes the above sequences.
 func unescape(path string) (string, error) {

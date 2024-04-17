@@ -2,8 +2,11 @@ package fs2
 
 import (
 	"bufio"
+	"errors"
 	"os"
 	"strconv"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
@@ -11,12 +14,18 @@ import (
 )
 
 func isCpuSet(r *configs.Resources) bool {
-	return r.CpuWeight != 0 || r.CpuQuota != 0 || r.CpuPeriod != 0
+	return r.CpuWeight != 0 || r.CpuQuota != 0 || r.CpuPeriod != 0 || r.CPUIdle != nil || r.CpuBurst != nil
 }
 
 func setCpu(dirPath string, r *configs.Resources) error {
 	if !isCpuSet(r) {
 		return nil
+	}
+
+	if r.CPUIdle != nil {
+		if err := cgroups.WriteFile(dirPath, "cpu.idle", strconv.FormatInt(*r.CPUIdle, 10)); err != nil {
+			return err
+		}
 	}
 
 	// NOTE: .CpuShares is not used here. Conversion is the caller's responsibility.
@@ -26,6 +35,23 @@ func setCpu(dirPath string, r *configs.Resources) error {
 		}
 	}
 
+	var burst string
+	if r.CpuBurst != nil {
+		burst = strconv.FormatUint(*r.CpuBurst, 10)
+		if err := cgroups.WriteFile(dirPath, "cpu.max.burst", burst); err != nil {
+			// Sometimes when the burst to be set is larger
+			// than the current one, it is rejected by the kernel
+			// (EINVAL) as old_quota/new_burst exceeds the parent
+			// cgroup quota limit. If this happens and the quota is
+			// going to be set, ignore the error for now and retry
+			// after setting the quota.
+			if !errors.Is(err, unix.EINVAL) || r.CpuQuota == 0 {
+				return err
+			}
+		} else {
+			burst = ""
+		}
+	}
 	if r.CpuQuota != 0 || r.CpuPeriod != 0 {
 		str := "max"
 		if r.CpuQuota > 0 {
@@ -40,6 +66,11 @@ func setCpu(dirPath string, r *configs.Resources) error {
 		str += " " + strconv.FormatUint(period, 10)
 		if err := cgroups.WriteFile(dirPath, "cpu.max", str); err != nil {
 			return err
+		}
+		if burst != "" {
+			if err := cgroups.WriteFile(dirPath, "cpu.max.burst", burst); err != nil {
+				return err
+			}
 		}
 	}
 

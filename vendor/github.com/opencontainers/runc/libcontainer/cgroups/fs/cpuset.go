@@ -195,7 +195,7 @@ func cpusetEnsureParent(current string) error {
 	}
 	// Treat non-existing directory as cgroupfs as it will be created,
 	// and the root cpuset directory obviously exists.
-	if err != nil && err != unix.ENOENT { //nolint:errorlint // unix errors are bare
+	if err != nil && err != unix.ENOENT {
 		return &os.PathError{Op: "statfs", Path: parent, Err: err}
 	}
 

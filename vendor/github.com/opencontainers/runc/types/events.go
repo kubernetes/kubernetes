@@ -1,6 +1,9 @@
 package types
 
-import "github.com/opencontainers/runc/libcontainer/intelrdt"
+import (
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/intelrdt"
+)
 
 // Event struct for encoding the event data to json.
 type Event struct {
@@ -20,6 +23,10 @@ type Stats struct {
 	IntelRdt          IntelRdt            `json:"intel_rdt"`
 	NetworkInterfaces []*NetworkInterface `json:"network_interfaces"`
 }
+
+type PSIData = cgroups.PSIData
+
+type PSIStats = cgroups.PSIStats
 
 type Hugetlb struct {
 	Usage   uint64 `json:"usage,omitempty"`
@@ -43,6 +50,7 @@ type Blkio struct {
 	IoMergedRecursive       []BlkioEntry `json:"ioMergedRecursive,omitempty"`
 	IoTimeRecursive         []BlkioEntry `json:"ioTimeRecursive,omitempty"`
 	SectorsRecursive        []BlkioEntry `json:"sectorsRecursive,omitempty"`
+	PSI                     *PSIStats    `json:"psi,omitempty"`
 }
 
 type Pids struct {
@@ -69,6 +77,7 @@ type CpuUsage struct {
 type Cpu struct {
 	Usage      CpuUsage   `json:"usage,omitempty"`
 	Throttling Throttling `json:"throttling,omitempty"`
+	PSI        *PSIStats  `json:"psi,omitempty"`
 }
 
 type CPUSet struct {
@@ -99,6 +108,7 @@ type Memory struct {
 	Kernel    MemoryEntry       `json:"kernel,omitempty"`
 	KernelTCP MemoryEntry       `json:"kernelTCP,omitempty"`
 	Raw       map[string]uint64 `json:"raw,omitempty"`
+	PSI       *PSIStats         `json:"psi,omitempty"`
 }
 
 type L3CacheInfo struct {

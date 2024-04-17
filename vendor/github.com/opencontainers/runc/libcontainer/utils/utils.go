@@ -3,15 +3,12 @@ package utils
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unsafe"
 
-	securejoin "github.com/cyphar/filepath-securejoin"
 	"golang.org/x/sys/unix"
 )
 
@@ -43,6 +40,9 @@ func ExitStatus(status unix.WaitStatus) int {
 }
 
 // WriteJSON writes the provided struct v to w using standard json marshaling
+// without a trailing newline. This is used instead of json.Encoder because
+// there might be a problem in json decoder in some cases, see:
+// https://github.com/docker/docker/issues/14203#issuecomment-174177790
 func WriteJSON(w io.Writer, v interface{}) error {
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -99,52 +99,16 @@ func stripRoot(root, path string) string {
 	return CleanPath("/" + path)
 }
 
-// WithProcfd runs the passed closure with a procfd path (/proc/self/fd/...)
-// corresponding to the unsafePath resolved within the root. Before passing the
-// fd, this path is verified to have been inside the root -- so operating on it
-// through the passed fdpath should be safe. Do not access this path through
-// the original path strings, and do not attempt to use the pathname outside of
-// the passed closure (the file handle will be freed once the closure returns).
-func WithProcfd(root, unsafePath string, fn func(procfd string) error) error {
-	// Remove the root then forcefully resolve inside the root.
-	unsafePath = stripRoot(root, unsafePath)
-	path, err := securejoin.SecureJoin(root, unsafePath)
-	if err != nil {
-		return fmt.Errorf("resolving path inside rootfs failed: %w", err)
-	}
-
-	// Open the target path.
-	fh, err := os.OpenFile(path, unix.O_PATH|unix.O_CLOEXEC, 0)
-	if err != nil {
-		return fmt.Errorf("open o_path procfd: %w", err)
-	}
-	defer fh.Close()
-
-	// Double-check the path is the one we expected.
-	procfd := "/proc/self/fd/" + strconv.Itoa(int(fh.Fd()))
-	if realpath, err := os.Readlink(procfd); err != nil {
-		return fmt.Errorf("procfd verification failed: %w", err)
-	} else if realpath != path {
-		return fmt.Errorf("possibly malicious path detected -- refusing to operate on %s", realpath)
-	}
-
-	// Run the closure.
-	return fn(procfd)
-}
-
-// SearchLabels searches a list of key-value pairs for the provided key and
-// returns the corresponding value. The pairs must be separated with '='.
-func SearchLabels(labels []string, query string) string {
-	for _, l := range labels {
-		parts := strings.SplitN(l, "=", 2)
-		if len(parts) < 2 {
-			continue
-		}
-		if parts[0] == query {
-			return parts[1]
+// SearchLabels searches through a list of key=value pairs for a given key,
+// returning its value, and the binary flag telling whether the key exist.
+func SearchLabels(labels []string, key string) (string, bool) {
+	key += "="
+	for _, s := range labels {
+		if strings.HasPrefix(s, key) {
+			return s[len(key):], true
 		}
 	}
-	return ""
+	return "", false
 }
 
 // Annotations returns the bundle path and user defined annotations from the

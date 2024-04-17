@@ -6,6 +6,7 @@ package seccomp
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	libseccomp "github.com/seccomp/libseccomp-golang"
 	"github.com/sirupsen/logrus"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/seccomp/patchbpf"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 var (
@@ -26,17 +28,16 @@ const (
 )
 
 // InitSeccomp installs the seccomp filters to be used in the container as
-// specified in config.
-// Returns the seccomp file descriptor if any of the filters include a
-// SCMP_ACT_NOTIFY action, otherwise returns -1.
-func InitSeccomp(config *configs.Seccomp) (int, error) {
+// specified in config. Returns the seccomp file descriptor if any of the
+// filters include a SCMP_ACT_NOTIFY action.
+func InitSeccomp(config *configs.Seccomp) (*os.File, error) {
 	if config == nil {
-		return -1, errors.New("cannot initialize Seccomp - nil config passed")
+		return nil, errors.New("cannot initialize Seccomp - nil config passed")
 	}
 
 	defaultAction, err := getAction(config.DefaultAction, config.DefaultErrnoRet)
 	if err != nil {
-		return -1, errors.New("error initializing seccomp - invalid default action")
+		return nil, errors.New("error initializing seccomp - invalid default action")
 	}
 
 	// Ignore the error since pre-2.4 libseccomp is treated as API level 0.
@@ -44,7 +45,7 @@ func InitSeccomp(config *configs.Seccomp) (int, error) {
 	for _, call := range config.Syscalls {
 		if call.Action == configs.Notify {
 			if apiLevel < 6 {
-				return -1, fmt.Errorf("seccomp notify unsupported: API level: got %d, want at least 6. Please try with libseccomp >= 2.5.0 and Linux >= 5.7", apiLevel)
+				return nil, fmt.Errorf("seccomp notify unsupported: API level: got %d, want at least 6. Please try with libseccomp >= 2.5.0 and Linux >= 5.7", apiLevel)
 			}
 
 			// We can't allow the write syscall to notify to the seccomp agent.
@@ -60,54 +61,135 @@ func InitSeccomp(config *configs.Seccomp) (int, error) {
 			// agent allows those syscalls to proceed, initialization works just fine and the agent can
 			// handle future read()/close() syscalls as it wanted.
 			if call.Name == "write" {
-				return -1, errors.New("SCMP_ACT_NOTIFY cannot be used for the write syscall")
+				return nil, errors.New("SCMP_ACT_NOTIFY cannot be used for the write syscall")
 			}
 		}
 	}
 
 	// See comment on why write is not allowed. The same reason applies, as this can mean handling write too.
 	if defaultAction == libseccomp.ActNotify {
-		return -1, errors.New("SCMP_ACT_NOTIFY cannot be used as default action")
+		return nil, errors.New("SCMP_ACT_NOTIFY cannot be used as default action")
 	}
 
 	filter, err := libseccomp.NewFilter(defaultAction)
 	if err != nil {
-		return -1, fmt.Errorf("error creating filter: %w", err)
+		return nil, fmt.Errorf("error creating filter: %w", err)
 	}
 
 	// Add extra architectures
 	for _, arch := range config.Architectures {
 		scmpArch, err := libseccomp.GetArchFromString(arch)
 		if err != nil {
-			return -1, fmt.Errorf("error validating Seccomp architecture: %w", err)
+			return nil, fmt.Errorf("error validating Seccomp architecture: %w", err)
 		}
 		if err := filter.AddArch(scmpArch); err != nil {
-			return -1, fmt.Errorf("error adding architecture to seccomp filter: %w", err)
+			return nil, fmt.Errorf("error adding architecture to seccomp filter: %w", err)
+		}
+	}
+
+	// Add extra flags.
+	for _, flag := range config.Flags {
+		if err := setFlag(filter, flag); err != nil {
+			return nil, err
+		}
+	}
+
+	// Enable libseccomp binary tree optimization for longer rulesets.
+	//
+	// The number below chosen semi-arbitrarily, considering the following:
+	// 1. libseccomp <= 2.5.4 misbehaves when binary tree optimization
+	// is enabled and there are 0 rules.
+	// 2. All known libseccomp versions (2.5.0 to 2.5.4) generate a binary
+	// tree with 4 syscalls per node.
+	if len(config.Syscalls) > 32 {
+		if err := filter.SetOptimize(2); err != nil {
+			// The error is not fatal and is probably means we have older libseccomp.
+			logrus.Debugf("seccomp binary tree optimization not available: %v", err)
 		}
 	}
 
 	// Unset no new privs bit
 	if err := filter.SetNoNewPrivsBit(false); err != nil {
-		return -1, fmt.Errorf("error setting no new privileges: %w", err)
+		return nil, fmt.Errorf("error setting no new privileges: %w", err)
 	}
 
 	// Add a rule for each syscall
 	for _, call := range config.Syscalls {
 		if call == nil {
-			return -1, errors.New("encountered nil syscall while initializing Seccomp")
+			return nil, errors.New("encountered nil syscall while initializing Seccomp")
 		}
 
 		if err := matchCall(filter, call, defaultAction); err != nil {
-			return -1, err
+			return nil, err
 		}
 	}
 
 	seccompFd, err := patchbpf.PatchAndLoad(config, filter)
 	if err != nil {
-		return -1, fmt.Errorf("error loading seccomp filter into kernel: %w", err)
+		return nil, fmt.Errorf("error loading seccomp filter into kernel: %w", err)
+	}
+	return seccompFd, nil
+}
+
+type unknownFlagError struct {
+	flag specs.LinuxSeccompFlag
+}
+
+func (e *unknownFlagError) Error() string {
+	return "seccomp flag " + string(e.flag) + " is not known to runc"
+}
+
+func setFlag(filter *libseccomp.ScmpFilter, flag specs.LinuxSeccompFlag) error {
+	switch flag {
+	case flagTsync:
+		// libseccomp-golang always use filterAttrTsync when
+		// possible so all goroutines will receive the same
+		// rules, so there is nothing to do. It does not make
+		// sense to apply the seccomp filter on only one
+		// thread; other threads will be terminated after exec
+		// anyway.
+		return nil
+	case specs.LinuxSeccompFlagLog:
+		if err := filter.SetLogBit(true); err != nil {
+			return fmt.Errorf("error adding log flag to seccomp filter: %w", err)
+		}
+		return nil
+	case specs.LinuxSeccompFlagSpecAllow:
+		if err := filter.SetSSB(true); err != nil {
+			return fmt.Errorf("error adding SSB flag to seccomp filter: %w", err)
+		}
+		return nil
+	}
+	// NOTE when adding more flags above, do not forget to also:
+	// - add new flags to `flags` slice in config.go;
+	// - add new flag values to flags_value() in tests/integration/seccomp.bats;
+	// - modify func filterFlags in patchbpf/ accordingly.
+
+	return &unknownFlagError{flag: flag}
+}
+
+// FlagSupported checks if the flag is known to runc and supported by
+// currently used libseccomp and kernel (i.e. it can be set).
+func FlagSupported(flag specs.LinuxSeccompFlag) error {
+	filter := &libseccomp.ScmpFilter{}
+	err := setFlag(filter, flag)
+
+	// For flags we don't know, setFlag returns unknownFlagError.
+	var uf *unknownFlagError
+	if errors.As(err, &uf) {
+		return err
+	}
+	// For flags that are known to runc and libseccomp-golang but can not
+	// be applied because either libseccomp or the kernel is too old,
+	// seccomp.VersionError is returned.
+	var verErr *libseccomp.VersionError
+	if errors.As(err, &verErr) {
+		// Not supported by libseccomp or the kernel.
+		return err
 	}
 
-	return seccompFd, nil
+	// All other flags are known and supported.
+	return nil
 }
 
 // Convert Libcontainer Action to Libseccomp ScmpAction

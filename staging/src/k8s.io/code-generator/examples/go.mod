@@ -55,3 +55,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace github.com/opencontainers/runc => github.com/kolyshkin/runc v1.0.1-0.20240417220538-4f3319b56d1c

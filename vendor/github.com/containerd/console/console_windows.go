@@ -24,12 +24,13 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var (
-	vtInputSupported  bool
-	ErrNotImplemented = errors.New("not implemented")
-)
+var vtInputSupported bool
 
 func (m *master) initStdios() {
+	// Note: We discard console mode warnings, because in/out can be redirected.
+	//
+	// TODO: Investigate opening CONOUT$/CONIN$ to handle this correctly
+
 	m.in = windows.Handle(os.Stdin.Fd())
 	if err := windows.GetConsoleMode(m.in, &m.inMode); err == nil {
 		// Validate that windows.ENABLE_VIRTUAL_TERMINAL_INPUT is supported, but do not set it.
@@ -39,8 +40,6 @@ func (m *master) initStdios() {
 		// Unconditionally set the console mode back even on failure because SetConsoleMode
 		// remembers invalid bits on input handles.
 		windows.SetConsoleMode(m.in, m.inMode)
-	} else {
-		fmt.Printf("failed to get console mode for stdin: %v\n", err)
 	}
 
 	m.out = windows.Handle(os.Stdout.Fd())
@@ -50,8 +49,6 @@ func (m *master) initStdios() {
 		} else {
 			windows.SetConsoleMode(m.out, m.outMode)
 		}
-	} else {
-		fmt.Printf("failed to get console mode for stdout: %v\n", err)
 	}
 
 	m.err = windows.Handle(os.Stderr.Fd())
@@ -61,8 +58,6 @@ func (m *master) initStdios() {
 		} else {
 			windows.SetConsoleMode(m.err, m.errMode)
 		}
-	} else {
-		fmt.Printf("failed to get console mode for stderr: %v\n", err)
 	}
 }
 
@@ -94,6 +89,8 @@ func (m *master) SetRaw() error {
 }
 
 func (m *master) Reset() error {
+	var errs []error
+
 	for _, s := range []struct {
 		fd   windows.Handle
 		mode uint32
@@ -103,8 +100,14 @@ func (m *master) Reset() error {
 		{m.err, m.errMode},
 	} {
 		if err := windows.SetConsoleMode(s.fd, s.mode); err != nil {
-			return fmt.Errorf("unable to restore console mode: %w", err)
+			// we can't just abort on the first error, otherwise we might leave
+			// the console in an unexpected state.
+			errs = append(errs, fmt.Errorf("unable to restore console mode: %w", err))
 		}
+	}
+
+	if len(errs) > 0 {
+		return errs[0]
 	}
 
 	return nil
