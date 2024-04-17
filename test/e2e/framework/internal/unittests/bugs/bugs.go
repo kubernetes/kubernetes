@@ -133,12 +133,12 @@ ERROR: some/relative/path/buggy.go:200: with spaces
 
 	// Used by unittests/list-labels.
 	ListLabelsOutput = `The following labels can be used with 'ginkgo run --label-filter':
-    Alpha
-    Beta
     Conformance
     Disruptive
     Environment:Linux
     Environment:no-such-env
+    Feature:Alpha
+    Feature:Beta
     Feature:feature-foo
     Feature:no-such-feature
     FeatureGate:TestAlphaFeature
