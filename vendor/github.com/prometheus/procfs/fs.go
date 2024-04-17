@@ -20,8 +20,8 @@ import (
 // FS represents the pseudo-filesystem sys, which provides an interface to
 // kernel data structures.
 type FS struct {
-	proc fs.FS
-	real bool
+	proc   fs.FS
+	isReal bool
 }
 
 // DefaultMountPoint is the common mount point of the proc filesystem.
@@ -41,10 +41,10 @@ func NewFS(mountPoint string) (FS, error) {
 		return FS{}, err
 	}
 
-	real, err := isRealProc(mountPoint)
+	isReal, err := isRealProc(mountPoint)
 	if err != nil {
 		return FS{}, err
 	}
 
-	return FS{fs, real}, nil
+	return FS{fs, isReal}, nil
 }

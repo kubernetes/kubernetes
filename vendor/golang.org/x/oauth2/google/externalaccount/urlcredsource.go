@@ -19,15 +19,19 @@ import (
 type urlCredentialSource struct {
 	URL     string
 	Headers map[string]string
-	Format  format
+	Format  Format
 	ctx     context.Context
+}
+
+func (cs urlCredentialSource) credentialSourceType() string {
+	return "url"
 }
 
 func (cs urlCredentialSource) subjectToken() (string, error) {
 	client := oauth2.NewClient(cs.ctx, nil)
 	req, err := http.NewRequest("GET", cs.URL, nil)
 	if err != nil {
-		return "", fmt.Errorf("oauth2/google: HTTP request for URL-sourced credential failed: %v", err)
+		return "", fmt.Errorf("oauth2/google/externalaccount: HTTP request for URL-sourced credential failed: %v", err)
 	}
 	req = req.WithContext(cs.ctx)
 
@@ -36,16 +40,16 @@ func (cs urlCredentialSource) subjectToken() (string, error) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("oauth2/google: invalid response when retrieving subject token: %v", err)
+		return "", fmt.Errorf("oauth2/google/externalaccount: invalid response when retrieving subject token: %v", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return "", fmt.Errorf("oauth2/google: invalid body in subject token URL query: %v", err)
+		return "", fmt.Errorf("oauth2/google/externalaccount: invalid body in subject token URL query: %v", err)
 	}
 	if c := resp.StatusCode; c < 200 || c > 299 {
-		return "", fmt.Errorf("oauth2/google: status code %d: %s", c, respBody)
+		return "", fmt.Errorf("oauth2/google/externalaccount: status code %d: %s", c, respBody)
 	}
 
 	switch cs.Format.Type {
@@ -53,15 +57,15 @@ func (cs urlCredentialSource) subjectToken() (string, error) {
 		jsonData := make(map[string]interface{})
 		err = json.Unmarshal(respBody, &jsonData)
 		if err != nil {
-			return "", fmt.Errorf("oauth2/google: failed to unmarshal subject token file: %v", err)
+			return "", fmt.Errorf("oauth2/google/externalaccount: failed to unmarshal subject token file: %v", err)
 		}
 		val, ok := jsonData[cs.Format.SubjectTokenFieldName]
 		if !ok {
-			return "", errors.New("oauth2/google: provided subject_token_field_name not found in credentials")
+			return "", errors.New("oauth2/google/externalaccount: provided subject_token_field_name not found in credentials")
 		}
 		token, ok := val.(string)
 		if !ok {
-			return "", errors.New("oauth2/google: improperly formatted subject token")
+			return "", errors.New("oauth2/google/externalaccount: improperly formatted subject token")
 		}
 		return token, nil
 	case "text":
@@ -69,7 +73,7 @@ func (cs urlCredentialSource) subjectToken() (string, error) {
 	case "":
 		return string(respBody), nil
 	default:
-		return "", errors.New("oauth2/google: invalid credential_source file format type")
+		return "", errors.New("oauth2/google/externalaccount: invalid credential_source file format type")
 	}
 
 }

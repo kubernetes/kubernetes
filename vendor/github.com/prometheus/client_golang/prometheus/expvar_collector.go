@@ -48,7 +48,7 @@ func (e *expvarCollector) Collect(ch chan<- Metric) {
 			continue
 		}
 		var v interface{}
-		labels := make([]string, len(desc.variableLabels))
+		labels := make([]string, len(desc.variableLabels.names))
 		if err := json.Unmarshal([]byte(expVar.String()), &v); err != nil {
 			ch <- NewInvalidMetric(desc, err)
 			continue
