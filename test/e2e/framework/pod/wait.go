@@ -104,17 +104,11 @@ func BeInPhase(phase v1.PodPhase) types.GomegaMatcher {
 // 2. All Pods in Namespace ns are either Ready or Succeeded
 // 3. All Pods part of a ReplicaSet or ReplicationController in Namespace ns are Ready
 //
-// After the timeout has elapsed, an error is returned if and only if either of
-// the following conditions hold:
-//  1. The number of Pods in Namespace ns that are not Succeeded or Failed is less than minPods
-//  2. The number of Pods in Namespace ns that are not Ready, Succeeded, or Failed
-//     is greater than to allowedNotReadyPods
-//
-// Roughly speaking, this means that not "too many" Pods are not Ready, where the tolerance
-// for "too many" is controlled by allowedNotReadyPods.
+// After the timeout has elapsed, an error is returned if the number of Pods in a Pending Phase
+// is greater than allowedNotReadyPods.
 //
 // It is generally recommended to use WaitForPodsRunningReady instead of this function
-// whenever possible, because it is easier to understand. Similar to WaitForPodsRunningReady,
+// whenever possible, because its behavior is more intuitive. Similar to WaitForPodsRunningReady,
 // this function requests the list of pods on every iteration, making it useful for situations
 // where the set of Pods is likely changing, such as during cluster startup.
 //
@@ -218,7 +212,7 @@ func WaitForAlmostAllPodsReady(ctx context.Context, c clientset.Interface, ns st
 	}))
 
 	// An error might not be fatal.
-	if nOk+len(otherPods) >= minPods && len(otherPods) <= allowedNotReadyPods {
+	if len(otherPods) <= allowedNotReadyPods {
 		return nil
 	}
 	return err
