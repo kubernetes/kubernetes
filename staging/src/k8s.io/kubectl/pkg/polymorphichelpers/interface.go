@@ -28,7 +28,7 @@ import (
 )
 
 // AllPodLogsForObjectFunc is a function type that can tell you how to get logs for a runtime.object
-type AllPodLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool, allPods bool) (map[v1.ObjectReference]rest.ResponseWrapper, error)
+type AllPodLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[v1.ObjectReference]rest.ResponseWrapper, error)
 
 // AllPodLogsForObjectFn gives a way to easily override the function for unit testing if needed.
 var AllPodLogsForObjectFn AllPodLogsForObjectFunc = allPodLogsForObject

@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 )
 
-func allPodLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool, allPods bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+func allPodLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func allPodLogsForObject(restClientGetter genericclioptions.RESTClientGetter, ob
 	if err != nil {
 		return nil, err
 	}
-	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, allPods)
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, true)
 }
 
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
