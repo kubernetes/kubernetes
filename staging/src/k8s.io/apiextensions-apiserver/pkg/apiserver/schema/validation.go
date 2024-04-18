@@ -91,6 +91,16 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 	for k, v := range s.Properties {
 		allErrs = append(allErrs, validateStructuralInvariants(&v, fieldLevel, fldPath.Child("properties").Key(k))...)
 	}
+
+	if s.AdditionalProperties != nil {
+		if lvl == rootLevel {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "must not be used at the root"))
+		}
+		if s.AdditionalProperties.Structural != nil {
+			allErrs = append(allErrs, validateStructuralInvariants(s.AdditionalProperties.Structural, fieldLevel, fldPath.Child("additionalProperties"))...)
+		}
+	}
+
 	allErrs = append(allErrs, validateGeneric(&s.Generic, lvl, fldPath)...)
 	allErrs = append(allErrs, validateExtensions(&s.Extensions, fldPath)...)
 
@@ -207,18 +217,7 @@ func validateGeneric(g *Generic, lvl level, fldPath *field.Path) field.ErrorList
 		return nil
 	}
 
-	allErrs := field.ErrorList{}
-
-	if g.AdditionalProperties != nil {
-		if lvl == rootLevel {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "must not be used at the root"))
-		}
-		if g.AdditionalProperties.Structural != nil {
-			allErrs = append(allErrs, validateStructuralInvariants(g.AdditionalProperties.Structural, fieldLevel, fldPath.Child("additionalProperties"))...)
-		}
-	}
-
-	return allErrs
+	return nil
 }
 
 // validateExtensions checks Kubernetes vendor extensions of a structural schema.
@@ -282,6 +281,7 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 
 	allErrs = append(allErrs, validateValueValidation(&v.ValueValidation, skipAnyOf, skipAllOfAnyOf, lvl, fldPath)...)
 	allErrs = append(allErrs, validateNestedValueValidation(v.Items, false, false, lvl, fldPath.Child("items"))...)
+	allErrs = append(allErrs, validateNestedValueValidation(v.AdditionalProperties, false, false, lvl, fldPath.Child("additionalProperties"))...)
 
 	for k, fld := range v.Properties {
 		allErrs = append(allErrs, validateNestedValueValidation(&fld, false, false, fieldLevel, fldPath.Child("properties").Key(k))...)
@@ -289,9 +289,6 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 
 	if len(v.ForbiddenGenerics.Type) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("type"), "must be empty to be structural"))
-	}
-	if v.ForbiddenGenerics.AdditionalProperties != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "must be undefined to be structural"))
 	}
 	if v.ForbiddenGenerics.Default.Object != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "must be undefined to be structural"))
@@ -323,9 +320,6 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 	}
 	if v.ForbiddenExtensions.XMapType != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-map-type"), "must be undefined to be structural"))
-	}
-	if len(v.ForbiddenExtensions.XValidations) > 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations"), "must be empty to be structural"))
 	}
 
 	// forbid reasoning about metadata because it can lead to metadata restriction we don't want
