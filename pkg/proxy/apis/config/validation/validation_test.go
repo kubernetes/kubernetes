@@ -827,7 +827,7 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 func TestValidateProxyMode(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 	successCases := []kubeproxyconfig.ProxyMode{""}
-	expectedNonExistentErrorMsg := "must be iptables, ipvs or blank (blank means the best-available proxy [currently iptables])"
+	expectedNonExistentErrorMsg := "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])"
 
 	if runtime.GOOS == "windows" {
 		successCases = append(successCases, kubeproxyconfig.ProxyModeKernelspace)
