@@ -25,12 +25,14 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	resourceapi "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
@@ -46,10 +48,12 @@ type ExamplePlugin struct {
 	cdiDir     string
 	driverName string
 	nodeName   string
+	instances  sets.Set[string]
 
-	mutex     sync.Mutex
-	prepared  map[ClaimID]bool
-	gRPCCalls []GRPCCall
+	mutex          sync.Mutex
+	instancesInUse sets.Set[string]
+	prepared       map[ClaimID]any
+	gRPCCalls      []GRPCCall
 
 	block bool
 }
@@ -117,13 +121,19 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string
 		}
 	}
 	ex := &ExamplePlugin{
-		stopCh:     ctx.Done(),
-		logger:     logger,
-		fileOps:    fileOps,
-		cdiDir:     cdiDir,
-		driverName: driverName,
-		nodeName:   nodeName,
-		prepared:   make(map[ClaimID]bool),
+		stopCh:         ctx.Done(),
+		logger:         logger,
+		fileOps:        fileOps,
+		cdiDir:         cdiDir,
+		driverName:     driverName,
+		nodeName:       nodeName,
+		instances:      sets.New[string](),
+		instancesInUse: sets.New[string](),
+		prepared:       make(map[ClaimID]any),
+	}
+
+	for i := 0; i < ex.fileOps.NumResourceInstances; i++ {
+		ex.instances.Insert(fmt.Sprintf("instance-%02d", i))
 	}
 
 	opts = append(opts,
@@ -174,14 +184,32 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 		return nil, ctx.Err()
 	}
 
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+
+	deviceName := "claim-" + req.ClaimUid
+	vendor := ex.driverName
+	class := "test"
+	dev := vendor + "/" + class + "=" + deviceName
+	resp := &drapbv1alpha2.NodePrepareResourceResponse{CdiDevices: []string{dev}}
+
+	claimID := ClaimID{Name: req.ClaimName, UID: req.ClaimUid}
+	if _, ok := ex.prepared[claimID]; ok {
+		// Idempotent call, nothing to do.
+		return resp, nil
+	}
+
 	// Determine environment variables.
 	var p parameters
+	var resourceHandle any
+	var instanceNames []string
 	switch len(req.StructuredResourceHandle) {
 	case 0:
 		// Control plane controller did the allocation.
 		if err := json.Unmarshal([]byte(req.ResourceHandle), &p); err != nil {
 			return nil, fmt.Errorf("unmarshal resource handle: %w", err)
 		}
+		resourceHandle = req.ResourceHandle
 	case 1:
 		// Scheduler did the allocation with structured parameters.
 		handle := req.StructuredResourceHandle[0]
@@ -199,7 +227,23 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 			if err := extractParameters(result.VendorRequestParameters, &p.EnvVars, "user"); err != nil {
 				return nil, err
 			}
+			namedResources := result.NamedResources
+			if namedResources == nil {
+				return nil, errors.New("missing named resources allocation result")
+			}
+			instanceName := namedResources.Name
+			if instanceName == "" {
+				return nil, errors.New("empty named resources instance name")
+			}
+			if !ex.instances.Has(instanceName) {
+				return nil, fmt.Errorf("unknown allocated instance %q", instanceName)
+			}
+			if ex.instancesInUse.Has(instanceName) {
+				return nil, fmt.Errorf("resource instance %q used more than once", instanceName)
+			}
+			instanceNames = append(instanceNames, instanceName)
 		}
+		resourceHandle = handle
 	default:
 		// Huh?
 		return nil, fmt.Errorf("invalid length of NodePrepareResourceRequest.StructuredResourceHandle: %d", len(req.StructuredResourceHandle))
@@ -216,9 +260,6 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 		envs = append(envs, key+"="+val)
 	}
 
-	deviceName := "claim-" + req.ClaimUid
-	vendor := ex.driverName
-	class := "test"
 	spec := &spec{
 		Version: "0.3.0", // This has to be a version accepted by the runtimes.
 		Kind:    vendor + "/" + class,
@@ -242,12 +283,10 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 		return nil, fmt.Errorf("failed to write CDI file %v", err)
 	}
 
-	dev := vendor + "/" + class + "=" + deviceName
-	resp := &drapbv1alpha2.NodePrepareResourceResponse{CdiDevices: []string{dev}}
-
-	ex.mutex.Lock()
-	defer ex.mutex.Unlock()
-	ex.prepared[ClaimID{Name: req.ClaimName, UID: req.ClaimUid}] = true
+	ex.prepared[claimID] = resourceHandle
+	for _, instanceName := range instanceNames {
+		ex.instancesInUse.Insert(instanceName)
+	}
 
 	logger.V(3).Info("CDI file created", "path", filePath, "device", dev)
 	return resp, nil
@@ -316,7 +355,34 @@ func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1
 
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
-	delete(ex.prepared, ClaimID{Name: req.ClaimName, UID: req.ClaimUid})
+
+	claimID := ClaimID{Name: req.ClaimName, UID: req.ClaimUid}
+	resp := &drapbv1alpha2.NodeUnprepareResourceResponse{}
+	expectedResourceHandle, ok := ex.prepared[claimID]
+	if !ok {
+		// Idempotent call, nothing to do.
+		return resp, nil
+	}
+
+	var actualResourceHandle any = req.ResourceHandle
+	if req.StructuredResourceHandle != nil {
+		if len(req.StructuredResourceHandle) != 1 {
+			return nil, fmt.Errorf("unexpected number of entries in StructuredResourceHandle: %d", len(req.StructuredResourceHandle))
+		}
+		actualResourceHandle = req.StructuredResourceHandle[0]
+	}
+	if diff := cmp.Diff(expectedResourceHandle, actualResourceHandle); diff != "" {
+		return nil, fmt.Errorf("difference between expected (-) and actual resource handle (+):\n%s", diff)
+	}
+	delete(ex.prepared, claimID)
+	if structuredResourceHandle := req.StructuredResourceHandle; structuredResourceHandle != nil {
+		for _, handle := range structuredResourceHandle {
+			for _, result := range handle.Results {
+				instanceName := result.NamedResources.Name
+				ex.instancesInUse.Delete(instanceName)
+			}
+		}
+	}
 
 	return &drapbv1alpha2.NodeUnprepareResourceResponse{}, nil
 }
@@ -327,10 +393,11 @@ func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv
 	}
 	for _, claimReq := range req.Claims {
 		_, err := ex.NodeUnprepareResource(ctx, &drapbv1alpha2.NodeUnprepareResourceRequest{
-			Namespace:      claimReq.Namespace,
-			ClaimName:      claimReq.Name,
-			ClaimUid:       claimReq.Uid,
-			ResourceHandle: claimReq.ResourceHandle,
+			Namespace:                claimReq.Namespace,
+			ClaimName:                claimReq.Name,
+			ClaimUid:                 claimReq.Uid,
+			ResourceHandle:           claimReq.ResourceHandle,
+			StructuredResourceHandle: claimReq.StructuredResourceHandle,
 		})
 		if err != nil {
 			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{
@@ -349,9 +416,9 @@ func (ex *ExamplePlugin) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAn
 		return status.New(codes.Unimplemented, "node resource support disabled").Err()
 	}
 
-	instances := make([]resourceapi.NamedResourcesInstance, ex.fileOps.NumResourceInstances)
-	for i := 0; i < ex.fileOps.NumResourceInstances; i++ {
-		instances[i].Name = fmt.Sprintf("instance-%d", i)
+	instances := make([]resourceapi.NamedResourcesInstance, len(ex.instances))
+	for i, name := range sets.List(ex.instances) {
+		instances[i].Name = name
 	}
 	resp := &drapbv1alpha3.NodeListAndWatchResourcesResponse{
 		Resources: []*resourceapi.ResourceModel{
