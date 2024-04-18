@@ -34,6 +34,12 @@ type RateLimitingInterface interface {
 	NumRequeues(item interface{}) int
 }
 
+// PeekableRateLimitingInterface extends RateLimitingInterface with peekable behavior
+type PeekableRateLimitingInterface interface {
+	RateLimitingInterface
+	DelayingPeekableQueue
+}
+
 // RateLimitingQueueConfig specifies optional configurations to customize a RateLimitingInterface.
 
 type RateLimitingQueueConfig struct {
@@ -48,21 +54,21 @@ type RateLimitingQueueConfig struct {
 	Clock clock.WithTicker
 
 	// DelayingQueue optionally allows injecting custom delaying queue DelayingInterface instead of the default one.
-	DelayingQueue DelayingInterface
+	DelayingQueue DelayingPeekableQueue
 }
 
 // NewRateLimitingQueue constructs a new workqueue with rateLimited queuing ability
 // Remember to call Forget!  If you don't, you may end up tracking failures forever.
 // NewRateLimitingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewRateLimitingQueueWithConfig instead and specify a name.
-func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
+func NewRateLimitingQueue(rateLimiter RateLimiter) PeekableRateLimitingInterface {
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{})
 }
 
 // NewRateLimitingQueueWithConfig constructs a new workqueue with rateLimited queuing ability
 // with options to customize different properties.
 // Remember to call Forget!  If you don't, you may end up tracking failures forever.
-func NewRateLimitingQueueWithConfig(rateLimiter RateLimiter, config RateLimitingQueueConfig) RateLimitingInterface {
+func NewRateLimitingQueueWithConfig(rateLimiter RateLimiter, config RateLimitingQueueConfig) PeekableRateLimitingInterface {
 	if config.Clock == nil {
 		config.Clock = clock.RealClock{}
 	}
@@ -76,14 +82,14 @@ func NewRateLimitingQueueWithConfig(rateLimiter RateLimiter, config RateLimiting
 	}
 
 	return &rateLimitingType{
-		DelayingInterface: config.DelayingQueue,
-		rateLimiter:       rateLimiter,
+		DelayingPeekableQueue: config.DelayingQueue,
+		rateLimiter:           rateLimiter,
 	}
 }
 
 // NewNamedRateLimitingQueue constructs a new named workqueue with rateLimited queuing ability.
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
-func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
+func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) PeekableRateLimitingInterface {
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
 		Name: name,
 	})
@@ -92,7 +98,7 @@ func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitin
 // NewRateLimitingQueueWithDelayingInterface constructs a new named workqueue with rateLimited queuing ability
 // with the option to inject a custom delaying queue instead of the default one.
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
-func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter RateLimiter) RateLimitingInterface {
+func NewRateLimitingQueueWithDelayingInterface(di DelayingPeekableQueue, rateLimiter RateLimiter) PeekableRateLimitingInterface {
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
 		DelayingQueue: di,
 	})
@@ -100,14 +106,17 @@ func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter
 
 // rateLimitingType wraps an Interface and provides rateLimited re-enquing
 type rateLimitingType struct {
-	DelayingInterface
+	DelayingPeekableQueue
 
 	rateLimiter RateLimiter
 }
 
 // AddRateLimited AddAfter's the item based on the time when the rate limiter says it's ok
 func (q *rateLimitingType) AddRateLimited(item interface{}) {
-	q.DelayingInterface.AddAfter(item, q.rateLimiter.When(item))
+	if q.DelayingPeekableQueue.Has(item) {
+		return
+	}
+	q.DelayingPeekableQueue.AddAfter(item, q.rateLimiter.When(item))
 }
 
 func (q *rateLimitingType) NumRequeues(item interface{}) int {
