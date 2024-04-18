@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/utils/clock"
 )
@@ -106,6 +107,7 @@ func (s *GenericAPIServer) installReadyz() {
 	healthz.InstallReadyzHandlerWithHealthyFunc(s.Handler.NonGoRestfulMux, func() {
 		// note: InstallReadyzHandlerWithHealthyFunc guarantees that this is called only once
 		s.lifecycleSignals.HasBeenReady.Signal()
+		s.Eventf(corev1.EventTypeNormal, s.lifecycleSignals.HasBeenReady.Name(), "KubeAPIServer is ready")
 	}, s.readyzChecks...)
 }
 
