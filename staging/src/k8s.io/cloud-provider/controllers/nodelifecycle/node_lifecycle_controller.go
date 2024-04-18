@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	deleteNodeEvent = "DeletingNode"
+	deleteNodeEvent       = "DeletingNode"
+	deleteNodeFailedEvent = "DeletingNodeFailed"
 )
 
 var ShutdownTaint = &v1.Taint{
@@ -175,6 +176,8 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 
 			if err := c.kubeClient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
 				klog.Errorf("unable to delete node %q: %v", node.Name, err)
+				c.recorder.Eventf(ref, v1.EventTypeWarning, deleteNodeFailedEvent,
+					"Failed deleting node %s: %v", node.Name, err)
 			}
 		} else {
 			// Node exists. We need to check this to get taint working in similar in all cloudproviders
