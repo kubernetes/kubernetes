@@ -224,12 +224,16 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		return c.watchObject(namespace, options)
 	}
 	store := c.newStore()
-	reflector := cache.NewNamedReflector(
-		fmt.Sprintf("object-%q/%q", namespace, name),
+	reflector := cache.NewReflectorWithOptions(
 		&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc},
 		c.newObject(),
 		store,
-		0,
+		cache.ReflectorOptions{
+			Name: fmt.Sprintf("object-%q/%q", namespace, name),
+			// Bump default 5m MinWatchTimeout to avoid recreating
+			// watches too often.
+			MinWatchTimeout: 30 * time.Minute,
+		},
 	)
 	item := &objectCacheItem{
 		refMap:    make(map[types.UID]int),
