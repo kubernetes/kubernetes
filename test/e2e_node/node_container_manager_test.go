@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -45,7 +46,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
+func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, hugePageAvailable bool) {
 	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
@@ -56,6 +57,10 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) 
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
 		string(pidlimit.PIDs):     "738",
+	}
+	if hugePageAvailable {
+		initialConfig.SystemReserved[hugepagesResourceName2Mi] = "2Mi"
+		initialConfig.KubeReserved[hugepagesResourceName2Mi] = "2Mi"
 	}
 	initialConfig.EvictionHard = map[string]string{"memory.available": "100Mi"}
 	// Necessary for allocatable cgroup creation.
@@ -91,8 +96,8 @@ func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
 	return nil
 }
 
-func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*resource.Quantity, *resource.Quantity, *resource.Quantity) {
-	var allocatableCPU, allocatableMemory, allocatablePIDs *resource.Quantity
+func getAllocatableLimits(cpu, memory, pids, hugepages2Mi string, capacity v1.ResourceList, hugePageAvailable bool) (*resource.Quantity, *resource.Quantity, *resource.Quantity, *resource.Quantity) {
+	var allocatableCPU, allocatableMemory, allocatablePIDs, allocatableHugepages2Mi *resource.Quantity
 	// Total cpu reservation is 200m.
 	for k, v := range capacity {
 		if k == v1.ResourceCPU {
@@ -105,6 +110,11 @@ func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*
 			allocatableMemory = &c
 			allocatableMemory.Sub(resource.MustParse(memory))
 		}
+		if hugePageAvailable && k == hugepagesResourceName2Mi {
+			c := v.DeepCopy()
+			allocatableHugepages2Mi = &c
+			allocatableHugepages2Mi.Sub(resource.MustParse(hugepages2Mi))
+		}
 	}
 	// Process IDs are not a node allocatable, so we have to do this ad hoc
 	pidlimits, err := pidlimit.Stats()
@@ -112,7 +122,7 @@ func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*
 		allocatablePIDs = resource.NewQuantity(int64(*pidlimits.MaxPID), resource.DecimalSI)
 		allocatablePIDs.Sub(resource.MustParse(pids))
 	}
-	return allocatableCPU, allocatableMemory, allocatablePIDs
+	return allocatableCPU, allocatableMemory, allocatablePIDs, allocatableHugepages2Mi
 }
 
 const (
@@ -161,6 +171,46 @@ func convertSharesToWeight(shares int64) int64 {
 }
 
 func runTest(ctx context.Context, f *framework.Framework) error {
+	var hugePageAvailable bool
+	hugepages := map[string]int{hugepagesResourceName2Mi: 5}
+
+	setHugepages := func(ctx context.Context) bool {
+		for hugepagesResource, count := range hugepages {
+			size := resourceToSize[hugepagesResource]
+			ginkgo.By(fmt.Sprintf("Verifying hugepages %d are supported", size))
+			if !isHugePageAvailable(size) {
+				ginkgo.By(fmt.Sprintf("the tests about hugepages will be skipped because hugepages of size %d not supported", size))
+				return false
+			}
+
+			ginkgo.By(fmt.Sprintf("Configuring the host to reserve %d of pre-allocated hugepages of size %d", count, size))
+			gomega.Eventually(ctx, func() error {
+				if err := configureHugePages(size, count, nil); err != nil {
+					return err
+				}
+				return nil
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+		}
+		return true
+	}
+
+	releaseHugepages := func(ctx context.Context) {
+		ginkgo.By("Releasing hugepages")
+		gomega.Eventually(ctx, func() error {
+			for hugepagesResource := range hugepages {
+				size := resourceToSize[hugepagesResource]
+				if !isHugePageAvailable(size) {
+					return nil
+				}
+				command := fmt.Sprintf("echo 0 > %s-%dkB/%s", hugepagesDirPrefix, resourceToSize[hugepagesResource], hugepagesCapacityFile)
+				if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
+					return err
+				}
+			}
+			return nil
+		}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+	}
+
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	subsystems, err := cm.GetCgroupSubsystems()
 	if err != nil {
@@ -207,12 +257,19 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 		}
 	})
+
+	// setup hugepages
+	hugePageAvailable = setHugepages(ctx)
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		releaseHugepages(ctx)
+	})
+
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
 		return err
 	}
 	newCfg := oldCfg.DeepCopy()
 	// Change existing kubelet configuration
-	setDesiredConfiguration(newCfg)
+	setDesiredConfiguration(newCfg, hugePageAvailable)
 	// Set the new kubelet configuration.
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
@@ -245,9 +302,10 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		return fmt.Errorf("Expected Node Allocatable Cgroup %q does not exist", expectedNAPodCgroup)
 	}
 
-	memoryLimitFile := "memory.limit_in_bytes"
+	memoryLimitFile, hugetlb2MBLimitFile := "memory.limit_in_bytes", "hugetlb.2MB.limit_in_bytes"
 	if IsCgroup2UnifiedMode() {
 		memoryLimitFile = "memory.max"
+		hugetlb2MBLimitFile = "hugetlb.2MB.max"
 	}
 
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
@@ -267,7 +325,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 		node := nodeList.Items[0]
 		capacity := node.Status.Capacity
-		allocatableCPU, allocatableMemory, allocatablePIDs := getAllocatableLimits("200m", "200Mi", "1738", capacity)
+		allocatableCPU, allocatableMemory, allocatablePIDs, allocatableHugepages2Mi := getAllocatableLimits("200m", "200Mi", "1738", "4Mi", capacity, hugePageAvailable)
 		// Total Memory reservation is 200Mi excluding eviction thresholds.
 		// Expect CPU shares on node allocatable cgroup to equal allocatable.
 		shares := int64(cm.MilliCPUToShares(allocatableCPU.MilliValue()))
@@ -289,12 +347,18 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], cgroupName, "pids.max"), allocatablePIDs.Value(), 0); err != nil {
 			return err
 		}
+		if hugePageAvailable {
+			// Expect Hugepages limit on node allocatable cgroup to equal allocatable.
+			if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["hugetlb"], cgroupName, hugetlb2MBLimitFile), allocatableHugepages2Mi.Value(), 0); err != nil {
+				return err
+			}
+		}
 
 		// Check that Allocatable reported to scheduler includes eviction thresholds.
 		schedulerAllocatable := node.Status.Allocatable
 		// Memory allocatable should take into account eviction thresholds.
 		// Process IDs are not a scheduler resource and as such cannot be tested here.
-		allocatableCPU, allocatableMemory, _ = getAllocatableLimits("200m", "300Mi", "1738", capacity)
+		allocatableCPU, allocatableMemory, _, allocatableHugepages2Mi = getAllocatableLimits("200m", "300Mi", "1738", "4Mi", capacity, hugePageAvailable)
 		// Expect allocatable to include all resources in capacity.
 		if len(schedulerAllocatable) != len(capacity) {
 			return fmt.Errorf("Expected all resources in capacity to be found in allocatable")
@@ -305,6 +369,11 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		}
 		if allocatableMemory.Cmp(schedulerAllocatable[v1.ResourceMemory]) != 0 {
 			return fmt.Errorf("Unexpected memory allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableMemory, schedulerAllocatable[v1.ResourceMemory], capacity[v1.ResourceMemory])
+		}
+		if hugePageAvailable {
+			if allocatableHugepages2Mi.Cmp(schedulerAllocatable[hugepagesResourceName2Mi]) != 0 {
+				return fmt.Errorf("Unexpected hugepages-2Mi allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableHugepages2Mi, schedulerAllocatable[hugepagesResourceName2Mi], capacity[hugepagesResourceName2Mi])
+			}
 		}
 		return nil
 	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
@@ -337,6 +406,13 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], cgroupPath, "pids.max"), kubeReservedPIDs.Value(), 0); err != nil {
 		return err
 	}
+	if hugePageAvailable {
+		// Expect hugepages-2Mi limit kube reserved cgroup to equal configured value `2Mi`.
+		kubeReservedHugepages2Mi := resource.MustParse(currentConfig.KubeReserved[hugepagesResourceName2Mi])
+		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["hugetlb"], cgroupPath, hugetlb2MBLimitFile), kubeReservedHugepages2Mi.Value(), 0); err != nil {
+			return err
+		}
+	}
 
 	if currentConfig.CgroupDriver == "systemd" {
 		cgroupPath = cm.ParseSystemdToCgroupName(systemReservedCgroup).ToSystemd()
@@ -365,6 +441,13 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	systemReservedPIDs := resource.MustParse(currentConfig.SystemReserved[string(pidlimit.PIDs)])
 	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["pids"], cgroupPath, "pids.max"), systemReservedPIDs.Value(), 0); err != nil {
 		return err
+	}
+	if hugePageAvailable {
+		// Expect hugepages-2Mi limit system reserved cgroup to equal configured value `2Mi`.
+		systemReservedHugepages2Mi := resource.MustParse(currentConfig.SystemReserved[hugepagesResourceName2Mi])
+		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["hugetlb"], cgroupPath, hugetlb2MBLimitFile), systemReservedHugepages2Mi.Value(), 0); err != nil {
+			return err
+		}
 	}
 	return nil
 }
