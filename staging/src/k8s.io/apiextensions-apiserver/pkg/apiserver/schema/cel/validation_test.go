@@ -2787,7 +2787,7 @@ func TestReasonAndFldPath(t *testing.T) {
 					"field2": stringType,
 					"field3": stringType,
 				},
-				Extensions: schema.Extensions{
+				ValidationExtensions: schema.ValidationExtensions{
 					XValidations: apiextensions.ValidationRules{
 						{
 							Rule:      `self.field2 != "value2"`,
@@ -2852,16 +2852,16 @@ func TestValidateFieldPath(t *testing.T) {
 			"foo": {
 				Generic: schema.Generic{
 					Type: "object",
-					AdditionalProperties: &schema.StructuralOrBool{
-						Structural: &schema.Structural{
-							Generic: schema.Generic{
-								Type: "object",
-							},
-							Properties: map[string]schema.Structural{
-								"subAdd": {
-									Generic: schema.Generic{
-										Type: "number",
-									},
+				},
+				AdditionalProperties: &schema.StructuralOrBool{
+					Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"subAdd": {
+								Generic: schema.Generic{
+									Type: "number",
 								},
 							},
 						},
@@ -4387,7 +4387,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 						ValueValidation: &schema.ValueValidation{
 							Format: "date-time",
 						},
-						Extensions: schema.Extensions{
+						ValidationExtensions: schema.ValidationExtensions{
 							XValidations: []apiextensions.ValidationRule{
 								{Rule: rule},
 							},
@@ -4520,9 +4520,9 @@ func objectTypePtr(props map[string]schema.Structural) *schema.Structural {
 func mapType(valSchema *schema.Structural) schema.Structural {
 	result := schema.Structural{
 		Generic: schema.Generic{
-			Type:                 "object",
-			AdditionalProperties: &schema.StructuralOrBool{Bool: true, Structural: valSchema},
+			Type: "object",
 		},
+		AdditionalProperties: &schema.StructuralOrBool{Bool: true, Structural: valSchema},
 	}
 	return result
 }
@@ -4541,7 +4541,7 @@ func intOrStringType() schema.Structural {
 }
 
 func withRule(s schema.Structural, rule string) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule: rule,
 		},
@@ -4550,7 +4550,7 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 }
 
 func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, messageExpression string) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule:              rule,
 			Message:           message,
@@ -4561,7 +4561,7 @@ func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, mes
 }
 
 func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *apiextensions.FieldValueErrorReason) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule:      rule,
 			FieldPath: jsonPath,
@@ -4572,7 +4572,7 @@ func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *ap
 }
 
 func withRuleAndMessageExpression(s schema.Structural, rule, messageExpression string) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule:              rule,
 			MessageExpression: messageExpression,
@@ -4582,7 +4582,7 @@ func withRuleAndMessageExpression(s schema.Structural, rule, messageExpression s
 }
 
 func withRulePtr(s *schema.Structural, rule string) *schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule: rule,
 		},
