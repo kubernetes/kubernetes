@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -832,11 +833,11 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 	testFn := func(test *testcase, t *testing.T) {
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		spc := NewStatefulPodControlFromManager(newFakeObjectManager(informerFactory), &noopRecorder{})
+		om := newFakeObjectManager(informerFactory)
+		spc := NewStatefulPodControlFromManager(om, &noopRecorder{})
 		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 		recorder := &noopRecorder{}
 		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder}
-
 		stop := make(chan struct{})
 		defer close(stop)
 		informerFactory.Start(stop)
@@ -846,6 +847,10 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
 			informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 		)
+		if test.set.Spec.UpdateStrategy.Type != apps.RollingUpdateStatefulSetStrategyType {
+			t.Fatal("stateful set is not RollingUpdate type")
+		}
+
 		test.set.Status.CollisionCount = new(int32)
 		for i := range test.existing {
 			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i], test.set.Status.CollisionCount)
@@ -854,7 +859,8 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
+
+		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions, nil)
 		if err != nil {
 			t.Fatalf("error getting statefulset revisions:%v", err)
 		}
@@ -946,6 +952,219 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 				testFn(&tests[i], t)
 			}
 		})
+}
+
+func createPodsAndRevisionForSet(set *apps.StatefulSet, revision int64) (retRev *apps.ControllerRevision, retPods []*v1.Pod) {
+	retRev = newRevisionOrDie(set, revision)
+	replicaCount := int(*set.Spec.Replicas)
+	for i := 0; i < replicaCount; i++ {
+		pod := newStatefulSetPod(set, i)
+		setPodRevision(pod, retRev.Name)
+		retPods = append(retPods, pod)
+	}
+	return
+}
+
+func newStatefulSetOnDelete() *apps.StatefulSet {
+	set := newStatefulSet(3)
+	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+		Type: apps.OnDeleteStatefulSetStrategyType,
+	}
+	return set
+}
+
+func runForOnDeletePodScenarios(t *testing.T,
+	testFn func(*testing.T, *apps.ControllerRevision, *apps.StatefulSet, []*v1.Pod, []*apps.ControllerRevision),
+) {
+
+	type SetPodRevision struct {
+		set      *apps.StatefulSet
+		pods     []*v1.Pod
+		revision *apps.ControllerRevision
+	}
+
+	setNextRevision := func(setPodRevisionByRevisionNumber []SetPodRevision, revisionNumber int, currRev *apps.ControllerRevision, changeImage string) []SetPodRevision {
+		set := newStatefulSetOnDelete()
+		rev := &apps.ControllerRevision{}
+		var pods []*v1.Pod
+		if revisionNumber != 0 {
+			set.Spec.Template.Spec.Containers[0].Image = changeImage
+			set.Status.CurrentRevision = currRev.Name
+			set.Status.CollisionCount = new(int32)
+			rev, pods = createPodsAndRevisionForSet(set, int64(revisionNumber)+1)
+			set.Status.UpdateRevision = rev.Name
+		} else {
+			set.Status.CollisionCount = new(int32)
+			rev, pods = createPodsAndRevisionForSet(set, int64(revisionNumber)+1)
+			set.Status.CurrentRevision = rev.Name
+			set.Status.UpdateRevision = rev.Name
+		}
+		setPodRevisionByRevisionNumber = append(setPodRevisionByRevisionNumber, SetPodRevision{
+			set:      set,
+			pods:     pods,
+			revision: rev,
+		})
+		return setPodRevisionByRevisionNumber
+	}
+
+	setPodRevisionByRevisionNumber := []SetPodRevision{}
+
+	buildSetPodRevisionByRevisionNumber := func(setPodRevisionByRevisionNumber []SetPodRevision) []SetPodRevision {
+		setPodRevisionByRevisionNumber = setNextRevision(setPodRevisionByRevisionNumber, 0, nil, "")
+		setPodRevisionByRevisionNumber = setNextRevision(setPodRevisionByRevisionNumber, 1, setPodRevisionByRevisionNumber[0].revision, "foo")
+		setPodRevisionByRevisionNumber = setNextRevision(setPodRevisionByRevisionNumber, 2, setPodRevisionByRevisionNumber[0].revision, "bar")
+		return setPodRevisionByRevisionNumber
+	}
+
+	setPodRevisionByRevisionNumber = buildSetPodRevisionByRevisionNumber(setPodRevisionByRevisionNumber)
+
+	tests := []struct {
+		name      string
+		expected  *apps.ControllerRevision
+		set       *apps.StatefulSet
+		pods      []*v1.Pod
+		revisions []*apps.ControllerRevision
+	}{
+		{
+			// Test case: stable statefulset
+			name:      "StableRevision",
+			expected:  setPodRevisionByRevisionNumber[0].revision,
+			set:       setPodRevisionByRevisionNumber[0].set,
+			pods:      setPodRevisionByRevisionNumber[0].pods,
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision},
+		},
+		{
+			// Test case: unsorted pods
+			name:     "StableRevisionUnsortedPods",
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[0].set,
+			pods: []*v1.Pod{
+				setPodRevisionByRevisionNumber[0].pods[1],
+				setPodRevisionByRevisionNumber[0].pods[2],
+				setPodRevisionByRevisionNumber[0].pods[0],
+			},
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision},
+		},
+		{
+			// Test case: new revision with one new pod
+			name:     "OneNewRevision",
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[1].set,
+			pods: []*v1.Pod{
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[0].pods[1],
+				setPodRevisionByRevisionNumber[0].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision, setPodRevisionByRevisionNumber[1].revision},
+		},
+		{
+			// Test case: pods spread across three revisions
+			name:     "TwoNewRevisions",
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
+			pods: []*v1.Pod{
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
+				setPodRevisionByRevisionNumber[0].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
+			},
+		},
+		{
+			// Test case: remove pod with current revision
+			name:     "RemoveOldestRevisionPod",
+			expected: setPodRevisionByRevisionNumber[1].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
+			pods: []*v1.Pod{
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
+				setPodRevisionByRevisionNumber[2].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
+			},
+		},
+		{
+			// Remove pod with current revision and unsorted pods
+			name:     "RemoveOldestRevisionPodUnsorted",
+			expected: setPodRevisionByRevisionNumber[1].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
+			pods: []*v1.Pod{
+				setPodRevisionByRevisionNumber[2].pods[2],
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
+			},
+			revisions: []*apps.ControllerRevision{
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
+			},
+		},
+		{
+			// No revisions for existing pods
+			// Remove pod with current revision and unsorted pods
+			name:     "PodRevisionsDoNotExist",
+			expected: nil,
+			set:      setPodRevisionByRevisionNumber[2].set,
+			pods: []*v1.Pod{
+				setPodRevisionByRevisionNumber[1].pods[0],
+				setPodRevisionByRevisionNumber[2].pods[1],
+				setPodRevisionByRevisionNumber[2].pods[2],
+			},
+			revisions: []*apps.ControllerRevision{setPodRevisionByRevisionNumber[0].revision},
+		},
+		{
+			// Test case: pods only have latest revision
+			// This being the case we don't expect the current revision to change as
+			// the update status will take care of this
+			name:     "AllNewRevision",
+			expected: setPodRevisionByRevisionNumber[0].revision,
+			set:      setPodRevisionByRevisionNumber[2].set,
+			pods:     setPodRevisionByRevisionNumber[2].pods,
+			revisions: []*apps.ControllerRevision{
+				setPodRevisionByRevisionNumber[0].revision,
+				setPodRevisionByRevisionNumber[1].revision,
+				setPodRevisionByRevisionNumber[2].revision,
+			},
+		},
+	}
+
+	for _, testCase := range tests {
+		testName := fmt.Sprintf("OnDeleteTest/%s", testCase.name)
+		t.Run(testName, func(t *testing.T) {
+			testFn(
+				t,
+				testCase.expected,
+				testCase.set,
+				testCase.pods,
+				testCase.revisions,
+			)
+		})
+	}
+}
+
+func TestStatefulSetControl_getCurrentRevision(t *testing.T) {
+	testFn := func(
+		t *testing.T,
+		expected *apps.ControllerRevision,
+		set *apps.StatefulSet,
+		pods []*v1.Pod,
+		revisions []*apps.ControllerRevision,
+	) {
+		history.SortControllerRevisions(revisions)
+		currentRevision := getCurrentRevision(set, revisions, pods)
+
+		if !apiequality.Semantic.DeepEqual(currentRevision, expected) {
+			t.Errorf("for current want %v got %v. \n\nWant current.Revision %d, got %d", expected, currentRevision, expected.Revision, currentRevision.Revision)
+		}
+	}
+
+	runForOnDeletePodScenarios(t, testFn)
 }
 
 func setupPodManagementPolicy(podManagementPolicy apps.PodManagementPolicyType, set *apps.StatefulSet) *apps.StatefulSet {
