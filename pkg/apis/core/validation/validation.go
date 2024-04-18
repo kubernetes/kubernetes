@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -4078,13 +4079,7 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 			podIPs = append(podIPs, podIP.IP)
 		}
 
-		dualStack, err := netutils.IsDualStackIPStrings(podIPs)
-		if err != nil {
-			allErrs = append(allErrs, field.InternalError(podIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
-		}
-
-		// We only support one from each IP family (i.e. max two IPs in this list).
-		if !dualStack || len(podIPs) > 2 {
+		if !utilip.IsDualStackIPPair(podIPs) {
 			allErrs = append(allErrs, field.Invalid(podIPsField, pod.Status.PodIPs, "may specify no more than one IP for each IP family"))
 		}
 
@@ -4137,13 +4132,7 @@ func validateHostIPs(pod *core.Pod) field.ErrorList {
 			seen.Insert(hostIP.IP)
 		}
 
-		dualStack, err := netutils.IsDualStackIPStrings(hostIPs)
-		if err != nil {
-			allErrs = append(allErrs, field.InternalError(hostIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
-		}
-
-		// We only support one from each IP family (i.e. max two IPs in this list).
-		if !dualStack || len(hostIPs) > 2 {
+		if !utilip.IsDualStackIPPair(hostIPs) {
 			allErrs = append(allErrs, field.Invalid(hostIPsField, pod.Status.HostIPs, "may specify no more than one IP for each IP family"))
 		}
 	}
@@ -5486,7 +5475,7 @@ var supportedServiceType = sets.New(core.ServiceTypeClusterIP, core.ServiceTypeN
 
 var supportedServiceInternalTrafficPolicy = sets.New(core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal)
 
-var supportedServiceIPFamily = sets.New(core.IPv4Protocol, core.IPv6Protocol)
+var supportedServiceIPFamily = sets.New(utilip.IPv4Protocol, utilip.IPv6Protocol)
 var supportedServiceIPFamilyPolicy = sets.New(
 	core.IPFamilyPolicySingleStack,
 	core.IPFamilyPolicyPreferDualStack,
@@ -6093,11 +6082,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 		// - validate for dual stack
 		// - validate for duplication
 		if len(node.Spec.PodCIDRs) > 1 {
-			dualStack, err := netutils.IsDualStackCIDRStrings(node.Spec.PodCIDRs)
-			if err != nil {
-				allErrs = append(allErrs, field.InternalError(podCIDRsField, fmt.Errorf("invalid PodCIDRs. failed to check with dual stack with error:%v", err)))
-			}
-			if !dualStack || len(node.Spec.PodCIDRs) > 2 {
+			if !utilip.IsDualStackCIDRPair(node.Spec.PodCIDRs) {
 				allErrs = append(allErrs, field.Invalid(podCIDRsField, node.Spec.PodCIDRs, "may specify no more than one CIDR for each IP family"))
 			}
 
@@ -7782,7 +7767,7 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 
 	// ipfamilies stand alone validation
 	// must be either IPv4 or IPv6
-	seen := sets.Set[core.IPFamily]{}
+	seen := sets.Set[utilip.IPFamily]{}
 	for i, ipFamily := range service.Spec.IPFamilies {
 		if !supportedServiceIPFamily.Has(ipFamily) {
 			allErrs = append(allErrs, field.NotSupported(ipFamiliesField.Index(i), ipFamily, sets.List(supportedServiceIPFamily)))
@@ -7835,16 +7820,8 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 	}
 
 	// must be dual stacked ips if they are more than one ip
-	if len(service.Spec.ClusterIPs) > 1 /* meaning: it does not have a None or empty string */ {
-		dualStack, err := netutils.IsDualStackIPStrings(service.Spec.ClusterIPs)
-		if err != nil { // though we check for that earlier. safe > sorry
-			allErrs = append(allErrs, field.InternalError(clusterIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
-		}
-
-		// We only support one from each IP family (i.e. max two IPs in this list).
-		if !dualStack {
-			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "may specify no more than one IP for each IP family"))
-		}
+	if len(service.Spec.ClusterIPs) > 1 && !utilip.IsDualStackIPPair(service.Spec.ClusterIPs) {
+		allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "may specify no more than one IP for each IP family"))
 	}
 
 	// match clusterIPs to their families, if they were provided
@@ -7854,13 +7831,8 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 				break // no more families to check
 			}
 
-			// 4=>6
-			if service.Spec.IPFamilies[i] == core.IPv4Protocol && netutils.IsIPv6String(ip) {
-				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an IPv4 value as indicated by `ipFamilies[%v]`", i)))
-			}
-			// 6=>4
-			if service.Spec.IPFamilies[i] == core.IPv6Protocol && !netutils.IsIPv6String(ip) {
-				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an IPv6 value as indicated by `ipFamilies[%v]`", i)))
+			if utilip.IPFamilyOf(ip) != service.Spec.IPFamilies[i] {
+				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an %s value as indicated by `ipFamilies[%v]`", service.Spec.IPFamilies[i], i)))
 			}
 		}
 	}

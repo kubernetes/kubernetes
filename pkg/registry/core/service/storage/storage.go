@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -44,7 +45,6 @@ import (
 	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	netutil "k8s.io/utils/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -59,8 +59,8 @@ type PodStorage interface {
 
 type REST struct {
 	*genericregistry.Store
-	primaryIPFamily   api.IPFamily
-	secondaryIPFamily api.IPFamily
+	primaryIPFamily   utilip.IPFamily
+	secondaryIPFamily utilip.IPFamily
 	alloc             Allocators
 	endpoints         EndpointsStorage
 	pods              PodStorage
@@ -78,8 +78,8 @@ var (
 // NewREST returns a REST object that will work against services.
 func NewREST(
 	optsGetter generic.RESTOptionsGetter,
-	serviceIPFamily api.IPFamily,
-	ipAllocs map[api.IPFamily]ipallocator.Interface,
+	serviceIPFamily utilip.IPFamily,
+	ipAllocs map[utilip.IPFamily]ipallocator.Interface,
 	portAlloc portallocator.Interface,
 	endpoints EndpointsStorage,
 	pods PodStorage,
@@ -108,10 +108,10 @@ func NewREST(
 	statusStore.UpdateStrategy = svcreg.StatusStrategy
 	statusStore.ResetFieldsStrategy = svcreg.StatusStrategy
 
-	var primaryIPFamily api.IPFamily = serviceIPFamily
-	var secondaryIPFamily api.IPFamily = "" // sentinel value
+	var primaryIPFamily = serviceIPFamily
+	var secondaryIPFamily = utilip.IPFamilyUnknown // sentinel value
 	if len(ipAllocs) > 1 {
-		secondaryIPFamily = otherFamily(serviceIPFamily)
+		secondaryIPFamily = utilip.OtherIPFamily(serviceIPFamily)
 	}
 	genericStore := &REST{
 		Store:             store,
@@ -133,15 +133,6 @@ func NewREST(
 	statusStore.AfterDelete = genericStore.afterDelete
 
 	return genericStore, &StatusREST{store: &statusStore}, &svcreg.ProxyREST{Redirector: genericStore, ProxyTransport: proxyTransport}, nil
-}
-
-// otherFamily returns the non-selected IPFamily.  This assumes the input is
-// valid.
-func otherFamily(fam api.IPFamily) api.IPFamily {
-	if fam == api.IPv4Protocol {
-		return api.IPv6Protocol
-	}
-	return api.IPv4Protocol
 }
 
 var (
@@ -301,21 +292,17 @@ func (r *REST) defaultOnReadIPFamilies(service *api.Service) {
 			// RequireDualStack on any cluster (single- or dual-stack
 			// configured).
 			service.Spec.IPFamilyPolicy = &requireDualStack
-			service.Spec.IPFamilies = []api.IPFamily{r.primaryIPFamily, otherFamily(r.primaryIPFamily)}
+			service.Spec.IPFamilies = []utilip.IPFamily{r.primaryIPFamily, utilip.OtherIPFamily(r.primaryIPFamily)}
 		} else {
 			// Headless + selector - default to single.
 			service.Spec.IPFamilyPolicy = &singleStack
-			service.Spec.IPFamilies = []api.IPFamily{r.primaryIPFamily}
+			service.Spec.IPFamilies = []utilip.IPFamily{r.primaryIPFamily}
 		}
 	} else {
 		// Headful: init ipFamilies from clusterIPs.
-		service.Spec.IPFamilies = make([]api.IPFamily, len(service.Spec.ClusterIPs))
+		service.Spec.IPFamilies = make([]utilip.IPFamily, len(service.Spec.ClusterIPs))
 		for idx, ip := range service.Spec.ClusterIPs {
-			if netutil.IsIPv6String(ip) {
-				service.Spec.IPFamilies[idx] = api.IPv6Protocol
-			} else {
-				service.Spec.IPFamilies[idx] = api.IPv4Protocol
-			}
+			service.Spec.IPFamilies[idx] = utilip.IPFamilyOf(ip)
 		}
 		if len(service.Spec.IPFamilies) == 1 {
 			service.Spec.IPFamilyPolicy = &singleStack

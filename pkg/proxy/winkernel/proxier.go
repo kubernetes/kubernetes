@@ -34,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -740,7 +741,7 @@ func NewProxier(
 		for _, inter := range interfaces {
 			addresses, _ := inter.Addrs()
 			for _, addr := range addresses {
-				addrIP, _, _ := netutils.ParseCIDRSloppy(addr.String())
+				addrIP := utilip.IPFromInterfaceAddr(addr)
 				if addrIP.String() == nodeIP.String() {
 					klog.V(2).InfoS("Record Host MAC address", "addr", inter.HardwareAddr)
 					hostMac = inter.HardwareAddr.String()

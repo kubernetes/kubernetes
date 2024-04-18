@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -95,12 +96,10 @@ func GetLocalAddrs() ([]net.IP, error) {
 	}
 
 	for _, addr := range addrs {
-		ip, _, err := netutils.ParseCIDRSloppy(addr.String())
-		if err != nil {
-			return nil, err
+		ip := utilip.IPFromInterfaceAddr(addr)
+		if ip != nil {
+			localAddrs = append(localAddrs, ip)
 		}
-
-		localAddrs = append(localAddrs, ip)
 	}
 
 	return localAddrs, nil
@@ -141,16 +140,8 @@ func ShouldSkipService(service *v1.Service) bool {
 func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.Set[string] {
 	ips := sets.New[string]()
 	for _, a := range addrs {
-		var ip net.IP
-		switch v := a.(type) {
-		case *net.IPAddr:
-			ip = v.IP
-		case *net.IPNet:
-			ip = v.IP
-		default:
-			continue
-		}
-		if isValid(ip) {
+		ip := utilip.IPFromInterfaceAddr(a)
+		if ip != nil && isValid(ip) {
 			ips.Insert(ip.String())
 		}
 	}
@@ -179,7 +170,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]net.IP {
 		ip := netutils.ParseIPSloppy(ipStr)
 		if ip != nil {
 			// Since ip is parsed ok, GetIPFamilyFromIP will never return v1.IPFamilyUnknown
-			ipFamily := GetIPFamilyFromIP(ip)
+			ipFamily := utilip.IPFamilyOf(ip)
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
 			// ExternalIPs may not be validated by the api-server.
@@ -207,36 +198,10 @@ func MapCIDRsByIPFamily(cidrsStrings []string) map[v1.IPFamily][]*net.IPNet {
 			continue
 		}
 		// since we just succefully parsed the CIDR, IPFamilyOfCIDR will never return "IPFamilyUnknown"
-		ipFamily := convertToV1IPFamily(netutils.IPFamilyOfCIDR(cidr))
+		ipFamily := utilip.IPFamilyOfCIDR(cidr)
 		ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 	}
 	return ipFamilyMap
-}
-
-// GetIPFamilyFromIP Returns the IP family of ipStr, or IPFamilyUnknown if ipStr can't be parsed as an IP
-func GetIPFamilyFromIP(ip net.IP) v1.IPFamily {
-	return convertToV1IPFamily(netutils.IPFamilyOf(ip))
-}
-
-// Convert netutils.IPFamily to v1.IPFamily
-func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
-	switch ipFamily {
-	case netutils.IPv4:
-		return v1.IPv4Protocol
-	case netutils.IPv6:
-		return v1.IPv6Protocol
-	}
-
-	return v1.IPFamilyUnknown
-}
-
-// OtherIPFamily returns the other ip family
-func OtherIPFamily(ipFamily v1.IPFamily) v1.IPFamily {
-	if ipFamily == v1.IPv6Protocol {
-		return v1.IPv4Protocol
-	}
-
-	return v1.IPv6Protocol
 }
 
 // AppendPortIfNeeded appends the given port to IP address unless it is already in

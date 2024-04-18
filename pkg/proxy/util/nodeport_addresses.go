@@ -21,6 +21,7 @@ import (
 	"net"
 
 	v1 "k8s.io/api/core/v1"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	netutils "k8s.io/utils/net"
 )
 
@@ -47,7 +48,7 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string, primaryIP ne
 
 	// Filter CIDRs to correct family
 	for _, str := range cidrStrings {
-		if (family == v1.IPv4Protocol) == netutils.IsIPv4CIDRString(str) {
+		if utilip.IPFamilyOfCIDR(str) == family {
 			npa.cidrStrings = append(npa.cidrStrings, str)
 		}
 	}
@@ -70,7 +71,8 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string, primaryIP ne
 	// Now parse
 	for _, str := range npa.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
-		if netutils.IsIPv4CIDR(cidr) {
+
+		if utilip.IsIPv4CIDR(cidr) {
 			if cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart) {
 				npa.containsIPv4Loopback = true
 			}
@@ -111,18 +113,8 @@ func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error)
 	addresses := make(map[string]net.IP)
 	for _, cidr := range npa.cidrs {
 		for _, addr := range addrs {
-			var ip net.IP
-			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
-			switch v := addr.(type) {
-			case *net.IPAddr:
-				ip = v.IP
-			case *net.IPNet:
-				ip = v.IP
-			default:
-				continue
-			}
-
-			if cidr.Contains(ip) {
+			ip := utilip.IPFromInterfaceAddr(addr)
+			if ip != nil && cidr.Contains(ip) {
 				addresses[ip.String()] = ip
 			}
 		}

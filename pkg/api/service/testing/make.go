@@ -19,6 +19,7 @@ package testing
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	utilpointer "k8s.io/utils/pointer"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -150,7 +151,7 @@ func SetClusterIPs(ips ...string) Tweak {
 }
 
 // SetIPFamilies sets the service IPFamilies field.
-func SetIPFamilies(families ...api.IPFamily) Tweak {
+func SetIPFamilies(families ...utilip.IPFamily) Tweak {
 	return func(svc *api.Service) {
 		svc.Spec.IPFamilies = families
 	}

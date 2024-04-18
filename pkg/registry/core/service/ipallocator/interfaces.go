@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net"
 
-	api "k8s.io/kubernetes/pkg/apis/core"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -32,7 +32,7 @@ type Interface interface {
 	Release(net.IP) error
 	ForEach(func(net.IP))
 	CIDR() net.IPNet
-	IPFamily() api.IPFamily
+	IPFamily() utilip.IPFamily
 	Has(ip net.IP) bool
 	Destroy()
 	EnableMetrics()
