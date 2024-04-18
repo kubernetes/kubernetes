@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func Test_countCSRDurationMetric(t *testing.T) {
@@ -66,7 +66,7 @@ func Test_countCSRDurationMetric(t *testing.T) {
 			old: &certificates.CertificateSigningRequest{
 				Spec: certificates.CertificateSigningRequestSpec{
 					SignerName:        "fancy",
-					ExpirationSeconds: pointer.Int32(77),
+					ExpirationSeconds: ptr.To[int32](77),
 				},
 			},
 			options:       &metav1.UpdateOptions{},

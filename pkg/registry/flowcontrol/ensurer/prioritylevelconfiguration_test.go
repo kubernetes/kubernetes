@@ -29,7 +29,6 @@ import (
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1"
 	toolscache "k8s.io/client-go/tools/cache"
 	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
@@ -39,8 +38,8 @@ func TestEnsurePriorityLevel(t *testing.T) {
 	validExemptPL := func() *flowcontrolv1.PriorityLevelConfiguration {
 		copy := bootstrap.MandatoryPriorityLevelConfigurationExempt.DeepCopy()
 		copy.Annotations[flowcontrolv1.AutoUpdateAnnotationKey] = "true"
-		copy.Spec.Exempt.NominalConcurrencyShares = pointer.Int32(10)
-		copy.Spec.Exempt.LendablePercent = pointer.Int32(50)
+		copy.Spec.Exempt.NominalConcurrencyShares = ptr.To[int32](10)
+		copy.Spec.Exempt.LendablePercent = ptr.To[int32](50)
 		return copy
 	}()
 
@@ -275,7 +274,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 			Type: flowcontrolv1.PriorityLevelEnablementLimited,
 			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: ptr.To(flowcontrolapisv1.PriorityLevelConfigurationDefaultNominalConcurrencyShares),
-				LendablePercent:          pointer.Int32(0),
+				LendablePercent:          ptr.To[int32](0),
 				LimitResponse: flowcontrolv1.LimitResponse{
 					Type: flowcontrolv1.LimitResponseTypeReject,
 				},
@@ -287,8 +286,8 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 			Type: flowcontrolv1.PriorityLevelEnablementExempt,
 			Exempt: &flowcontrolv1.ExemptPriorityLevelConfiguration{
-				NominalConcurrencyShares: pointer.Int32(42),
-				LendablePercent:          pointer.Int32(33),
+				NominalConcurrencyShares: ptr.To[int32](42),
+				LendablePercent:          ptr.To[int32](33),
 			},
 		},
 	}
@@ -297,8 +296,8 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
 			Type: flowcontrolv1.PriorityLevelEnablementExempt,
 			Exempt: &flowcontrolv1.ExemptPriorityLevelConfiguration{
-				NominalConcurrencyShares: pointer.Int32(24),
-				LendablePercent:          pointer.Int32(86),
+				NominalConcurrencyShares: ptr.To[int32](24),
+				LendablePercent:          ptr.To[int32](86),
 			},
 		},
 	}
@@ -488,7 +487,7 @@ func (b *plBuilder) WithLimited(nominalConcurrencyShares int32) *plBuilder {
 	b.object.Spec.Type = flowcontrolv1.PriorityLevelEnablementLimited
 	b.object.Spec.Limited = &flowcontrolv1.LimitedPriorityLevelConfiguration{
 		NominalConcurrencyShares: ptr.To(nominalConcurrencyShares),
-		LendablePercent:          pointer.Int32(0),
+		LendablePercent:          ptr.To[int32](0),
 		LimitResponse: flowcontrolv1.LimitResponse{
 			Type: flowcontrolv1.LimitResponseTypeReject,
 		},
