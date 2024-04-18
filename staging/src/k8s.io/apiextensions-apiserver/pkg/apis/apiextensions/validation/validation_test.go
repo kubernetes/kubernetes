@@ -9749,6 +9749,89 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "x-kubernetes-validation rule with multiple messageExpressions returning empty list",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									MessageExpression: `[]`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				{
+					path:           field.NewPath("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+					errorType:      field.ErrorTypeInvalid,
+					containsString: "messageExpression must evaluate to a string",
+				},
+			},
+		},
+		{
+			name: "x-kubernetes-validation rule with multiple messageExpressions returning invalid type",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									MessageExpression: `3`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				{
+					path:           field.NewPath("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+					errorType:      field.ErrorTypeInvalid,
+					containsString: "messageExpression must evaluate to a string",
+				},
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule with multiple messageExpressions",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:              "self == \"string value\"",
+									MessageExpression: `[self + " should be \"string value\"", "another message"]`,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				{
+					// This feature is introduced 1.31 and enabled for stored expressions
+					// But not for new expressions
+					path:           field.NewPath("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].messageExpression"),
+					errorType:      field.ErrorTypeInvalid,
+					containsString: "messageExpression must evaluate to a string",
+				},
+			},
+		},
+		{
 			name: "x-kubernetes-validations rule with messageExpression",
 			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{

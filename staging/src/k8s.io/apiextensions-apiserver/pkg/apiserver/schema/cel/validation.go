@@ -383,7 +383,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			}
 
 			if compiled.MessageExpression != nil {
-				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
+				messageExpressions, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
 				if msgErr != nil {
 					if msgErr.Type == cel.ErrorTypeInternal {
 						addErr(field.InternalError(currentFldPath, msgErr))
@@ -397,7 +397,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 						remainingBudget = newRemainingBudget
 					}
 				} else {
-					addErr(fieldErrorForReason(currentFldPath, sts.Type, messageExpression, rule.Reason))
+					for _, messageExpression := range messageExpressions {
+						addErr(fieldErrorForReason(currentFldPath, sts.Type, messageExpression, rule.Reason))
+					}
 					remainingBudget = newRemainingBudget
 				}
 			} else {
@@ -598,58 +600,85 @@ func fieldErrorForReason(fldPath *field.Path, value interface{}, detail string, 
 
 // evalMessageExpression evaluates the given message expression and returns the evaluated string form and the remaining budget, or an error if one
 // occurred during evaluation.
-func evalMessageExpression(ctx context.Context, expr celgo.Program, exprSrc string, activation interpreter.Activation, remainingBudget int64) (string, int64, *cel.Error) {
+func evalMessageExpression(ctx context.Context, expr celgo.Program, exprSrc string, activation interpreter.Activation, remainingBudget int64) ([]string, int64, *cel.Error) {
 	evalResult, evalDetails, err := expr.ContextEval(ctx, activation)
 	if evalDetails == nil {
-		return "", -1, &cel.Error{
+		return nil, -1, &cel.Error{
 			Type:   cel.ErrorTypeInternal,
 			Detail: fmt.Sprintf("runtime cost could not be calculated for messageExpression: %q", exprSrc),
 		}
 	}
 	rtCost := evalDetails.ActualCost()
 	if rtCost == nil {
-		return "", -1, &cel.Error{
+		return nil, -1, &cel.Error{
 			Type:   cel.ErrorTypeInternal,
 			Detail: fmt.Sprintf("runtime cost could not be calculated for messageExpression: %q", exprSrc),
 		}
 	} else if *rtCost > math.MaxInt64 || int64(*rtCost) > remainingBudget {
-		return "", -1, &cel.Error{
+		return nil, -1, &cel.Error{
 			Type:   cel.ErrorTypeInvalid,
 			Detail: "messageExpression evaluation failed due to running out of cost budget, no further validation rules will be run",
 		}
 	}
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "operation cancelled: actual cost limit exceeded") {
-			return "", -1, &cel.Error{
+			return nil, -1, &cel.Error{
 				Type:   cel.ErrorTypeInvalid,
 				Detail: fmt.Sprintf("no further validation rules will be run due to call cost exceeds limit for messageExpression: %q", exprSrc),
 			}
 		}
-		return "", remainingBudget - int64(*rtCost), &cel.Error{
+		return nil, remainingBudget - int64(*rtCost), &cel.Error{
 			Detail: fmt.Sprintf("messageExpression evaluation failed due to: %v", err.Error()),
 		}
 	}
-	messageStr, ok := evalResult.Value().(string)
-	if !ok {
-		return "", remainingBudget - int64(*rtCost), &cel.Error{
-			Detail: "messageExpression failed to convert to string",
+
+	var results []string
+
+	resultValue := evalResult.Value()
+	if messageStr, ok := resultValue.(string); ok {
+		results = []string{messageStr}
+	} else if messageStrList, ok := resultValue.([]string); ok {
+		results = messageStrList
+	} else if messageList, ok := resultValue.([]ref.Val); ok {
+		// CEL Type Checker for some reason verifies this is a list of string
+		// in compilation.go, but here its dynamic value might be a []rev.Val{},
+		// if you used CEL literal syntax like ["a", "b"] as opposed to list(string)(["a", "b"])
+		results = make([]string, len(messageList))
+		for i, msg := range messageList {
+			if msgStr, ok := msg.Value().(string); ok {
+				results[i] = msgStr
+			} else {
+				return nil, remainingBudget - int64(*rtCost), &cel.Error{
+					Detail: "messageExpression failed to evaluate to a list of strings",
+				}
+			}
+		}
+	} else {
+		return nil, remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: "messageExpression failed to evaluate to a string",
 		}
 	}
-	trimmedMsgStr := strings.TrimSpace(messageStr)
-	if len(trimmedMsgStr) > celconfig.MaxEvaluatedMessageExpressionSizeBytes {
-		return "", remainingBudget - int64(*rtCost), &cel.Error{
-			Detail: fmt.Sprintf("messageExpression beyond allowable length of %d", celconfig.MaxEvaluatedMessageExpressionSizeBytes),
+
+	for i, messageStr := range results {
+
+		trimmedMsgStr := strings.TrimSpace(messageStr)
+		if len(trimmedMsgStr) > celconfig.MaxEvaluatedMessageExpressionSizeBytes {
+			return nil, remainingBudget - int64(*rtCost), &cel.Error{
+				Detail: fmt.Sprintf("messageExpression beyond allowable length of %d", celconfig.MaxEvaluatedMessageExpressionSizeBytes),
+			}
+		} else if hasNewlines(trimmedMsgStr) {
+			return nil, remainingBudget - int64(*rtCost), &cel.Error{
+				Detail: "messageExpression should not contain line breaks",
+			}
+		} else if len(trimmedMsgStr) == 0 {
+			return nil, remainingBudget - int64(*rtCost), &cel.Error{
+				Detail: "messageExpression should evaluate to a non-empty string",
+			}
 		}
-	} else if hasNewlines(trimmedMsgStr) {
-		return "", remainingBudget - int64(*rtCost), &cel.Error{
-			Detail: "messageExpression should not contain line breaks",
-		}
-	} else if len(trimmedMsgStr) == 0 {
-		return "", remainingBudget - int64(*rtCost), &cel.Error{
-			Detail: "messageExpression should evaluate to a non-empty string",
-		}
+
+		results[i] = trimmedMsgStr
 	}
-	return trimmedMsgStr, remainingBudget - int64(*rtCost), nil
+	return results, remainingBudget - int64(*rtCost), nil
 }
 
 var newlineMatcher = regexp.MustCompile(`[\n]+`)
