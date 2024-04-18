@@ -245,6 +245,11 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	default:
 		return cmdutil.UsageErrorf(cmd, "%s", logsUsageErrStr)
 	}
+
+	if o.AllPods {
+		o.Prefix = true
+	}
+
 	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -403,9 +408,7 @@ func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReferenc
 }
 
 func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Writer) io.Writer {
-	if o.AllPods {
-		o.Prefix = true
-	}
+
 	if !o.Prefix || ref.FieldPath == "" || ref.Name == "" {
 		return writer
 	}
