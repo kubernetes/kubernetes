@@ -23,7 +23,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -203,10 +202,6 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 }
 
 func TestFileExists(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
@@ -221,6 +216,10 @@ func TestFileExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpfile: %v", err)
 	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Couldn't close tmpfile: %v", err)
+	}
+
 	tests := []struct {
 		name     string
 		filename string
@@ -308,10 +307,6 @@ func TestPKICertificateReadWriterExists(t *testing.T) {
 }
 
 func TestKubeConfigReadWriterExists(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
@@ -326,6 +321,10 @@ func TestKubeConfigReadWriterExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpfile: %v", err)
 	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Couldn't close tmpfile: %v", err)
+	}
+
 	tests := []struct {
 		name               string
 		kubeConfigFilePath string
