@@ -144,12 +144,18 @@ func (c *FakeClusterTestTypes) Apply(ctx context.Context, clusterTestType *examp
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := clusterTestType.Name
 	if name == nil {
 		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data), &v1.ClusterTestType{})
+		Invokes(testing.NewRootApplySubresourceAction(clustertesttypesResource, *name, data, manager, opts.Force), &v1.ClusterTestType{})
 	if obj == nil {
 		return nil, err
 	}
@@ -166,12 +172,18 @@ func (c *FakeClusterTestTypes) ApplyStatus(ctx context.Context, clusterTestType 
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := clusterTestType.Name
 	if name == nil {
 		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data, "status"), &v1.ClusterTestType{})
+		Invokes(testing.NewRootApplySubresourceAction(clustertesttypesResource, *name, data, manager, opts.Force, "status"), &v1.ClusterTestType{})
 	if obj == nil {
 		return nil, err
 	}

@@ -143,12 +143,18 @@ func (c *FakePriorityLevelConfigurations) Apply(ctx context.Context, priorityLev
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := priorityLevelConfiguration.Name
 	if name == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(prioritylevelconfigurationsResource, *name, types.ApplyPatchType, data), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootApplySubresourceAction(prioritylevelconfigurationsResource, *name, data, manager, opts.Force), &v1beta2.PriorityLevelConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakePriorityLevelConfigurations) ApplyStatus(ctx context.Context, prior
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := priorityLevelConfiguration.Name
 	if name == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(prioritylevelconfigurationsResource, *name, types.ApplyPatchType, data, "status"), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootApplySubresourceAction(prioritylevelconfigurationsResource, *name, data, manager, opts.Force, "status"), &v1beta2.PriorityLevelConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

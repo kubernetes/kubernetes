@@ -140,12 +140,18 @@ func (c *FakeResourceClaimTemplates) Apply(ctx context.Context, resourceClaimTem
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := resourceClaimTemplate.Name
 	if name == nil {
 		return nil, fmt.Errorf("resourceClaimTemplate.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourceclaimtemplatesResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha2.ResourceClaimTemplate{})
+		Invokes(testing.NewApplySubresourceAction(resourceclaimtemplatesResource, c.ns, *name, data, manager, opts.Force), &v1alpha2.ResourceClaimTemplate{})
 
 	if obj == nil {
 		return nil, err

@@ -152,12 +152,18 @@ func (c *FakeTestTypes) Apply(ctx context.Context, testType *examplev1.TestTypeA
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := testType.Name
 	if name == nil {
 		return nil, fmt.Errorf("testType.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, *name, types.ApplyPatchType, data), &v1.TestType{})
+		Invokes(testing.NewApplySubresourceAction(testtypesResource, c.ns, *name, data, manager, opts.Force), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeTestTypes) ApplyStatus(ctx context.Context, testType *examplev1.Tes
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := testType.Name
 	if name == nil {
 		return nil, fmt.Errorf("testType.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.TestType{})
+		Invokes(testing.NewApplySubresourceAction(testtypesResource, c.ns, *name, data, manager, opts.Force, "status"), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err

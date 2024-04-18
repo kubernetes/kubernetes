@@ -143,12 +143,18 @@ func (c *FakeNodes) Apply(ctx context.Context, node *corev1.NodeApplyConfigurati
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := node.Name
 	if name == nil {
 		return nil, fmt.Errorf("node.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, *name, types.ApplyPatchType, data), &v1.Node{})
+		Invokes(testing.NewRootApplySubresourceAction(nodesResource, *name, data, manager, opts.Force), &v1.Node{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakeNodes) ApplyStatus(ctx context.Context, node *corev1.NodeApplyConfi
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := node.Name
 	if name == nil {
 		return nil, fmt.Errorf("node.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, *name, types.ApplyPatchType, data, "status"), &v1.Node{})
+		Invokes(testing.NewRootApplySubresourceAction(nodesResource, *name, data, manager, opts.Force, "status"), &v1.Node{})
 	if obj == nil {
 		return nil, err
 	}

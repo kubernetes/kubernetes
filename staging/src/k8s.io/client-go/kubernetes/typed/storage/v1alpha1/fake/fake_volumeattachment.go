@@ -143,12 +143,18 @@ func (c *FakeVolumeAttachments) Apply(ctx context.Context, volumeAttachment *sto
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := volumeAttachment.Name
 	if name == nil {
 		return nil, fmt.Errorf("volumeAttachment.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, *name, types.ApplyPatchType, data), &v1alpha1.VolumeAttachment{})
+		Invokes(testing.NewRootApplySubresourceAction(volumeattachmentsResource, *name, data, manager, opts.Force), &v1alpha1.VolumeAttachment{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakeVolumeAttachments) ApplyStatus(ctx context.Context, volumeAttachmen
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := volumeAttachment.Name
 	if name == nil {
 		return nil, fmt.Errorf("volumeAttachment.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.VolumeAttachment{})
+		Invokes(testing.NewRootApplySubresourceAction(volumeattachmentsResource, *name, data, manager, opts.Force, "status"), &v1alpha1.VolumeAttachment{})
 	if obj == nil {
 		return nil, err
 	}

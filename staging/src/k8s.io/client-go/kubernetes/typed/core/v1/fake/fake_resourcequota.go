@@ -152,12 +152,18 @@ func (c *FakeResourceQuotas) Apply(ctx context.Context, resourceQuota *corev1.Re
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := resourceQuota.Name
 	if name == nil {
 		return nil, fmt.Errorf("resourceQuota.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data), &v1.ResourceQuota{})
+		Invokes(testing.NewApplySubresourceAction(resourcequotasResource, c.ns, *name, data, manager, opts.Force), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeResourceQuotas) ApplyStatus(ctx context.Context, resourceQuota *cor
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := resourceQuota.Name
 	if name == nil {
 		return nil, fmt.Errorf("resourceQuota.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ResourceQuota{})
+		Invokes(testing.NewApplySubresourceAction(resourcequotasResource, c.ns, *name, data, manager, opts.Force, "status"), &v1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err

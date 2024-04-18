@@ -152,12 +152,18 @@ func (c *FakePodDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudge
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := podDisruptionBudget.Name
 	if name == nil {
 		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(poddisruptionbudgetsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.PodDisruptionBudget{})
+		Invokes(testing.NewApplySubresourceAction(poddisruptionbudgetsResource, c.ns, *name, data, manager, opts.Force), &v1beta1.PodDisruptionBudget{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakePodDisruptionBudgets) ApplyStatus(ctx context.Context, podDisruptio
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := podDisruptionBudget.Name
 	if name == nil {
 		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(poddisruptionbudgetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta1.PodDisruptionBudget{})
+		Invokes(testing.NewApplySubresourceAction(poddisruptionbudgetsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1beta1.PodDisruptionBudget{})
 
 	if obj == nil {
 		return nil, err

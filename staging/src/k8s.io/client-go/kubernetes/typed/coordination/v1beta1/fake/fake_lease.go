@@ -140,12 +140,18 @@ func (c *FakeLeases) Apply(ctx context.Context, lease *coordinationv1beta1.Lease
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := lease.Name
 	if name == nil {
 		return nil, fmt.Errorf("lease.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(leasesResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Lease{})
+		Invokes(testing.NewApplySubresourceAction(leasesResource, c.ns, *name, data, manager, opts.Force), &v1beta1.Lease{})
 
 	if obj == nil {
 		return nil, err

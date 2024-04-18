@@ -140,12 +140,18 @@ func (c *FakePodTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTem
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := podTemplate.Name
 	if name == nil {
 		return nil, fmt.Errorf("podTemplate.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, *name, types.ApplyPatchType, data), &v1.PodTemplate{})
+		Invokes(testing.NewApplySubresourceAction(podtemplatesResource, c.ns, *name, data, manager, opts.Force), &v1.PodTemplate{})
 
 	if obj == nil {
 		return nil, err

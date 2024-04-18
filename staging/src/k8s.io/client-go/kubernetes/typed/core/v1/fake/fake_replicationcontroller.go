@@ -153,12 +153,18 @@ func (c *FakeReplicationControllers) Apply(ctx context.Context, replicationContr
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := replicationController.Name
 	if name == nil {
 		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data), &v1.ReplicationController{})
+		Invokes(testing.NewApplySubresourceAction(replicationcontrollersResource, c.ns, *name, data, manager, opts.Force), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -176,12 +182,18 @@ func (c *FakeReplicationControllers) ApplyStatus(ctx context.Context, replicatio
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := replicationController.Name
 	if name == nil {
 		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ReplicationController{})
+		Invokes(testing.NewApplySubresourceAction(replicationcontrollersResource, c.ns, *name, data, manager, opts.Force, "status"), &v1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err

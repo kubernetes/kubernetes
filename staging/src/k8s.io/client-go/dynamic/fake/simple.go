@@ -423,6 +423,7 @@ func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptio
 func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
+
 	switch {
 	case len(c.namespace) == 0 && len(subresources) == 0:
 		uncastRet, err = c.client.Fake.
@@ -456,30 +457,35 @@ func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types
 	return ret, err
 }
 
-// TODO: opts are currently ignored.
+// TODO: some opts are currently ignored.
 func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options metav1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := options.FieldManager; m != "" {
+		manager = m
+	}
+
 	var uncastRet runtime.Object
 	switch {
 	case len(c.namespace) == 0 && len(subresources) == 0:
 		uncastRet, err = c.client.Fake.
-			Invokes(testing.NewRootPatchAction(c.resource, name, types.ApplyPatchType, outBytes), &metav1.Status{Status: "dynamic patch fail"})
+			Invokes(testing.NewRootApplyAction(c.resource, name, outBytes, manager, options.Force), &metav1.Status{Status: "dynamic patch fail"})
 
 	case len(c.namespace) == 0 && len(subresources) > 0:
 		uncastRet, err = c.client.Fake.
-			Invokes(testing.NewRootPatchSubresourceAction(c.resource, name, types.ApplyPatchType, outBytes, subresources...), &metav1.Status{Status: "dynamic patch fail"})
+			Invokes(testing.NewRootApplySubresourceAction(c.resource, name, outBytes, manager, options.Force, subresources...), &metav1.Status{Status: "dynamic patch fail"})
 
 	case len(c.namespace) > 0 && len(subresources) == 0:
 		uncastRet, err = c.client.Fake.
-			Invokes(testing.NewPatchAction(c.resource, c.namespace, name, types.ApplyPatchType, outBytes), &metav1.Status{Status: "dynamic patch fail"})
+			Invokes(testing.NewApplyAction(c.resource, c.namespace, name, outBytes, manager, options.Force), &metav1.Status{Status: "dynamic patch fail"})
 
 	case len(c.namespace) > 0 && len(subresources) > 0:
 		uncastRet, err = c.client.Fake.
-			Invokes(testing.NewPatchSubresourceAction(c.resource, c.namespace, name, types.ApplyPatchType, outBytes, subresources...), &metav1.Status{Status: "dynamic patch fail"})
-
+			Invokes(testing.NewApplySubresourceAction(c.resource, c.namespace, name, outBytes, manager, options.Force, subresources...), &metav1.Status{Status: "dynamic patch fail"})
 	}
 
 	if err != nil {

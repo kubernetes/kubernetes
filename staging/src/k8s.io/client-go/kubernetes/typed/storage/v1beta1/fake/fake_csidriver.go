@@ -132,12 +132,18 @@ func (c *FakeCSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1beta1.CS
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := cSIDriver.Name
 	if name == nil {
 		return nil, fmt.Errorf("cSIDriver.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, *name, types.ApplyPatchType, data), &v1beta1.CSIDriver{})
+		Invokes(testing.NewRootApplySubresourceAction(csidriversResource, *name, data, manager, opts.Force), &v1beta1.CSIDriver{})
 	if obj == nil {
 		return nil, err
 	}

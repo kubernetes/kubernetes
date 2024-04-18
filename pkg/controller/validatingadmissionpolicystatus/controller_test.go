@@ -25,6 +25,9 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	"k8s.io/apimachinery/pkg/util/wait"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
@@ -33,6 +36,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
+
+var policyGVK = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingAdmissionPolicy"}
 
 func TestTypeChecking(t *testing.T) {
 	for _, tc := range []struct {
@@ -99,7 +104,13 @@ func TestTypeChecking(t *testing.T) {
 			defer cancel()
 			policy := tc.policy.DeepCopy()
 			policy.ObjectMeta.Generation = 1 // fake storage does not do this automatically
-			client := fake.NewSimpleClientset(policy)
+			typeconverter := managedfields.NewDeducedTypeConverter()
+			// typeconverter, err := clientgoopenapi.NewTypeConverter(openapitest.NewEmbeddedFileClient(), false)
+			// if err != nil {
+			// 	t.Fatalf("Failed to create TypeConverter: %v", err)
+			// }
+			fieldManager := managedfieldstest.NewFakeFieldManager(typeconverter, policyGVK)
+			client := fake.NewSimpleClientsetWithFieldManager(fieldManager, policy)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			typeChecker := &validatingadmissionpolicy.TypeChecker{
 				SchemaResolver: resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, scheme.Scheme),
@@ -208,6 +219,7 @@ func withGVRMatch(groups []string, versions []string, resources []string, policy
 			},
 		},
 	}
+	policy.SetGroupVersionKind(policyGVK)
 	return policy
 }
 

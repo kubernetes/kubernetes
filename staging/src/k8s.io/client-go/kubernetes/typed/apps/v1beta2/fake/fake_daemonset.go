@@ -152,12 +152,18 @@ func (c *FakeDaemonSets) Apply(ctx context.Context, daemonSet *appsv1beta2.Daemo
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := daemonSet.Name
 	if name == nil {
 		return nil, fmt.Errorf("daemonSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.DaemonSet{})
+		Invokes(testing.NewApplySubresourceAction(daemonsetsResource, c.ns, *name, data, manager, opts.Force), &v1beta2.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeDaemonSets) ApplyStatus(ctx context.Context, daemonSet *appsv1beta2
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := daemonSet.Name
 	if name == nil {
 		return nil, fmt.Errorf("daemonSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.DaemonSet{})
+		Invokes(testing.NewApplySubresourceAction(daemonsetsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1beta2.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
