@@ -1250,7 +1250,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 			Object: &example.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: createdInitialPods[len(createdInitialPods)-1].ResourceVersion,
-					Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+					Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 				},
 			},
 		}}
@@ -1512,7 +1512,7 @@ func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, st
 		watchEvents = append(watchEvents, watch.Event{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: globalResourceVersion,
-				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 			},
 		}})
 		return watchEvents

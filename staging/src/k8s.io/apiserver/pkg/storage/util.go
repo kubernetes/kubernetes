@@ -24,16 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-)
-
-const (
-	// initialEventsAnnotationKey the name of the key
-	// under which an annotation marking the end of list stream
-	// is kept.
-	initialEventsAnnotationKey = "k8s.io/initial-events-end"
 )
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
@@ -140,7 +134,7 @@ func AnnotateInitialEventsEndBookmark(obj runtime.Object) error {
 	if objAnnotations == nil {
 		objAnnotations = map[string]string{}
 	}
-	objAnnotations[initialEventsAnnotationKey] = "true"
+	objAnnotations[metav1.InitialEventsAnnotationKey] = "true"
 	objMeta.SetAnnotations(objAnnotations)
 	return nil
 }
@@ -153,5 +147,5 @@ func HasInitialEventsEndBookmarkAnnotation(obj runtime.Object) (bool, error) {
 		return false, err
 	}
 	objAnnotations := objMeta.GetAnnotations()
-	return objAnnotations[initialEventsAnnotationKey] == "true", nil
+	return objAnnotations[metav1.InitialEventsAnnotationKey] == "true", nil
 }
