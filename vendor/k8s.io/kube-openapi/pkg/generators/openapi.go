@@ -362,6 +362,88 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 	return g.Error()
 }
 
+// Generates Go code to represent an OpenAPI schema. May be refactored in
+// the future to take more responsibility as we transition from an on-line
+// approach to parsing the comments to spec.Schema
+func (g openAPITypeWriter) generateSchema(s *spec.Schema) error {
+	if !reflect.DeepEqual(s.SchemaProps, spec.SchemaProps{}) {
+		g.Do("SchemaProps: spec.SchemaProps{\n", nil)
+		err := g.generateValueValidations(&s.SchemaProps)
+		if err != nil {
+			return err
+		}
+
+		if len(s.Properties) > 0 {
+			g.Do("Properties: map[string]spec.Schema{\n", nil)
+
+			// Sort property names to generate deterministic output
+			keys := []string{}
+			for k := range s.Properties {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+
+			for _, k := range keys {
+				v := s.Properties[k]
+				g.Do("$.$: {\n", fmt.Sprintf("%#v", k))
+				err := g.generateSchema(&v)
+				if err != nil {
+					return err
+				}
+				g.Do("},\n", nil)
+			}
+			g.Do("},\n", nil)
+		}
+
+		if s.AdditionalProperties != nil && s.AdditionalProperties.Schema != nil {
+			g.Do("AdditionalProperties: &spec.SchemaOrBool{\n", nil)
+			g.Do("Allows: true,\n", nil)
+			g.Do("Schema: &spec.Schema{\n", nil)
+			err := g.generateSchema(s.AdditionalProperties.Schema)
+			if err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			g.Do("},\n", nil)
+		}
+
+		if s.Items != nil && s.Items.Schema != nil {
+			g.Do("Items: &spec.SchemaOrArray{\n", nil)
+			g.Do("Schema: &spec.Schema{\n", nil)
+			err := g.generateSchema(s.Items.Schema)
+			if err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+			g.Do("},\n", nil)
+		}
+
+		g.Do("},\n", nil)
+	}
+
+	if len(s.Extensions) > 0 {
+		g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+
+		// Sort extension keys to generate deterministic output
+		keys := []string{}
+		for k := range s.Extensions {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			v := s.Extensions[k]
+			g.Do("$.key$: $.value$,\n", map[string]interface{}{
+				"key":   fmt.Sprintf("%#v", k),
+				"value": fmt.Sprintf("%#v", v),
+			})
+		}
+		g.Do("},\n},\n", nil)
+	}
+
+	return nil
+}
+
 func (g openAPITypeWriter) generateValueValidations(vs *spec.SchemaProps) error {
 
 	if vs == nil {
@@ -420,6 +502,26 @@ func (g openAPITypeWriter) generateValueValidations(vs *spec.SchemaProps) error 
 		g.Do("UniqueItems: true,\n", nil)
 	}
 
+	if len(vs.Enum) > 0 {
+		g.Do("Enum: []interface{}{\n", nil)
+		for _, e := range vs.Enum {
+			g.Do("$.$,\n", fmt.Sprintf("%#v", e))
+		}
+		g.Do("},\n", nil)
+	}
+
+	if len(vs.AllOf) > 0 {
+		g.Do("AllOf: []spec.Schema{\n", nil)
+		for _, s := range vs.AllOf {
+			g.Do("{\n", nil)
+			if err := g.generateSchema(&s); err != nil {
+				return err
+			}
+			g.Do("},\n", nil)
+		}
+		g.Do("},\n", nil)
+	}
+
 	return nil
 }
 
@@ -429,7 +531,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 	case types.Struct:
 		validationSchema, err := ParseCommentTags(t, t.CommentLines, markerPrefix)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed parsing comment tags for %v: %w", t.String(), err)
 		}
 
 		hasV2Definition := hasOpenAPIDefinitionMethod(t)
@@ -644,7 +746,15 @@ func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union
 	}
 
 	if len(otherExtensions) > 0 {
-		for k, v := range otherExtensions {
+		// Sort extension keys to generate deterministic output
+		keys := []string{}
+		for k := range otherExtensions {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			v := otherExtensions[k]
 			g.Do("$.key$: $.value$,\n", map[string]interface{}{
 				"key":   fmt.Sprintf("%#v", k),
 				"value": fmt.Sprintf("%#v", v),
@@ -704,7 +814,7 @@ func defaultFromComments(comments []string, commentPath string, t *types.Type) (
 
 	var i interface{}
 	if id, ok := parseSymbolReference(tag, commentPath); ok {
-		klog.Errorf("%v, %v", id, commentPath)
+		klog.V(5).Infof("%v, %v", id, commentPath)
 		return nil, &id, nil
 	} else if err := json.Unmarshal([]byte(tag), &i); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal default: %v", err)
@@ -932,6 +1042,17 @@ func (g openAPITypeWriter) generateSimpleProperty(typeString, format string) {
 func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
 	g.refTypes[t.Name.String()] = t
 	g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
+}
+
+func resolvePtrType(t *types.Type) *types.Type {
+	var prev *types.Type
+	for prev != t {
+		prev = t
+		if t.Kind == types.Pointer {
+			t = t.Elem
+		}
+	}
+	return t
 }
 
 func resolveAliasAndPtrType(t *types.Type) *types.Type {
