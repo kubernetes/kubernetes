@@ -547,7 +547,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	return nil
 }
 
-// handleResourceClaim is invoked for each volume of a pod.
+// handleResourceClaim is invoked for each resource claim of a pod.
 func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim, newPodClaims *map[string]string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
 	ctx = klog.NewContext(ctx, logger)
