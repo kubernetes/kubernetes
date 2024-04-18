@@ -1774,6 +1774,12 @@ function prepare-kube-proxy-manifest-variables {
       fi
       params+=" --proxy-mode=ipvs --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
       ;;
+    nftables)
+      # Pass --conntrack-tcp-be-liberal so we can test that this makes the
+      # "proxy implementation should not be vulnerable to the invalid conntrack state bug"
+      # test pass. https://issues.k8s.io/122663#issuecomment-1885024015
+      params+=" --proxy-mode=nftables --conntrack-tcp-be-liberal"
+      ;;
   esac
 
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
