@@ -340,13 +340,13 @@ func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
 	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
 }
 
-func TestCacherWatchSemantics(t *testing.T) {
+func TestWatchSemantics(t *testing.T) {
 	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchSemantics(context.TODO(), t, store)
 }
 
-func TestCacherWatchSemanticInitialEventsExtended(t *testing.T) {
+func TestWatchSemanticInitialEventsExtended(t *testing.T) {
 	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)

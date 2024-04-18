@@ -344,7 +344,7 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 			continue
 		}
 		if _, err := conn.channels[channel].DataFromSocket(data); err != nil {
-			klog.Errorf("Unable to write frame to %d: %v\n%s", channel, err, string(data))
+			klog.Errorf("Unable to write frame (%d bytes) to %d: %v", len(data), channel, err)
 			continue
 		}
 	}
