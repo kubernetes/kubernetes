@@ -635,6 +635,7 @@ kube::golang::place_bins() {
       ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
     fi
 
+    V=3 kube::log::status "Placing binaries for ${platform} in ${KUBE_OUTPUT_BIN}/${platform}"
     local full_binpath_src="${KUBE_GOPATH}/bin${platform_src}"
     if [[ -d "${full_binpath_src}" ]]; then
       mkdir -p "${KUBE_OUTPUT_BIN}/${platform}"
@@ -795,7 +796,7 @@ kube::golang::build_binaries_for_platform() {
     fi
    done
 
-  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
+  V=2 kube::log::info "Env for ${platform}: GOPATH=${GOPATH-} GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
   V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags}"
 
   local -a build_args
@@ -873,106 +874,101 @@ kube::golang::get_physmem() {
 #   KUBE_BUILD_PLATFORMS - Incoming variable of targets to build for.  If unset
 #     then just the host architecture is built.
 kube::golang::build_binaries() {
-  # Create a sub-shell so that we don't pollute the outer environment
-  (
-    # Check for `go` binary and set ${GOPATH}.
-    kube::golang::setup_env
-    V=2 kube::log::info "Go version: $(GOFLAGS='' go version)"
+  V=2 kube::log::info "Go version: $(GOFLAGS='' go version)"
 
-    local host_platform
-    host_platform=$(kube::golang::host_platform)
+  local host_platform
+  host_platform=$(kube::golang::host_platform)
 
-    # These are "local" but are visible to and relied on by functions this
-    # function calls.  They are effectively part of the calling API to
-    # build_binaries_for_platform.
-    local goflags goldflags gogcflags gotags
+  # These are "local" but are visible to and relied on by functions this
+  # function calls.  They are effectively part of the calling API to
+  # build_binaries_for_platform.
+  local goflags goldflags gogcflags gotags
 
-    goflags=()
-    gogcflags="${GOGCFLAGS:-}"
-    goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
+  goflags=()
+  gogcflags="${GOGCFLAGS:-}"
+  goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
 
-    if [[ "${DBG:-}" == 1 ]]; then
-        # Debugging - disable optimizations and inlining and trimPath
-        gogcflags="${gogcflags} all=-N -l"
+  if [[ "${DBG:-}" == 1 ]]; then
+      # Debugging - disable optimizations and inlining and trimPath
+      gogcflags="${gogcflags} all=-N -l"
+  else
+      # Not debugging - disable symbols and DWARF, trim embedded paths
+      goldflags="${goldflags} -s -w"
+      goflags+=("-trimpath")
+  fi
+
+  # Extract tags if any specified in GOFLAGS
+  gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+
+  local -a targets=()
+  local arg
+
+  for arg; do
+    if [[ "${arg}" == -* ]]; then
+      # Assume arguments starting with a dash are flags to pass to go.
+      goflags+=("${arg}")
     else
-        # Not debugging - disable symbols and DWARF, trim embedded paths
-        goldflags="${goldflags} -s -w"
-        goflags+=("-trimpath")
+      targets+=("${arg}")
     fi
+  done
 
-    # Extract tags if any specified in GOFLAGS
-    gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+  local -a platforms
+  IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
+  if [[ ${#platforms[@]} -eq 0 ]]; then
+    platforms=("${host_platform}")
+  fi
 
-    local -a targets=()
-    local arg
+  if [[ ${#targets[@]} -eq 0 ]]; then
+    targets=("${KUBE_ALL_TARGETS[@]}")
+  fi
+  kube::util::read-array targets < <(kube::golang::dedup "${targets[@]}")
 
-    for arg; do
-      if [[ "${arg}" == -* ]]; then
-        # Assume arguments starting with a dash are flags to pass to go.
-        goflags+=("${arg}")
-      else
-        targets+=("${arg}")
-      fi
+  local -a binaries
+  kube::util::read-array binaries < <(kube::golang::normalize_go_targets "${targets[@]}")
+  kube::util::read-array binaries < <(kube::golang::dedup "${binaries[@]}")
+
+  local parallel=false
+  if [[ ${#platforms[@]} -gt 1 ]]; then
+    local gigs
+    gigs=$(kube::golang::get_physmem)
+
+    if [[ ${gigs} -ge ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
+      kube::log::status "Multiple platforms requested and available ${gigs}G >= threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
+      parallel=true
+    else
+      kube::log::status "Multiple platforms requested, but available ${gigs}G < threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in serial"
+      parallel=false
+    fi
+  fi
+
+  if [[ "${parallel}" == "true" ]]; then
+    kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
+    local platform
+    for platform in "${platforms[@]}"; do (
+        kube::golang::set_platform_envs "${platform}"
+        kube::log::status "${platform}: build started"
+        kube::golang::build_binaries_for_platform "${platform}"
+        kube::log::status "${platform}: build finished"
+      ) &> "/tmp//${platform//\//_}.build" &
     done
 
-    local -a platforms
-    IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
-    if [[ ${#platforms[@]} -eq 0 ]]; then
-      platforms=("${host_platform}")
-    fi
+    local fails=0
+    for job in $(jobs -p); do
+      wait "${job}" || (( fails+=1 ))
+    done
 
-    if [[ ${#targets[@]} -eq 0 ]]; then
-      targets=("${KUBE_ALL_TARGETS[@]}")
-    fi
-    kube::util::read-array targets < <(kube::golang::dedup "${targets[@]}")
+    for platform in "${platforms[@]}"; do
+      cat "/tmp//${platform//\//_}.build"
+    done
 
-    local -a binaries
-    kube::util::read-array binaries < <(kube::golang::normalize_go_targets "${targets[@]}")
-    kube::util::read-array binaries < <(kube::golang::dedup "${binaries[@]}")
-
-    local parallel=false
-    if [[ ${#platforms[@]} -gt 1 ]]; then
-      local gigs
-      gigs=$(kube::golang::get_physmem)
-
-      if [[ ${gigs} -ge ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
-        kube::log::status "Multiple platforms requested and available ${gigs}G >= threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
-        parallel=true
-      else
-        kube::log::status "Multiple platforms requested, but available ${gigs}G < threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in serial"
-        parallel=false
-      fi
-    fi
-
-    if [[ "${parallel}" == "true" ]]; then
-      kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
-      local platform
-      for platform in "${platforms[@]}"; do (
-          kube::golang::set_platform_envs "${platform}"
-          kube::log::status "${platform}: build started"
-          kube::golang::build_binaries_for_platform "${platform}"
-          kube::log::status "${platform}: build finished"
-        ) &> "/tmp//${platform//\//_}.build" &
-      done
-
-      local fails=0
-      for job in $(jobs -p); do
-        wait "${job}" || (( fails+=1 ))
-      done
-
-      for platform in "${platforms[@]}"; do
-        cat "/tmp//${platform//\//_}.build"
-      done
-
-      exit "${fails}"
-    else
-      for platform in "${platforms[@]}"; do
-        kube::log::status "Building go targets for ${platform}"
-        (
-          kube::golang::set_platform_envs "${platform}"
-          kube::golang::build_binaries_for_platform "${platform}"
-        )
-      done
-    fi
-  )
+    return "${fails}"
+  else
+    for platform in "${platforms[@]}"; do
+      kube::log::status "Building go targets for ${platform}"
+      (
+        kube::golang::set_platform_envs "${platform}"
+        kube::golang::build_binaries_for_platform "${platform}"
+      )
+    done
+  fi
 }
