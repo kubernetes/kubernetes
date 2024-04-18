@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
+	attachdetachutil "k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -51,6 +52,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 
 	// Act
 	tCtx := ktesting.Init(t)
+	logger, _ := ktesting.NewTestContext(t)
 	_, err := NewAttachDetachController(
 		tCtx,
 		fakeKubeClient,
@@ -67,6 +69,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		false,
 		5*time.Second,
 		false,
+		attachdetachutil.NewThrottleLogger(tCtx, logger),
 		DefaultTimerConfig,
 	)
 
@@ -280,6 +283,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		false,
 		1*time.Second,
 		false,
+		attachdetachutil.NewThrottleLogger(ctx, logger),
 		DefaultTimerConfig,
 	)
 
@@ -544,6 +548,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		false,
 		1*time.Second,
 		false,
+		attachdetachutil.NewThrottleLogger(ctx, logger),
 		DefaultTimerConfig,
 	)
 	if err != nil {

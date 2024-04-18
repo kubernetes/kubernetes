@@ -27,8 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -63,6 +61,7 @@ import (
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/ephemeral"
 	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -390,6 +389,7 @@ func startPersistentVolumeAttachDetachController(ctx context.Context, controller
 			controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 			controllerContext.ComponentConfig.AttachDetachController.DisableForceDetachOnTimeout,
+			util.NewThrottleLogger(ctx, logger, util.WithInterval(controllerContext.ComponentConfig.AttachDetachController.ErrorLogInterval.Duration)),
 			attachdetach.DefaultTimerConfig,
 		)
 	if attachDetachControllerErr != nil {

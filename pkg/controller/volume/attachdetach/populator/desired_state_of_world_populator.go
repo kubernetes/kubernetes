@@ -64,7 +64,8 @@ func NewDesiredStateOfWorldPopulator(
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pvLister corelisters.PersistentVolumeLister,
 	csiMigratedPluginManager csimigration.PluginManager,
-	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
+	intreeToCSITranslator csimigration.InTreeToCSITranslator,
+	throttleLogger *util.ThrottleLogger) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		loopSleepDuration:        loopSleepDuration,
 		listPodsRetryDuration:    listPodsRetryDuration,
@@ -75,6 +76,7 @@ func NewDesiredStateOfWorldPopulator(
 		pvLister:                 pvLister,
 		csiMigratedPluginManager: csiMigratedPluginManager,
 		intreeToCSITranslator:    intreeToCSITranslator,
+		throttleLogger:           throttleLogger,
 	}
 }
 
@@ -89,6 +91,7 @@ type desiredStateOfWorldPopulator struct {
 	timeOfLastListPods       time.Time
 	csiMigratedPluginManager csimigration.PluginManager
 	intreeToCSITranslator    csimigration.InTreeToCSITranslator
+	throttleLogger           *util.ThrottleLogger
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context) {
@@ -190,8 +193,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods(logger klog.Logge
 			continue
 		}
 		util.ProcessPodVolumes(logger, pod, true,
-			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.csiMigratedPluginManager, dswp.intreeToCSITranslator)
-
+			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.csiMigratedPluginManager, dswp.intreeToCSITranslator, dswp.throttleLogger)
 	}
 
 }

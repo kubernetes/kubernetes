@@ -185,7 +185,7 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 
 // ProcessPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world if addVolumes is true, otherwise it removes them.
-func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.DesiredStateOfWorld, volumePluginMgr *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) {
+func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.DesiredStateOfWorld, volumePluginMgr *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, throttleLogger *ThrottleLogger) {
 	if pod == nil {
 		return
 	}
@@ -208,16 +208,18 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
+		uniqueVolName := fmt.Sprintf("%s-%s", string(pod.GetUID()), podVolume.Name)
+
 		volumeSpec, err := CreateVolumeSpec(logger, podVolume, pod, nodeName, volumePluginMgr, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
 		if err != nil {
-			logger.V(10).Info("Error processing volume for pod", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
+			throttleLogger.Log(10, uniqueVolName, "Error processing volume for pod", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 			continue
 		}
 
 		attachableVolumePlugin, err :=
 			volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
-			logger.V(10).Info("Skipping volume for pod, it does not implement attacher interface", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
+			throttleLogger.Log(10, uniqueVolName, "Skipping volume for pod, it does not implement attacher interface", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 			continue
 		}
 
@@ -227,7 +229,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 			_, err := desiredStateOfWorld.AddPod(
 				uniquePodName, pod, volumeSpec, nodeName)
 			if err != nil {
-				logger.V(10).Info("Failed to add volume for pod to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
+				throttleLogger.Log(10, uniqueVolName, "Failed to add volume for pod to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 			}
 
 		} else {
@@ -235,7 +237,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 			uniqueVolumeName, err := util.GetUniqueVolumeNameFromSpec(
 				attachableVolumePlugin, volumeSpec)
 			if err != nil {
-				logger.V(10).Info("Failed to delete volume for pod from desiredStateOfWorld. GetUniqueVolumeNameFromSpec failed", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
+				throttleLogger.Log(10, uniqueVolName, "Failed to delete volume for pod from desiredStateOfWorld. GetUniqueVolumeNameFromSpec failed", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 				continue
 			}
 			desiredStateOfWorld.DeletePod(
