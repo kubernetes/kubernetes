@@ -17,6 +17,7 @@ package gomock
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -24,7 +25,7 @@ import (
 // It is used to represent the valid or expected arguments to a mocked method.
 type Matcher interface {
 	// Matches returns whether x is a match.
-	Matches(x interface{}) bool
+	Matches(x any) bool
 
 	// String describes what the matcher matches.
 	String() string
@@ -35,7 +36,7 @@ type Matcher interface {
 // printing .
 func WantFormatter(s fmt.Stringer, m Matcher) Matcher {
 	type matcher interface {
-		Matches(x interface{}) bool
+		Matches(x any) bool
 	}
 
 	return struct {
@@ -63,16 +64,16 @@ func (f StringerFunc) String() string {
 type GotFormatter interface {
 	// Got is invoked with the received value. The result is used when
 	// printing the failure message.
-	Got(got interface{}) string
+	Got(got any) string
 }
 
 // GotFormatterFunc type is an adapter to allow the use of ordinary
 // functions as a GotFormatter. If f is a function with the appropriate
 // signature, GotFormatterFunc(f) is a GotFormatter that calls f.
-type GotFormatterFunc func(got interface{}) string
+type GotFormatterFunc func(got any) string
 
 // Got implements GotFormatter.
-func (f GotFormatterFunc) Got(got interface{}) string {
+func (f GotFormatterFunc) Got(got any) string {
 	return f(got)
 }
 
@@ -89,7 +90,7 @@ func GotFormatterAdapter(s GotFormatter, m Matcher) Matcher {
 
 type anyMatcher struct{}
 
-func (anyMatcher) Matches(interface{}) bool {
+func (anyMatcher) Matches(any) bool {
 	return true
 }
 
@@ -97,11 +98,23 @@ func (anyMatcher) String() string {
 	return "is anything"
 }
 
-type eqMatcher struct {
-	x interface{}
+type condMatcher struct {
+	fn func(x any) bool
 }
 
-func (e eqMatcher) Matches(x interface{}) bool {
+func (c condMatcher) Matches(x any) bool {
+	return c.fn(x)
+}
+
+func (condMatcher) String() string {
+	return "adheres to a custom condition"
+}
+
+type eqMatcher struct {
+	x any
+}
+
+func (e eqMatcher) Matches(x any) bool {
 	// In case, some value is nil
 	if e.x == nil || x == nil {
 		return reflect.DeepEqual(e.x, x)
@@ -125,7 +138,7 @@ func (e eqMatcher) String() string {
 
 type nilMatcher struct{}
 
-func (nilMatcher) Matches(x interface{}) bool {
+func (nilMatcher) Matches(x any) bool {
 	if x == nil {
 		return true
 	}
@@ -148,7 +161,7 @@ type notMatcher struct {
 	m Matcher
 }
 
-func (n notMatcher) Matches(x interface{}) bool {
+func (n notMatcher) Matches(x any) bool {
 	return !n.m.Matches(x)
 }
 
@@ -156,11 +169,30 @@ func (n notMatcher) String() string {
 	return "not(" + n.m.String() + ")"
 }
 
+type regexMatcher struct {
+	regex *regexp.Regexp
+}
+
+func (m regexMatcher) Matches(x any) bool {
+	switch t := x.(type) {
+	case string:
+		return m.regex.MatchString(t)
+	case []byte:
+		return m.regex.Match(t)
+	default:
+		return false
+	}
+}
+
+func (m regexMatcher) String() string {
+	return "matches regex " + m.regex.String()
+}
+
 type assignableToTypeOfMatcher struct {
 	targetType reflect.Type
 }
 
-func (m assignableToTypeOfMatcher) Matches(x interface{}) bool {
+func (m assignableToTypeOfMatcher) Matches(x any) bool {
 	return reflect.TypeOf(x).AssignableTo(m.targetType)
 }
 
@@ -168,11 +200,32 @@ func (m assignableToTypeOfMatcher) String() string {
 	return "is assignable to " + m.targetType.Name()
 }
 
+type anyOfMatcher struct {
+	matchers []Matcher
+}
+
+func (am anyOfMatcher) Matches(x any) bool {
+	for _, m := range am.matchers {
+		if m.Matches(x) {
+			return true
+		}
+	}
+	return false
+}
+
+func (am anyOfMatcher) String() string {
+	ss := make([]string, 0, len(am.matchers))
+	for _, matcher := range am.matchers {
+		ss = append(ss, matcher.String())
+	}
+	return strings.Join(ss, " | ")
+}
+
 type allMatcher struct {
 	matchers []Matcher
 }
 
-func (am allMatcher) Matches(x interface{}) bool {
+func (am allMatcher) Matches(x any) bool {
 	for _, m := range am.matchers {
 		if !m.Matches(x) {
 			return false
@@ -193,7 +246,7 @@ type lenMatcher struct {
 	i int
 }
 
-func (m lenMatcher) Matches(x interface{}) bool {
+func (m lenMatcher) Matches(x any) bool {
 	v := reflect.ValueOf(x)
 	switch v.Kind() {
 	case reflect.Array, reflect.Chan, reflect.Map, reflect.Slice, reflect.String:
@@ -208,10 +261,10 @@ func (m lenMatcher) String() string {
 }
 
 type inAnyOrderMatcher struct {
-	x interface{}
+	x any
 }
 
-func (m inAnyOrderMatcher) Matches(x interface{}) bool {
+func (m inAnyOrderMatcher) Matches(x any) bool {
 	given, ok := m.prepareValue(x)
 	if !ok {
 		return false
@@ -257,7 +310,7 @@ func (m inAnyOrderMatcher) Matches(x interface{}) bool {
 	return extraInGiven == 0 && missingFromWanted == 0
 }
 
-func (m inAnyOrderMatcher) prepareValue(x interface{}) (reflect.Value, bool) {
+func (m inAnyOrderMatcher) prepareValue(x any) (reflect.Value, bool) {
 	xValue := reflect.ValueOf(x)
 	switch xValue.Kind() {
 	case reflect.Slice, reflect.Array:
@@ -280,12 +333,45 @@ func All(ms ...Matcher) Matcher { return allMatcher{ms} }
 // Any returns a matcher that always matches.
 func Any() Matcher { return anyMatcher{} }
 
+// Cond returns a matcher that matches when the given function returns true
+// after passing it the parameter to the mock function.
+// This is particularly useful in case you want to match over a field of a custom struct, or dynamic logic.
+//
+// Example usage:
+//
+//	Cond(func(x any){return x.(int) == 1}).Matches(1) // returns true
+//	Cond(func(x any){return x.(int) == 2}).Matches(1) // returns false
+func Cond(fn func(x any) bool) Matcher { return condMatcher{fn} }
+
+// AnyOf returns a composite Matcher that returns true if at least one of the
+// matchers returns true.
+//
+// Example usage:
+//
+//	AnyOf(1, 2, 3).Matches(2) // returns true
+//	AnyOf(1, 2, 3).Matches(10) // returns false
+//	AnyOf(Nil(), Len(2)).Matches(nil) // returns true
+//	AnyOf(Nil(), Len(2)).Matches("hi") // returns true
+//	AnyOf(Nil(), Len(2)).Matches("hello") // returns false
+func AnyOf(xs ...any) Matcher {
+	ms := make([]Matcher, 0, len(xs))
+	for _, x := range xs {
+		if m, ok := x.(Matcher); ok {
+			ms = append(ms, m)
+		} else {
+			ms = append(ms, Eq(x))
+		}
+	}
+	return anyOfMatcher{ms}
+}
+
 // Eq returns a matcher that matches on equality.
 //
 // Example usage:
-//   Eq(5).Matches(5) // returns true
-//   Eq(5).Matches(4) // returns false
-func Eq(x interface{}) Matcher { return eqMatcher{x} }
+//
+//	Eq(5).Matches(5) // returns true
+//	Eq(5).Matches(4) // returns false
+func Eq(x any) Matcher { return eqMatcher{x} }
 
 // Len returns a matcher that matches on length. This matcher returns false if
 // is compared to a type that is not an array, chan, map, slice, or string.
@@ -296,35 +382,50 @@ func Len(i int) Matcher {
 // Nil returns a matcher that matches if the received value is nil.
 //
 // Example usage:
-//   var x *bytes.Buffer
-//   Nil().Matches(x) // returns true
-//   x = &bytes.Buffer{}
-//   Nil().Matches(x) // returns false
+//
+//	var x *bytes.Buffer
+//	Nil().Matches(x) // returns true
+//	x = &bytes.Buffer{}
+//	Nil().Matches(x) // returns false
 func Nil() Matcher { return nilMatcher{} }
 
 // Not reverses the results of its given child matcher.
 //
 // Example usage:
-//   Not(Eq(5)).Matches(4) // returns true
-//   Not(Eq(5)).Matches(5) // returns false
-func Not(x interface{}) Matcher {
+//
+//	Not(Eq(5)).Matches(4) // returns true
+//	Not(Eq(5)).Matches(5) // returns false
+func Not(x any) Matcher {
 	if m, ok := x.(Matcher); ok {
 		return notMatcher{m}
 	}
 	return notMatcher{Eq(x)}
 }
 
+// Regex checks whether parameter matches the associated regex.
+//
+// Example usage:
+//
+//	Regex("[0-9]{2}:[0-9]{2}").Matches("23:02") // returns true
+//	Regex("[0-9]{2}:[0-9]{2}").Matches([]byte{'2', '3', ':', '0', '2'}) // returns true
+//	Regex("[0-9]{2}:[0-9]{2}").Matches("hello world") // returns false
+//	Regex("[0-9]{2}").Matches(21) // returns false as it's not a valid type
+func Regex(regexStr string) Matcher {
+	return regexMatcher{regex: regexp.MustCompile(regexStr)}
+}
+
 // AssignableToTypeOf is a Matcher that matches if the parameter to the mock
 // function is assignable to the type of the parameter to this function.
 //
 // Example usage:
-//   var s fmt.Stringer = &bytes.Buffer{}
-//   AssignableToTypeOf(s).Matches(time.Second) // returns true
-//   AssignableToTypeOf(s).Matches(99) // returns false
 //
-//   var ctx = reflect.TypeOf((*context.Context)(nil)).Elem()
-//   AssignableToTypeOf(ctx).Matches(context.Background()) // returns true
-func AssignableToTypeOf(x interface{}) Matcher {
+//	var s fmt.Stringer = &bytes.Buffer{}
+//	AssignableToTypeOf(s).Matches(time.Second) // returns true
+//	AssignableToTypeOf(s).Matches(99) // returns false
+//
+//	var ctx = reflect.TypeOf((*context.Context)(nil)).Elem()
+//	AssignableToTypeOf(ctx).Matches(context.Background()) // returns true
+func AssignableToTypeOf(x any) Matcher {
 	if xt, ok := x.(reflect.Type); ok {
 		return assignableToTypeOfMatcher{xt}
 	}
@@ -334,8 +435,9 @@ func AssignableToTypeOf(x interface{}) Matcher {
 // InAnyOrder is a Matcher that returns true for collections of the same elements ignoring the order.
 //
 // Example usage:
-//   InAnyOrder([]int{1, 2, 3}).Matches([]int{1, 3, 2}) // returns true
-//   InAnyOrder([]int{1, 2, 3}).Matches([]int{1, 2}) // returns false
-func InAnyOrder(x interface{}) Matcher {
+//
+//	InAnyOrder([]int{1, 2, 3}).Matches([]int{1, 3, 2}) // returns true
+//	InAnyOrder([]int{1, 2, 3}).Matches([]int{1, 2}) // returns false
+func InAnyOrder(x any) Matcher {
 	return inAnyOrderMatcher{x}
 }
