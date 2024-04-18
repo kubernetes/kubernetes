@@ -70,6 +70,10 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 		config.Mode = proxyconfigapi.ProxyModeIPTables
 	}
 
+	if config.Mode == proxyconfigapi.ProxyModeNFTables && len(config.NodePortAddresses) == 0 {
+		config.NodePortAddresses = []string{proxyconfigapi.NodePortAddressesPrimary}
+	}
+
 	if config.DetectLocalMode == "" {
 		o.logger.V(4).Info("Defaulting detect-local-mode", "localModeClusterCIDR", string(proxyconfigapi.LocalModeClusterCIDR))
 		config.DetectLocalMode = proxyconfigapi.LocalModeClusterCIDR

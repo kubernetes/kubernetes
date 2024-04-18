@@ -975,6 +975,7 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		{[]string{"10.20.0.0/16", "100.200.0.0/16"}},
 		{[]string{"10.0.0.0/8"}},
 		{[]string{"2001:db8::/32"}},
+		{[]string{kubeproxyconfig.NodePortAddressesPrimary}},
 	}
 
 	for _, successCase := range successCases {
@@ -1011,6 +1012,14 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		"invalid ipv6 ip format": {
 			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[2]"), "2001:db8:xyz/64", "must be a valid CIDR")},
+		},
+		"invalid primary/CIDR mix 1": {
+			addresses:    []string{"primary", "127.0.0.1/32"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "primary", "can't use both 'primary' and CIDRs")},
+		},
+		"invalid primary/CIDR mix 2": {
+			addresses:    []string{"127.0.0.1/32", "primary"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "primary", "can't use both 'primary' and CIDRs")},
 		},
 	}
 
