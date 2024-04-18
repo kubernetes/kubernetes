@@ -44,22 +44,24 @@ var resourceclassparametersKind = v1alpha2.SchemeGroupVersion.WithKind("Resource
 
 // Get takes name of the resourceClassParameters, and returns the corresponding resourceClassParameters object, and an error if there is any.
 func (c *FakeResourceClassParameters) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceClassParameters, err error) {
+	emptyResult := &v1alpha2.ResourceClassParameters{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(resourceclassparametersResource, c.ns, name), &v1alpha2.ResourceClassParameters{})
+		Invokes(testing.NewGetAction(resourceclassparametersResource, c.ns, name), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClassParameters), err
 }
 
 // List takes label and field selectors, and returns the list of ResourceClassParameters that match those selectors.
 func (c *FakeResourceClassParameters) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClassParametersList, err error) {
+	emptyResult := &v1alpha2.ResourceClassParametersList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(resourceclassparametersResource, resourceclassparametersKind, c.ns, opts), &v1alpha2.ResourceClassParametersList{})
+		Invokes(testing.NewListAction(resourceclassparametersResource, resourceclassparametersKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -84,22 +86,24 @@ func (c *FakeResourceClassParameters) Watch(ctx context.Context, opts v1.ListOpt
 
 // Create takes the representation of a resourceClassParameters and creates it.  Returns the server's representation of the resourceClassParameters, and an error, if there is any.
 func (c *FakeResourceClassParameters) Create(ctx context.Context, resourceClassParameters *v1alpha2.ResourceClassParameters, opts v1.CreateOptions) (result *v1alpha2.ResourceClassParameters, err error) {
+	emptyResult := &v1alpha2.ResourceClassParameters{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(resourceclassparametersResource, c.ns, resourceClassParameters), &v1alpha2.ResourceClassParameters{})
+		Invokes(testing.NewCreateAction(resourceclassparametersResource, c.ns, resourceClassParameters), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClassParameters), err
 }
 
 // Update takes the representation of a resourceClassParameters and updates it. Returns the server's representation of the resourceClassParameters, and an error, if there is any.
 func (c *FakeResourceClassParameters) Update(ctx context.Context, resourceClassParameters *v1alpha2.ResourceClassParameters, opts v1.UpdateOptions) (result *v1alpha2.ResourceClassParameters, err error) {
+	emptyResult := &v1alpha2.ResourceClassParameters{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(resourceclassparametersResource, c.ns, resourceClassParameters), &v1alpha2.ResourceClassParameters{})
+		Invokes(testing.NewUpdateAction(resourceclassparametersResource, c.ns, resourceClassParameters), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClassParameters), err
 }
@@ -122,11 +126,12 @@ func (c *FakeResourceClassParameters) DeleteCollection(ctx context.Context, opts
 
 // Patch applies the patch and returns the patched resourceClassParameters.
 func (c *FakeResourceClassParameters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClassParameters, err error) {
+	emptyResult := &v1alpha2.ResourceClassParameters{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourceclassparametersResource, c.ns, name, pt, data, subresources...), &v1alpha2.ResourceClassParameters{})
+		Invokes(testing.NewPatchSubresourceAction(resourceclassparametersResource, c.ns, name, pt, data, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClassParameters), err
 }
@@ -144,11 +149,12 @@ func (c *FakeResourceClassParameters) Apply(ctx context.Context, resourceClassPa
 	if name == nil {
 		return nil, fmt.Errorf("resourceClassParameters.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha2.ResourceClassParameters{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourceclassparametersResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha2.ResourceClassParameters{})
+		Invokes(testing.NewPatchSubresourceAction(resourceclassparametersResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClassParameters), err
 }

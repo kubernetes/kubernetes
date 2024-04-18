@@ -43,20 +43,22 @@ var clusterrolesKind = v1.SchemeGroupVersion.WithKind("ClusterRole")
 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
 func (c *FakeClusterRoles) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterRole, err error) {
+	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &v1.ClusterRole{})
+		Invokes(testing.NewRootGetAction(clusterrolesResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRole), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
 func (c *FakeClusterRoles) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterRoleList, err error) {
+	emptyResult := &v1.ClusterRoleList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &v1.ClusterRoleList{})
+		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,20 +82,22 @@ func (c *FakeClusterRoles) Watch(ctx context.Context, opts metav1.ListOptions) (
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
 func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.CreateOptions) (result *v1.ClusterRole, err error) {
+	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &v1.ClusterRole{})
+		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRole), err
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
 func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.UpdateOptions) (result *v1.ClusterRole, err error) {
+	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &v1.ClusterRole{})
+		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRole), err
 }
@@ -115,10 +119,11 @@ func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, opts metav1.Del
 
 // Patch applies the patch and returns the patched clusterRole.
 func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRole, err error) {
+	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), &v1.ClusterRole{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRole), err
 }
@@ -136,10 +141,11 @@ func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *rbacv1.Cluste
 	if name == nil {
 		return nil, fmt.Errorf("clusterRole.Name must be provided to Apply")
 	}
+	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), &v1.ClusterRole{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterRole), err
 }
