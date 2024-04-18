@@ -362,7 +362,7 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">deprecated_version</span><span class="metric_label">stability_level</span></li></ul>
 	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">scheduler_pod_scheduling_sli_duration_seconds</div>
-	<div class="metric_help">E2e latency for a pod being scheduled, from the time the pod enters the scheduling queue an d might involve multiple scheduling attempts.</div>
+	<div class="metric_help">E2e latency for a pod being scheduled, from the time the pod enters the scheduling queue and might involve multiple scheduling attempts.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
