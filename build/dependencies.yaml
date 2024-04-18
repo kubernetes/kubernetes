@@ -119,6 +119,7 @@ dependencies:
     version: 1.22.2
     refPaths:
     - path: .go-version
+    - path: go.mod
     - path: build/build-image/cross/VERSION
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
