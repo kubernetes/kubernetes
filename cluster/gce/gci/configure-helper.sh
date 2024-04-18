@@ -3280,6 +3280,8 @@ oom_score = -999
 # See: https://github.com/kubernetes/k8s.io/issues/3411
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
   endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.k8s.io"]
+  endpoint = ["https://mirror.gcr.io"]
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
   SystemdCgroup = ${systemdCgroup}
 EOF
