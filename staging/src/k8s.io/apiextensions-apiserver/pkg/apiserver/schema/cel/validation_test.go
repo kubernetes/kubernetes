@@ -2518,42 +2518,42 @@ func TestMessageExpression(t *testing.T) {
 		message                 string
 		messageExpression       string
 		expectedLogErr          string
-		expectedValidationErr   string
+		expectedValidationErrs  []string
 		expectedRemainingBudget int64
 	}{
 		{
 			name:                    "no cost error expected",
 			messageExpression:       `"static string"`,
-			expectedValidationErr:   "static string",
+			expectedValidationErrs:  []string{"static string"},
 			costBudget:              300,
 			expectedRemainingBudget: 300,
 		},
 		{
-			name:                  "messageExpression takes precedence over message",
-			message:               "invisible",
-			messageExpression:     `"this is messageExpression"`,
-			costBudget:            celconfig.RuntimeCELCostBudget,
-			expectedValidationErr: "this is messageExpression",
+			name:                   "messageExpression takes precedence over message",
+			message:                "invisible",
+			messageExpression:      `"this is messageExpression"`,
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedValidationErrs: []string{"this is messageExpression"},
 		},
 		{
 			name:                    "default rule message used if messageExpression does not eval to string",
 			messageExpression:       `true`,
 			costBudget:              celconfig.RuntimeCELCostBudget,
-			expectedValidationErr:   "failed rule",
+			expectedValidationErrs:  []string{"failed rule"},
 			expectedRemainingBudget: celconfig.RuntimeCELCostBudget,
 		},
 		{
 			name:                    "limit exceeded",
 			messageExpression:       `"string 1" + "string 2" + "string 3"`,
 			costBudget:              1,
-			expectedValidationErr:   "messageExpression evaluation failed due to running out of cost budget",
+			expectedValidationErrs:  []string{"messageExpression evaluation failed due to running out of cost budget"},
 			expectedRemainingBudget: -1,
 		},
 		{
 			name:                    "messageExpression budget (str concat)",
 			messageExpression:       `"str1 " + self.str`,
 			costBudget:              50,
-			expectedValidationErr:   "str1 a string",
+			expectedValidationErrs:  []string{"str1 a string"},
 			expectedRemainingBudget: 46,
 		},
 		{
@@ -2562,7 +2562,7 @@ func TestMessageExpression(t *testing.T) {
 			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
 			costBudget:              50,
 			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
-			expectedValidationErr:   "message not messageExpression",
+			expectedValidationErrs:  []string{"message not messageExpression"},
 			expectedRemainingBudget: 47,
 		},
 		{
@@ -2570,7 +2570,7 @@ func TestMessageExpression(t *testing.T) {
 			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
 			costBudget:              50,
 			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
-			expectedValidationErr:   "failed rule",
+			expectedValidationErrs:  []string{"failed rule"},
 			expectedRemainingBudget: 47,
 		},
 		{
@@ -2578,40 +2578,62 @@ func TestMessageExpression(t *testing.T) {
 			messageExpression:       `"string 1" + "string 2" + "string 3"`,
 			costBudget:              celconfig.RuntimeCELCostBudget,
 			perCallLimit:            1,
-			expectedValidationErr:   "call cost exceeds limit for messageExpression",
+			expectedValidationErrs:  []string{"call cost exceeds limit for messageExpression"},
 			expectedRemainingBudget: -1,
 		},
 		{
-			name:                  "messageExpression is not allowed to generate a string with newlines",
-			message:               "message not messageExpression",
-			messageExpression:     `"str with \na newline"`,
-			costBudget:            celconfig.RuntimeCELCostBudget,
-			expectedLogErr:        "messageExpression should not contain line breaks",
-			expectedValidationErr: "message not messageExpression",
+			name:                   "messageExpression is not allowed to generate a string with newlines",
+			message:                "message not messageExpression",
+			messageExpression:      `"str with \na newline"`,
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedLogErr:         "messageExpression should not contain line breaks",
+			expectedValidationErrs: []string{"message not messageExpression"},
 		},
 		{
-			name:                  "messageExpression is not allowed to generate messages >5000 characters",
-			message:               "message not messageExpression",
-			messageExpression:     fmt.Sprintf(`"%s"`, genString(5121, 'a')),
-			costBudget:            celconfig.RuntimeCELCostBudget,
-			expectedLogErr:        "messageExpression beyond allowable length of 5120",
-			expectedValidationErr: "message not messageExpression",
+			name:                   "messageExpression is not allowed to generate messages >5000 characters",
+			message:                "message not messageExpression",
+			messageExpression:      fmt.Sprintf(`"%s"`, genString(5121, 'a')),
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedLogErr:         "messageExpression beyond allowable length of 5120",
+			expectedValidationErrs: []string{"message not messageExpression"},
 		},
 		{
-			name:                  "messageExpression is not allowed to generate an empty string",
-			message:               "message not messageExpression",
-			messageExpression:     `string("")`,
-			costBudget:            celconfig.RuntimeCELCostBudget,
-			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
-			expectedValidationErr: "message not messageExpression",
+			name:                   "messageExpression is not allowed to generate an empty string",
+			message:                "message not messageExpression",
+			messageExpression:      `string("")`,
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedLogErr:         "messageExpression should evaluate to a non-empty string",
+			expectedValidationErrs: []string{"message not messageExpression"},
 		},
 		{
-			name:                  "messageExpression is not allowed to generate a string with only spaces",
-			message:               "message not messageExpression",
-			messageExpression:     `string("     ")`,
-			costBudget:            celconfig.RuntimeCELCostBudget,
-			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
-			expectedValidationErr: "message not messageExpression",
+			name:                   "messageExpression is not allowed to generate a string with only spaces",
+			message:                "message not messageExpression",
+			messageExpression:      `string("     ")`,
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedLogErr:         "messageExpression should evaluate to a non-empty string",
+			expectedValidationErrs: []string{"message not messageExpression"},
+		},
+		{
+			name:                   "multiple message expressions",
+			messageExpression:      `["error1", "error2"]`,
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedValidationErrs: []string{"error1", "error2"},
+		},
+		{
+			name:                   "multiple messageExpression is not allowed to generate a string with only spaces",
+			message:                "message not messageExpression",
+			messageExpression:      `["withoutspaces", string("     ")]`,
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedLogErr:         "messageExpression should evaluate to a non-empty string",
+			expectedValidationErrs: []string{"message not messageExpression"},
+		},
+		{
+			name:                   "multiple message expressions",
+			message:                "message not messageExpression",
+			messageExpression:      `["error1", 5]`,
+			costBudget:             celconfig.RuntimeCELCostBudget,
+			expectedValidationErrs: []string{`message not messageExpression`},
+			expectedLogErr:         ``,
 		},
 	}
 	for _, tt := range tests {
@@ -2643,8 +2665,8 @@ func TestMessageExpression(t *testing.T) {
 			errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, obj, nil, tt.costBudget)
 			klog.Flush()
 
-			if len(errs) != 1 {
-				t.Fatalf("expected 1 error, got %d", len(errs))
+			if len(errs) != len(tt.expectedValidationErrs) {
+				t.Fatalf("expected %d error(s), got %d", len(tt.expectedValidationErrs), len(errs))
 			}
 
 			if tt.expectedLogErr != "" {
@@ -2655,9 +2677,9 @@ func TestMessageExpression(t *testing.T) {
 				t.Fatalf("expected no log output, got: %q", outputBuffer.String())
 			}
 
-			if tt.expectedValidationErr != "" {
-				if !strings.Contains(errs[0].Error(), tt.expectedValidationErr) {
-					t.Fatalf("did not find expected validation error message: %q", tt.expectedValidationErr)
+			for i, expectedValidationErr := range tt.expectedValidationErrs {
+				if !strings.Contains(errs[i].Error(), expectedValidationErr) {
+					t.Fatalf("did not find expected validation error message: %q", expectedValidationErr)
 				}
 			}
 

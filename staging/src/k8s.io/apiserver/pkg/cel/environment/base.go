@@ -130,11 +130,11 @@ var baseOpts = []VersionedOptions{
 			library.CIDR(),
 		},
 	},
-	// Format Library
 	{
 		IntroducedVersion: version.MajorMinor(1, 31),
 		EnvOptions: []cel.EnvOption{
 			library.Format(),
+			library.MultipleMessageExpression(),
 		},
 	},
 }
