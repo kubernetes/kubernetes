@@ -2096,13 +2096,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 
 		convertCustomResources := func(inResources, outResources v1.ResourceList) {
-			for extendedResourceName, extendedResourceQuantity := range inResources {
-				if extendedResourceName == v1.ResourceCPU || extendedResourceName == v1.ResourceMemory ||
-					extendedResourceName == v1.ResourceStorage || extendedResourceName == v1.ResourceEphemeralStorage {
+			for resourceName, resourceQuantity := range inResources {
+				if resourceName == v1.ResourceCPU || resourceName == v1.ResourceMemory ||
+					resourceName == v1.ResourceStorage || resourceName == v1.ResourceEphemeralStorage {
 					continue
 				}
 
-				outResources[extendedResourceName] = extendedResourceQuantity.DeepCopy()
+				outResources[resourceName] = resourceQuantity.DeepCopy()
 			}
 		}
 
