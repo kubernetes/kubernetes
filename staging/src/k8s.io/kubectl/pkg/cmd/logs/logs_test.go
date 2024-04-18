@@ -137,6 +137,28 @@ func TestLog(t *testing.T) {
 			expectedOutSubstrings: []string{"[pod/test-pod/test-container] test log content\n"},
 		},
 		{
+			name: "logs from all pods",
+			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Deployment",
+							Name:      "test-deployment",
+							FieldPath: "spec.replicas",
+						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Prefix = true
+
+				return o
+			},
+			expectedOutSubstrings: []string{"[pod/test-pod/test-container] test log content\n"},
+		},
+		{
 			name: "get logs from multiple requests sequentially",
 			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
 				mock := &logTestMock{
