@@ -122,10 +122,10 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 		metrics.Metrics.ObserveCompilation(time.Since(t))
 	}()
 
-	if len(s.Extensions.XValidations) == 0 {
+	if len(s.XValidations) == 0 {
 		return nil, nil
 	}
-	celRules := s.Extensions.XValidations
+	celRules := s.XValidations
 
 	oldSelfEnvSet, optionalOldSelfEnvSet, err := prepareEnvSet(baseEnvSet, declType)
 	if err != nil {
