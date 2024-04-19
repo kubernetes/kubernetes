@@ -1,6 +1,25 @@
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package apiserver
 
 import (
+	"net"
+	"testing"
+
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -10,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	netutils "k8s.io/utils/net"
-	"net"
-	"testing"
 )
 
 func TestBuildGenericConfig(t *testing.T) {
@@ -23,7 +40,12 @@ func TestBuildGenericConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to listen on 127.0.0.1:0")
 	}
-	defer ln.Close()
+	defer func() {
+		err := ln.Close()
+		if err != nil {
+			t.Fatalf("Failed to close tcp listener: %v", err)
+		}
+	}()
 	s.Listener = ln
 	s.BindPort = ln.Addr().(*net.TCPAddr).Port
 	opts.SecureServing = s
