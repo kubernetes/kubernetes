@@ -29,6 +29,7 @@ import (
 	"testing/iotest"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,6 +94,32 @@ func TestLog(t *testing.T) {
 			expectedOutSubstrings: []string{"[pod/test-pod/test-container] test log content\n"},
 		},
 		{
+			name: "stateful set logs with all pods",
+			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "test-sts-0",
+							FieldPath: "spec.containers{test-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content for pod test-sts-0\n")},
+						{
+							Kind:      "Pod",
+							Name:      "test-sts-1",
+							FieldPath: "spec.containers{test-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content for pod test-sts-1\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Prefix = true
+				return o
+			},
+			expectedOutSubstrings: []string{"[pod/test-sts-0/test-container] test log content for pod test-sts-0\n[pod/test-sts-1/test-container] test log content for pod test-sts-1\n"},
+		},
+		{
 			name: "pod logs with prefix: init container",
 			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
 				mock := &logTestMock{
@@ -123,28 +150,6 @@ func TestLog(t *testing.T) {
 							Kind:      "Pod",
 							Name:      "test-pod",
 							FieldPath: "spec.ephemeralContainers{test-container}",
-						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
-					},
-				}
-
-				o := NewLogsOptions(streams)
-				o.LogsForObject = mock.mockLogsForObject
-				o.ConsumeRequestFn = mock.mockConsumeRequest
-				o.Prefix = true
-
-				return o
-			},
-			expectedOutSubstrings: []string{"[pod/test-pod/test-container] test log content\n"},
-		},
-		{
-			name: "logs from all pods",
-			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
-				mock := &logTestMock{
-					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
-						{
-							Kind:      "Deployment",
-							Name:      "test-deployment",
-							FieldPath: "spec.replicas",
 						}: &responseWrapperMock{data: strings.NewReader("test log content\n")},
 					},
 				}
@@ -942,6 +947,13 @@ func (l *logTestMock) mockConsumeRequest(request restclient.ResponseWrapper, out
 
 func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 	switch object.(type) {
+	case *appsv1.Deployment:
+		_, ok := options.(*corev1.PodLogOptions)
+		if !ok {
+			return nil, errors.New("provided options object is not a PodLogOptions")
+		}
+
+		return l.logsForObjectRequests, nil
 	case *corev1.Pod:
 		_, ok := options.(*corev1.PodLogOptions)
 		if !ok {

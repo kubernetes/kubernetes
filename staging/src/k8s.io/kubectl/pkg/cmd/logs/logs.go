@@ -339,7 +339,7 @@ func (o LogsOptions) RunLogs() error {
 	var requests map[corev1.ObjectReference]rest.ResponseWrapper
 	var err error
 	if o.AllPods {
-		requests, err = o.AllPodLogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.AllPods)
+		requests, err = o.AllPodLogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
 	} else {
 		requests, err = o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
 	}
