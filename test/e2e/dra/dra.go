@@ -1114,16 +1114,14 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	})
 
-	multipleDrivers := func(nodeV1alpha2, nodeV1alpha3 bool) {
+	multipleDrivers := func(nodeV1alpha3 bool) {
 		nodes := NewNodes(f, 1, 4)
 		driver1 := NewDriver(f, nodes, perNode(2, nodes))
-		driver1.NodeV1alpha2 = nodeV1alpha2
 		driver1.NodeV1alpha3 = nodeV1alpha3
 		b1 := newBuilder(f, driver1)
 
 		driver2 := NewDriver(f, nodes, perNode(2, nodes))
 		driver2.NameSuffix = "-other"
-		driver2.NodeV1alpha2 = nodeV1alpha2
 		driver2.NodeV1alpha3 = nodeV1alpha3
 		b2 := newBuilder(f, driver2)
 
@@ -1150,16 +1148,14 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b1.testPod(ctx, f.ClientSet, pod)
 		})
 	}
-	multipleDriversContext := func(prefix string, nodeV1alpha2, nodeV1alpha3 bool) {
+	multipleDriversContext := func(prefix string, nodeV1alpha3 bool) {
 		ginkgo.Context(prefix, func() {
-			multipleDrivers(nodeV1alpha2, nodeV1alpha3)
+			multipleDrivers(nodeV1alpha3)
 		})
 	}
 
 	ginkgo.Context("multiple drivers", func() {
-		multipleDriversContext("using only drapbv1alpha2", true, false)
-		multipleDriversContext("using only drapbv1alpha3", false, true)
-		multipleDriversContext("using both drapbv1alpha2 and drapbv1alpha3", true, true)
+		multipleDriversContext("using only drapbv1alpha3", true)
 	})
 })
 

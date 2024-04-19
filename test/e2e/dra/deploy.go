@@ -55,9 +55,7 @@ import (
 )
 
 const (
-	NodePrepareResourceMethod       = "/v1alpha2.Node/NodePrepareResource"
 	NodePrepareResourcesMethod      = "/v1alpha3.Node/NodePrepareResources"
-	NodeUnprepareResourceMethod     = "/v1alpha2.Node/NodeUnprepareResource"
 	NodeUnprepareResourcesMethod    = "/v1alpha3.Node/NodeUnprepareResources"
 	NodeListAndWatchResourcesMethod = "/v1alpha3.Node/NodeListAndWatchResources"
 )
@@ -146,7 +144,6 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() a
 		f:            f,
 		fail:         map[MethodInstance]bool{},
 		callCounts:   map[MethodInstance]int64{},
-		NodeV1alpha2: true,
 		NodeV1alpha3: true,
 	}
 
@@ -186,7 +183,7 @@ type Driver struct {
 	claimParameterAPIKind string
 	classParameterAPIKind string
 
-	NodeV1alpha2, NodeV1alpha3 bool
+	NodeV1alpha3 bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -339,7 +336,6 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
-			kubeletplugin.NodeV1alpha2(d.NodeV1alpha2),
 			kubeletplugin.NodeV1alpha3(d.NodeV1alpha3),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
