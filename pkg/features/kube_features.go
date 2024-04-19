@@ -525,6 +525,7 @@ const (
 	// owner: @danwinship
 	// kep: https://kep.k8s.io/3866
 	// alpha: v1.29
+	// beta: v1.31
 	//
 	// Allows running kube-proxy with `--mode nftables`.
 	NFTablesProxyMode featuregate.Feature = "NFTablesProxyMode"
@@ -1131,7 +1132,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	NFTablesProxyMode: {Default: false, PreRelease: featuregate.Alpha},
+	NFTablesProxyMode: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeLogQuery: {Default: false, PreRelease: featuregate.Beta},
 
