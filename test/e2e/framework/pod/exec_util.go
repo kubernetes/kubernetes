@@ -51,6 +51,10 @@ type ExecOptions struct {
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
 func ExecWithOptions(f *framework.Framework, options ExecOptions) (string, string, error) {
+	return ExecWithOptionsContext(context.Background(), f, options)
+}
+
+func ExecWithOptionsContext(ctx context.Context, f *framework.Framework, options ExecOptions) (string, string, error) {
 	if !options.Quiet {
 		framework.Logf("ExecWithOptions %+v", options)
 	}
@@ -77,7 +81,8 @@ func ExecWithOptions(f *framework.Framework, options ExecOptions) (string, strin
 
 	var stdout, stderr bytes.Buffer
 	framework.Logf("ExecWithOptions: execute(POST %s)", req.URL())
-	err = execute("POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
+	err = execute(ctx, "POST", req.URL(), config, options.Stdin, &stdout, &stderr, tty)
+
 	if options.PreserveWhitespace {
 		return stdout.String(), stderr.String(), err
 	}
@@ -139,12 +144,12 @@ func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, p
 	return execCommandInPodWithFullOutput(ctx, f, podName, "/bin/sh", "-c", cmd)
 }
 
-func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func execute(ctx context.Context, method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
 	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
-	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  stdin,
 		Stdout: stdout,
 		Stderr: stderr,
