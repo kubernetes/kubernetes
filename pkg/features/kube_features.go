@@ -187,15 +187,6 @@ const (
 	// Set the scheduled time as an annotation in the job.
 	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
 
-	// owner: @thockin
-	// deprecated: v1.28
-	//
-	// Changes when the default value of PodSpec.containers[].ports[].hostPort
-	// is assigned.  The default is to only set a default value in Pods.
-	// Enabling this means a default will be assigned even to embeddedPodSpecs
-	// (e.g. in a Deployment), which is the historical default.
-	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
-
 	// owner: @elezar
 	// kep: http://kep.k8s.io/4009
 	// alpha: v1.28
@@ -1039,8 +1030,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	CronJobsScheduledAnnotation: {Default: true, PreRelease: featuregate.Beta},
-
-	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
 
 	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 
