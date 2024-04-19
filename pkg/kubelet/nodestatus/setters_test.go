@@ -47,6 +47,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -1902,6 +1903,128 @@ func TestPIDPressureCondition(t *testing.T) {
 	}
 }
 
+func TestImageGCRunningCondition(t *testing.T) {
+	now := time.Now()
+	before := now.Add(-time.Second)
+	nowFunc := func() time.Time { return now }
+
+	cases := []struct {
+		desc             string
+		node             *v1.Node
+		isGCRunning      bool
+		expectConditions []v1.NodeCondition
+		expectEvents     []testEvent
+	}{
+		{
+			desc:             "new, GC is not Running",
+			node:             &v1.Node{},
+			isGCRunning:      false,
+			expectConditions: []v1.NodeCondition{*makeImageGCRunningCondition(false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "ImageGCNotRunning",
+				},
+			},
+		},
+		{
+			desc:             "new, GC is Running",
+			node:             &v1.Node{},
+			isGCRunning:      true,
+			expectConditions: []v1.NodeCondition{*makeImageGCRunningCondition(true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "ImageGCRunning",
+				},
+			},
+		},
+		{
+			desc: "transition to GC is running",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeImageGCRunningCondition(false, before, before)},
+				},
+			},
+			isGCRunning:      true,
+			expectConditions: []v1.NodeCondition{*makeImageGCRunningCondition(true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "ImageGCRunning",
+				},
+			},
+		},
+		{
+			desc: "transition to GC is not running",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeImageGCRunningCondition(true, before, before)},
+				},
+			},
+			isGCRunning:      false,
+			expectConditions: []v1.NodeCondition{*makeImageGCRunningCondition(false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "ImageGCNotRunning",
+				},
+			},
+		},
+		{
+			desc: "GC is running, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeImageGCRunningCondition(true, before, before)},
+				},
+			},
+			isGCRunning:      true,
+			expectConditions: []v1.NodeCondition{*makeImageGCRunningCondition(true, before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "GC is not running, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeImageGCRunningCondition(false, before, before)},
+				},
+			},
+			isGCRunning:      false,
+			expectConditions: []v1.NodeCondition{*makeImageGCRunningCondition(false, before, now)},
+			expectEvents:     []testEvent{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx := context.Background()
+			events := []testEvent{}
+			recordEventFunc := func(eventType, event string) {
+				events = append(events, testEvent{
+					eventType: eventType,
+					event:     event,
+				})
+			}
+			isGCRunningFunc := func() bool {
+				return tc.isGCRunning
+			}
+			// construct setter
+			setter := ImageGCRunningCondition(nowFunc, isGCRunningFunc, recordEventFunc)
+			// call setter on node
+			if err := setter(ctx, tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected condition
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
+			// check expected events
+			require.Equal(t, len(tc.expectEvents), len(events))
+			for i := range tc.expectEvents {
+				assert.Equal(t, tc.expectEvents[i], events[i])
+			}
+		})
+	}
+}
+
 func TestDiskPressureCondition(t *testing.T) {
 	now := time.Now()
 	before := now.Add(-time.Second)
@@ -2292,6 +2415,27 @@ func makePIDPressureCondition(pressure bool, transition, heartbeat time.Time) *v
 		Status:             v1.ConditionFalse,
 		Reason:             "KubeletHasSufficientPID",
 		Message:            "kubelet has sufficient PID available",
+		LastTransitionTime: metav1.NewTime(transition),
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
+}
+
+func makeImageGCRunningCondition(isGCRunning bool, transition, heartbeat time.Time) *v1.NodeCondition {
+	if isGCRunning {
+		return &v1.NodeCondition{
+			Type:               v1.NodeImageGCRunning,
+			Status:             v1.ConditionTrue,
+			Reason:             images.GarbageCollectionReason,
+			Message:            images.GarbageCollectionMessage,
+			LastTransitionTime: metav1.NewTime(transition),
+			LastHeartbeatTime:  metav1.NewTime(heartbeat),
+		}
+	}
+	return &v1.NodeCondition{
+		Type:               v1.NodeImageGCRunning,
+		Status:             v1.ConditionFalse,
+		Reason:             "ImageGCNotRunning",
+		Message:            "image GC is not running",
 		LastTransitionTime: metav1.NewTime(transition),
 		LastHeartbeatTime:  metav1.NewTime(heartbeat),
 	}

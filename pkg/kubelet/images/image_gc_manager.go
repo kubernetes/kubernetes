@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -57,6 +58,11 @@ const (
 	ImageGarbageCollectedTotalReasonSpace = "space"
 )
 
+const (
+	GarbageCollectionReason  = "ImageGCIsTriggered"
+	GarbageCollectionMessage = "image GC is triggered on the node"
+)
+
 // StatsProvider is an interface for fetching stats used during image garbage
 // collection.
 type StatsProvider interface {
@@ -78,6 +84,8 @@ type ImageGCManager interface {
 
 	// Delete all unused images.
 	DeleteUnusedImages(ctx context.Context) error
+
+	IsGCRunning() bool
 }
 
 // ImageGCPolicy is a policy for garbage collecting images. Policy defines an allowed band in
@@ -130,6 +138,26 @@ type realImageGCManager struct {
 
 	// tracer for recording spans
 	tracer trace.Tracer
+
+	// Is the garbage collection is running and images are about to be deleted.
+	isTriggered isTriggered
+
+	// updateImageGCRunningCondition provides a function for setting the ImageGCRunning condition on the node.
+	updateImageGCRunningCondition func(status bool, reason, message string) error
+}
+
+// isTriggered indecates whether the GC is triggered.
+// isTriggered is safe for concurrent use.
+type isTriggered struct {
+	atomic.Bool
+}
+
+func (it *isTriggered) set(value bool) {
+	it.Store(value)
+}
+
+func (it *isTriggered) get() bool {
+	return it.Load()
 }
 
 // imageCache caches latest result of ListImages.
@@ -181,7 +209,7 @@ type imageRecord struct {
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
-func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider, updateImageGCRunningCondition func(status bool, reason, message string) error) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -194,13 +222,14 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 	}
 	tracer := tracerProvider.Tracer(instrumentationScope)
 	im := &realImageGCManager{
-		runtime:       runtime,
-		policy:        policy,
-		imageRecords:  make(map[string]*imageRecord),
-		statsProvider: statsProvider,
-		recorder:      recorder,
-		nodeRef:       nodeRef,
-		tracer:        tracer,
+		runtime:                       runtime,
+		policy:                        policy,
+		imageRecords:                  make(map[string]*imageRecord),
+		statsProvider:                 statsProvider,
+		recorder:                      recorder,
+		nodeRef:                       nodeRef,
+		tracer:                        tracer,
+		updateImageGCRunningCondition: updateImageGCRunningCondition,
 	}
 
 	return im, nil
@@ -312,17 +341,6 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
 	defer otelSpan.End()
 
-	freeTime := time.Now()
-	images, err := im.imagesInEvictionOrder(ctx, freeTime)
-	if err != nil {
-		return err
-	}
-
-	images, err = im.freeOldImages(ctx, images, freeTime, beganGC)
-	if err != nil {
-		return err
-	}
-
 	// Get disk usage on disk holding images.
 	fsStats, _, err := im.statsProvider.ImageFsStats(ctx)
 	if err != nil {
@@ -349,8 +367,46 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 		return err
 	}
 
-	// If over the max threshold, free enough to place us at the lower threshold.
+	// If over the threshold, ImageGCRunning node condition needs to be updated
+	// and prevent new pods from scheduling on the node before the unused images are detected from runtime.
+	// See https://github.com/kubernetes/kubernetes/issues/123631.
 	usagePercent := 100 - int(available*100/capacity)
+	if usagePercent >= im.policy.HighThresholdPercent {
+		im.isTriggered.set(true)
+		defer im.isTriggered.set(false)
+		// There is no need to update the ImageGCRunning condition to be false as it will be updated at the nodeStatusUpdateFrequency interval.
+		err := im.updateImageGCRunningCondition(true, GarbageCollectionReason, GarbageCollectionMessage)
+		if err != nil {
+			klog.ErrorS(err, "Error updating ImageGCRunning node condition before the GC starts, will retry in the next nodeStatusUpdateFrequency interval")
+		}
+	}
+
+	freeTime := time.Now()
+	images, err := im.imagesInEvictionOrder(ctx, freeTime)
+	if err != nil {
+		return err
+	}
+
+	oldLen := len(images)
+
+	images, err = im.freeOldImages(ctx, images, freeTime, beganGC)
+	if err != nil {
+		return err
+	}
+
+	// If old images were removed, disk usage should be rechecked.
+	if im.isTriggered.get() && len(images) < oldLen {
+		fsStats, _, err = im.statsProvider.ImageFsStats(ctx)
+		if err != nil {
+			return err
+		}
+		if fsStats.AvailableBytes != nil {
+			available = int64(*fsStats.AvailableBytes)
+			usagePercent = 100 - int(available*100/capacity)
+		}
+	}
+
+	// If over the max threshold, free enough to place us at the lower threshold.
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		klog.InfoS("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
@@ -402,6 +458,17 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 
 func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 	klog.InfoS("Attempting to delete unused images")
+	// When images are about to be deleted, ImageGCRunning node condition needs to be updated
+	// and prevent new pods from scheduling on the node before the unused images are detected from runtime.
+	// See https://github.com/kubernetes/kubernetes/issues/123631.
+	im.isTriggered.set(true)
+	defer im.isTriggered.set(false)
+	// There is no need to update the ImageGCRunning condition to be false as it will be updated at the nodeStatusUpdateFrequency interval.
+	err := im.updateImageGCRunningCondition(true, GarbageCollectionReason, GarbageCollectionMessage)
+	if err != nil {
+		klog.ErrorS(err, "Error updating ImageGCRunning node condition before the GC starts, will retry in the next nodeStatusUpdateFrequency interval")
+	}
+
 	freeTime := time.Now()
 	images, err := im.imagesInEvictionOrder(ctx, freeTime)
 	if err != nil {
@@ -517,6 +584,11 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 	}
 	sort.Sort(byLastUsedAndDetected(images))
 	return images, nil
+}
+
+// IsGCRunning return true if image GC is triggered on the node.
+func (im *realImageGCManager) IsGCRunning() bool {
+	return im.isTriggered.get()
 }
 
 // If RuntimeClassInImageCriAPI feature gate is enabled, imageRecords

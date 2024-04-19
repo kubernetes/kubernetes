@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/volume"
 	netutils "k8s.io/utils/net"
 
@@ -758,6 +759,67 @@ func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.
 			condition.Message = "kubelet has no disk pressure"
 			condition.LastTransitionTime = currentTime
 			recordEventFunc(v1.EventTypeNormal, "NodeHasNoDiskPressure")
+		}
+
+		if newCondition {
+			node.Status.Conditions = append(node.Status.Conditions, *condition)
+		}
+		return nil
+	}
+}
+
+// ImageGCRunningCondition returns a Setter that updates the v1.NodeImageGCRunning condition on the node.
+func ImageGCRunningCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
+	isGCRunningFunc func() bool, // typically Kubelet.imageManager.IsGCRunning
+	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
+) Setter {
+	return func(ctx context.Context, node *v1.Node) error {
+		currentTime := metav1.NewTime(nowFunc())
+		var condition *v1.NodeCondition
+
+		// Check if NodeImageGCRunning condition already exists and if it does, just pick it up for update.
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type == v1.NodeImageGCRunning {
+				condition = &node.Status.Conditions[i]
+			}
+		}
+
+		newCondition := false
+		// If the NodeImageGCRunning condition doesn't exist, create one
+		if condition == nil {
+			condition = &v1.NodeCondition{
+				Type:   v1.NodeImageGCRunning,
+				Status: v1.ConditionUnknown,
+			}
+			// cannot be appended to node.Status.Conditions here because it gets
+			// copied to the slice. So if we append to the slice here none of the
+			// updates we make below are reflected in the slice.
+			newCondition = true
+		}
+
+		// Update the heartbeat time
+		condition.LastHeartbeatTime = currentTime
+
+		// Note: The conditions below take care of the case when a new NodeImageGCRunning condition is
+		// created and as well as the case when the condition already exists. When a new condition
+		// is created its status is set to v1.ConditionUnknown which matches either
+		// condition.Status != v1.ConditionTrue or
+		// condition.Status != v1.ConditionFalse in the conditions below depending on whether
+		// the image GC is triggered on the node
+		if isGCRunningFunc() {
+			if condition.Status != v1.ConditionTrue {
+				condition.Status = v1.ConditionTrue
+				condition.Reason = images.GarbageCollectionReason
+				condition.Message = images.GarbageCollectionMessage
+				condition.LastTransitionTime = currentTime
+				recordEventFunc(v1.EventTypeNormal, "ImageGCRunning")
+			}
+		} else if condition.Status != v1.ConditionFalse {
+			condition.Status = v1.ConditionFalse
+			condition.Reason = "ImageGCNotRunning"
+			condition.Message = "image GC is not running"
+			condition.LastTransitionTime = currentTime
+			recordEventFunc(v1.EventTypeNormal, "ImageGCNotRunning")
 		}
 
 		if newCondition {

@@ -46,6 +46,10 @@ const (
 	// and removed when node has enough pid.
 	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
 
+	// TaintNodeImageGCRunning will be added when image GC is triggered on the node
+	// and removed when GC is over.
+	TaintNodeImageGCRunning = "node.kubernetes.io/image-gc-running"
+
 	// TaintNodeOutOfService can be added when node is out of service in case of
 	// a non-graceful shutdown
 	TaintNodeOutOfService = "node.kubernetes.io/out-of-service"
