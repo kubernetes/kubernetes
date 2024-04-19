@@ -82,6 +82,12 @@ func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntime
 		t.Fatalf("%v", issues.Errors())
 	}
 
+	// Typecheck expression
+	_, err = cel.AstToCheckedExpr(compiled)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
 	prog, err := env.Program(compiled)
 	if err != nil {
 		t.Fatalf("%v", err)
