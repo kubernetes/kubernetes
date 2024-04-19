@@ -1,0 +1,21 @@
+rolebindingrestrictions.authorization.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: rolebindingrestrictions.authorization.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_03"
+  GroupName: authorization.openshift.io
+  HasStatus: false
+  KindName: RoleBindingRestriction
+  Labels: {}
+  PluralName: rolebindingrestrictions
+  PrinterColumns: []
+  Scope: Namespaced
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+

@@ -1,0 +1,491 @@
+apiservers.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: apiservers.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: APIServer
+  Labels: {}
+  PluralName: apiservers
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+authentications.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: authentications.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - ExternalOIDC
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Authentication
+  Labels: {}
+  PluralName: authentications
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+builds.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: builds.config.openshift.io
+  Capability: Build
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: openshift-controller-manager
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Build
+  Labels: {}
+  PluralName: builds
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+clusteroperators.config.openshift.io:
+  Annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+  ApprovedPRNumber: https://github.com/openshift/api/pull/497
+  CRDName: clusteroperators.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: cluster-version-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_00"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: ClusterOperator
+  Labels: {}
+  PluralName: clusteroperators
+  PrinterColumns:
+  - description: The version the operator is at.
+    jsonPath: .status.versions[?(@.name=="operator")].version
+    name: Version
+    type: string
+  - description: Whether the operator is running and stable.
+    jsonPath: .status.conditions[?(@.type=="Available")].status
+    name: Available
+    type: string
+  - description: Whether the operator is processing changes.
+    jsonPath: .status.conditions[?(@.type=="Progressing")].status
+    name: Progressing
+    type: string
+  - description: Whether the operator is degraded.
+    jsonPath: .status.conditions[?(@.type=="Degraded")].status
+    name: Degraded
+    type: string
+  - description: The time the operator's Available status last changed.
+    jsonPath: .status.conditions[?(@.type=="Available")].lastTransitionTime
+    name: Since
+    type: date
+  Scope: Cluster
+  ShortNames:
+  - co
+  TopLevelFeatureGates: []
+  Version: v1
+
+clusterversions.config.openshift.io:
+  Annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+  ApprovedPRNumber: https://github.com/openshift/api/pull/495
+  CRDName: clusterversions.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - SignatureStores
+  FilenameOperatorName: cluster-version-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_00"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: ClusterVersion
+  Labels: {}
+  PluralName: clusterversions
+  PrinterColumns:
+  - jsonPath: .status.history[?(@.state=="Completed")].version
+    name: Version
+    type: string
+  - jsonPath: .status.conditions[?(@.type=="Available")].status
+    name: Available
+    type: string
+  - jsonPath: .status.conditions[?(@.type=="Progressing")].status
+    name: Progressing
+    type: string
+  - jsonPath: .status.conditions[?(@.type=="Progressing")].lastTransitionTime
+    name: Since
+    type: date
+  - jsonPath: .status.conditions[?(@.type=="Progressing")].message
+    name: Status
+    type: string
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+consoles.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: consoles.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Console
+  Labels: {}
+  PluralName: consoles
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+dnses.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: dnses.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: DNS
+  Labels: {}
+  PluralName: dnses
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+featuregates.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: featuregates.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: FeatureGate
+  Labels: {}
+  PluralName: featuregates
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+images.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: images.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Image
+  Labels: {}
+  PluralName: images
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+imagecontentpolicies.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/874
+  CRDName: imagecontentpolicies.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: ImageContentPolicy
+  Labels: {}
+  PluralName: imagecontentpolicies
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+imagedigestmirrorsets.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1126
+  CRDName: imagedigestmirrorsets.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: ImageDigestMirrorSet
+  Labels: {}
+  PluralName: imagedigestmirrorsets
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames:
+  - idms
+  TopLevelFeatureGates: []
+  Version: v1
+
+imagetagmirrorsets.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1126
+  CRDName: imagetagmirrorsets.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: ImageTagMirrorSet
+  Labels: {}
+  PluralName: imagetagmirrorsets
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames:
+  - itms
+  TopLevelFeatureGates: []
+  Version: v1
+
+infrastructures.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: infrastructures.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - BareMetalLoadBalancer
+  - GCPClusterHostedDNS
+  - GCPLabelsTags
+  - VSphereControlPlaneMachineSet
+  - VSphereMultiVCenters
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Infrastructure
+  Labels: {}
+  PluralName: infrastructures
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+ingresses.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: ingresses.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Ingress
+  Labels: {}
+  PluralName: ingresses
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+networks.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: networks.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - NetworkDiagnosticsConfig
+  - NetworkLiveMigration
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: false
+  KindName: Network
+  Labels: {}
+  PluralName: networks
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+nodes.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1107
+  CRDName: nodes.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Node
+  Labels: {}
+  PluralName: nodes
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+oauths.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: oauths.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: OAuth
+  Labels: {}
+  PluralName: oauths
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+operatorhubs.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: operatorhubs.config.openshift.io
+  Capability: marketplace
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: marketplace
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_03"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: OperatorHub
+  Labels: {}
+  PluralName: operatorhubs
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+projects.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: projects.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Project
+  Labels: {}
+  PluralName: projects
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+proxies.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: proxies.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_03"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Proxy
+  Labels: {}
+  PluralName: proxies
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
+schedulers.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: schedulers.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - DynamicResourceAllocation
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Scheduler
+  Labels: {}
+  PluralName: schedulers
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+

@@ -1,0 +1,23 @@
+dnsnameresolvers.network.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1524
+  CRDName: dnsnameresolvers.network.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - DNSNameResolver
+  FilenameOperatorName: dns
+  FilenameOperatorOrdering: "00"
+  FilenameRunLevel: "0000_70"
+  GroupName: network.openshift.io
+  HasStatus: true
+  KindName: DNSNameResolver
+  Labels: {}
+  PluralName: dnsnameresolvers
+  PrinterColumns: []
+  Scope: Namespaced
+  ShortNames: null
+  TopLevelFeatureGates:
+  - DNSNameResolver
+  Version: v1alpha1
+

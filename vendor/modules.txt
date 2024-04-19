@@ -12,6 +12,9 @@ cloud.google.com/go/compute/metadata
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
+# github.com/Azure/go-ntlmssp v0.0.0-20211209120228-48547f28849e
+## explicit
+github.com/Azure/go-ntlmssp
 # github.com/GoogleCloudPlatform/k8s-cloud-provider v1.18.1-0.20220218231025-f11817397a1b
 ## explicit; go 1.13
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
@@ -185,9 +188,15 @@ github.com/fvbommel/sortorder
 # github.com/fxamacker/cbor/v2 v2.6.0
 ## explicit; go 1.17
 github.com/fxamacker/cbor/v2
+# github.com/go-asn1-ber/asn1-ber v1.5.4
+## explicit; go 1.13
+github.com/go-asn1-ber/asn1-ber
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14
 github.com/go-errors/errors
+# github.com/go-ldap/ldap/v3 v3.4.3
+## explicit; go 1.13
+github.com/go-ldap/ldap/v3
 # github.com/go-logr/logr v1.4.1
 ## explicit; go 1.18
 github.com/go-logr/logr
@@ -424,7 +433,7 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
-# github.com/imdario/mergo v0.3.6
+# github.com/imdario/mergo v0.3.7
 ## explicit
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
@@ -513,7 +522,7 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.15.0
+# github.com/onsi/ginkgo/v2 v2.15.0 => github.com/soltysh/ginkgo/v2 v2.1.5-0.20240209144154-7bbda43b8ce6
 ## explicit; go 1.20
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -590,6 +599,227 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalkdir
+# github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
+## explicit; go 1.22.0
+github.com/openshift/api/apiserver/v1
+github.com/openshift/api/apps/v1
+github.com/openshift/api/authorization/v1
+github.com/openshift/api/build/v1
+github.com/openshift/api/config/v1
+github.com/openshift/api/config/v1alpha1
+github.com/openshift/api/features
+github.com/openshift/api/image/docker10
+github.com/openshift/api/image/dockerpre012
+github.com/openshift/api/image/v1
+github.com/openshift/api/kubecontrolplane/v1
+github.com/openshift/api/network/v1
+github.com/openshift/api/network/v1alpha1
+github.com/openshift/api/oauth/v1
+github.com/openshift/api/operator/v1
+github.com/openshift/api/osin/v1
+github.com/openshift/api/pkg/serialization
+github.com/openshift/api/project/v1
+github.com/openshift/api/quota/v1
+github.com/openshift/api/route/v1
+github.com/openshift/api/security
+github.com/openshift/api/security/v1
+github.com/openshift/api/template/v1
+github.com/openshift/api/user/v1
+# github.com/openshift/apiserver-library-go v0.0.0-20240522092531-e30326329813
+## explicit; go 1.22.0
+github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy
+github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/v1
+github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/validation
+github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/imagereferencemutators
+github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/rules
+github.com/openshift/apiserver-library-go/pkg/admission/quota/clusterresourcequota
+github.com/openshift/apiserver-library-go/pkg/authorization/scope
+github.com/openshift/apiserver-library-go/pkg/configflags
+github.com/openshift/apiserver-library-go/pkg/labelselector
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/capabilities
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/group
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccadmission
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccmatching
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/seccomp
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/selinux
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sysctl
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util
+github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort
+# github.com/openshift/client-go v0.0.0-20240521210225-1a8f9bfc8107
+## explicit; go 1.22.0
+github.com/openshift/client-go/apiserver/applyconfigurations/apiserver/v1
+github.com/openshift/client-go/apiserver/applyconfigurations/internal
+github.com/openshift/client-go/apiserver/clientset/versioned
+github.com/openshift/client-go/apiserver/clientset/versioned/fake
+github.com/openshift/client-go/apiserver/clientset/versioned/scheme
+github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1
+github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1/fake
+github.com/openshift/client-go/apps/applyconfigurations/apps/v1
+github.com/openshift/client-go/apps/applyconfigurations/internal
+github.com/openshift/client-go/apps/clientset/versioned
+github.com/openshift/client-go/apps/clientset/versioned/scheme
+github.com/openshift/client-go/apps/clientset/versioned/typed/apps/v1
+github.com/openshift/client-go/apps/informers/externalversions
+github.com/openshift/client-go/apps/informers/externalversions/apps
+github.com/openshift/client-go/apps/informers/externalversions/apps/v1
+github.com/openshift/client-go/apps/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/apps/listers/apps/v1
+github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1
+github.com/openshift/client-go/authorization/applyconfigurations/internal
+github.com/openshift/client-go/authorization/clientset/versioned
+github.com/openshift/client-go/authorization/clientset/versioned/fake
+github.com/openshift/client-go/authorization/clientset/versioned/scheme
+github.com/openshift/client-go/authorization/clientset/versioned/typed/authorization/v1
+github.com/openshift/client-go/authorization/clientset/versioned/typed/authorization/v1/fake
+github.com/openshift/client-go/authorization/informers/externalversions
+github.com/openshift/client-go/authorization/informers/externalversions/authorization
+github.com/openshift/client-go/authorization/informers/externalversions/authorization/v1
+github.com/openshift/client-go/authorization/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/authorization/listers/authorization/v1
+github.com/openshift/client-go/build/applyconfigurations/build/v1
+github.com/openshift/client-go/build/applyconfigurations/internal
+github.com/openshift/client-go/build/clientset/versioned
+github.com/openshift/client-go/build/clientset/versioned/scheme
+github.com/openshift/client-go/build/clientset/versioned/typed/build/v1
+github.com/openshift/client-go/build/informers/externalversions
+github.com/openshift/client-go/build/informers/externalversions/build
+github.com/openshift/client-go/build/informers/externalversions/build/v1
+github.com/openshift/client-go/build/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/build/listers/build/v1
+github.com/openshift/client-go/config/applyconfigurations/config/v1
+github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
+github.com/openshift/client-go/config/applyconfigurations/internal
+github.com/openshift/client-go/config/clientset/versioned
+github.com/openshift/client-go/config/clientset/versioned/fake
+github.com/openshift/client-go/config/clientset/versioned/scheme
+github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
+github.com/openshift/client-go/config/clientset/versioned/typed/config/v1/fake
+github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1
+github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1/fake
+github.com/openshift/client-go/config/informers/externalversions
+github.com/openshift/client-go/config/informers/externalversions/config
+github.com/openshift/client-go/config/informers/externalversions/config/v1
+github.com/openshift/client-go/config/informers/externalversions/config/v1alpha1
+github.com/openshift/client-go/config/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/config/listers/config/v1
+github.com/openshift/client-go/config/listers/config/v1alpha1
+github.com/openshift/client-go/image/applyconfigurations/image/v1
+github.com/openshift/client-go/image/applyconfigurations/internal
+github.com/openshift/client-go/image/clientset/versioned
+github.com/openshift/client-go/image/clientset/versioned/scheme
+github.com/openshift/client-go/image/clientset/versioned/typed/image/v1
+github.com/openshift/client-go/image/informers/externalversions
+github.com/openshift/client-go/image/informers/externalversions/image
+github.com/openshift/client-go/image/informers/externalversions/image/v1
+github.com/openshift/client-go/image/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/image/listers/image/v1
+github.com/openshift/client-go/network/applyconfigurations/internal
+github.com/openshift/client-go/network/applyconfigurations/network/v1
+github.com/openshift/client-go/network/applyconfigurations/network/v1alpha1
+github.com/openshift/client-go/network/clientset/versioned
+github.com/openshift/client-go/network/clientset/versioned/scheme
+github.com/openshift/client-go/network/clientset/versioned/typed/network/v1
+github.com/openshift/client-go/network/clientset/versioned/typed/network/v1alpha1
+github.com/openshift/client-go/network/informers/externalversions
+github.com/openshift/client-go/network/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/network/informers/externalversions/network
+github.com/openshift/client-go/network/informers/externalversions/network/v1
+github.com/openshift/client-go/network/informers/externalversions/network/v1alpha1
+github.com/openshift/client-go/network/listers/network/v1
+github.com/openshift/client-go/network/listers/network/v1alpha1
+github.com/openshift/client-go/oauth/applyconfigurations/internal
+github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1
+github.com/openshift/client-go/oauth/clientset/versioned
+github.com/openshift/client-go/oauth/clientset/versioned/scheme
+github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1
+github.com/openshift/client-go/oauth/informers/externalversions
+github.com/openshift/client-go/oauth/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/oauth/informers/externalversions/oauth
+github.com/openshift/client-go/oauth/informers/externalversions/oauth/v1
+github.com/openshift/client-go/oauth/listers/oauth/v1
+github.com/openshift/client-go/quota/applyconfigurations/internal
+github.com/openshift/client-go/quota/applyconfigurations/quota/v1
+github.com/openshift/client-go/quota/clientset/versioned
+github.com/openshift/client-go/quota/clientset/versioned/scheme
+github.com/openshift/client-go/quota/clientset/versioned/typed/quota/v1
+github.com/openshift/client-go/quota/informers/externalversions
+github.com/openshift/client-go/quota/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/quota/informers/externalversions/quota
+github.com/openshift/client-go/quota/informers/externalversions/quota/v1
+github.com/openshift/client-go/quota/listers/quota/v1
+github.com/openshift/client-go/route/applyconfigurations/internal
+github.com/openshift/client-go/route/applyconfigurations/route/v1
+github.com/openshift/client-go/route/clientset/versioned
+github.com/openshift/client-go/route/clientset/versioned/scheme
+github.com/openshift/client-go/route/clientset/versioned/typed/route/v1
+github.com/openshift/client-go/route/informers/externalversions
+github.com/openshift/client-go/route/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/route/informers/externalversions/route
+github.com/openshift/client-go/route/informers/externalversions/route/v1
+github.com/openshift/client-go/route/listers/route/v1
+github.com/openshift/client-go/security/applyconfigurations/internal
+github.com/openshift/client-go/security/applyconfigurations/security/v1
+github.com/openshift/client-go/security/clientset/versioned
+github.com/openshift/client-go/security/clientset/versioned/scheme
+github.com/openshift/client-go/security/clientset/versioned/typed/security/v1
+github.com/openshift/client-go/security/informers/externalversions
+github.com/openshift/client-go/security/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/security/informers/externalversions/security
+github.com/openshift/client-go/security/informers/externalversions/security/v1
+github.com/openshift/client-go/security/listers/security/v1
+github.com/openshift/client-go/template/applyconfigurations/internal
+github.com/openshift/client-go/template/applyconfigurations/template/v1
+github.com/openshift/client-go/template/clientset/versioned
+github.com/openshift/client-go/template/clientset/versioned/scheme
+github.com/openshift/client-go/template/clientset/versioned/typed/template/v1
+github.com/openshift/client-go/template/informers/externalversions
+github.com/openshift/client-go/template/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/template/informers/externalversions/template
+github.com/openshift/client-go/template/informers/externalversions/template/v1
+github.com/openshift/client-go/template/listers/template/v1
+github.com/openshift/client-go/user/applyconfigurations/internal
+github.com/openshift/client-go/user/applyconfigurations/user/v1
+github.com/openshift/client-go/user/clientset/versioned
+github.com/openshift/client-go/user/clientset/versioned/fake
+github.com/openshift/client-go/user/clientset/versioned/scheme
+github.com/openshift/client-go/user/clientset/versioned/typed/user/v1
+github.com/openshift/client-go/user/clientset/versioned/typed/user/v1/fake
+github.com/openshift/client-go/user/informers/externalversions
+github.com/openshift/client-go/user/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/user/informers/externalversions/user
+github.com/openshift/client-go/user/informers/externalversions/user/v1
+github.com/openshift/client-go/user/listers/user/v1
+# github.com/openshift/library-go v0.0.0-20240522085517-46b9cb74daa4
+## explicit; go 1.22.0
+github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
+github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
+github.com/openshift/library-go/pkg/apiserver/admission/admissiontimeout
+github.com/openshift/library-go/pkg/apiserver/apiserverconfig
+github.com/openshift/library-go/pkg/authorization/authorizationutil
+github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
+github.com/openshift/library-go/pkg/authorization/scopemetadata
+github.com/openshift/library-go/pkg/client/openshiftrestmapper
+github.com/openshift/library-go/pkg/config/client
+github.com/openshift/library-go/pkg/config/configdefaults
+github.com/openshift/library-go/pkg/config/helpers
+github.com/openshift/library-go/pkg/config/validation
+github.com/openshift/library-go/pkg/crypto
+github.com/openshift/library-go/pkg/image/imageutil
+github.com/openshift/library-go/pkg/image/internal/digest
+github.com/openshift/library-go/pkg/image/internal/reference
+github.com/openshift/library-go/pkg/image/reference
+github.com/openshift/library-go/pkg/monitor/health
+github.com/openshift/library-go/pkg/network
+github.com/openshift/library-go/pkg/oauth/oauthdiscovery
+github.com/openshift/library-go/pkg/quota/clusterquotamapping
+github.com/openshift/library-go/pkg/quota/quotautil
+github.com/openshift/library-go/pkg/route
+github.com/openshift/library-go/pkg/route/defaulting
+github.com/openshift/library-go/pkg/route/hostassignment
+github.com/openshift/library-go/pkg/route/validation
+github.com/openshift/library-go/pkg/security/ldaputil
+github.com/openshift/library-go/pkg/security/uid
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
@@ -863,6 +1093,9 @@ go.starlark.net/resolve
 go.starlark.net/starlark
 go.starlark.net/starlarkstruct
 go.starlark.net/syntax
+# go.uber.org/atomic v1.10.0
+## explicit; go 1.18
+go.uber.org/atomic
 # go.uber.org/goleak v1.3.0
 ## explicit; go 1.20
 go.uber.org/goleak
@@ -898,6 +1131,7 @@ golang.org/x/crypto/ed25519
 golang.org/x/crypto/hkdf
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
+golang.org/x/crypto/md4
 golang.org/x/crypto/nacl/secretbox
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/salsa20/salsa
@@ -1185,27 +1419,27 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
+# k8s.io/api v0.30.0 => ./staging/src/k8s.io/api
 ## explicit; go 1.22.0
-# k8s.io/apiextensions-apiserver v0.0.0 => ./staging/src/k8s.io/apiextensions-apiserver
+# k8s.io/apiextensions-apiserver v0.30.0 => ./staging/src/k8s.io/apiextensions-apiserver
 ## explicit; go 1.22.0
-# k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery
+# k8s.io/apimachinery v0.30.0 => ./staging/src/k8s.io/apimachinery
 ## explicit; go 1.22.0
-# k8s.io/apiserver v0.0.0 => ./staging/src/k8s.io/apiserver
+# k8s.io/apiserver v0.30.0 => ./staging/src/k8s.io/apiserver
 ## explicit; go 1.22.0
 # k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime
 ## explicit; go 1.22.0
-# k8s.io/client-go v0.0.0 => ./staging/src/k8s.io/client-go
+# k8s.io/client-go v0.30.0 => ./staging/src/k8s.io/client-go
 ## explicit; go 1.22.0
 # k8s.io/cloud-provider v0.0.0 => ./staging/src/k8s.io/cloud-provider
 ## explicit; go 1.22.0
 # k8s.io/cluster-bootstrap v0.0.0 => ./staging/src/k8s.io/cluster-bootstrap
 ## explicit; go 1.22.0
-# k8s.io/code-generator v0.0.0 => ./staging/src/k8s.io/code-generator
+# k8s.io/code-generator v0.30.0 => ./staging/src/k8s.io/code-generator
 ## explicit; go 1.22.0
-# k8s.io/component-base v0.0.0 => ./staging/src/k8s.io/component-base
+# k8s.io/component-base v0.30.0 => ./staging/src/k8s.io/component-base
 ## explicit; go 1.22.0
-# k8s.io/component-helpers v0.0.0 => ./staging/src/k8s.io/component-helpers
+# k8s.io/component-helpers v0.29.0 => ./staging/src/k8s.io/component-helpers
 ## explicit; go 1.22.0
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
 ## explicit; go 1.22.0
@@ -1238,9 +1472,9 @@ k8s.io/klog/v2/ktesting
 k8s.io/klog/v2/ktesting/init
 k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
-# k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
+# k8s.io/kms v0.30.0 => ./staging/src/k8s.io/kms
 ## explicit; go 1.22.0
-# k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
+# k8s.io/kube-aggregator v0.30.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit; go 1.22.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.22.0
@@ -1428,3 +1662,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/onsi/ginkgo/v2 => github.com/soltysh/ginkgo/v2 v2.1.5-0.20240209144154-7bbda43b8ce6
