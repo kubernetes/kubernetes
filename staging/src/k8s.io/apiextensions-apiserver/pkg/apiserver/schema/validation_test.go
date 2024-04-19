@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	fuzz "github.com/google/gofuzz"
 )
@@ -146,6 +147,52 @@ func TestValidateStructuralMetadataInvariants(t *testing.T) {
 	}
 }
 
+func TestValidateStructuralCompleteness(t *testing.T) {
+	sch := Structural{
+		AdditionalProperties: &StructuralOrBool{
+			Structural: &Structural{
+				Generic: Generic{
+					Type: "object",
+				},
+				Properties: map[string]Structural{
+					"bar": {
+						Generic: Generic{
+							Type: "string",
+						},
+					},
+				},
+			},
+		},
+		ValueValidation: &ValueValidation{
+			AllOf: []NestedValueValidation{
+				{
+					Properties: map[string]NestedValueValidation{
+						"foo": {
+							ValueValidation: ValueValidation{
+								MinLength: ptr.To[int64](2),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, allowedPropertiesForAdditionalProperties := range []bool{false, true} {
+		errs := validateStructuralCompleteness(&sch, nil, ValidationOptions{
+			AllowValidationPropertiesWithAdditionalProperties: allowedPropertiesForAdditionalProperties,
+		})
+		if allowedPropertiesForAdditionalProperties {
+			if len(errs) != 0 {
+				t.Errorf("unexpected validation errors for: %#v", sch)
+			}
+		} else if len(errs) == 0 {
+			t.Errorf("expected validation errors for: %#v", sch)
+		}
+	}
+
+}
+
 func TestValidateNestedValueValidationComplete(t *testing.T) {
 	fuzzer := fuzz.New()
 	fuzzer.Funcs(
@@ -154,9 +201,9 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 				s.Object = float64(42.0)
 			}
 		},
-		func(s **StructuralOrBool, c fuzz.Continue) {
+		func(s **NestedValueValidation, c fuzz.Continue) {
 			if c.RandBool() {
-				*s = &StructuralOrBool{}
+				*s = &NestedValueValidation{}
 			}
 		},
 	)
@@ -169,7 +216,7 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 		x := reflect.ValueOf(&vv.ForbiddenGenerics).Elem()
 		fuzzer.Fuzz(x.Field(i).Addr().Interface())
 
-		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil)
+		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil, ValidationOptions{})
 		if len(errs) == 0 && !reflect.DeepEqual(vv.ForbiddenGenerics, Generic{}) {
 			t.Errorf("expected ForbiddenGenerics validation errors for: %#v", vv)
 		}
@@ -182,9 +229,40 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 		x := reflect.ValueOf(&vv.ForbiddenExtensions).Elem()
 		fuzzer.Fuzz(x.Field(i).Addr().Interface())
 
-		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil)
+		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil, ValidationOptions{})
 		if len(errs) == 0 && !reflect.DeepEqual(vv.ForbiddenExtensions, Extensions{}) {
 			t.Errorf("expected ForbiddenExtensions validation errors for: %#v", vv)
+		}
+	}
+
+	for _, allowedNestedXValidations := range []bool{false, true} {
+		for _, allowedNestedAdditionalProperties := range []bool{false, true} {
+			opts := ValidationOptions{
+				AllowNestedXValidations:         allowedNestedXValidations,
+				AllowNestedAdditionalProperties: allowedNestedAdditionalProperties,
+			}
+
+			vv := NestedValueValidation{}
+			fuzzer.Fuzz(&vv.ValidationExtensions.XValidations)
+			errs := validateNestedValueValidation(&vv, false, false, fieldLevel, nil, opts)
+			if allowedNestedXValidations {
+				if len(errs) != 0 {
+					t.Errorf("unexpected XValidations validation errors for: %#v", vv)
+				}
+			} else if len(errs) == 0 && len(vv.ValidationExtensions.XValidations) != 0 {
+				t.Errorf("expected XValidations validation errors for: %#v", vv)
+			}
+
+			vv = NestedValueValidation{}
+			fuzzer.Fuzz(&vv.AdditionalProperties)
+			errs = validateNestedValueValidation(&vv, false, false, fieldLevel, nil, opts)
+			if allowedNestedAdditionalProperties {
+				if len(errs) != 0 {
+					t.Errorf("unexpected AdditionalProperties validation errors for: %#v", vv)
+				}
+			} else if len(errs) == 0 && vv.AdditionalProperties != nil {
+				t.Errorf("expected AdditionalProperties validation errors for: %#v", vv)
+			}
 		}
 	}
 }
