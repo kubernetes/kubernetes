@@ -738,8 +738,6 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.GoRuntime(),
 		nodestatus.RuntimeHandlers(kl.runtimeState.runtimeHandlers),
 	)
-	// Volume limits
-	setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))
 
 	setters = append(setters,
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
