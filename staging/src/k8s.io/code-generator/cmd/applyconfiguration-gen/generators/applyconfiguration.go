@@ -230,7 +230,7 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 }
 
 func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter, typeParams TypeParams) {
-	sw.Do("// $.ApplyConfig.ApplyConfiguration|public$ represents an declarative configuration of the $.ApplyConfig.Type|public$ type for use\n", typeParams)
+	sw.Do("// $.ApplyConfig.ApplyConfiguration|public$ represents a declarative configuration of the $.ApplyConfig.Type|public$ type for use\n", typeParams)
 	sw.Do("// with apply.\n", typeParams)
 	sw.Do("type $.ApplyConfig.ApplyConfiguration|public$ struct {\n", typeParams)
 	for _, structMember := range typeParams.Struct.Members {
@@ -382,7 +382,7 @@ func (b *$.ApplyConfig.ApplyConfiguration|public$) ensure$.MemberType.Elem|publi
 `
 
 var clientgenTypeConstructorNamespaced = `
-// $.ApplyConfig.Type|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.Type|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$(name, namespace string) *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
@@ -395,7 +395,7 @@ func $.ApplyConfig.Type|public$(name, namespace string) *$.ApplyConfig.ApplyConf
 `
 
 var clientgenTypeConstructorNonNamespaced = `
-// $.ApplyConfig.Type|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.Type|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$(name string) *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
@@ -407,7 +407,7 @@ func $.ApplyConfig.Type|public$(name string) *$.ApplyConfig.ApplyConfiguration|p
 `
 
 var constructorWithTypeMeta = `
-// $.ApplyConfig.ApplyConfiguration|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.ApplyConfiguration|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
@@ -418,7 +418,7 @@ func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
 `
 
 var constructor = `
-// $.ApplyConfig.ApplyConfiguration|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// $.ApplyConfig.ApplyConfiguration|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
 func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
   return &$.ApplyConfig.ApplyConfiguration|public${}
