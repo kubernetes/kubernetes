@@ -42,6 +42,22 @@ const (
 	fieldLevel
 )
 
+type ValidationOptions struct {
+	// AllowNestedAdditionalProperties allows additionalProperties to be specified in
+	// nested contexts (allOf, anyOf, oneOf, not).
+	AllowNestedAdditionalProperties bool
+
+	// AllowNestedXValidations allows x-kubernetes-validations to be specified in
+	// nested contexts (allOf, anyOf, oneOf, not).
+	AllowNestedXValidations bool
+
+	// AllowValidationPropertiesWithAdditionalProperties allows
+	// value validations on specific properties that are structually
+	// defined by additionalProperties. i.e. additionalProperties in main structural
+	// schema, but properties within an allOf.
+	AllowValidationPropertiesWithAdditionalProperties bool
+}
+
 // ValidateStructural checks that s is a structural schema with the invariants:
 //
 // * structurality: both `ForbiddenGenerics` and `ForbiddenExtensions` only have zero values, with the two exceptions for IntOrString.
@@ -61,10 +77,21 @@ const (
 // * metadata at the root can only restrict the name and generateName, and not be specified at all in nested contexts.
 // * additionalProperties at the root is not allowed.
 func ValidateStructural(fldPath *field.Path, s *Structural) field.ErrorList {
+	return ValidateStructuralWithOptions(fldPath, s, ValidationOptions{
+		// This widens the schema for CRDs, so first few releases will still
+		// not admit any. But it can still be used by libraries and
+		// declarative validation for native types
+		AllowNestedAdditionalProperties:                   false,
+		AllowNestedXValidations:                           false,
+		AllowValidationPropertiesWithAdditionalProperties: false,
+	})
+}
+
+func ValidateStructuralWithOptions(fldPath *field.Path, s *Structural, opts ValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, validateStructuralInvariants(s, rootLevel, fldPath)...)
-	allErrs = append(allErrs, validateStructuralCompleteness(s, fldPath)...)
+	allErrs = append(allErrs, validateStructuralInvariants(s, rootLevel, fldPath, opts)...)
+	allErrs = append(allErrs, validateStructuralCompleteness(s, fldPath, opts)...)
 
 	// sort error messages. Otherwise, the errors slice will change every time due to
 	// maps in the types and randomized iteration.
@@ -76,7 +103,7 @@ func ValidateStructural(fldPath *field.Path, s *Structural) field.ErrorList {
 }
 
 // validateStructuralInvariants checks the invariants of a structural schema.
-func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path) field.ErrorList {
+func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path, opts ValidationOptions) field.ErrorList {
 	if s == nil {
 		return nil
 	}
@@ -86,10 +113,10 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 	if s.Type == "array" && s.Items == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("items"), "must be specified"))
 	}
-	allErrs = append(allErrs, validateStructuralInvariants(s.Items, itemLevel, fldPath.Child("items"))...)
+	allErrs = append(allErrs, validateStructuralInvariants(s.Items, itemLevel, fldPath.Child("items"), opts)...)
 
 	for k, v := range s.Properties {
-		allErrs = append(allErrs, validateStructuralInvariants(&v, fieldLevel, fldPath.Child("properties").Key(k))...)
+		allErrs = append(allErrs, validateStructuralInvariants(&v, fieldLevel, fldPath.Child("properties").Key(k), opts)...)
 	}
 
 	if s.AdditionalProperties != nil {
@@ -97,7 +124,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "must not be used at the root"))
 		}
 		if s.AdditionalProperties.Structural != nil {
-			allErrs = append(allErrs, validateStructuralInvariants(s.AdditionalProperties.Structural, fieldLevel, fldPath.Child("additionalProperties"))...)
+			allErrs = append(allErrs, validateStructuralInvariants(s.AdditionalProperties.Structural, fieldLevel, fldPath.Child("additionalProperties"), opts)...)
 		}
 	}
 
@@ -116,7 +143,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 	skipAnyOf := isIntOrStringAnyOfPattern(s)
 	skipFirstAllOfAnyOf := isIntOrStringAllOfPattern(s)
 
-	allErrs = append(allErrs, validateValueValidation(s.ValueValidation, skipAnyOf, skipFirstAllOfAnyOf, lvl, fldPath)...)
+	allErrs = append(allErrs, validateValueValidation(s.ValueValidation, skipAnyOf, skipFirstAllOfAnyOf, lvl, fldPath, opts)...)
 
 	checkMetadata := (lvl == rootLevel) || s.XEmbeddedResource
 
@@ -235,16 +262,23 @@ func validateExtensions(x *Extensions, fldPath *field.Path) field.ErrorList {
 }
 
 // validateValueValidation checks the value validation in a structural schema.
-func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf bool, lvl level, fldPath *field.Path) field.ErrorList {
+func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf bool, lvl level, fldPath *field.Path, opts ValidationOptions) field.ErrorList {
 	if v == nil {
 		return nil
 	}
 
 	allErrs := field.ErrorList{}
 
+	// We still unconditionally forbid XValidations in quantifiers, the only
+	// quantifier that is allowed to have right now is AllOf. This is due to
+	// implementation constraints - the SchemaValidator would need to become
+	// aware of CEL to properly implement the other quantifiers.
+	optsWithCELDisabled := opts
+	optsWithCELDisabled.AllowNestedXValidations = false
+
 	if !skipAnyOf {
 		for i := range v.AnyOf {
-			allErrs = append(allErrs, validateNestedValueValidation(&v.AnyOf[i], false, false, lvl, fldPath.Child("anyOf").Index(i))...)
+			allErrs = append(allErrs, validateNestedValueValidation(&v.AnyOf[i], false, false, lvl, fldPath.Child("anyOf").Index(i), optsWithCELDisabled)...)
 		}
 	}
 
@@ -253,14 +287,14 @@ func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf 
 		if skipFirstAllOfAnyOf && i == 0 {
 			skipAnyOf = true
 		}
-		allErrs = append(allErrs, validateNestedValueValidation(&v.AllOf[i], skipAnyOf, false, lvl, fldPath.Child("allOf").Index(i))...)
+		allErrs = append(allErrs, validateNestedValueValidation(&v.AllOf[i], skipAnyOf, false, lvl, fldPath.Child("allOf").Index(i), opts)...)
 	}
 
 	for i := range v.OneOf {
-		allErrs = append(allErrs, validateNestedValueValidation(&v.OneOf[i], false, false, lvl, fldPath.Child("oneOf").Index(i))...)
+		allErrs = append(allErrs, validateNestedValueValidation(&v.OneOf[i], false, false, lvl, fldPath.Child("oneOf").Index(i), optsWithCELDisabled)...)
 	}
 
-	allErrs = append(allErrs, validateNestedValueValidation(v.Not, false, false, lvl, fldPath.Child("not"))...)
+	allErrs = append(allErrs, validateNestedValueValidation(v.Not, false, false, lvl, fldPath.Child("not"), optsWithCELDisabled)...)
 
 	if len(v.Pattern) > 0 {
 		if _, err := regexp.Compile(v.Pattern); err != nil {
@@ -272,23 +306,27 @@ func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf 
 }
 
 // validateNestedValueValidation checks the nested value validation under a logic junctor in a structural schema.
-func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllOfAnyOf bool, lvl level, fldPath *field.Path) field.ErrorList {
+func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllOfAnyOf bool, lvl level, fldPath *field.Path, opts ValidationOptions) field.ErrorList {
 	if v == nil {
 		return nil
 	}
 
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, validateValueValidation(&v.ValueValidation, skipAnyOf, skipAllOfAnyOf, lvl, fldPath)...)
-	allErrs = append(allErrs, validateNestedValueValidation(v.Items, false, false, lvl, fldPath.Child("items"))...)
-	allErrs = append(allErrs, validateNestedValueValidation(v.AdditionalProperties, false, false, lvl, fldPath.Child("additionalProperties"))...)
+	allErrs = append(allErrs, validateValueValidation(&v.ValueValidation, skipAnyOf, skipAllOfAnyOf, lvl, fldPath, opts)...)
+	allErrs = append(allErrs, validateNestedValueValidation(v.Items, false, false, lvl, fldPath.Child("items"), opts)...)
 
 	for k, fld := range v.Properties {
-		allErrs = append(allErrs, validateNestedValueValidation(&fld, false, false, fieldLevel, fldPath.Child("properties").Key(k))...)
+		allErrs = append(allErrs, validateNestedValueValidation(&fld, false, false, fieldLevel, fldPath.Child("properties").Key(k), opts)...)
 	}
 
 	if len(v.ForbiddenGenerics.Type) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("type"), "must be empty to be structural"))
+	}
+	if v.AdditionalProperties != nil && !opts.AllowNestedAdditionalProperties {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "must be undefined to be structural"))
+	} else {
+		allErrs = append(allErrs, validateNestedValueValidation(v.AdditionalProperties, false, false, lvl, fldPath.Child("additionalProperties"), opts)...)
 	}
 	if v.ForbiddenGenerics.Default.Object != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "must be undefined to be structural"))
@@ -320,6 +358,9 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 	}
 	if v.ForbiddenExtensions.XMapType != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-map-type"), "must be undefined to be structural"))
+	}
+	if len(v.ValidationExtensions.XValidations) > 0 && !opts.AllowNestedXValidations {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations"), "must be empty to be structural"))
 	}
 
 	// forbid reasoning about metadata because it can lead to metadata restriction we don't want

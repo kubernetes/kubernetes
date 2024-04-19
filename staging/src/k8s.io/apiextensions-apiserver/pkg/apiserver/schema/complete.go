@@ -24,15 +24,15 @@ import (
 
 // validateStructuralCompleteness checks that every specified field or array in s is also specified
 // outside of value validation.
-func validateStructuralCompleteness(s *Structural, fldPath *field.Path) field.ErrorList {
+func validateStructuralCompleteness(s *Structural, fldPath *field.Path, opts ValidationOptions) field.ErrorList {
 	if s == nil {
 		return nil
 	}
 
-	return validateValueValidationCompleteness(s.ValueValidation, s, fldPath, fldPath)
+	return validateValueValidationCompleteness(s.ValueValidation, s, fldPath, fldPath, opts)
 }
 
-func validateValueValidationCompleteness(v *ValueValidation, s *Structural, sPath, vPath *field.Path) field.ErrorList {
+func validateValueValidationCompleteness(v *ValueValidation, s *Structural, sPath, vPath *field.Path, opts ValidationOptions) field.ErrorList {
 	if v == nil {
 		return nil
 	}
@@ -42,21 +42,21 @@ func validateValueValidationCompleteness(v *ValueValidation, s *Structural, sPat
 
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.Not, s, sPath, vPath.Child("not"))...)
+	allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.Not, s, sPath, vPath.Child("not"), opts)...)
 	for i := range v.AllOf {
-		allErrs = append(allErrs, validateNestedValueValidationCompleteness(&v.AllOf[i], s, sPath, vPath.Child("allOf").Index(i))...)
+		allErrs = append(allErrs, validateNestedValueValidationCompleteness(&v.AllOf[i], s, sPath, vPath.Child("allOf").Index(i), opts)...)
 	}
 	for i := range v.AnyOf {
-		allErrs = append(allErrs, validateNestedValueValidationCompleteness(&v.AnyOf[i], s, sPath, vPath.Child("anyOf").Index(i))...)
+		allErrs = append(allErrs, validateNestedValueValidationCompleteness(&v.AnyOf[i], s, sPath, vPath.Child("anyOf").Index(i), opts)...)
 	}
 	for i := range v.OneOf {
-		allErrs = append(allErrs, validateNestedValueValidationCompleteness(&v.OneOf[i], s, sPath, vPath.Child("oneOf").Index(i))...)
+		allErrs = append(allErrs, validateNestedValueValidationCompleteness(&v.OneOf[i], s, sPath, vPath.Child("oneOf").Index(i), opts)...)
 	}
 
 	return allErrs
 }
 
-func validateNestedValueValidationCompleteness(v *NestedValueValidation, s *Structural, sPath, vPath *field.Path) field.ErrorList {
+func validateNestedValueValidationCompleteness(v *NestedValueValidation, s *Structural, sPath, vPath *field.Path, opts ValidationOptions) field.ErrorList {
 	if v == nil {
 		return nil
 	}
@@ -66,17 +66,29 @@ func validateNestedValueValidationCompleteness(v *NestedValueValidation, s *Stru
 
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, validateValueValidationCompleteness(&v.ValueValidation, s, sPath, vPath)...)
-	allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.Items, s.Items, sPath.Child("items"), vPath.Child("items"))...)
+	allErrs = append(allErrs, validateValueValidationCompleteness(&v.ValueValidation, s, sPath, vPath, opts)...)
+	allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.Items, s.Items, sPath.Child("items"), vPath.Child("items"), opts)...)
+
+	var additionalPropertiesSchema *Structural
+	if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
+		additionalPropertiesSchema = s.AdditionalProperties.Structural
+	}
+
 	for k, vFld := range v.Properties {
 		if sFld, ok := s.Properties[k]; !ok {
-			allErrs = append(allErrs, field.Required(sPath.Child("properties").Key(k), fmt.Sprintf("because it is defined in %s", vPath.Child("properties").Key(k))))
+			if additionalPropertiesSchema == nil || !opts.AllowValidationPropertiesWithAdditionalProperties {
+				allErrs = append(allErrs, field.Required(sPath.Child("properties").Key(k), fmt.Sprintf("because it is defined in %s", vPath.Child("properties").Key(k))))
+			} else {
+				allErrs = append(allErrs, validateNestedValueValidationCompleteness(&vFld, additionalPropertiesSchema, sPath.Child("additionalProperties"), vPath.Child("properties").Key(k), opts)...)
+			}
 		} else {
-			allErrs = append(allErrs, validateNestedValueValidationCompleteness(&vFld, &sFld, sPath.Child("properties").Key(k), vPath.Child("properties").Key(k))...)
+			allErrs = append(allErrs, validateNestedValueValidationCompleteness(&vFld, &sFld, sPath.Child("properties").Key(k), vPath.Child("properties").Key(k), opts)...)
 		}
 	}
 
-	// don't check additionalProperties as this is not allowed (and checked during validation)
+	if v.AdditionalProperties != nil && opts.AllowNestedAdditionalProperties {
+		allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.AdditionalProperties, s.AdditionalProperties.Structural, sPath.Child("additionalProperties"), vPath.Child("additionalProperties"), opts)...)
+	}
 
 	return allErrs
 }
