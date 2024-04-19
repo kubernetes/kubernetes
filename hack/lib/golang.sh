@@ -581,6 +581,9 @@ kube::golang::setup_env() {
   # Make sure our own Go binaries are in PATH.
   export PATH="${KUBE_GOPATH}/bin:${PATH}"
 
+  # In workspace mode, -mod flag may only be set to readonly or vendor.
+  export GOFLAGS=-mod=readonly
+
   # Unset GOBIN in case it already exists in the current session.
   # Cross-compiles will not work with it set.
   unset GOBIN
