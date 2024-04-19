@@ -142,7 +142,7 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 
 	// kubeadm allows users to specify address=Loopback as a selector for global unicast IP address that can be found on loopback interface.
 	// e.g. This is required for network setups where default routes are present, but network interfaces use only link-local addresses (e.g. as described in RFC5549).
-	if addressIP.IsLoopback() {
+	if addressIP != nil && addressIP.IsLoopback() {
 		loopbackIP, err := netutil.ChooseBindAddressForInterface(netutil.LoopbackInterfaceName)
 		if err != nil {
 			return err
