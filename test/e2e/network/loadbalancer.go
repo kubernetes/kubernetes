@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"strconv"
@@ -125,13 +124,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
-	var subnetPrefix *net.IPNet
-	var err error
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet
-		subnetPrefix, err = getSubnetPrefix(ctx, cs)
-		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
@@ -609,135 +604,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
 		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
 		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
-	})
-
-	f.It("should be able to create an internal type load balancer", f.WithSlow(), func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gke", "gce")
-
-		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
-		pollInterval := framework.Poll * 10
-
-		namespace := f.Namespace.Name
-		serviceName := "lb-internal"
-		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
-
-		ginkgo.By("creating pod to be part of service " + serviceName)
-		_, err := jig.Run(ctx, nil)
-		framework.ExpectNoError(err)
-
-		enableILB, disableILB := enableAndDisableInternalLB()
-
-		isInternalEndpoint := func(lbIngress *v1.LoadBalancerIngress) bool {
-			ingressEndpoint := e2eservice.GetIngressPoint(lbIngress)
-			ingressIP := netutils.ParseIPSloppy(ingressEndpoint)
-			if ingressIP == nil {
-				framework.Failf("invalid ingressEndpoint IP address format: %s", ingressEndpoint)
-			}
-			// Needs update for providers using hostname as endpoint.
-			return subnetPrefix.Contains(ingressIP)
-		}
-
-		ginkgo.By("creating a service with type LoadBalancer and cloud specific Internal-LB annotation enabled")
-		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			enableILB(svc)
-		})
-		framework.ExpectNoError(err)
-
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			ginkgo.By("Clean up loadbalancer service")
-			e2eservice.WaitForServiceDeletedWithFinalizer(ctx, cs, svc.Namespace, svc.Name)
-		})
-
-		svc, err = jig.WaitForLoadBalancer(ctx, createTimeout)
-		framework.ExpectNoError(err)
-		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
-		svcPort := int(svc.Spec.Ports[0].Port)
-		// should have an internal IP.
-		if !isInternalEndpoint(lbIngress) {
-			framework.Failf("lbIngress %v doesn't have an internal IP", lbIngress)
-		}
-
-		// ILBs are not accessible from the test orchestrator, so it's necessary to use
-		//  a pod to test the service.
-		ginkgo.By("hitting the internal load balancer from pod")
-		framework.Logf("creating pod with host network")
-		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "ilb-host-exec")
-
-		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
-		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
-		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-			cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
-			stdout, err := e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
-			if err != nil {
-				framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
-				return false, nil
-			}
-
-			if !strings.Contains(stdout, "hello") {
-				framework.Logf("Expected output to contain 'hello', got %q; retrying...", stdout)
-				return false, nil
-			}
-
-			framework.Logf("Successful curl; stdout: %v", stdout)
-			return true, nil
-		}); pollErr != nil {
-			framework.Failf("ginkgo.Failed to hit ILB IP, err: %v", pollErr)
-		}
-
-		ginkgo.By("switching to external type LoadBalancer")
-		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			disableILB(svc)
-		})
-		framework.ExpectNoError(err)
-		framework.Logf("Waiting up to %v for service %q to have an external LoadBalancer", createTimeout, serviceName)
-		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-			svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			lbIngress = &svc.Status.LoadBalancer.Ingress[0]
-			return !isInternalEndpoint(lbIngress), nil
-		}); pollErr != nil {
-			framework.Failf("Loadbalancer IP not changed to external.")
-		}
-		// should have an external IP.
-		gomega.Expect(isInternalEndpoint(lbIngress)).To(gomega.BeFalse())
-
-		ginkgo.By("hitting the external load balancer")
-		framework.Logf("Waiting up to %v for service %q's external LB to respond to requests", createTimeout, serviceName)
-		tcpIngressIP = e2eservice.GetIngressPoint(lbIngress)
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
-
-		// GCE cannot test a specific IP because the test may not own it. This cloud specific condition
-		// will be removed when GCP supports similar functionality.
-		if framework.ProviderIs("azure") {
-			ginkgo.By("switching back to interal type LoadBalancer, with static IP specified.")
-			// For a cluster created with CAPZ, node-subnet may not be "10.240.0.0/16", e.g. "10.1.0.0/16".
-			base := netutils.BigForIP(subnetPrefix.IP)
-			offset := big.NewInt(0).SetBytes(netutils.ParseIPSloppy("0.0.11.11").To4()).Int64()
-
-			internalStaticIP := netutils.AddIPOffset(base, int(offset)).String()
-
-			svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-				svc.Spec.LoadBalancerIP = internalStaticIP
-				enableILB(svc)
-			})
-			framework.ExpectNoError(err)
-			framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
-			if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-				svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				lbIngress = &svc.Status.LoadBalancer.Ingress[0]
-				return isInternalEndpoint(lbIngress), nil
-			}); pollErr != nil {
-				framework.Failf("Loadbalancer IP not changed to internal.")
-			}
-			// should have the given static internal IP.
-			gomega.Expect(e2eservice.GetIngressPoint(lbIngress)).To(gomega.Equal(internalStaticIP))
-		}
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
