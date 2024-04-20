@@ -230,9 +230,6 @@ var (
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PodHostIPs = framework.WithFeature(framework.ValidFeatures.Add("PodHostIPs"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodLifecycleSleepAction = framework.WithFeature(framework.ValidFeatures.Add("PodLifecycleSleepAction"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
