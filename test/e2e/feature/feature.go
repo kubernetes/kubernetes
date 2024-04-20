@@ -328,9 +328,6 @@ var (
 	TopologyManager = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	UDP = framework.WithFeature(framework.ValidFeatures.Add("UDP"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Upgrade = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
