@@ -4152,12 +4152,6 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 	framework.ExpectNoError(err)
 }
 
-// enableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
-// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
-func enableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
-}
-
 func validatePorts(ep, expectedEndpoints portsByPodUID) error {
 	if len(ep) != len(expectedEndpoints) {
 		// should not happen because we check this condition before

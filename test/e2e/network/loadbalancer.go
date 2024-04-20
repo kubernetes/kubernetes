@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"strconv"
@@ -31,8 +30,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	compute "google.golang.org/api/compute/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -52,7 +49,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -125,13 +121,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
-	var subnetPrefix *net.IPNet
-	var err error
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet
-		subnetPrefix, err = getSubnetPrefix(ctx, cs)
-		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
@@ -187,37 +179,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		// Change the services to LoadBalancer.
-
-		// Here we test that LoadBalancers can receive static IP addresses.  This isn't
-		// necessary, but is an additional feature this monolithic test checks.
-		requestedIP := ""
-		staticIPName := ""
-		if framework.ProviderIs("gce", "gke") {
-			ginkgo.By("creating a static load balancer IP")
-			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunID)
-			gceCloud, err := gce.GetGCECloud()
-			framework.ExpectNoError(err, "failed to get GCE cloud provider")
-
-			err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
-			defer func() {
-				if staticIPName != "" {
-					// Release GCE static IP - this is not kube-managed and will not be automatically released.
-					if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
-						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
-					}
-				}
-			}()
-			framework.ExpectNoError(err, "failed to create region address: %s", staticIPName)
-			reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
-			framework.ExpectNoError(err, "failed to get region address: %s", staticIPName)
-
-			requestedIP = reservedAddr.Address
-			framework.Logf("Allocated static load balancer IP: %s", requestedIP)
-		}
-
 		ginkgo.By("changing the TCP service to type=LoadBalancer")
 		_, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.LoadBalancerIP = requestedIP // will be "" if not applicable
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
 		framework.ExpectNoError(err)
@@ -229,29 +192,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
 		}
-		if requestedIP != "" && e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != requestedIP {
-			framework.Failf("unexpected TCP Status.LoadBalancer.Ingress (expected %s, got %s)", requestedIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
-		}
 		tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 		framework.Logf("TCP load balancer: %s", tcpIngressIP)
-
-		if framework.ProviderIs("gce", "gke") {
-			// Do this as early as possible, which overrides the `defer` above.
-			// This is mostly out of fear of leaking the IP in a timeout case
-			// (as of this writing we're not 100% sure where the leaks are
-			// coming from, so this is first-aid rather than surgery).
-			ginkgo.By("demoting the static IP to ephemeral")
-			if staticIPName != "" {
-				gceCloud, err := gce.GetGCECloud()
-				framework.ExpectNoError(err, "failed to get GCE cloud provider")
-				// Deleting it after it is attached "demotes" it to an
-				// ephemeral IP, which can be auto-released.
-				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
-					framework.Failf("failed to release static IP %s: %v", staticIPName, err)
-				}
-				staticIPName = ""
-			}
-		}
 
 		err = tcpJig.CheckServiceReachability(ctx, tcpService, execPod)
 		framework.ExpectNoError(err)
@@ -377,53 +319,11 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		// Change the services to LoadBalancer.
-
-		// Here we test that LoadBalancers can receive static IP addresses.  This isn't
-		// necessary, but is an additional feature this monolithic test checks.
-		requestedIP := ""
-		staticIPName := ""
-		ginkgo.By("creating a static load balancer IP")
-		staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunID)
-		gceCloud, err := gce.GetGCECloud()
-		framework.ExpectNoError(err, "failed to get GCE cloud provider")
-
-		err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
-		defer func() {
-			if staticIPName != "" {
-				// Release GCE static IP - this is not kube-managed and will not be automatically released.
-				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
-					framework.Logf("failed to release static IP %s: %v", staticIPName, err)
-				}
-			}
-		}()
-		framework.ExpectNoError(err, "failed to create region address: %s", staticIPName)
-		reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
-		framework.ExpectNoError(err, "failed to get region address: %s", staticIPName)
-
-		requestedIP = reservedAddr.Address
-		framework.Logf("Allocated static load balancer IP: %s", requestedIP)
-
 		ginkgo.By("changing the UDP service to type=LoadBalancer")
 		_, err = udpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
 		framework.ExpectNoError(err)
-
-		// Do this as early as possible, which overrides the `defer` above.
-		// This is mostly out of fear of leaking the IP in a timeout case
-		// (as of this writing we're not 100% sure where the leaks are
-		// coming from, so this is first-aid rather than surgery).
-		ginkgo.By("demoting the static IP to ephemeral")
-		if staticIPName != "" {
-			gceCloud, err := gce.GetGCECloud()
-			framework.ExpectNoError(err, "failed to get GCE cloud provider")
-			// Deleting it after it is attached "demotes" it to an
-			// ephemeral IP, which can be auto-released.
-			if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
-				framework.Failf("failed to release static IP %s: %v", staticIPName, err)
-			}
-			staticIPName = ""
-		}
 
 		var udpIngressIP string
 		ginkgo.By("waiting for the UDP service to have a load balancer")
@@ -611,135 +511,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 	})
 
-	f.It("should be able to create an internal type load balancer", f.WithSlow(), func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gke", "gce")
-
-		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
-		pollInterval := framework.Poll * 10
-
-		namespace := f.Namespace.Name
-		serviceName := "lb-internal"
-		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
-
-		ginkgo.By("creating pod to be part of service " + serviceName)
-		_, err := jig.Run(ctx, nil)
-		framework.ExpectNoError(err)
-
-		enableILB, disableILB := enableAndDisableInternalLB()
-
-		isInternalEndpoint := func(lbIngress *v1.LoadBalancerIngress) bool {
-			ingressEndpoint := e2eservice.GetIngressPoint(lbIngress)
-			ingressIP := netutils.ParseIPSloppy(ingressEndpoint)
-			if ingressIP == nil {
-				framework.Failf("invalid ingressEndpoint IP address format: %s", ingressEndpoint)
-			}
-			// Needs update for providers using hostname as endpoint.
-			return subnetPrefix.Contains(ingressIP)
-		}
-
-		ginkgo.By("creating a service with type LoadBalancer and cloud specific Internal-LB annotation enabled")
-		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			enableILB(svc)
-		})
-		framework.ExpectNoError(err)
-
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			ginkgo.By("Clean up loadbalancer service")
-			e2eservice.WaitForServiceDeletedWithFinalizer(ctx, cs, svc.Namespace, svc.Name)
-		})
-
-		svc, err = jig.WaitForLoadBalancer(ctx, createTimeout)
-		framework.ExpectNoError(err)
-		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
-		svcPort := int(svc.Spec.Ports[0].Port)
-		// should have an internal IP.
-		if !isInternalEndpoint(lbIngress) {
-			framework.Failf("lbIngress %v doesn't have an internal IP", lbIngress)
-		}
-
-		// ILBs are not accessible from the test orchestrator, so it's necessary to use
-		//  a pod to test the service.
-		ginkgo.By("hitting the internal load balancer from pod")
-		framework.Logf("creating pod with host network")
-		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "ilb-host-exec")
-
-		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
-		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
-		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-			cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
-			stdout, err := e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
-			if err != nil {
-				framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
-				return false, nil
-			}
-
-			if !strings.Contains(stdout, "hello") {
-				framework.Logf("Expected output to contain 'hello', got %q; retrying...", stdout)
-				return false, nil
-			}
-
-			framework.Logf("Successful curl; stdout: %v", stdout)
-			return true, nil
-		}); pollErr != nil {
-			framework.Failf("ginkgo.Failed to hit ILB IP, err: %v", pollErr)
-		}
-
-		ginkgo.By("switching to external type LoadBalancer")
-		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			disableILB(svc)
-		})
-		framework.ExpectNoError(err)
-		framework.Logf("Waiting up to %v for service %q to have an external LoadBalancer", createTimeout, serviceName)
-		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-			svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			lbIngress = &svc.Status.LoadBalancer.Ingress[0]
-			return !isInternalEndpoint(lbIngress), nil
-		}); pollErr != nil {
-			framework.Failf("Loadbalancer IP not changed to external.")
-		}
-		// should have an external IP.
-		gomega.Expect(isInternalEndpoint(lbIngress)).To(gomega.BeFalse())
-
-		ginkgo.By("hitting the external load balancer")
-		framework.Logf("Waiting up to %v for service %q's external LB to respond to requests", createTimeout, serviceName)
-		tcpIngressIP = e2eservice.GetIngressPoint(lbIngress)
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
-
-		// GCE cannot test a specific IP because the test may not own it. This cloud specific condition
-		// will be removed when GCP supports similar functionality.
-		if framework.ProviderIs("azure") {
-			ginkgo.By("switching back to interal type LoadBalancer, with static IP specified.")
-			// For a cluster created with CAPZ, node-subnet may not be "10.240.0.0/16", e.g. "10.1.0.0/16".
-			base := netutils.BigForIP(subnetPrefix.IP)
-			offset := big.NewInt(0).SetBytes(netutils.ParseIPSloppy("0.0.11.11").To4()).Int64()
-
-			internalStaticIP := netutils.AddIPOffset(base, int(offset)).String()
-
-			svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-				svc.Spec.LoadBalancerIP = internalStaticIP
-				enableILB(svc)
-			})
-			framework.ExpectNoError(err)
-			framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
-			if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-				svc, err := cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				lbIngress = &svc.Status.LoadBalancer.Ingress[0]
-				return isInternalEndpoint(lbIngress), nil
-			}); pollErr != nil {
-				framework.Failf("Loadbalancer IP not changed to internal.")
-			}
-			// should have the given static internal IP.
-			gomega.Expect(e2eservice.GetIngressPoint(lbIngress)).To(gomega.Equal(internalStaticIP))
-		}
-	})
-
 	// [LinuxOnly]: Windows does not support session affinity.
 	f.It("should have session affinity work for LoadBalancer service with ESIPP on", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
@@ -852,37 +623,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		// Change the services to LoadBalancer.
-
-		// Here we test that LoadBalancers can receive static IP addresses.  This isn't
-		// necessary, but is an additional feature this monolithic test checks.
-		requestedIP := ""
-		staticIPName := ""
-		if framework.ProviderIs("gce", "gke") {
-			ginkgo.By("creating a static load balancer IP")
-			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunID)
-			gceCloud, err := gce.GetGCECloud()
-			framework.ExpectNoError(err, "failed to get GCE cloud provider")
-
-			err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				if staticIPName != "" {
-					// Release GCE static IP - this is not kube-managed and will not be automatically released.
-					if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
-						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
-					}
-				}
-			})
-			framework.ExpectNoError(err, "failed to create region address: %s", staticIPName)
-			reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
-			framework.ExpectNoError(err, "failed to get region address: %s", staticIPName)
-
-			requestedIP = reservedAddr.Address
-			framework.Logf("Allocated static load balancer IP: %s", requestedIP)
-		}
-
 		ginkgo.By("changing the TCP service to type=LoadBalancer")
 		_, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.LoadBalancerIP = requestedIP // will be "" if not applicable
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 		})
@@ -895,29 +637,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		if int(tcpService.Spec.Ports[0].NodePort) != 0 {
 			framework.Failf("TCP Spec.Ports[0].NodePort allocated %d when not expected", tcpService.Spec.Ports[0].NodePort)
 		}
-		if requestedIP != "" && e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != requestedIP {
-			framework.Failf("unexpected TCP Status.LoadBalancer.Ingress (expected %s, got %s)", requestedIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
-		}
 		tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 		framework.Logf("TCP load balancer: %s", tcpIngressIP)
-
-		if framework.ProviderIs("gce", "gke") {
-			// Do this as early as possible, which overrides the `defer` above.
-			// This is mostly out of fear of leaking the IP in a timeout case
-			// (as of this writing we're not 100% sure where the leaks are
-			// coming from, so this is first-aid rather than surgery).
-			ginkgo.By("demoting the static IP to ephemeral")
-			if staticIPName != "" {
-				gceCloud, err := gce.GetGCECloud()
-				framework.ExpectNoError(err, "failed to get GCE cloud provider")
-				// Deleting it after it is attached "demotes" it to an
-				// ephemeral IP, which can be auto-released.
-				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
-					framework.Failf("failed to release static IP %s: %v", staticIPName, err)
-				}
-				staticIPName = ""
-			}
-		}
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)

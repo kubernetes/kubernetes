@@ -148,9 +148,6 @@ var (
 	Ingress = framework.WithFeature(framework.ValidFeatures.Add("Ingress"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	IngressScale = framework.WithFeature(framework.ValidFeatures.Add("IngressScale"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
 
 	// Owner: sig-network
@@ -189,9 +186,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	NEG = framework.WithFeature(framework.ValidFeatures.Add("NEG"))
 
 	// Owner: sig-network
 	// Marks tests that require working external DNS.
