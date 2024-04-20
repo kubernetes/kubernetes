@@ -2984,6 +2984,9 @@ EOF
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
   fi
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "kube-network-policies" ]]; then
+    setup-addon-manifests "addons" "kube-network-policies"
+  fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
@@ -3249,8 +3252,8 @@ function setup-containerd {
 }
 EOF
   if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
-    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
-      # Use Kubernetes cni daemonset on node if network policy provider is specified
+    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
+      # Use Kubernetes cni daemonset on node if network policy provider calico is specified
       # or netd is enabled.
       cni_template_path=""
     fi
