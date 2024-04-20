@@ -2,7 +2,6 @@ package generated
 
 import (
 	"fmt"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 )
@@ -28,9 +27,9 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating a validating webhook should work [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to create and update mutating webhook configurations with match conditions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to create and update mutating webhook configurations with match conditions [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to create and update validating webhook configurations with match conditions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to create and update validating webhook configurations with match conditions [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to deny attaching pod [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -52,19 +51,43 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate custom resource with pruning [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate everything except 'skip-me' configmaps": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate everything except 'skip-me' configmaps [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate pod and apply defaults after mutation [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should not be able to mutate or prevent deletion of webhook configuration objects [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should reject mutating webhook configurations with invalid match conditions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should reject mutating webhook configurations with invalid match conditions [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should reject validating webhook configurations with invalid match conditions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should reject validating webhook configurations with invalid match conditions [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should unconditionally reject operations on fail closed webhook [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-api-machinery] AggregatedDiscovery should support aggregated discovery interface [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] AggregatedDiscovery should support aggregated discovery interface for CRDs [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] AggregatedDiscovery should support raw aggregated discovery endpoint Accept headers [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] AggregatedDiscovery should support raw aggregated discovery request for CRDs [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
 	"[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample API Server using the current Aggregator [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST NOT fail to update a resource due to CRD Validation Rule errors on unchanged correlatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST NOT fail to update a resource due to JSONSchema errors on unchanged correlatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST NOT ratchet errors raised by transition rules": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST evaluate a CRD Validation Rule with oldSelf = nil for new values when optionalOldSelf is true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to CRD Validation Rule errors on changed fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to CRD Validation Rule errors on unchanged uncorrelatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to JSONSchema errors on changed fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to JSONSchema errors on unchanged uncorrelatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin] should be able to convert a non homogeneous list of CRs [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -274,13 +297,17 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] StorageVersion resources [Feature:StorageVersionAPI] storage version with non-existing id should be GC'ed": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] [FeatureGate:ValidatingAdmissionPolicy] [Beta] should allow expressions to refer variables.": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] should allow expressions to refer variables. [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] [FeatureGate:ValidatingAdmissionPolicy] [Beta] should type check a CRD": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] should support ValidatingAdmissionPolicy API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] [FeatureGate:ValidatingAdmissionPolicy] [Beta] should type check validation expressions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] should support ValidatingAdmissionPolicyBinding API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] [FeatureGate:ValidatingAdmissionPolicy] [Beta] should validate against a Deployment": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] should type check a CRD": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] should type check validation expressions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin] should validate against a Deployment [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] Watchers should be able to restart watching from the last resource version observed by the previous watch [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -660,6 +687,8 @@ var Annotations = map[string]string{
 
 	"[sig-autoscaling] Cluster size autoscaling [Slow] should scale up when non expendable pod is created [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
 
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should scale up when unprocessed pod is created and is going to be unschedulable [Feature:ClusterScaleUpBypassScheduler]": " [Suite:k8s]",
+
 	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't be able to scale down when rescheduling a pod is required, but pdb doesn't allow drain [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
 
 	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't increase cluster size if pending pod is too large [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
@@ -669,6 +698,10 @@ var Annotations = map[string]string{
 	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when expendable pod is created [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
 
 	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when expendable pod is preempted [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when unprocessed pod is created and is going to be schedulable [Feature:ClusterScaleUpBypassScheduler]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when unprocessed pod is created and scheduler is not specified to be bypassed [Feature:ClusterScaleUpBypassScheduler]": " [Suite:k8s]",
 
 	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't trigger additional scale-ups during processing scale-up [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
 
@@ -882,6 +915,8 @@ var Annotations = map[string]string{
 
 	"[sig-cli] Kubectl client kubectl wait should ignore not found error with --for=delete": " [Disabled:Broken] [Suite:k8s]",
 
+	"[sig-cli] Kubectl delete interactive based on user confirmation input": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-cli] Kubectl logs default container logs the second container is the default-container by annotation should log default container if not specified": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-cli] Kubectl logs logs should be able to retrieve and filter logs [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -930,6 +965,8 @@ var Annotations = map[string]string{
 
 	"[sig-network] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod": " [Disabled:RebaseInProgress] [Suite:k8s]",
 
+	"[sig-network] Conntrack proxy implementation should not be vulnerable to the invalid conntrack state bug [Privileged]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-network] Conntrack should be able to preserve UDP traffic when initial unready endpoints get ready": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service and client is hostNetwork": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -937,8 +974,6 @@ var Annotations = map[string]string{
 	"[sig-network] Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Conntrack should be able to preserve UDP traffic when server pod cycles for a NodePort service": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-network] Conntrack should drop INVALID conntrack entries [Privileged]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy: ClusterFirstWithHostNet [LinuxOnly]": " [Disabled:RebaseInProgress] [Suite:k8s]",
 
@@ -1376,7 +1411,7 @@ var Annotations = map[string]string{
 
 	"[sig-network] [Feature:IPv6DualStack] should create a single stack service with cluster ip from primary service range": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] [Feature:IPv6DualStack] should create pod, add ipv6 and ipv4 ip to host ips [Feature:PodHostIPs]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-network] [Feature:IPv6DualStack] should create pod, add ipv6 and ipv4 ip to host ips": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] [Feature:IPv6DualStack] should create pod, add ipv6 and ipv4 ip to pod ips": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1396,9 +1431,17 @@ var Annotations = map[string]string{
 
 	"[sig-network] [Feature:Topology Hints] should distribute endpoints evenly": " [Disabled:SpecialConfig] [Suite:k8s]",
 
+	"[sig-network] [Feature:Traffic Distribution] when Service has trafficDistribution=PreferClose should route traffic to an endpoint that is close to the client": " [Disabled:Alpha] [Suite:k8s]",
+
 	"[sig-node] AppArmor load AppArmor profiles can disable an AppArmor profile, using unconfined": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] AppArmor load AppArmor profiles should enforce an AppArmor profile": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] AppArmor load AppArmor profiles should enforce an AppArmor profile specified in annotations": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] AppArmor load AppArmor profiles should enforce an AppArmor profile specified on the container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] AppArmor load AppArmor profiles should enforce an AppArmor profile specified on the pod": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] ConfigMap should be consumable as environment variable names when configmap keys start with a digit [Feature:RelaxedEnvironmentVariableValidation]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-node] ConfigMap should be consumable via environment variable [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1498,6 +1541,8 @@ var Annotations = map[string]string{
 
 	"[sig-node] Kubelet when scheduling an agnhost Pod with hostAliases should write entries to /etc/hosts [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-node] Kubelet with pods in a privileged namespace when scheduling an agnhost Pod with hostAliases and hostNetwork should write entries to /etc/hosts when hostNetwork is enabled [NodeConformance]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-node] KubeletManagedEtcHosts should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] Lease lease API should be available [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -1514,7 +1559,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] NoExecuteTaintManager Single Pod [Serial] evicts pods from tainted nodes": " [Skipped:SingleReplicaTopology] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-node] NoExecuteTaintManager Single Pod [Serial] pods evicted from tainted nodes have pod disruption condition": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-node] NoExecuteTaintManager Single Pod [Serial] pods evicted from tainted nodes have pod disruption condition": " [Skipped:SingleReplicaTopology] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-node] NoExecuteTaintManager Single Pod [Serial] removing taint cancels eviction [Disruptive] [Conformance]": " [Skipped:SingleReplicaTopology] [Suite:k8s]",
 
@@ -1524,7 +1569,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] NodeLease NodeLease the kubelet should report node status infrequently": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] NodeProblemDetector should run without error": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] NodeProblemDetector [NodeFeature:NodeProblemDetector] should run without error": " [Disabled:SpecialConfig] [Suite:k8s]",
 
 	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] BestEffort pod - try requesting memory, expect error": " [Disabled:Alpha] [Suite:k8s]",
 
@@ -1716,6 +1761,8 @@ var Annotations = map[string]string{
 
 	"[sig-node] SSH should SSH to all nodes and run commands": " [Disabled:Broken] [Suite:k8s]",
 
+	"[sig-node] Secrets should be consumable as environment variable names when secret keys start with a digit [Feature:RelaxedEnvironmentVariableValidation]": " [Disabled:Alpha] [Suite:k8s]",
+
 	"[sig-node] Secrets should be consumable from pods in env vars [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] Secrets should be consumable via the environment [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -1792,6 +1839,10 @@ var Annotations = map[string]string{
 
 	"[sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls with slashes as separator [MinimumKubeletVersion:1.23] [Environment:NotInUserNS]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-node] User Namespaces for Pod Security Standards [LinuxOnly] with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled should allow pod [Feature:UserNamespacesPodSecurityStandards]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Variable Expansion allow almost all printable ASCII characters as environment variable names [Feature:RelaxedEnvironmentVariableValidation]": " [Disabled:Alpha] [Suite:k8s]",
+
 	"[sig-node] Variable Expansion should allow composing env vars into new env vars [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] Variable Expansion should allow substituting values in a container's args [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -1814,67 +1865,69 @@ var Annotations = map[string]string{
 
 	"[sig-node] [Feature:Example] Secret should create a pod that reads a secret": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action reduce GracePeriodSeconds during runtime": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action ignore terminated container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action reduce GracePeriodSeconds during runtime": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted by liveness probe because startup probe delays it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted by liveness probe because startup probe delays it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a non-local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a tcp:8080 liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a non-local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be ready immediately after startupProbe succeeds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a tcp:8080 liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted by liveness probe after startup probe enables it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be ready immediately after startupProbe succeeds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted startup probe fails": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted by liveness probe after startup probe enables it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted startup probe fails": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a failing exec liveness probe that took longer than the timeout": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a failing exec liveness probe that took longer than the timeout": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should have monotonically increasing restart count": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should have monotonically increasing restart count": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when LivenessProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when StartupProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when LivenessProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container with readiness probe should not be ready before initial delay and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when StartupProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container with readiness probe that fails should never be ready and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container with readiness probe should not be ready before initial delay and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container with readiness probe that fails should never be ready and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeAlphaFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] [Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling] pod-resize-scheduler-tests": " [Disabled:Alpha] [Suite:k8s]",
 
@@ -1882,21 +1935,27 @@ var Annotations = map[string]string{
 
 	"[sig-node] kubelet Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s.": " [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-node] kubelet host cleanup with volume mounts [HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed.": " [Suite:k8s]",
+	"[sig-node] kubelet host cleanup with volume mounts [HostCleanup] [Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed.": " [Suite:k8s]",
 
-	"[sig-node] kubelet host cleanup with volume mounts [HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed.": " [Suite:k8s]",
+	"[sig-node] kubelet host cleanup with volume mounts [HostCleanup] [Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed.": " [Suite:k8s]",
 
-	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly] should return the error with an empty --query option": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the Microsoft-Windows-Security-SPP logs with the pattern Health": " [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly] should return the kubelet logs ": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the Microsoft-Windows-Security-SPP logs": " [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly] should return the kubelet logs for the current boot with the pattern container": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the error with an empty --query option": " [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly] should return the kubelet logs for the current boot": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the kubelet logs ": " [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly] should return the kubelet logs since the current date and time": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the kubelet logs for the current boot with the pattern container": " [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly] should return the last three lines of the kubelet logs": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the kubelet logs for the current boot": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the kubelet logs since the current date and time": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the last three lines of the Microsoft-Windows-Security-SPP logs": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-node] kubelet kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] should return the last three lines of the kubelet logs": " [Disabled:SpecialConfig] [Suite:k8s]",
 
 	"[sig-scheduling] GPUDevicePluginAcrossRecreate [Feature:Recreate] run Nvidia GPU Device Plugin tests with a recreation": " [Disabled:SpecialConfig] [Suite:k8s]",
 
@@ -1958,25 +2017,37 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Mock fsgroup as mount option Delegate FSGroup to CSI driver [LinuxOnly] should pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should add SELinux mount option to existing mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should add SELinux mount option to existing mount options [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for CSI driver that does not support SELinux mount": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for CSI driver that does not support SELinux mount [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for Pod without SELinux context": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for Pod without SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for RWO volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for RWO volume with SELinuxMount disabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not unstage volume when starting a second pod with the same SELinux context": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not unstage RWO volume when starting a second pod with the same SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should pass SELinux mount option for RWOP volume and Pod with SELinux context set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not unstage RWOP volume when starting a second pod with the same SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage volume when starting a second pod with different SELinux context": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should pass SELinux mount option for RWO volume with SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Feature:SELinuxMountReadWriteOncePod] [Serial] error is bumped on two Pods with a different context on RWOP volume": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should pass SELinux mount option for RWOP volume and Pod with SELinux context set [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Feature:SELinuxMountReadWriteOncePod] [Serial] warning is bumped on two Pods with a different context on RWO volume": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage RWO volume when starting a second pod with different SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Feature:SELinuxMountReadWriteOncePod] [Serial] warning is not bumped on two Pods with the same context on RWO volume": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage RWOP volume when starting a second pod with different SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWO volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWOP volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWX volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is not bumped on two Pods with the same context on RWO volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is bumped on two Pods with a different context on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is not bumped on two Pods with the same context on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock volume attach CSI CSIDriver deployment after pod creation using non-attachable mock driver should bringup pod after deploying CSIDriver attach=false [Slow]": " [Suite:k8s]",
 
@@ -2009,6 +2080,18 @@ var Annotations = map[string]string{
 	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should allow recovery if controller expansion fails with final error": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should record target size in allocated resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should not update fsGroup if update from File to None": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should not update fsGroup if update from detault to None": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should update fsGroup if update from File to default": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should update fsGroup if update from None to File": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should update fsGroup if update from None to default": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should update fsGroup if update from detault to File": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy [LinuxOnly] should modify fsGroup if fsGroupPolicy=File": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -2070,6 +2153,10 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Mock volume storage capacity storage capacity unlimited": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] CSI Mock workload info CSI PodInfoOnMount Update should be passed when update from false to true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock workload info CSI PodInfoOnMount Update should not be passed when update from true to false": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] CSI Mock workload info CSI workload information using mock driver contain ephemeral=true when using inline volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock workload info CSI workload information using mock driver should be passed when podInfoOnMount=true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -2077,8 +2164,6 @@ var Annotations = map[string]string{
 	"[sig-storage] CSI Mock workload info CSI workload information using mock driver should not be passed when CSIDriver does not exist": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock workload info CSI workload information using mock driver should not be passed when podInfoOnMount=false": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI Mock workload info CSI workload information using mock driver should not be passed when podInfoOnMount=nil": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: CSI Ephemeral-volume (default fs)] ephemeral should create read-only inline ephemeral volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -3447,532 +3532,6 @@ var Annotations = map[string]string{
 	"[sig-storage] HostPathType Socket [Slow] Should fail on mounting socket 'asocket' when HostPathType is HostPathDirectory": " [Suite:k8s]",
 
 	"[sig-storage] HostPathType Socket [Slow] Should fail on mounting socket 'asocket' when HostPathType is HostPathFile": " [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)(allowExpansion)] volume-expand Verify if offline PVC expansion works": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with pvc data source (ROX mode)": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with pvc data source in parallel [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with pvc data source": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with snapshot data source (ROX mode) [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with different fsgroup applied to the volume contents": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup applied to the volume contents": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with different fsgroup applied to the volume contents": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with pvc data source (ROX mode)": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with pvc data source in parallel [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with pvc data source": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with snapshot data source (ROX mode) [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should fail if non-existent subpath is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should fail if subpath directory is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should fail if subpath file is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should fail if subpath with backstepping is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support creating multiple subpath from same volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support existing single file [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support file as subpath [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly directory specified in the volumeMount": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support restarting containers using directory as subpath [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should support restarting containers using file as subpath [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should unmount if pod is force deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] subPath should verify container cannot write to subpath readonly volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (delayed binding)] topology should fail to schedule a pod which has topologies that conflict with AllowedTopologies": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (delayed binding)] topology should provision a volume and schedule a pod with AllowedTopologies": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext3)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext3)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] volumeLimits should support volume limits [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] volumeLimits should verify that all csinodes have volume limits": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (immediate binding)] topology should fail to schedule a pod which has topologies that conflict with AllowedTopologies": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)(allowExpansion)] [Feature:Windows] volume-expand Verify if offline PVC expansion works": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)(allowExpansion)] [Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision storage with mount options": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision storage with pvc data source (ROX mode)": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision storage with pvc data source": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision storage with snapshot data source (ROX mode) [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should fail if subpath file is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support existing directory": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support existing single file [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support file as subpath [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support non-existent path": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support readOnly directory specified in the volumeMount": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should support restarting containers using file as subpath [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)] [Slow] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (block volmode) (late-binding)] ephemeral should create read-only inline ephemeral volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (block volmode) (late-binding)] ephemeral should create read/write inline ephemeral volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (block volmode) (late-binding)] ephemeral should support expansion of pvcs created for ephemeral pvcs": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (block volmode) (late-binding)] ephemeral should support multiple inline ephemeral volumes": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (block volmode) (late-binding)] ephemeral should support two pods which have the same volume definition": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read-only inline ephemeral volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read/write inline ephemeral volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support expansion of pvcs created for ephemeral pvcs": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support multiple inline ephemeral volumes": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support two pods which have the same volume definition": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read-only inline ephemeral volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read/write inline ephemeral volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support expansion of pvcs created for ephemeral pvcs": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support multiple inline ephemeral volumes": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support two pods which have the same volume definition": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs)] volumeLimits should support volume limits [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Generic Ephemeral-volume (default fs)] volumeLimits should verify that all csinodes have volume limits": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should fail if non-existent subpath is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should fail if subpath directory is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should fail if subpath file is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should fail if subpath with backstepping is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support creating multiple subpath from same volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support existing directories when readOnly specified in the volumeSource": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support existing directory": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support existing single file [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support readOnly directory specified in the volumeMount": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support restarting containers using directory as subpath [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should support restarting containers using file as subpath [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should unmount if pod is force deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] subPath should verify container cannot write to subpath readonly volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (default fs)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ext3)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ext3)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ext4)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ext4)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ntfs)] [Feature:Windows] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ntfs)] [Feature:Windows] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (xfs)] [Slow] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (xfs)] [Slow] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (block volmode)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if non-existent subpath is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath directory is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath file is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath with backstepping is outside the volume [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support creating multiple subpath from same volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support non-existent path": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support restarting containers using directory as subpath [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should support restarting containers using file as subpath [Slow] [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should unmount if pod is force deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] subPath should verify container cannot write to subpath readonly volumes [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ext3)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ext3)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ext4)] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ntfs)] [Feature:Windows] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ntfs)] [Feature:Windows] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (xfs)] [Slow] volumes should allow exec of files on the volume": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
-
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (xfs)] [Slow] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (block volmode)(allowExpansion)] volume-expand Verify if offline PVC expansion works": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -14032,10 +13591,6 @@ var Annotations = map[string]string{
 
 	"[sig-storage] NFSPersistentVolumes [Disruptive] [Flaky] when kubelet restarts Should test that a volume mounted to a pod that is force deleted while the kubelet is down unmounts when the kubelet returns.": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] Node Poweroff [Feature:vsphere] [Slow] [Disruptive] verify volume status after node power off": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
-
-	"[sig-storage] Node Unregister [Feature:vsphere] [Slow] [Disruptive] node unregister": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
-
 	"[sig-storage] PV Protection Verify \"immediate\" deletion of a PV that is not bound to a PVC": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] PV Protection Verify that PV bound to a PVC is not removed immediately": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -14081,14 +13636,6 @@ var Annotations = map[string]string{
 	"[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access [Slow]": " [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes [Feature:vsphere] [Feature:LabelSelector] Selector-Label Volume Binding:vsphere [Feature:vsphere] should bind volume with claim for given label": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes [Feature:vsphere] [Feature:ReclaimPolicy] persistentvolumereclaim:vsphere [Feature:vsphere] should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes [Feature:vsphere] [Feature:ReclaimPolicy] persistentvolumereclaim:vsphere [Feature:vsphere] should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes [Feature:vsphere] [Feature:ReclaimPolicy] persistentvolumereclaim:vsphere [Feature:vsphere] should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] PersistentVolumes-expansion loopback local block volume should support online expansion on node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -14236,16 +13783,6 @@ var Annotations = map[string]string{
 
 	"[sig-storage] PersistentVolumes-local [Volume type: tmpfs] Two pods mounting a local volume one after the other should be able to write from pod1 and read from pod2": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] PersistentVolumes:vsphere [Feature:vsphere] should test that a file written to the vsphere volume mount before kubelet restart can be read after restart [Disruptive]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes:vsphere [Feature:vsphere] should test that a vsphere volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes:vsphere [Feature:vsphere] should test that deleting a PVC before the pod does not cause pod deletion to fail on vsphere volume detach": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes:vsphere [Feature:vsphere] should test that deleting the Namespace of a PVC and Pod causes the successful detach of vsphere volume": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] PersistentVolumes:vsphere [Feature:vsphere] should test that deleting the PV before the pod does not cause pod deletion to fail on vsphere volume detach": " [Disabled:Unsupported] [Suite:k8s]",
-
 	"[sig-storage] Pod Disks [Feature:StorageProvider] [Serial] attach on previously attached volumes should work": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] Pod Disks [Feature:StorageProvider] detach in a disrupted environment [Slow] [Disruptive] when node's API object is deleted": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
@@ -14376,32 +13913,6 @@ var Annotations = map[string]string{
 
 	"[sig-storage] StaticPods [Feature:Kind] should run after kubelet stopped with CSI volume mounted [Disruptive] [Serial]": " [Suite:k8s]",
 
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with invalid capability name objectSpaceReserve is not honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with invalid diskStripes value is not honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with invalid hostFailuresToTolerate value is not honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with non-vsan datastore is not honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with valid diskStripes and objectSpaceReservation values and a VSAN datastore is honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with valid diskStripes and objectSpaceReservation values is honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with valid hostFailuresToTolerate and cacheReservation values is honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with valid objectSpaceReservation and iopsLimit values is honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify an existing and compatible SPBM policy is honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify an if a SPBM policy and VSAN capabilities cannot be honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify clean up of stale dummy VM for dynamically provisioned pvc using SPBM policy": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify if a SPBM policy is not honored on a non-compatible datastore for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify if a non-existing SPBM policy is not honored for dynamically provisioned pvc using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
 	"[sig-storage] StorageClasses CSI Conformance should run through the lifecycle of a StorageClass [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-storage] Subpath Atomic writer volumes should support subpaths with configmap pod [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -14416,105 +13927,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Subpath Container restart should verify that container can restart successfully after configmaps modified": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] Verify Volume Attach Through vpxd Restart [Feature:vsphere] [Serial] [Disruptive] verify volume remains attached through vpxd restart": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Attach Verify [Feature:vsphere] [Serial] [Disruptive] verify volume remains attached after master kubelet restart": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Disk Format [Feature:vsphere] verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Disk Format [Feature:vsphere] verify disk format type - thin is honored for dynamically provisioned pv using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Disk Format [Feature:vsphere] verify disk format type - zeroedthick is honored for dynamically provisioned pv using storageclass": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Disk Size [Feature:vsphere] verify dynamically provisioned pv has size rounded up correctly": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume FStype [Feature:vsphere] verify fstype - default value should be ext4": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume FStype [Feature:vsphere] verify fstype - ext3 formatted volume": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume FStype [Feature:vsphere] verify invalid fstype": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Operations Storm [Feature:vsphere] should create pod with many volumes and verify no attach call fails": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Placement [Feature:vsphere] should create and delete pod with multiple volumes from different datastore": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Placement [Feature:vsphere] should create and delete pod with multiple volumes from same datastore": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Placement [Feature:vsphere] should create and delete pod with the same volume source attach/detach to different worker nodes": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Placement [Feature:vsphere] should create and delete pod with the same volume source on the same worker node": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Placement [Feature:vsphere] test back to back pod creation and deletion with different volume sources on the same worker node": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Provisioning On Clustered Datastore [Feature:vsphere] verify dynamic provision with default parameter on clustered datastore": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Provisioning On Clustered Datastore [Feature:vsphere] verify dynamic provision with spbm policy on clustered datastore": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Provisioning On Clustered Datastore [Feature:vsphere] verify static provisioning on clustered datastore": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Volume Provisioning on Datastore [Feature:vsphere] verify dynamically provisioned pv using storageclass fails on an invalid datastore": " [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] VolumeAttachment Conformance should run through the lifecycle of a VolumeAttachment [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-storage] Volumes ConfigMap should be mountable": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] Volumes NFSv3 should be mountable for NFSv3": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] Volumes NFSv4 should be mountable for NFSv4": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation fails if no zones are specified in the storage class (No shared datastores exist among all the nodes)": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation fails if only datastore is specified in the storage class (No shared datastores exist among all the nodes)": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation fails if only storage policy is specified in the storage class (No shared datastores exist among all the nodes)": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation fails if the availability zone specified in the storage class have no shared datastores under it.": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation with an invalid VSAN capability along with a compatible zone combination specified in storage class fails": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation with compatible policy and datastore without any zones specified in the storage class fails (No shared datastores exist among all the nodes)": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation with incompatible datastore and zone combination specified in storage class fails": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation with incompatible storage policy along with compatible zone and datastore combination specified in storage class fails": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation with incompatible storagePolicy and zone combination specified in storage class fails": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation with incompatible zone along with compatible storagePolicy and datastore combination specified in storage class fails": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify PVC creation with invalid zone specified in storage class fails": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a PVC creation fails when multiple zones are specified in the storage class without shared datastores among the zones in waitForFirstConsumer binding mode": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod fails to get scheduled when conflicting volume topology (allowedTopologies) and pod scheduling constraints(nodeSelector) are specified": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode with allowedTopologies": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode with multiple allowedTopologies": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on a VSAN capability, datastore and compatible zone specified in storage class": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on allowed zones specified in storage class ": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on multiple zones specified in storage class ": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on multiple zones specified in the storage class. (No shared datastores exist among both zones)": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on the allowed zones and datastore specified in storage class when there are multiple datastores with the same name under different zones across datacenters": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on the allowed zones and datastore specified in storage class": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on the allowed zones and storage policy specified in storage class": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on the allowed zones specified in storage class when the datastore under the zone is present in another datacenter": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created and attached to a dynamically created PV, based on the allowed zones, datastore and storage policy specified in storage class": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify a pod is created on a non-Workspace zone and attached to a dynamically created PV, based on the allowed zones and storage policy specified in storage class": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify dynamically created pv with allowed zones specified in storage class, shows the right zone information on its labels": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] Zone Support [Feature:vsphere] Verify dynamically created pv with multiple zones specified in the storage class, shows both the zones on its labels": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] [Feature:Flexvolumes] Detaching volumes should not work when mount is in progress [Slow]": " [Suite:k8s]",
 
@@ -14561,14 +13980,6 @@ var Annotations = map[string]string{
 	"[sig-storage] [Serial] Volume metrics PVController should create unbound pv count metrics for pvc controller after creating pv only": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] [Serial] Volume metrics PVController should create unbound pvc count metrics for pvc controller after creating pvc only": " [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[sig-storage] vcp at scale [Feature:vsphere] vsphere scale tests": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] vcp-performance [Feature:vsphere] vcp performance tests": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] vsphere cloud provider stress [Feature:vsphere] vsphere stress tests": " [Disabled:Unsupported] [Suite:k8s]",
-
-	"[sig-storage] vsphere statefulset [Feature:vsphere] vsphere statefulset testing": " [Disabled:Unsupported] [Suite:k8s]",
 }
 
 func init() {
