@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
@@ -44,11 +45,10 @@ func TestControllerStrategy(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-			},
+			Spec: podtest.MakePod("",
+				podtest.SetContainers(podtest.MakeContainer("abc")),
+				podtest.SetRestartPolicy(api.RestartPolicyAlways),
+			).Spec,
 		},
 	}
 	rc := &api.ReplicationController{
@@ -163,11 +163,10 @@ func TestValidateUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			},
+			Spec: podtest.MakePod("",
+				podtest.SetRestartPolicy(api.RestartPolicyAlways),
+				podtest.SetContainers(podtest.MakeContainer("abc")),
+			).Spec,
 		},
 	}
 	oldController := &api.ReplicationController{

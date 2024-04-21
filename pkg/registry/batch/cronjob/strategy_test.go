@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/ptr"
@@ -29,11 +30,10 @@ import (
 
 var (
 	validPodTemplateSpec = api.PodTemplateSpec{
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
+		Spec: podtest.MakePod("",
+			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+			podtest.SetContainers(podtest.MakeContainer("abc")),
+		).Spec,
 	}
 	validCronjobSpec = batch.CronJobSpec{
 		Schedule:          "5 5 * * ?",
@@ -115,6 +115,8 @@ func TestCronJobStrategy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.CronJobSpec{
 			Schedule: "5 5 5 * ?",
+			// FIX ME
+			JobTemplate: cronJob.Spec.JobTemplate,
 		},
 		Status: batch.CronJobStatus{
 			LastScheduleTime: &now,

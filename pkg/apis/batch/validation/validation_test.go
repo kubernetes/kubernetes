@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -61,11 +62,10 @@ func getValidPodTemplateSpecForManual(selector *metav1.LabelSelector) api.PodTem
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
+		Spec: podtest.MakePod("",
+			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+			podtest.SetContainers(podtest.MakeContainer("abc")),
+		).Spec,
 	}
 }
 
@@ -80,12 +80,11 @@ func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.Pod
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
 		},
-		Spec: api.PodSpec{
-			RestartPolicy:  api.RestartPolicyOnFailure,
-			DNSPolicy:      api.DNSClusterFirst,
-			Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-			InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
+		Spec: podtest.MakePod("",
+			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+			podtest.SetContainers(podtest.MakeContainer("abc")),
+			podtest.SetInitContainers(podtest.MakeContainer("def")),
+		).Spec,
 	}
 }
 
@@ -395,12 +394,11 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyControllerUidLabel: "1a2b3c", batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy:  api.RestartPolicyOnFailure,
-							DNSPolicy:      api.DNSClusterFirst,
-							Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+							podtest.SetInitContainers(podtest.MakeContainer("def")),
+						).Spec,
 					},
 				},
 			},
@@ -1033,11 +1031,10 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validGeneratedSelector.MatchLabels,
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{},
@@ -1251,11 +1248,10 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"y": "z"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 				},
 			},
@@ -1275,11 +1271,10 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"controller-uid": "4d5e6f"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 				},
 			},
@@ -1299,11 +1294,10 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validManualSelector.MatchLabels,
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyAlways,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyAlways),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 				},
 			},
@@ -1323,11 +1317,10 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validManualSelector.MatchLabels,
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: "Invalid",
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy("Invalid"),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 				},
 			},
@@ -1395,12 +1388,11 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy:  api.RestartPolicyOnFailure,
-							DNSPolicy:      api.DNSClusterFirst,
-							Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+							podtest.SetInitContainers(podtest.MakeContainer("def")),
+						).Spec,
 					},
 				},
 			},
@@ -1420,12 +1412,11 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy:  api.RestartPolicyOnFailure,
-							DNSPolicy:      api.DNSClusterFirst,
-							Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+							podtest.SetInitContainers(podtest.MakeContainer("def")),
+						).Spec,
 					},
 				},
 			},
@@ -1462,12 +1453,11 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.JobNameLabel: "myjob", batch.LegacyControllerUidLabel: "1a2b3c", batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy:  api.RestartPolicyOnFailure,
-							DNSPolicy:      api.DNSClusterFirst,
-							Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+							podtest.SetInitContainers(podtest.MakeContainer("def")),
+						).Spec,
 					},
 				},
 			},
@@ -2882,11 +2872,10 @@ func TestValidateCronJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: api.PodTemplateSpec{
-							Spec: api.PodSpec{
-								RestartPolicy: api.RestartPolicyAlways,
-								DNSPolicy:     api.DNSClusterFirst,
-								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							},
+							Spec: podtest.MakePod("",
+								podtest.SetRestartPolicy(api.RestartPolicyAlways),
+								podtest.SetContainers(podtest.MakeContainer("abc")),
+							).Spec,
 						},
 					},
 				},
@@ -2904,11 +2893,10 @@ func TestValidateCronJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: api.PodTemplateSpec{
-							Spec: api.PodSpec{
-								RestartPolicy: "Invalid",
-								DNSPolicy:     api.DNSClusterFirst,
-								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							},
+							Spec: podtest.MakePod("",
+								podtest.SetRestartPolicy("Invalid"),
+								podtest.SetContainers(podtest.MakeContainer("abc")),
+							).Spec,
 						},
 					},
 				},

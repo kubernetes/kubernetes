@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -59,15 +60,10 @@ func validNewCronJob() *batch.CronJob {
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers: []api.Container{{
-								Name: "abc", Image: "image",
-								ImagePullPolicy:          api.PullIfNotPresent,
-								TerminationMessagePolicy: api.TerminationMessageReadFile,
-							}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 				},
 			},
@@ -87,7 +83,18 @@ func TestCreate(t *testing.T) {
 		validCronJob,
 		// invalid (empty spec)
 		&batch.CronJob{
-			Spec: batch.CronJobSpec{},
+			Spec: batch.CronJobSpec{
+				// FIX ME
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: api.PodTemplateSpec{
+							Spec: api.PodSpec{
+								TerminationGracePeriodSeconds: validCronJob.Spec.JobTemplate.Spec.Template.Spec.TerminationGracePeriodSeconds,
+							},
+						},
+					},
+				},
+			},
 		},
 	)
 }

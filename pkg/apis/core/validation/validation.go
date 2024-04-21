@@ -4145,11 +4145,7 @@ func validateHostIPs(pod *core.Pod) field.ErrorList {
 func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	var gracePeriod int64
-	if spec.TerminationGracePeriodSeconds != nil {
-		// this could happen in tests
-		gracePeriod = *spec.TerminationGracePeriodSeconds
-	}
+	gracePeriod := *spec.TerminationGracePeriodSeconds
 
 	// The default for hostUsers is true, so a spec with no SecurityContext or no HostUsers field will be true.
 	// If the default ever changes, this condition will need to be changed.

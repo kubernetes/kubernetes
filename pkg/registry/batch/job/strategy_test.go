@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
@@ -1020,11 +1021,10 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
+		Spec: podtest.MakePod("",
+			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+			podtest.SetContainers(podtest.MakeContainer("abc")),
+		).Spec,
 	}
 	validPodTemplateSpecNever := *validPodTemplateSpec.DeepCopy()
 	validPodTemplateSpecNever.Spec.RestartPolicy = api.RestartPolicyNever
@@ -1226,11 +1226,10 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 				},
 			},
@@ -1256,11 +1255,10 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.JobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test", batch.ControllerUidLabel: "test"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+						).Spec,
 					},
 				},
 			},
@@ -1326,11 +1324,10 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
+		Spec: podtest.MakePod("",
+			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+			podtest.SetContainers(podtest.MakeContainer("abc")),
+		).Spec,
 	}
 	cases := map[string]struct {
 		oldJob            *batch.Job
@@ -1485,11 +1482,10 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
+		Spec: podtest.MakePod("",
+			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+			podtest.SetContainers(podtest.MakeContainer("abc")),
+		).Spec,
 	}
 	validSpec := batch.JobSpec{
 		CompletionMode: completionModePtr(batch.NonIndexedCompletion),
@@ -1556,11 +1552,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 	batchLabels := getValidBatchLabels()
 	labelsWithNonBatch := getValidBatchLabelsWithNonBatch()
 	defaultSelector := &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}}
-	validPodSpec := api.PodSpec{
-		RestartPolicy: api.RestartPolicyOnFailure,
-		DNSPolicy:     api.DNSClusterFirst,
-		Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-	}
+	validPodSpec := podtest.MakePod("",
+		podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+		podtest.SetContainers(podtest.MakeContainer("abc")),
+	).Spec
 	validPodSpecNever := *validPodSpec.DeepCopy()
 	validPodSpecNever.RestartPolicy = api.RestartPolicyNever
 	validObjectMeta := getValidObjectMeta(0)
@@ -1745,12 +1740,11 @@ func TestJobStrategy_Validate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							Volumes:       []api.Volume{{Name: "volume-name"}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+							podtest.SetVolumes(api.Volume{Name: "volume-name"}),
+						).Spec,
 					},
 				},
 			},
@@ -1763,12 +1757,11 @@ func TestJobStrategy_Validate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							DNSPolicy:     api.DNSClusterFirst,
-							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-							Volumes:       []api.Volume{{Name: "volume-name"}},
-						},
+						Spec: podtest.MakePod("",
+							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
+							podtest.SetContainers(podtest.MakeContainer("abc")),
+							podtest.SetVolumes(api.Volume{Name: "volume-name"}),
+						).Spec,
 					},
 				},
 			},

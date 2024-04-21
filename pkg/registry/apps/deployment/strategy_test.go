@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -175,11 +176,10 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: selectorLabels,
 				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers:    []api.Container{{Name: fakeImageName, Image: fakeImage, ImagePullPolicy: api.PullNever, TerminationMessagePolicy: api.TerminationMessageReadFile}},
-				},
+				Spec: podtest.MakePod("",
+					podtest.SetRestartPolicy(api.RestartPolicyAlways),
+					podtest.SetContainers(podtest.MakeContainer(fakeImageName)),
+				).Spec,
 			},
 		},
 	}
@@ -210,15 +210,10 @@ func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resourc
 					Name:      "foo",
 					Labels:    map[string]string{"foo": "bar"},
 				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{{
-						Name:                     fakeImageName,
-						Image:                    fakeImage,
-						ImagePullPolicy:          api.PullNever,
-						TerminationMessagePolicy: api.TerminationMessageReadFile,
-						Resources: api.ResourceRequirements{
+				Spec: podtest.MakePod("",
+					podtest.SetRestartPolicy(api.RestartPolicyAlways),
+					podtest.SetContainers(podtest.MakeContainer(fakeImageName, podtest.SetContainerResources(
+						api.ResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
 								api.ResourceName(resourceName):    value,
@@ -227,8 +222,8 @@ func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resourc
 								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
 								api.ResourceName(resourceName):    value,
 							},
-						}},
-					}},
+						}))),
+				).Spec,
 			},
 		},
 	}
