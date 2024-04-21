@@ -95,7 +95,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		Testname: DNS, cluster
 		Description: When a Pod is created, the container hostname should match with spec hostname after setting the hostNetwork to true
 	*/
-	framework.ConformanceIt("should resolve hostname and hostNetwork for a Pod", func(ctx context.Context) {
+	framework.ConformanceIt("should resolve the hostname and hostNetwork for a Pod", func(ctx context.Context) {
 		ginkgo.By("Creating a pod by setting hostname")
 		execPod := e2epod.CreateExecPodOrFail(ctx, f.ClientSet, f.Namespace.Name, dnsTestPodHostName, nil)
 		cmd := "hostname"
