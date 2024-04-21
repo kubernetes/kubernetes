@@ -25175,6 +25175,48 @@ func TestValidateNonSpecialIP(t *testing.T) {
 	}
 }
 
+func TestValidateHostPathVolumes(t *testing.T) {
+    cases := []struct {
+        name     string
+        pv       *core.PersistentVolume
+        expected bool
+    }{
+        {
+            name: "hostPath with RWX",
+            pv: &core.PersistentVolume{
+                Spec: core.PersistentVolumeSpec{
+                    PersistentVolumeSource: core.PersistentVolumeSource{
+                        HostPath: &core.HostPathVolumeSource{},
+                    },
+                    AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteMany},
+                },
+            },
+            expected: false,
+        },
+        {
+            name: "hostPath without RWX",
+            pv: &core.PersistentVolume{
+                Spec: core.PersistentVolumeSpec{
+                    PersistentVolumeSource: core.PersistentVolumeSource{
+                        HostPath: &core.HostPathVolumeSource{},
+                    },
+                    AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+                },
+            },
+            expected: true,
+        },
+    }
+
+    for _, c := range cases {
+        t.Run(c.name, func(t *testing.T) {
+            errs := validation.ValidatePersistentVolume(c.pv)
+            if (len(errs) == 0) != c.expected {
+                t.Errorf("TestValidateHostPathVolumes %s failed: expected %v, got errs %v", c.name, c.expected, errs)
+            }
+        })
+    }
+}
+
 func TestValidateHostUsers(t *testing.T) {
 	falseVar := false
 	trueVar := true
