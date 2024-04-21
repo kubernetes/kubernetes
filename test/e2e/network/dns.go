@@ -19,6 +19,8 @@ package network
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"strings"
 	"time"
 
@@ -86,6 +88,38 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
+	})
+
+	/*
+		Release: v1.30
+		Testname: DNS, cluster
+		Description: When a Pod is created, the container hostname should match with spec hostname after setting the hostNetwork to true
+	*/
+	framework.ConformanceIt("should resolve hostname and hostNetwork for a Pod", func(ctx context.Context) {
+		ginkgo.By("Creating a pod by setting hostname")
+		execPod := e2epod.CreateExecPodOrFail(ctx, f.ClientSet, f.Namespace.Name, dnsTestPodHostName, nil)
+		cmd := "hostname"
+		execPod.Spec.Hostname = dnsTestPodHostName
+		framework.Logf("Setting up hostname to: %v", execPod.Spec.Hostname)
+		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		if err != nil {
+			framework.Logf("Error running hostname command: %v", err)
+		}
+		trimmed := strings.TrimSpace(stdout)
+		gomega.Expect(execPod.Spec.Hostname).NotTo(gomega.Equal(trimmed))
+		framework.Logf("The spec.hostname is not same as container hostname, expected to contain: %s, got: %s", execPod.Spec.Hostname, stdout)
+
+		ginkgo.By("Updating the pod spec.hostNetwork to true")
+		execPod.Spec.HostNetwork = true
+		framework.Logf("Setting up hostNetwork to: %v", execPod.Spec.HostNetwork)
+		stdout, err = e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		if err != nil {
+			framework.Logf("Error running hostname command: %v", err)
+		}
+		trimmed = strings.TrimSpace(stdout)
+		framework.ExpectNoError(err)
+		gomega.Expect(execPod.ObjectMeta.Name).To(gomega.Equal(trimmed))
+		framework.Logf("The hostname and pod metadata are same: %s, %s", execPod.ObjectMeta.Name, stdout)
 	})
 
 	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.

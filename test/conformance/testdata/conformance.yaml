@@ -1546,6 +1546,12 @@
     entries such as kubernetes.default via /etc/hosts.
   release: v1.14
   file: test/e2e/network/dns.go
+- testname: DNS, cluster
+  codename: '[sig-network] DNS should resolve hostname and hostNetwork for a Pod [Conformance]'
+  description: When a Pod is created, the container hostname should match with spec 
+    hostname after setting the hostNetwork to true
+  release: v1.30
+  file: test/e2e/network/dns.go
 - testname: DNS, for ExternalName Services
   codename: '[sig-network] DNS should provide DNS for ExternalName services [Conformance]'
   description: Create a service with externalName. Pod MUST be able to resolve the
