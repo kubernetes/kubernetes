@@ -142,7 +142,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	HugePages = framework.WithFeature(framework.ValidFeatures.Add("HugePages"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests that require a conforming implementation of
+	// Ingress.networking.k8s.io to be present.
 	Ingress = framework.WithFeature(framework.ValidFeatures.Add("Ingress"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -151,7 +153,8 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests that require a cluster with dual-stack pod and service networks.
 	IPv6DualStack = framework.WithFeature(framework.ValidFeatures.Add("IPv6DualStack"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -190,19 +193,26 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NEG = framework.WithFeature(framework.ValidFeatures.Add("NEG"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests that require working external DNS.
 	NetworkingDNS = framework.WithFeature(framework.ValidFeatures.Add("Networking-DNS"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests that require connectivity to the Internet via IPv4
 	NetworkingIPv4 = framework.WithFeature(framework.ValidFeatures.Add("Networking-IPv4"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests that require connectivity to the Internet via IPv6
 	NetworkingIPv6 = framework.WithFeature(framework.ValidFeatures.Add("Networking-IPv6"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks a single test that creates potentially-disruptive amounts of network
+	// traffic between nodes.
 	NetworkingPerformance = framework.WithFeature(framework.ValidFeatures.Add("Networking-Performance"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests that require a conforming implementation of
+	// NetworkPolicy.networking.k8s.io to be present.
 	NetworkPolicy = framework.WithFeature(framework.ValidFeatures.Add("NetworkPolicy"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -217,13 +227,15 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeOutOfServiceVolumeDetach = framework.WithFeature(framework.ValidFeatures.Add("NodeOutOfServiceVolumeDetach"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks a single test that tests pod-to-pod connectivity between every pair of nodes.
 	NoSNAT = framework.WithFeature(framework.ValidFeatures.Add("NoSNAT"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PersistentVolumeLastPhaseTransitionTime = framework.WithFeature(framework.ValidFeatures.Add("PersistentVolumeLastPhaseTransitionTime"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -266,7 +278,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ScopeSelectors = framework.WithFeature(framework.ValidFeatures.Add("ScopeSelectors"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests that require a pod networking implementation that supports SCTP
+	// traffic between pods.
 	SCTPConnectivity = framework.WithFeature(framework.ValidFeatures.Add("SCTPConnectivity"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -282,7 +296,9 @@ var (
 	// TODO: remove when SELinuxMount feature gate is enabled by default.
 	SELinuxMountReadWriteOncePodOnly = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePodOnly"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-network
+	// Marks tests of KEP-1880 that require the `MultiCIDRServiceAllocator` feature gate
+	// and the networking.k8s.io/v1alpha1 API.
 	ServiceCIDRs = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -326,9 +342,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	TopologyManager = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	UDP = framework.WithFeature(framework.ValidFeatures.Add("UDP"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Upgrade = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
