@@ -132,16 +132,18 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (testServerCtx *TestServer, err error) {
+	// This context will react to CTRL-C and/or test deadlines.
 	tCtx := ktesting.Init(t)
 
 	if instanceOptions == nil {
 		instanceOptions = NewDefaultTestServerOptions()
 	}
 
+	result := &TestServer{}
 	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
 	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
+		return nil, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
 	var errCh chan error
@@ -175,7 +177,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {
-		return result, fmt.Errorf("failed to create listener: %v", err)
+		return nil, fmt.Errorf("failed to create listener: %v", err)
 	}
 	s.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
@@ -196,16 +198,16 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 			// create certificates for aggregation and client-cert auth
 			proxySigningKey, err = testutil.NewPrivateKey()
 			if err != nil {
-				return result, err
+				return nil, err
 			}
 			proxySigningCert, err = cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
 			if err != nil {
-				return result, err
+				return nil, err
 			}
 		}
 		proxyCACertFile := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
 		if err := os.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
-			return result, err
+			return nil, err
 		}
 		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
 
@@ -216,13 +218,13 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		// create private key
 		signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 
 		// make a client certificate for the api server - common name has to match one of our defined names above
 		serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 		serial = new(big.Int).Add(serial, big.NewInt(1))
 		tenThousandHoursLater := time.Now().Add(10_000 * time.Hour)
@@ -241,11 +243,11 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		}
 		certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, proxySigningCert, signer.Public(), proxySigningKey)
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 		clientCrtOfAPIServer, err := x509.ParseCertificate(certDERBytes)
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 
 		// write the cert to disk
@@ -256,17 +258,17 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		}
 		certBytes := pem.EncodeToMemory(&certBlock)
 		if err := cert.WriteCert(certificatePath, certBytes); err != nil {
-			return result, err
+			return nil, err
 		}
 
 		// write the key to disk
 		privateKeyPath := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
 		encodedPrivateKey, err := keyutil.MarshalPrivateKeyToPEM(signer)
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 		if err := keyutil.WriteKey(privateKeyPath, encodedPrivateKey); err != nil {
-			return result, err
+			return nil, err
 		}
 
 		s.ProxyClientKeyFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
@@ -274,15 +276,15 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 		clientSigningKey, err := testutil.NewPrivateKey()
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 		clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 		clientCACertFile := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
 		if err := os.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
-			return result, err
+			return nil, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
 		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
@@ -300,7 +302,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	pkgPath, err := pkgPath(t)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	s.SecureServing.ServerCert.FixtureDirectory = filepath.Join(pkgPath, "testdata")
 
@@ -309,16 +311,16 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	if err := fs.Parse(customFlags); err != nil {
-		return result, err
+		return nil, err
 	}
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
-		t.Fatalf("create temp file failed: %v", err)
+		return nil, fmt.Errorf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
-		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
+		return nil, fmt.Errorf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 	s.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
 	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
@@ -326,11 +328,11 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	completedOptions, err := s.Complete()
 	if err != nil {
-		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
+		return nil, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}
 
 	if errs := completedOptions.Validate(); len(errs) != 0 {
-		return result, fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
+		return nil, fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
 	}
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
@@ -338,15 +340,15 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	config, err := app.NewConfig(completedOptions)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	completed, err := config.Complete()
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	server, err := app.CreateServerChain(completed)
 	if err != nil {
-		return result, fmt.Errorf("failed to create server chain: %v", err)
+		return nil, fmt.Errorf("failed to create server chain: %v", err)
 	}
 	if instanceOptions.StorageVersionWrapFunc != nil {
 		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
@@ -365,7 +367,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
-		return result, fmt.Errorf("failed to create a client: %v", err)
+		return nil, fmt.Errorf("failed to create a client: %v", err)
 	}
 
 	if !instanceOptions.SkipHealthzCheck {
@@ -397,7 +399,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 			return false, nil
 		})
 		if err != nil {
-			return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
+			return nil, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 		}
 	}
 
@@ -418,7 +420,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return true, nil
 	})
 	if err != nil {
-		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
+		return nil, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
 	tlsInfo := transport.TLSInfo{
@@ -428,7 +430,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	etcdConfig := clientv3.Config{
 		Endpoints:   storageConfig.Transport.ServerList,
@@ -440,7 +442,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 	etcdClient, err := clientv3.New(etcdConfig)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 
 	// from here the caller must call tearDown
@@ -461,12 +463,10 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
 func StartTestServerOrDie(t testing.TB, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
 	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
-	if err == nil {
-		return &result
+	if err != nil {
+		t.Fatalf("failed to launch server: %v", err)
 	}
-
-	t.Fatalf("failed to launch server: %v", err)
-	return nil
+	return result
 }
 
 func createLocalhostListenerOnFreePort() (net.Listener, int, error) {
