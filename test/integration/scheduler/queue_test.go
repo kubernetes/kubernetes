@@ -152,6 +152,63 @@ func TestSchedulingGates(t *testing.T) {
 	}
 }
 
+// We create a gated and non-gated pod. After scheduling and deleting the
+// non-gated pod, we ensure that the gated pod is schedulable after the removal
+// of its gate.
+func TestGatedPodSchedulableAfterEvent(t *testing.T) {
+	testCtx := testutils.InitTestSchedulerWithOptions(
+		t,
+		testutils.InitTestAPIServer(t, "pod-scheduling-gates", nil),
+		0,
+		scheduler.WithPodInitialBackoffSeconds(0),
+		scheduler.WithPodMaxBackoffSeconds(0),
+	)
+	testutils.SyncSchedulerInformerFactory(testCtx)
+	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+
+	// create initially gated pod
+	pod1 := st.MakePod().Namespace(ns).Name("p1").Container("pause").SchedulingGates([]string{"foo"}).Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod1, metav1.CreateOptions{}); err != nil {
+		t.Fatal("Failed to create p1")
+	}
+
+	// create immediately schedulable pod
+	pod2 := st.MakePod().Namespace(ns).Name("p2").Container("pause").Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod2, metav1.CreateOptions{}); err != nil {
+		t.Fatal("Failed to create p2")
+	}
+
+	// create node on which to schedule pods
+	node := st.MakeNode().Name("node1").Obj()
+	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatal("Failed to create node1")
+	}
+
+	// schedule p2
+	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+	if err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, "p2")); err != nil {
+		t.Fatal("Failed to schedule p2")
+	}
+
+	// delete p2, which triggers DeletePodFromCache event
+	cs.CoreV1().Pods(ns).Delete(ctx, "p2", metav1.DeleteOptions{})
+	if err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodDeleted(ctx, cs, ns, "p2")); err != nil {
+		t.Fatal("Failed to delete p2")
+	}
+
+	// remove gate from p1
+	patch := `{"spec": {"schedulingGates": null}}`
+	if _, err := cs.CoreV1().Pods(ns).Patch(ctx, "p1", types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
+		t.Fatal("Failed to remove schedulingGates from p1")
+	}
+
+	// schedule p1
+	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+	if err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, "p1")); err != nil {
+		t.Fatal("Failed to schedule p1")
+	}
+}
+
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
 func TestCoreResourceEnqueue(t *testing.T) {

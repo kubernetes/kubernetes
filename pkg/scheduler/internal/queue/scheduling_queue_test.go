@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -92,6 +93,11 @@ var (
 		return framework.QueueSkip, nil
 	}
 )
+
+func setQueuedPodInfoGated(queuedPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
+	queuedPodInfo.Gated = true
+	return queuedPodInfo
+}
 
 func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
 	pInfo := p.unschedulablePods.get(pod)
@@ -1451,6 +1457,14 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			hint:      queueHintReturnSkip,
 			expectedQ: unschedulablePods,
 		},
+		{
+			name:    "QueueHintFunction is not called when Pod is gated",
+			podInfo: setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")}),
+			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+				return framework.Queue, fmt.Errorf("QueueingHintFn should not be called as pod is gated")
+			},
+			expectedQ: unschedulablePods,
+		},
 	}
 
 	for _, test := range tests {
@@ -2732,7 +2746,7 @@ func TestPendingPodsMetric(t *testing.T) {
 	gated := makeQueuedPodInfos(total-queueableNum, "y", failme, timestamp)
 	// Manually mark them as gated=true.
 	for _, pInfo := range gated {
-		pInfo.Gated = true
+		setQueuedPodInfoGated(pInfo)
 	}
 	pInfos = append(pInfos, gated...)
 	totalWithDelay := 20
@@ -3727,5 +3741,28 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 				t.Errorf("isPodWorthRequeuing() executed queueing hint functions %v times, expected: %v", count, test.expectedExecutionCount)
 			}
 		})
+	}
+}
+
+func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	plugin, _ := schedulinggates.New(ctx, nil, nil)
+	m := map[string][]framework.PreEnqueuePlugin{"": {plugin.(framework.PreEnqueuePlugin)}}
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(m))
+
+	gatedPod := st.MakePod().SchedulingGates([]string{"hello world"}).Obj()
+	q.Add(logger, gatedPod)
+
+	if !q.unschedulablePods.get(gatedPod).Gated {
+		t.Error("expected pod to be gated")
+	}
+
+	ungatedPod := gatedPod.DeepCopy()
+	ungatedPod.Spec.SchedulingGates = nil
+	q.Update(logger, gatedPod, ungatedPod)
+
+	ungatedPodInfo, _ := q.Pop(logger)
+	if ungatedPodInfo.Gated {
+		t.Error("expected pod to be ungated")
 	}
 }

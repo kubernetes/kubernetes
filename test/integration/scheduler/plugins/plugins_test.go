@@ -2677,7 +2677,7 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 		{
 			name:          "preEnqueue plugin with event registered",
 			enqueuePlugin: &SchedulingGatesPluginWithEvents{SchedulingGates: schedulinggates.SchedulingGates{}},
-			count:         3,
+			count:         2,
 		},
 	}
 
