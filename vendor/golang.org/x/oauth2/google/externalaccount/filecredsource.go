@@ -16,18 +16,22 @@ import (
 
 type fileCredentialSource struct {
 	File   string
-	Format format
+	Format Format
+}
+
+func (cs fileCredentialSource) credentialSourceType() string {
+	return "file"
 }
 
 func (cs fileCredentialSource) subjectToken() (string, error) {
 	tokenFile, err := os.Open(cs.File)
 	if err != nil {
-		return "", fmt.Errorf("oauth2/google: failed to open credential file %q", cs.File)
+		return "", fmt.Errorf("oauth2/google/externalaccount: failed to open credential file %q", cs.File)
 	}
 	defer tokenFile.Close()
 	tokenBytes, err := ioutil.ReadAll(io.LimitReader(tokenFile, 1<<20))
 	if err != nil {
-		return "", fmt.Errorf("oauth2/google: failed to read credential file: %v", err)
+		return "", fmt.Errorf("oauth2/google/externalaccount: failed to read credential file: %v", err)
 	}
 	tokenBytes = bytes.TrimSpace(tokenBytes)
 	switch cs.Format.Type {
@@ -35,15 +39,15 @@ func (cs fileCredentialSource) subjectToken() (string, error) {
 		jsonData := make(map[string]interface{})
 		err = json.Unmarshal(tokenBytes, &jsonData)
 		if err != nil {
-			return "", fmt.Errorf("oauth2/google: failed to unmarshal subject token file: %v", err)
+			return "", fmt.Errorf("oauth2/google/externalaccount: failed to unmarshal subject token file: %v", err)
 		}
 		val, ok := jsonData[cs.Format.SubjectTokenFieldName]
 		if !ok {
-			return "", errors.New("oauth2/google: provided subject_token_field_name not found in credentials")
+			return "", errors.New("oauth2/google/externalaccount: provided subject_token_field_name not found in credentials")
 		}
 		token, ok := val.(string)
 		if !ok {
-			return "", errors.New("oauth2/google: improperly formatted subject token")
+			return "", errors.New("oauth2/google/externalaccount: improperly formatted subject token")
 		}
 		return token, nil
 	case "text":
@@ -51,7 +55,7 @@ func (cs fileCredentialSource) subjectToken() (string, error) {
 	case "":
 		return string(tokenBytes), nil
 	default:
-		return "", errors.New("oauth2/google: invalid credential_source file format type")
+		return "", errors.New("oauth2/google/externalaccount: invalid credential_source file format type")
 	}
 
 }
