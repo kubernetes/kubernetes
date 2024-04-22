@@ -301,6 +301,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, nil, err
 	}
 
+	hubGV := schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal}
 	versionedPtr, err := a.group.Creater.New(fqKindToRegister)
 	if err != nil {
 		return nil, nil, err
@@ -491,6 +492,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, nil, err
 		}
+		hubGV = gvk.GroupVersion()
 		apiResource.StorageVersionHash = discovery.StorageVersionHash(gvk.Group, gvk.Version, gvk.Kind)
 	}
 
@@ -675,7 +677,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		AcceptsGroupVersionDelegate: gvAcceptor,
 
-		HubGroupVersion: schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal},
+		HubGroupVersion: hubGV,
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
 
