@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -637,4 +638,8 @@ func getLivez(checkName string, clientConfig *rest.Config, excludes ...string) (
 	}
 	body, err := req.DoRaw(context.TODO()) // we can still have a response body during an error case
 	return string(body), err == nil, nil
+}
+
+func getSocketPath() string {
+	return fmt.Sprintf("@%s.sock", rand.String(10))
 }
