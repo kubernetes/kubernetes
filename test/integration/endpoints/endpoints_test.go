@@ -48,6 +48,7 @@ func TestEndpointUpdates(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(client, 0)
 
 	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test completed")
 	epController := endpoint.NewEndpointController(
 		tCtx,
 		informers.Core().V1().Pods(),
