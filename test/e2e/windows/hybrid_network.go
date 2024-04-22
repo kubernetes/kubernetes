@@ -40,11 +40,6 @@ const (
 	windowsOS = "windows"
 )
 
-var (
-	windowsBusyBoximage = imageutils.GetE2EImage(imageutils.Agnhost)
-	linuxBusyBoxImage   = imageutils.GetE2EImage(imageutils.Nginx)
-)
-
 var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("hybrid-network")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -57,11 +52,11 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 
 		ginkgo.It("should have stable networking for Linux and Windows pods", func(ctx context.Context) {
 
-			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
+			linuxPod := createTestPod(f, imageutils.GetE2EImage(imageutils.Nginx), linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
 			linuxPod = e2epod.NewPodClient(f).CreateSync(ctx, linuxPod)
 
-			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+			windowsPod := createTestPod(f, imageutils.GetE2EImage(imageutils.Agnhost), windowsOS)
 
 			windowsPod.Spec.Containers[0].Args = []string{"test-webserver"}
 			ginkgo.By("creating a windows pod and waiting for it to be running")
@@ -78,7 +73,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 		})
 
 		f.It("should provide Internet connection for Linux containers", feature.NetworkingIPv4, func(ctx context.Context) {
-			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
+			linuxPod := createTestPod(f, imageutils.GetE2EImage(imageutils.Nginx), linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
 			linuxPod = e2epod.NewPodClient(f).CreateSync(ctx, linuxPod)
 
@@ -89,7 +84,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 		})
 
 		f.It("should provide Internet connection and DNS for Windows containers", feature.NetworkingIPv4, feature.NetworkingDNS, func(ctx context.Context) {
-			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+			windowsPod := createTestPod(f, imageutils.GetE2EImage(imageutils.Agnhost), windowsOS)
 			ginkgo.By("creating a windows pod and waiting for it to be running")
 			windowsPod = e2epod.NewPodClient(f).CreateSync(ctx, windowsPod)
 
