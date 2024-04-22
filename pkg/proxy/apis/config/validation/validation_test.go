@@ -825,34 +825,80 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 }
 
 func TestValidateProxyMode(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
-	successCases := []kubeproxyconfig.ProxyMode{""}
-	expectedNonExistentErrorMsg := "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])"
-
 	if runtime.GOOS == "windows" {
-		successCases = append(successCases, kubeproxyconfig.ProxyModeKernelspace)
-		expectedNonExistentErrorMsg = "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])"
+		testValidateProxyModeWindows(t)
 	} else {
-		successCases = append(successCases, kubeproxyconfig.ProxyModeIPTables, kubeproxyconfig.ProxyModeIPVS)
+		testValidateProxyModeLinux(t)
 	}
+}
 
-	for _, successCase := range successCases {
-		if errs := validateProxyMode(successCase, newPath.Child("ProxyMode")); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
+func testValidateProxyModeLinux(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
 	testCases := map[string]struct {
 		mode         kubeproxyconfig.ProxyMode
 		expectedErrs field.ErrorList
 	}{
 		"blank mode should default": {
-			mode:         kubeproxyconfig.ProxyMode(""),
-			expectedErrs: field.ErrorList{},
+			mode: kubeproxyconfig.ProxyMode(""),
+		},
+		"iptables is allowed": {
+			mode: kubeproxyconfig.ProxyModeIPTables,
+		},
+		"ipvs is allowed": {
+			mode: kubeproxyconfig.ProxyModeIPVS,
+		},
+		"nftables is allowed": {
+			mode: kubeproxyconfig.ProxyModeNFTables,
+		},
+		"winkernel is not allowed": {
+			mode:         kubeproxyconfig.ProxyModeKernelspace,
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "kernelspace", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
 		},
 		"invalid mode non-existent": {
 			mode:         kubeproxyconfig.ProxyMode("non-existing"),
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "non-existing", expectedNonExistentErrorMsg)},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "non-existing", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
+		},
+	}
+	for _, testCase := range testCases {
+		errs := validateProxyMode(testCase.mode, newPath)
+		if len(testCase.expectedErrs) != len(errs) {
+			t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
+		}
+		for i, err := range errs {
+			if err.Error() != testCase.expectedErrs[i].Error() {
+				t.Errorf("Expected error: %s, got %v", testCase.expectedErrs[i], err.Error())
+			}
+		}
+	}
+}
+
+func testValidateProxyModeWindows(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
+	testCases := map[string]struct {
+		mode         kubeproxyconfig.ProxyMode
+		expectedErrs field.ErrorList
+	}{
+		"blank mode should default": {
+			mode: kubeproxyconfig.ProxyMode(""),
+		},
+		"winkernel is allowed": {
+			mode: kubeproxyconfig.ProxyModeKernelspace,
+		},
+		"iptables is not allowed": {
+			mode:         kubeproxyconfig.ProxyModeIPTables,
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "iptables", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
+		},
+		"ipvs is not allowed": {
+			mode:         kubeproxyconfig.ProxyModeIPVS,
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "ipvs", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
+		},
+		"nftables is not allowed": {
+			mode:         kubeproxyconfig.ProxyModeNFTables,
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "nftables", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
+		},
+		"invalid mode non-existent": {
+			mode:         kubeproxyconfig.ProxyMode("non-existing"),
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "non-existing", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
 		},
 	}
 	for _, testCase := range testCases {
