@@ -695,7 +695,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 	// we utilize the temporaryStore to ensure independence from the current store implementation.
 	// as of today, the store is implemented as a queue and will be drained by the higher-level
 	// component as soon as it finishes replacing the content.
-	checkWatchListConsistencyIfRequested(stopCh, r.name, resourceVersion, r.listerWatcher, temporaryStore)
+	checkWatchListDataConsistencyIfRequested(wait.ContextForChannel(stopCh), r.name, resourceVersion, wrapListFuncWithContext(r.listerWatcher.List), temporaryStore.List)
 
 	if err = r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
 		return nil, fmt.Errorf("unable to sync watch-list result: %v", err)
@@ -931,6 +931,13 @@ func isWatchErrorRetriable(err error) bool {
 		return true
 	}
 	return false
+}
+
+// wrapListFuncWithContext simply wraps ListFunction into another function that accepts a context and ignores it.
+func wrapListFuncWithContext(listFn ListFunc) func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+	return func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+		return listFn(options)
+	}
 }
 
 // initialEventsEndBookmarkTicker a ticker that produces a warning if the bookmark event
