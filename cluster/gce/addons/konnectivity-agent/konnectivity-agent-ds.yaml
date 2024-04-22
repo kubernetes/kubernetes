@@ -39,6 +39,7 @@ __EXTRA_PARAMS__
                   "--sync-interval=5s",
                   "--sync-interval-cap=30s",
                   "--probe-interval=5s",
+                  "--keepalive-time=60s",
                   "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token",
                   "--agent-identifiers=ipv4=$(HOST_IP)"
                   ]
