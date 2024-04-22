@@ -1636,8 +1636,13 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		// Introduce some small jittering to ensure that over time the requests won't start
 		// accumulating at approximately the same time from the set of nodes due to priority and
 		// fairness effect.
-		go wait.JitterUntil(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
+		go func() {
+			kl.updateRuntimeUp()
+			wait.JitterUntil(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
+		}()
+
 		go kl.fastStatusUpdateOnce()
+
 
 		// start syncing lease
 		go kl.nodeLeaseController.Run(context.Background())
