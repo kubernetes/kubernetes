@@ -106,6 +106,13 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
 
+	// Set the ImagePullPolicy and ImagePullSerial from the UpgradeApplyConfiguration to the InitConfiguration.
+	// These are used by preflight.RunPullImagesCheck() when running 'apply'.
+	if upgradeApply {
+		initCfg.NodeRegistration.ImagePullPolicy = upgradeCfg.Apply.ImagePullPolicy
+		initCfg.NodeRegistration.ImagePullSerial = upgradeCfg.Apply.ImagePullSerial
+	}
+
 	newK8sVersion := upgradeCfg.Plan.KubernetesVersion
 	if upgradeApply {
 		newK8sVersion = upgradeCfg.Apply.KubernetesVersion

@@ -663,6 +663,17 @@ type UpgradeApplyConfiguration struct {
 	// SkipPhases is a list of phases to skip during command execution.
 	// NOTE: This field is currently ignored for "kubeadm upgrade apply", but in the future it will be supported.
 	SkipPhases []string
+
+	// ImagePullPolicy specifies the policy for image pulling during kubeadm "upgrade apply" operations.
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSerial specifies if image pulling performed by kubeadm must be done serially or in parallel.
+	// Default: true
+	// +optional
+	ImagePullSerial *bool `json:"imagePullSerial,omitempty"`
 }
 
 // UpgradeDiffConfiguration contains a list of configurable options which are specific to the "kubeadm upgrade diff" command.
@@ -705,6 +716,17 @@ type UpgradeNodeConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during "kubeadm upgrade".
 	// +optional
 	Patches *Patches `json:"patches,omitempty"`
+
+	// ImagePullPolicy specifies the policy for image pulling during kubeadm "upgrade node" operations.
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSerial specifies if image pulling performed by kubeadm must be done serially or in parallel.
+	// Default: true
+	// +optional
+	ImagePullSerial *bool `json:"imagePullSerial,omitempty"`
 }
 
 // UpgradePlanConfiguration contains a list of configurable options which are specific to the "kubeadm upgrade plan" command.

@@ -1009,6 +1009,8 @@ func autoConvert_v1beta4_UpgradeApplyConfiguration_To_kubeadm_UpgradeApplyConfig
 	out.Patches = (*kubeadm.Patches)(unsafe.Pointer(in.Patches))
 	out.PrintConfig = (*bool)(unsafe.Pointer(in.PrintConfig))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 
@@ -1029,6 +1031,8 @@ func autoConvert_kubeadm_UpgradeApplyConfiguration_To_v1beta4_UpgradeApplyConfig
 	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
 	out.PrintConfig = (*bool)(unsafe.Pointer(in.PrintConfig))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 
@@ -1110,6 +1114,8 @@ func autoConvert_v1beta4_UpgradeNodeConfiguration_To_kubeadm_UpgradeNodeConfigur
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	out.Patches = (*kubeadm.Patches)(unsafe.Pointer(in.Patches))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 
@@ -1125,6 +1131,8 @@ func autoConvert_kubeadm_UpgradeNodeConfiguration_To_v1beta4_UpgradeNodeConfigur
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 

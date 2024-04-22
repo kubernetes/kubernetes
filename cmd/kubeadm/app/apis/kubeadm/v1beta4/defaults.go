@@ -278,18 +278,29 @@ func SetDefaults_UpgradeConfiguration(obj *UpgradeConfiguration) {
 	if obj.Node.EtcdUpgrade == nil {
 		obj.Node.EtcdUpgrade = ptr.To(true)
 	}
-
 	if obj.Node.CertificateRenewal == nil {
 		obj.Node.CertificateRenewal = ptr.To(true)
+	}
+	if len(obj.Node.ImagePullPolicy) == 0 {
+		obj.Node.ImagePullPolicy = DefaultImagePullPolicy
+	}
+	if obj.Node.ImagePullSerial == nil {
+		obj.Node.ImagePullSerial = ptr.To(true)
 	}
 
 	if obj.Apply.EtcdUpgrade == nil {
 		obj.Apply.EtcdUpgrade = ptr.To(true)
 	}
-
 	if obj.Apply.CertificateRenewal == nil {
 		obj.Apply.CertificateRenewal = ptr.To(true)
 	}
+	if len(obj.Apply.ImagePullPolicy) == 0 {
+		obj.Apply.ImagePullPolicy = DefaultImagePullPolicy
+	}
+	if obj.Apply.ImagePullSerial == nil {
+		obj.Apply.ImagePullSerial = ptr.To(true)
+	}
+
 	if obj.Timeouts == nil {
 		obj.Timeouts = &Timeouts{}
 	}
