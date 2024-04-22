@@ -24,7 +24,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -212,10 +211,6 @@ func TestReadLogs(t *testing.T) {
 }
 
 func TestReadRotatedLog(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	tmpDir := t.TempDir()
 	file, err := os.CreateTemp(tmpDir, "logfile")
 	if err != nil {
@@ -287,6 +282,10 @@ func TestReadRotatedLog(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 	}
+
+	// Finished writing into the file, close it, so we can delete it later.
+	err = file.Close()
+	assert.NoErrorf(t, err, "could not close file.")
 
 	time.Sleep(20 * time.Millisecond)
 	// Make the function ReadLogs end.
