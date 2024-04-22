@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -38,17 +37,10 @@ import (
 func TestEndpointUpdates(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
-	defer server.TearDownFn()
-
-	client, err := clientset.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("Error creating clientset: %v", err)
-	}
-
+	client := server.Client()
 	informers := informers.NewSharedInformerFactory(client, 0)
 
-	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test completed")
+	tCtx := server.TContext
 	epController := endpoint.NewEndpointController(
 		tCtx,
 		informers.Core().V1().Pods(),
@@ -58,6 +50,8 @@ func TestEndpointUpdates(t *testing.T) {
 		0)
 
 	// Start informer and controllers
+	tCtx = ktesting.WithCancel(tCtx)
+	defer tCtx.Cancel("done")
 	informers.Start(tCtx.Done())
 	go epController.Run(tCtx, 1)
 
@@ -165,16 +159,10 @@ func TestEndpointUpdates(t *testing.T) {
 func TestExternalNameToClusterIPTransition(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
-	defer server.TearDownFn()
-
-	client, err := clientset.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("Error creating clientset: %v", err)
-	}
-
+	client := server.Client()
 	informers := informers.NewSharedInformerFactory(client, 0)
 
-	tCtx := ktesting.Init(t)
+	tCtx := server.TContext
 	epController := endpoint.NewEndpointController(
 		tCtx,
 		informers.Core().V1().Pods(),
@@ -274,16 +262,10 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 func TestEndpointWithTerminatingPod(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
-	defer server.TearDownFn()
-
-	client, err := clientset.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("Error creating clientset: %v", err)
-	}
-
+	client := server.Client()
 	informers := informers.NewSharedInformerFactory(client, 0)
 
-	tCtx := ktesting.Init(t)
+	tCtx := server.TContext
 	epController := endpoint.NewEndpointController(
 		tCtx,
 		informers.Core().V1().Pods(),

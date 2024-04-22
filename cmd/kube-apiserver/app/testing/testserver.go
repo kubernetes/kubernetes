@@ -102,7 +102,8 @@ type TestServerInstanceOptions struct {
 
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
-	ClientConfig      *restclient.Config        // Rest client config
+	ktesting.TContext
+	ClientConfig      *restclient.Config        // Rest client config, also available via TContext.RESTConfig() (= TestServer.RESTConfig())
 	ServerOpts        *options.ServerRunOptions // ServerOpts
 	TearDownFn        TearDownFunc              // TearDown function
 	TmpDir            string                    // Temp Dir used, by the apiserver
@@ -131,7 +132,13 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
-// enough time to remove temporary files.
+// enough time to remove temporary files. Calling the tear-down func is optional. It will be called
+// automatically when the test is done.
+//
+// The returned TestServer contains a TContext which get canceled before tearing down the server.
+// When all clients of kube-apiserver use that context, shutdown proceeds faster because the clients quit
+// before the server. That TContext also has ready-to-use clients for the kube-apiserver
+// instance.
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (testServerCtx *TestServer, err error) {
 	// This context will react to CTRL-C and/or test deadlines.
 	tCtx := ktesting.Init(t)
@@ -288,9 +295,8 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
 		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-			// TODO: set up a general clean up for testserver
 			if clientgotransport.DialerStopCh == wait.NeverStop {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+				ctx, cancel := context.WithTimeout(tCtx, time.Hour)
 				t.Cleanup(cancel)
 				clientgotransport.DialerStopCh = ctx.Done()
 			}
@@ -374,7 +380,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		t.Logf("Waiting for /healthz to be ok...")
 
 		// wait until healthz endpoint returns ok
-		err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+		err = wait.PollWithContext(tCtx, 100*time.Millisecond, time.Minute, func(ctx context.Context) (bool, error) {
 			select {
 			case err := <-errCh:
 				return false, err
@@ -390,7 +396,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 				storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
 				req.Param("exclude", storageVersionCheck)
 			}
-			result := req.Do(context.TODO())
+			result := req.Do(ctx)
 			status := 0
 			result.StatusCode(&status)
 			if status == 200 {
@@ -404,14 +410,14 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 
 	// wait until default namespace is created
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollWithContext(tCtx, 100*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err
 		default:
 		}
 
-		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
+		if _, err := client.CoreV1().Namespaces().Get(ctx, "default", metav1.GetOptions{}); err != nil {
 			if !errors.IsNotFound(err) {
 				t.Logf("Unable to get default namespace: %v", err)
 			}
@@ -445,8 +451,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return nil, err
 	}
 
-	// from here the caller must call tearDown
+	// From here the caller may call tearDown (but is not required to).
 	result.ClientConfig = restclient.CopyConfig(server.GenericAPIServer.LoopbackClientConfig)
+	result.TContext = ktesting.WithRESTConfig(tCtx, result.ClientConfig)
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
@@ -454,6 +461,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		tearDown()
 		etcdClient.Close()
 	}
+	tCtx.Cleanup(result.TearDownFn)
 	result.EtcdClient = etcdClient
 	result.EtcdStoragePrefix = storageConfig.Prefix
 
