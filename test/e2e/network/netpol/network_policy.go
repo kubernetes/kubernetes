@@ -109,7 +109,7 @@ and what is happening in practice:
 		z/c	.	.	.	.	.	.	.	.	.
 */
 
-var _ = common.SIGDescribe("Netpol", func() {
+var _ = common.SIGDescribe("Netpol", framework.WithConformance(), func() {
 	f := framework.NewDefaultFramework("netpol")
 	f.SkipNamespaceCreation = true // we create our own 3 test namespaces, we don't need the default one
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
@@ -1245,14 +1245,13 @@ var _ = common.SIGDescribe("Netpol", func() {
 	})
 })
 
-var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol", framework.WithConformance(), func() {
 	f := framework.NewDefaultFramework("udp-network-policy")
 	f.SkipNamespaceCreation = true
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 	ginkgo.BeforeEach(func() {
 		// Windows does not support UDP testing via agnhost.
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client using UDP", func() {
