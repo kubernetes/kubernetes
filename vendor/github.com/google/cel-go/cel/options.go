@@ -448,6 +448,8 @@ const (
 	OptTrackCost EvalOption = 1 << iota
 
 	// OptCheckStringFormat enables compile-time checking of string.format calls for syntax/cardinality.
+	//
+	// Deprecated: use ext.StringsValidateFormatCalls() as this option is now a no-op.
 	OptCheckStringFormat EvalOption = 1 << iota
 )
 

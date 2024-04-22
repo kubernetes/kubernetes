@@ -14,7 +14,6 @@ go_library(
         "decorators.go",
         "dispatcher.go",
         "evalstate.go",
-        "formatting.go",
         "interpretable.go",
         "interpreter.go",
         "optimizations.go",

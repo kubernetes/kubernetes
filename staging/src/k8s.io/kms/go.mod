@@ -11,7 +11,6 @@ require (
 
 require (
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/cel-go v0.20.1
 	github.com/google/go-cmp v0.6.0 // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
