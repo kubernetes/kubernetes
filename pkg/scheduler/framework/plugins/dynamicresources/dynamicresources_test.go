@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1172,10 +1173,8 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		}
 	}
 	sortObjects(wantObjects)
-	stripObjects(wantObjects)
-	stripObjects(objects)
 	// Sometimes assert strips the diff too much, let's do it ourselves...
-	if diff := cmp.Diff(wantObjects, objects); diff != "" {
+	if diff := cmp.Diff(wantObjects, objects, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
 		t.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
 	}
 
@@ -1184,31 +1183,17 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		expectAssumedClaims = append(expectAssumedClaims, expected.assumedClaim)
 	}
 	actualAssumedClaims := tc.listAssumedClaims()
-	assert.Equal(t, expectAssumedClaims, actualAssumedClaims, "assumed claims")
+	if diff := cmp.Diff(expectAssumedClaims, actualAssumedClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+		t.Errorf("Assumed claims are different (- expected, + actual):\n%s", diff)
+	}
 
 	var expectInFlightClaims []metav1.Object
 	if expected.inFlightClaim != nil {
 		expectInFlightClaims = append(expectInFlightClaims, expected.inFlightClaim)
 	}
 	actualInFlightClaims := tc.listInFlightClaims()
-	assert.Equal(t, expectInFlightClaims, actualInFlightClaims, "in-flight claims")
-}
-
-// setGVK is implemented by metav1.TypeMeta and thus all API objects, in
-// contrast to metav1.Type, which is not (?!) implemented.
-type setGVK interface {
-	SetGroupVersionKind(gvk schema.GroupVersionKind)
-}
-
-// stripObjects removes certain fields (Kind, APIVersion, etc.) which are not
-// important and might not be set.
-func stripObjects(objects []metav1.Object) {
-	for _, obj := range objects {
-		obj.SetResourceVersion("")
-		obj.SetUID("")
-		if objType, ok := obj.(setGVK); ok {
-			objType.SetGroupVersionKind(schema.GroupVersionKind{})
-		}
+	if diff := cmp.Diff(expectInFlightClaims, actualInFlightClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+		t.Errorf("In-flight claims are different (- expected, + actual):\n%s", diff)
 	}
 }
 
@@ -1242,7 +1227,6 @@ func (tc *testContext) listAssumedClaims() []metav1.Object {
 		}
 	}
 	sortObjects(assumedClaims)
-	stripObjects(assumedClaims)
 	return assumedClaims
 }
 
@@ -1253,7 +1237,6 @@ func (tc *testContext) listInFlightClaims() []metav1.Object {
 		return true
 	})
 	sortObjects(inFlightClaims)
-	stripObjects(inFlightClaims)
 	return inFlightClaims
 }
 
