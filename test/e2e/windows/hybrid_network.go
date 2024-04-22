@@ -77,7 +77,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 
 		})
 
-		f.It("should provide Internet connection for Linux containers using DNS", feature.NetworkingDNS, func(ctx context.Context) {
+		f.It("should provide Internet connection for Linux containers", feature.NetworkingIPv4, func(ctx context.Context) {
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
 			linuxPod = e2epod.NewPodClient(f).CreateSync(ctx, linuxPod)
@@ -88,7 +88,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53), externalMaxTries)
 		})
 
-		f.It("should provide Internet connection for Windows containers using DNS", feature.NetworkingDNS, func(ctx context.Context) {
+		f.It("should provide Internet connection and DNS for Windows containers", feature.NetworkingIPv4, feature.NetworkingDNS, func(ctx context.Context) {
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 			ginkgo.By("creating a windows pod and waiting for it to be running")
 			windowsPod = e2epod.NewPodClient(f).CreateSync(ctx, windowsPod)
@@ -136,7 +136,7 @@ func linuxCheck(address string, port int) []string {
 }
 
 func windowsCheck(address string) []string {
-	curl := fmt.Sprintf("curl.exe %s --connect-timeout %v --fail", address, timeoutSeconds)
+	curl := fmt.Sprintf("curl.exe -4 %s --connect-timeout %v --fail", address, timeoutSeconds)
 	cmd := []string{"cmd", "/c", curl}
 	return cmd
 }
