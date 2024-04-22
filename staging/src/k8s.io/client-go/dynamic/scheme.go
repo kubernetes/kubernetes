@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
@@ -52,6 +53,13 @@ func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInf
 				Serializer:    json.NewSerializer(json.DefaultMetaFactory, basicScheme, basicScheme, false),
 				Framer:        json.Framer,
 			},
+		},
+		{
+			MediaType:        "application/cbor",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "cbor",
+			Serializer:       cbor.NewSerializer(unstructuredCreater{basicScheme}, unstructuredTyper{basicScheme}),
+			PrettySerializer: cbor.NewSerializer(unstructuredCreater{basicScheme}, unstructuredTyper{basicScheme}),
 		},
 	}
 }
