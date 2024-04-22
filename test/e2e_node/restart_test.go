@@ -474,6 +474,82 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 				return checkMirrorPodDisappear(ctx, f.ClientSet, pod.Name, pod.Namespace)
 			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.BeNil())
 		})
+		// Regression test for an extended scenario for https://issues.k8s.io/123980
+		ginkgo.It("should evict running pods that do not meet the affinity after the kubelet restart", func(ctx context.Context) {
+			nodeLabelKey := string(uuid.NewUUID())
+			nodeLabelValueRequired := string(uuid.NewUUID())
+			podName := "affinity-pod" + string(uuid.NewUUID())
+			nodeName := getNodeName(ctx, f)
+
+			ginkgo.By(fmt.Sprintf("Adding node label for node (%s) to satisify pod (%s/%s) affinity", nodeName, f.Namespace.Name, podName))
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, nodeLabelKey, nodeLabelValueRequired)
+			ginkgo.DeferCleanup(func() { e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, nodeLabelKey) })
+
+			pod := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      nodeLabelKey,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{nodeLabelValueRequired},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  podName,
+							Image: imageutils.GetPauseImageName(),
+						},
+					},
+				},
+			})
+
+			// Create the pod bound to the node. It will start, but will be rejected after kubelet restart.
+			ginkgo.By(fmt.Sprintf("Creating a pod (%s/%s)", f.Namespace.Name, podName))
+			e2epod.NewPodClient(f).Create(ctx, pod)
+
+			ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be running", f.Namespace.Name, pod.Name))
+			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err, "Failed to await for the pod to be running: (%v/%v)", f.Namespace.Name, pod.Name)
+
+			// Remove node label
+			e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, nodeLabelKey)
+
+			ginkgo.By("Restart the kubelet")
+			restartKubelet(true)
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, recoverTimeout, f.Timeouts.Poll).
+				Should(gomega.BeTrueBecause("kubelet should be healthy after restart"))
+
+			// Pod should be terminated, maybe not immediately, should allow a few seconds for the kubelet to kill the pod
+			// after kubelet restart, pod admission denied, kubelet will reject the pod and kill container.
+			gomega.Eventually(ctx, func() bool {
+				pod, err = e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				// pod is in a final state, the following are the behaviors of pods after kubelet restarted:
+				// 1. kubelet `canAdmitPod` reject pod by reason Pod admission denied by nodeAffinity
+				// 2. kubelet stop/kill container
+				// the final state of the pod is related to the kill container.
+				// if an error occurs in the preStop of the container or the exitCode is not 0,
+				// the phase is PodFailed. if the exitCode of the StopContainer is 0, the phase is PodSucceeded.
+				// in this case, stop and kill container is successful(exitCode 0), the pod phase should be PodSucceeded.
+				return pod.Status.Phase == v1.PodSucceeded
+			}, recoverTimeout, f.Timeouts.Poll).Should(gomega.BeTrueBecause("Pod %s not terminated: %s", pod.Name, pod.Status.Phase))
+		})
 	})
 
 })
