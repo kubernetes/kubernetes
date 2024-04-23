@@ -513,7 +513,7 @@ kind: KubeProxyConfiguration
 type fakeProxyServerLongRun struct{}
 
 // Run runs the specified ProxyServer.
-func (s *fakeProxyServerLongRun) Run() error {
+func (s *fakeProxyServerLongRun) Run(ctx context.Context) error {
 	for {
 		time.Sleep(2 * time.Second)
 	}
@@ -527,7 +527,7 @@ func (s *fakeProxyServerLongRun) CleanupAndExit() error {
 type fakeProxyServerError struct{}
 
 // Run runs the specified ProxyServer.
-func (s *fakeProxyServerError) Run() error {
+func (s *fakeProxyServerError) Run(ctx context.Context) error {
 	for {
 		time.Sleep(2 * time.Second)
 		return fmt.Errorf("mocking error from ProxyServer.Run()")
@@ -654,8 +654,8 @@ func Test_getNodeIPs(t *testing.T) {
 		nodeName := fmt.Sprintf("node%d", i+1)
 		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
 		go func() {
-			logger, _ := ktesting.NewTestContext(t)
-			ips := getNodeIPs(logger, client, nodeName)
+			_, ctx := ktesting.NewTestContext(t)
+			ips := getNodeIPs(ctx, client, nodeName)
 			if len(ips) == 0 {
 				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
 			} else if ips[0].String() != expectIP {
@@ -834,8 +834,8 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			primaryFamily, ips := detectNodeIPs(logger, c.rawNodeIPs, c.bindAddress)
+			_, ctx := ktesting.NewTestContext(t)
+			primaryFamily, ips := detectNodeIPs(ctx, c.rawNodeIPs, c.bindAddress)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}
