@@ -88,6 +88,7 @@ type KubectlOptions struct {
 	PluginHandler PluginHandler
 	Arguments     []string
 	ConfigFlags   *genericclioptions.ConfigFlags
+	WarningWriter *rest.WarningWriter
 
 	genericiooptions.IOStreams
 }
@@ -308,7 +309,12 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string, minArgs 
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(o KubectlOptions) *cobra.Command {
-	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(o.IOStreams.ErrOut)})
+	var warningHandler *rest.WarningWriter
+	if o.WarningWriter == nil {
+		warningHandler = rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(o.IOStreams.ErrOut)})
+	} else {
+		warningHandler = o.WarningWriter
+	}
 	warningsAsErrors := false
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{

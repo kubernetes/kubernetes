@@ -70,7 +70,7 @@ func (WarningLogger) HandleWarningHeader(code int, agent string, message string)
 	klog.Warning(message)
 }
 
-type warningWriter struct {
+type WarningWriter struct {
 	// out is the writer to output warnings to
 	out io.Writer
 	// opts contains options controlling warning output
@@ -91,8 +91,8 @@ type WarningWriterOptions struct {
 }
 
 // NewWarningWriter returns an implementation of WarningHandler that outputs code 299 warnings to the specified writer.
-func NewWarningWriter(out io.Writer, opts WarningWriterOptions) *warningWriter {
-	h := &warningWriter{out: out, opts: opts}
+func NewWarningWriter(out io.Writer, opts WarningWriterOptions) *WarningWriter {
+	h := &WarningWriter{out: out, opts: opts}
 	if opts.Deduplicate {
 		h.written = map[string]struct{}{}
 	}
@@ -105,7 +105,7 @@ const (
 )
 
 // HandleWarningHeader prints warnings with code=299 to the configured writer.
-func (w *warningWriter) HandleWarningHeader(code int, agent string, message string) {
+func (w *WarningWriter) HandleWarningHeader(code int, agent string, message string) {
 	if code != 299 || len(message) == 0 {
 		return
 	}
@@ -128,7 +128,7 @@ func (w *warningWriter) HandleWarningHeader(code int, agent string, message stri
 	}
 }
 
-func (w *warningWriter) WarningCount() int {
+func (w *WarningWriter) WarningCount() int {
 	w.writtenLock.Lock()
 	defer w.writtenLock.Unlock()
 	return w.writtenCount
