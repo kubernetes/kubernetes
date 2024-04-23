@@ -84,10 +84,7 @@ kube::util::ensure-temp-dir
 export GOBIN="${KUBE_TEMP}"
 PATH="${GOBIN}:${PATH}"
 echo "installing apidiff into ${GOBIN}"
-(
-    cd "${KUBE_ROOT}/hack/tools"
-    go install golang.org/x/exp/cmd/apidiff
-)
+go install golang.org/x/exp/cmd/apidiff@latest
 
 cd "${KUBE_ROOT}"
 
