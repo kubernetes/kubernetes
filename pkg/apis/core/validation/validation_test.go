@@ -10221,15 +10221,6 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 }
 
-func extendPodSpecwithTolerations(in core.PodSpec, tolerations []core.Toleration) core.PodSpec {
-	var out core.PodSpec
-	out.Containers = in.Containers
-	out.RestartPolicy = in.RestartPolicy
-	out.DNSPolicy = in.DNSPolicy
-	out.Tolerations = tolerations
-	return out
-}
-
 func TestValidatePod(t *testing.T) {
 	validPVCSpec := core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
