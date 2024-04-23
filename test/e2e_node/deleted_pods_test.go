@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -163,10 +162,19 @@ var _ = SIGDescribe("Deleted pods handling", framework.WithNodeConformance(), fu
 							}
 
 							trap _term SIGTERM
+							touch /tmp/trap-marker
 							wait $PID
 
 							exit 0
 							`,
+							},
+							ReadinessProbe: &v1.Probe{
+								PeriodSeconds: 1,
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{
+										Command: []string{"/bin/sh", "-c", "cat /tmp/trap-marker"},
+									},
+								},
 							},
 						},
 					},
@@ -178,13 +186,11 @@ var _ = SIGDescribe("Deleted pods handling", framework.WithNodeConformance(), fu
 			ginkgo.By("set up cleanup of the finalizer")
 			ginkgo.DeferCleanup(e2epod.NewPodClient(f).RemoveFinalizer, pod.Name, testFinalizer)
 
-			ginkgo.By("Waiting for the pod to be running")
-			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			ginkgo.By(fmt.Sprintf("Waiting for the pod (%v/%v) to be running and with the SIGTERM trap registered", pod.Namespace, pod.Name))
+			err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
 			framework.ExpectNoError(err, "Failed to await for the pod to be running: %q", pod.Name)
 
 			ginkgo.By(fmt.Sprintf("Deleting the pod (%v/%v) to set a deletion timestamp", pod.Namespace, pod.Name))
-			// wait a little bit to make sure the we are inside the while and that the trap is registered
-			time.Sleep(time.Second)
 			err = e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Failed to delete the pod: %q", pod.Name)
 
