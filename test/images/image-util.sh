@@ -30,6 +30,7 @@ export DOCKER_CLI_EXPERIMENTAL="enabled"
 DOCKER_CERT_BASE_PATH="${DOCKER_CERT_BASE_PATH:-${HOME}}"
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
@@ -265,11 +266,16 @@ bin() {
   fi
   for SRC in "$@";
   do
-  docker run --rm -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
+  local -r target=${TARGET:-}
+  if [[ -z "${target}" ]]; then
+    echo "TARGET is not set"
+    exit 1
+  fi
+  docker run --rm -v "${target}:${target}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
         golang:"${GOLANG_VERSION}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
-                CGO_ENABLED=0 ${arch_prefix} GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
+                CGO_ENABLED=0 ${arch_prefix} GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags \"-w ${LD_FLAGS:-}\" -o ${target}/${SRC} ./$(dirname "${SRC}")"
   done
 }
 
