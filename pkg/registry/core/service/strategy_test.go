@@ -473,7 +473,7 @@ func TestDropServiceStatusDisabledFields(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			dropServiceStatusDisabledFields(tc.svc, tc.oldSvc)
 
 			if !reflect.DeepEqual(tc.svc, tc.compareSvc) {

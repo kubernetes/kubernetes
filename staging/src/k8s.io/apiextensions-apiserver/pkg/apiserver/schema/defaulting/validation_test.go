@@ -105,7 +105,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 		ctx := context.TODO()
 		t.Run(tt.name, func(t *testing.T) {
 			for _, f := range tt.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
 			}
 
 			schema := tt.input.OpenAPIV3Schema
@@ -214,7 +214,7 @@ func TestDefaultValidationWithOptionalOldSelf(t *testing.T) {
 	for _, tt := range tests {
 		ctx := context.TODO()
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 			schema := tt.input.OpenAPIV3Schema
 			ss, err := structuralschema.NewStructural(schema)
 			if err != nil {

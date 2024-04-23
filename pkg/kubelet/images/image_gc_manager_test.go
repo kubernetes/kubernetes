@@ -172,7 +172,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 }
 
 func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 	testRuntimeHandler := "test-runtimeHandler"
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)

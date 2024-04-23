@@ -136,7 +136,7 @@ func TestAddRemovePods(t *testing.T) {
 func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 	m := newTestManager()
 	defer cleanup(t, m)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}
@@ -172,7 +172,7 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, tc.enableSidecarContainers)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, tc.enableSidecarContainers)
 
 			probePod := v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -498,7 +498,7 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, tc.enableSidecarContainers)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, tc.enableSidecarContainers)
 			podStatus := v1.PodStatus{
 				Phase: v1.PodRunning,
 				InitContainerStatuses: []v1.ContainerStatus{

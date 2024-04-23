@@ -470,7 +470,7 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	tCtx, closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
@@ -694,7 +694,7 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)
 	tCtx, closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
 	cancel := runControllerAndInformers(tCtx, rm, informers)

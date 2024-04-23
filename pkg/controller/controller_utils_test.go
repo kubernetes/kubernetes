@@ -668,7 +668,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	}
 	for i, test := range equalityTests {
 		t.Run(fmt.Sprintf("Equality tests %d", i), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)
 			if test.p2 == nil {
 				test.p2 = test.p1
 			}
@@ -712,8 +712,8 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 
 	for i, test := range inequalityTests {
 		t.Run(fmt.Sprintf("Inequality tests %d", i), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)
 
 			podsWithRanks := ActivePodsWithRanks{
 				Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},

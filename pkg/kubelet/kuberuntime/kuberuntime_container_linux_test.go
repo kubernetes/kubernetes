@@ -848,7 +848,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer setSwapControllerAvailableDuringTest(false)()
 			if tc.scalingFg {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 			}
 
 			setCgroupVersionDuringTest(cgroupV1)
@@ -1126,7 +1126,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			setCgroupVersionDuringTest(tc.cgroupVersion)
 			defer setSwapControllerAvailableDuringTest(!tc.swapDisabledOnNode)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.nodeSwapFeatureGateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.nodeSwapFeatureGateEnabled)
 			m.memorySwapBehavior = tc.swapBehavior
 
 			var resourceReqsC1, resourceReqsC2 v1.ResourceRequirements

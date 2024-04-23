@@ -3235,7 +3235,7 @@ func TestEvictonMessageWithResourceResize(t *testing.T) {
 
 	for _, enabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("InPlacePodVerticalScaling enabled=%v", enabled), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)
 			msg, _ := evictionMessage(v1.ResourceMemory, testpod, statsFn, threshold, observations)
 			if enabled {
 				if !strings.Contains(msg, "testcontainer was using 150Mi, request is 100Mi") {

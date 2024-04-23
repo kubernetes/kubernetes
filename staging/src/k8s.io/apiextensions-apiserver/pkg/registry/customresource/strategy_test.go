@@ -307,7 +307,7 @@ func TestSelectableFields(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
 		t.Run(tc.name, func(t *testing.T) {
 			strategy := customResourceStrategy{selectableFieldSet: prepareSelectableFields(tc.selectableFields)}
 

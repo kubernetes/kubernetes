@@ -559,7 +559,7 @@ func TestAuthzCoverage(t *testing.T) {
 
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -862,7 +862,7 @@ func TestCheckpointContainer(t *testing.T) {
 
 	setupTest := func(featureGate bool) *serverTestFramework {
 		// Enable features.ContainerCheckpoint during test
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)
 
 		fw := newServerTest()
 		// GetPodByName() should always fail

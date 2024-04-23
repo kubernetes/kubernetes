@@ -609,7 +609,7 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 // Verifies newly added pod/volume exists via PodExistsInVolume() without SELinux context
 // VolumeExists() and GetVolumesToMount() and no errors.
 func Test_AddPodToVolume_Positive_SELinuxNoRWOP(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// Arrange
 	plugins := []volume.VolumePlugin{
 		&volumetesting.FakeDeviceMountableVolumePlugin{
@@ -691,7 +691,7 @@ func Test_AddPodToVolume_Positive_SELinuxNoRWOP(t *testing.T) {
 // Verifies newly added pod/volume exists via PodExistsInVolume() without SELinux context
 // VolumeExists() and GetVolumesToMount() and no errors.
 func Test_AddPodToVolume_Positive_NoSELinuxPlugin(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// Arrange
 	plugins := []volume.VolumePlugin{
 		&volumetesting.FakeDeviceMountableVolumePlugin{
@@ -774,7 +774,7 @@ func Test_AddPodToVolume_Positive_NoSELinuxPlugin(t *testing.T) {
 // Verifies newly added pod/volume exists via PodExistsInVolume()
 // VolumeExists() and GetVolumesToMount() and no errors.
 func Test_AddPodToVolume_Positive_ExistingPodSameSELinuxRWOP(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// Arrange
 	plugins := []volume.VolumePlugin{
 		&volumetesting.FakeDeviceMountableVolumePlugin{
@@ -876,7 +876,7 @@ func Test_AddPodToVolume_Positive_ExistingPodSameSELinuxRWOP(t *testing.T) {
 // Verifies newly added pod/volume exists via PodExistsInVolume()
 // VolumeExists() and GetVolumesToMount() and no errors.
 func Test_AddPodToVolume_Negative_ExistingPodDifferentSELinuxRWOP(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// Arrange
 	plugins := []volume.VolumePlugin{
 		&volumetesting.FakeDeviceMountableVolumePlugin{

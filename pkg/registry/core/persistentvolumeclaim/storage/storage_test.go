@@ -275,7 +275,7 @@ func TestDefaultOnReadPvc(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)
 			pvc := new(api.PersistentVolumeClaim)
 			if test.dataSource {
 				pvc.Spec.DataSource = dataSource.DeepCopy()
