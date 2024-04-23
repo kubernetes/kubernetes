@@ -77,6 +77,9 @@ $(GOTMPL): PACKAGE=go.opentelemetry.io/build-tools/gotmpl
 GORELEASE = $(TOOLS)/gorelease
 $(GORELEASE): PACKAGE=golang.org/x/exp/cmd/gorelease
 
+GOVULNCHECK = $(TOOLS)/govulncheck
+$(TOOLS)/govulncheck: PACKAGE=golang.org/x/vuln/cmd/govulncheck
+
 .PHONY: tools
 tools: $(CROSSLINK) $(DBOTCONF) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(PORTO) $(GOJQ) $(SEMCONVGEN) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
 
@@ -189,6 +192,18 @@ test-coverage: | $(GOCOVMERGE)
 	done; \
 	$(GOCOVMERGE) $$(find . -name coverage.out) > coverage.txt
 
+# Adding a directory will include all benchmarks in that direcotry if a filter is not specified.
+BENCHMARK_TARGETS := sdk/trace
+.PHONY: benchmark
+benchmark: $(BENCHMARK_TARGETS:%=benchmark/%)
+BENCHMARK_FILTER = .
+# You can override the filter for a particular directory by adding a rule here.
+benchmark/sdk/trace: BENCHMARK_FILTER = SpanWithAttributes_8/AlwaysSample
+benchmark/%:
+	@echo "$(GO) test -timeout $(TIMEOUT)s -run=xxxxxMatchNothingxxxxx -bench=$(BENCHMARK_FILTER) $*..." \
+		&& cd $* \
+		$(foreach filter, $(BENCHMARK_FILTER), && $(GO) test -timeout $(TIMEOUT)s -run=xxxxxMatchNothingxxxxx -bench=$(filter))
+
 .PHONY: golangci-lint golangci-lint-fix
 golangci-lint-fix: ARGS=--fix
 golangci-lint-fix: golangci-lint
@@ -216,7 +231,7 @@ go-mod-tidy/%: | crosslink
 lint-modules: go-mod-tidy
 
 .PHONY: lint
-lint: misspell lint-modules golangci-lint
+lint: misspell lint-modules golangci-lint govulncheck
 
 .PHONY: vanity-import-check
 vanity-import-check: | $(PORTO)
@@ -225,6 +240,14 @@ vanity-import-check: | $(PORTO)
 .PHONY: misspell
 misspell: | $(MISSPELL)
 	@$(MISSPELL) -w $(ALL_DOCS)
+
+.PHONY: govulncheck
+govulncheck: $(OTEL_GO_MOD_DIRS:%=govulncheck/%)
+govulncheck/%: DIR=$*
+govulncheck/%: | $(GOVULNCHECK)
+	@echo "govulncheck ./... in $(DIR)" \
+		&& cd $(DIR) \
+		&& $(GOVULNCHECK) ./...
 
 .PHONY: codespell
 codespell: | $(CODESPELL)
@@ -289,3 +312,7 @@ COMMIT ?= "HEAD"
 add-tags: | $(MULTIMOD)
 	@[ "${MODSET}" ] || ( echo ">> env var MODSET is not set"; exit 1 )
 	$(MULTIMOD) verify && $(MULTIMOD) tag -m ${MODSET} -c ${COMMIT}
+
+.PHONY: lint-markdown
+lint-markdown: 
+	docker run -v "$(CURDIR):$(WORKDIR)" docker://avtodev/markdown-lint:v1 -c $(WORKDIR)/.markdownlint.yaml $(WORKDIR)/**/*.md

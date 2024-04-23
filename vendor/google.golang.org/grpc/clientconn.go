@@ -337,8 +337,8 @@ func (cc *ClientConn) exitIdleMode() error {
 		return errConnClosing
 	}
 	if cc.idlenessState != ccIdlenessStateIdle {
-		cc.mu.Unlock()
 		channelz.Infof(logger, cc.channelzID, "ClientConn asked to exit idle mode, current mode is %v", cc.idlenessState)
+		cc.mu.Unlock()
 		return nil
 	}
 
@@ -404,13 +404,13 @@ func (cc *ClientConn) exitIdleMode() error {
 // name resolver, load balancer and any subchannels.
 func (cc *ClientConn) enterIdleMode() error {
 	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
 	if cc.conns == nil {
-		cc.mu.Unlock()
 		return ErrClientConnClosing
 	}
 	if cc.idlenessState != ccIdlenessStateActive {
-		channelz.Errorf(logger, cc.channelzID, "ClientConn asked to enter idle mode, current mode is %v", cc.idlenessState)
-		cc.mu.Unlock()
+		channelz.Warningf(logger, cc.channelzID, "ClientConn asked to enter idle mode, current mode is %v", cc.idlenessState)
 		return nil
 	}
 
@@ -431,14 +431,14 @@ func (cc *ClientConn) enterIdleMode() error {
 	cc.balancerWrapper.enterIdleMode()
 	cc.csMgr.updateState(connectivity.Idle)
 	cc.idlenessState = ccIdlenessStateIdle
-	cc.mu.Unlock()
+	cc.addTraceEvent("entering idle mode")
 
 	go func() {
-		cc.addTraceEvent("entering idle mode")
 		for ac := range conns {
 			ac.tearDown(errConnIdling)
 		}
 	}()
+
 	return nil
 }
 
@@ -803,6 +803,12 @@ func init() {
 
 	internal.SubscribeToConnectivityStateChanges = func(cc *ClientConn, s grpcsync.Subscriber) func() {
 		return cc.csMgr.pubSub.Subscribe(s)
+	}
+	internal.EnterIdleModeForTesting = func(cc *ClientConn) error {
+		return cc.enterIdleMode()
+	}
+	internal.ExitIdleModeForTesting = func(cc *ClientConn) error {
+		return cc.exitIdleMode()
 	}
 }
 
