@@ -124,11 +124,15 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	}
 }
 
+func TestEtcdSupportedVersionLength(t *testing.T) {
+	const max = 3
+	if len(SupportedEtcdVersion) > max {
+		t.Fatalf("SupportedEtcdVersion must not include more than %d versions", max)
+	}
+}
+
 func TestEtcdSupportedVersion(t *testing.T) {
 	var supportedEtcdVersion = map[uint8]string{
-		13: "3.2.24",
-		14: "3.3.10",
-		15: "3.3.10",
 		16: "3.3.17-0",
 		17: "3.4.3-0",
 		18: "3.4.3-0",
@@ -147,7 +151,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		},
 		{
 			kubernetesVersion: "1.10.1",
-			expectedVersion:   version.MustParseSemantic("3.2.24"),
+			expectedVersion:   version.MustParseSemantic("3.3.17-0"),
 			expectedWarning:   true,
 			expectedError:     false,
 		},
