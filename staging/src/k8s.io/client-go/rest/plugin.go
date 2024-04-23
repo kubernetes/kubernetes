@@ -21,9 +21,8 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/klog/v2"
-
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
 )
 
 type AuthProvider interface {
@@ -65,7 +64,8 @@ func RegisterAuthProviderPlugin(name string, plugin Factory) error {
 	if _, found := plugins[name]; found {
 		return fmt.Errorf("auth Provider Plugin %q was registered twice", name)
 	}
-	klog.V(4).Infof("Registered Auth Provider Plugin %q", name)
+	//nolint:logchck // For development and debugging only
+	klog.Background().V(4).Info("Registered Auth Provider Plugin", "plugin-name", name)
 	plugins[name] = plugin
 	return nil
 }
