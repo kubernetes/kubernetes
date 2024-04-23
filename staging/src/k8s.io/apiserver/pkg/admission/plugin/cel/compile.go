@@ -163,11 +163,12 @@ type variableDeclEnvs map[OptionalVariableDeclarations]*environment.EnvSet
 // CompileCELExpression returns a compiled CEL expression.
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, options OptionalVariableDeclarations, envType environment.Type) CompilationResult {
-	resultError := func(errorString string, errType apiservercel.ErrorType) CompilationResult {
+	resultError := func(errorString string, errType apiservercel.ErrorType, errors ...error) CompilationResult {
 		return CompilationResult{
 			Error: &apiservercel.Error{
 				Type:   errType,
 				Detail: errorString,
+				Errors: errors,
 			},
 			ExpressionAccessor: expressionAccessor,
 		}
@@ -180,7 +181,7 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 
 	ast, issues := env.Compile(expressionAccessor.GetExpression())
 	if issues != nil {
-		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
+		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid, apiservercel.NewCompilationError(issues))
 	}
 	found := false
 	returnTypes := expressionAccessor.ReturnTypes()

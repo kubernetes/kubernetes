@@ -16,11 +16,46 @@ limitations under the License.
 
 package cel
 
+import (
+	"fmt"
+
+	"github.com/google/cel-go/cel"
+)
+
+// ErrInternal the basic error that occurs when the expression fails to evaluate
+// due to internal reasons. Any Error that has the Type of
+// ErrorInternal is considered equal to ErrInternal
+var ErrInternal = fmt.Errorf("internal")
+
+// ErrInvalid is the basic error that occurs when the expression fails to
+// evaluate but not due to internal reasons. Any Error that has the Type of
+// ErrorInvalid is considered equal to ErrInvalid.
+var ErrInvalid = fmt.Errorf("invalid")
+
+// ErrRequired is the basic error that occurs when the expression is required
+// but absent.
+// Any Error that has the Type of ErrorRequired is considered equal
+// to ErrRequired.
+var ErrRequired = fmt.Errorf("required")
+
+// ErrCompilation is the basic error that occurs when the expression fails to
+// compile. Any CompilationError wraps ErrCompilation.
+// ErrCompilation wraps ErrInvalid
+var ErrCompilation = fmt.Errorf("%w: compilation error", ErrInvalid)
+
+// ErrOutOfBudget is the basic error that occurs when the expression fails due to
+// exceeding budget.
+var ErrOutOfBudget = fmt.Errorf("out of budget")
+
 // Error is an implementation of the 'error' interface, which represents a
 // XValidation error.
 type Error struct {
 	Type   ErrorType
 	Detail string
+
+	// Errors are optional wrapped errors that can be useful to
+	// programmatically retrieve detailed errors.
+	Errors []error
 }
 
 var _ error = &Error{}
@@ -30,7 +65,24 @@ func (v *Error) Error() string {
 	return v.Detail
 }
 
-// ErrorType is a machine readable value providing more detail about why
+func (v *Error) Is(err error) bool {
+	switch v.Type {
+	case ErrorTypeRequired:
+		return err == ErrRequired
+	case ErrorTypeInvalid:
+		return err == ErrInvalid
+	case ErrorTypeInternal:
+		return err == ErrInternal
+	}
+	return false
+}
+
+// Unwrap returns wrapped errors.
+func (v *Error) Unwrap() []error {
+	return v.Errors
+}
+
+// ErrorType is a machine-readable value providing more detail about why
 // a XValidation is invalid.
 type ErrorType string
 
@@ -45,3 +97,28 @@ const (
 	// to user input.  See InternalError().
 	ErrorTypeInternal ErrorType = "InternalError"
 )
+
+// CompilationError indicates an error during expression compilation.
+// It wraps ErrCompilation.
+type CompilationError struct {
+	err    *Error
+	Issues *cel.Issues
+}
+
+// NewCompilationError wraps a cel.Issues to indicate a compilation failure.
+func NewCompilationError(issues *cel.Issues) *CompilationError {
+	return &CompilationError{
+		Issues: issues,
+		err: &Error{
+			Type:   ErrorTypeInvalid,
+			Detail: fmt.Sprintf("compilation error: %s", issues),
+		}}
+}
+
+func (e *CompilationError) Error() string {
+	return e.err.Error()
+}
+
+func (e *CompilationError) Unwrap() []error {
+	return []error{e.err, ErrCompilation}
+}
