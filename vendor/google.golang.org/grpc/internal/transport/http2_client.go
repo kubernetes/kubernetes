@@ -286,7 +286,7 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	if transportCreds != nil {
 		conn, authInfo, err = transportCreds.ClientHandshake(connectCtx, addr.ServerName, conn)
 		if err != nil {
-			return nil, connectionErrorf(isTemporary(err), err, "transport: authentication handshake failed for %s: %v", addr.ServerName, err)
+			return nil, connectionErrorf(isTemporary(err), err, "transport: authentication handshake failed: %v", err)
 		}
 		for _, cd := range perRPCCreds {
 			if cd.RequireTransportSecurity() {
