@@ -9349,7 +9349,7 @@
           "type": "string"
         },
         "resourceClaimName": {
-          "description": "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod. It this is unset, then generating a ResourceClaim was not necessary. The pod.spec.resourceClaims entry can be ignored in this case.",
+          "description": "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod. If this is unset, then generating a ResourceClaim was not necessary. The pod.spec.resourceClaims entry can be ignored in this case.",
           "type": "string"
         }
       },
@@ -15026,7 +15026,7 @@
       "description": "NamedResourcesFilter is used in ResourceFilterModel.",
       "properties": {
         "selector": {
-          "description": "Selector is a CEL expression which must evaluate to true if a resource instance is suitable. The language is as defined in https://kubernetes.io/docs/reference/using-api/cel/\n\nIn addition, for each type NamedResourcesin AttributeValue there is a map that resolves to the corresponding value of the instance under evaluation. For example:\n\n   attributes.quantity[\"a\"].isGreaterThan(quantity(\"0\")) &&\n   attributes.stringslice[\"b\"].isSorted()",
+          "description": "Selector is a CEL expression which must evaluate to true if a resource instance is suitable. The language is as defined in https://kubernetes.io/docs/reference/using-api/cel/\n\nIn addition, for each type in NamedResourcesAttributeValue there is a map that resolves to the corresponding value of the instance under evaluation. For example:\n\n   attributes.quantity[\"a\"].isGreaterThan(quantity(\"0\")) &&\n   attributes.stringslice[\"b\"].isSorted()",
           "type": "string"
         }
       },
@@ -15792,6 +15792,9 @@
           "description": "If StructuredData is set, then it needs to be used instead of Data."
         }
       },
+      "required": [
+        "driverName"
+      ],
       "type": "object"
     },
     "io.k8s.api.resource.v1alpha2.ResourceRequest": {

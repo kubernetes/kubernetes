@@ -111,7 +111,7 @@ type NamedResourcesFilter struct {
 	// resource instance is suitable. The language is as defined in
 	// https://kubernetes.io/docs/reference/using-api/cel/
 	//
-	// In addition, for each type NamedResourcesin AttributeValue there is a map that
+	// In addition, for each type in NamedResourcesAttributeValue there is a map that
 	// resolves to the corresponding value of the instance under evaluation.
 	// For example:
 	//

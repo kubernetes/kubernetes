@@ -92,8 +92,16 @@ type NamedResourcesRequest struct {
 
 // NamedResourcesFilter is used in ResourceFilterModel.
 type NamedResourcesFilter struct {
-	// Selector is a selector like the one in Request. It must be true for
-	// a resource instance to be suitable for a claim using the class.
+	// Selector is a CEL expression which must evaluate to true if a
+	// resource instance is suitable. The language is as defined in
+	// https://kubernetes.io/docs/reference/using-api/cel/
+	//
+	// In addition, for each type in NamedResourcesAttributeValue there is a map that
+	// resolves to the corresponding value of the instance under evaluation.
+	// For example:
+	//
+	//    attributes.quantity["a"].isGreaterThan(quantity("0")) &&
+	//    attributes.stringslice["b"].isSorted()
 	Selector string
 }
 
