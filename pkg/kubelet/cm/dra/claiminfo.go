@@ -102,6 +102,10 @@ func (info *ClaimInfo) setCDIDevices(pluginName string, cdiDevices []string) err
 		info.CDIDevices = make(map[string][]string)
 	}
 
+	if info.annotations == nil {
+		info.annotations = make(map[string][]kubecontainer.Annotation)
+	}
+
 	info.CDIDevices[pluginName] = cdiDevices
 	info.annotations[pluginName] = annotations
 
