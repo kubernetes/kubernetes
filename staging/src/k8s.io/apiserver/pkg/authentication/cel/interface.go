@@ -35,6 +35,7 @@ type ExpressionAccessor interface {
 // CompilationResult represents a compiled validations expression.
 type CompilationResult struct {
 	Program            celgo.Program
+	AST                *celgo.Ast
 	ExpressionAccessor ExpressionAccessor
 }
 

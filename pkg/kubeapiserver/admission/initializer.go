@@ -17,7 +17,6 @@ limitations under the License.
 package admission
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
@@ -34,7 +33,6 @@ type WantsCloudConfig interface {
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
 	cloudConfig                []byte
-	restMapper                 meta.RESTMapper
 	quotaConfiguration         quota.Configuration
 	excludedAdmissionResources []schema.GroupResource
 }
@@ -46,13 +44,11 @@ var _ admission.PluginInitializer = &PluginInitializer{}
 // all public, this construction method is pointless boilerplate.
 func NewPluginInitializer(
 	cloudConfig []byte,
-	restMapper meta.RESTMapper,
 	quotaConfiguration quota.Configuration,
 	excludedAdmissionResources []schema.GroupResource,
 ) *PluginInitializer {
 	return &PluginInitializer{
 		cloudConfig:                cloudConfig,
-		restMapper:                 restMapper,
 		quotaConfiguration:         quotaConfiguration,
 		excludedAdmissionResources: excludedAdmissionResources,
 	}
@@ -63,10 +59,6 @@ func NewPluginInitializer(
 func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(WantsCloudConfig); ok {
 		wants.SetCloudConfig(i.cloudConfig)
-	}
-
-	if wants, ok := plugin.(initializer.WantsRESTMapper); ok {
-		wants.SetRESTMapper(i.restMapper)
 	}
 
 	if wants, ok := plugin.(initializer.WantsQuotaConfiguration); ok {

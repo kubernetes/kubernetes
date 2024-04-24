@@ -49,14 +49,16 @@ var (
 
 func init() {
 	// ktesting and testinit already registered the -v and -vmodule
-	// command line flags. To configure the textlogger instead, we
-	// need to swap out the flag.Value for those.
+	// command line flags. To configure the textlogger and klog
+	// consistently, we need to intercept the Set call. This
+	// can be done by swapping out the flag.Value for the -v and
+	// -vmodule flags with a wrapper which calls both.
 	var fs flag.FlagSet
 	logConfig.AddFlags(&fs)
 	fs.VisitAll(func(loggerFlag *flag.Flag) {
 		klogFlag := flag.CommandLine.Lookup(loggerFlag.Name)
 		if klogFlag != nil {
-			klogFlag.Value = loggerFlag.Value
+			klogFlag.Value = &valueChain{Value: loggerFlag.Value, parentValue: klogFlag.Value}
 		}
 	})
 
@@ -73,6 +75,21 @@ func init() {
 		klog.WriteKlogBuffer(writer.WriteKlogBuffer),
 	}
 	klog.SetLoggerWithOptions(ginkgoLogger, opts...)
+}
+
+type valueChain struct {
+	flag.Value
+	parentValue flag.Value
+}
+
+func (v *valueChain) Set(value string) error {
+	if err := v.Value.Set(value); err != nil {
+		return err
+	}
+	if err := v.parentValue.Set(value); err != nil {
+		return err
+	}
+	return nil
 }
 
 func unwind(skip int) (string, int) {

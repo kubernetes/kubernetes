@@ -44,22 +44,24 @@ var networkpoliciesKind = v1.SchemeGroupVersion.WithKind("NetworkPolicy")
 
 // Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
 func (c *FakeNetworkPolicies) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.NetworkPolicy, err error) {
+	emptyResult := &v1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(networkpoliciesResource, c.ns, name), &v1.NetworkPolicy{})
+		Invokes(testing.NewGetAction(networkpoliciesResource, c.ns, name), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.NetworkPolicy), err
 }
 
 // List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
 func (c *FakeNetworkPolicies) List(ctx context.Context, opts metav1.ListOptions) (result *v1.NetworkPolicyList, err error) {
+	emptyResult := &v1.NetworkPolicyList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(networkpoliciesResource, networkpoliciesKind, c.ns, opts), &v1.NetworkPolicyList{})
+		Invokes(testing.NewListAction(networkpoliciesResource, networkpoliciesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -84,22 +86,24 @@ func (c *FakeNetworkPolicies) Watch(ctx context.Context, opts metav1.ListOptions
 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
 func (c *FakeNetworkPolicies) Create(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.CreateOptions) (result *v1.NetworkPolicy, err error) {
+	emptyResult := &v1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), &v1.NetworkPolicy{})
+		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.NetworkPolicy), err
 }
 
 // Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
 func (c *FakeNetworkPolicies) Update(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.UpdateOptions) (result *v1.NetworkPolicy, err error) {
+	emptyResult := &v1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), &v1.NetworkPolicy{})
+		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.NetworkPolicy), err
 }
@@ -122,11 +126,12 @@ func (c *FakeNetworkPolicies) DeleteCollection(ctx context.Context, opts metav1.
 
 // Patch applies the patch and returns the patched networkPolicy.
 func (c *FakeNetworkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NetworkPolicy, err error) {
+	emptyResult := &v1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, pt, data, subresources...), &v1.NetworkPolicy{})
+		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, pt, data, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.NetworkPolicy), err
 }
@@ -144,11 +149,12 @@ func (c *FakeNetworkPolicies) Apply(ctx context.Context, networkPolicy *networki
 	if name == nil {
 		return nil, fmt.Errorf("networkPolicy.Name must be provided to Apply")
 	}
+	emptyResult := &v1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, *name, types.ApplyPatchType, data), &v1.NetworkPolicy{})
+		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.NetworkPolicy), err
 }

@@ -101,7 +101,10 @@ const (
 	// owner: @cici37 @jpbetz
 	// kep: http://kep.k8s.io/3488
 	// alpha: v1.26
+	// beta: v1.28
+	// stable: v1.30
 	//
+	// Note: the feature gate can be removed in 1.32
 	// Enables expression validation in Admission Control
 	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
 
@@ -234,6 +237,7 @@ const (
 	// owner: @aramase, @enj, @nabokihms
 	// kep: https://kep.k8s.io/3331
 	// alpha: v1.29
+	// beta: v1.30
 	//
 	// Enables Structured Authentication Configuration
 	StructuredAuthenticationConfiguration featuregate.Feature = "StructuredAuthenticationConfiguration"
@@ -253,6 +257,12 @@ const (
 	//
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
+
+	// owner: @serathius
+	// beta: 1.30
+	// Enables watches without resourceVersion to be served from storage.
+	// Used to prevent https://github.com/kubernetes/kubernetes/issues/123072 until etcd fixes the issue.
+	WatchFromStorageWithoutResourceVersion featuregate.Feature = "WatchFromStorageWithoutResourceVersion"
 
 	// owner: @vinaykul
 	// kep: http://kep.k8s.io/1287
@@ -309,7 +319,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
 
-	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
+	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
@@ -337,13 +347,15 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
 
-	StructuredAuthenticationConfiguration: {Default: false, PreRelease: featuregate.Alpha},
+	StructuredAuthenticationConfiguration: {Default: true, PreRelease: featuregate.Beta},
 
 	StructuredAuthorizationConfiguration: {Default: true, PreRelease: featuregate.Beta},
 
 	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 

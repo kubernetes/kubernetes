@@ -22,17 +22,18 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Secrets", func() {
@@ -237,6 +238,54 @@ var _ = SIGDescribe("Secrets", func() {
 		if foundCreatedSecret {
 			framework.Failf("secret %s/%s was not deleted successfully", f.Namespace.Name, secretTestName)
 		}
+	})
+
+	/*
+		Release: v1.30
+		Testname: Secrets, pod environment from source
+		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret.
+		Allows users to use envFrom to set prefix starting with a digit as environment variable names.
+	*/
+	framework.It("should be consumable as environment variable names when secret keys start with a digit", feature.RelaxedEnvironmentVariableValidation, func(ctx context.Context) {
+		name := "secret-test-" + string(uuid.NewUUID())
+		secret := secretForTest(f.Namespace.Name, name)
+
+		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
+		var err error
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "env-test",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", "env"},
+						EnvFrom: []v1.EnvFromSource{
+							{
+								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								// prefix start with a digit can be consumed as environment variables.
+								Prefix:    "1-",
+								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		e2epodoutput.TestContainerOutput(ctx, f, "consume secrets", pod, 0, []string{
+			"data-1=value-1", "data-2=value-2", "data-3=value-3",
+			"1-data-1=value-1", "1-data-2=value-2", "1-data-3=value-3",
+		})
 	})
 })
 

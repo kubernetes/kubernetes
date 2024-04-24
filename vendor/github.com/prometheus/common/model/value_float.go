@@ -20,14 +20,12 @@ import (
 	"strconv"
 )
 
-var (
-	// ZeroSamplePair is the pseudo zero-value of SamplePair used to signal a
-	// non-existing sample pair. It is a SamplePair with timestamp Earliest and
-	// value 0.0. Note that the natural zero value of SamplePair has a timestamp
-	// of 0, which is possible to appear in a real SamplePair and thus not
-	// suitable to signal a non-existing SamplePair.
-	ZeroSamplePair = SamplePair{Timestamp: Earliest}
-)
+// ZeroSamplePair is the pseudo zero-value of SamplePair used to signal a
+// non-existing sample pair. It is a SamplePair with timestamp Earliest and
+// value 0.0. Note that the natural zero value of SamplePair has a timestamp
+// of 0, which is possible to appear in a real SamplePair and thus not
+// suitable to signal a non-existing SamplePair.
+var ZeroSamplePair = SamplePair{Timestamp: Earliest}
 
 // A SampleValue is a representation of a value for a given sample at a given
 // time.

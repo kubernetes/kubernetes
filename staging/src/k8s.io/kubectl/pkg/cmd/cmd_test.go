@@ -197,6 +197,18 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			expectPluginArgs: []string{"--bar"},
 		},
 		{
+			name:             "test that a plugin executable is found based on command args with positional argument",
+			args:             []string{"kubectl", "foo", "positional", "--bar"},
+			expectPlugin:     "plugin/testdata/kubectl-foo",
+			expectPluginArgs: []string{"positional", "--bar"},
+		},
+		{
+			name:             "test that an allowed subcommand plugin executable is found based on command args with positional argument",
+			args:             []string{"kubectl", "create", "foo", "positional", "--bar"},
+			expectPlugin:     "plugin/testdata/kubectl-create-foo",
+			expectPluginArgs: []string{"positional", "--bar"},
+		},
+		{
 			name: "test that a plugin does not execute over an existing command by the same name",
 			args: []string{"kubectl", "version", "--client=true"},
 		},
@@ -330,6 +342,7 @@ func (h *testPluginHandler) Lookup(filename string) (string, bool) {
 		for _, p := range plugins {
 			filenameWithSuportedPrefix = fmt.Sprintf("%s-%s", prefix, filename)
 			if p.Name() == filenameWithSuportedPrefix {
+				h.lookupErr = nil
 				return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), true
 			}
 		}

@@ -17,25 +17,25 @@ limitations under the License.
 package validating
 
 import (
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 )
 
-func NewValidatingAdmissionPolicyAccessor(obj *v1beta1.ValidatingAdmissionPolicy) generic.PolicyAccessor {
+func NewValidatingAdmissionPolicyAccessor(obj *v1.ValidatingAdmissionPolicy) generic.PolicyAccessor {
 	return &validatingAdmissionPolicyAccessor{
 		ValidatingAdmissionPolicy: obj,
 	}
 }
 
-func NewValidatingAdmissionPolicyBindingAccessor(obj *v1beta1.ValidatingAdmissionPolicyBinding) generic.BindingAccessor {
+func NewValidatingAdmissionPolicyBindingAccessor(obj *v1.ValidatingAdmissionPolicyBinding) generic.BindingAccessor {
 	return &validatingAdmissionPolicyBindingAccessor{
 		ValidatingAdmissionPolicyBinding: obj,
 	}
 }
 
 type validatingAdmissionPolicyAccessor struct {
-	*v1beta1.ValidatingAdmissionPolicy
+	*v1.ValidatingAdmissionPolicy
 }
 
 func (v *validatingAdmissionPolicyAccessor) GetNamespace() string {
@@ -46,16 +46,16 @@ func (v *validatingAdmissionPolicyAccessor) GetName() string {
 	return v.Name
 }
 
-func (v *validatingAdmissionPolicyAccessor) GetParamKind() *v1beta1.ParamKind {
+func (v *validatingAdmissionPolicyAccessor) GetParamKind() *v1.ParamKind {
 	return v.Spec.ParamKind
 }
 
-func (v *validatingAdmissionPolicyAccessor) GetMatchConstraints() *v1beta1.MatchResources {
+func (v *validatingAdmissionPolicyAccessor) GetMatchConstraints() *v1.MatchResources {
 	return v.Spec.MatchConstraints
 }
 
 type validatingAdmissionPolicyBindingAccessor struct {
-	*v1beta1.ValidatingAdmissionPolicyBinding
+	*v1.ValidatingAdmissionPolicyBinding
 }
 
 func (v *validatingAdmissionPolicyBindingAccessor) GetNamespace() string {
@@ -73,10 +73,10 @@ func (v *validatingAdmissionPolicyBindingAccessor) GetPolicyName() types.Namespa
 	}
 }
 
-func (v *validatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1beta1.MatchResources {
+func (v *validatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1.MatchResources {
 	return v.Spec.MatchResources
 }
 
-func (v *validatingAdmissionPolicyBindingAccessor) GetParamRef() *v1beta1.ParamRef {
+func (v *validatingAdmissionPolicyBindingAccessor) GetParamRef() *v1.ParamRef {
 	return v.Spec.ParamRef
 }

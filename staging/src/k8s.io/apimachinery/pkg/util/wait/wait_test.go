@@ -194,8 +194,8 @@ func TestJitterUntilRecoversPanic(t *testing.T) {
 
 	// Hook up a custom crash handler to ensure it is called when a jitter function panics
 	runtime.ReallyCrash = false
-	runtime.PanicHandlers = []func(interface{}){
-		func(p interface{}) {
+	runtime.PanicHandlers = []func(context.Context, interface{}){
+		func(_ context.Context, p interface{}) {
 			handled++
 		},
 	}

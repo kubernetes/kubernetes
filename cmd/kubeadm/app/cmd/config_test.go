@@ -248,7 +248,7 @@ registry.k8s.io/etcd:{{.EtcdVersion}}
 			outputFormat: "json",
 			expectedOutput: `{
     "kind": "Images",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha3",
     "images": [
         "registry.k8s.io/kube-apiserver:{{.KubeVersion}}",
         "registry.k8s.io/kube-controller-manager:{{.KubeVersion}}",
@@ -267,7 +267,7 @@ registry.k8s.io/etcd:{{.EtcdVersion}}
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "yaml",
-			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha2
+			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha3
 images:
 - registry.k8s.io/kube-apiserver:{{.KubeVersion}}
 - registry.k8s.io/kube-controller-manager:{{.KubeVersion}}

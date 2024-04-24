@@ -258,7 +258,7 @@ func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 		{
 			name:           "invalid versionInfo; placeholder version is returned",
 			versionInfo:    &apimachineryversion.Info{},
-			expectedResult: defaultKubernetesPlaceholderVersion,
+			expectedResult: DefaultKubernetesPlaceholderVersion,
 		},
 		{
 			name:           "valid skew of -1",

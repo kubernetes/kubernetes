@@ -17,11 +17,16 @@ limitations under the License.
 package create
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestCreateSecretDockerRegistry(t *testing.T) {
@@ -179,6 +184,83 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 			}
 			if !apiequality.Semantic.DeepEqual(secretDockerRegistry, test.expected) {
 				t.Errorf("test %s\n expected:\n%#v\ngot:\n%#v", name, test.expected, secretDockerRegistry)
+			}
+		})
+	}
+}
+
+func TestCreateSecretDockerRegistryFromFile(t *testing.T) {
+	username, password, email, server := "test-user", "test-password", "test-user@example.org", "https://index.docker.io/v1/"
+	secretData, err := handleDockerCfgJSONContent(username, password, email, server)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	secret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			corev1.DockerConfigJsonKey: secretData,
+		},
+	}
+
+	tests := map[string]struct {
+		withKey  bool
+		expected *corev1.Secret
+	}{
+		"create_secret_docker_registry_from_file_with_keyname": {
+			withKey:  true,
+			expected: secret,
+		},
+		"create_secret_docker_registry_from_file_without_keyname": {
+			withKey:  false,
+			expected: secret,
+		},
+	}
+
+	// Run all the tests
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmp, _ := os.MkdirTemp("", "input")
+			defer func() {
+				err := os.RemoveAll(tmp)
+				if err != nil {
+					t.Fatalf("Failed to teardown: %s", err)
+				}
+			}()
+			dockerCfgFile := tmp + "/dockerconfig.json"
+			err := os.WriteFile(dockerCfgFile, secretData, 0644)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
+			cmd := NewCmdCreateSecretDockerRegistry(tf, ioStreams)
+			args := []string{"foo", "--dry-run=client", "-ojson"}
+			if test.withKey {
+				args = append(args, fmt.Sprintf("--from-file=%s=%s", corev1.DockerConfigJsonKey, dockerCfgFile))
+			} else {
+				args = append(args, fmt.Sprintf("--from-file=%s", dockerCfgFile))
+			}
+			cmd.SetArgs(args)
+			err = cmd.Execute()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			got := &corev1.Secret{}
+			err = json.Unmarshal(out.Bytes(), got)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !apiequality.Semantic.DeepEqual(got, test.expected) {
+				t.Errorf("test %s\n expected:\n%#v\ngot:\n%#v", name, test.expected, got)
 			}
 		})
 	}

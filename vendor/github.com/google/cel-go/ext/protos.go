@@ -16,8 +16,7 @@ package ext
 
 import (
 	"github.com/google/cel-go/cel"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"github.com/google/cel-go/common/ast"
 )
 
 // Protos returns a cel.EnvOption to configure extended macros and functions for
@@ -72,9 +71,9 @@ func (protoLib) CompileOptions() []cel.EnvOption {
 	return []cel.EnvOption{
 		cel.Macros(
 			// proto.getExt(msg, select_expression)
-			cel.NewReceiverMacro(getExtension, 2, getProtoExt),
+			cel.ReceiverMacro(getExtension, 2, getProtoExt),
 			// proto.hasExt(msg, select_expression)
-			cel.NewReceiverMacro(hasExtension, 2, hasProtoExt),
+			cel.ReceiverMacro(hasExtension, 2, hasProtoExt),
 		),
 	}
 }
@@ -85,56 +84,56 @@ func (protoLib) ProgramOptions() []cel.ProgramOption {
 }
 
 // hasProtoExt generates a test-only select expression for a fully-qualified extension name on a protobuf message.
-func hasProtoExt(meh cel.MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *cel.Error) {
+func hasProtoExt(mef cel.MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *cel.Error) {
 	if !macroTargetMatchesNamespace(protoNamespace, target) {
 		return nil, nil
 	}
-	extensionField, err := getExtFieldName(meh, args[1])
+	extensionField, err := getExtFieldName(mef, args[1])
 	if err != nil {
 		return nil, err
 	}
-	return meh.PresenceTest(args[0], extensionField), nil
+	return mef.NewPresenceTest(args[0], extensionField), nil
 }
 
 // getProtoExt generates a select expression for a fully-qualified extension name on a protobuf message.
-func getProtoExt(meh cel.MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *cel.Error) {
+func getProtoExt(mef cel.MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *cel.Error) {
 	if !macroTargetMatchesNamespace(protoNamespace, target) {
 		return nil, nil
 	}
-	extFieldName, err := getExtFieldName(meh, args[1])
+	extFieldName, err := getExtFieldName(mef, args[1])
 	if err != nil {
 		return nil, err
 	}
-	return meh.Select(args[0], extFieldName), nil
+	return mef.NewSelect(args[0], extFieldName), nil
 }
 
-func getExtFieldName(meh cel.MacroExprHelper, expr *exprpb.Expr) (string, *cel.Error) {
+func getExtFieldName(mef cel.MacroExprFactory, expr ast.Expr) (string, *cel.Error) {
 	isValid := false
 	extensionField := ""
-	switch expr.GetExprKind().(type) {
-	case *exprpb.Expr_SelectExpr:
+	switch expr.Kind() {
+	case ast.SelectKind:
 		extensionField, isValid = validateIdentifier(expr)
 	}
 	if !isValid {
-		return "", meh.NewError(expr.GetId(), "invalid extension field")
+		return "", mef.NewError(expr.ID(), "invalid extension field")
 	}
 	return extensionField, nil
 }
 
-func validateIdentifier(expr *exprpb.Expr) (string, bool) {
-	switch expr.GetExprKind().(type) {
-	case *exprpb.Expr_IdentExpr:
-		return expr.GetIdentExpr().GetName(), true
-	case *exprpb.Expr_SelectExpr:
-		sel := expr.GetSelectExpr()
-		if sel.GetTestOnly() {
+func validateIdentifier(expr ast.Expr) (string, bool) {
+	switch expr.Kind() {
+	case ast.IdentKind:
+		return expr.AsIdent(), true
+	case ast.SelectKind:
+		sel := expr.AsSelect()
+		if sel.IsTestOnly() {
 			return "", false
 		}
-		opStr, isIdent := validateIdentifier(sel.GetOperand())
+		opStr, isIdent := validateIdentifier(sel.Operand())
 		if !isIdent {
 			return "", false
 		}
-		return opStr + "." + sel.GetField(), true
+		return opStr + "." + sel.FieldName(), true
 	default:
 		return "", false
 	}

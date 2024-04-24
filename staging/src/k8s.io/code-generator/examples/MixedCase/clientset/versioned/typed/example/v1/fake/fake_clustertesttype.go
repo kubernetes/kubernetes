@@ -44,20 +44,22 @@ var clustertesttypesKind = v1.SchemeGroupVersion.WithKind("ClusterTestType")
 
 // Get takes name of the clusterTestType, and returns the corresponding clusterTestType object, and an error if there is any.
 func (c *FakeClusterTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterTestType, err error) {
+	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clustertesttypesResource, name), &v1.ClusterTestType{})
+		Invokes(testing.NewRootGetAction(clustertesttypesResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterTestType), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterTestTypes that match those selectors.
 func (c *FakeClusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
+	emptyResult := &v1.ClusterTestTypeList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clustertesttypesResource, clustertesttypesKind, opts), &v1.ClusterTestTypeList{})
+		Invokes(testing.NewRootListAction(clustertesttypesResource, clustertesttypesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -81,31 +83,34 @@ func (c *FakeClusterTestTypes) Watch(ctx context.Context, opts metav1.ListOption
 
 // Create takes the representation of a clusterTestType and creates it.  Returns the server's representation of the clusterTestType, and an error, if there is any.
 func (c *FakeClusterTestTypes) Create(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.CreateOptions) (result *v1.ClusterTestType, err error) {
+	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clustertesttypesResource, clusterTestType), &v1.ClusterTestType{})
+		Invokes(testing.NewRootCreateAction(clustertesttypesResource, clusterTestType), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterTestType), err
 }
 
 // Update takes the representation of a clusterTestType and updates it. Returns the server's representation of the clusterTestType, and an error, if there is any.
 func (c *FakeClusterTestTypes) Update(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
+	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clustertesttypesResource, clusterTestType), &v1.ClusterTestType{})
+		Invokes(testing.NewRootUpdateAction(clustertesttypesResource, clusterTestType), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterTestType), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (*v1.ClusterTestType, error) {
+func (c *FakeClusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
+	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "status", clusterTestType), &v1.ClusterTestType{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "status", clusterTestType), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterTestType), err
 }
@@ -127,10 +132,11 @@ func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, opts metav1
 
 // Patch applies the patch and returns the patched clusterTestType.
 func (c *FakeClusterTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error) {
+	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, name, pt, data, subresources...), &v1.ClusterTestType{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterTestType), err
 }
@@ -148,10 +154,11 @@ func (c *FakeClusterTestTypes) Apply(ctx context.Context, clusterTestType *examp
 	if name == nil {
 		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
 	}
+	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data), &v1.ClusterTestType{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterTestType), err
 }
@@ -170,40 +177,44 @@ func (c *FakeClusterTestTypes) ApplyStatus(ctx context.Context, clusterTestType 
 	if name == nil {
 		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
 	}
+	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data, "status"), &v1.ClusterTestType{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ClusterTestType), err
 }
 
 // GetScale takes name of the clusterTestType, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetSubresourceAction(clustertesttypesResource, "scale", clusterTestTypeName), &autoscalingv1.Scale{})
+		Invokes(testing.NewRootGetSubresourceAction(clustertesttypesResource, "scale", clusterTestTypeName), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
 func (c *FakeClusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
+	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "scale", scale), &autoscalingv1.Scale{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "scale", scale), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }
 
 // CreateScale takes the representation of a scale and creates it.  Returns the server's representation of the scale, and an error, if there is any.
 func (c *FakeClusterTestTypes) CreateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.CreateOptions) (result *autoscalingv1.Scale, err error) {
+	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateSubresourceAction(clustertesttypesResource, clusterTestTypeName, "scale", scale), &autoscalingv1.Scale{})
+		Invokes(testing.NewRootCreateSubresourceAction(clustertesttypesResource, clusterTestTypeName, "scale", scale), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }

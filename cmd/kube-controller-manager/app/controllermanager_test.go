@@ -94,6 +94,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.LegacyServiceAccountTokenCleanerController,
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,
+		names.StorageVersionMigratorController,
 	)
 
 	for _, name := range KnownControllers() {

@@ -8,6 +8,7 @@ spec:
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
+  hostUsers: false
   initContainers:
   - image: registry.k8s.io/pause
     name: initcontainer1

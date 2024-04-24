@@ -664,7 +664,7 @@ func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 
 // Populates data struct with one volume/node entry.
 // Verifies mountedByNode is true and DetachRequestedTime is zero.
-func Test_SetVolumeMountedByNode_Positive_Set(t *testing.T) {
+func Test_SetVolumesMountedByNode_Positive_Set(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -690,9 +690,9 @@ func Test_SetVolumeMountedByNode_Positive_Set(t *testing.T) {
 }
 
 // Populates data struct with one volume/node entry.
-// Calls SetVolumeMountedByNode twice, first setting mounted to true then false.
+// Calls SetVolumesMountedByNode twice, first setting mounted to true then false.
 // Verifies mountedByNode is false.
-func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
+func Test_SetVolumesMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -707,16 +707,8 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
 	}
 
 	// Act
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, true /* mounted */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, false /* mounted */)
-
-	// Assert
-	if setVolumeMountedErr1 != nil {
-		t.Fatalf("SetVolumeMountedByNode1 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr1)
-	}
-	if setVolumeMountedErr2 != nil {
-		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
-	}
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
@@ -727,9 +719,9 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
 }
 
 // Populates data struct with one volume/node entry.
-// Calls SetVolumeMountedByNode once, setting mounted to false.
+// Calls SetVolumesMountedByNode once, setting mounted to false.
 // Verifies mountedByNode is false because value is overwritten
-func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
+func Test_SetVolumesMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -751,13 +743,9 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 
 	// Act
-	setVolumeMountedErr := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, false /* mounted */)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	// Assert
-	if setVolumeMountedErr != nil {
-		t.Fatalf("SetVolumeMountedByNode failed. Expected <no error> Actual: <%v>", setVolumeMountedErr)
-	}
-
 	attachedVolumes = asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
@@ -767,10 +755,10 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 }
 
 // Populates data struct with one volume/node entry.
-// Calls SetVolumeMountedByNode twice, first setting mounted to true then false.
+// Calls SetVolumesMountedByNode twice, first setting mounted to true then false.
 // Calls AddVolumeNode to readd the same volume/node.
 // Verifies mountedByNode is false and detachRequestedTime is zero.
-func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotReset(t *testing.T) {
+func Test_SetVolumesMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotReset(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -785,17 +773,11 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotRes
 	}
 
 	// Act
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, true /* mounted */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, false /* mounted */)
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 	generatedVolumeName, addErr = asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
 
 	// Assert
-	if setVolumeMountedErr1 != nil {
-		t.Fatalf("SetVolumeMountedByNode1 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr1)
-	}
-	if setVolumeMountedErr2 != nil {
-		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
-	}
 	if addErr != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
@@ -810,9 +792,9 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotRes
 
 // Populates data struct with one volume/node entry.
 // Calls RemoveVolumeFromReportAsAttached() once on volume/node entry.
-// Calls SetVolumeMountedByNode() twice, first setting mounted to true then false.
+// Calls SetVolumesMountedByNode() twice, first setting mounted to true then false.
 // Verifies mountedByNode is false and detachRequestedTime is NOT zero.
-func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequestedTimePerserved(t *testing.T) {
+func Test_SetVolumesMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequestedTimePerserved(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -836,17 +818,10 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 	expectedDetachRequestedTime := asw.GetAttachedVolumes()[0].DetachRequestedTime
 
 	// Act
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, true /* mounted */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, false /* mounted */)
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 
 	// Assert
-	if setVolumeMountedErr1 != nil {
-		t.Fatalf("SetVolumeMountedByNode1 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr1)
-	}
-	if setVolumeMountedErr2 != nil {
-		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
-	}
-
 	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
@@ -966,10 +941,10 @@ func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 }
 
 // Populates data struct with one volume/node entry.
-// Calls SetVolumeMountedByNode() twice, first setting mounted to true then false.
+// Calls SetVolumesMountedByNode() twice, first setting mounted to true then false.
 // Calls RemoveVolumeFromReportAsAttached() once on volume/node entry.
 // Verifies mountedByNode is false and detachRequestedTime is NOT zero.
-func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumeMountedByNodePreserved(t *testing.T) {
+func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumesMountedByNodePreserved(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -982,15 +957,8 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumeMou
 	if addErr != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, true /* mounted */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(logger, generatedVolumeName, nodeName, false /* mounted */)
-	if setVolumeMountedErr1 != nil {
-		t.Fatalf("SetVolumeMountedByNode1 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr1)
-	}
-	if setVolumeMountedErr2 != nil {
-		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
-	}
-
+	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
+	asw.SetVolumesMountedByNode(logger, nil, nodeName)
 	// Act
 	_, err := asw.SetDetachRequestTime(logger, generatedVolumeName, nodeName)
 	if err != nil {

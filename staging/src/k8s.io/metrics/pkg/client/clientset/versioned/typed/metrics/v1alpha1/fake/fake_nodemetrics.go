@@ -39,20 +39,22 @@ var nodemetricsesKind = v1alpha1.SchemeGroupVersion.WithKind("NodeMetrics")
 
 // Get takes name of the nodeMetrics, and returns the corresponding nodeMetrics object, and an error if there is any.
 func (c *FakeNodeMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {
+	emptyResult := &v1alpha1.NodeMetrics{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(nodemetricsesResource, name), &v1alpha1.NodeMetrics{})
+		Invokes(testing.NewRootGetAction(nodemetricsesResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.NodeMetrics), err
 }
 
 // List takes label and field selectors, and returns the list of NodeMetricses that match those selectors.
 func (c *FakeNodeMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
+	emptyResult := &v1alpha1.NodeMetricsList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(nodemetricsesResource, nodemetricsesKind, opts), &v1alpha1.NodeMetricsList{})
+		Invokes(testing.NewRootListAction(nodemetricsesResource, nodemetricsesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)

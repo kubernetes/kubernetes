@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/discovery/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type EndpointSliceLister interface {
 
 // endpointSliceLister implements the EndpointSliceLister interface.
 type endpointSliceLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1beta1.EndpointSlice]
 }
 
 // NewEndpointSliceLister returns a new EndpointSliceLister.
 func NewEndpointSliceLister(indexer cache.Indexer) EndpointSliceLister {
-	return &endpointSliceLister{indexer: indexer}
-}
-
-// List lists all EndpointSlices in the indexer.
-func (s *endpointSliceLister) List(selector labels.Selector) (ret []*v1beta1.EndpointSlice, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.EndpointSlice))
-	})
-	return ret, err
+	return &endpointSliceLister{listers.New[*v1beta1.EndpointSlice](indexer, v1beta1.Resource("endpointslice"))}
 }
 
 // EndpointSlices returns an object that can list and get EndpointSlices.
 func (s *endpointSliceLister) EndpointSlices(namespace string) EndpointSliceNamespaceLister {
-	return endpointSliceNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return endpointSliceNamespaceLister{listers.NewNamespaced[*v1beta1.EndpointSlice](s.ResourceIndexer, namespace)}
 }
 
 // EndpointSliceNamespaceLister helps list and get EndpointSlices.
@@ -74,26 +66,5 @@ type EndpointSliceNamespaceLister interface {
 // endpointSliceNamespaceLister implements the EndpointSliceNamespaceLister
 // interface.
 type endpointSliceNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all EndpointSlices in the indexer for a given namespace.
-func (s endpointSliceNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.EndpointSlice, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.EndpointSlice))
-	})
-	return ret, err
-}
-
-// Get retrieves the EndpointSlice from the indexer for a given namespace and name.
-func (s endpointSliceNamespaceLister) Get(name string) (*v1beta1.EndpointSlice, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("endpointslice"), name)
-	}
-	return obj.(*v1beta1.EndpointSlice), nil
+	listers.ResourceIndexer[*v1beta1.EndpointSlice]
 }

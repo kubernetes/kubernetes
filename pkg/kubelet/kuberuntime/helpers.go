@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 type podsByID []*kubecontainer.Pod
@@ -217,15 +219,18 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 			Message: c.Message,
 		})
 	}
-	retHandlers := make(map[string]kubecontainer.RuntimeHandler)
-	for _, h := range handlers {
+	retHandlers := make([]kubecontainer.RuntimeHandler, len(handlers))
+	for i, h := range handlers {
+		supportsRRO := false
 		supportsUserns := false
 		if h.Features != nil {
+			supportsRRO = h.Features.RecursiveReadOnlyMounts
 			supportsUserns = h.Features.UserNamespaces
 		}
-		retHandlers[h.Name] = kubecontainer.RuntimeHandler{
-			Name:                   h.Name,
-			SupportsUserNamespaces: supportsUserns,
+		retHandlers[i] = kubecontainer.RuntimeHandler{
+			Name:                            h.Name,
+			SupportsRecursiveReadOnlyMounts: supportsRRO,
+			SupportsUserNamespaces:          supportsUserns,
 		}
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers}
@@ -284,4 +289,46 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
 	}, nil
+}
+
+func getAppArmorProfile(pod *v1.Pod, container *v1.Container) (*runtimeapi.SecurityProfile, string, error) {
+	profile := apparmor.GetProfile(pod, container)
+	if profile == nil {
+		return nil, "", nil
+	}
+
+	var (
+		securityProfile   *runtimeapi.SecurityProfile
+		deprecatedProfile string // Deprecated apparmor profile format, still provided for backwards compatibility with older runtimes.
+	)
+
+	switch profile.Type {
+	case v1.AppArmorProfileTypeRuntimeDefault:
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileRuntimeDefault
+
+	case v1.AppArmorProfileTypeUnconfined:
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNameUnconfined
+
+	case v1.AppArmorProfileTypeLocalhost:
+		if profile.LocalhostProfile == nil {
+			return nil, "", errors.New("missing localhost apparmor profile name")
+		}
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: *profile.LocalhostProfile,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNamePrefix + *profile.LocalhostProfile
+
+	default:
+		// Shouldn't happen.
+		return nil, "", fmt.Errorf("unknown apparmor profile type: %q", profile.Type)
+	}
+
+	return securityProfile, deprecatedProfile, nil
 }

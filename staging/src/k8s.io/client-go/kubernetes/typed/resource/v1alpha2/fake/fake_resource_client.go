@@ -36,12 +36,24 @@ func (c *FakeResourceV1alpha2) ResourceClaims(namespace string) v1alpha2.Resourc
 	return &FakeResourceClaims{c, namespace}
 }
 
+func (c *FakeResourceV1alpha2) ResourceClaimParameters(namespace string) v1alpha2.ResourceClaimParametersInterface {
+	return &FakeResourceClaimParameters{c, namespace}
+}
+
 func (c *FakeResourceV1alpha2) ResourceClaimTemplates(namespace string) v1alpha2.ResourceClaimTemplateInterface {
 	return &FakeResourceClaimTemplates{c, namespace}
 }
 
 func (c *FakeResourceV1alpha2) ResourceClasses() v1alpha2.ResourceClassInterface {
 	return &FakeResourceClasses{c}
+}
+
+func (c *FakeResourceV1alpha2) ResourceClassParameters(namespace string) v1alpha2.ResourceClassParametersInterface {
+	return &FakeResourceClassParameters{c, namespace}
+}
+
+func (c *FakeResourceV1alpha2) ResourceSlices() v1alpha2.ResourceSliceInterface {
+	return &FakeResourceSlices{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

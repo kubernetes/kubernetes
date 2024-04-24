@@ -2011,6 +2011,26 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	// +optional
 	ReadOnly bool
+	// RecursiveReadOnly specifies whether read-only mounts should be handled
+	// recursively.
+	//
+	// If ReadOnly is false, this field has no meaning and must be unspecified.
+	//
+	// If ReadOnly is true, and this field is set to Disabled, the mount is not made
+	// recursively read-only.  If this field is set to IfPossible, the mount is made
+	// recursively read-only, if it is supported by the container runtime.  If this
+	// field is set to Enabled, the mount is made recursively read-only if it is
+	// supported by the container runtime, otherwise the pod will not be started and
+	// an error will be generated to indicate the reason.
+	//
+	// If this field is set to IfPossible or Enabled, MountPropagation must be set to
+	// None (or be unspecified, which defaults to None).
+	//
+	// If this field is not specified, it is treated as an equivalent of Disabled.
+	//
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode
 	// Required. If the path is not an absolute path (e.g. some/path) it
 	// will be prepended with the appropriate root prefix for the operating
 	// system.  On Linux this is '/', on Windows this is 'C:\'.
@@ -2023,6 +2043,8 @@ type VolumeMount struct {
 	// to container and the other way around.
 	// When not set, MountPropagationNone is used.
 	// This field is beta in 1.10.
+	// When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+	// (which defaults to None).
 	// +optional
 	MountPropagation *MountPropagationMode
 	// Expanded path within the volume from which the container's volume should be mounted.
@@ -2058,6 +2080,18 @@ const (
 	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
 )
 
+// RecursiveReadOnlyMode describes recursive-readonly mode.
+type RecursiveReadOnlyMode string
+
+const (
+	// RecursiveReadOnlyDisabled disables recursive-readonly mode.
+	RecursiveReadOnlyDisabled RecursiveReadOnlyMode = "Disabled"
+	// RecursiveReadOnlyIfPossible enables recursive-readonly mode if possible.
+	RecursiveReadOnlyIfPossible RecursiveReadOnlyMode = "IfPossible"
+	// RecursiveReadOnlyEnabled enables recursive-readonly mode, or raise an error.
+	RecursiveReadOnlyEnabled RecursiveReadOnlyMode = "Enabled"
+)
+
 // VolumeDevice describes a mapping of a raw block device within a container.
 type VolumeDevice struct {
 	// name must match the name of a persistentVolumeClaim in the pod
@@ -2068,7 +2102,11 @@ type VolumeDevice struct {
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
-	// Required: This must be a C_IDENTIFIER.
+	// Required: Name of the environment variable.
+	// When the RelaxedEnvironmentVariableValidation feature gate is disabled, this must consist of alphabetic characters,
+	// digits, '_', '-', or '.', and must not start with a digit.
+	// When the RelaxedEnvironmentVariableValidation feature gate is enabled,
+	// this may contain any printable ASCII characters except '='.
 	Name string
 	// Optional: no more than one of the following may be specified.
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
@@ -2698,6 +2736,11 @@ type ContainerStatus struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements
+	// Status of volume mounts.
+	// +listType=atomic
+	// +optional
+	// +featureGate=RecursiveReadOnlyMounts
+	VolumeMounts []VolumeMountStatus
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -2770,6 +2813,23 @@ const (
 	// Requested pod resize is not feasible and will not be re-evaluated.
 	PodResizeStatusInfeasible PodResizeStatus = "Infeasible"
 )
+
+// VolumeMountStatus shows status of volume mounts.
+type VolumeMountStatus struct {
+	// Name corresponds to the name of the original VolumeMount.
+	Name string
+	// MountPath corresponds to the original VolumeMount.
+	MountPath string
+	// ReadOnly corresponds to the original VolumeMount.
+	// +optional
+	ReadOnly bool
+	// RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+	// An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+	// depending on the mount result.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode
+}
 
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
@@ -3217,9 +3277,11 @@ type PodSpec struct {
 	// +optional
 	AutomountServiceAccountToken *bool
 
-	// NodeName is a request to schedule this pod onto a specific node.  If it is non-empty,
-	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
-	// requirements.
+	// NodeName indicates in which node this pod is scheduled.
+	// If empty, this pod is a candidate for scheduling by the scheduler defined in schedulerName.
+	// Once this field is set, the kubelet for this node becomes responsible for the lifecycle of this pod.
+	// This field should not be used to express a desire for the pod to be scheduled on a specific node.
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
 	// +optional
 	NodeName string
 	// SecurityContext holds pod-level security attributes and common container settings.
@@ -3325,6 +3387,7 @@ type PodSpec struct {
 	// - spec.hostPID
 	// - spec.hostIPC
 	// - spec.hostUsers
+	// - spec.securityContext.appArmorProfile
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
 	// - spec.securityContext.fsGroup
@@ -3334,6 +3397,7 @@ type PodSpec struct {
 	// - spec.securityContext.runAsUser
 	// - spec.securityContext.runAsGroup
 	// - spec.securityContext.supplementalGroups
+	// - spec.containers[*].securityContext.appArmorProfile
 	// - spec.containers[*].securityContext.seLinuxOptions
 	// - spec.containers[*].securityContext.seccompProfile
 	// - spec.containers[*].securityContext.capabilities
@@ -3415,7 +3479,7 @@ type PodResourceClaimStatus struct {
 	Name string
 
 	// ResourceClaimName is the name of the ResourceClaim that was
-	// generated for the Pod in the namespace of the Pod. It this is
+	// generated for the Pod in the namespace of the Pod. If this is
 	// unset, then generating a ResourceClaim was not necessary. The
 	// pod.spec.resourceClaims entry can be ignored in this case.
 	ResourceClaimName *string
@@ -3598,6 +3662,10 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile
+	// appArmorProfile is the AppArmor options to use by the containers in this pod.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	AppArmorProfile *AppArmorProfile
 }
 
 // SeccompProfile defines a pod/container's seccomp profile settings.
@@ -3623,6 +3691,38 @@ const (
 	SeccompProfileTypeRuntimeDefault SeccompProfileType = "RuntimeDefault"
 	// SeccompProfileTypeLocalhost represents custom made profiles stored on the node's disk.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+)
+
+// AppArmorProfile defines a pod or container's AppArmor settings.
+// +union
+type AppArmorProfile struct {
+	// type indicates which kind of AppArmor profile will be applied.
+	// Valid options are:
+	//   Localhost - a profile pre-loaded on the node.
+	//   RuntimeDefault - the container runtime's default profile.
+	//   Unconfined - no AppArmor enforcement.
+	// +unionDescriminator
+	Type AppArmorProfileType
+
+	// localhostProfile indicates a profile loaded on the node that should be used.
+	// The profile must be preconfigured on the node to work.
+	// Must match the loaded name of the profile.
+	// Must be set if and only if type is "Localhost".
+	// +optional
+	LocalhostProfile *string
+}
+
+// +enum
+type AppArmorProfileType string
+
+const (
+	// AppArmorProfileTypeUnconfined indicates that no AppArmor profile should be enforced.
+	AppArmorProfileTypeUnconfined AppArmorProfileType = "Unconfined"
+	// AppArmorProfileTypeRuntimeDefault indicates that the container runtime's default AppArmor
+	// profile should be used.
+	AppArmorProfileTypeRuntimeDefault AppArmorProfileType = "RuntimeDefault"
+	// AppArmorProfileTypeLocalhost indicates that a profile pre-loaded on the node should be used.
+	AppArmorProfileTypeLocalhost AppArmorProfileType = "Localhost"
 )
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -4735,6 +4835,26 @@ type NodeDaemonEndpoints struct {
 	KubeletEndpoint DaemonEndpoint
 }
 
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+type NodeRuntimeHandlerFeatures struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnlyMounts *bool
+	// Reserved: UserNamespaces *bool
+}
+
+// NodeRuntimeHandler is a set of runtime handler information.
+type NodeRuntimeHandler struct {
+	// Runtime handler name.
+	// Empty for the default runtime handler.
+	// +optional
+	Name string
+	// Supported features.
+	// +optional
+	Features *NodeRuntimeHandlerFeatures
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
 	// MachineID reported by the node. For unique machine identification
@@ -4845,6 +4965,10 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus
+	// The available runtime handlers.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RuntimeHandlers []NodeRuntimeHandler
 }
 
 // UniqueVolumeName defines the name of attached volume
@@ -6028,6 +6152,11 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile
+	// appArmorProfile is the AppArmor options to use by this container. If set, this profile
+	// overrides the pod's appArmorProfile.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	AppArmorProfile *AppArmorProfile
 }
 
 // ProcMountType defines the type of proc mount

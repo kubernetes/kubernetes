@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -320,7 +320,7 @@ func handleConfigMapFromFileSources(configMap *corev1.ConfigMap, fileSources []s
 				return fmt.Errorf("error listing files in %s: %v", filePath, err)
 			}
 			for _, item := range fileList {
-				itemPath := path.Join(filePath, item.Name())
+				itemPath := filepath.Join(filePath, item.Name())
 				if item.Type().IsRegular() {
 					keyName = item.Name()
 					err = addKeyFromFileToConfigMap(configMap, keyName, itemPath)

@@ -26,8 +26,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"go.uber.org/mock/gomock"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"

@@ -21,8 +21,9 @@ package v1alpha2
 // ResourceHandleApplyConfiguration represents an declarative configuration of the ResourceHandle type for use
 // with apply.
 type ResourceHandleApplyConfiguration struct {
-	DriverName *string `json:"driverName,omitempty"`
-	Data       *string `json:"data,omitempty"`
+	DriverName     *string                                     `json:"driverName,omitempty"`
+	Data           *string                                     `json:"data,omitempty"`
+	StructuredData *StructuredResourceHandleApplyConfiguration `json:"structuredData,omitempty"`
 }
 
 // ResourceHandleApplyConfiguration constructs an declarative configuration of the ResourceHandle type for use with
@@ -44,5 +45,13 @@ func (b *ResourceHandleApplyConfiguration) WithDriverName(value string) *Resourc
 // If called multiple times, the Data field is set to the value of the last call.
 func (b *ResourceHandleApplyConfiguration) WithData(value string) *ResourceHandleApplyConfiguration {
 	b.Data = &value
+	return b
+}
+
+// WithStructuredData sets the StructuredData field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StructuredData field is set to the value of the last call.
+func (b *ResourceHandleApplyConfiguration) WithStructuredData(value *StructuredResourceHandleApplyConfiguration) *ResourceHandleApplyConfiguration {
+	b.StructuredData = value
 	return b
 }

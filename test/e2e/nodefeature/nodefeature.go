@@ -86,10 +86,10 @@ var (
 	PodDisruptionConditions = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodDisruptionConditions"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PodHostIPs = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodHostIPs"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodResources = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
+
+	// RecursiveReadOnlyMounts (SIG-node, used for testing recursive read-only mounts <https://kep.k8s.io/3857>)
+	RecursiveReadOnlyMounts = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RecursiveReadOnlyMounts"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ResourceMetrics = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))

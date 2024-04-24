@@ -107,7 +107,7 @@
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
-    queue an d might involve multiple scheduling attempts.
+    queue and might involve multiple scheduling attempts.
   type: Histogram
   stabilityLevel: BETA
   labels:
@@ -314,7 +314,7 @@
   type: Custom
   stabilityLevel: STABLE
   labels:
-  - cluster
+  - storage_cluster_id
 - name: container_cpu_usage_seconds_total
   help: Cumulative cpu time consumed by the container in core-seconds
   type: Custom

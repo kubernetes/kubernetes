@@ -162,8 +162,8 @@ func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 }
 
 func TestGetListNonRecursive(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, store)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(client), store)
 }
 
 type storeWithPrefixTransformer struct {
@@ -214,6 +214,11 @@ func TestTransformationFailure(t *testing.T) {
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	storagetesting.RunTestList(ctx, t, store, compactStorage(client), false)
+}
+
+func TestConsistentList(t *testing.T) {
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestConsistentList(ctx, t, store, compactStorage(client), false, true)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -285,9 +290,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 	storagetesting.RunTestListInconsistentContinuation(ctx, t, store, compactStorage(client))
 }
 
-func TestConsistentList(t *testing.T) {
+func TestListResourceVersionMatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, &storeWithPrefixTransformer{store})
+	storagetesting.RunTestListResourceVersionMatch(ctx, t, &storeWithPrefixTransformer{store})
 }
 
 func TestCount(t *testing.T) {

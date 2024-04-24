@@ -28,10 +28,16 @@ type Interface interface {
 	PodSchedulingContexts() PodSchedulingContextInformer
 	// ResourceClaims returns a ResourceClaimInformer.
 	ResourceClaims() ResourceClaimInformer
+	// ResourceClaimParameters returns a ResourceClaimParametersInformer.
+	ResourceClaimParameters() ResourceClaimParametersInformer
 	// ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
 	ResourceClaimTemplates() ResourceClaimTemplateInformer
 	// ResourceClasses returns a ResourceClassInformer.
 	ResourceClasses() ResourceClassInformer
+	// ResourceClassParameters returns a ResourceClassParametersInformer.
+	ResourceClassParameters() ResourceClassParametersInformer
+	// ResourceSlices returns a ResourceSliceInformer.
+	ResourceSlices() ResourceSliceInformer
 }
 
 type version struct {
@@ -55,6 +61,11 @@ func (v *version) ResourceClaims() ResourceClaimInformer {
 	return &resourceClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// ResourceClaimParameters returns a ResourceClaimParametersInformer.
+func (v *version) ResourceClaimParameters() ResourceClaimParametersInformer {
+	return &resourceClaimParametersInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
 func (v *version) ResourceClaimTemplates() ResourceClaimTemplateInformer {
 	return &resourceClaimTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -63,4 +74,14 @@ func (v *version) ResourceClaimTemplates() ResourceClaimTemplateInformer {
 // ResourceClasses returns a ResourceClassInformer.
 func (v *version) ResourceClasses() ResourceClassInformer {
 	return &resourceClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceClassParameters returns a ResourceClassParametersInformer.
+func (v *version) ResourceClassParameters() ResourceClassParametersInformer {
+	return &resourceClassParametersInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceSlices returns a ResourceSliceInformer.
+func (v *version) ResourceSlices() ResourceSliceInformer {
+	return &resourceSliceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

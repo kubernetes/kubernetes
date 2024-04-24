@@ -432,7 +432,7 @@ msgstr "Create a service account with the specified name"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:42
 msgid "Delete the specified cluster from the kubeconfig"
-msgstr "指定したコンテキストをkubeconfigから削除する"
+msgstr "指定したクラスターをkubeconfigから削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
 #: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:42

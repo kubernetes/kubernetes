@@ -17,10 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
-	"sort"
-	"strings"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -228,10 +224,12 @@ type KubeProxyConfiguration struct {
 	// used.)
 	ClusterCIDR string
 
-	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set,
+	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or
+	// alternatively, the single string 'primary'. If set to a list of CIDRs,
 	// connections to NodePort services will only be accepted on node IPs in one of
-	// the indicated ranges. If unset, NodePort connections will be accepted on all
-	// local IPs.
+	// the indicated ranges. If set to 'primary', NodePort services will only be
+	// accepted on the node's primary IPv4 and/or IPv6 address according to the Node
+	// object. If unset, NodePort connections will be accepted on all local IPs.
 	NodePortAddresses []string
 
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
@@ -265,17 +263,6 @@ const (
 	ProxyModeKernelspace ProxyMode = "kernelspace"
 )
 
-// LocalMode represents modes to detect local traffic from the node
-type LocalMode string
-
-// Currently supported modes for LocalMode
-const (
-	LocalModeClusterCIDR         LocalMode = "ClusterCIDR"
-	LocalModeNodeCIDR            LocalMode = "NodeCIDR"
-	LocalModeBridgeInterface     LocalMode = "BridgeInterface"
-	LocalModeInterfaceNamePrefix LocalMode = "InterfaceNamePrefix"
-)
-
 func (m *ProxyMode) Set(s string) error {
 	*m = ProxyMode(s)
 	return nil
@@ -291,6 +278,17 @@ func (m *ProxyMode) String() string {
 func (m *ProxyMode) Type() string {
 	return "ProxyMode"
 }
+
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string
+
+// Currently supported modes for LocalMode
+const (
+	LocalModeClusterCIDR         LocalMode = "ClusterCIDR"
+	LocalModeNodeCIDR            LocalMode = "NodeCIDR"
+	LocalModeBridgeInterface     LocalMode = "BridgeInterface"
+	LocalModeInterfaceNamePrefix LocalMode = "InterfaceNamePrefix"
+)
 
 func (m *LocalMode) Set(s string) error {
 	*m = LocalMode(s)
@@ -308,32 +306,6 @@ func (m *LocalMode) Type() string {
 	return "LocalMode"
 }
 
-type ConfigurationMap map[string]string
-
-func (m *ConfigurationMap) String() string {
-	pairs := []string{}
-	for k, v := range *m {
-		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
-	}
-	sort.Strings(pairs)
-	return strings.Join(pairs, ",")
-}
-
-func (m *ConfigurationMap) Set(value string) error {
-	for _, s := range strings.Split(value, ",") {
-		if len(s) == 0 {
-			continue
-		}
-		arr := strings.SplitN(s, "=", 2)
-		if len(arr) == 2 {
-			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
-		} else {
-			(*m)[strings.TrimSpace(arr[0])] = ""
-		}
-	}
-	return nil
-}
-
-func (*ConfigurationMap) Type() string {
-	return "mapStringString"
-}
+// NodePortAddressesPrimary is a special value for NodePortAddresses indicating that it
+// should only use the primary node IPs.
+const NodePortAddressesPrimary string = "primary"

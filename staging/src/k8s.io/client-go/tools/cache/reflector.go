@@ -49,6 +49,12 @@ import (
 
 const defaultExpectedTypeName = "<unspecified>"
 
+var (
+	// We try to spread the load on apiserver by setting timeouts for
+	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+	defaultMinWatchTimeout = 5 * time.Minute
+)
+
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
 	// name identifies this reflector. By default it will be a file:line if possible.
@@ -72,6 +78,8 @@ type Reflector struct {
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
 	resyncPeriod   time.Duration
+	// minWatchTimeout defines the minimum timeout for watch requests.
+	minWatchTimeout time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
@@ -151,12 +159,6 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 	}
 }
 
-var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	minWatchTimeout = 5 * time.Minute
-)
-
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
 // The indexer is configured to key on namespace
 func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
@@ -194,6 +196,10 @@ type ReflectorOptions struct {
 	// (do not resync).
 	ResyncPeriod time.Duration
 
+	// MinWatchTimeout, if non-zero, defines the minimum timeout for watch requests send to kube-apiserver.
+	// However, values lower than 5m will not be honored to avoid negative performance impact on controlplane.
+	MinWatchTimeout time.Duration
+
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
 }
@@ -213,9 +219,14 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	if reflectorClock == nil {
 		reflectorClock = clock.RealClock{}
 	}
+	minWatchTimeout := defaultMinWatchTimeout
+	if options.MinWatchTimeout > defaultMinWatchTimeout {
+		minWatchTimeout = options.MinWatchTimeout
+	}
 	r := &Reflector{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
+		minWatchTimeout: minWatchTimeout,
 		typeDescription: options.TypeDescription,
 		listerWatcher:   lw,
 		store:           store,
@@ -415,7 +426,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		start := r.clock.Now()
 
 		if w == nil {
-			timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+			timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 			options := metav1.ListOptions{
 				ResourceVersion: r.LastSyncResourceVersion(),
 				// We want to avoid situations of hanging watchers. Stop any watchers that do not
@@ -642,7 +653,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
-		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+		timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 		options := metav1.ListOptions{
 			ResourceVersion:      lastKnownRV,
 			AllowWatchBookmarks:  true,
@@ -780,7 +791,7 @@ loop:
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
-				if meta.GetAnnotations()["k8s.io/initial-events-end"] == "true" {
+				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
 					if exitOnInitialEventsEndBookmark != nil {
 						*exitOnInitialEventsEndBookmark = true
 					}

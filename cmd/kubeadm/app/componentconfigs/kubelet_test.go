@@ -49,12 +49,6 @@ func testKubeletConfigMap(contents string) *v1.ConfigMap {
 }
 
 func TestKubeletDefault(t *testing.T) {
-	var resolverConfig *string
-	if isSystemdResolvedActive, _ := isServiceActive("systemd-resolved"); isSystemdResolvedActive {
-		// If systemd-resolved is active, we need to set the default resolver config
-		resolverConfig = ptr.To(kubeletSystemdResolverConfig)
-	}
-
 	tests := []struct {
 		name       string
 		clusterCfg kubeadmapi.ClusterConfiguration
@@ -85,7 +79,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -119,7 +112,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -153,7 +145,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -188,7 +179,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -220,7 +210,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},

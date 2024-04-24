@@ -64,6 +64,7 @@ func Test_NodesDeleted(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
@@ -178,6 +179,7 @@ func Test_NodesDeleted(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
@@ -289,6 +291,7 @@ func Test_NodesDeleted(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2:  true,
@@ -406,6 +409,7 @@ func Test_NodesDeleted(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				EnableInstancesV2:  true,
@@ -674,6 +678,7 @@ func Test_NodesShutdown(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				ErrShutdownByProviderID: nil,
@@ -751,6 +756,7 @@ func Test_NodesShutdown(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				ErrShutdownByProviderID: nil,
@@ -777,6 +783,7 @@ func Test_NodesShutdown(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            false,
@@ -801,6 +808,7 @@ func Test_NodesShutdown(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            false,
@@ -865,6 +873,7 @@ func Test_NodesShutdown(t *testing.T) {
 					},
 				},
 			},
+			expectedNode:    &v1.Node{},
 			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            true,

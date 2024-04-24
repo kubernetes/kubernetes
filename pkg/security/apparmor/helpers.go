@@ -19,26 +19,87 @@ package apparmor
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 )
 
-// Checks whether app armor is required for pod to be run.
+// Checks whether app armor is required for the pod to run. AppArmor is considered required if any
+// non-unconfined profiles are specified.
 func isRequired(pod *v1.Pod) bool {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.AppArmorProfile != nil &&
+		pod.Spec.SecurityContext.AppArmorProfile.Type != v1.AppArmorProfileTypeUnconfined {
+		return true
+	}
+
+	inUse := !podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(c *v1.Container, _ podutil.ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil &&
+			c.SecurityContext.AppArmorProfile.Type != v1.AppArmorProfileTypeUnconfined {
+			return false // is in use; short-circuit
+		}
+		return true
+	})
+	if inUse {
+		return true
+	}
+
 	for key, value := range pod.Annotations {
-		if strings.HasPrefix(key, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
-			return value != v1.AppArmorBetaProfileNameUnconfined
+		if strings.HasPrefix(key, v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) {
+			return value != v1.DeprecatedAppArmorBetaProfileNameUnconfined
 		}
 	}
 	return false
 }
 
 // GetProfileName returns the name of the profile to use with the container.
-func GetProfileName(pod *v1.Pod, containerName string) string {
-	return GetProfileNameFromPodAnnotations(pod.Annotations, containerName)
+func GetProfile(pod *v1.Pod, container *v1.Container) *v1.AppArmorProfile {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields) {
+		return getProfileFromPodAnnotations(pod.Annotations, container.Name)
+	}
+
+	if container.SecurityContext != nil && container.SecurityContext.AppArmorProfile != nil {
+		return container.SecurityContext.AppArmorProfile
+	}
+
+	// Static pods may not have had annotations synced to fields, so fallback to annotations before
+	// the pod profile.
+	if profile := getProfileFromPodAnnotations(pod.Annotations, container.Name); profile != nil {
+		return profile
+	}
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.AppArmorProfile != nil {
+		return pod.Spec.SecurityContext.AppArmorProfile
+	}
+
+	return nil
 }
 
-// GetProfileNameFromPodAnnotations gets the name of the profile to use with container from
-// pod annotations
-func GetProfileNameFromPodAnnotations(annotations map[string]string, containerName string) string {
-	return annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName]
+// getProfileFromPodAnnotations gets the AppArmor profile to use with container from
+// (deprecated) pod annotations.
+func getProfileFromPodAnnotations(annotations map[string]string, containerName string) *v1.AppArmorProfile {
+	val, ok := annotations[v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+containerName]
+	if !ok {
+		return nil
+	}
+
+	switch {
+	case val == v1.DeprecatedAppArmorBetaProfileRuntimeDefault:
+		return &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeRuntimeDefault}
+
+	case val == v1.DeprecatedAppArmorBetaProfileNameUnconfined:
+		return &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeUnconfined}
+
+	case strings.HasPrefix(val, v1.DeprecatedAppArmorBetaProfileNamePrefix):
+		// Note: an invalid empty localhost profile will be rejected by kubelet admission.
+		profileName := strings.TrimPrefix(val, v1.DeprecatedAppArmorBetaProfileNamePrefix)
+		return &v1.AppArmorProfile{
+			Type:             v1.AppArmorProfileTypeLocalhost,
+			LocalhostProfile: &profileName,
+		}
+
+	default:
+		// Invalid annotation.
+		return nil
+	}
 }

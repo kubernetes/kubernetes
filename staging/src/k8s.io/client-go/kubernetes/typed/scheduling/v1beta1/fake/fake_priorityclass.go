@@ -43,20 +43,22 @@ var priorityclassesKind = v1beta1.SchemeGroupVersion.WithKind("PriorityClass")
 
 // Get takes name of the priorityClass, and returns the corresponding priorityClass object, and an error if there is any.
 func (c *FakePriorityClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PriorityClass, err error) {
+	emptyResult := &v1beta1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(priorityclassesResource, name), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootGetAction(priorityclassesResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.PriorityClass), err
 }
 
 // List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
 func (c *FakePriorityClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PriorityClassList, err error) {
+	emptyResult := &v1beta1.PriorityClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(priorityclassesResource, priorityclassesKind, opts), &v1beta1.PriorityClassList{})
+		Invokes(testing.NewRootListAction(priorityclassesResource, priorityclassesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,20 +82,22 @@ func (c *FakePriorityClasses) Watch(ctx context.Context, opts v1.ListOptions) (w
 
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
 func (c *FakePriorityClasses) Create(ctx context.Context, priorityClass *v1beta1.PriorityClass, opts v1.CreateOptions) (result *v1beta1.PriorityClass, err error) {
+	emptyResult := &v1beta1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.PriorityClass), err
 }
 
 // Update takes the representation of a priorityClass and updates it. Returns the server's representation of the priorityClass, and an error, if there is any.
 func (c *FakePriorityClasses) Update(ctx context.Context, priorityClass *v1beta1.PriorityClass, opts v1.UpdateOptions) (result *v1beta1.PriorityClass, err error) {
+	emptyResult := &v1beta1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.PriorityClass), err
 }
@@ -115,10 +119,11 @@ func (c *FakePriorityClasses) DeleteCollection(ctx context.Context, opts v1.Dele
 
 // Patch applies the patch and returns the patched priorityClass.
 func (c *FakePriorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PriorityClass, err error) {
+	emptyResult := &v1beta1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.PriorityClass), err
 }
@@ -136,10 +141,11 @@ func (c *FakePriorityClasses) Apply(ctx context.Context, priorityClass *scheduli
 	if name == nil {
 		return nil, fmt.Errorf("priorityClass.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, *name, types.ApplyPatchType, data), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.PriorityClass), err
 }

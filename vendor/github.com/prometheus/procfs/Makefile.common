@@ -49,19 +49,19 @@ endif
 GOTEST := $(GO) test
 GOTEST_DIR :=
 ifneq ($(CIRCLE_JOB),)
-ifneq ($(shell which gotestsum),)
+ifneq ($(shell command -v gotestsum > /dev/null),)
 	GOTEST_DIR := test-results
 	GOTEST := gotestsum --junitfile $(GOTEST_DIR)/unit-tests.xml --
 endif
 endif
 
-PROMU_VERSION ?= 0.14.0
+PROMU_VERSION ?= 0.15.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
 SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v1.51.2
+GOLANGCI_LINT_VERSION ?= v1.54.2
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
@@ -178,7 +178,7 @@ endif
 .PHONY: common-yamllint
 common-yamllint:
 	@echo ">> running yamllint on all YAML files in the repository"
-ifeq (, $(shell which yamllint))
+ifeq (, $(shell command -v yamllint > /dev/null))
 	@echo "yamllint not installed so skipping"
 else
 	yamllint .
