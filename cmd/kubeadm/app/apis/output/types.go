@@ -93,9 +93,6 @@ type UpgradePlan struct {
 	AvailableUpgrades []AvailableUpgrade
 
 	ConfigVersions []ComponentConfigVersionState
-
-	// TODO: Remove this field when v1alpha2 is removed
-	Components []ComponentUpgradePlan
 }
 
 // Certificate represents information for a certificate or a certificate authority when using the check-expiration command.
