@@ -189,6 +189,12 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	validPlugins := validConfig.DeepCopy()
 	validPlugins.Profiles[0].Plugins.Score.Enabled = append(validPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
 
+	invalidPlugins := validConfig.DeepCopy()
+	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "AzureDiskLimits"})
+	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "CinderLimits"})
+	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "EBSLimits"})
+	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "GCEPDLimits"})
+
 	scenarios := map[string]struct {
 		config   *config.KubeSchedulerConfiguration
 		wantErrs field.ErrorList
@@ -364,6 +370,27 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "profiles[1].plugins.queueSort",
+				},
+			},
+		},
+		"invalid-plugins": {
+			config: invalidPlugins,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].plugins.score.enabled[0]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].plugins.score.enabled[1]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].plugins.score.enabled[2]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].plugins.score.enabled[3]",
 				},
 			},
 		},

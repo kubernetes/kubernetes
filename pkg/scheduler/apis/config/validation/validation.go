@@ -101,7 +101,12 @@ type invalidPlugins struct {
 var invalidPluginsByVersion = []invalidPlugins{
 	{
 		schemeGroupVersion: v1.SchemeGroupVersion.String(),
-		plugins:            []string{},
+		plugins: []string{
+			"AzureDiskLimits",
+			"CinderLimits",
+			"EBSLimits",
+			"GCEPDLimits",
+		},
 	},
 }
 
