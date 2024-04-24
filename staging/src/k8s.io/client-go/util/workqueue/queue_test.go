@@ -29,7 +29,7 @@ import (
 
 // traceQueue traces whether items are touched
 type traceQueue struct {
-	workqueue.Queue
+	workqueue.Queue[any]
 
 	touched map[interface{}]struct{}
 }
@@ -42,7 +42,7 @@ func (t *traceQueue) Touch(item interface{}) {
 	t.touched[item] = struct{}{}
 }
 
-var _ workqueue.Queue = &traceQueue{}
+var _ workqueue.Queue[any] = &traceQueue{}
 
 func TestBasic(t *testing.T) {
 	tests := []struct {
@@ -215,7 +215,7 @@ func TestReinsert(t *testing.T) {
 }
 
 func TestCollapse(t *testing.T) {
-	tq := &traceQueue{Queue: workqueue.DefaultQueue()}
+	tq := &traceQueue{Queue: workqueue.DefaultQueue[any]()}
 	q := workqueue.NewWithConfig(workqueue.QueueConfig{
 		Name:  "",
 		Queue: tq,
@@ -244,7 +244,7 @@ func TestCollapse(t *testing.T) {
 }
 
 func TestCollapseWhileProcessing(t *testing.T) {
-	tq := &traceQueue{Queue: workqueue.DefaultQueue()}
+	tq := &traceQueue{Queue: workqueue.DefaultQueue[any]()}
 	q := workqueue.NewWithConfig(workqueue.QueueConfig{
 		Name:  "",
 		Queue: tq,
