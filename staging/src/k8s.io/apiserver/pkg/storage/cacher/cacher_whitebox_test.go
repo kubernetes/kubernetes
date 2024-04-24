@@ -2446,9 +2446,8 @@ func TestWatchStreamSeparation(t *testing.T) {
 			if tc.useWatchCacheContextMetadata {
 				contextMetadata = cacher.watchCache.waitingUntilFresh.contextMetadata
 			}
-			// Wait before sending watch progress request to avoid https://github.com/etcd-io/etcd/issues/17507
-			// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove sleep when etcd is upgraded to version with fix.
-			time.Sleep(time.Second)
+			// For the first 100ms from watch creation, watch progress requests are ignored.
+			time.Sleep(200 * time.Millisecond)
 			err = cacher.storage.RequestWatchProgress(metadata.NewOutgoingContext(context.Background(), contextMetadata))
 			if err != nil {
 				t.Fatal(err)
@@ -2459,13 +2458,13 @@ func TestWatchStreamSeparation(t *testing.T) {
 			etcdWatchResourceVersion := waitForEtcdBookmark()
 			gotEtcdWatchBookmark := etcdWatchResourceVersion == lastResourceVersion
 			if gotEtcdWatchBookmark != tc.expectBookmarkOnEtcd {
-				t.Errorf("Unexpected etcd bookmark check result, rv: %d, got: %v, want: %v", etcdWatchResourceVersion, etcdWatchResourceVersion, tc.expectBookmarkOnEtcd)
+				t.Errorf("Unexpected etcd bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", etcdWatchResourceVersion, lastResourceVersion, tc.expectBookmarkOnEtcd)
 			}
 
 			watchCacheResourceVersion := getCacherRV()
 			cacherGotBookmark := watchCacheResourceVersion == lastResourceVersion
 			if cacherGotBookmark != tc.expectBookmarkOnWatchCache {
-				t.Errorf("Unexpected watch cache bookmark check result, rv: %d, got: %v, want: %v", watchCacheResourceVersion, cacherGotBookmark, tc.expectBookmarkOnWatchCache)
+				t.Errorf("Unexpected watch cache bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", watchCacheResourceVersion, lastResourceVersion, tc.expectBookmarkOnWatchCache)
 			}
 		})
 	}
