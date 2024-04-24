@@ -495,9 +495,9 @@ var (
 	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
 	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
 
-	// defaultKubernetesPlaceholderVersion is a placeholder version in case the component-base
+	// DefaultKubernetesPlaceholderVersion is a placeholder version in case the component-base
 	// version was not populated during build.
-	defaultKubernetesPlaceholderVersion = version.MustParseSemantic("v1.0.0-placeholder-version")
+	DefaultKubernetesPlaceholderVersion = version.MustParseSemantic("v1.0.0-placeholder-version")
 )
 
 // getSkewedKubernetesVersion returns the current MAJOR.(MINOR+n).0 Kubernetes version with a skew of 'n'
@@ -515,7 +515,7 @@ func getSkewedKubernetesVersionImpl(versionInfo *apimachineryversion.Info, n int
 	// More changes would be required if the kubelet version one day decouples from that of Kubernetes.
 	var ver *version.Version
 	if len(versionInfo.Major) == 0 {
-		return defaultKubernetesPlaceholderVersion
+		return DefaultKubernetesPlaceholderVersion
 	}
 	ver = version.MustParseSemantic(versionInfo.GitVersion)
 	// Append the MINOR version skew.
