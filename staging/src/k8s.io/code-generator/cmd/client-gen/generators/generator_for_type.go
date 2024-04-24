@@ -172,6 +172,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
 		"jsonMarshal":          c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
+		"CheckListFromCacheDataConsistencyIfRequested": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/consistencydetector", Name: "CheckListFromCacheDataConsistencyIfRequested"}),
 	}
 
 	if generateApply {
@@ -223,6 +224,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	if tags.HasVerb("list") {
 		sw.Do(listTemplate, m)
+		sw.Do(privateListTemplate, m)
 	}
 	if tags.HasVerb("watch") {
 		sw.Do(watchTemplate, m)
@@ -298,6 +300,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listSubresourceTemplate), m)
 			} else {
 				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listTemplate), m)
+				sw.Do(adjustTemplate(e.VerbName, e.VerbType, privateListTemplate), m)
 			}
 		}
 
@@ -459,6 +462,18 @@ func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privateP
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List(ctx context.Context, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+    defer func() {
+        if err == nil {
+            $.CheckListFromCacheDataConsistencyIfRequested|raw$(ctx, "list request for $.type|resource$", c.list, opts, result)
+        }
+    }()
+    return c.list(ctx, opts)
+}
+`
+
+var privateListTemplate = `
+// list takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
+func (c *$.type|privatePlural$) list(ctx context.Context, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil{
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
