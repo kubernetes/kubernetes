@@ -277,7 +277,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 
 			ginkgo.It("should get logs from all pods", func(ctx context.Context) {
 				ginkgo.By("Waiting for StatefulSet pods to be running.")
-				e2estatefulset.WaitForRunningAndReady(ctx, c, int32(numberReplicas), sts)
+				e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, sts, int32(numberReplicas))
 
 				ginkgo.By("default container for each pod")
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods")
