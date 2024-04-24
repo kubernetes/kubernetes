@@ -26,6 +26,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"runtime"
 	"sort"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -580,6 +582,13 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder) (ControllerContext, error) {
 	// Informer transform to trim ManagedFields for memory efficiency.
 	trim := func(obj interface{}) (interface{}, error) {
+		if _, ok := obj.(pkgruntime.Unstructured); ok {
+			stacktrace := make([]byte, 64<<10)
+			stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
+			klog.Errorf("AAA: panic: %s", stacktrace)
+			panic("using unstructured")
+		}
+
 		if accessor, err := meta.Accessor(obj); err == nil {
 			if accessor.GetManagedFields() != nil {
 				accessor.SetManagedFields(nil)
