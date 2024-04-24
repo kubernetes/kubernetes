@@ -20,10 +20,14 @@ package kubectl
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -33,12 +37,54 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
+func testingStatefulSet(name string, numberOfPods int32) appsv1.StatefulSet {
+	return appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
+			},
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: &numberOfPods,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": name,
+				},
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+					},
+					Annotations: map[string]string{
+						podcmd.DefaultContainerAnnotationName: "container-2",
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "container-1",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Args:  []string{"logs-generator", "--log-lines-total", "10", "--run-duration", "5s"},
+						},
+						{
+							Name:  "container-2",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Args:  []string{"logs-generator", "--log-lines-total", "20", "--run-duration", "5s"},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+}
 func testingPod(name, value, defaultContainerName string) v1.Pod {
 	return v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -55,12 +101,12 @@ func testingPod(name, value, defaultContainerName string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "container-1",
-					Image: agnhostImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"logs-generator", "--log-lines-total", "10", "--run-duration", "5s"},
 				},
 				{
 					Name:  defaultContainerName,
-					Image: agnhostImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"logs-generator", "--log-lines-total", "20", "--run-duration", "5s"},
 				},
 			},
@@ -94,7 +140,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("creating an pod")
 			// Agnhost image generates logs for a total of 100 lines over 20s.
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, "--restart=Never", podRunningTimeoutArg, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+imageutils.GetE2EImage(imageutils.Agnhost), "--restart=Never", podRunningTimeoutArg, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
 		})
 		ginkgo.AfterEach(func() {
 			e2ekubectl.RunKubectlOrDie(ns, "delete", "pod", podName)
@@ -205,6 +251,48 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				framework.Logf("got output %q", out)
 				gomega.Expect(lines(out)).To(gomega.HaveLen(20))
 			})
+		})
+	})
+
+	ginkgo.Describe("all pod logs", func() {
+		ginkgo.Describe("the StatefulSet has 2 replicas and each pod has 2 containers", func() {
+			var sts *appsv1.StatefulSet
+			stsName := "sts" + string(uuid.NewUUID())
+			numberReplicas := int32(2)
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				stsClient := c.AppsV1().StatefulSets(ns)
+				ginkgo.By("constructing the StatefulSet")
+				stsCopy := testingStatefulSet(stsName, numberReplicas)
+				sts = &stsCopy
+				ginkgo.By("creating the StatefulSet")
+				_, err := stsClient.Create(ctx, sts, metav1.CreateOptions{})
+				if err != nil {
+					framework.Failf("Failed to create StatefulSet: %v", err)
+				}
+			})
+
+			ginkgo.AfterEach(func() {
+				e2ekubectl.RunKubectlOrDie(ns, "delete", "sts", stsName)
+			})
+
+			ginkgo.It("should get logs from all pods", func(ctx context.Context) {
+				ginkgo.By("Waiting for StatefulSet pods to be running.")
+				e2estatefulset.WaitForRunningAndReady(ctx, c, int32(numberReplicas), sts)
+
+				ginkgo.By("default container for each pod")
+				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods")
+				framework.Logf("got output %q", out)
+				gomega.Expect(out).NotTo(gomega.BeEmpty())
+				gomega.Expect(lines(out)).To(gomega.HaveLen(20))
+
+				ginkgo.By("all containers for each pod")
+				out = e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods", "--all-containers")
+				framework.Logf("got output %q", out)
+				gomega.Expect(out).NotTo(gomega.BeEmpty())
+				gomega.Expect(lines(out)).To(gomega.HaveLen(30))
+
+			})
+
 		})
 	})
 
