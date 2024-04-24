@@ -1525,7 +1525,7 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
 
 			pod := &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1569,7 +1569,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	)
 
 	// Enable the Feature Gate during the first rule creation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)
 	ctx := genericapirequest.NewDefaultContext()
 
 	pod := &api.Pod{
@@ -1616,7 +1616,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	}
 
 	// Disable the Feature Gate and expect these fields still exist after updating.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)
 
 	updatedPod := createdPod.DeepCopy()
 	updatedPod.Labels = map[string]string{"foo": "bar"}
@@ -1636,7 +1636,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	}
 
 	// Enable the Feature Gate again to check whether configured fields still exist after updating.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)
 
 	updatedPod2 := updatedPod.DeepCopy()
 	updatedPod2.Labels = map[string]string{"foo": "fuz"}
@@ -2003,7 +2003,7 @@ func Test_mutatePodAffinity(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tc.featureGateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tc.featureGateEnabled)
 
 			pod := tc.pod
 			mutatePodAffinity(pod)
@@ -2094,7 +2094,7 @@ func TestPodLifecycleSleepActionEnablement(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)
 
 			newPod := tc.newPod
 

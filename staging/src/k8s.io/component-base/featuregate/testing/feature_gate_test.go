@@ -133,8 +133,8 @@ func TestSetFeatureGateInTest(t *gotest.T) {
 	require.NoError(t, err)
 
 	assert.False(t, gate.Enabled("feature"))
-	defer SetFeatureGateDuringTest(t, gate, "feature", true)()
-	defer SetFeatureGateDuringTest(t, gate, "feature", true)()
+	SetFeatureGateDuringTest(t, gate, "feature", true)
+	SetFeatureGateDuringTest(t, gate, "feature", true)
 
 	assert.True(t, gate.Enabled("feature"))
 	t.Run("Subtest", func(t *gotest.T) {
@@ -150,7 +150,7 @@ func TestSetFeatureGateInTest(t *gotest.T) {
 	assert.True(t, gate.Enabled("feature"))
 
 	t.Run("OverwriteInSubtest", func(t *gotest.T) {
-		defer SetFeatureGateDuringTest(t, gate, "feature", false)()
+		SetFeatureGateDuringTest(t, gate, "feature", false)
 		assert.False(t, gate.Enabled("feature"))
 	})
 	assert.True(t, gate.Enabled("feature"))
@@ -169,7 +169,7 @@ func TestDetectLeakToMainTest(t *gotest.T) {
 	// Subtest setting feature gate and calling parallel will leak it out
 	t.Run("LeakingSubtest", func(t *gotest.T) {
 		fakeT := &ignoreFatalT{T: t}
-		defer SetFeatureGateDuringTest(fakeT, gate, "feature", true)()
+		SetFeatureGateDuringTest(fakeT, gate, "feature", true)
 		// Calling t.Parallel in subtest will resume the main test body
 		t.Parallel()
 		// Leaked false from main test
@@ -178,7 +178,7 @@ func TestDetectLeakToMainTest(t *gotest.T) {
 	// Leaked true from subtest
 	assert.True(t, gate.Enabled("feature"))
 	fakeT := &ignoreFatalT{T: t}
-	defer SetFeatureGateDuringTest(fakeT, gate, "feature", false)()
+	SetFeatureGateDuringTest(fakeT, gate, "feature", false)
 	assert.True(t, fakeT.fatalRecorded)
 }
 
@@ -196,7 +196,7 @@ func TestDetectLeakToOtherSubtest(t *gotest.T) {
 	// Subtest setting feature gate and calling parallel will leak it out
 	t.Run(subtestName, func(t *gotest.T) {
 		fakeT := &ignoreFatalT{T: t}
-		defer SetFeatureGateDuringTest(fakeT, gate, "feature", true)()
+		SetFeatureGateDuringTest(fakeT, gate, "feature", true)
 		t.Parallel()
 	})
 	// Add suffix to name to prevent tests with the same prefix.
@@ -205,7 +205,7 @@ func TestDetectLeakToOtherSubtest(t *gotest.T) {
 		assert.True(t, gate.Enabled("feature"))
 
 		fakeT := &ignoreFatalT{T: t}
-		defer SetFeatureGateDuringTest(fakeT, gate, "feature", false)()
+		SetFeatureGateDuringTest(fakeT, gate, "feature", false)
 		assert.True(t, fakeT.fatalRecorded)
 	})
 }
@@ -220,10 +220,10 @@ func TestCannotDetectLeakFromSubtest(t *gotest.T) {
 	})
 	require.NoError(t, err)
 
-	defer SetFeatureGateDuringTest(t, gate, "feature", false)()
+	SetFeatureGateDuringTest(t, gate, "feature", false)
 	// Subtest setting feature gate and calling parallel will leak it out
 	t.Run("Subtest", func(t *gotest.T) {
-		defer SetFeatureGateDuringTest(t, gate, "feature", true)()
+		SetFeatureGateDuringTest(t, gate, "feature", true)
 		t.Parallel()
 	})
 	// Leaked true

@@ -189,7 +189,7 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			if scenario.enableWatchList {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 			}
 			origCtx, store, _ := testSetup(t, scenario.setupFn)
 			ctx, cancel := context.WithCancel(origCtx)
@@ -210,7 +210,7 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 }
 
 func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
 	defer cancel()

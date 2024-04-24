@@ -83,9 +83,9 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 	// Enable the node token improvements feature gates prior to starting the apiserver, as the node getter is
 	// conditionally passed to the service account token generator based on feature enablement.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBindingValidation, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBindingValidation, true)
 
 	// Start the server
 	var serverAddress string
@@ -248,7 +248,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 	t.Run("bound to service account and pod", func(t *testing.T) {
 		// Disable embedding pod's node info
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, false)
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
 				Audiences: []string{"api"},
@@ -423,7 +423,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 	t.Run("fails to bind to a Node if the feature gate is disabled", func(t *testing.T) {
 		// Disable node binding
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, false)
 
 		// Create ServiceAccount and Node objects
 		sa, del := createDeleteSvcAcct(t, cs, sa)

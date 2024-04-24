@@ -378,7 +378,7 @@ func (c *claimsTest) run(t *testing.T) {
 }
 
 func TestToken(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	synchronizeTokenIDVerifierForTest = true
 	tests := []claimsTest{

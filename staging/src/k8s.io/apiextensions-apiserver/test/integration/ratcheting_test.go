@@ -332,7 +332,7 @@ type ratchetingTestCase struct {
 }
 
 func runTests(t *testing.T, cases []ratchetingTestCase) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, true)
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -1901,7 +1901,7 @@ func BenchmarkRatcheting(b *testing.B) {
 			name = "RatchetingDisabled"
 		}
 		b.Run(name, func(b *testing.B) {
-			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)
 			b.ResetTimer()
 
 			do := func(pairs []pair) {
@@ -1942,7 +1942,7 @@ func BenchmarkRatcheting(b *testing.B) {
 
 func TestRatchetingDropFields(t *testing.T) {
 	// Field dropping only takes effect when feature is disabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, false)
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)

@@ -192,7 +192,7 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 
 	t.Run("ConsistentListFromStorage", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
 		)
@@ -202,7 +202,7 @@ func TestGetListCacheBypass(t *testing.T) {
 
 	})
 	t.Run("ConsistentListFromCache", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
 		)
@@ -354,7 +354,7 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "",
 		Predicate:       storage.Everything,
@@ -365,7 +365,7 @@ func TestWatchCacheBypass(t *testing.T) {
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.injectError(errDummy)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "",
 		Predicate:       storage.Everything,
@@ -1644,8 +1644,8 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 
 	scenarios := []struct {
 		name               string
@@ -1906,7 +1906,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 // a bookmark event will be delivered after the cacher has seen an event.
 // Previously the watchers have been removed from the "want bookmark" queue.
 func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2414,7 +2414,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)
 			_, cacher, _, terminate := testSetupWithEtcdServer(t)
 			t.Cleanup(terminate)
 			if err := cacher.ready.wait(context.TODO()); err != nil {

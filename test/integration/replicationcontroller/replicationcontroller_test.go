@@ -503,7 +503,7 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestLogarithmicScaleDown(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, true)
 	tCtx, closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
 	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)

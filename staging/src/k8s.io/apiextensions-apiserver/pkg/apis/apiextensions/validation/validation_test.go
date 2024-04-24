@@ -4373,7 +4373,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 }
 
 func TestSelectableFields(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
 	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
 		{
 			Name:    "version",

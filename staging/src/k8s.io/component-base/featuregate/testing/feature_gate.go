@@ -36,21 +36,18 @@ func init() {
 
 // SetFeatureGateDuringTest sets the specified gate to the specified value for duration of the test.
 // Fails when it detects second call to the same flag or is unable to set or restore feature flag.
-// Returns empty cleanup function to maintain the old function signature that uses defer.
-// TODO: Remove defer from calls to SetFeatureGateDuringTest and update hack/verify-test-featuregates.sh when we can do large scale code change.
 //
 // WARNING: Can leak set variable when called in test calling t.Parallel(), however second attempt to set the same feature flag will cause fatal.
 //
 // Example use:
 //
-// defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
-func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
+// featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)
+func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) {
 	tb.Helper()
 	detectParallelOverrideCleanup := detectParallelOverride(tb, f)
 	originalValue := gate.Enabled(f)
 
 	// Specially handle AllAlpha and AllBeta
-	var cleanups []func()
 	if f == "AllAlpha" || f == "AllBeta" {
 		// Iterate over individual gates so their individual values get restored
 		for k, v := range gate.(featuregate.MutableFeatureGate).GetAll() {
@@ -58,7 +55,7 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 				continue
 			}
 			if (f == "AllAlpha" && v.PreRelease == featuregate.Alpha) || (f == "AllBeta" && v.PreRelease == featuregate.Beta) {
-				cleanups = append(cleanups, SetFeatureGateDuringTest(tb, gate, k, value))
+				SetFeatureGateDuringTest(tb, gate, k, value)
 			}
 		}
 	}
@@ -73,11 +70,7 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 		if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
 			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
 		}
-		for _, cleanup := range cleanups {
-			cleanup()
-		}
 	})
-	return func() {}
 }
 
 func detectParallelOverride(tb testing.TB, f featuregate.Feature) func() {

@@ -115,7 +115,7 @@ func TestServiceAlloc(t *testing.T) {
 func TestServiceAllocIPAddress(t *testing.T) {
 	// Create an IPv6 single stack control-plane with a large range
 	serviceCIDR := "2001:db8::/64"
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 
 	tCtx := ktesting.Init(t)
 	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
@@ -179,7 +179,7 @@ func TestServiceAllocIPAddress(t *testing.T) {
 }
 
 func TestMigrateService(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 	//logs.GlogSetter("7")
 
 	etcdOptions := framework.SharedEtcd()

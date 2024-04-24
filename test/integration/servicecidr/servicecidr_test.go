@@ -40,7 +40,7 @@ import (
 )
 
 func TestServiceAllocNewServiceCIDR(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 
 	etcdOptions := framework.SharedEtcd()
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
@@ -134,7 +134,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 // Deletes the Service with the IPAddress blocking the deletion
 // cidr3 must not exist at this point
 func TestServiceCIDRDeletion(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 	cidr1 := "192.168.0.0/29" // same as the default
 	cidr2 := "10.0.0.0/24"    // new range
 	cidr3 := "10.0.0.0/16"    // contains cidr2

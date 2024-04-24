@@ -1440,7 +1440,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 	for idx, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			// set up env
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 			if scenario.expectedInitialEvents == nil {
 				scenario.expectedInitialEvents = func(_ []*example.Pod) []watch.Event { return nil }
 			}
@@ -1517,7 +1517,7 @@ func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, st
 		}})
 		return watchEvents
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 
 	initialPods := []*example.Pod{}
 	ns := "ns-foo"

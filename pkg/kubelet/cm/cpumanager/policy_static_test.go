@@ -656,7 +656,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 }
 
 func runStaticPolicyTestCaseWithFeatureGate(t *testing.T, testCase staticPolicyTest) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 	runStaticPolicyTestCase(t, testCase)
 }
 

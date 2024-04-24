@@ -664,7 +664,7 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 			defer server.TearDownFn()
 

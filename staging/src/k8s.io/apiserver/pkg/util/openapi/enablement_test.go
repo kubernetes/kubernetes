@@ -109,7 +109,7 @@ func TestGetOpenAPIDefinitionsWithoutDisabledFeatures(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("enabled=%v", tc.enabled), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.enabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.enabled)
 			defs := GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefs)(func(path string) spec.Ref {
 				return spec.Ref{}
 			})

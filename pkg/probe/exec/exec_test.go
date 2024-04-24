@@ -134,7 +134,7 @@ func TestExec(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, test.execProbeTimeout)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, test.execProbeTimeout)
 		fake := FakeCmd{
 			out: []byte(test.output),
 			err: test.err,

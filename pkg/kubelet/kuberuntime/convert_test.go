@@ -231,7 +231,7 @@ func TestConvertToKubeContainerImageSpecWithRuntimeHandlerInImageSpecCri(t *test
 	}
 
 	for _, test := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 		actual := toKubeContainerImageSpec(test.input)
 		assert.Equal(t, test.expected, actual)
 	}
@@ -293,7 +293,7 @@ func TestConvertToRuntimeAPIImageSpecWithRuntimeHandlerInImageSpecCri(t *testing
 	}
 
 	for _, test := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 		actual := toRuntimeAPIImageSpec(test.input)
 		assert.Equal(t, test.expected, actual)
 	}

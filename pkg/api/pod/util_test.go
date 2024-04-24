@@ -665,7 +665,7 @@ func TestDropProcMount(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)()
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -772,8 +772,8 @@ func TestDropAppArmor(t *testing.T) {
 		for _, enabled := range []bool{true, false} {
 			for _, fieldsEnabled := range []bool{true, false} {
 				t.Run(fmt.Sprintf("%v/enabled=%v/fields=%v", test.description, enabled, fieldsEnabled), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmorFields, fieldsEnabled)()
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmorFields, fieldsEnabled)
 
 					newPod := test.pod.DeepCopy()
 
@@ -956,7 +956,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.enabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.enabled)
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
@@ -1014,7 +1014,7 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, tc.featureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, tc.featureEnabled)
 			// The new pod doesn't impact the outcome.
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, nil, nil, tc.oldPodMeta)
 			if tc.wantAllowInvalidPodDeletionCost != gotOptions.AllowInvalidPodDeletionCost {
@@ -1325,7 +1325,7 @@ func TestDropNodeInclusionPolicyFields(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, test.enabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, test.enabled)
 
 			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
 			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
@@ -2180,7 +2180,7 @@ func Test_dropDisabledMatchLabelKeysFieldInPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enabled)
 
 			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
 			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
@@ -2315,7 +2315,7 @@ func Test_dropDisabledMatchLabelKeysFieldInTopologySpread(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, test.enabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, test.enabled)
 
 			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
 			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
@@ -2385,7 +2385,7 @@ func TestDropHostUsers(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, enabled)()
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, enabled)
 
 					DropDisabledPodFields(newPod, oldPod)
 
@@ -2656,7 +2656,7 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)()
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)
 
 					var oldPodSpec *api.PodSpec
 					var oldPodStatus *api.PodStatus
@@ -2761,7 +2761,7 @@ func TestDropSidecarContainers(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, enabled)()
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, enabled)
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -3201,7 +3201,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClusterTrustBundleProjection, tc.clusterTrustBundleProjectionEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClusterTrustBundleProjection, tc.clusterTrustBundleProjectionEnabled)
 
 			dropDisabledClusterTrustBundleProjection(tc.newPod, tc.oldPod)
 			if diff := cmp.Diff(tc.newPod, tc.wantPod); diff != "" {
@@ -3376,7 +3376,7 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)
 
 			// preStop
 			// container

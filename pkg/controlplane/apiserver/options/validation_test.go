@@ -148,7 +148,7 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 				PeerAdvertiseAddress: test.peerAdvertiseAddress,
 			}
 			if test.featureEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnknownVersionInteroperabilityProxy, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnknownVersionInteroperabilityProxy, true)
 			}
 			var errMessageGot string
 			if errs := validateUnknownVersionInteroperabilityProxyFlags(options); len(errs) > 0 {
@@ -177,7 +177,7 @@ func TestValidateUnknownVersionInteroperabilityProxyFeature(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			for _, feature := range test.featuresEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
 			}
 			var errMessageGot string
 			if errs := validateUnknownVersionInteroperabilityProxyFeature(); len(errs) > 0 {

@@ -537,7 +537,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 		t.Run(testTitle, func(t *testing.T) {
 			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 			}
 
 			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))

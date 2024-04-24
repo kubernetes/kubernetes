@@ -263,7 +263,7 @@ func TestParseWatchCacheSizes(t *testing.T) {
 }
 
 func TestKMSHealthzEndpoint(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	testCases := []struct {
 		name                 string

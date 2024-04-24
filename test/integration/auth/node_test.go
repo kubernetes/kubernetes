@@ -65,7 +65,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}, "\n"))
 	tokenFile.Close()
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--runtime-config=api/all=true",

@@ -558,7 +558,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
 			errs := ValidatePersistentVolume(scenario.volume, opts)
@@ -1000,7 +1000,7 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(nil, tc.oldPv)
 			if opts != tc.expectValidationOpts {
@@ -1572,7 +1572,7 @@ func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 		originalNewPV := scenario.newPV.DeepCopy()
 		originalOldPV := scenario.oldPV.DeepCopy()
@@ -2173,7 +2173,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			var errs field.ErrorList
 			if ephemeral {
@@ -3022,8 +3022,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
@@ -3086,7 +3086,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
 			if opts != tc.expectValidationOpts {
@@ -3117,7 +3117,7 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
 			if opts != tc.expectValidationOpts {
@@ -7590,7 +7590,7 @@ func TestValidatePullPolicy(t *testing.T) {
 }
 
 func TestValidateResizePolicy(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 	type T struct {
@@ -13225,7 +13225,7 @@ func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	var (
 		activeDeadlineSecondsZero     = int64(0)
 		activeDeadlineSecondsNegative = int64(-30)
@@ -18027,7 +18027,7 @@ func TestValidateServiceCreate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := range tc.featureGates {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)
 			}
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
@@ -21310,7 +21310,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)
 
 			validateOpts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
 
@@ -24001,8 +24001,8 @@ func TestCrossNamespaceSource(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)()
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)
 		opts := PersistentVolumeClaimSpecValidationOptions{}
 		if tc.expectedFail {
 			if errs := ValidatePersistentVolumeClaimSpec(tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
@@ -25783,7 +25783,7 @@ func TestValidateDownwardAPIHostIPs(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)
 
 			errs := validateDownwardAPIHostIPs(testCase.fieldSel, field.NewPath("fieldSel"), PodValidationOptions{AllowHostIPsField: testCase.featureEnabled})
 			if testCase.expectError && len(errs) == 0 {
@@ -26176,8 +26176,8 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
 			status := core.LoadBalancerStatus{}
 			tc.tweakLBStatus(&status)
 			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}

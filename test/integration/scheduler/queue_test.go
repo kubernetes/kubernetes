@@ -224,7 +224,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	for _, featureEnabled := range []bool{false, true} {
 		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%s [SchedulerQueueingHints enabled: %v]", tt.name, featureEnabled), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, featureEnabled)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, featureEnabled)
 
 				// Use zero backoff seconds to bypass backoffQ.
 				// It's intended to not start the scheduler's queue, and hence to
@@ -579,7 +579,7 @@ func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleSt
 // TestRequeueByPermitRejection verify Pods failed by permit plugins in the binding cycle are
 // put back to the queue, according to the correct scheduling cycle number.
 func TestRequeueByPermitRejection(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
 	queueingHintCalledCounter := 0
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{

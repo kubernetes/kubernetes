@@ -188,7 +188,7 @@ func TestReallocate(t *testing.T) {
 }
 
 func TestAllocateReserved(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)
 
 	_, storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()
@@ -235,7 +235,7 @@ func TestAllocateReserved(t *testing.T) {
 }
 
 func TestAllocateReservedDynamicBlockExhausted(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)
 
 	_, storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()

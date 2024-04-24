@@ -399,7 +399,7 @@ func (m *sequentialNameGenerator) GenerateName(base string) string {
 }
 
 func TestStoreCreateWithRetryNameGenerate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetryGenerateName, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetryGenerateName, true)
 
 	namedObj := func(id int) *example.Pod {
 		return &example.Pod{

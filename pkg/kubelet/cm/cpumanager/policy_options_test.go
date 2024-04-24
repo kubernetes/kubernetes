@@ -97,7 +97,7 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)
 			err := CheckPolicyOptionAvailable(testCase.option)
 			isEnabled := (err == nil)
 			if isEnabled != testCase.expectedAvailable {
@@ -167,7 +167,7 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			}
 			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)
 			err := ValidateStaticPolicyOptions(policyOpt, testCase.topology, topoMgrStore)
 			gotError := (err != nil)
