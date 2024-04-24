@@ -60,7 +60,7 @@ func testingStatefulSet(name string, numberOfPods int32) appsv1.StatefulSet {
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"name": "foo",
+						"name": name,
 					},
 					Annotations: map[string]string{
 						podcmd.DefaultContainerAnnotationName: "container-2",
