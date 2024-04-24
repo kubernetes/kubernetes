@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
@@ -63,14 +64,16 @@ const (
 
 	PollInterval time.Duration = 2 * time.Second
 	PollTimeout  time.Duration = 4 * time.Minute
+
+	fakeExtendedResource = "dummy.com/dummy"
 )
 
 type ContainerResources struct {
-	CPUReq, CPULim, MemReq, MemLim, EphStorReq, EphStorLim string
+	CPUReq, CPULim, MemReq, MemLim, EphStorReq, EphStorLim, ExtendedResourceReq, ExtendedResourceLim string
 }
 
 type ContainerAllocations struct {
-	CPUAlloc, MemAlloc, ephStorAlloc string
+	CPUAlloc, MemAlloc, ephStorAlloc, ExtendedResourceAlloc string
 }
 
 type TestContainerInfo struct {
@@ -146,6 +149,9 @@ func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.
 		if tcInfo.Resources.EphStorLim != "" {
 			lim[v1.ResourceEphemeralStorage] = resource.MustParse(tcInfo.Resources.EphStorLim)
 		}
+		if tcInfo.Resources.ExtendedResourceLim != "" {
+			lim[fakeExtendedResource] = resource.MustParse(tcInfo.Resources.ExtendedResourceLim)
+		}
 		if tcInfo.Resources.CPUReq != "" {
 			req[v1.ResourceCPU] = resource.MustParse(tcInfo.Resources.CPUReq)
 		}
@@ -154,6 +160,9 @@ func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.
 		}
 		if tcInfo.Resources.EphStorReq != "" {
 			req[v1.ResourceEphemeralStorage] = resource.MustParse(tcInfo.Resources.EphStorReq)
+		}
+		if tcInfo.Resources.ExtendedResourceReq != "" {
+			req[fakeExtendedResource] = resource.MustParse(tcInfo.Resources.ExtendedResourceReq)
 		}
 		res = v1.ResourceRequirements{Limits: lim, Requests: req}
 	}
@@ -168,7 +177,9 @@ func getTestResourceInfo(tcInfo TestContainerInfo) (v1.ResourceRequirements, v1.
 		if tcInfo.Allocations.ephStorAlloc != "" {
 			alloc[v1.ResourceEphemeralStorage] = resource.MustParse(tcInfo.Allocations.ephStorAlloc)
 		}
-
+		if tcInfo.Allocations.ExtendedResourceAlloc != "" {
+			alloc[fakeExtendedResource] = resource.MustParse(tcInfo.Allocations.ExtendedResourceAlloc)
+		}
 	}
 	if tcInfo.CPUPolicy != nil {
 		cpuPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: *tcInfo.CPUPolicy}
@@ -318,7 +329,8 @@ func verifyPodAllocations(pod *v1.Pod, tcInfo []TestContainerInfo, flagError boo
 		cStatus := cStatusMap[ci.Name]
 		if ci.Allocations == nil {
 			if ci.Resources != nil {
-				alloc := &ContainerAllocations{CPUAlloc: ci.Resources.CPUReq, MemAlloc: ci.Resources.MemReq}
+				alloc := &ContainerAllocations{CPUAlloc: ci.Resources.CPUReq, MemAlloc: ci.Resources.MemReq,
+					ExtendedResourceAlloc: ci.Resources.ExtendedResourceReq}
 				ci.Allocations = alloc
 				defer func() {
 					ci.Allocations = nil
@@ -571,18 +583,92 @@ func genPatchString(containers []TestContainerInfo) (string, error) {
 	return string(patchBytes), nil
 }
 
+func patchNode(ctx context.Context, client clientset.Interface, old *v1.Node, new *v1.Node) error {
+	oldData, err := json.Marshal(old)
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(new)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
+	if err != nil {
+		return fmt.Errorf("failed to create merge patch for node %q: %w", old.Name, err)
+	}
+	_, err = client.CoreV1().Nodes().Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
+}
+
+func addExtendedResource(clientSet clientset.Interface, nodeName, extendedResourceName string, extendedResourceQuantity resource.Quantity) {
+	extendedResource := v1.ResourceName(extendedResourceName)
+
+	ginkgo.By("Adding a custom resource")
+	OriginalNode, err := clientSet.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	node := OriginalNode.DeepCopy()
+	node.Status.Capacity[extendedResource] = extendedResourceQuantity
+	node.Status.Allocatable[extendedResource] = extendedResourceQuantity
+	err = patchNode(context.Background(), clientSet, OriginalNode.DeepCopy(), node)
+	framework.ExpectNoError(err)
+
+	gomega.Eventually(func() error {
+		node, err = clientSet.CoreV1().Nodes().Get(context.Background(), node.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		fakeResourceCapacity, exists := node.Status.Capacity[extendedResource]
+		if !exists {
+			return fmt.Errorf("node %s has no %s resource capacity", node.Name, extendedResourceName)
+		}
+		if expectedResource := resource.MustParse("123"); fakeResourceCapacity.Cmp(expectedResource) != 0 {
+			return fmt.Errorf("node %s has resource capacity %s, expected: %s", node.Name, fakeResourceCapacity.String(), expectedResource.String())
+		}
+
+		return nil
+	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
+}
+
+func removeExtendedResource(clientSet clientset.Interface, nodeName, extendedResourceName string) {
+	extendedResource := v1.ResourceName(extendedResourceName)
+
+	ginkgo.By("Removing a custom resource")
+	originalNode, err := clientSet.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	node := originalNode.DeepCopy()
+	delete(node.Status.Capacity, extendedResource)
+	delete(node.Status.Allocatable, extendedResource)
+	err = patchNode(context.Background(), clientSet, originalNode.DeepCopy(), node)
+	framework.ExpectNoError(err)
+
+	gomega.Eventually(func() error {
+		node, err = clientSet.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		if _, exists := node.Status.Capacity[extendedResource]; exists {
+			return fmt.Errorf("node %s has resource capacity %s which is expected to be removed", node.Name, extendedResourceName)
+		}
+
+		return nil
+	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
+}
+
 func doPodResizeTests() {
 	f := framework.NewDefaultFramework("pod-resize")
 	var podClient *e2epod.PodClient
+
 	ginkgo.BeforeEach(func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
 	type testCase struct {
-		name        string
-		containers  []TestContainerInfo
-		patchString string
-		expected    []TestContainerInfo
+		name                string
+		containers          []TestContainerInfo
+		patchString         string
+		expected            []TestContainerInfo
+		addExtendedResource bool
 	}
 
 	noRestart := v1.NotRequired
@@ -1284,6 +1370,31 @@ func doPodResizeTests() {
 				},
 			},
 		},
+		{
+			name: "Guaranteed QoS pod, one container - increase CPU & memory with an extended resource",
+			containers: []TestContainerInfo{
+				{
+					Name: "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi",
+						ExtendedResourceReq: "1", ExtendedResourceLim: "1"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"200m","memory":"400Mi"},"limits":{"cpu":"200m","memory":"400Mi"}}}
+					]}}`,
+			expected: []TestContainerInfo{
+				{
+					Name: "c1",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi",
+						ExtendedResourceReq: "1", ExtendedResourceLim: "1"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			addExtendedResource: true,
+		},
 	}
 
 	for idx := range tests {
@@ -1291,11 +1402,22 @@ func doPodResizeTests() {
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			var testPod, patchedPod *v1.Pod
 			var pErr error
+			var nodeName string
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
 			initDefaultResizePolicy(tc.containers)
 			initDefaultResizePolicy(tc.expected)
 			testPod = makeTestPod(f.Namespace.Name, "testpod", tStamp, tc.containers)
+
+			if tc.addExtendedResource {
+				nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
+				framework.ExpectNoError(err)
+
+				nodeName = nodes.Items[0].Name
+
+				addExtendedResource(f.ClientSet, nodeName, fakeExtendedResource, resource.MustParse("123"))
+				testPod.Spec.NodeName = nodeName
+			}
 
 			ginkgo.By("creating pod")
 			newPod := podClient.CreateSync(ctx, testPod)
@@ -1358,6 +1480,10 @@ func doPodResizeTests() {
 			ginkgo.By("deleting pod")
 			err = e2epod.DeletePodWithWait(ctx, f.ClientSet, newPod)
 			framework.ExpectNoError(err, "failed to delete pod")
+
+			if tc.addExtendedResource {
+				removeExtendedResource(f.ClientSet, nodeName, fakeExtendedResource)
+			}
 		})
 	}
 }
