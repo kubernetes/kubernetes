@@ -179,8 +179,7 @@ func TestDefaultValues(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(cancel)
 
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -190,9 +189,9 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
-	_ = kmsv2mock.NewBase64Plugin(t, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -262,8 +261,7 @@ func TestKMSv2Provider(t *testing.T) {
 }
 
 func testKMSv2Provider(t *testing.T, useSeed bool) {
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -273,11 +271,11 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
 	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	providerName := "kms-provider"
-	pluginMock := kmsv2mock.NewBase64Plugin(t, socketPath)
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -412,9 +410,7 @@ func TestKMSv2ProviderKeyIDStaleness(t *testing.T) {
 }
 
 func testKMSv2ProviderKeyIDStaleness(t *testing.T) {
-	t.Parallel()
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -425,9 +421,9 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
-	pluginMock := kmsv2mock.NewBase64Plugin(t, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -707,8 +703,7 @@ func testKMSv2ProviderDEKSourceReuse(t *testing.T, f checkFunc) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(cancel)
 
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -718,9 +713,9 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
-	_ = kmsv2mock.NewBase64Plugin(t, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -840,9 +835,7 @@ func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebacken
 func TestKMSv2Healthz(t *testing.T) {
 	defer encryptionconfig.SetKDFForTests(randomBool())()
 
-	socketPath1 := getSocketPath()
-	socketPath2 := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -852,15 +845,15 @@ resources:
     - kms:
        apiVersion: v2
        name: provider-1
-       endpoint: unix:///%s
+       endpoint: unix:///@kms-provider-1.sock
     - kms:
        apiVersion: v2
        name: provider-2
-       endpoint: unix:///%s
-`, socketPath1, socketPath2)
+       endpoint: unix:///@kms-provider-2.sock
+`
 
-	pluginMock1 := kmsv2mock.NewBase64Plugin(t, socketPath1)
-	pluginMock2 := kmsv2mock.NewBase64Plugin(t, socketPath2)
+	pluginMock1 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-1.sock")
+	pluginMock2 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -917,12 +910,11 @@ func TestKMSv2SingleService(t *testing.T) {
 		encryptionconfig.EnvelopeKMSv2ServiceFactory = origEnvelopeKMSv2ServiceFactory
 	})
 
-	socketPath := getSocketPath()
 	// check resources provided by the three servers that we have wired together
 	// - pods and config maps from KAS
 	// - CRDs and CRs from API extensions
 	// - API services from aggregator
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -936,10 +928,10 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
 
-	_ = kmsv2mock.NewBase64Plugin(t, socketPath)
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -979,8 +971,7 @@ resources:
 // 2. After a restart, loading a encryptionConfig with the same KMSv2 plugin from 1 should work,
 // decryption of data encrypted with v2 should work
 func TestKMSv2FeatureFlag(t *testing.T) {
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -990,10 +981,10 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
 	providerName := "kms-provider"
-	pluginMock := kmsv2mock.NewBase64Plugin(t, socketPath)
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 	storageConfig := framework.SharedEtcd()
 
 	// KMSv2 is enabled by default. Loading a encryptionConfig with KMSv2 should work
@@ -1103,8 +1094,7 @@ func BenchmarkKMSv2KDF(b *testing.B) {
 
 	ctx = request.WithNamespace(ctx, testNamespace)
 
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -1114,9 +1104,9 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
-	_ = kmsv2mock.NewBase64Plugin(b, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
+	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider.sock")
 
 	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -1257,8 +1247,7 @@ func BenchmarkKMSv2REST(b *testing.B) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	b.Cleanup(cancel)
 
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -1268,9 +1257,9 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
-	_ = kmsv2mock.NewBase64Plugin(b, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
+	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider.sock")
 
 	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -1348,9 +1337,7 @@ func TestKMSv2ProviderLegacyData(t *testing.T) {
 }
 
 func testKMSv2ProviderLegacyData(t *testing.T) {
-	t.Parallel()
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -1360,10 +1347,10 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       endpoint: unix:///%s
-`, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
 
-	_ = kmsv2mock.NewBase64Plugin(t, socketPath)
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 	// the value.Context.AuthenticatedData during read is the etcd storage path of the associated resource
 	// thus we need to manually construct the storage config so that we can have a static path

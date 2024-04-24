@@ -131,8 +131,7 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 func TestKMSProvider(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -142,10 +141,10 @@ resources:
     - kms:
        name: kms-provider
        cachesize: 1000
-       endpoint: unix:///%s
-`, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
 	providerName := "kms-provider"
-	pluginMock := mock.NewBase64Plugin(t, socketPath)
+	pluginMock := mock.NewBase64Plugin(t, "@kms-provider.sock")
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
@@ -313,9 +312,8 @@ func TestEncryptionConfigHotReload(t *testing.T) {
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
 
-	socketPath := getSocketPath()
 	storageConfig := framework.SharedEtcd()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -325,11 +323,11 @@ resources:
     - kms:
        name: kms-provider
        cachesize: 1000
-       endpoint: unix:///%s
-`, socketPath)
+       endpoint: unix:///@kms-provider.sock
+`
 
 	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
-	_ = mock.NewBase64Plugin(t, socketPath)
+	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	var restarted bool
 	test, err := newTransformTest(t, encryptionConfig, true, "", storageConfig)
 	if err != nil {
@@ -381,8 +379,7 @@ resources:
 	// test if hot reload controller is healthy
 	mustBeHealthy(t, "/poststarthook/start-encryption-provider-config-automatic-reload", "ok", test.kubeAPIServer.ClientConfig)
 
-	newKMSProviderSocketPath := getSocketPath()
-	encryptionConfigWithNewProvider := fmt.Sprintf(`
+	encryptionConfigWithNewProvider := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -392,22 +389,22 @@ resources:
     - kms:
        name: new-kms-provider-for-secrets
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@new-kms-provider.sock
     - kms:
        name: kms-provider
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@kms-provider.sock
   - resources:
     - configmaps
     providers:
     - kms:
        name: new-kms-provider-for-configmaps
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@new-kms-provider.sock
     - identity: {}
-`, newKMSProviderSocketPath, socketPath, newKMSProviderSocketPath)
+`
 	// start new KMS Plugin
-	_ = mock.NewBase64Plugin(t, newKMSProviderSocketPath)
+	_ = mock.NewBase64Plugin(t, "@new-kms-provider.sock")
 	// update encryption config
 	updateFile(t, test.configDir, encryptionConfigFileName, []byte(encryptionConfigWithNewProvider))
 
@@ -484,13 +481,12 @@ resources:
 		t.Fatalf("expected configmap to be prefixed with %s, but got %s", wantPrefixForConfigmaps, rawConfigmapEnvelope.Kvs[0].Value)
 	}
 
-	newEncryptAllProviderSocketPath := getSocketPath()
 	// remove old KMS provider
 	// verifyIfKMSTransformersSwapped sometimes passes even before the changes in the encryption config file are observed.
 	// this causes the metrics tests to fail, which validate two config changes.
 	// this may happen when an existing KMS provider is already running (e.g., new-kms-provider-for-secrets in this case).
 	// to ensure that the changes are observed, we added one more provider (kms-provider-to-encrypt-all) and are validating it in verifyIfKMSTransformersSwapped.
-	encryptionConfigWithoutOldProvider := fmt.Sprintf(`
+	encryptionConfigWithoutOldProvider := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -500,25 +496,25 @@ resources:
     - kms:
        name: new-kms-provider-for-secrets
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@new-kms-provider.sock
   - resources:
     - configmaps
     providers:
     - kms:
        name: new-kms-provider-for-configmaps
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@new-kms-provider.sock
   - resources:
     - '*.*'
     providers:
     - kms:
         name: kms-provider-to-encrypt-all
         cachesize: 1000
-        endpoint: unix:///%s
+        endpoint: unix:///@new-encrypt-all-kms-provider.sock
     - identity: {}
-`, newKMSProviderSocketPath, newKMSProviderSocketPath, newEncryptAllProviderSocketPath)
+`
 	// start new KMS Plugin
-	_ = mock.NewBase64Plugin(t, newEncryptAllProviderSocketPath)
+	_ = mock.NewBase64Plugin(t, "@new-encrypt-all-kms-provider.sock")
 
 	// update encryption config and wait for hot reload
 	updateFile(t, test.configDir, encryptionConfigFileName, []byte(encryptionConfigWithoutOldProvider))
@@ -609,8 +605,7 @@ resources:
 }
 
 func TestEncryptAll(t *testing.T) {
-	socketPath := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -620,11 +615,11 @@ resources:
     - kms:
         name: encrypt-all-kms-provider
         cachesize: 1000
-        endpoint: unix:///%s
-`, socketPath)
+        endpoint: unix:///@encrypt-all-kms-provider.sock
+`
 
 	t.Run("encrypt all resources", func(t *testing.T) {
-		_ = mock.NewBase64Plugin(t, socketPath)
+		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 		// To ensure we are checking all REST resources
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)()
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)()
@@ -729,9 +724,7 @@ resources:
 }
 
 func TestEncryptAllWithWildcard(t *testing.T) {
-	socketPath1 := getSocketPath()
-	socketPath2 := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -745,17 +738,17 @@ resources:
     - kms:
         name: kms-provider
         cachesize: 1000
-        endpoint: unix:///%s
+        endpoint: unix:///@kms-provider.sock
   - resources:
     - '*.*'
     providers:
     - kms:
         name: encrypt-all-kms-provider
         cachesize: 1000
-        endpoint: unix:///%s
-`, socketPath1, socketPath2)
-	_ = mock.NewBase64Plugin(t, socketPath1)
-	_ = mock.NewBase64Plugin(t, socketPath2)
+        endpoint: unix:///@encrypt-all-kms-provider.sock
+`
+	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
+	_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
@@ -890,12 +883,8 @@ func TestEncryptionConfigHotReloadFilePolling(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			socketPath := getSocketPath()
-			encryptionConfig := fmt.Sprintf(`
+			encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -905,10 +894,10 @@ resources:
     - kms:
        name: kms-provider
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@kms-provider.sock
        timeout: 1s
-`, socketPath)
-			_ = mock.NewBase64Plugin(t, socketPath)
+`
+			_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 			test, err := newTransformTest(t, encryptionConfig, true, "", nil)
 			if err != nil {
@@ -924,8 +913,7 @@ resources:
 			// test if hot reload controller is healthy
 			mustBeHealthy(t, "/poststarthook/start-encryption-provider-config-automatic-reload", "ok", test.kubeAPIServer.ClientConfig)
 
-			newKMSProviderSocketPath := getSocketPath()
-			encryptionConfigWithNewProvider := fmt.Sprintf(`
+			encryptionConfigWithNewProvider := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -935,12 +923,12 @@ resources:
     - kms:
        name: new-kms-provider-for-secrets
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@new-kms-provider.sock
        timeout: 1s
     - kms:
        name: kms-provider
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@kms-provider.sock
        timeout: 1s
   - resources:
     - configmaps
@@ -948,12 +936,12 @@ resources:
     - kms:
        name: new-kms-provider-for-configmaps
        cachesize: 1000
-       endpoint: unix:///%s
+       endpoint: unix:///@new-kms-provider.sock
        timeout: 1s
     - identity: {}
-`, newKMSProviderSocketPath, socketPath, newKMSProviderSocketPath)
+`
 			// start new KMS Plugin
-			_ = mock.NewBase64Plugin(t, newKMSProviderSocketPath)
+			_ = mock.NewBase64Plugin(t, "@new-kms-provider.sock")
 			// update encryption config
 			if err := tc.updateFile(filepath.Join(test.configDir, encryptionConfigFileName), encryptionConfigWithNewProvider); err != nil {
 				t.Fatalf("failed to update encryption config, err: %v", err)
@@ -1105,9 +1093,7 @@ func updateFile(t *testing.T, configDir, filename string, newContent []byte) {
 func TestKMSHealthz(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
-	socketPath1 := getSocketPath()
-	socketPath2 := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -1116,14 +1102,14 @@ resources:
     providers:
     - kms:
        name: provider-1
-       endpoint: unix:///%s
+       endpoint: unix:///@kms-provider-1.sock
     - kms:
        name: provider-2
-       endpoint: unix:///%s
-`, socketPath1, socketPath2)
+       endpoint: unix:///@kms-provider-2.sock
+`
 
-	pluginMock1 := mock.NewBase64Plugin(t, socketPath1)
-	pluginMock2 := mock.NewBase64Plugin(t, socketPath2)
+	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
+	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -1170,9 +1156,7 @@ resources:
 func TestKMSHealthzWithReload(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
 
-	socketPath1 := getSocketPath()
-	socketPath2 := getSocketPath()
-	encryptionConfig := fmt.Sprintf(`
+	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -1181,14 +1165,14 @@ resources:
     providers:
     - kms:
        name: provider-1
-       endpoint: unix:///%s
+       endpoint: unix:///@kms-provider-1.sock
     - kms:
        name: provider-2
-       endpoint: unix:///%s
-`, socketPath1, socketPath2)
+       endpoint: unix:///@kms-provider-2.sock
+`
 
-	pluginMock1 := mock.NewBase64Plugin(t, socketPath1)
-	pluginMock2 := mock.NewBase64Plugin(t, socketPath2)
+	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
+	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, true, "", nil)
 	if err != nil {
