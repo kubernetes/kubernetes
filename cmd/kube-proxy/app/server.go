@@ -63,6 +63,7 @@ import (
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/client/hadialer"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
@@ -403,6 +404,8 @@ func createClient(ctx context.Context, config componentbaseconfig.ClientConnecti
 	kubeConfig.ContentType = config.ContentType
 	kubeConfig.QPS = config.QPS
 	kubeConfig.Burst = int(config.Burst)
+
+	hadialer.OverrideDial(kubeConfig)
 
 	client, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
