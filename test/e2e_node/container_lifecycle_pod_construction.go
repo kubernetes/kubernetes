@@ -125,10 +125,10 @@ func (o containerOutputList) String() string {
 // RunTogether returns an error the lhs and rhs run together
 func (o containerOutputList) RunTogether(lhs, rhs string) error {
 	lhsStart := o.findIndex(lhs, "Started", 0)
-	rhsStart := o.findIndex(rhs, "Started", lhsStart+1)
+	rhsStart := o.findIndex(rhs, "Started", 0)
 
-	lhsFinish := o.findIndex(lhs, "Exiting", lhsStart+1)
-	rhsFinish := o.findIndex(rhs, "Exiting", rhsStart+1)
+	lhsFinish := o.findIndex(lhs, "Finishing", 0)
+	rhsFinish := o.findIndex(rhs, "Finishing", 0)
 
 	if lhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got\n%v", lhs, o)
