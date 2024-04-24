@@ -22,9 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/ptr"
 )
 
 func TestConfigMapStrategy(t *testing.T) {
+	t.Parallel()
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("ConfigMap must be namespace scoped")
@@ -44,6 +46,9 @@ func TestConfigMapStrategy(t *testing.T) {
 	}
 
 	Strategy.PrepareForCreate(ctx, cfg)
+	if cfg.Generation != 1 {
+		t.Errorf("expected generation to be 1, was %d", cfg.Generation)
+	}
 
 	errs := Strategy.Validate(ctx, cfg)
 	if len(errs) != 0 {
@@ -62,9 +67,36 @@ func TestConfigMapStrategy(t *testing.T) {
 	}
 
 	Strategy.PrepareForUpdate(ctx, newCfg, cfg)
+	if expected, actual := cfg.Generation+1, newCfg.Generation; expected != actual {
+		t.Errorf("expected generation to be %d, was %d", expected, actual)
+	}
 
 	errs = Strategy.ValidateUpdate(ctx, newCfg, cfg)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
+	}
+
+	newCfg = cfg.DeepCopy()
+	newCfg.BinaryData = map[string][]byte{
+		"foo": []byte("bar"),
+	}
+
+	Strategy.PrepareForUpdate(ctx, newCfg, cfg)
+	if expected, actual := cfg.Generation+1, newCfg.Generation; expected != actual {
+		t.Errorf("expected generation to be %d, was %d", expected, actual)
+	}
+
+	identicalDataCfg := cfg.DeepCopy()
+	identicalDataCfg.Labels = map[string]string{"foo": "bar"}
+	Strategy.PrepareForUpdate(ctx, cfg, identicalDataCfg)
+	if expected, actual := cfg.Generation, identicalDataCfg.Generation; expected != actual {
+		t.Errorf("expected generation to be %d, was %d", expected, actual)
+	}
+
+	enabledImmutability := cfg.DeepCopy()
+	enabledImmutability.Immutable = ptr.To(true)
+	Strategy.PrepareForUpdate(ctx, enabledImmutability, cfg)
+	if expected, actual := cfg.Generation+1, enabledImmutability.Generation; expected != actual {
+		t.Errorf("expected generation to be %d, was %d", expected, actual)
 	}
 }

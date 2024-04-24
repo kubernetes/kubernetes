@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -890,6 +891,7 @@ func TestApplyManagedFields(t *testing.T) {
 			"namespace": "default",
 			"uid": "` + string(accessor.GetUID()) + `",
 			"resourceVersion": "` + accessor.GetResourceVersion() + `",
+			"generation": ` + strconv.Itoa(int(accessor.GetGeneration())) + `,
 			"creationTimestamp": "` + accessor.GetCreationTimestamp().UTC().Format(time.RFC3339) + `",
 			"labels": {
 				"test-label": "test"
