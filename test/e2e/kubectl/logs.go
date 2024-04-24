@@ -79,7 +79,7 @@ func testingStatefulSet(name string, numberOfPods int32) appsv1.StatefulSet {
 							Args:  []string{"logs-generator", "--log-lines-total", "20", "--run-duration", "5s"},
 						},
 					},
-					RestartPolicy: v1.RestartPolicyNever,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
