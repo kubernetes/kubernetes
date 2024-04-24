@@ -28,11 +28,12 @@ import (
 
 func TestParseNodeIPArgument(t *testing.T) {
 	testCases := []struct {
-		desc  string
-		in    string
-		out   []net.IP
-		err   string
-		ssErr string
+		desc     string
+		in       string
+		out      []net.IP
+		invalids []string
+		err      string
+		ssErr    string
 	}{
 		{
 			desc: "empty --node-ip",
@@ -40,14 +41,16 @@ func TestParseNodeIPArgument(t *testing.T) {
 			out:  nil,
 		},
 		{
-			desc: "just whitespace (ignored)",
-			in:   " ",
-			out:  nil,
+			desc:     "just whitespace (ignored)",
+			in:       " ",
+			out:      nil,
+			invalids: []string{""},
 		},
 		{
-			desc: "garbage (ignored)",
-			in:   "blah",
-			out:  nil,
+			desc:     "garbage (ignored)",
+			in:       "blah",
+			out:      nil,
+			invalids: []string{"blah"},
 		},
 		{
 			desc: "single IPv4",
@@ -71,14 +74,16 @@ func TestParseNodeIPArgument(t *testing.T) {
 			},
 		},
 		{
-			desc: "single IPv4 invalid (ignored)",
-			in:   "1.2.3",
-			out:  nil,
+			desc:     "single IPv4 invalid (ignored)",
+			in:       "1.2.3",
+			out:      nil,
+			invalids: []string{"1.2.3"},
 		},
 		{
-			desc: "single IPv4 CIDR (ignored)",
-			in:   "1.2.3.0/24",
-			out:  nil,
+			desc:     "single IPv4 CIDR (ignored)",
+			in:       "1.2.3.0/24",
+			out:      nil,
+			invalids: []string{"1.2.3.0/24"},
 		},
 		{
 			desc: "single IPv4 unspecified",
@@ -93,6 +98,7 @@ func TestParseNodeIPArgument(t *testing.T) {
 			out: []net.IP{
 				netutils.ParseIPSloppy("1.2.3.4"),
 			},
+			invalids: []string{"not-an-IPv6-address"},
 		},
 		{
 			desc: "single IPv6",
@@ -155,7 +161,8 @@ func TestParseNodeIPArgument(t *testing.T) {
 				netutils.ParseIPSloppy("abcd::ef01"),
 				netutils.ParseIPSloppy("1.2.3.4"),
 			},
-			ssErr: "not supported in this configuration",
+			invalids: []string{"something else"},
+			ssErr:    "not supported in this configuration",
 		},
 		{
 			desc: "triple stack!",
@@ -177,9 +184,10 @@ func TestParseNodeIPArgument(t *testing.T) {
 		for _, conf := range configurations {
 			desc := fmt.Sprintf("%s, cloudProvider=%q", tc.desc, conf.cloudProvider)
 			t.Run(desc, func(t *testing.T) {
-				parsed, err := ParseNodeIPArgument(tc.in, conf.cloudProvider)
+				parsed, invalidIPs, err := ParseNodeIPArgument(tc.in, conf.cloudProvider)
 
 				expectedOut := tc.out
+				expectedInvalids := tc.invalids
 				expectedErr := tc.err
 
 				if !conf.dualStackSupported {
@@ -193,6 +201,9 @@ func TestParseNodeIPArgument(t *testing.T) {
 
 				if !reflect.DeepEqual(parsed, expectedOut) {
 					t.Errorf("expected %#v, got %#v", expectedOut, parsed)
+				}
+				if !reflect.DeepEqual(invalidIPs, expectedInvalids) {
+					t.Errorf("[invalidIps] expected %#v, got %#v", expectedInvalids, invalidIPs)
 				}
 				if err != nil {
 					if expectedErr == "" {

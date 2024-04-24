@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -126,8 +127,8 @@ func NewHollowKubelet(
 }
 
 // Starts this HollowKubelet and blocks.
-func (hk *HollowKubelet) Run() {
-	if err := kubeletapp.RunKubelet(&options.KubeletServer{
+func (hk *HollowKubelet) Run(ctx context.Context) {
+	if err := kubeletapp.RunKubelet(ctx, &options.KubeletServer{
 		KubeletFlags:         *hk.KubeletFlags,
 		KubeletConfiguration: *hk.KubeletConfiguration,
 	}, hk.KubeletDeps, false); err != nil {
