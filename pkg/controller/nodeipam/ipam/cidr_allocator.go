@@ -61,20 +61,8 @@ const (
 	// The no. of NodeSpec updates NC can process concurrently.
 	cidrUpdateWorkers = 30
 
-	// The max no. of NodeSpec updates that can be enqueued.
-	cidrUpdateQueueSize = 5000
-
 	// cidrUpdateRetries is the no. of times a NodeSpec update will be retried before dropping it.
 	cidrUpdateRetries = 3
-
-	// updateRetryTimeout is the time to wait before requeing a failed node for retry
-	updateRetryTimeout = 250 * time.Millisecond
-
-	// maxUpdateRetryTimeout is the maximum amount of time between timeouts.
-	maxUpdateRetryTimeout = 5 * time.Second
-
-	// updateMaxRetries is the max retries for a failed node
-	updateMaxRetries = 10
 )
 
 // nodePollInterval is used in listing node
