@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -142,7 +143,8 @@ func addNotReadyPodsWithSpecifiedRestartPolicyAndPhase(store cache.Store, namesp
 	}
 }
 
-func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltesting.FakeHandler) {
+func makeTestServer(t *testing.T, namespace string) (ktesting.TContext, *httptest.Server, *utiltesting.FakeHandler) {
+	tCtx := ktesting.Init(t)
 	fakeEndpointsHandler := utiltesting.FakeHandler{
 		StatusCode:   http.StatusOK,
 		ResponseBody: runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{}),
@@ -157,7 +159,9 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 		t.Errorf("unexpected request: %v", req.RequestURI)
 		http.Error(res, "", http.StatusNotFound)
 	})
-	return httptest.NewServer(mux), &fakeEndpointsHandler
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return tCtx, server, &fakeEndpointsHandler
 }
 
 // makeBlockingEndpointDeleteTestServer will signal the blockNextAction channel on endpoint "POST" & "DELETE" requests. All
@@ -252,10 +256,7 @@ func newFakeController(ctx context.Context, batchPeriod time.Duration) (*fake.Cl
 
 func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -281,10 +282,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 
 func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -310,10 +308,7 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 
 func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -339,11 +334,9 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 
 func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	pod0 := testPod(ns, 0, 1, true, ipv4only)
 	pod1 := testPod(ns, 1, 1, false, ipv4only)
-	tCtx := ktesting.Init(t)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -390,9 +383,7 @@ func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
 
 func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -410,10 +401,7 @@ func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 
 func TestCheckLeftoverEndpoints(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, _ := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, _ := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -438,9 +426,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 
 func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -486,9 +472,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 
 func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -568,10 +552,7 @@ func TestSyncServiceExternalNameType(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			testServer, endpointsHandler := makeTestServer(t, namespace)
-
-			defer testServer.Close()
-			tCtx := ktesting.Init(t)
+			tCtx, testServer, endpointsHandler := makeTestServer(t, namespace)
 			endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 			err := endpoints.serviceStore.Add(tc.service)
 			if err != nil {
@@ -588,9 +569,7 @@ func TestSyncServiceExternalNameType(t *testing.T) {
 
 func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -636,9 +615,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 
 func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -684,9 +661,7 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -728,10 +703,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -773,10 +745,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -819,9 +788,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	ns := "bar"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -866,9 +833,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -898,9 +863,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 
 func TestSyncEndpointsItems(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	addPods(endpoints.podStore, ns, 3, 2, 0, ipv4only)
 	addPods(endpoints.podStore, "blah", 5, 2, 0, ipv4only) // make sure these aren't found!
@@ -947,9 +910,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 
 func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	addPods(endpoints.podStore, ns, 3, 2, 0, ipv4only)
 	serviceLabels := map[string]string{"foo": "bar"}
@@ -999,9 +960,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 
 func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	ns := "bar"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1064,12 +1023,10 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 		{alwaysReady, alwaysReady, alwaysReady, true},
 	}
 
-	for _, test := range tests {
-		func() {
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("testcase_%d", i), func(t *testing.T) {
 			ns := "other"
-			testServer, endpointsHandler := makeTestServer(t, ns)
-			defer testServer.Close()
-			tCtx := ktesting.Init(t)
+			tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 			endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 			addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 
@@ -1101,15 +1058,13 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			} else {
 				endpointsHandler.ValidateRequestCount(t, 0)
 			}
-		}()
+		})
 	}
 }
 
 func TestSyncEndpointsHeadlessService(t *testing.T) {
 	ns := "headless"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1161,10 +1116,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 
 func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFailed(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1205,10 +1157,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 
 func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucceeded(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1249,10 +1198,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 
 func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhaseSucceeded(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1294,9 +1240,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 
 func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -1531,10 +1475,7 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1583,10 +1524,7 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 
 func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1638,10 +1576,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 
 func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 	ns := "other"
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1788,10 +1723,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := "other"
 			resourceVersion := 1
-			testServer, endpointsHandler := makeTestServer(t, ns)
-			defer testServer.Close()
-
-			tCtx := ktesting.Init(t)
+			tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 			endpoints := newController(tCtx, testServer.URL, tc.batchPeriod)
 			endpoints.podsSynced = alwaysReady
 			endpoints.servicesSynced = alwaysReady
@@ -1911,10 +1843,7 @@ func TestPodAddsBatching(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := "other"
-			testServer, endpointsHandler := makeTestServer(t, ns)
-			defer testServer.Close()
-
-			tCtx := ktesting.Init(t)
+			tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 			endpoints := newController(tCtx, testServer.URL, tc.batchPeriod)
 			endpoints.podsSynced = alwaysReady
 			endpoints.servicesSynced = alwaysReady
@@ -2033,10 +1962,7 @@ func TestPodDeleteBatching(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := "other"
-			testServer, endpointsHandler := makeTestServer(t, ns)
-			defer testServer.Close()
-
-			tCtx := ktesting.Init(t)
+			tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 			endpoints := newController(tCtx, testServer.URL, tc.batchPeriod)
 			endpoints.podsSynced = alwaysReady
 			endpoints.servicesSynced = alwaysReady
@@ -2077,10 +2003,7 @@ func TestPodDeleteBatching(t *testing.T) {
 
 func TestSyncEndpointsServiceNotFound(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, endpointsHandler := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, endpointsHandler := makeTestServer(t, ns)
 	endpoints := newController(tCtx, testServer.URL, 0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2377,7 +2300,6 @@ func TestMultipleServiceChanges(t *testing.T) {
 	controller := &endpointController{}
 	blockDelete := make(chan struct{})
 	blockNextAction := make(chan struct{})
-	stopChan := make(chan struct{})
 	testServer := makeBlockingEndpointDeleteTestServer(t, controller, endpoint, blockDelete, blockNextAction, ns)
 	defer testServer.Close()
 
@@ -2420,7 +2342,6 @@ func TestMultipleServiceChanges(t *testing.T) {
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Endpoint should have been recreated")
 
 	close(blockNextAction)
-	close(stopChan)
 }
 
 func TestSyncServiceAddresses(t *testing.T) {
@@ -2656,10 +2577,7 @@ func TestSyncServiceAddresses(t *testing.T) {
 
 func TestEndpointsDeletionEvents(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	testServer, _ := makeTestServer(t, ns)
-	defer testServer.Close()
-
-	tCtx := ktesting.Init(t)
+	tCtx, testServer, _ := makeTestServer(t, ns)
 	controller := newController(tCtx, testServer.URL, 0)
 	store := controller.endpointsStore
 	ep1 := &v1.Endpoints{

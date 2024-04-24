@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
@@ -75,7 +76,7 @@ const (
 type unSealSecret func(ctx context.Context, cipherText []byte, dataCtx value.Context, config apiserverv1.ProviderConfiguration) ([]byte, error)
 
 type transformTest struct {
-	logger            kubeapiservertesting.Logger
+	ktesting.TContext
 	storageConfig     *storagebackend.Config
 	configDir         string
 	transformerConfig string
@@ -85,12 +86,13 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+	tCtx := ktesting.Init(tb)
 	if storageConfig == nil {
 		storageConfig = framework.SharedEtcd()
 	}
 	e := transformTest{
-		logger:            l,
+		TContext:          tCtx,
 		transformerConfig: transformerConfigYAML,
 		storageConfig:     storageConfig,
 	}
@@ -113,7 +115,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
+	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(tb, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
 		e.cleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
 	}
@@ -131,11 +133,11 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 
 	if transformerConfigYAML != "" && reload {
 		// when reloading is enabled, this healthz endpoint is always present
-		mustBeHealthy(l, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
-		mustNotHaveLivez(l, "/kms-providers", "404 page not found", e.kubeAPIServer.ClientConfig)
+		mustBeHealthy(tCtx, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
+		mustNotHaveLivez(tCtx, "/kms-providers", "404 page not found", e.kubeAPIServer.ClientConfig)
 
 		// excluding healthz endpoints even if they do not exist should work
-		mustBeHealthy(l, "", `warn: some health checks cannot be excluded: no matches for "kms-provider-0","kms-provider-1","kms-provider-2","kms-provider-3"`,
+		mustBeHealthy(tCtx, "", `warn: some health checks cannot be excluded: no matches for "kms-provider-0","kms-provider-1","kms-provider-2","kms-provider-3"`,
 			e.kubeAPIServer.ClientConfig, "kms-provider-0", "kms-provider-1", "kms-provider-2", "kms-provider-3")
 	}
 
@@ -156,7 +158,7 @@ func (e *transformTest) shutdownAPIServer() {
 	e.kubeAPIServer.TearDownFn()
 }
 
-func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretFunc unSealSecret, expectedEnvelopePrefix,
+func (e *transformTest) runResource(tCtx ktesting.TContext, unSealSecretFunc unSealSecret, expectedEnvelopePrefix,
 	group,
 	version,
 	resource,
@@ -165,41 +167,40 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 ) {
 	response, err := e.readRawRecordFromETCD(e.getETCDPathForResource(e.storageConfig.Prefix, group, resource, name, namespaceName))
 	if err != nil {
-		l.Errorf("failed to read from etcd: %v", err)
+		tCtx.Errorf("failed to read from etcd: %v", err)
 		return
 	}
 
 	if !bytes.HasPrefix(response.Kvs[0].Value, []byte(expectedEnvelopePrefix)) {
-		l.Errorf("expected data to be prefixed with %s, but got %s",
+		tCtx.Errorf("expected data to be prefixed with %s, but got %s",
 			expectedEnvelopePrefix, response.Kvs[0].Value)
 		return
 	}
 
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
-	ctx := context.Background()
 	dataCtx := value.DefaultContext(e.getETCDPathForResource(e.storageConfig.Prefix, group, resource, name, namespaceName))
 	// Envelope header precedes the cipherTextPayload
 	sealedData := response.Kvs[0].Value[len(expectedEnvelopePrefix):]
 	transformerConfig, err := e.getEncryptionConfig()
 	if err != nil {
-		l.Errorf("failed to parse transformer config: %v", err)
+		tCtx.Errorf("failed to parse transformer config: %v", err)
 	}
-	v, err := unSealSecretFunc(ctx, sealedData, dataCtx, *transformerConfig)
+	v, err := unSealSecretFunc(tCtx, sealedData, dataCtx, *transformerConfig)
 	if err != nil {
-		l.Errorf("failed to unseal secret: %v", err)
+		tCtx.Errorf("failed to unseal secret: %v", err)
 		return
 	}
 	if resource == "secrets" {
 		if !strings.Contains(string(v), secretVal) {
-			l.Errorf("expected %q after decryption, but got %q", secretVal, string(v))
+			tCtx.Errorf("expected %q after decryption, but got %q", secretVal, string(v))
 		}
 	} else if resource == "configmaps" {
 		if !strings.Contains(string(v), configMapVal) {
-			l.Errorf("expected %q after decryption, but got %q", configMapVal, string(v))
+			tCtx.Errorf("expected %q after decryption, but got %q", configMapVal, string(v))
 		}
 	} else {
 		if !strings.Contains(string(v), name) {
-			l.Errorf("expected %q after decryption, but got %q", name, string(v))
+			tCtx.Errorf("expected %q after decryption, but got %q", name, string(v))
 		}
 	}
 
@@ -207,36 +208,36 @@ func (e *transformTest) runResource(l kubeapiservertesting.Logger, unSealSecretF
 	if resource == "secrets" {
 		s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			l.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
+			tCtx.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
 		}
 		if secretVal != string(s.Data[secretKey]) {
-			l.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+			tCtx.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 		}
 	} else if resource == "configmaps" {
 		s, err := e.restClient.CoreV1().ConfigMaps(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			l.Fatalf("failed to get ConfigMap from %s, err: %v", namespaceName, err)
+			tCtx.Fatalf("failed to get ConfigMap from %s, err: %v", namespaceName, err)
 		}
 		if configMapVal != string(s.Data[configMapKey]) {
-			l.Errorf("expected %s from KubeAPI, but got %s", configMapVal, string(s.Data[configMapKey]))
+			tCtx.Errorf("expected %s from KubeAPI, but got %s", configMapVal, string(s.Data[configMapKey]))
 		}
 	} else if resource == "pods" {
 		p, err := e.restClient.CoreV1().Pods(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			l.Fatalf("failed to get Pod from %s, err: %v", namespaceName, err)
+			tCtx.Fatalf("failed to get Pod from %s, err: %v", namespaceName, err)
 		}
 		if p.Name != name {
-			l.Errorf("expected %s from KubeAPI, but got %s", name, p.Name)
+			tCtx.Errorf("expected %s from KubeAPI, but got %s", name, p.Name)
 		}
 	} else {
-		l.Logf("Get object with dynamic client")
+		tCtx.Logf("Get object with dynamic client")
 		fooResource := schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
 		obj, err := dynamic.NewForConfigOrDie(e.kubeAPIServer.ClientConfig).Resource(fooResource).Namespace(namespaceName).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			l.Fatalf("Failed to get test instance: %v, name: %s", err, name)
+			tCtx.Fatalf("Failed to get test instance: %v, name: %s", err, name)
 		}
 		if obj.GetObjectKind().GroupVersionKind().Group == group && obj.GroupVersionKind().Version == version && obj.GetKind() == resource && obj.GetNamespace() == namespaceName && obj.GetName() != name {
-			l.Errorf("expected %s from KubeAPI, but got %s", name, obj.GetName())
+			tCtx.Errorf("expected %s from KubeAPI, but got %s", name, obj.GetName())
 		}
 	}
 }
@@ -530,7 +531,7 @@ func (e *transformTest) writeRawRecordToETCD(path string, data []byte) (*clientv
 }
 
 func (e *transformTest) printMetrics() error {
-	e.logger.Logf("Transformation Metrics:")
+	e.Logf("Transformation Metrics:")
 	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		return fmt.Errorf("failed to gather metrics: %s", err)
@@ -538,9 +539,9 @@ func (e *transformTest) printMetrics() error {
 
 	for _, mf := range metrics {
 		if strings.HasPrefix(*mf.Name, metricsPrefix) {
-			e.logger.Logf("%s", *mf.Name)
+			e.Logf("%s", *mf.Name)
 			for _, metric := range mf.GetMetric() {
-				e.logger.Logf("%v", metric)
+				e.Logf("%v", metric)
 			}
 		}
 	}
@@ -548,70 +549,70 @@ func (e *transformTest) printMetrics() error {
 	return nil
 }
 
-func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
-	t.Helper()
+func mustBeHealthy(tCtx ktesting.TContext, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+	tCtx.Helper()
 	var restErr error
-	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
-		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
+	pollErr := wait.PollUntilContextTimeout(tCtx, 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		body, ok, err := getHealthz(tCtx, checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
 			return false, err
 		}
 		done := ok && strings.Contains(body, wantBodyContains)
 		if !done {
-			t.Logf("expected server check %q to be healthy with message %q but it is not: %s", checkName, wantBodyContains, body)
+			tCtx.Logf("expected server check %q to be healthy with message %q but it is not: %s", checkName, wantBodyContains, body)
 		}
 		return done, nil
 	})
 
 	if pollErr != nil {
-		t.Fatalf("failed to get the expected healthz status of OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
+		tCtx.Fatalf("failed to get the expected healthz status of OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
 
-func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
-	t.Helper()
+func mustBeUnHealthy(tCtx ktesting.TContext, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+	tCtx.Helper()
 	var restErr error
-	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
-		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
+	pollErr := wait.PollUntilContextTimeout(tCtx, 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		body, ok, err := getHealthz(tCtx, checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
 			return false, err
 		}
 		done := !ok && strings.Contains(body, wantBodyContains)
 		if !done {
-			t.Logf("expected server check %q to be unhealthy with message %q but it is not: %s", checkName, wantBodyContains, body)
+			tCtx.Logf("expected server check %q to be unhealthy with message %q but it is not: %s", checkName, wantBodyContains, body)
 		}
 		return done, nil
 	})
 
 	if pollErr != nil {
-		t.Fatalf("failed to get the expected healthz status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
+		tCtx.Fatalf("failed to get the expected healthz status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
 
-func mustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
-	t.Helper()
+func mustNotHaveLivez(tCtx ktesting.TContext, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+	tCtx.Helper()
 	var restErr error
-	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
-		body, ok, err := getLivez(checkName, clientConfig, excludes...)
+	pollErr := wait.PollUntilContextTimeout(tCtx, 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		body, ok, err := getLivez(tCtx, checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
 			return false, err
 		}
 		done := !ok && strings.Contains(body, wantBodyContains)
 		if !done {
-			t.Logf("expected server check %q with message %q but it is not: %s", checkName, wantBodyContains, body)
+			tCtx.Logf("expected server check %q with message %q but it is not: %s", checkName, wantBodyContains, body)
 		}
 		return done, nil
 	})
 
 	if pollErr != nil {
-		t.Fatalf("failed to get the expected livez status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
+		tCtx.Fatalf("failed to get the expected livez status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
 
-func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
+func getHealthz(tCtx ktesting.TContext, checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
 	client, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to create a client: %v", err)
@@ -621,11 +622,11 @@ func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string)
 	for _, exclude := range excludes {
 		req.Param("exclude", exclude)
 	}
-	body, err := req.DoRaw(context.TODO()) // we can still have a response body during an error case
+	body, err := req.DoRaw(tCtx) // we can still have a response body during an error case
 	return string(body), err == nil, nil
 }
 
-func getLivez(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
+func getLivez(tCtx ktesting.TContext, checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
 	client, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to create a client: %v", err)
@@ -635,6 +636,6 @@ func getLivez(checkName string, clientConfig *rest.Config, excludes ...string) (
 	for _, exclude := range excludes {
 		req.Param("exclude", exclude)
 	}
-	body, err := req.DoRaw(context.TODO()) // we can still have a response body during an error case
+	body, err := req.DoRaw(tCtx) // we can still have a response body during an error case
 	return string(body), err == nil, nil
 }

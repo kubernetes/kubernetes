@@ -20,10 +20,11 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
-	"k8s.io/controller-manager/pkg/informerfactory"
 	"reflect"
 	"sync"
 	"time"
+
+	"k8s.io/controller-manager/pkg/informerfactory"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"

@@ -17,7 +17,6 @@ limitations under the License.
 package servicecidrs
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -44,7 +43,8 @@ type testController struct {
 	ipaddressesStore  cache.Store
 }
 
-func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1alpha1.ServiceCIDR, ips []*networkingapiv1alpha1.IPAddress) (*fake.Clientset, *testController) {
+func newController(t *testing.T, cidrs []*networkingapiv1alpha1.ServiceCIDR, ips []*networkingapiv1alpha1.IPAddress) (ktesting.TContext, *fake.Clientset, *testController) {
+	tCtx := ktesting.Init(t)
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -66,7 +66,7 @@ func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1al
 		}
 	}
 	controller := NewController(
-		ctx,
+		tCtx,
 		serviceCIDRInformer,
 		ipAddressInformer,
 		client)
@@ -75,7 +75,7 @@ func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1al
 	controller.serviceCIDRsSynced = alwaysReady
 	controller.ipAddressSynced = alwaysReady
 
-	return client, &testController{
+	return tCtx, client, &testController{
 		controller,
 		cidrStore,
 		ipStore,
@@ -235,8 +235,7 @@ func TestControllerSync(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			client, controller := newController(tCtx, t, tc.cidrs, tc.ips)
+			tCtx, client, controller := newController(t, tc.cidrs, tc.ips)
 			// server side apply does not play well with fake client go
 			// so we skup the errors and only assert on the actions
 			// https://github.com/kubernetes/kubernetes/issues/99953
@@ -426,8 +425,7 @@ func TestController_canDeleteCIDR(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			_, controller := newController(tCtx, t, tc.cidrs, tc.ips)
+			tCtx, _, controller := newController(t, tc.cidrs, tc.ips)
 			err := controller.syncCIDRs()
 			if err != nil {
 				t.Fatal(err)
@@ -532,8 +530,7 @@ func TestController_ipToCidrs(t *testing.T) {
 		}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			_, controller := newController(tCtx, t, tt.cidrs, nil)
+			_, _, controller := newController(t, tt.cidrs, nil)
 			err := controller.syncCIDRs()
 			if err != nil {
 				t.Fatal(err)
@@ -589,8 +586,7 @@ func TestController_cidrToCidrs(t *testing.T) {
 		}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			_, controller := newController(tCtx, t, tt.cidrs, nil)
+			_, _, controller := newController(t, tt.cidrs, nil)
 			err := controller.syncCIDRs()
 			if err != nil {
 				t.Fatal(err)

@@ -225,7 +225,7 @@ func TestSyncEndpoints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			client, esController := newController(ctx, time.Duration(0))
 			tc.endpoints.Name = endpointsName
 			tc.endpoints.Namespace = namespace
@@ -245,7 +245,6 @@ func TestSyncEndpoints(t *testing.T) {
 				}
 			}
 
-			logger, _ := ktesting.NewTestContext(t)
 			err := esController.syncEndpoints(logger, fmt.Sprintf("%s/%s", namespace, endpointsName))
 			if err != nil {
 				t.Fatalf("Unexpected error from syncEndpoints: %v", err)
@@ -266,7 +265,7 @@ func TestSyncEndpoints(t *testing.T) {
 				t.Fatal("Timed out waiting for expected actions")
 			}
 
-			endpointSlices := fetchEndpointSlices(t, client, namespace)
+			endpointSlices := fetchEndpointSlices(ctx, t, client, namespace)
 			expectEndpointSlices(t, tc.expectedNumSlices, int(defaultMaxEndpointsPerSubset), *tc.endpoints, endpointSlices)
 		})
 	}

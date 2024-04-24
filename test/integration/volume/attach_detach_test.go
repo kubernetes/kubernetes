@@ -216,6 +216,7 @@ func initCSIObjects(stopCh <-chan struct{}, informers clientgoinformers.SharedIn
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -241,13 +242,13 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	podStopCh := make(chan struct{})
 	defer close(podStopCh)
 
-	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -279,7 +280,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -476,6 +477,7 @@ func TestPodAddedByDswp(t *testing.T) {
 }
 
 func TestPVCBoundWithADC(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -504,7 +506,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 			},
 		},
 	}
-	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
@@ -512,10 +514,10 @@ func TestPVCBoundWithADC(t *testing.T) {
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := 0; i < 3; i++ {
 		pod, pvc := fakePodWithPVC(fmt.Sprintf("fakepod-pvcnotbound-%d", i), fmt.Sprintf("fakepvc-%d", i), namespaceName)
-		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod : %v", err)
 		}
-		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
+		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pvc : %v", err)
 		}
 		pvcs = append(pvcs, pvc)
@@ -523,7 +525,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	// pod with no pvc
 	podNew := fakePodWithVol(namespaceName)
 	podNew.SetName("fakepod")
-	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(context.TODO(), podNew, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(ctx, podNew, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -539,13 +541,13 @@ func TestPVCBoundWithADC(t *testing.T) {
 	time.Sleep(10 * time.Second)
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 1 pod in dsw", 1)
 	for _, pvc := range pvcs {
-		createPVForPVC(t, testClient, pvc)
+		createPVForPVC(ctx, t, testClient, pvc)
 	}
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 4 pods in dsw after PVCs are bound", 4)
 }
 
 // Create PV for PVC, pv controller will bind them together.
-func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.PersistentVolumeClaim) {
+func createPVForPVC(ctx context.Context, t *testing.T, testClient *clientset.Clientset, pvc *v1.PersistentVolumeClaim) {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("fakepv-%s", pvc.Name),
@@ -562,7 +564,7 @@ func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.Persi
 			StorageClassName: *pvc.Spec.StorageClassName,
 		},
 	}
-	if _, err := testClient.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pv : %v", err)
 	}
 }

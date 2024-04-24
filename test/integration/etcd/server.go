@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 
 	// install all APIs
@@ -64,6 +65,8 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 
 // StartRealAPIServerOrDie starts an API server that is appropriate for use in tests that require one of every resource
 func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
+	tCtx := ktesting.Init(t)
+
 	certDir, err := os.MkdirTemp("", t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +151,6 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 
 	kubeClient := clientset.NewForConfigOrDie(kubeClientConfig)
 
-	stopCh := make(chan struct{})
 	errCh := make(chan error)
 	go func() {
 		// Catch panics that occur in this go routine so we get a comprehensible failure
@@ -164,7 +166,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 			errCh <- err
 			return
 		}
-		if err := prepared.Run(stopCh); err != nil {
+		if err := prepared.Run(tCtx); err != nil {
 			errCh <- err
 			t.Error(err)
 			return
@@ -215,9 +217,9 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	}
 
 	cleanup := func() {
-		// Closing stopCh is stopping apiserver and cleaning up
+		// Cancel stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
-		close(stopCh)
+		tCtx.Cancel("cleaning up")
 
 		// If the apiserver was started, let's wait for it to
 		// shutdown clearly.

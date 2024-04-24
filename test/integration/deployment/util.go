@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -56,8 +57,7 @@ var resumeFn = func(update *apps.Deployment) {
 }
 
 type deploymentTester struct {
-	t          *testing.T
-	c          clientset.Interface
+	ktesting.TContext
 	deployment *apps.Deployment
 }
 
@@ -101,20 +101,20 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 }
 
 // dcSetup sets up necessities for Deployment integration test, including control plane, apiserver, informers, and clientset
-func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+func dcSetup(t *testing.T) (ktesting.TContext, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory) {
+	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
 
 	config := restclient.CopyConfig(server.ClientConfig)
-	clientSet, err := clientset.NewForConfig(config)
-	if err != nil {
-		t.Fatalf("error in create clientset: %v", err)
-	}
+	tCtx = ktesting.WithRESTConfig(tCtx, config)
+
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-informers")), resyncPeriod)
 
 	dc, err := deployment.NewDeploymentController(
-		ctx,
+		tCtx,
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
@@ -124,27 +124,26 @@ func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
 	rm := replicaset.NewReplicaSetController(
-		ctx,
+		tCtx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
-	return server.TearDownFn, rm, dc, informers, clientSet
+	return tCtx, rm, dc, informers
 }
 
 // dcSimpleSetup sets up necessities for Deployment integration test, including control plane, apiserver,
 // and clientset, but not controllers and informers
-func dcSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
+func dcSimpleSetup(t *testing.T) ktesting.TContext {
+	tCtx := ktesting.Init(t)
+
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	tCtx.Cleanup(server.TearDownFn)
 
-	config := restclient.CopyConfig(server.ClientConfig)
-	clientSet, err := clientset.NewForConfig(config)
-	if err != nil {
-		t.Fatalf("error in create clientset: %v", err)
-	}
-	return server.TearDownFn, clientSet
+	tCtx = ktesting.WithRESTConfig(tCtx, server.ClientConfig)
+	return tCtx
 }
 
 // runControllersAndInformers runs RS and deployment controllers and informers
@@ -171,7 +170,7 @@ func addPodConditionReady(pod *v1.Pod, time metav1.Time) {
 }
 
 func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image string) error {
-	if err := testutil.WaitForDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image, d.t.Logf, pollInterval, pollTimeout); err != nil {
+	if err := testutil.WaitForDeploymentRevisionAndImage(d.Client(), d.deployment.Namespace, d.deployment.Name, revision, image, d.Logf, pollInterval, pollTimeout); err != nil {
 		return fmt.Errorf("failed to wait for Deployment revision %s: %v", d.deployment.Name, err)
 	}
 	return nil
@@ -199,28 +198,28 @@ func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
 		// Otherwise, mark remaining pods as ready
 		pods, err := d.listUpdatedPods()
 		if err != nil {
-			d.t.Log(err)
+			d.Log(err)
 			return false, nil
 		}
-		d.t.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
+		d.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
 		for i := range pods {
 			pod := pods[i]
 			if podutil.IsPodReady(&pod) {
 				continue
 			}
-			if err = markPodReady(d.c, ns, &pod); err != nil {
-				d.t.Logf("failed to update Deployment pod %s, will retry later: %v", pod.Name, err)
+			if err = markPodReady(d.Client(), ns, &pod); err != nil {
+				d.Logf("failed to update Deployment pod %s, will retry later: %v", pod.Name, err)
 			}
 		}
 		return false, nil
 	})
 	if err != nil {
-		d.t.Errorf("failed to mark updated Deployment pods to ready: %v", err)
+		d.Errorf("failed to mark updated Deployment pods to ready: %v", err)
 	}
 }
 
 func (d *deploymentTester) deploymentComplete() (bool, error) {
-	latest, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
+	latest, err := d.Client().AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -230,14 +229,14 @@ func (d *deploymentTester) deploymentComplete() (bool, error) {
 // Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
 // Rolling update strategy should not be broken during a rolling update.
 func (d *deploymentTester) waitForDeploymentCompleteAndCheckRolling() error {
-	return testutil.WaitForDeploymentCompleteAndCheckRolling(d.c, d.deployment, d.t.Logf, pollInterval, pollTimeout)
+	return testutil.WaitForDeploymentCompleteAndCheckRolling(d.Client(), d.deployment, d.Logf, pollInterval, pollTimeout)
 }
 
 // Waits for the deployment to complete, and don't check if rolling update strategy is broken.
 // Rolling update strategy is used only during a rolling update, and can be violated in other situations,
 // such as shortly after a scaling event or the deployment is just created.
 func (d *deploymentTester) waitForDeploymentComplete() error {
-	return testutil.WaitForDeploymentComplete(d.c, d.deployment, d.t.Logf, pollInterval, pollTimeout)
+	return testutil.WaitForDeploymentComplete(d.Client(), d.deployment, d.Logf, pollInterval, pollTimeout)
 }
 
 // waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady waits for the Deployment to complete
@@ -283,22 +282,22 @@ func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReady() error {
 }
 
 func (d *deploymentTester) updateDeployment(applyUpdate testutil.UpdateDeploymentFunc) (*apps.Deployment, error) {
-	return testutil.UpdateDeploymentWithRetries(d.c, d.deployment.Namespace, d.deployment.Name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
+	return testutil.UpdateDeploymentWithRetries(d.Client(), d.deployment.Namespace, d.deployment.Name, applyUpdate, d.Logf, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) error {
-	if err := testutil.WaitForObservedDeployment(d.c, d.deployment.Namespace, d.deployment.Name, desiredGeneration); err != nil {
+	if err := testutil.WaitForObservedDeployment(d.Client(), d.deployment.Namespace, d.deployment.Name, desiredGeneration); err != nil {
 		return fmt.Errorf("failed waiting for ObservedGeneration of deployment %s to become %d: %v", d.deployment.Name, desiredGeneration, err)
 	}
 	return nil
 }
 
 func (d *deploymentTester) getNewReplicaSet() (*apps.ReplicaSet, error) {
-	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
+	deployment, err := d.Client().AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
 	}
-	rs, err := testutil.GetNewReplicaSet(deployment, d.c)
+	rs, err := testutil.GetNewReplicaSet(deployment, d.Client())
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving new replicaset of deployment %s: %v", d.deployment.Name, err)
 	}
@@ -328,15 +327,15 @@ func (d *deploymentTester) expectNewReplicaSet() (*apps.ReplicaSet, error) {
 }
 
 func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
-	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
+	return testutil.UpdateReplicaSetWithRetries(d.Client(), d.deployment.Namespace, name, applyUpdate, d.Logf, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) waitForDeploymentUpdatedReplicasGTE(minUpdatedReplicas int32) error {
-	return testutil.WaitForDeploymentUpdatedReplicasGTE(d.c, d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
+	return testutil.WaitForDeploymentUpdatedReplicasGTE(d.Client(), d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) waitForDeploymentWithCondition(reason string, condType apps.DeploymentConditionType) error {
-	return testutil.WaitForDeploymentWithCondition(d.c, d.deployment.Namespace, d.deployment.Name, reason, condType, d.t.Logf, pollInterval, pollTimeout)
+	return testutil.WaitForDeploymentWithCondition(d.Client(), d.deployment.Namespace, d.deployment.Name, reason, condType, d.Logf, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
@@ -344,7 +343,7 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse deployment selector: %v", err)
 	}
-	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := d.Client().CoreV1().Pods(d.deployment.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list deployment pods, will retry later: %v", err)
 	}
@@ -367,7 +366,7 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 }
 
 func (d *deploymentTester) waitRSStable(replicaset *apps.ReplicaSet) error {
-	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
+	return testutil.WaitRSStable(d, replicaset, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
@@ -396,7 +395,7 @@ func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
 // waitForReadyReplicas waits for number of ready replicas to equal number of replicas.
 func (d *deploymentTester) waitForReadyReplicas() error {
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
+		deployment, err := d.Client().AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
 		}
@@ -419,8 +418,8 @@ func (d *deploymentTester) markUpdatedPodsReadyWithoutComplete() error {
 			if podutil.IsPodReady(&pod) {
 				continue
 			}
-			if err = markPodReady(d.c, d.deployment.Namespace, &pod); err != nil {
-				d.t.Logf("failed to update Deployment pod %q, will retry later: %v", pod.Name, err)
+			if err = markPodReady(d.Client(), d.deployment.Namespace, &pod); err != nil {
+				d.Logf("failed to update Deployment pod %q, will retry later: %v", pod.Name, err)
 				return false, nil
 			}
 		}
@@ -434,7 +433,7 @@ func (d *deploymentTester) markUpdatedPodsReadyWithoutComplete() error {
 // Verify all replicas fields of DeploymentStatus have desired count.
 // Immediately return an error when found a non-matching replicas field.
 func (d *deploymentTester) checkDeploymentStatusReplicasFields(replicas, updatedReplicas, readyReplicas, availableReplicas, unavailableReplicas int32) error {
-	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
+	deployment, err := d.Client().AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
 	}
