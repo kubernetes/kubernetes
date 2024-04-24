@@ -139,10 +139,7 @@ func newDaemonSetWithSelectorLabels(selectorLabels map[string]string, templateGe
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: selectorLabels,
 				},
-				Spec: podtest.MakePod("",
-					podtest.SetRestartPolicy(api.RestartPolicyAlways),
-					podtest.SetContainers(podtest.MakeContainer(fakeImageName)),
-				).Spec,
+				Spec: podtest.MakePod("").Spec,
 			},
 		},
 	}

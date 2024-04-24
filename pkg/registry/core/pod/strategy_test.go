@@ -833,7 +833,6 @@ func newPodWithHugePageValue(resourceName api.ResourceName, value resource.Quant
 		Name:            "foo",
 		ResourceVersion: "1",
 	}),
-		podtest.SetRestartPolicy(api.RestartPolicyAlways),
 		podtest.SetContainers(podtest.MakeContainer("foo",
 			podtest.SetContainerResources(api.ResourceRequirements{
 				Requests: api.ResourceList{
@@ -865,7 +864,6 @@ func TestPodStrategyValidate(t *testing.T) {
 		{
 			name: "a new pod setting init-container with indivisible hugepages values",
 			pod: podtest.MakePod("foo",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
 				podtest.SetInitContainers(podtest.MakeContainer(containerName, podtest.SetContainerResources(
 					api.ResourceRequirements{
 						Requests: api.ResourceList{
@@ -881,7 +879,6 @@ func TestPodStrategyValidate(t *testing.T) {
 		{
 			name: "a new pod setting init-container with indivisible hugepages values while container with divisible hugepages values",
 			pod: podtest.MakePod("foo",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
 				podtest.SetInitContainers(podtest.MakeContainer(containerName, podtest.SetContainerResources(
 					api.ResourceRequirements{
 						Requests: api.ResourceList{
@@ -906,7 +903,6 @@ func TestPodStrategyValidate(t *testing.T) {
 		{
 			name: "a new pod setting container with divisible hugepages values",
 			pod: podtest.MakePod("foo",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
 				podtest.SetContainers(podtest.MakeContainer(containerName, podtest.SetContainerResources(
 					api.ResourceRequirements{
 						Requests: api.ResourceList{
@@ -946,13 +942,9 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 			name: "add ephemeral container to regular pod and expect success",
 			oldPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 			),
 			newPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetEphemeralContainers(api.EphemeralContainer{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Name:                     "debugger",
@@ -983,14 +975,10 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 			name: "add ephemeral container to static pod and expect failure",
 			oldPod: podtest.MakePod("test-pod",
 				podtest.SetAnnotations(map[string]string{api.MirrorPodAnnotationKey: "someVal"}),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetNodeName("example.com"),
 			),
 			newPod: podtest.MakePod("test-pod",
 				podtest.SetAnnotations(map[string]string{api.MirrorPodAnnotationKey: "someVal"}),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetEphemeralContainers(api.EphemeralContainer{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Name:                     "debugger",
@@ -1006,13 +994,9 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 			name: "remove ephemeral container from regular pod and expect failure",
 			newPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 			),
 			oldPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetEphemeralContainers(api.EphemeralContainer{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Name:                     "debugger",
@@ -1027,8 +1011,6 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 			name: "change ephemeral container from regular pod and expect failure",
 			newPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetEphemeralContainers(api.EphemeralContainer{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Name:                     "debugger",
@@ -1040,8 +1022,6 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 			),
 			oldPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetEphemeralContainers(api.EphemeralContainer{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Name:                     "debugger",
@@ -1358,10 +1338,7 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
 
-			pod := podtest.MakePod("foo",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("container")),
-			)
+			pod := podtest.MakePod("foo")
 			wantPod := pod.DeepCopy()
 			pod.Spec.TopologySpreadConstraints = append(pod.Spec.TopologySpreadConstraints, tc.topologySpreadConstraints...)
 
@@ -1390,8 +1367,6 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	pod := podtest.MakePod("foo",
-		podtest.SetRestartPolicy(api.RestartPolicyAlways),
-		podtest.SetContainers(podtest.MakeContainer("container")),
 		podtest.SetTopologySpreadConstraints(api.TopologySpreadConstraint{
 			NodeAffinityPolicy: &ignore,
 			NodeTaintsPolicy:   &honor,

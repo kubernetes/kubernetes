@@ -32,8 +32,6 @@ import (
 )
 
 const (
-	fakeImageName  = "fake-name"
-	fakeImage      = "fakeimage"
 	deploymentName = "test-deployment"
 	namespace      = "test-namespace"
 )
@@ -176,10 +174,7 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: selectorLabels,
 				},
-				Spec: podtest.MakePod("",
-					podtest.SetRestartPolicy(api.RestartPolicyAlways),
-					podtest.SetContainers(podtest.MakeContainer(fakeImageName)),
-				).Spec,
+				Spec: podtest.MakePod("").Spec,
 			},
 		},
 	}
@@ -211,8 +206,7 @@ func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resourc
 					Labels:    map[string]string{"foo": "bar"},
 				},
 				Spec: podtest.MakePod("",
-					podtest.SetRestartPolicy(api.RestartPolicyAlways),
-					podtest.SetContainers(podtest.MakeContainer(fakeImageName, podtest.SetContainerResources(
+					podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 						api.ResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),

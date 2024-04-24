@@ -1023,7 +1023,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 		},
 		Spec: podtest.MakePod("",
 			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-			podtest.SetContainers(podtest.MakeContainer("abc")),
 		).Spec,
 	}
 	validPodTemplateSpecNever := *validPodTemplateSpec.DeepCopy()
@@ -1228,7 +1227,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 						},
 						Spec: podtest.MakePod("",
 							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-							podtest.SetContainers(podtest.MakeContainer("abc")),
 						).Spec,
 					},
 				},
@@ -1554,7 +1552,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 	defaultSelector := &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}}
 	validPodSpec := podtest.MakePod("",
 		podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-		podtest.SetContainers(podtest.MakeContainer("abc")),
 	).Spec
 	validPodSpecNever := *validPodSpec.DeepCopy()
 	validPodSpecNever.RestartPolicy = api.RestartPolicyNever
@@ -1742,7 +1739,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 						},
 						Spec: podtest.MakePod("",
 							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-							podtest.SetContainers(podtest.MakeContainer("abc")),
 							podtest.SetVolumes(api.Volume{Name: "volume-name"}),
 						).Spec,
 					},
@@ -1759,7 +1755,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 						},
 						Spec: podtest.MakePod("",
 							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-							podtest.SetContainers(podtest.MakeContainer("abc")),
 							podtest.SetVolumes(api.Volume{Name: "volume-name"}),
 						).Spec,
 					},

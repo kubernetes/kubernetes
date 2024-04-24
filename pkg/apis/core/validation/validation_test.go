@@ -5403,11 +5403,11 @@ func TestValidateVolumes(t *testing.T) {
 
 func TestHugePagesIsolation(t *testing.T) {
 	testCases := map[string]struct {
-		pod         *core.Pod
+		pod         core.Pod
 		expectError bool
 	}{
 		"Valid: request hugepages-2Mi": {
-			pod: podtest.MakePod("123",
+			pod: *podtest.MakePod("123",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5422,7 +5422,7 @@ func TestHugePagesIsolation(t *testing.T) {
 						}))))),
 		},
 		"Valid: request more than one hugepages size": {
-			pod: podtest.MakePod("hugepages-shared",
+			pod: *podtest.MakePod("hugepages-shared",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5440,7 +5440,7 @@ func TestHugePagesIsolation(t *testing.T) {
 			expectError: false,
 		},
 		"Valid: request hugepages-1Gi, limit hugepages-2Mi and hugepages-1Gi": {
-			pod: podtest.MakePod("hugepages-multiple",
+			pod: *podtest.MakePod("hugepages-multiple",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5457,7 +5457,7 @@ func TestHugePagesIsolation(t *testing.T) {
 						}))))),
 		},
 		"Invalid: not requesting cpu and memory": {
-			pod: podtest.MakePod("hugepages-requireCpuOrMemory",
+			pod: *podtest.MakePod("hugepages-requireCpuOrMemory",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5469,7 +5469,7 @@ func TestHugePagesIsolation(t *testing.T) {
 			expectError: true,
 		},
 		"Invalid: request 1Gi hugepages-2Mi but limit 2Gi": {
-			pod: podtest.MakePod("hugepages-shared",
+			pod: *podtest.MakePod("hugepages-shared",
 				podtest.SetContainers(podtest.MakeContainer("ctr",
 					podtest.SetContainerResources(
 						podtest.MakeResourceRequirements(
@@ -5488,7 +5488,7 @@ func TestHugePagesIsolation(t *testing.T) {
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
-			errs := ValidatePodCreate(tc.pod, PodValidationOptions{})
+			errs := ValidatePodCreate(&tc.pod, PodValidationOptions{})
 			if tc.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
@@ -9908,13 +9908,9 @@ func TestValidatePodSpec(t *testing.T) {
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
 
-	successCases := map[string]core.PodSpec{
-		"populate basic fields, leave defaults for most": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol")))).Spec,
-		"populate all fields": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+	successCases := map[string]core.Pod{
+		"populate basic fields, leave defaults for most": *podtest.MakePod(""),
+		"populate all fields": *podtest.MakePod("",
 			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
 			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
 			podtest.SetNodeSelector(map[string]string{
@@ -9923,9 +9919,8 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetNodeName("foobar"),
 			podtest.SetActiveDeadlineSeconds(activeDeadlineSeconds),
 			podtest.SetServiceAccountName("acct"),
-		).Spec,
-		"populate all fields with larger active deadline": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"populate all fields with larger active deadline": *podtest.MakePod("",
 			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
 			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
 			podtest.SetNodeSelector(map[string]string{
@@ -9934,44 +9929,37 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetNodeName("foobar"),
 			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsMax),
 			podtest.SetServiceAccountName("acct"),
-		).Spec,
-		"populate HostNetwork": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}))),
+		),
+		"populate HostNetwork": *podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr",
+				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}))),
 			podtest.SetSecurityContext(core.PodSecurityContext{HostNetwork: true}),
-		).Spec,
-		"populate RunAsUser SupplementalGroups FSGroup with minID 0": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"populate RunAsUser SupplementalGroups FSGroup with minID 0": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				SupplementalGroups: []int64{minGroupID},
 				RunAsUser:          &minUserID,
 				FSGroup:            &minGroupID,
 			}),
-		).Spec,
-		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID},
 				RunAsUser:          &maxUserID,
 				FSGroup:            &maxGroupID,
 			}),
-		).Spec,
-		"populate HostIPC": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+		),
+		"populate HostIPC": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostIPC: true,
 			}),
-		).Spec,
-		"populate HostPID": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+		),
+		"populate HostPID": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostPID: true,
 			}),
-		).Spec,
-		"populate Affinity": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+		),
+		"populate Affinity": *podtest.MakePod("",
 			podtest.SetAffinity(&core.Affinity{
 				NodeAffinity: &core.NodeAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -10000,65 +9988,50 @@ func TestValidatePodSpec(t *testing.T) {
 					}},
 				},
 			}),
-		).Spec,
-		"populate HostAliases": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+		),
+		"populate HostAliases": *podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}),
-		).Spec,
-		"populate HostAliases with `foo.bar` hostnames": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+		),
+		"populate HostAliases with `foo.bar` hostnames": *podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
-		).Spec,
-		"populate HostAliases with HostNetwork": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+		),
+		"populate HostAliases with HostNetwork": *podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostNetwork: true,
 			}),
-		).Spec,
-		"populate PriorityClassName": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
+		),
+		"populate PriorityClassName": *podtest.MakePod("",
 			podtest.SetPriorityClassName("valid-name"),
-		).Spec,
-		"populate ShareProcessNamespace": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
-			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
+		),
+		"populate ShareProcessNamespace": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				ShareProcessNamespace: &[]bool{true}[0],
 			}),
-		).Spec,
-		"populate RuntimeClassName": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"populate RuntimeClassName": *podtest.MakePod("",
 			podtest.SetRuntimeClassName("valid-sandbox"),
-		).Spec,
-		"populate Overhead": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetRuntimeClassName("valid-sandbox"),
+		),
+		"populate Overhead": *podtest.MakePod("",
 			podtest.SetOverhead(core.ResourceList{}),
-		).Spec,
-		"populate FSGroupChangePolicy": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"populate FSGroupChangePolicy": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				FSGroupChangePolicy: &goodfsGroupChangePolicy,
 			}),
-		).Spec,
-		"resources resize policy for containers": podtest.MakePod("",
+		),
+		"resources resize policy for containers": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResizePolicy(
 				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"}),
 			)),
-		).Spec,
+		),
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
 			opts := PodValidationOptions{
 				ResourceIsPod: true,
 			}
-			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -10072,150 +10045,112 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID = int64(-1)
 	maxGroupID = int64(2147483648)
 
-	failureCases := map[string]core.PodSpec{
-		"bad volume": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(core.Volume{}),
-		).Spec,
-		"no containers": podtest.MakePod("").Spec,
-		"bad container": podtest.MakePod("",
-			podtest.SetContainers(core.Container{}),
-		).Spec,
-		"bad init container": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetInitContainers(core.Container{}),
-		).Spec,
-		"bad DNS policy": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetDNSPolicy(core.DNSPolicy("invalid")),
-		).Spec,
-		"bad service account name": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetServiceAccountName("invalidName"),
-		).Spec,
-		"bad restart policy": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetRestartPolicy("UnknowPolicy"),
-		).Spec,
-		"with hostNetwork hostPort unspecified": podtest.MakePod("",
+	failureCases := map[string]core.Pod{
+		"bad volume":               *podtest.MakePod("", podtest.SetVolumes(core.Volume{})),
+		"no containers":            *podtest.MakePod("", podtest.SetContainers()),
+		"bad container":            *podtest.MakePod("", podtest.SetContainers(core.Container{})),
+		"bad init container":       *podtest.MakePod("", podtest.SetInitContainers(core.Container{})),
+		"bad DNS policy":           *podtest.MakePod("", podtest.SetDNSPolicy(core.DNSPolicy("invalid"))),
+		"bad service account name": *podtest.MakePod("", podtest.SetServiceAccountName("invalidName")),
+		"bad restart policy":       *podtest.MakePod("", podtest.SetRestartPolicy("UnknowPolicy")),
+		"with hostNetwork hostPort unspecified": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}))),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostNetwork: true,
 			}),
-		).Spec,
-		"with hostNetwork hostPort not equal to containerPort": podtest.MakePod("",
+		),
+		"with hostNetwork hostPort not equal to containerPort": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}))),
-
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostNetwork: true,
 			}),
-		).Spec,
-		"with hostAliases with invalid IP": podtest.MakePod("",
+		),
+		"with hostAliases with invalid IP": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostNetwork: false,
 			}),
 			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
-		).Spec,
-		"with hostAliases with invalid hostname": podtest.MakePod("",
+		),
+		"with hostAliases with invalid hostname": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostNetwork: false,
 			}),
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
-		).Spec,
-		"bad supplementalGroups large than math.MaxInt32": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad supplementalGroups large than math.MaxInt32": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID, 1234},
 			}),
-		).Spec,
-		"bad supplementalGroups less than 0": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad supplementalGroups less than 0": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				SupplementalGroups: []int64{minGroupID, 1234},
 			}),
-		).Spec,
-		"bad runAsUser large than math.MaxInt32": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad runAsUser large than math.MaxInt32": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				RunAsUser: &maxUserID,
 			}),
-		).Spec,
-		"bad runAsUser less than 0": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad runAsUser less than 0": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				RunAsUser: &minUserID,
 			}),
-		).Spec,
-		"bad fsGroup large than math.MaxInt32": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad fsGroup large than math.MaxInt32": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				FSGroup: &maxGroupID,
 			}),
-		).Spec,
-		"bad fsGroup less than 0": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad fsGroup less than 0": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				FSGroup: &minGroupID,
 			}),
-		).Spec,
-		"bad-active-deadline-seconds": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+		),
+		"bad-active-deadline-seconds": *podtest.MakePod("",
 			podtest.SetActiveDeadlineSeconds(activeDeadlineSeconds),
-		).Spec,
-		"active-deadline-seconds-too-large": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+		),
+		"active-deadline-seconds-too-large": *podtest.MakePod("",
 			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsTooLarge),
-		).Spec,
-		"bad nodeName": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+		),
+		"bad nodeName": *podtest.MakePod("",
 			podtest.SetNodeName("node name"),
-		).Spec,
-		"bad PriorityClassName": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+		),
+		"bad PriorityClassName": *podtest.MakePod("",
 			podtest.SetPriorityClassName("InvalidName"),
-		).Spec,
-		"ShareProcessNamespace and HostPID both set": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"ShareProcessNamespace and HostPID both set": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				HostPID:               true,
 				ShareProcessNamespace: &[]bool{true}[0],
 			}),
-		).Spec,
-		"bad RuntimeClassName": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+		),
+		"bad RuntimeClassName": *podtest.MakePod("",
 			podtest.SetRuntimeClassName("invalid/sandbox"),
-		).Spec,
-		"bad empty fsGroupchangepolicy": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad empty fsGroupchangepolicy": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy2,
 			}),
-		).Spec,
-		"bad invalid fsgroupchangepolicy": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"bad invalid fsgroupchangepolicy": *podtest.MakePod("",
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
 			}),
-		).Spec,
-		"disallowed resources resize policy for init containers": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
+		),
+		"disallowed resources resize policy for init containers": *podtest.MakePod("",
 			podtest.SetInitContainers(podtest.MakeContainer("initctr", podtest.SetContainerResizePolicy(
 				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 			))),
-		).Spec,
+		),
 	}
 	for k, v := range failureCases {
 		opts := PodValidationOptions{
 			ResourceIsPod: true,
 		}
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -10239,36 +10174,32 @@ func TestValidatePod(t *testing.T) {
 	longVolName := strings.Repeat("b", 60)
 
 	successCases := map[string]core.Pod{
-		"basic fields": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
-		),
+		"basic fields": *podtest.MakePod("123"),
 		"just about everything": *podtest.MakePod("abc.123.do-re-mi",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
+			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
+			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
 			podtest.SetNodeSelector(map[string]string{
 				"key": "value",
 			}),
 			podtest.SetNodeName("foobar"),
+			podtest.SetServiceAccountName("acct"),
 		),
 		"serialized node affinity requirements": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetAffinity(
 				// TODO: Uncomment and move this block and move inside NodeAffinity once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
-				// //		RequiredDuringSchedulingRequiredDuringExecution: &core.NodeSelector{
-				// //			NodeSelectorTerms: []core.NodeSelectorTerm{
-				// //				{
-				// //					MatchExpressions: []core.NodeSelectorRequirement{
-				// //						{
-				// //							Key: "key1",
-				// //							Operator: core.NodeSelectorOpExists
-				// //						},
-				// //					},
-				// //				},
-				// //			},
-				// //		},
+				//		RequiredDuringSchedulingRequiredDuringExecution: &core.NodeSelector{
+				//			NodeSelectorTerms: []core.NodeSelectorTerm{
+				//				{
+				//					MatchExpressions: []core.NodeSelectorRequirement{
+				//						{
+				//							Key: "key1",
+				//							Operator: core.NodeSelectorOpExists
+				//						},
+				//					},
+				//				},
+				//			},
+				//		},
 				&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -10299,8 +10230,6 @@ func TestValidatePod(t *testing.T) {
 				}),
 		),
 		"serialized node affinity requirements, II": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetAffinity(
 				// TODO: Uncomment and move this block and move inside NodeAffinity once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
@@ -10334,8 +10263,6 @@ func TestValidatePod(t *testing.T) {
 			),
 		),
 		"serialized pod affinity in affinity requirements in annotations": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetAffinity(
 				// TODO: Uncomment and move this block into Annotations map once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
@@ -10388,8 +10315,6 @@ func TestValidatePod(t *testing.T) {
 				}),
 		),
 		"serialized pod anti affinity with different Label Operators in affinity requirements in annotations": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetAffinity(
 				// TODO: Uncomment and move this block into Annotations map once
 				// RequiredDuringSchedulingRequiredDuringExecution is implemented
@@ -10433,75 +10358,55 @@ func TestValidatePod(t *testing.T) {
 				}),
 		),
 		"populate forgiveness tolerations with exists operator in annotations.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Exists", Value: "", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}),
 		),
 		"populate forgiveness tolerations with equal operator in annotations.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}),
 		),
 		"populate tolerations equal operator in annotations.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}),
 		),
 		"populate tolerations exists operator in annotations.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 		),
 		"empty key with Exists operator is OK for toleration, empty toleration key means match all taint keys.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetTolerations(core.Toleration{Operator: "Exists", Effect: "NoSchedule"}),
 		),
 		"empty operator is OK for toleration, defaults to Equal.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetTolerations(core.Toleration{Key: "foo", Value: "bar", Effect: "NoSchedule"}),
 		),
 		"empty effect is OK for toleration, empty toleration effect means match all taint effects.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar"}),
 		),
 		"negative tolerationSeconds is OK for toleration.": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
 			podtest.SetTolerations(
 				core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}),
 		),
 		"runtime default seccomp profile": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{
 				core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
 			},
 			),
 		),
 		"docker default seccomp profile": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{
 				core.SeccompPodAnnotationKey: "unconfined",
 			},
 			),
 		),
 		"localhost seccomp profile": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{
 				core.SeccompPodAnnotationKey: "localhost/foo",
 			},
 			),
 		),
 		"localhost seccomp profile for a container": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{
 				core.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
 			},
 			),
 		),
 		"runtime default seccomp profile for a pod": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type: core.SeccompProfileTypeRuntimeDefault,
@@ -10519,7 +10424,6 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"unconfined seccomp profile for a pod": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type: core.SeccompProfileTypeRuntimeDefault,
@@ -10536,7 +10440,6 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"localhost seccomp profile for a pod": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type:             core.SeccompProfileTypeLocalhost,
@@ -10555,26 +10458,22 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"default AppArmor annotation for a container": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{
 				v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
 			}),
 		),
 		"default AppArmor annotation for an init container": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetInitContainers(podtest.MakeContainer("init-ctr")),
 			podtest.SetAnnotations(map[string]string{
 				v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
 			}),
 		),
 		"localhost AppArmor annotation for a container": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{
 				v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileNamePrefix + "foo",
 			}),
 		),
 		"runtime default AppArmor profile for a pod": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type: core.AppArmorProfileTypeRuntimeDefault,
@@ -10591,7 +10490,6 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"unconfined AppArmor profile for a pod": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type: core.AppArmorProfileTypeUnconfined,
@@ -10608,7 +10506,6 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"localhost AppArmor profile for a pod": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type:             core.AppArmorProfileTypeLocalhost,
@@ -10643,7 +10540,6 @@ func TestValidatePod(t *testing.T) {
 			podtest.SetAnnotations(map[string]string{
 				core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
 			}),
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type:             core.AppArmorProfileTypeLocalhost,
@@ -10652,7 +10548,6 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"syntactically valid sysctls": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetSecurityContext(core.PodSecurityContext{
 				Sysctls: []core.Sysctl{{
 					Name:  "kernel.shmmni",
@@ -10678,7 +10573,6 @@ func TestValidatePod(t *testing.T) {
 						},
 					))),
 			),
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 		),
 		"valid extended resources for regular container": *podtest.MakePod("valid-extended",
 			podtest.SetContainers(podtest.MakeContainer("valid-extended",
@@ -10692,10 +10586,8 @@ func TestValidatePod(t *testing.T) {
 						},
 					))),
 			),
-			podtest.SetInitContainers(podtest.MakeContainer("ctr")),
 		),
 		"valid serviceaccount token projected volume with serviceaccount name specified": *podtest.MakePod("valid-extended",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetServiceAccountName("some-service-account"),
 			podtest.SetVolumes(core.Volume{
 				Name: "projected-volume",
@@ -10713,8 +10605,6 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"valid ClusterTrustBundlePEM projected volume referring to a CTB by name": *podtest.MakePod("valid-extended",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetServiceAccountName("some-service-account"),
 			podtest.SetVolumes(core.Volume{
 				Name: "projected-volume",
 				VolumeSource: core.VolumeSource{
@@ -10732,8 +10622,6 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"valid ClusterTrustBundlePEM projected volume referring to a CTB by signer name": *podtest.MakePod("valid-extended",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetServiceAccountName("some-service-account"),
 			podtest.SetVolumes(core.Volume{
 				Name: "projected-volume",
 				VolumeSource: core.VolumeSource{
@@ -10756,23 +10644,18 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"ephemeral volume + PVC, no conflict between them": *podtest.MakePod("valid-extended",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetServiceAccountName("some-service-account"),
 			podtest.SetVolumes(
 				core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
 				core.Volume{Name: "ephemeral", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
 			),
 		),
 		"negative pod-deletion-cost": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "-100"}),
 		),
 		"positive pod-deletion-cost": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "100"}),
 		),
 		"MatchLabelKeys/MismatchLabelKeys in required PodAffinity": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAffinity(&core.Affinity{
 				PodAffinity: &core.PodAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -10805,7 +10688,6 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"MatchLabelKeys/MismatchLabelKeys in preferred PodAffinity": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAffinity(&core.Affinity{
 				PodAffinity: &core.PodAffinity{
 					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -10841,7 +10723,6 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"MatchLabelKeys/MismatchLabelKeys in required PodAntiAffinity": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAffinity(&core.Affinity{
 				PodAntiAffinity: &core.PodAntiAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -10874,7 +10755,6 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"MatchLabelKeys/MismatchLabelKeys in preferred PodAntiAffinity": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAffinity(&core.Affinity{
 				PodAntiAffinity: &core.PodAntiAffinity{
 					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -10910,7 +10790,6 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"LabelSelector can have the same key as MismatchLabelKeys": *podtest.MakePod("123",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
 			podtest.SetAffinity(&core.Affinity{
 				// Note: On the contrary, in case of matchLabelKeys, keys in matchLabelKeys are not allowed to be specified in labelSelector by users.
 				PodAffinity: &core.PodAffinity{
@@ -10960,7 +10839,7 @@ func TestValidatePod(t *testing.T) {
 	}{
 		"bad name": {
 			expectedError: "metadata.name",
-			spec:          *podtest.MakePod("", podtest.SetContainers(podtest.MakeContainer("ctr"))),
+			spec:          *podtest.MakePod(""),
 		},
 		"image whitespace": {
 			expectedError: "spec.containers[0].image",
@@ -10976,16 +10855,11 @@ func TestValidatePod(t *testing.T) {
 		},
 		"bad namespace": {
 			expectedError: "metadata.namespace",
-			spec: *podtest.MakePod("123",
-				podtest.SetNamespace(""),
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
-			),
+			spec:          *podtest.MakePod("123", podtest.SetNamespace("")),
 		},
 		"bad spec": {
 			expectedError: "spec.containers[0].name",
-			spec: *podtest.MakePod("123",
-				podtest.SetContainers(core.Container{}),
-			),
+			spec:          *podtest.MakePod("123", podtest.SetContainers(core.Container{})),
 		},
 		"bad label": {
 			expectedError: "NoUppercaseOrSpecialCharsLike=Equals",
@@ -10993,13 +10867,11 @@ func TestValidatePod(t *testing.T) {
 				podtest.SetLabels(map[string]string{
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				}),
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 			),
 		},
 		"invalid node selector requirement in node affinity, operator can't be null": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -11015,7 +10887,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid node selector requirement in node affinity, key is invalid": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -11033,7 +10904,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid node field selector requirement in node affinity, more values for field selector": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -11051,7 +10921,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid node field selector requirement in node affinity, invalid operator": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].operator",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -11069,7 +10938,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid node field selector requirement in node affinity, invalid key": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].key",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -11088,7 +10956,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid preferredSchedulingTerm in node affinity, weight should be in range 1-100": {
 			expectedError: "must be in the range 1-100",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
@@ -11108,7 +10975,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
@@ -11121,7 +10987,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
 			expectedError: "must be in the range 1-100",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
@@ -11145,7 +11010,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
 			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchExpressions[0].values",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
@@ -11169,7 +11033,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, In operator must include Values": {
 			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
@@ -11192,7 +11055,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, Exists operator can not have values": {
 			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
@@ -11216,7 +11078,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, namespace should be valid": {
 			expectedError: "spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespace",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
@@ -11239,7 +11100,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod affinity, empty topologyKey is not allowed for hard pod affinity": {
 			expectedError: "can not be empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
@@ -11259,7 +11119,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
 			expectedError: "can not be empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{{
@@ -11279,7 +11138,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod affinity, empty topologyKey is not allowed for soft pod affinity": {
 			expectedError: "can not be empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
@@ -11302,7 +11160,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod anti-affinity, empty topologyKey is not allowed for soft pod anti-affinity": {
 			expectedError: "can not be empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{{
@@ -11325,7 +11182,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11353,7 +11209,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11378,7 +11233,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod anti-affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11406,7 +11260,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod anti-affinity, key in MatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11431,7 +11284,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11459,7 +11311,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11484,7 +11335,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod anti-affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11512,7 +11362,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod anti-affinity, key in MismatchLabelKeys isn't correctly defined": {
 			expectedError: "prefix part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11537,7 +11386,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod affinity, key exists in both matchLabelKeys and labelSelector": {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11572,7 +11420,6 @@ func TestValidatePod(t *testing.T) {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
 			spec: *podtest.MakePod("123",
 				podtest.SetLabels(map[string]string{"key": "value1"}),
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11604,7 +11451,6 @@ func TestValidatePod(t *testing.T) {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
 			spec: *podtest.MakePod("123",
 				podtest.SetLabels(map[string]string{"key": "value1"}),
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11639,7 +11485,6 @@ func TestValidatePod(t *testing.T) {
 			expectedError: "exists in both matchLabelKeys and labelSelector",
 			spec: *podtest.MakePod("123",
 				podtest.SetLabels(map[string]string{"key": "value1"}),
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11670,7 +11515,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11699,7 +11543,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAffinity: &core.PodAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11725,7 +11568,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid soft pod anti-affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -11754,7 +11596,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid hard pod anti-affinity, key exists in both MatchLabelKeys and MismatchLabelKeys": {
 			expectedError: "exists in both matchLabelKeys and mismatchLabelKeys",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAffinity(&core.Affinity{
 					PodAntiAffinity: &core.PodAntiAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
@@ -11810,7 +11651,6 @@ func TestValidatePod(t *testing.T) {
 		"must be a valid pod seccomp profile": {
 			expectedError: "must be a valid seccomp profile",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompPodAnnotationKey: "foo",
 				}),
@@ -11819,7 +11659,6 @@ func TestValidatePod(t *testing.T) {
 		"must be a valid container seccomp profile": {
 			expectedError: "must be a valid seccomp profile",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
 				}),
@@ -11828,7 +11667,6 @@ func TestValidatePod(t *testing.T) {
 		"must be a non-empty container name in seccomp annotation": {
 			expectedError: "name part must be non-empty",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompContainerAnnotationKeyPrefix: "foo",
 				}),
@@ -11837,7 +11675,6 @@ func TestValidatePod(t *testing.T) {
 		"must be a non-empty container profile in seccomp annotation": {
 			expectedError: "must be a valid seccomp profile",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompContainerAnnotationKeyPrefix + "foo": "",
 				}),
@@ -11846,7 +11683,6 @@ func TestValidatePod(t *testing.T) {
 		"must match seccomp profile type and pod annotation": {
 			expectedError: "seccomp type in annotation and field must match",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompPodAnnotationKey: "unconfined",
 				}),
@@ -11875,7 +11711,6 @@ func TestValidatePod(t *testing.T) {
 		"must be a relative path in a node-local seccomp profile annotation": {
 			expectedError: "must be a relative path",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompPodAnnotationKey: "localhost//foo",
 				}),
@@ -11884,7 +11719,6 @@ func TestValidatePod(t *testing.T) {
 		"must not start with '../'": {
 			expectedError: "must not contain '..'",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompPodAnnotationKey: "localhost/../foo",
 				}),
@@ -11893,7 +11727,6 @@ func TestValidatePod(t *testing.T) {
 		"AppArmor profile must apply to a container": {
 			expectedError: "metadata.annotations[container.apparmor.security.beta.kubernetes.io/fake-ctr]",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetInitContainers(podtest.MakeContainer("init-ctr")),
 				podtest.SetAnnotations(map[string]string{
 					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr":      v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
@@ -11905,7 +11738,6 @@ func TestValidatePod(t *testing.T) {
 		"AppArmor profile format must be valid": {
 			expectedError: "invalid AppArmor profile name",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "bad-name",
 				}),
@@ -11914,7 +11746,6 @@ func TestValidatePod(t *testing.T) {
 		"only default AppArmor profile may start with runtime/": {
 			expectedError: "invalid AppArmor profile name",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
 				}),
@@ -11923,7 +11754,6 @@ func TestValidatePod(t *testing.T) {
 		"unsupported pod AppArmor profile type": {
 			expectedError: `Unsupported value: "test"`,
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: "test",
@@ -11946,7 +11776,6 @@ func TestValidatePod(t *testing.T) {
 		"missing pod AppArmor profile type": {
 			expectedError: "Required value: type is required when appArmorProfile is set",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: "",
@@ -11957,7 +11786,6 @@ func TestValidatePod(t *testing.T) {
 		"missing AppArmor localhost profile": {
 			expectedError: "Required value: must be set when AppArmor type is Localhost",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: core.AppArmorProfileTypeLocalhost,
@@ -11968,7 +11796,6 @@ func TestValidatePod(t *testing.T) {
 		"empty AppArmor localhost profile": {
 			expectedError: "Required value: must be set when AppArmor type is Localhost",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
@@ -11980,7 +11807,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid AppArmor localhost profile type": {
 			expectedError: `Invalid value: "foo-bar"`,
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeRuntimeDefault,
@@ -11992,7 +11818,6 @@ func TestValidatePod(t *testing.T) {
 		"invalid AppArmor localhost profile": {
 			expectedError: `Invalid value: "foo-bar "`,
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
@@ -12004,7 +11829,6 @@ func TestValidatePod(t *testing.T) {
 		"too long AppArmor localhost profile": {
 			expectedError: "Too long: may not be longer than 4095",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
@@ -12031,7 +11855,6 @@ func TestValidatePod(t *testing.T) {
 		"mismatched AppArmor pod field and annotation types": {
 			expectedError: "Forbidden: apparmor type in annotation and field must match",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{
 					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 				}),
@@ -12130,7 +11953,6 @@ func TestValidatePod(t *testing.T) {
 							map[string]string{},
 						))),
 				),
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 			),
 		},
 		"invalid fractional extended resource in container limit": {
@@ -12163,27 +11985,23 @@ func TestValidatePod(t *testing.T) {
 							},
 						))),
 				),
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 			),
 		},
 		"mirror-pod present without nodeName": {
 			expectedError: "mirror",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: ""}),
 			),
 		},
 		"mirror-pod populated without nodeName": {
 			expectedError: "mirror",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{core.MirrorPodAnnotationKey: "foo"}),
 			),
 		},
 		"serviceaccount token projected volume with no serviceaccount name specified": {
 			expectedError: "must not be specified when serviceAccountName is not set",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetVolumes(core.Volume{
 					Name: "projected-volume",
 					VolumeSource: core.VolumeSource{
@@ -12203,8 +12021,6 @@ func TestValidatePod(t *testing.T) {
 		"ClusterTrustBundlePEM projected volume using both byName and bySigner": {
 			expectedError: "only one of name and signerName may be used",
 			spec: *podtest.MakePod("valid-extended",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
-				podtest.SetServiceAccountName("some-service-account"),
 				podtest.SetVolumes(core.Volume{
 					Name: "projected-volume",
 					VolumeSource: core.VolumeSource{
@@ -12231,8 +12047,6 @@ func TestValidatePod(t *testing.T) {
 		"ClusterTrustBundlePEM projected volume byName with no name": {
 			expectedError: "must be a valid object name",
 			spec: *podtest.MakePod("valid-extended",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
-				podtest.SetServiceAccountName("some-service-account"),
 				podtest.SetVolumes(core.Volume{
 					Name: "projected-volume",
 					VolumeSource: core.VolumeSource{
@@ -12253,8 +12067,6 @@ func TestValidatePod(t *testing.T) {
 		"ClusterTrustBundlePEM projected volume bySigner with no signer name": {
 			expectedError: "must be a valid signer name",
 			spec: *podtest.MakePod("valid-extended",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
-				podtest.SetServiceAccountName("some-service-account"),
 				podtest.SetVolumes(core.Volume{
 					Name: "projected-volume",
 					VolumeSource: core.VolumeSource{
@@ -12280,8 +12092,6 @@ func TestValidatePod(t *testing.T) {
 		"ClusterTrustBundlePEM projected volume bySigner with invalid signer name": {
 			expectedError: "must be a fully qualified domain and path of the form",
 			spec: *podtest.MakePod("valid-extended",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
-				podtest.SetServiceAccountName("some-service-account"),
 				podtest.SetVolumes(core.Volume{
 					Name: "projected-volume",
 					VolumeSource: core.VolumeSource{
@@ -12302,7 +12112,6 @@ func TestValidatePod(t *testing.T) {
 		"final PVC name for ephemeral volume must be valid": {
 			expectedError: "spec.volumes[1].name: Invalid value: \"" + longVolName + "\": PVC name \"" + longPodName + "-" + longVolName + "\": must be no more than 253 characters",
 			spec: *podtest.MakePod(longPodName,
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetVolumes(
 					core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
 					core.Volume{Name: longVolName, VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
@@ -12312,7 +12121,6 @@ func TestValidatePod(t *testing.T) {
 		"PersistentVolumeClaimVolumeSource must not reference a generated PVC": {
 			expectedError: "spec.volumes[0].persistentVolumeClaim.claimName: Invalid value: \"123-ephemeral-volume\": must not reference a PVC that gets created for an ephemeral volume",
 			spec: *podtest.MakePod("123",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetVolumes(
 					core.Volume{Name: "pvc-volume", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "123-ephemeral-volume"}}},
 					core.Volume{Name: "ephemeral-volume", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &validPVCTemplate}}},
@@ -12322,21 +12130,18 @@ func TestValidatePod(t *testing.T) {
 		"invalid pod-deletion-cost": {
 			expectedError: "metadata.annotations[controller.kubernetes.io/pod-deletion-cost]: Invalid value: \"text\": must be a 32bit integer",
 			spec: *podtest.MakePod("valid-extended",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "text"}),
 			),
 		},
 		"invalid leading zeros pod-deletion-cost": {
 			expectedError: "metadata.annotations[controller.kubernetes.io/pod-deletion-cost]: Invalid value: \"008\": must be a 32bit integer",
 			spec: *podtest.MakePod("valid-extended",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "008"}),
 			),
 		},
 		"invalid leading plus sign pod-deletion-cost": {
 			expectedError: "metadata.annotations[controller.kubernetes.io/pod-deletion-cost]: Invalid value: \"+10\": must be a 32bit integer",
 			spec: *podtest.MakePod("valid-extended",
-				podtest.SetContainers(podtest.MakeContainer("ctr")),
 				podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "+10"}),
 			),
 		},
@@ -12433,49 +12238,43 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "annotations",
 		}, {
 			new: *podtest.MakePod("foo", podtest.SetContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V2")))),
 			old: *podtest.MakePod("foo", podtest.SetContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V2")),
-				podtest.MakeContainer("", podtest.SetContainerImage("bar:V2")))),
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V1")),
+				podtest.MakeContainer("bar", podtest.SetContainerImage("bar:V1")))),
 			err:  "may not add or remove containers",
 			test: "less containers",
 		}, {
 			new: *podtest.MakePod("foo", podtest.SetContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")),
-				podtest.MakeContainer("", podtest.SetContainerImage("bar:V1")))),
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V2")),
+				podtest.MakeContainer("bar", podtest.SetContainerImage("bar:V2")))),
 			old: *podtest.MakePod("foo", podtest.SetContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V2")))),
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V1")))),
 			err:  "may not add or remove containers",
 			test: "more containers",
 		}, {
 			new: *podtest.MakePod("foo", podtest.SetInitContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V2")))),
 			old: *podtest.MakePod("foo", podtest.SetInitContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V2")),
-				podtest.MakeContainer("", podtest.SetContainerImage("bar:V2")))),
+				podtest.MakeContainer("foo", podtest.SetContainerImage("foo:V1")),
+				podtest.MakeContainer("bar", podtest.SetContainerImage("bar:V1")))),
 			err:  "may not add or remove containers",
 			test: "more init containers",
 		}, {
-			new: *podtest.MakePod("foo", podtest.SetContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
-			old: *podtest.MakePod("", podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now}),
-				podtest.SetContainers(podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
+			new:  *podtest.MakePod("foo"),
+			old:  *podtest.MakePod("foo", podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now})),
 			err:  "metadata.deletionTimestamp",
 			test: "deletion timestamp removed",
 		}, {
-			new: *podtest.MakePod("", podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now}),
-				podtest.SetContainers(podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
-			old: *podtest.MakePod("foo", podtest.SetContainers(
-				podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
+			new:  *podtest.MakePod("foo", podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now})),
+			old:  *podtest.MakePod("foo"),
 			err:  "metadata.deletionTimestamp",
 			test: "deletion timestamp added",
 		}, {
-			new: *podtest.MakePod("",
-				podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace}),
-				podtest.SetContainers(podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
-			old: *podtest.MakePod("",
-				podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2}),
-				podtest.SetContainers(podtest.MakeContainer("", podtest.SetContainerImage("foo:V1")))),
+			new: *podtest.MakePod("foo",
+				podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace})),
+			old: *podtest.MakePod("foo",
+				podtest.SetObjectMeta(metav1.ObjectMeta{DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2})),
 			err:  "metadata.deletionGracePeriodSeconds",
 			test: "deletion grace period seconds changed",
 		}, {
@@ -12811,15 +12610,11 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			old: *podtest.MakePod("pod",
-				podtest.SetContainers(podtest.MakeContainer("container")),
-			),
+			old:  *podtest.MakePod("pod"),
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, besteffort -> burstable",
 		}, {
-			new: *podtest.MakePod("pod",
-				podtest.SetContainers(podtest.MakeContainer("container")),
-			),
+			new: *podtest.MakePod("pod"),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
@@ -12831,13 +12626,11 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "Pod QoS change, burstable -> besteffort",
 		}, {
 			new: *podtest.MakePod("pod",
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					FSGroupChangePolicy: &validfsGroupChangePolicy,
 				}),
 			),
 			old: *podtest.MakePod("pod",
-				podtest.SetContainers(podtest.MakeContainer("container")),
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					FSGroupChangePolicy: nil,
 				}),
@@ -13015,39 +12808,39 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "update termination grace period seconds not 1",
 		}, {
 			new: *podtest.MakePod("foo",
-				podtest.SetOS(core.PodOS{Name: core.Windows}),
+				podtest.SetOS(core.Windows),
 				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			old: *podtest.MakePod("foo",
-				podtest.SetOS(core.PodOS{Name: core.Linux}),
+				podtest.SetOS(core.Linux),
 				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
 		}, {
 			new: *podtest.MakePod("foo",
-				podtest.SetOS(core.PodOS{Name: core.Windows}),
+				podtest.SetOS(core.Windows),
 				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			old: *podtest.MakePod("foo",
-				podtest.SetOS(core.PodOS{Name: core.Linux}),
+				podtest.SetOS(core.Linux),
 				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			err:  "spec.securityContext.seLinuxOptions: Forbidden",
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
 		}, {
 			new: *podtest.MakePod("foo",
-				podtest.SetOS(core.PodOS{Name: "dummy"}),
+				podtest.SetOS("dummy"),
 			),
 			old:  *podtest.MakePod("foo"),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "invalid PodOS update, IdentifyPodOS featuregate set",
 		}, {
 			new: *podtest.MakePod("foo",
-				podtest.SetOS(core.PodOS{Name: core.Linux}),
+				podtest.SetOS(core.Linux),
 			),
 			old: *podtest.MakePod("foo",
-				podtest.SetOS(core.PodOS{Name: core.Windows}),
+				podtest.SetOS(core.Windows),
 			),
 			err:  "Forbidden: pod updates may not change fields other than ",
 			test: "update pod spec OS to a valid value, featuregate disabled",
@@ -14302,7 +14095,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 	}, {
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("init")),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14333,7 +14125,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("init")),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetRestartPolicy(core.RestartPolicyNever),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -14369,7 +14160,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 	}, {
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetRestartPolicy(core.RestartPolicyNever),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -14401,7 +14191,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetRestartPolicy(core.RestartPolicyNever),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -14437,7 +14226,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 	}, {
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -14469,7 +14257,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -14505,7 +14292,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 	}, {
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -14537,7 +14323,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		*podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
-			podtest.SetContainers(podtest.MakeContainer("nginx")),
 			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -14621,7 +14406,6 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 				Namespace:       "ns",
 				ResourceVersion: "1",
 			}),
-			podtest.SetContainers(podtest.MakeContainer("cnt")),
 			podtest.SetEphemeralContainers(ephemeralContainers...),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
 		)
@@ -16484,10 +16268,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("abc")),
-			).Spec,
+			Spec: podtest.MakePod("").Spec,
 		},
 	}
 	readWriteVolumePodTemplate := core.PodTemplate{
@@ -16496,8 +16277,6 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("abc")),
 				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
 			).Spec,
 		},
@@ -16508,9 +16287,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
-			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
-			).Spec,
+			Spec: podtest.MakePod("").Spec,
 		},
 	}
 	type rcUpdateTest struct {
@@ -16642,10 +16419,7 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("abc")),
-			).Spec,
+			Spec: podtest.MakePod("").Spec,
 		},
 	}
 	readWriteVolumePodTemplate := core.PodTemplate{
@@ -16655,8 +16429,6 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 			Spec: podtest.MakePod("",
 				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("abc")),
 			).Spec,
 		},
 	}
@@ -16669,7 +16441,6 @@ func TestValidateReplicationController(t *testing.T) {
 				podtest.SetSecurityContext(core.PodSecurityContext{
 					HostNetwork: true,
 				}),
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
 				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(
 					core.ContainerPort{
 						ContainerPort: 12345,
@@ -16681,9 +16452,7 @@ func TestValidateReplicationController(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := core.PodTemplate{
 		Template: core.PodTemplateSpec{
-			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
-			).Spec,
+			Spec: podtest.MakePod("").Spec,
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
@@ -16819,7 +16588,6 @@ func TestValidateReplicationController(t *testing.T) {
 				Template: &core.PodTemplateSpec{
 					Spec: podtest.MakePod("",
 						podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
-						podtest.SetContainers(podtest.MakeContainer("abc")),
 					).Spec,
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
@@ -16837,7 +16605,6 @@ func TestValidateReplicationController(t *testing.T) {
 				Template: &core.PodTemplateSpec{
 					Spec: podtest.MakePod("",
 						podtest.SetRestartPolicy(core.RestartPolicyNever),
-						podtest.SetContainers(podtest.MakeContainer("abc")),
 					).Spec,
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
@@ -16855,8 +16622,6 @@ func TestValidateReplicationController(t *testing.T) {
 						Labels: validSelector,
 					},
 					Spec: podtest.MakePod("",
-						podtest.SetRestartPolicy(core.RestartPolicyAlways),
-						podtest.SetContainers(podtest.MakeContainer("abc")),
 						podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}),
 					).Spec,
 				},
@@ -23110,7 +22875,6 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 								Type: core.SeccompProfileTypeRuntimeDefault,
 							},
 						}))),
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			).Spec,
 		},
 	}, {
@@ -23133,8 +22897,6 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 						Type: core.SeccompProfileTypeUnconfined,
 					},
 				}),
-				podtest.SetContainers(podtest.MakeContainer("test1")),
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			).Spec,
 		},
 	}, {
@@ -23152,14 +22914,12 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 				},
 			},
 			Spec: podtest.MakePod("",
-				podtest.SetContainers(podtest.MakeContainer("test")),
 				podtest.SetInitContainers(podtest.MakeContainer("init-test",
 					podtest.SetContainerSecurityContext(core.SecurityContext{
 						SeccompProfile: &core.SeccompProfile{
 							Type: core.SeccompProfileTypeRuntimeDefault,
 						},
 					}))),
-				podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			).Spec,
 		},
 	},
@@ -23975,29 +23735,28 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
-	goodClaimTemplate := podtest.MakePod("",
+	goodClaimTemplate := *podtest.MakePod("",
 		podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-template"}}}))),
 		podtest.SetRestartPolicy(core.RestartPolicyAlways),
 		podtest.SetResourceClaims(core.PodResourceClaim{
 			Name:                      "my-claim-template",
 			ResourceClaimTemplateName: &externalClaimTemplateName,
 		}),
-	).Spec
-	goodClaimReference := podtest.MakePod("",
+	)
+	goodClaimReference := *podtest.MakePod("",
 		podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-reference"}}}))),
 		podtest.SetRestartPolicy(core.RestartPolicyAlways),
 		podtest.SetResourceClaims(core.PodResourceClaim{
 			Name:              "my-claim-reference",
 			ResourceClaimName: &externalClaimName,
 		}),
-	).Spec
+	)
 
-	successCases := map[string]core.PodSpec{
-		"resource claim reference": goodClaimTemplate,
+	successCases := map[string]core.Pod{
+		"resource claim reference": goodClaimReference,
 		"resource claim template":  goodClaimTemplate,
-		"multiple claims": podtest.MakePod("",
+		"multiple claims": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "another-claim"}}}))),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(
 				core.PodResourceClaim{
 					Name:              "my-claim",
@@ -24007,53 +23766,43 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 					Name:              "another-claim",
 					ResourceClaimName: &externalClaimName,
 				}),
-		).Spec,
-		"init container": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+		),
+		"init container": *podtest.MakePod("",
 			podtest.SetInitContainers(podtest.MakeContainer("ctr-init", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "my-claim",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
+		),
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v.Spec, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
 	}
 
-	failureCases := map[string]core.PodSpec{
-		"pod claim name with prefix": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+	failureCases := map[string]core.Pod{
+		"pod claim name with prefix": *podtest.MakePod("",
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "../my-claim",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
-		"pod claim name with path": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		),
+		"pod claim name with path": *podtest.MakePod("",
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "my/claim",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
-		"pod claim name empty": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		),
+		"pod claim name empty": *podtest.MakePod("",
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
-		"duplicate pod claim entries": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr")),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		),
+		"duplicate pod claim entries": *podtest.MakePod("",
 			podtest.SetResourceClaims(
 				core.PodResourceClaim{
 					Name:              "my-claim",
@@ -24063,52 +23812,46 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 					Name:              "my-claim",
 					ResourceClaimName: &externalClaimName,
 				}),
-		).Spec,
-		"resource claim source empty": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
+		),
+		"resource claim source empty": *podtest.MakePod("",
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name: "my-claim",
 			}),
-		).Spec,
-		"resource claim reference and template": podtest.MakePod("",
+		),
+		"resource claim reference and template": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:                      "my-claim",
 				ResourceClaimName:         &externalClaimName,
 				ResourceClaimTemplateName: &externalClaimTemplateName,
 			}),
-		).Spec,
-		"claim not found": podtest.MakePod("",
+		),
+		"claim not found": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "no-such-claim"}}}))),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "my-claim",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
-		"claim name empty": podtest.MakePod("",
+		),
+		"claim name empty": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: ""}}}))),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "my-claim",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
-		"pod claim name duplicates": podtest.MakePod("",
+		),
+		"pod claim name duplicates": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim"}}}))),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "my-claim",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
-		"no claims defined": podtest.MakePod("",
+		),
+		"no claims defined": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
 			podtest.SetRestartPolicy(core.RestartPolicyAlways),
-		).Spec,
-		"duplicate pod claim name": podtest.MakePod("",
+		),
+		"duplicate pod claim name": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
 			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(
@@ -24120,31 +23863,29 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 					Name:              "my-claim",
 					ResourceClaimName: &externalClaimName,
 				}),
-		).Spec,
-		"ephemeral container don't support resource requirements": podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}))),
+		),
+		"ephemeral container don't support resource requirements": *podtest.MakePod("",
 			podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}, TargetContainerName: "ctr"}),
-			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "my-claim",
 				ResourceClaimName: &externalClaimName,
 			}),
-		).Spec,
-		"invalid claim template name": func() core.PodSpec {
-			spec := goodClaimTemplate.DeepCopy()
+		),
+		"invalid claim template name": func() core.Pod {
+			pod := goodClaimTemplate.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].ResourceClaimTemplateName = &notLabel
-			return *spec
+			pod.Spec.ResourceClaims[0].ResourceClaimTemplateName = &notLabel
+			return *pod
 		}(),
-		"invalid claim reference name": func() core.PodSpec {
-			spec := goodClaimReference.DeepCopy()
+		"invalid claim reference name": func() core.Pod {
+			pod := goodClaimReference.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].ResourceClaimName = &notLabel
-			return *spec
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &notLabel
+			return *pod
 		}(),
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}

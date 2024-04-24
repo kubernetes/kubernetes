@@ -83,10 +83,7 @@ func validNewController() *api.ReplicationController {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
-				Spec: podtest.MakePod("",
-					podtest.SetContainers(podtest.MakeContainer("test")),
-					podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				).Spec,
+				Spec: podtest.MakePod("").Spec,
 			},
 		},
 	}

@@ -67,7 +67,6 @@ func validNewPod() *api.Pod {
 	enableServiceLinks := v1.DefaultEnableServiceLinks
 
 	pod := podtest.MakePod("foo",
-		podtest.SetRestartPolicy(api.RestartPolicyAlways),
 		podtest.SetContainers(podtest.MakeContainer("foo",
 			podtest.SetContainerSecurityContext(*securitycontext.ValidInternalSecurityContextWithContainerDefaults()))),
 		podtest.SetSecurityContext(api.PodSecurityContext{}),

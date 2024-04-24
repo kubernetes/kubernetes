@@ -45,10 +45,7 @@ func TestControllerStrategy(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: podtest.MakePod("",
-				podtest.SetContainers(podtest.MakeContainer("abc")),
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-			).Spec,
+			Spec: podtest.MakePod("").Spec,
 		},
 	}
 	rc := &api.ReplicationController{
@@ -163,10 +160,7 @@ func TestValidateUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
-				podtest.SetContainers(podtest.MakeContainer("abc")),
-			).Spec,
+			Spec: podtest.MakePod("").Spec,
 		},
 	}
 	oldController := &api.ReplicationController{

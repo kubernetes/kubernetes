@@ -1569,7 +1569,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		Template: api.PodTemplateSpec{
 			// no containers specified
 			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
+				podtest.SetContainers(),
 			).Spec,
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
@@ -2608,7 +2608,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 		Template: api.PodTemplateSpec{
 			// no containers specified
 			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
+				podtest.SetContainers(),
 			).Spec,
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
@@ -3009,7 +3009,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			Spec: podtest.MakePod("",
-				podtest.SetRestartPolicy(api.RestartPolicyAlways),
+				podtest.SetContainers(),
 			).Spec,
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,

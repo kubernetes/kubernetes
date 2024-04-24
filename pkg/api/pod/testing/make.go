@@ -41,6 +41,7 @@ func MakePod(name string, tweaks ...Tweak) *api.Pod {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
+			Containers:                    []api.Container{MakeContainer("ctr")},
 			DNSPolicy:                     api.DNSClusterFirst,
 			RestartPolicy:                 api.RestartPolicyAlways,
 			TerminationGracePeriodSeconds: ptr.To[int64](v1.DefaultTerminationGracePeriodSeconds),
@@ -196,9 +197,9 @@ func SetTerminationGracePeriodSeconds(grace int64) Tweak {
 	}
 }
 
-func SetOS(os api.PodOS) Tweak {
+func SetOS(name api.OSName) Tweak {
 	return func(pod *api.Pod) {
-		pod.Spec.OS = &os
+		pod.Spec.OS = &api.PodOS{Name: name}
 	}
 }
 
@@ -228,7 +229,9 @@ func SetObjectMeta(objectMeta metav1.ObjectMeta) Tweak {
 
 func MakeContainer(name string, tweaks ...TweakContainer) api.Container {
 	cnr := api.Container{
-		Name: name, Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+		Name: name, Image: "image", ImagePullPolicy: "IfNotPresent",
+		TerminationMessagePolicy: "File",
+		TerminationMessagePath:   v1.TerminationMessagePathDefault,
 	}
 
 	for _, tweak := range tweaks {

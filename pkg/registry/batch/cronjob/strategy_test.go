@@ -32,7 +32,6 @@ var (
 	validPodTemplateSpec = api.PodTemplateSpec{
 		Spec: podtest.MakePod("",
 			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-			podtest.SetContainers(podtest.MakeContainer("abc")),
 		).Spec,
 	}
 	validCronjobSpec = batch.CronJobSpec{
