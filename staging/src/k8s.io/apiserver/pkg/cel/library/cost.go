@@ -25,6 +25,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"k8s.io/apiserver/pkg/cel"
 )
 
 // CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.
@@ -152,6 +153,35 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 			return &cost
 		}
+	case "validate":
+		if len(args) >= 2 {
+			format, isFormat := args[0].Value().(*cel.Format)
+			if isFormat {
+				strSize := actualSize(args[1])
+
+				// Dont have access to underlying regex, estimate a long regexp
+				regexSize := format.MaxRegexSize
+
+				// Copied from CEL implementation for regex cost
+				//
+				// https://swtch.com/~rsc/regexp/regexp1.html applies to RE2 implementation supported by CEL
+				// Add one to string length for purposes of cost calculation to prevent product of string and regex to be 0
+				// in case where string is empty but regex is still expensive.
+				strCost := uint64(math.Ceil((1.0 + float64(strSize)) * common.StringTraversalCostFactor))
+				// We don't know how many expressions are in the regex, just the string length (a huge
+				// improvement here would be to somehow get a count the number of expressions in the regex or
+				// how many states are in the regex state machine and use that to measure regex cost).
+				// For now, we're making a guess that each expression in a regex is typically at least 4 chars
+				// in length.
+				regexCost := uint64(math.Ceil(float64(regexSize) * common.RegexStringLengthCostFactor))
+				cost := strCost * regexCost
+				return &cost
+			}
+		}
+	case "format.named":
+		// Simply dictionary lookup
+		cost := uint64(1)
+		return &cost
 	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
 		cost := uint64(1)
 		return &cost
@@ -375,6 +405,13 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
 		}
+	case "validate":
+		if target != nil {
+			sz := l.sizeEstimate(args[0])
+			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor).MultiplyByCostFactor(cel.MaxNameFormatRegexSize * common.RegexStringLengthCostFactor)}
+		}
+	case "format.named":
+		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	}
