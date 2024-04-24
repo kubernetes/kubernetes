@@ -84,11 +84,11 @@ Tries to open a TCP or SCTP connection to the given host and port. On error it
 prints an error message prefixed with a specific fixed string that
 test cases can check for:
 
-* `UNKNOWN` - Generic/unknown (non-network) error (e.g. bad arguments)
+* `UNKNOWN` - Generic/unknown (non-network) error (eg, bad arguments)
 * `TIMEOUT` - The connection attempt timed out
 * `DNS` - An error in DNS resolution
 * `REFUSED` - Connection refused
-* `OTHER` - Other networking error (e.g. "no route to host")
+* `OTHER` - Other networking error (eg, "no route to host")
 
 (Theoretically it would be nicer for it to distinguish these by exit
 code, but it's much easier for test programs to compare strings in the
