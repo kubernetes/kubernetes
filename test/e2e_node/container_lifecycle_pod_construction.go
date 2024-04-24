@@ -124,28 +124,34 @@ func (o containerOutputList) String() string {
 
 // RunTogether returns an error the lhs and rhs run together
 func (o containerOutputList) RunTogether(lhs, rhs string) error {
-	lhsStart := o.findIndex(lhs, "Started", 0)
-	rhsStart := o.findIndex(rhs, "Started", lhsStart+1)
+	var startIdx int
+	for {
+		lhsStart := o.findIndex(lhs, "Started", startIdx)
+		if lhsStart == -1 {
+			break
+		}
+		// prepare for the next iteration
+		startIdx = lhsStart + 1
 
-	lhsFinish := o.findIndex(lhs, "Exiting", lhsStart+1)
-	rhsFinish := o.findIndex(rhs, "Exiting", rhsStart+1)
+		rhsStart := o.findIndex(rhs, "Started", lhsStart+1)
+		if rhsStart == -1 {
+			break
+		}
 
-	if lhsStart == -1 {
-		return fmt.Errorf("couldn't find that %s ever started, got\n%v", lhs, o)
+		lhsFinish := o.findIndex(lhs, "Exiting", lhsStart+1)
+		rhsFinish := o.findIndex(rhs, "Exiting", rhsStart+1)
+
+		if lhsFinish != -1 && rhsStart > lhsFinish {
+			continue
+		}
+
+		if rhsFinish != -1 && lhsStart > rhsFinish {
+			continue
+		}
+
+		return nil
 	}
-	if rhsStart == -1 {
-		return fmt.Errorf("couldn't find that %s ever started, got\n%v", rhs, o)
-	}
-
-	if lhsFinish != -1 && rhsStart > lhsFinish {
-		return fmt.Errorf("expected %s to start before finishing %s, got\n%v", rhs, lhs, o)
-	}
-
-	if rhsFinish != -1 && lhsStart > rhsFinish {
-		return fmt.Errorf("expected %s to start before finishing %s, got\n%v", lhs, rhs, o)
-	}
-
-	return nil
+	return fmt.Errorf("couldn't find that %s ran together with %s, got\n%v", lhs, rhs, o)
 }
 
 // StartsBefore returns an error if lhs did not start before rhs
