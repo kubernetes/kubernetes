@@ -575,7 +575,9 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 	// Informer transform to trim ManagedFields for memory efficiency.
 	trim := func(obj interface{}) (interface{}, error) {
 		if accessor, err := meta.Accessor(obj); err == nil {
-			accessor.SetManagedFields(nil)
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
 		}
 		return obj, nil
 	}
