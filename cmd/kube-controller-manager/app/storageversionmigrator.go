@@ -32,6 +32,10 @@ import (
 	svm "k8s.io/kubernetes/pkg/controller/storageversionmigrator"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newStorageVersionMigratorControllerDescriptor())
+}
+
 func newStorageVersionMigratorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.StorageVersionMigratorController,

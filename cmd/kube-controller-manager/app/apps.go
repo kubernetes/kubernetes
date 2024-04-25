@@ -33,6 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newDaemonSetControllerDescriptor())
+}
+
 func newDaemonSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.DaemonSetController,
@@ -57,6 +61,10 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newStatefulSetControllerDescriptor())
+}
+
 func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.StatefulSetController,
@@ -76,6 +84,10 @@ func startStatefulSetController(ctx context.Context, controllerContext Controlle
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newReplicaSetControllerDescriptor())
+}
+
 func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ReplicaSetController,
@@ -93,6 +105,10 @@ func startReplicaSetController(ctx context.Context, controllerContext Controller
 		replicaset.BurstReplicas,
 	).Run(ctx, int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs))
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newDeploymentControllerDescriptor())
 }
 
 func newDeploymentControllerDescriptor() *ControllerDescriptor {

@@ -22,7 +22,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"os"
@@ -30,9 +29,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -55,7 +54,6 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
@@ -394,56 +392,6 @@ func (c ControllerContext) IsControllerEnabled(controllerDescriptor *ControllerD
 	return genericcontrollermanager.IsControllerEnabled(controllerDescriptor.Name(), controllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
 
-// InitFunc is used to launch a particular controller. It returns a controller
-// that can optionally implement other interfaces so that the controller manager
-// can support the requested features.
-// The returned controller may be nil, which will be considered an anonymous controller
-// that requests no additional features from the controller manager.
-// Any error returned will cause the controller process to `Fatal`
-// The bool indicates whether the controller was enabled.
-type InitFunc func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller controller.Interface, enabled bool, err error)
-
-type ControllerDescriptor struct {
-	name                      string
-	initFunc                  InitFunc
-	requiredFeatureGates      []featuregate.Feature
-	aliases                   []string
-	isDisabledByDefault       bool
-	isCloudProviderController bool
-	requiresSpecialHandling   bool
-}
-
-func (r *ControllerDescriptor) Name() string {
-	return r.name
-}
-
-func (r *ControllerDescriptor) GetInitFunc() InitFunc {
-	return r.initFunc
-}
-
-func (r *ControllerDescriptor) GetRequiredFeatureGates() []featuregate.Feature {
-	return append([]featuregate.Feature(nil), r.requiredFeatureGates...)
-}
-
-// GetAliases returns aliases to ensure backwards compatibility and should never be removed!
-// Only addition of new aliases is allowed, and only when a canonical name is changed (please see CHANGE POLICY of controller names)
-func (r *ControllerDescriptor) GetAliases() []string {
-	return append([]string(nil), r.aliases...)
-}
-
-func (r *ControllerDescriptor) IsDisabledByDefault() bool {
-	return r.isDisabledByDefault
-}
-
-func (r *ControllerDescriptor) IsCloudProviderController() bool {
-	return r.isCloudProviderController
-}
-
-// RequiresSpecialHandling should return true only in a special non-generic controllers like ServiceAccountTokenController
-func (r *ControllerDescriptor) RequiresSpecialHandling() bool {
-	return r.requiresSpecialHandling
-}
-
 // KnownControllers returns all known controllers's name
 func KnownControllers() []string {
 	return sets.StringKeySet(NewControllerDescriptors()).List()
@@ -472,106 +420,6 @@ func ControllersDisabledByDefault() []string {
 	sort.Strings(controllersDisabledByDefault)
 
 	return controllersDisabledByDefault
-}
-
-// NewControllerDescriptors is a public map of named controller groups (you can start more than one in an init func)
-// paired to their ControllerDescriptor wrapper object that includes InitFunc.
-// This allows for structured downstream composition and subdivision.
-func NewControllerDescriptors() map[string]*ControllerDescriptor {
-	controllers := map[string]*ControllerDescriptor{}
-	aliases := sets.NewString()
-
-	// All the controllers must fulfil common constraints, or else we will explode.
-	register := func(controllerDesc *ControllerDescriptor) {
-		if controllerDesc == nil {
-			panic("received nil controller for a registration")
-		}
-		name := controllerDesc.Name()
-		if len(name) == 0 {
-			panic("received controller without a name for a registration")
-		}
-		if _, found := controllers[name]; found {
-			panic(fmt.Sprintf("controller name %q was registered twice", name))
-		}
-		if controllerDesc.GetInitFunc() == nil {
-			panic(fmt.Sprintf("controller %q does not have an init function", name))
-		}
-
-		for _, alias := range controllerDesc.GetAliases() {
-			if aliases.Has(alias) {
-				panic(fmt.Sprintf("controller %q has a duplicate alias %q", name, alias))
-			}
-			aliases.Insert(alias)
-		}
-
-		controllers[name] = controllerDesc
-	}
-
-	// First add "special" controllers that aren't initialized normally. These controllers cannot be initialized
-	// in the main controller loop initialization, so we add them here only for the metadata and duplication detection.
-	// app.ControllerDescriptor#RequiresSpecialHandling should return true for such controllers
-	// The only known special case is the ServiceAccountTokenController which *must* be started
-	// first to ensure that the SA tokens for future controllers will exist. Think very carefully before adding new
-	// special controllers.
-	register(newServiceAccountTokenControllerDescriptor(nil))
-
-	register(newEndpointsControllerDescriptor())
-	register(newEndpointSliceControllerDescriptor())
-	register(newEndpointSliceMirroringControllerDescriptor())
-	register(newReplicationControllerDescriptor())
-	register(newPodGarbageCollectorControllerDescriptor())
-	register(newResourceQuotaControllerDescriptor())
-	register(newNamespaceControllerDescriptor())
-	register(newServiceAccountControllerDescriptor())
-	register(newGarbageCollectorControllerDescriptor())
-	register(newDaemonSetControllerDescriptor())
-	register(newJobControllerDescriptor())
-	register(newDeploymentControllerDescriptor())
-	register(newReplicaSetControllerDescriptor())
-	register(newHorizontalPodAutoscalerControllerDescriptor())
-	register(newDisruptionControllerDescriptor())
-	register(newStatefulSetControllerDescriptor())
-	register(newCronJobControllerDescriptor())
-	register(newCertificateSigningRequestSigningControllerDescriptor())
-	register(newCertificateSigningRequestApprovingControllerDescriptor())
-	register(newCertificateSigningRequestCleanerControllerDescriptor())
-	register(newTTLControllerDescriptor())
-	register(newBootstrapSignerControllerDescriptor())
-	register(newTokenCleanerControllerDescriptor())
-	register(newNodeIpamControllerDescriptor())
-	register(newNodeLifecycleControllerDescriptor())
-
-	register(newServiceLBControllerDescriptor())          // cloud provider controller
-	register(newNodeRouteControllerDescriptor())          // cloud provider controller
-	register(newCloudNodeLifecycleControllerDescriptor()) // cloud provider controller
-	// TODO: persistent volume controllers into the IncludeCloudLoops only set as a cloud provider controller.
-
-	register(newPersistentVolumeBinderControllerDescriptor())
-	register(newPersistentVolumeAttachDetachControllerDescriptor())
-	register(newPersistentVolumeExpanderControllerDescriptor())
-	register(newClusterRoleAggregrationControllerDescriptor())
-	register(newPersistentVolumeClaimProtectionControllerDescriptor())
-	register(newPersistentVolumeProtectionControllerDescriptor())
-	register(newTTLAfterFinishedControllerDescriptor())
-	register(newRootCACertificatePublisherControllerDescriptor())
-	register(newEphemeralVolumeControllerDescriptor())
-
-	// feature gated
-	register(newStorageVersionGarbageCollectorControllerDescriptor())
-	register(newResourceClaimControllerDescriptor())
-	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
-	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
-	register(newTaintEvictionControllerDescriptor())
-	register(newServiceCIDRsControllerDescriptor())
-	register(newStorageVersionMigratorControllerDescriptor())
-
-	for _, alias := range aliases.UnsortedList() {
-		if _, ok := controllers[alias]; ok {
-			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
-		}
-	}
-
-	return controllers
 }
 
 // CreateControllerContext creates a context struct containing references to resources needed by the
@@ -760,6 +608,10 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 
 	logger.Info("Started controller", "controller", controllerName)
 	return check, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newServiceAccountTokenControllerDescriptor(nil))
 }
 
 // serviceAccountTokenControllerStarter is special because it must run first to set up permissions for other controllers.

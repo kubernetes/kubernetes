@@ -24,6 +24,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newClusterRoleAggregrationControllerDescriptor())
+}
+
 func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ClusterRoleAggregationController,

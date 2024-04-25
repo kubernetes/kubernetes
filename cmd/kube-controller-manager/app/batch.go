@@ -29,6 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newJobControllerDescriptor())
+}
+
 func newJobControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.JobController,
@@ -49,6 +53,10 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 	}
 	go jobController.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newCronJobControllerDescriptor())
 }
 
 func newCronJobControllerDescriptor() *ControllerDescriptor {

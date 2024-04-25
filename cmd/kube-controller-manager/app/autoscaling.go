@@ -34,6 +34,10 @@ import (
 	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newHorizontalPodAutoscalerControllerDescriptor())
+}
+
 func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.HorizontalPodAutoscalerController,

@@ -28,6 +28,10 @@ import (
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newEndpointSliceControllerDescriptor())
+}
+
 func newEndpointSliceControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.EndpointSliceController,
@@ -48,6 +52,10 @@ func startEndpointSliceController(ctx context.Context, controllerContext Control
 		controllerContext.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
 	).Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs))
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newEndpointSliceMirroringControllerDescriptor())
 }
 
 func newEndpointSliceMirroringControllerDescriptor() *ControllerDescriptor {
