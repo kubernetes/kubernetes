@@ -30,9 +30,7 @@ import (
 
 var (
 	validPodTemplateSpec = api.PodTemplateSpec{
-		Spec: podtest.MakePod("",
-			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-		).Spec,
+		Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 	}
 	validCronjobSpec = batch.CronJobSpec{
 		Schedule:          "5 5 * * ?",
@@ -113,8 +111,7 @@ func TestCronJobStrategy(t *testing.T) {
 	updatedCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.CronJobSpec{
-			Schedule: "5 5 5 * ?",
-			// FIX ME
+			Schedule:    "5 5 5 * ?",
 			JobTemplate: cronJob.Spec.JobTemplate,
 		},
 		Status: batch.CronJobStatus{

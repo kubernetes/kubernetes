@@ -30,8 +30,8 @@ type TweakContainer func(*api.Container)
 
 // MakePod helps construct Pod objects (which pass API validation) more
 // legibly and tersely than a Go struct definition.  By default this produces
-// a ClusterIP service with a single port and a trivial selector.  The caller
-// can pass any number of tweak functions to further modify the result.
+// a Pod with a single container, ctr.  The caller can pass any number of tweak
+// functions to further modify the result.
 func MakePod(name string, tweaks ...Tweak) *api.Pod {
 	// NOTE: Any field that would be populated by defaulting needs to be
 	// present and valid here.
@@ -53,6 +53,10 @@ func MakePod(name string, tweaks ...Tweak) *api.Pod {
 	}
 
 	return pod
+}
+
+func MakePodSpec(policy api.RestartPolicy, tweaks ...Tweak) api.PodSpec {
+	return MakePod("", append([]Tweak{SetRestartPolicy(policy)}, tweaks...)...).Spec
 }
 
 func SetNamespace(ns string) Tweak {

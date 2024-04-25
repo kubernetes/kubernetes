@@ -5403,11 +5403,11 @@ func TestValidateVolumes(t *testing.T) {
 
 func TestHugePagesIsolation(t *testing.T) {
 	testCases := map[string]struct {
-		pod         core.Pod
+		pod         *core.Pod
 		expectError bool
 	}{
 		"Valid: request hugepages-2Mi": {
-			pod: *podtest.MakePod("123",
+			pod: podtest.MakePod("123",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5422,7 +5422,7 @@ func TestHugePagesIsolation(t *testing.T) {
 						}))))),
 		},
 		"Valid: request more than one hugepages size": {
-			pod: *podtest.MakePod("hugepages-shared",
+			pod: podtest.MakePod("hugepages-shared",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5440,7 +5440,7 @@ func TestHugePagesIsolation(t *testing.T) {
 			expectError: false,
 		},
 		"Valid: request hugepages-1Gi, limit hugepages-2Mi and hugepages-1Gi": {
-			pod: *podtest.MakePod("hugepages-multiple",
+			pod: podtest.MakePod("hugepages-multiple",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5457,7 +5457,7 @@ func TestHugePagesIsolation(t *testing.T) {
 						}))))),
 		},
 		"Invalid: not requesting cpu and memory": {
-			pod: *podtest.MakePod("hugepages-requireCpuOrMemory",
+			pod: podtest.MakePod("hugepages-requireCpuOrMemory",
 				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 					podtest.MakeResourceRequirements(
 						map[string]string{
@@ -5469,7 +5469,7 @@ func TestHugePagesIsolation(t *testing.T) {
 			expectError: true,
 		},
 		"Invalid: request 1Gi hugepages-2Mi but limit 2Gi": {
-			pod: *podtest.MakePod("hugepages-shared",
+			pod: podtest.MakePod("hugepages-shared",
 				podtest.SetContainers(podtest.MakeContainer("ctr",
 					podtest.SetContainerResources(
 						podtest.MakeResourceRequirements(
@@ -5488,7 +5488,7 @@ func TestHugePagesIsolation(t *testing.T) {
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
-			errs := ValidatePodCreate(&tc.pod, PodValidationOptions{})
+			errs := ValidatePodCreate(tc.pod, PodValidationOptions{})
 			if tc.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}

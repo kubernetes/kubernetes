@@ -79,12 +79,9 @@ func TestReplicaSetStrategy(t *testing.T) {
 
 	invalidRc := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
-		// FIX ME
 		Spec: apps.ReplicaSetSpec{
 			Template: api.PodTemplateSpec{
-				Spec: api.PodSpec{
-					TerminationGracePeriodSeconds: validPodTemplate.Template.Spec.TerminationGracePeriodSeconds,
-				},
+				Spec: podtest.MakePod("", podtest.SetContainers()).Spec,
 			},
 		},
 	}

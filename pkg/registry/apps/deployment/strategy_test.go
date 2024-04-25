@@ -205,7 +205,7 @@ func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resourc
 					Name:      "foo",
 					Labels:    map[string]string{"foo": "bar"},
 				},
-				Spec: podtest.MakePod("",
+				Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
 					podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 						api.ResourceRequirements{
 							Requests: api.ResourceList{
@@ -217,7 +217,7 @@ func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resourc
 								api.ResourceName(resourceName):    value,
 							},
 						}))),
-				).Spec,
+				),
 			},
 		},
 	}

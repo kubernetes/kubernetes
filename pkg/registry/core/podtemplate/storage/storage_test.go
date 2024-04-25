@@ -74,10 +74,8 @@ func TestCreate(t *testing.T) {
 		// invalid
 		&api.PodTemplate{
 			Template: api.PodTemplateSpec{
-				// FIX ME
-				Spec: api.PodSpec{
-					TerminationGracePeriodSeconds: pod.Template.Spec.TerminationGracePeriodSeconds,
-				}},
+				Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
+			},
 		},
 	)
 }

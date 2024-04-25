@@ -60,9 +60,7 @@ func validNewCronJob() *batch.CronJob {
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 				},
 			},
@@ -80,16 +78,13 @@ func TestCreate(t *testing.T) {
 	test.TestCreate(
 		// valid
 		validCronJob,
-		// invalid (empty spec)
+		// invalid (no containers)
 		&batch.CronJob{
 			Spec: batch.CronJobSpec{
-				// FIX ME
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: api.PodTemplateSpec{
-							Spec: api.PodSpec{
-								TerminationGracePeriodSeconds: validCronJob.Spec.JobTemplate.Spec.Template.Spec.TerminationGracePeriodSeconds,
-							},
+							Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure, podtest.SetContainers()),
 						},
 					},
 				},

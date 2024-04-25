@@ -62,10 +62,7 @@ func getValidPodTemplateSpecForManual(selector *metav1.LabelSelector) api.PodTem
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
 		},
-		Spec: podtest.MakePod("",
-			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-			podtest.SetContainers(podtest.MakeContainer("abc")),
-		).Spec,
+		Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 	}
 }
 
@@ -80,11 +77,8 @@ func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.Pod
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
 		},
-		Spec: podtest.MakePod("",
-			podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-			podtest.SetContainers(podtest.MakeContainer("abc")),
-			podtest.SetInitContainers(podtest.MakeContainer("def")),
-		).Spec,
+		Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure,
+			podtest.SetInitContainers(podtest.MakeContainer("def"))),
 	}
 }
 
@@ -164,7 +158,7 @@ func TestValidateJob(t *testing.T) {
 						}, {
 							Action: batch.PodFailurePolicyActionCount,
 							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-								ContainerName: pointer.String("abc"),
+								ContainerName: pointer.String("ctr"),
 								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 								Values:        []int32{1, 2, 3},
 							},
@@ -394,9 +388,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyControllerUidLabel: "1a2b3c", batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 				},
 			},
@@ -815,7 +807,7 @@ func TestValidateJob(t *testing.T) {
 						Rules: []batch.PodFailurePolicyRule{{
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-								ContainerName: pointer.String("abc"),
+								ContainerName: pointer.String("ctr"),
 								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 								Values:        []int32{1, 2, 3},
 							},
@@ -858,7 +850,7 @@ func TestValidateJob(t *testing.T) {
 						Rules: []batch.PodFailurePolicyRule{{
 							Action: batch.PodFailurePolicyActionIgnore,
 							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-								ContainerName: pointer.String("abc"),
+								ContainerName: pointer.String("ctr"),
 								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 								Values:        []int32{1, 2, 3},
 							},
@@ -885,7 +877,7 @@ func TestValidateJob(t *testing.T) {
 						Rules: []batch.PodFailurePolicyRule{{
 							Action: "UnknownAction",
 							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-								ContainerName: pointer.String("abc"),
+								ContainerName: pointer.String("ctr"),
 								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 								Values:        []int32{1, 2, 3},
 							},
@@ -1029,9 +1021,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validGeneratedSelector.MatchLabels,
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{},
@@ -1245,9 +1235,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"y": "z"},
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 				},
 			},
@@ -1267,9 +1255,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"controller-uid": "4d5e6f"},
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 				},
 			},
@@ -1289,9 +1275,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validManualSelector.MatchLabels,
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyAlways),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
 					},
 				},
 			},
@@ -1311,9 +1295,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validManualSelector.MatchLabels,
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy("Invalid"),
-						).Spec,
+						Spec: podtest.MakePodSpec("Invalid"),
 					},
 				},
 			},
@@ -1381,9 +1363,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 				},
 			},
@@ -1403,9 +1383,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 				},
 			},
@@ -1442,9 +1420,7 @@ func TestValidateJob(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.JobNameLabel: "myjob", batch.LegacyControllerUidLabel: "1a2b3c", batch.LegacyJobNameLabel: "myjob"},
 						},
-						Spec: podtest.MakePod("",
-							podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
-						).Spec,
+						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
 					},
 				},
 			},
@@ -2859,9 +2835,7 @@ func TestValidateCronJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: api.PodTemplateSpec{
-							Spec: podtest.MakePod("",
-								podtest.SetRestartPolicy(api.RestartPolicyAlways),
-							).Spec,
+							Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
 						},
 					},
 				},
@@ -2879,9 +2853,7 @@ func TestValidateCronJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: api.PodTemplateSpec{
-							Spec: podtest.MakePod("",
-								podtest.SetRestartPolicy("Invalid"),
-							).Spec,
+							Spec: podtest.MakePodSpec("Invalid"),
 						},
 					},
 				},
