@@ -27,16 +27,8 @@ import (
 )
 
 // PVAssumeCache is a AssumeCache for PersistentVolume objects
-type PVAssumeCache interface {
-	assumecache.AssumeCache
-
-	GetPV(pvName string) (*v1.PersistentVolume, error)
-	GetAPIPV(pvName string) (*v1.PersistentVolume, error)
-	ListPVs(storageClassName string) []*v1.PersistentVolume
-}
-
-type pvAssumeCache struct {
-	assumecache.AssumeCache
+type PVAssumeCache struct {
+	*assumecache.AssumeCache
 	logger klog.Logger
 }
 
@@ -48,15 +40,15 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // NewPVAssumeCache creates a PV assume cache.
-func NewPVAssumeCache(logger klog.Logger, informer assumecache.Informer) PVAssumeCache {
+func NewPVAssumeCache(logger klog.Logger, informer assumecache.Informer) *PVAssumeCache {
 	logger = klog.LoggerWithName(logger, "PV Cache")
-	return &pvAssumeCache{
+	return &PVAssumeCache{
 		AssumeCache: assumecache.NewAssumeCache(logger, informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc),
 		logger:      logger,
 	}
 }
 
-func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
+func (c *PVAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
 	obj, err := c.Get(pvName)
 	if err != nil {
 		return nil, err
@@ -69,7 +61,7 @@ func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-func (c *pvAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
+func (c *PVAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
 	obj, err := c.GetAPIObj(pvName)
 	if err != nil {
 		return nil, err
@@ -81,7 +73,7 @@ func (c *pvAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
+func (c *PVAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
 	objs := c.List(&v1.PersistentVolume{
 		Spec: v1.PersistentVolumeSpec{
 			StorageClassName: storageClassName,
@@ -100,30 +92,21 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 }
 
 // PVCAssumeCache is a AssumeCache for PersistentVolumeClaim objects
-type PVCAssumeCache interface {
-	assumecache.AssumeCache
-
-	// GetPVC returns the PVC from the cache with given pvcKey.
-	// pvcKey is the result of MetaNamespaceKeyFunc on PVC obj
-	GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
-	GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
-}
-
-type pvcAssumeCache struct {
-	assumecache.AssumeCache
+type PVCAssumeCache struct {
+	*assumecache.AssumeCache
 	logger klog.Logger
 }
 
 // NewPVCAssumeCache creates a PVC assume cache.
-func NewPVCAssumeCache(logger klog.Logger, informer assumecache.Informer) PVCAssumeCache {
+func NewPVCAssumeCache(logger klog.Logger, informer assumecache.Informer) *PVCAssumeCache {
 	logger = klog.LoggerWithName(logger, "PVC Cache")
-	return &pvcAssumeCache{
+	return &PVCAssumeCache{
 		AssumeCache: assumecache.NewAssumeCache(logger, informer, "v1.PersistentVolumeClaim", "", nil),
 		logger:      logger,
 	}
 }
 
-func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
+func (c *PVCAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
 	obj, err := c.Get(pvcKey)
 	if err != nil {
 		return nil, err
@@ -136,7 +119,7 @@ func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error
 	return pvc, nil
 }
 
-func (c *pvcAssumeCache) GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
+func (c *PVCAssumeCache) GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
 	obj, err := c.GetAPIObj(pvcKey)
 	if err != nil {
 		return nil, err

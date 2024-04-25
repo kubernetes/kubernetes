@@ -28,45 +28,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// AssumeCache is a cache on top of the informer that allows for updating
-// objects outside of informer events and also restoring the informer
-// cache's version of the object. Objects are assumed to be
-// Kubernetes API objects that are supported by [meta.Accessor].
-//
-// Objects can referenced via their key, with [cache.MetaNamespaceKeyFunc]
-// as key function.
-type AssumeCache interface {
-	// Assume updates the object in-memory only.
-	//
-	// The version of the object must be greater or equal to
-	// the current object, otherwise an error is returned.
-	//
-	// Storing an object with the same version is supported
-	// by the assume cache, but suffers from a race: if an
-	// update is received via the informer while such an
-	// object is assumed, it gets dropped in favor of the
-	// newer object from the apiserver.
-	//
-	// Only assuming objects that were returned by an apiserver
-	// operation (Update, Patch) is safe.
-	Assume(obj interface{}) error
-
-	// Restore the informer cache's version of the object.
-	Restore(key string)
-
-	// Get the object by its key.
-	Get(key string) (interface{}, error)
-
-	// GetAPIObj gets the informer cache's version by its key.
-	GetAPIObj(key string) (interface{}, error)
-
-	// List all the objects in the cache.
-	List(indexObj interface{}) []interface{}
-
-	// getImplementation is used internally by [AddTestObject], [UpdateTestObject], [DeleteTestObject].
-	getImplementation() *assumeCache
-}
-
 // Informer is the subset of [cache.SharedInformer] that NewAssumeCache depends upon.
 type Informer interface {
 	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
@@ -74,20 +35,20 @@ type Informer interface {
 
 // AddTestObject adds an object to the assume cache.
 // Only use this for unit testing!
-func AddTestObject(cache AssumeCache, obj interface{}) {
-	cache.getImplementation().add(obj)
+func AddTestObject(cache *AssumeCache, obj interface{}) {
+	cache.add(obj)
 }
 
 // UpdateTestObject updates an object in the assume cache.
 // Only use this for unit testing!
-func UpdateTestObject(cache AssumeCache, obj interface{}) {
-	cache.getImplementation().update(nil, obj)
+func UpdateTestObject(cache *AssumeCache, obj interface{}) {
+	cache.update(nil, obj)
 }
 
 // DeleteTestObject deletes object in the assume cache.
 // Only use this for unit testing!
-func DeleteTestObject(cache AssumeCache, obj interface{}) {
-	cache.getImplementation().delete(obj)
+func DeleteTestObject(cache *AssumeCache, obj interface{}) {
+	cache.delete(obj)
 }
 
 // Sentinel errors that can be checked for with errors.Is.
@@ -135,7 +96,15 @@ func (e ObjectNameError) Is(err error) bool {
 	return err == ErrObjectName
 }
 
-// assumeCache stores two pointers to represent a single object:
+// AssumeCache is a cache on top of the informer that allows for updating
+// objects outside of informer events and also restoring the informer
+// cache's version of the object. Objects are assumed to be
+// Kubernetes API objects that are supported by [meta.Accessor].
+//
+// Objects can referenced via their key, with [cache.MetaNamespaceKeyFunc]
+// as key function.
+//
+// AssumeCache stores two pointers to represent a single object:
 //   - The pointer to the informer object.
 //   - The pointer to the latest object, which could be the same as
 //     the informer object, or an in-memory object.
@@ -145,7 +114,7 @@ func (e ObjectNameError) Is(err error) bool {
 // Assume() only updates the latest object pointer.
 // Restore() sets the latest object pointer back to the informer object.
 // Get/List() always returns the latest object pointer.
-type assumeCache struct {
+type AssumeCache struct {
 	// The logger that was chosen when setting up the cache.
 	// Will be used for all operations.
 	logger klog.Logger
@@ -183,7 +152,7 @@ func objInfoKeyFunc(obj interface{}) (string, error) {
 	return objInfo.name, nil
 }
 
-func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
+func (c *AssumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 	objInfo, ok := obj.(*objInfo)
 	if !ok {
 		return []string{""}, &WrongTypeError{TypeName: "objInfo", Object: obj}
@@ -192,8 +161,8 @@ func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // NewAssumeCache creates an assume cache for general objects.
-func NewAssumeCache(logger klog.Logger, informer Informer, description, indexName string, indexFunc cache.IndexFunc) AssumeCache {
-	c := &assumeCache{
+func NewAssumeCache(logger klog.Logger, informer Informer, description, indexName string, indexFunc cache.IndexFunc) *AssumeCache {
+	c := &AssumeCache{
 		logger:      logger,
 		description: description,
 		indexFunc:   indexFunc,
@@ -219,11 +188,7 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 	return c
 }
 
-func (c *assumeCache) getImplementation() *assumeCache {
-	return c
-}
-
-func (c *assumeCache) add(obj interface{}) {
+func (c *AssumeCache) add(obj interface{}) {
 	if obj == nil {
 		return
 	}
@@ -266,11 +231,11 @@ func (c *assumeCache) add(obj interface{}) {
 	}
 }
 
-func (c *assumeCache) update(oldObj interface{}, newObj interface{}) {
+func (c *AssumeCache) update(oldObj interface{}, newObj interface{}) {
 	c.add(newObj)
 }
 
-func (c *assumeCache) delete(obj interface{}) {
+func (c *AssumeCache) delete(obj interface{}) {
 	if obj == nil {
 		return
 	}
@@ -291,7 +256,7 @@ func (c *assumeCache) delete(obj interface{}) {
 	}
 }
 
-func (c *assumeCache) getObjVersion(name string, obj interface{}) (int64, error) {
+func (c *AssumeCache) getObjVersion(name string, obj interface{}) (int64, error) {
 	objAccessor, err := meta.Accessor(obj)
 	if err != nil {
 		return -1, err
@@ -305,7 +270,7 @@ func (c *assumeCache) getObjVersion(name string, obj interface{}) (int64, error)
 	return objResourceVersion, nil
 }
 
-func (c *assumeCache) getObjInfo(key string) (*objInfo, error) {
+func (c *AssumeCache) getObjInfo(key string) (*objInfo, error) {
 	obj, ok, err := c.store.GetByKey(key)
 	if err != nil {
 		return nil, err
@@ -321,7 +286,8 @@ func (c *assumeCache) getObjInfo(key string) (*objInfo, error) {
 	return objInfo, nil
 }
 
-func (c *assumeCache) Get(key string) (interface{}, error) {
+// Get the object by its key.
+func (c *AssumeCache) Get(key string) (interface{}, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
@@ -332,7 +298,8 @@ func (c *assumeCache) Get(key string) (interface{}, error) {
 	return objInfo.latestObj, nil
 }
 
-func (c *assumeCache) GetAPIObj(key string) (interface{}, error) {
+// GetAPIObj gets the informer cache's version by its key.
+func (c *AssumeCache) GetAPIObj(key string) (interface{}, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
@@ -343,7 +310,8 @@ func (c *assumeCache) GetAPIObj(key string) (interface{}, error) {
 	return objInfo.apiObj, nil
 }
 
-func (c *assumeCache) List(indexObj interface{}) []interface{} {
+// List all the objects in the cache.
+func (c *AssumeCache) List(indexObj interface{}) []interface{} {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
@@ -371,7 +339,20 @@ func (c *assumeCache) List(indexObj interface{}) []interface{} {
 	return allObjs
 }
 
-func (c *assumeCache) Assume(obj interface{}) error {
+// Assume updates the object in-memory only.
+//
+// The version of the object must be greater or equal to
+// the current object, otherwise an error is returned.
+//
+// Storing an object with the same version is supported
+// by the assume cache, but suffers from a race: if an
+// update is received via the informer while such an
+// object is assumed, it gets dropped in favor of the
+// newer object from the apiserver.
+//
+// Only assuming objects that were returned by an apiserver
+// operation (Update, Patch) is safe.
+func (c *AssumeCache) Assume(obj interface{}) error {
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return &ObjectNameError{err}
@@ -405,7 +386,8 @@ func (c *assumeCache) Assume(obj interface{}) error {
 	return nil
 }
 
-func (c *assumeCache) Restore(objName string) {
+// Restore the informer cache's version of the object.
+func (c *AssumeCache) Restore(objName string) {
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 

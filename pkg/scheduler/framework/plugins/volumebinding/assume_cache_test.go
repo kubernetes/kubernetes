@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
-func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
+func verifyListPVs(t *testing.T, cache *PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
 	pvList := cache.ListPVs(storageClassName)
 	if len(pvList) != len(expectedPVs) {
 		t.Errorf("ListPVs() returned %v PVs, expected %v", len(pvList), len(expectedPVs))
@@ -43,7 +43,7 @@ func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1
 	}
 }
 
-func verifyPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
+func verifyPV(cache *PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
 	pv, err := cache.GetPV(name)
 	if err != nil {
 		return err
@@ -102,7 +102,7 @@ func TestAssumePV(t *testing.T) {
 		cache := NewPVAssumeCache(logger, nil)
 
 		// Add oldPV to cache
-		assumecache.AddTestObject(cache, scenario.oldPV)
+		assumecache.AddTestObject(cache.AssumeCache, scenario.oldPV)
 		if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
 			t.Errorf("Failed to GetPV() after initial update: %v", err)
 			continue
@@ -139,7 +139,7 @@ func TestRestorePV(t *testing.T) {
 	cache.Restore("nothing")
 
 	// Add oldPV to cache
-	assumecache.AddTestObject(cache, oldPV)
+	assumecache.AddTestObject(cache.AssumeCache, oldPV)
 	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after initial update: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestBasicPVCache(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pv := makePV(fmt.Sprintf("test-pv%v", i), "").withVersion("1").PersistentVolume
 		pvs[pv.Name] = pv
-		assumecache.AddTestObject(cache, pv)
+		assumecache.AddTestObject(cache.AssumeCache, pv)
 	}
 
 	// List them
@@ -192,7 +192,7 @@ func TestBasicPVCache(t *testing.T) {
 	// Update a PV
 	updatedPV := makePV("test-pv3", "").withVersion("2").PersistentVolume
 	pvs[updatedPV.Name] = updatedPV
-	assumecache.UpdateTestObject(cache, updatedPV)
+	assumecache.UpdateTestObject(cache.AssumeCache, updatedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs, "")
@@ -200,7 +200,7 @@ func TestBasicPVCache(t *testing.T) {
 	// Delete a PV
 	deletedPV := pvs["test-pv7"]
 	delete(pvs, deletedPV.Name)
-	assumecache.DeleteTestObject(cache, deletedPV)
+	assumecache.DeleteTestObject(cache.AssumeCache, deletedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs, "")
@@ -215,7 +215,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pv := makePV(fmt.Sprintf("test-pv%v", i), "class1").withVersion("1").PersistentVolume
 		pvs1[pv.Name] = pv
-		assumecache.AddTestObject(cache, pv)
+		assumecache.AddTestObject(cache.AssumeCache, pv)
 	}
 
 	// Add a bunch of PVs
@@ -223,7 +223,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pv := makePV(fmt.Sprintf("test2-pv%v", i), "class2").withVersion("1").PersistentVolume
 		pvs2[pv.Name] = pv
-		assumecache.AddTestObject(cache, pv)
+		assumecache.AddTestObject(cache.AssumeCache, pv)
 	}
 
 	// List them
@@ -233,7 +233,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	// Update a PV
 	updatedPV := makePV("test-pv3", "class1").withVersion("2").PersistentVolume
 	pvs1[updatedPV.Name] = updatedPV
-	assumecache.UpdateTestObject(cache, updatedPV)
+	assumecache.UpdateTestObject(cache.AssumeCache, updatedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs1, "class1")
@@ -242,7 +242,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	// Delete a PV
 	deletedPV := pvs1["test-pv7"]
 	delete(pvs1, deletedPV.Name)
-	assumecache.DeleteTestObject(cache, deletedPV)
+	assumecache.DeleteTestObject(cache.AssumeCache, deletedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs1, "class1")
@@ -257,7 +257,7 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 
 	// Add a PV
 	pv := makePV(pvName, "").withVersion("1").PersistentVolume
-	assumecache.AddTestObject(cache, pv)
+	assumecache.AddTestObject(cache.AssumeCache, pv)
 	if err := verifyPV(cache, pvName, pv); err != nil {
 		t.Fatalf("failed to get PV: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	}
 
 	// Add old PV
-	assumecache.AddTestObject(cache, pv)
+	assumecache.AddTestObject(cache.AssumeCache, pv)
 	if err := verifyPV(cache, pvName, newPV); err != nil {
 		t.Fatalf("failed to get PV after old PV added: %v", err)
 	}
@@ -290,7 +290,7 @@ func makeClaim(name, version, namespace string) *v1.PersistentVolumeClaim {
 	}
 }
 
-func verifyPVC(cache PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVolumeClaim) error {
+func verifyPVC(cache *PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVolumeClaim) error {
 	pvc, err := cache.GetPVC(pvcKey)
 	if err != nil {
 		return err
@@ -344,7 +344,7 @@ func TestAssumePVC(t *testing.T) {
 		cache := NewPVCAssumeCache(logger, nil)
 
 		// Add oldPVC to cache
-		assumecache.AddTestObject(cache, scenario.oldPVC)
+		assumecache.AddTestObject(cache.AssumeCache, scenario.oldPVC)
 		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
 			t.Errorf("Failed to GetPVC() after initial update: %v", err)
 			continue
@@ -381,7 +381,7 @@ func TestRestorePVC(t *testing.T) {
 	cache.Restore("nothing")
 
 	// Add oldPVC to cache
-	assumecache.AddTestObject(cache, oldPVC)
+	assumecache.AddTestObject(cache.AssumeCache, oldPVC)
 	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after initial update: %v", err)
 	}
@@ -416,7 +416,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 
 	// Add a PVC
 	pvc := makeClaim(pvcName, "1", pvcNamespace)
-	assumecache.AddTestObject(cache, pvc)
+	assumecache.AddTestObject(cache.AssumeCache, pvc)
 	if err := verifyPVC(cache, getPVCName(pvc), pvc); err != nil {
 		t.Fatalf("failed to get PVC: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 	}
 
 	// Add old PVC
-	assumecache.AddTestObject(cache, pvc)
+	assumecache.AddTestObject(cache.AssumeCache, pvc)
 	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
 		t.Fatalf("failed to get PVC after old PVC added: %v", err)
 	}

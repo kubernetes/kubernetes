@@ -302,7 +302,7 @@ type dynamicResources struct {
 	// When implementing cluster autoscaler support, this assume cache or
 	// something like it (see https://github.com/kubernetes/kubernetes/pull/112202)
 	// might have to be managed by the cluster autoscaler.
-	claimAssumeCache assumecache.AssumeCache
+	claimAssumeCache *assumecache.AssumeCache
 
 	// inFlightAllocations is map from claim UUIDs to claim objects for those claims
 	// for which allocation was triggered during a scheduling cycle and the

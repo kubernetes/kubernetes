@@ -220,8 +220,8 @@ type volumeBinder struct {
 	nodeLister    corelisters.NodeLister
 	csiNodeLister storagelisters.CSINodeLister
 
-	pvcCache PVCAssumeCache
-	pvCache  PVAssumeCache
+	pvcCache *PVCAssumeCache
+	pvCache  *PVAssumeCache
 
 	// Amount of time to wait for the bind operation to succeed
 	bindTimeout time.Duration

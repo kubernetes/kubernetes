@@ -71,18 +71,18 @@ func makeObj(name, version, namespace string) metav1.Object {
 	}
 }
 
-func newTest(t *testing.T) (ktesting.TContext, AssumeCache, *testInformer) {
+func newTest(t *testing.T) (ktesting.TContext, *AssumeCache, *testInformer) {
 	return newTestWithIndexer(t, "", nil)
 }
 
-func newTestWithIndexer(t *testing.T, indexName string, indexFunc cache.IndexFunc) (ktesting.TContext, AssumeCache, *testInformer) {
+func newTestWithIndexer(t *testing.T, indexName string, indexFunc cache.IndexFunc) (ktesting.TContext, *AssumeCache, *testInformer) {
 	tCtx := ktesting.Init(t)
 	informer := new(testInformer)
 	cache := NewAssumeCache(tCtx.Logger(), informer, "TestObject", indexName, indexFunc)
 	return tCtx, cache, informer
 }
 
-func verify(tCtx ktesting.TContext, cache AssumeCache, key string, expectedObject, expectedAPIObject interface{}) {
+func verify(tCtx ktesting.TContext, cache *AssumeCache, key string, expectedObject, expectedAPIObject interface{}) {
 	tCtx.Helper()
 	actualObject, err := cache.Get(key)
 	if err != nil {
@@ -100,7 +100,7 @@ func verify(tCtx ktesting.TContext, cache AssumeCache, key string, expectedObjec
 	}
 }
 
-func verifyList(tCtx ktesting.TContext, assumeCache AssumeCache, expectedObjs []interface{}, indexObj interface{}) {
+func verifyList(tCtx ktesting.TContext, assumeCache *AssumeCache, expectedObjs []interface{}, indexObj interface{}) {
 	actualObjs := assumeCache.List(indexObj)
 	diff := cmp.Diff(expectedObjs, actualObjs, cmpopts.SortSlices(func(x, y interface{}) bool {
 		xKey, err := cache.MetaNamespaceKeyFunc(x)

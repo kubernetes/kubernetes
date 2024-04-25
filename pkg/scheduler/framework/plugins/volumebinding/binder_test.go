@@ -299,7 +299,7 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 
 func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range cachedPVCs {
-		assumecache.AddTestObject(env.internalBinder.pvcCache, pvc)
+		assumecache.AddTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
 		if apiPVCs == nil {
 			env.reactor.AddClaim(pvc)
 		}
@@ -311,7 +311,7 @@ func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs [
 
 func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
 	for _, pv := range cachedPVs {
-		assumecache.AddTestObject(env.internalBinder.pvCache, pv)
+		assumecache.AddTestObject(env.internalBinder.pvCache.AssumeCache, pv)
 		if apiPVs == nil {
 			env.reactor.AddVolume(pv)
 		}
@@ -376,13 +376,13 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 
 func (env *testEnv) deleteVolumes(pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		assumecache.DeleteTestObject(env.internalBinder.pvCache, pv)
+		assumecache.DeleteTestObject(env.internalBinder.pvCache.AssumeCache, pv)
 	}
 }
 
 func (env *testEnv) deleteClaims(pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range pvcs {
-		assumecache.DeleteTestObject(env.internalBinder.pvcCache, pvc)
+		assumecache.DeleteTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
 	}
 }
 
