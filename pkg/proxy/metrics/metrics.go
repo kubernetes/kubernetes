@@ -185,6 +185,17 @@ var (
 		[]string{"table"},
 	)
 
+	// NFTablesSyncFailuresTotal is the number of nftables sync failures that the
+	// proxy has seen.
+	NFTablesSyncFailuresTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_nftables_sync_failures_total",
+			Help:           "Cumulative proxy nftables sync failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// ProxyHealthzTotal is the number of returned HTTP Status for each
 	// healthz probe.
 	ProxyHealthzTotal = metrics.NewCounterVec(
@@ -268,8 +279,7 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
 
 		case kubeproxyconfig.ProxyModeNFTables:
-			// FIXME: should not use the iptables-specific metric
-			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
+			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
 
 		case kubeproxyconfig.ProxyModeKernelspace:
 			// currently no winkernel-specific metrics
