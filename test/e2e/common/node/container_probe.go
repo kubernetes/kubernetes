@@ -543,6 +543,32 @@ var _ = SIGDescribe("Probing container", func() {
 	})
 
 	/*
+		Release: v1.23
+		Testname: GRPC probe ignores certificate issues
+		Description: A Pod is created with liveness probe on grpc service with a self-signed certificate. Liveness probe on this endpoint should not fail because of cert issues.
+	*/
+	f.It("should *not* fail on cert issues with a GRPC probe", f.WithNodeConformance(), func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				GRPC: &v1.GRPCAction{
+					Port:    5000,
+					Service: nil,
+				},
+			},
+			InitialDelaySeconds: probeTestInitialDelaySeconds,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
+			FailureThreshold:    1,
+		}
+
+		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost",
+			"--tls-cert-file", "/localhost.crt",
+			"--tls-private-key-file", "/localhost.key")
+
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+	})
+
+
+	/*
 			Release: v1.23
 			Testname: Pod liveness probe, using grpc call, failure
 			Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint should fail because of wrong probe port.
@@ -1818,7 +1844,13 @@ func runReadinessFailTest(ctx context.Context, f *framework.Framework, pod *v1.P
 	}
 }
 
-func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string) *v1.Pod {
+func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string, extraArgs ...string) *v1.Pod {
+	command := []string{
+		"/agnhost",
+		"grpc-health-checking",
+	}
+	command = append(command, extraArgs...)
+
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-grpc-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
@@ -1826,10 +1858,7 @@ func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName st
 				{
 					Name:  containerName,
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{
-						"/agnhost",
-						"grpc-health-checking",
-					},
+					Command: command,
 					Ports:          []v1.ContainerPort{{ContainerPort: int32(5000)}, {ContainerPort: int32(8080)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
