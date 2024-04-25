@@ -364,6 +364,11 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 		return nil, err
 	}
 
+	if c.Location == "" {
+		// The cloud provider is not initialized and cannot get the topology labels.
+		return nil, nil
+	}
+
 	labels := map[string]string{
 		v1.LabelTopologyRegion: c.Location,
 	}
