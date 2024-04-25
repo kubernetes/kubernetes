@@ -204,6 +204,13 @@ const (
 	// that is independent of a Pod.
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
+	// owner: @linxiulei
+	// beta: v1.31
+	//
+	// Enable dynamic node lease renew interval that allows kubelet to renew leases
+	// at longer interval in first attempt and shorter interval after failures.
+	DynamicNodeLeaseRenewInterval featuregate.Feature = "DynamicNodeLeaseRenewInterval"
+
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
 	// alpha: v1.25
@@ -1000,6 +1007,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DevicePluginCDIDevices: {Default: true, PreRelease: featuregate.Beta},
 
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
+
+	DynamicNodeLeaseRenewInterval: {Default: true, PreRelease: featuregate.Beta},
 
 	EventedPLEG: {Default: false, PreRelease: featuregate.Alpha},
 

@@ -232,7 +232,8 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				leaseName,
 				metav1.NamespaceSystem,
 				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
-				labelAPIServerHeartbeatFunc(name, peeraddress))
+				labelAPIServerHeartbeatFunc(name, peeraddress),
+				lease.FixedLeaseRenewPolicy)
 			go controller.Run(ctx)
 			return nil
 		})

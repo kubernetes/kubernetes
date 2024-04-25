@@ -903,6 +903,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
 	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
+	renewPolicy := lease.FixedLeaseRenewPolicy
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLeaseRenewInterval) {
+		renewPolicy = lease.DynamicLeaseRenewPolicy
+	}
 	klet.nodeLeaseController = lease.NewController(
 		klet.clock,
 		klet.heartbeatClient,
@@ -912,7 +916,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		renewInterval,
 		string(klet.nodeName),
 		v1.NamespaceNodeLease,
-		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
+		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)),
+		renewPolicy)
 
 	// setup node shutdown manager
 	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(&nodeshutdown.Config{
