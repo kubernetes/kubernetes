@@ -617,7 +617,8 @@ func CoreDump(dir string) {
 	}
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
-	cmd.Env = append(env, fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+	env = append(env, fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+	cmd.Env = env
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
