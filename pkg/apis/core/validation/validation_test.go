@@ -9897,7 +9897,6 @@ func TestValidatePodConditions(t *testing.T) {
 }
 
 func TestValidatePodSpec(t *testing.T) {
-	activeDeadlineSeconds := int64(30)
 	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
 	minUserID := int64(0)
@@ -9911,16 +9910,6 @@ func TestValidatePodSpec(t *testing.T) {
 	successCases := map[string]core.Pod{
 		"populate basic fields, leave defaults for most": *podtest.MakePod(""),
 		"populate all fields": *podtest.MakePod("",
-			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
-			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
-			podtest.SetNodeSelector(map[string]string{
-				"key": "value",
-			}),
-			podtest.SetNodeName("foobar"),
-			podtest.SetActiveDeadlineSeconds(activeDeadlineSeconds),
-			podtest.SetServiceAccountName("acct"),
-		),
-		"populate all fields with larger active deadline": *podtest.MakePod("",
 			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
 			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
 			podtest.SetNodeSelector(map[string]string{
@@ -10037,7 +10026,7 @@ func TestValidatePodSpec(t *testing.T) {
 		})
 	}
 
-	activeDeadlineSeconds = int64(0)
+	activeDeadlineSecondsZero := int64(0)
 	activeDeadlineSecondsTooLarge := int64(math.MaxInt32 + 1)
 
 	minUserID = int64(-1)
@@ -10110,7 +10099,7 @@ func TestValidatePodSpec(t *testing.T) {
 			}),
 		),
 		"bad-active-deadline-seconds": *podtest.MakePod("",
-			podtest.SetActiveDeadlineSeconds(activeDeadlineSeconds),
+			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsZero),
 		),
 		"active-deadline-seconds-too-large": *podtest.MakePod("",
 			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsTooLarge),
