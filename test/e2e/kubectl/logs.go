@@ -42,11 +42,11 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-func testingStatefulSet(name string, numberOfPods int32) appsv1.StatefulSet {
+func testingStatefulSet(name, ns string, numberOfPods int32) appsv1.StatefulSet {
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: name,
+			Namespace: ns,
 			Labels: map[string]string{
 				"name": name,
 			},
@@ -263,7 +263,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 			ginkgo.BeforeEach(func(ctx context.Context) {
 				stsClient := c.AppsV1().StatefulSets(ns)
 				ginkgo.By("constructing the StatefulSet")
-				stsCopy := testingStatefulSet(stsName, numberReplicas)
+				stsCopy := testingStatefulSet(stsName, ns, numberReplicas)
 				sts = &stsCopy
 				ginkgo.By("creating the StatefulSet")
 				_, err := stsClient.Create(ctx, sts, metav1.CreateOptions{})
