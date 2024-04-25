@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1777,10 +1778,14 @@ func Test_syncNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			clientset := fake.NewSimpleClientset(test.existingNode)
 			factory := informers.NewSharedInformerFactory(clientset, 0)
 
-			eventBroadcaster := record.NewBroadcaster()
+			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			cloudNodeController := &CloudNodeController{
 				kubeClient:                clientset,
 				nodeInformer:              factory.Core().V1().Nodes(),
@@ -1799,12 +1804,12 @@ func Test_syncNode(t *testing.T) {
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
 
-			err := cloudNodeController.syncNode(context.TODO(), test.existingNode.Name)
+			err := cloudNodeController.syncNode(ctx, test.existingNode.Name)
 			if (err != nil) != test.expectedErr {
 				t.Fatalf("error got: %v expected: %v", err, test.expectedErr)
 			}
 
-			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), test.existingNode.Name, metav1.GetOptions{})
+			updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, test.existingNode.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("error getting updated nodes: %v", err)
 			}
@@ -1884,6 +1889,11 @@ func Test_reconcileNodeLabels(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			stopCh := ctx.Done()
+
 			testNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "node01",
@@ -1899,9 +1909,6 @@ func Test_reconcileNodeLabels(t *testing.T) {
 				nodeInformer: factory.Core().V1().Nodes(),
 			}
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-
 			// activate node informer
 			factory.Core().V1().Nodes().Informer()
 			factory.Start(stopCh)
@@ -1914,7 +1921,7 @@ func Test_reconcileNodeLabels(t *testing.T) {
 				t.Errorf("unexpected error")
 			}
 
-			actualNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), "node01", metav1.GetOptions{})
+			actualNode, err := clientset.CoreV1().Nodes().Get(ctx, "node01", metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("error getting updated node: %v", err)
 			}
@@ -2062,6 +2069,10 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 
 // Test updateNodeAddress with instanceV2, same test case with TestNodeAddressesNotUpdate.
 func TestNodeAddressesNotUpdateV2(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	existingNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "node0",
@@ -2119,13 +2130,13 @@ func TestNodeAddressesNotUpdateV2(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(context.TODO(), existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(ctx, existingNode)
 	if err != nil {
 		t.Errorf("get instance metadata with error %v", err)
 	}
-	cloudNodeController.updateNodeAddress(context.TODO(), existingNode, instanceMeta)
+	cloudNodeController.updateNodeAddress(ctx, existingNode, instanceMeta)
 
-	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
+	updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, existingNode.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error getting updated nodes: %v", err)
 	}
@@ -2138,6 +2149,10 @@ func TestNodeAddressesNotUpdateV2(t *testing.T) {
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // and node addresses will not be updated when node isn't present according to the cloudprovider
 func TestNodeAddressesNotUpdate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	existingNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "node0",
@@ -2195,13 +2210,13 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(context.TODO(), existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(ctx, existingNode)
 	if err != nil {
 		t.Errorf("get instance metadata with error %v", err)
 	}
-	cloudNodeController.updateNodeAddress(context.TODO(), existingNode, instanceMeta)
+	cloudNodeController.updateNodeAddress(ctx, existingNode, instanceMeta)
 
-	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
+	updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, existingNode.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error getting updated nodes: %v", err)
 	}
@@ -2514,11 +2529,13 @@ func TestGetInstanceMetadata(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			cloudNodeController := &CloudNodeController{
 				cloud: test.fakeCloud,
 			}
 
-			metadata, err := cloudNodeController.getInstanceMetadata(context.TODO(), test.existingNode)
+			metadata, err := cloudNodeController.getInstanceMetadata(ctx, test.existingNode)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("error expected %v got: %v", test.expectErr, err)
 			}
@@ -2574,6 +2591,10 @@ func TestUpdateNodeStatus(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			fakeCloud := &fakecloud.Cloud{
 				EnableInstancesV2: false,
 				Addresses: []v1.NodeAddress{
@@ -2600,7 +2621,7 @@ func TestUpdateNodeStatus(t *testing.T) {
 			})
 
 			factory := informers.NewSharedInformerFactory(clientset, 0)
-			eventBroadcaster := record.NewBroadcaster()
+			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			nodeInformer := factory.Core().V1().Nodes()
 			nodeIndexer := nodeInformer.Informer().GetIndexer()
 			cloudNodeController := &CloudNodeController{
@@ -2621,11 +2642,13 @@ func TestUpdateNodeStatus(t *testing.T) {
 				}
 			}
 
-			w := eventBroadcaster.StartLogging(klog.Infof)
+			w := eventBroadcaster.StartStructuredLogging(0)
 			defer w.Stop()
 
 			start := time.Now()
-			cloudNodeController.UpdateNodeStatus(context.TODO())
+			if err := cloudNodeController.UpdateNodeStatus(ctx); err != nil {
+				t.Fatalf("error updating node status: %v", err)
+			}
 			t.Logf("%d workers: processed %d nodes int %v ", test.workers, test.nodes, time.Since(start))
 			if len(fakeCloud.Calls) != test.nodes {
 				t.Errorf("expected %d cloud-provider calls, got %d", test.nodes, len(fakeCloud.Calls))

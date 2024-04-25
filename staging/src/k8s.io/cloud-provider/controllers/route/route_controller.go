@@ -74,9 +74,6 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
-
 	rc := &RouteController{
 		routes:           routes,
 		kubeClient:       kubeClient,
@@ -84,8 +81,6 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		clusterCIDRs:     clusterCIDRs,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		broadcaster:      eventBroadcaster,
-		recorder:         recorder,
 	}
 
 	return rc
@@ -93,6 +88,9 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 
 func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
+
+	rc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	rc.recorder = rc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	// Start event processing pipeline.
 	if rc.broadcaster != nil {
