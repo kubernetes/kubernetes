@@ -823,9 +823,7 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 		}
 
 		klog.Errorf("error: az.EnsureHostInPool(%s), az.VMSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
-		if err != cloudprovider.InstanceNotFound {
-			return "", "", "", nil, err
-		}
+		return "", "", "", nil, err
 	}
 
 	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
