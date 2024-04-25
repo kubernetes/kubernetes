@@ -36,7 +36,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-base="$(git merge-base origin/master HEAD)"
+base=
 while getopts "r:" o; do
     case "${o}" in
         r)
@@ -72,10 +72,22 @@ if [ ${#targets[@]} -eq 0 ]; then
     )
 fi
 
+# Default if -r was not given.
+if [ -z "${base}" ]; then
+    if ! base="$(git merge-base origin/master HEAD)"; then
+        echo >&2 "Could not determine default base revision. -r must be used explicitly."
+        exit 1
+    fi
+fi
+
 # Must be a something that git can resolve to a commit.
 # "git rev-parse --verify" checks that and prints a detailed
 # error.
 base="$(git rev-parse --verify "$base")"
+
+# Give some information about what's happening. Failures from "git describe" are ignored
+# silently, that's optional information.
+echo "Checking for API changes since ${base}$(if descr=$(git describe --tags "${base}" 2>/dev/null); then echo " = ${descr}"; fi)."
 
 kube::golang::setup_env
 kube::util::ensure-temp-dir
@@ -83,7 +95,7 @@ kube::util::ensure-temp-dir
 # Install apidiff and make sure it's found.
 export GOBIN="${KUBE_TEMP}"
 PATH="${GOBIN}:${PATH}"
-echo "installing apidiff into ${GOBIN}"
+echo "Installing apidiff into ${GOBIN}."
 go install golang.org/x/exp/cmd/apidiff@latest
 
 cd "${KUBE_ROOT}"
