@@ -5366,6 +5366,8 @@ type ServiceSpec struct {
 	// not set, the implementation will apply its default routing strategy. If set
 	// to "PreferClose", implementations should prioritize endpoints that are
 	// topologically close (e.g., same zone).
+	// This is an alpha field and requires enabling ServiceTrafficDistribution feature.
+	// +featureGate=ServiceTrafficDistribution
 	// +optional
 	TrafficDistribution *string `json:"trafficDistribution,omitempty" protobuf:"bytes,23,opt,name=trafficDistribution"`
 }
