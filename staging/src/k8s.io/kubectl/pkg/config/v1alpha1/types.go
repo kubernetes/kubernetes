@@ -38,12 +38,31 @@ type PreferencesCommandOverride struct {
 	Flags []PreferencesCommandOverrideFlag `json:"flags"`
 }
 
+// PreferencesAliasOverride stores the alias definitions.
+// It is applied in a pre-defined order which is
+// kubectl [ALIAS NAME] expands kubectl [COMMAND] [ARGUMENTS] [FLAGS]
+type PreferencesAliasOverride struct {
+	// Name is the name of alias
+	Name string `json:"name"`
+	// Command is the single or set of commands to execute, such as "set env" or "create"
+	Command string `json:"command"`
+	// Arguments is allocated for the arguments such as resource names, etc.
+	Arguments []string `json:"arguments,omitempty"`
+	// Flags stores the flag definitions of the alias.
+	// Same object definition that is used for default flag overrides.
+	Flags []PreferencesCommandOverrideFlag `json:"flags,omitempty"`
+}
+
 // PreferencesSpec stores the overrides
 type PreferencesSpec struct {
 	// Overrides is used to change the defaults values of flags of commands.
 	// This is especially useful, when user doesn't want to explicitly
 	// set flags each time.
 	Overrides []PreferencesCommandOverride `json:"overrides"`
+
+	// Aliases stores the alias definitions. If the alias name collides with
+	// a built-in command, built-in command always overrides the alias name.
+	Aliases []PreferencesAliasOverride `json:"aliases"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
