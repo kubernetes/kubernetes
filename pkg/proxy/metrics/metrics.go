@@ -196,6 +196,17 @@ var (
 		},
 	)
 
+	// NFTablesCleanupFailuresTotal is the number of nftables stale chain cleanup
+	// failures that the proxy has seen.
+	NFTablesCleanupFailuresTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_nftables_cleanup_failures_total",
+			Help:           "Cumulative proxy nftables cleanup failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// ProxyHealthzTotal is the number of returned HTTP Status for each
 	// healthz probe.
 	ProxyHealthzTotal = metrics.NewCounterVec(
@@ -280,6 +291,7 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 
 		case kubeproxyconfig.ProxyModeNFTables:
 			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
+			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
 
 		case kubeproxyconfig.ProxyModeKernelspace:
 			// currently no winkernel-specific metrics
