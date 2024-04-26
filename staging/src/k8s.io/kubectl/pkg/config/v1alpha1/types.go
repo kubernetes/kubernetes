@@ -40,17 +40,14 @@ type PreferencesCommandOverride struct {
 
 // PreferencesAliasOverride stores the alias definitions.
 // It is applied in a pre-defined order which is
-// kubectl [ALIAS NAME] expands kubectl [COMMAND] [ARGUMENTS] [FLAGS]
+// kubectl [ALIAS NAME] expands to kubectl [COMMAND] [ARGUMENTS]
 type PreferencesAliasOverride struct {
 	// Name is the name of alias
 	Name string `json:"name"`
 	// Command is the single or set of commands to execute, such as "set env" or "create"
 	Command string `json:"command"`
 	// Arguments is allocated for the arguments such as resource names, etc.
-	Arguments []string `json:"arguments,omitempty"`
-	// Flags stores the flag definitions of the alias.
-	// Same object definition that is used for default flag overrides.
-	Flags []PreferencesCommandOverrideFlag `json:"flags,omitempty"`
+	Arguments []string `json:"args,omitempty"`
 }
 
 // PreferencesSpec stores the overrides

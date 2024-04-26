@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -28,6 +29,7 @@ var (
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	InjectOverrides(rootCmd *cobra.Command, args []string)
+	InjectAliases(rootCmd *cobra.Command, args []string)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -48,10 +50,11 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 	}
 }
 
+// InjectOverrides injects the default flags defined in kuberc file.
 func (p *Preferences) InjectOverrides(rootCmd *cobra.Command, args []string, errOut io.Writer) {
 	kuberc, err := p.getPreferences()
 	if err != nil {
-		fmt.Fprintf(errOut, "kuberc error %v", err)
+		fmt.Fprintf(errOut, "kuberc error %v\n", err)
 		return
 	}
 
@@ -62,7 +65,7 @@ func (p *Preferences) InjectOverrides(rootCmd *cobra.Command, args []string, err
 	args = args[1:]
 	cmd, _, err := rootCmd.Find(args)
 	if err != nil {
-		fmt.Fprintf(errOut, "could not find command %q", args)
+		fmt.Fprintf(errOut, "could not find command %q\n", args)
 		return
 	}
 
@@ -74,17 +77,45 @@ func (p *Preferences) InjectOverrides(rootCmd *cobra.Command, args []string, err
 		for _, fl := range c.Flags {
 			err = cmd.Flags().Set(fmt.Sprintf("%s", fl.Name), fl.Default)
 			if err != nil {
-				fmt.Fprintf(errOut, "could not apply value %s to flag %s in command %s", fl.Default, fl.Name, c.Command)
+				fmt.Fprintf(errOut, "could not apply value %s to flag %s in command %s\n", fl.Default, fl.Name, c.Command)
 				return
 			}
 		}
 
 		// TODO do we really need to parse in here?
-		if err = cmd.Flags().Parse(args); err != nil {
+		/*if err = cmd.Flags().Parse(args); err != nil {
 			// return without raising any error because
 			// real command execution will catch this invalid request
 			return
+		}*/
+	}
+}
+
+func (p *Preferences) InjectAliases(rootCmd *cobra.Command, args []string, errOut io.Writer) {
+	kuberc, err := p.getPreferences()
+	if err != nil {
+		fmt.Fprintf(errOut, "kuberc error %v\n", err)
+		return
+	}
+
+	if kuberc == nil {
+		return
+	}
+
+	for _, alias := range kuberc.Spec.Aliases {
+		commands := strings.Split(alias.Command, " ")
+		cmd, flags, err := rootCmd.Find(commands)
+		if err != nil {
+			fmt.Fprintf(errOut, "Command %q not found to set alias %q: %v\n", alias.Command, alias.Name, flags)
+			continue
 		}
+		// do not allow shadowing built-ins
+		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
+			fmt.Fprintf(errOut, "Setting alias %q to a built-in command is not supported\n", alias.Name)
+			continue
+		}
+		cmd.Aliases = append(cmd.Aliases, alias.Name)
+		cmd.Flags().Parse(alias.Arguments)
 	}
 }
 

@@ -1180,6 +1180,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-scheduler/config/v1.UtilizationShapePoint":                                                 schema_k8sio_kube_scheduler_config_v1_UtilizationShapePoint(ref),
 		"k8s.io/kube-scheduler/config/v1.VolumeBindingArgs":                                                     schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.Preferences":                                                        schema_kubectl_pkg_config_v1alpha1_Preferences(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesAliasOverride":                                           schema_kubectl_pkg_config_v1alpha1_PreferencesAliasOverride(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverride":                                         schema_kubectl_pkg_config_v1alpha1_PreferencesCommandOverride(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag":                                     schema_kubectl_pkg_config_v1alpha1_PreferencesCommandOverrideFlag(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesSpec":                                                    schema_kubectl_pkg_config_v1alpha1_PreferencesSpec(ref),
@@ -60570,6 +60571,51 @@ func schema_kubectl_pkg_config_v1alpha1_Preferences(ref common.ReferenceCallback
 	}
 }
 
+func schema_kubectl_pkg_config_v1alpha1_PreferencesAliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PreferencesAliasOverride stores the alias definitions. It is applied in a pre-defined order which is kubectl [ALIAS NAME] expands kubectl [COMMAND] [ARGUMENTS] [FLAGS]",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of alias",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Command is the single or set of commands to execute, such as \"set env\" or \"create\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"args": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Arguments is allocated for the arguments such as resource names, etc.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "command"},
+			},
+		},
+	}
+}
+
 func schema_kubectl_pkg_config_v1alpha1_PreferencesCommandOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -60659,12 +60705,26 @@ func schema_kubectl_pkg_config_v1alpha1_PreferencesSpec(ref common.ReferenceCall
 							},
 						},
 					},
+					"aliases": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Aliases stores the alias definitions. If the alias name collides with a built-in command, built-in command always overrides the alias name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.PreferencesAliasOverride"),
+									},
+								},
+							},
+						},
+					},
 				},
-				Required: []string{"overrides"},
+				Required: []string{"overrides", "aliases"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverride"},
+			"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesAliasOverride", "k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverride"},
 	}
 }
 

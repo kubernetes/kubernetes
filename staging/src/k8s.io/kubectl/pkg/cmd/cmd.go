@@ -497,6 +497,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	pref.InjectOverrides(cmds, o.Arguments, o.IOStreams.ErrOut)
+	pref.InjectAliases(cmds, o.Arguments, o.IOStreams.ErrOut)
 
 	return cmds
 }
