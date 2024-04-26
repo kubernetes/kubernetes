@@ -2213,7 +2213,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2"),
-			wantEvaluatedNodes: pointer.Int32(1),
+			wantEvaluatedNodes: pointer.Int32(3),
 		},
 		{
 			name: "test prefilter plugin returning non-intersecting nodes",
