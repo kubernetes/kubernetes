@@ -49,8 +49,6 @@ import (
 const (
 	// maxPatchRetry is the maximum number of conflicts retry for during a patch operation before returning failure
 	maxPatchRetry = 5
-	// backOffPeriod is the period to back off when apply patch results in error.
-	backOffPeriod = 1 * time.Second
 	// how many times we can retry before back off
 	triesBeforeBackOff = 1
 	// groupVersionKindExtensionKey is the key used to lookup the
@@ -58,6 +56,9 @@ const (
 	// definition's "extensions" map.
 	groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
 )
+
+// patchRetryBackOffPeriod is the period to back off when apply patch results in error.
+var patchRetryBackOffPeriod = 1 * time.Second
 
 var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
 
@@ -363,7 +364,7 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 	}
 	for i := 1; i <= p.Retries && apierrors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
-			p.BackOff.Sleep(backOffPeriod)
+			p.BackOff.Sleep(patchRetryBackOffPeriod)
 		}
 		current, getErr = p.Helper.Get(namespace, name)
 		if getErr != nil {
