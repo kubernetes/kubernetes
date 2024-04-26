@@ -44,22 +44,22 @@ type CPUTopology struct {
 	CPUDetails   CPUDetails
 }
 
-// CPUsPerCore returns the number of logical CPUs are associated with
-// each core.
-func (topo *CPUTopology) CPUsPerCore() int {
+// MaxCPUsPerCore returns the max number of logical CPUs are associated with each core.
+// When SMT (HyperThreading) is enabled but some logical cores are disabled, we have uneven CPUs per Core.
+func (topo *CPUTopology) MaxCPUsPerCore() int {
 	if topo.NumCores == 0 {
 		return 0
 	}
-	return topo.NumCPUs / topo.NumCores
-}
 
-// CPUsPerSocket returns the number of logical CPUs are associated with
-// each socket.
-func (topo *CPUTopology) CPUsPerSocket() int {
-	if topo.NumSockets == 0 {
-		return 0
+	cpusByCore := make(map[int]int)
+	maxCPUsPerCore := 1
+	for _, info := range topo.CPUDetails {
+		cpusByCore[info.CoreID] += 1
+		if cpusByCore[info.CoreID] > maxCPUsPerCore {
+			maxCPUsPerCore = cpusByCore[info.CoreID]
+		}
 	}
-	return topo.NumCPUs / topo.NumSockets
+	return maxCPUsPerCore
 }
 
 // CPUCoreID returns the physical core ID which the given logical CPU

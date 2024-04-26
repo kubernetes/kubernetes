@@ -1100,3 +1100,104 @@ func TestCPUNUMANodeID(t *testing.T) {
 		})
 	}
 }
+
+func TestMaxCPUsPerCore(t *testing.T) {
+	tests := []struct {
+		name string
+		topo *CPUTopology
+		want int
+	}{
+		{
+			name: "No HT",
+			topo: &CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 2,
+				NumCores:   8,
+				CPUDetails: map[int]CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 4, SocketID: 1, NUMANodeID: 1},
+					5: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					6: {CoreID: 6, SocketID: 1, NUMANodeID: 1},
+					7: {CoreID: 7, SocketID: 1, NUMANodeID: 1},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "Single Socket HT",
+			topo: &CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "Dual Socket HT",
+			topo: &CPUTopology{
+				NumCPUs:    12,
+				NumSockets: 2,
+				NumCores:   6,
+				CPUDetails: map[int]CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+					2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					3:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+					4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					6:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+					8:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					9:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+					10: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+					11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "Dual Socket HT with CPU offline",
+			topo: &CPUTopology{
+				NumCPUs:    11,
+				NumSockets: 2,
+				NumCores:   6,
+				CPUDetails: map[int]CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+					2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					3:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+					4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					6:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+					8:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					9:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+					10: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			want: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.topo.MaxCPUsPerCore()
+			if got != tt.want {
+				t.Errorf("MaxCPUsPerCore() returned %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

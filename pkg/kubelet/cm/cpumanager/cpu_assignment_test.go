@@ -110,6 +110,18 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			mustParseCPUSet(t, "0-40,42-49,51-68,71-79"),
 			[]int{},
 		},
+		{
+			"multi numa, dual socket, HT, last CPU offline, socket-0 free",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "0-63,128-191"),
+			[]int{0},
+		},
+		{
+			"multi numa, dual socket, HT, last CPU offline, socket-1 free",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "64-127,192-254"),
+			[]int{1},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -119,7 +131,6 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			sort.Ints(result)
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
-
 			}
 		})
 	}
@@ -208,6 +219,24 @@ func TestCPUAccumulatorFreeNUMANodes(t *testing.T) {
 			"dual numa, multi socket per per socket, HT, 0 sockets free",
 			fakeTopoMultiSocketDualSocketPerNumaHT,
 			mustParseCPUSet(t, "0-9,11-59,61-79"),
+			[]int{},
+		},
+		{
+			"multi numa, dual socket, HT, last CPU offline, NUMA node-0 free",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "0-15,128-143"),
+			[]int{0},
+		},
+		{
+			"multi numa, dual socket, HT, last CPU offline, NUMA node-7 free",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "112-127,240-254"),
+			[]int{7},
+		},
+		{
+			"multi numa, dual socket, HT, last CPU offline, 0 NUMA nodes free(1 CPU consumed)",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "0-15,128-142"),
 			[]int{},
 		},
 	}
@@ -330,6 +359,18 @@ func TestCPUAccumulatorFreeCores(t *testing.T) {
 			topoDualSocketHT,
 			cpuset.New(2, 3, 4, 5, 8, 9, 10, 11),
 			[]int{2, 4, 3, 5},
+		},
+		{
+			"multi numa, dual socket, HT, last CPU offline, 0 cores free (1 partially consumed)",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "0"),
+			[]int{},
+		},
+		{
+			"multi numa, dual socket, HT, last CPU offline, 1 cores free (1 online CPU, 1 offline CPU)",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "127"),
+			[]int{127},
 		},
 	}
 
@@ -853,6 +894,29 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			1,
 			"",
 			mustParseCPUSet(t, "43-47,75-79,96,101-105,171-174,203-206,229-232"),
+		},
+		// this case demonstrates that the policy does not guarantee Full Physical CPUs yet. Once the behavior changes, it can be deleted
+		// the provided available Numas are:
+		// - 0,1 both aliged 5 Cores, and 2 single CPUs within 2 Cores
+		// - 2,3 both aliged 6 Cores
+		// the result chooses all 24 CPUs in Numa 0,1, but Numa 2,3 are better
+		{
+			"allocate 10 full cores distributed across first 2 NUMA nodes and 4 CPUs spilling over to each of NUMA 0,1",
+			topoDualSocketMultiNumaPerSocketHTLarge,
+			mustParseCPUSet(t, "0-5,129-134,16-21,144-149,32-37,160-165,48-53,176-181"),
+			24,
+			2,
+			"",
+			mustParseCPUSet(t, "0-5,16-21,129-134,144-149"),
+		},
+		{
+			"allocate 10 full cores distributed across first 2 NUMA nodes and 4 CPUs spilling over to each of NUMA 0,1(CPU 255 offline)",
+			topoDualSocketMultiNumaPerSocketHTLargeWithSingleCPUOffline,
+			mustParseCPUSet(t, "0-5,129-134,16-21,144-149,32-37,160-165,48-53,176-181"),
+			24,
+			2,
+			"",
+			mustParseCPUSet(t, "0-5,16-21,129-134,144-149"),
 		},
 	}...)
 
