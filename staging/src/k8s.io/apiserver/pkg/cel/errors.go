@@ -53,9 +53,9 @@ type Error struct {
 	Type   ErrorType
 	Detail string
 
-	// Errors are optional wrapped errors that can be useful to
+	// Cause is an optional wrapped errors that can be useful to
 	// programmatically retrieve detailed errors.
-	Errors []error
+	Cause error
 }
 
 var _ error = &Error{}
@@ -77,9 +77,9 @@ func (v *Error) Is(err error) bool {
 	return false
 }
 
-// Unwrap returns wrapped errors.
-func (v *Error) Unwrap() []error {
-	return v.Errors
+// Unwrap returns the wrapped Cause.
+func (v *Error) Unwrap() error {
+	return v.Cause
 }
 
 // ErrorType is a machine-readable value providing more detail about why

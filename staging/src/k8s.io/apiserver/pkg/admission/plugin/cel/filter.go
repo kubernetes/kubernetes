@@ -192,7 +192,7 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 			evaluation.Error = &cel.Error{
 				Type:   cel.ErrorTypeInvalid,
 				Detail: fmt.Sprintf("compilation error: %v", compilationResult.Error),
-				Errors: []error{compilationResult.Error},
+				Cause:  compilationResult.Error,
 			}
 			continue
 		}
@@ -212,7 +212,7 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 				return nil, -1, &cel.Error{
 					Type:   cel.ErrorTypeInvalid,
 					Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
-					Errors: []error{cel.ErrOutOfBudget},
+					Cause:  cel.ErrOutOfBudget,
 				}
 			}
 			remainingBudget -= compositionCost
@@ -230,14 +230,14 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 				return nil, -1, &cel.Error{
 					Type:   cel.ErrorTypeInvalid,
 					Detail: fmt.Sprintf("runtime cost could not be calculated for expression: %v, no further expression will be run", compilationResult.ExpressionAccessor.GetExpression()),
-					Errors: []error{cel.ErrOutOfBudget},
+					Cause:  cel.ErrOutOfBudget,
 				}
 			} else {
 				if *rtCost > math.MaxInt64 || int64(*rtCost) > remainingBudget {
 					return nil, -1, &cel.Error{
 						Type:   cel.ErrorTypeInvalid,
 						Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
-						Errors: []error{cel.ErrOutOfBudget},
+						Cause:  cel.ErrOutOfBudget,
 					}
 				}
 				remainingBudget -= int64(*rtCost)
