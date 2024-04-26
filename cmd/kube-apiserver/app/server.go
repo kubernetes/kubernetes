@@ -271,7 +271,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		}
 		// build peer proxy config only if peer ca file exists
 		if opts.PeerCAFile != "" {
-			config.Extra.PeerProxy, err = controlplaneapiserver.BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
+			config.Extra.PeerProxy, err = controlplane.BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
 				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.Extra.PeerEndpointLeaseReconciler, config.ControlPlane.Generic.Serializer)
 			if err != nil {
 				return nil, nil, nil, err
