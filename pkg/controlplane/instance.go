@@ -54,6 +54,7 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -66,11 +67,14 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
+	clientgoinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	"k8s.io/client-go/transport"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -124,9 +128,6 @@ const (
 	DefaultEndpointReconcilerInterval = 10 * time.Second
 	// DefaultEndpointReconcilerTTL is the default TTL timeout for the storage layer
 	DefaultEndpointReconcilerTTL = 15 * time.Second
-	// DefaultPeerEndpointReconcilerTTL is the default TTL timeout for peer endpoint
-	// leases on the storage layer
-	DefaultPeerEndpointReconcilerTTL = 15 * time.Second
 	// IdentityLeaseComponentLabelKey is used to apply a component label to identity lease objects, indicating:
 	//   1. the lease is an identity lease (different from leader election leases)
 	//   2. which component owns this lease
@@ -151,7 +152,7 @@ var (
 	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
 )
 
-// Extra defines extra configuration for the master
+// Extra defines extra configuration for kube-apiserver
 type Extra struct {
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
@@ -788,13 +789,48 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 // CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop
 // The peer endpoint leases are used to find network locations of apiservers for peer proxy
 func CreatePeerEndpointLeaseReconciler(c genericapiserver.Config, storageFactory serverstorage.StorageFactory) (peerreconcilers.PeerEndpointLeaseReconciler, error) {
-	ttl := DefaultPeerEndpointReconcilerTTL
+	ttl := DefaultEndpointReconcilerTTL
 	config, err := storageFactory.NewConfig(api.Resource("apiServerPeerIPInfo"))
 	if err != nil {
 		return nil, fmt.Errorf("error creating storage factory config: %w", err)
 	}
 	reconciler, err := peerreconcilers.NewPeerEndpointLeaseReconciler(config, "/peerserverleases/", ttl)
 	return reconciler, err
+}
+
+func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, svm storageversion.Manager,
+	proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress,
+	apiServerID string, reconciler peerreconcilers.PeerEndpointLeaseReconciler, serializer kruntime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
+	if proxyClientCertFile == "" {
+		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
+	}
+	if proxyClientKeyFile == "" {
+		return nil, fmt.Errorf("error building peer proxy handler, proxy-key-file not specified")
+	}
+	// create proxy client config
+	clientConfig := &transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure:   false,
+			CertFile:   proxyClientCertFile,
+			KeyFile:    proxyClientKeyFile,
+			CAFile:     peerCAFile,
+			ServerName: "kubernetes.default.svc",
+		}}
+
+	// build proxy transport
+	proxyRoundTripper, transportBuildingError := transport.New(clientConfig)
+	if transportBuildingError != nil {
+		klog.Error(transportBuildingError.Error())
+		return nil, transportBuildingError
+	}
+	return utilpeerproxy.NewPeerProxyHandler(
+		versionedInformer,
+		svm,
+		proxyRoundTripper,
+		apiServerID,
+		reconciler,
+		serializer,
+	), nil
 }
 
 // utility function to get the apiserver address that is used by peer apiservers to proxy

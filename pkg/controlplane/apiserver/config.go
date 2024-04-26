@@ -31,20 +31,15 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/reconcilers"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
-	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/transport"
 	"k8s.io/component-base/version"
-	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -237,39 +232,4 @@ func BuildAuthorizer(ctx context.Context, s controlplaneapiserver.CompletedOptio
 	authorizer, ruleResolver, err := authorizationConfig.New(ctx, apiserverID)
 
 	return authorizer, ruleResolver, enablesRBAC, err
-}
-
-func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, svm storageversion.Manager,
-	proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerAdvertiseAddress reconcilers.PeerAdvertiseAddress,
-	apiServerID string, reconciler reconcilers.PeerEndpointLeaseReconciler, serializer runtime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
-	if proxyClientCertFile == "" {
-		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
-	}
-	if proxyClientKeyFile == "" {
-		return nil, fmt.Errorf("error building peer proxy handler, proxy-key-file not specified")
-	}
-	// create proxy client config
-	clientConfig := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure:   false,
-			CertFile:   proxyClientCertFile,
-			KeyFile:    proxyClientKeyFile,
-			CAFile:     peerCAFile,
-			ServerName: "kubernetes.default.svc",
-		}}
-
-	// build proxy transport
-	proxyRoundTripper, transportBuildingError := transport.New(clientConfig)
-	if transportBuildingError != nil {
-		klog.Error(transportBuildingError.Error())
-		return nil, transportBuildingError
-	}
-	return utilpeerproxy.NewPeerProxyHandler(
-		versionedInformer,
-		svm,
-		proxyRoundTripper,
-		apiServerID,
-		reconciler,
-		serializer,
-	), nil
 }
