@@ -142,9 +142,17 @@ func createAggregatorServer(aggregatorConfig aggregatorapiserver.CompletedConfig
 	}
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
-	crdRegistrationController := crdregistration.NewCRDRegistrationController(
-		apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
-		autoRegistrationController)
+
+	type controller interface {
+		Run(workers int, stopCh <-chan struct{})
+		WaitForInitialSync()
+	}
+	var crdRegistrationController controller
+	if crdAPIEnabled {
+		crdRegistrationController = crdregistration.NewCRDRegistrationController(
+			apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
+			autoRegistrationController)
+	}
 
 	// Imbue all builtin group-priorities onto the aggregated discovery
 	if aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager != nil {
@@ -154,7 +162,9 @@ func createAggregatorServer(aggregatorConfig aggregatorapiserver.CompletedConfig
 	}
 
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
-		go crdRegistrationController.Run(5, context.StopCh)
+		if crdAPIEnabled {
+			go crdRegistrationController.Run(5, context.StopCh)
+		}
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
