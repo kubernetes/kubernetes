@@ -41,7 +41,7 @@ func kubernetesReleaseVersionTest(version string) (string, error) {
 	return kubernetesReleaseVersion(version, fetcher)
 }
 
-func TesKubernetesReleaseVersion(t *testing.T) {
+func TestKubernetesReleaseVersion(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
@@ -57,7 +57,7 @@ func TesKubernetesReleaseVersion(t *testing.T) {
 		{
 			name:           "label as input",
 			input:          "stable",
-			expectedOutput: constants.DefaultKubernetesPlaceholderVersion.String(),
+			expectedOutput: normalizedBuildVersion(constants.DefaultKubernetesPlaceholderVersion.String()),
 			expectedError:  false,
 		},
 	}
