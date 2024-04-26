@@ -141,13 +141,6 @@ const (
 	// Enables the Portworx in-tree driver to Portworx migration feature.
 	CSIMigrationPortworx featuregate.Feature = "CSIMigrationPortworx"
 
-	// owner: @humblec
-	// alpha: v1.23
-	// deprecated: v1.28
-	//
-	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
-	CSIMigrationRBD featuregate.Feature = "CSIMigrationRBD"
-
 	// owner: @fengzixu
 	// alpha: v1.21
 	//
@@ -304,13 +297,6 @@ const (
 	//
 	// Disables the Portworx in-tree driver.
 	InTreePluginPortworxUnregister featuregate.Feature = "InTreePluginPortworxUnregister"
-
-	// owner: @humblec
-	// alpha: v1.23
-	// deprecated: v1.28
-	//
-	// Disables the RBD in-tree driver.
-	InTreePluginRBDUnregister featuregate.Feature = "InTreePluginRBDUnregister"
 
 	// owner: @divyenpatel
 	// alpha: v1.21
@@ -996,8 +982,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
 
-	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Deprecated}, //  deprecated in 1.28, remove in 1.31
-
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
 
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
@@ -1043,8 +1027,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginOpenStackUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginPortworxUnregister: {Default: false, PreRelease: featuregate.Alpha},
-
-	InTreePluginRBDUnregister: {Default: false, PreRelease: featuregate.Deprecated}, // deprecated in 1.28, remove in 1.31
 
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
