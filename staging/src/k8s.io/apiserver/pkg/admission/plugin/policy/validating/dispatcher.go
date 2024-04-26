@@ -223,7 +223,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 					switch decision.Action {
 					case ActionAdmit:
 						if decision.Evaluation == EvalError {
-							celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.Elapsed, definition.Name, binding.Name)
+							celmetrics.Metrics.ObserveAdmission(ctx, decision.Elapsed, definition.Name, binding.Name, ErrorType(&decision))
 						}
 					case ActionDeny:
 						for _, action := range binding.Spec.ValidationActions {
