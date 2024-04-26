@@ -58,7 +58,7 @@ func TestNoUtils(t *testing.T) {
             apiserver_validating_admission_policy_check_total{enforcement_action="allow",policy="policy.example.com",policy_binding="binding.example.com"} 1
 			`,
 			observer: func() {
-				Metrics.ObserveAdmissionWithError(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com")
+				Metrics.ObserveAdmission(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com")
 			},
 		},
 		{

@@ -29,6 +29,22 @@ const (
 	metricsSubsystem = "validating_admission_policy"
 )
 
+// ValidationErrorType defines different error types that happen to a validation expression
+type ValidationErrorType string
+
+const (
+	// ValidationCompileError indicates that the expression fails to compile.
+	ValidationCompileError ValidationErrorType = "compile_error"
+	// ValidatingInternalError indicates that the expression fails due to internal
+	// errors that are out of the control of the user.
+	ValidatingInternalError ValidationErrorType = "internal_error"
+	// ValidatingOutOfBudget indicates that the expression fails due to running
+	// out of cost budget, or the budget cannot be obtained.
+	ValidatingOutOfBudget ValidationErrorType = "out_of_budget"
+	// ValidationNoError indicates that the expression returns without an error.
+	ValidationNoError ValidationErrorType = "no_error"
+)
+
 var (
 	// Metrics provides access to validation admission metrics.
 	Metrics = newValidationAdmissionMetrics()
@@ -81,8 +97,8 @@ func (m *ValidatingAdmissionPolicyMetrics) Reset() {
 	m.policyLatency.Reset()
 }
 
-// ObserveAdmissionWithError observes a policy validation error that was ignored due to failure policy.
-func (m *ValidatingAdmissionPolicyMetrics) ObserveAdmissionWithError(ctx context.Context, elapsed time.Duration, policy, binding string) {
+// ObserveAdmission observes a policy validation, with an optional error to indicate the error that may occur but ignored.
+func (m *ValidatingAdmissionPolicyMetrics) ObserveAdmission(ctx context.Context, elapsed time.Duration, policy, binding string, errorType ValidationErrorType) {
 	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "allow").Inc()
 	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "allow").Observe(elapsed.Seconds())
 }
