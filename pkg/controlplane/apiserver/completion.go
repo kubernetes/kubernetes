@@ -40,5 +40,9 @@ func (c *Config) Complete() CompletedConfig {
 	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.Generic.ExternalAddress}
 	cfg.Generic.DiscoveryAddresses = discoveryAddresses
 
+	if cfg.Extra.PeerEndpointReconcileInterval == 0 {
+		cfg.Extra.PeerEndpointReconcileInterval = DefaultPeerEndpointReconcileInterval
+	}
+
 	return CompletedConfig{&cfg}
 }
