@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package iptables
+package util
 
 import (
 	"reflect"
@@ -38,46 +38,6 @@ func TestNoOpLocalDetector(t *testing.T) {
 	}
 }
 
-func TestNewDetectLocalByCIDR(t *testing.T) {
-	cases := []struct {
-		cidr        string
-		errExpected bool
-	}{
-		{
-			cidr:        "10.0.0.0/14",
-			errExpected: false,
-		},
-		{
-			cidr:        "2002:0:0:1234::/64",
-			errExpected: false,
-		},
-		{
-			cidr:        "10.0.0.0",
-			errExpected: true,
-		},
-		{
-			cidr:        "2002:0:0:1234::",
-			errExpected: true,
-		},
-		{
-			cidr:        "",
-			errExpected: true,
-		},
-	}
-	for i, c := range cases {
-		r, err := NewDetectLocalByCIDR(c.cidr)
-		if c.errExpected {
-			if err == nil {
-				t.Errorf("Case[%d] expected error, but succeeded with: %q", i, r)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("Case[%d] failed with error: %v", i, err)
-		}
-	}
-}
-
 func TestDetectLocalByCIDR(t *testing.T) {
 	cases := []struct {
 		cidr                     string
@@ -96,11 +56,7 @@ func TestDetectLocalByCIDR(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		localDetector, err := NewDetectLocalByCIDR(c.cidr)
-		if err != nil {
-			t.Errorf("Error initializing localDetector: %v", err)
-			continue
-		}
+		localDetector := NewDetectLocalByCIDR(c.cidr)
 		if !localDetector.IsImplemented() {
 			t.Error("DetectLocalByCIDR returns false for IsImplemented")
 		}
@@ -118,66 +74,6 @@ func TestDetectLocalByCIDR(t *testing.T) {
 	}
 }
 
-func TestNewDetectLocalByBridgeInterface(t *testing.T) {
-	cases := []struct {
-		ifaceName   string
-		errExpected bool
-	}{
-		{
-			ifaceName:   "avz",
-			errExpected: false,
-		},
-		{
-			ifaceName:   "",
-			errExpected: true,
-		},
-	}
-	for i, c := range cases {
-		r, err := NewDetectLocalByBridgeInterface(c.ifaceName)
-		if c.errExpected {
-			if err == nil {
-				t.Errorf("Case[%d] expected error, but succeeded with: %q", i, r)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("Case[%d] failed with error: %v", i, err)
-		}
-	}
-}
-
-func TestNewDetectLocalByInterfaceNamePrefix(t *testing.T) {
-	cases := []struct {
-		ifacePrefix string
-		errExpected bool
-	}{
-		{
-			ifacePrefix: "veth",
-			errExpected: false,
-		},
-		{
-			ifacePrefix: "cbr0",
-			errExpected: false,
-		},
-		{
-			ifacePrefix: "",
-			errExpected: true,
-		},
-	}
-	for i, c := range cases {
-		r, err := NewDetectLocalByInterfaceNamePrefix(c.ifacePrefix)
-		if c.errExpected {
-			if err == nil {
-				t.Errorf("Case[%d] expected error, but succeeded with: %q", i, r)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("Case[%d] failed with error: %v", i, err)
-		}
-	}
-}
-
 func TestDetectLocalByBridgeInterface(t *testing.T) {
 	cases := []struct {
 		ifaceName               string
@@ -191,11 +87,7 @@ func TestDetectLocalByBridgeInterface(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		localDetector, err := NewDetectLocalByBridgeInterface(c.ifaceName)
-		if err != nil {
-			t.Errorf("Error initializing localDetector: %v", err)
-			continue
-		}
+		localDetector := NewDetectLocalByBridgeInterface(c.ifaceName)
 		if !localDetector.IsImplemented() {
 			t.Error("DetectLocalByBridgeInterface returns false for IsImplemented")
 		}
@@ -228,11 +120,7 @@ func TestDetectLocalByInterfaceNamePrefix(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		localDetector, err := NewDetectLocalByInterfaceNamePrefix(c.ifacePrefix)
-		if err != nil {
-			t.Errorf("Error initializing localDetector: %v", err)
-			continue
-		}
+		localDetector := NewDetectLocalByInterfaceNamePrefix(c.ifacePrefix)
 		if !localDetector.IsImplemented() {
 			t.Error("DetectLocalByInterfaceNamePrefix returns false for IsImplemented")
 		}

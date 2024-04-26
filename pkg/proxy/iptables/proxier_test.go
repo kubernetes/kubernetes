@@ -54,7 +54,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -94,7 +93,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		ipfamily = v1.IPv6Protocol
 		podCIDR = "fd00:10::/64"
 	}
-	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR)
+	detectLocal := proxyutil.NewDetectLocalByCIDR(podCIDR)
 
 	networkInterfacer := proxyutiltest.NewFakeNetwork()
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
@@ -5588,7 +5587,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			fp := NewFakeProxier(ipt)
 			fp.masqueradeAll = tc.masqueradeAll
 			if !tc.localDetector {
-				fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
+				fp.localDetector = proxyutil.NewNoOpLocalDetector()
 			}
 			setupTest(fp)
 
