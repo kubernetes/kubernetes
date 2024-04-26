@@ -18,6 +18,8 @@ package apiserver
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,4 +88,14 @@ func CreatePeerEndpointLeaseReconciler(c genericapiserver.Config, storageFactory
 	}
 	reconciler, err := reconcilers.NewPeerEndpointLeaseReconciler(config, "/peerserverleases/", ttl)
 	return reconciler, err
+}
+
+// utility function to get the apiserver address that is used by peer apiservers to proxy
+// requests to this apiserver in case the peer is incapable of serving the request
+func getPeerAddress(peerAdvertiseAddress reconcilers.PeerAdvertiseAddress, publicAddress net.IP, publicServicePort int) string {
+	if peerAdvertiseAddress.PeerAdvertiseIP != "" && peerAdvertiseAddress.PeerAdvertisePort != "" {
+		return net.JoinHostPort(peerAdvertiseAddress.PeerAdvertiseIP, peerAdvertiseAddress.PeerAdvertisePort)
+	} else {
+		return net.JoinHostPort(publicAddress.String(), strconv.Itoa(publicServicePort))
+	}
 }

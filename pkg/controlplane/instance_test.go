@@ -224,7 +224,7 @@ func TestVersion(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/version", nil)
 	resp := httptest.NewRecorder()
-	s.GenericAPIServer.Handler.ServeHTTP(resp, req)
+	s.ControlPlane.GenericAPIServer.Handler.ServeHTTP(resp, req)
 	if resp.Code != 200 {
 		t.Fatalf("expected http 200, got: %d", resp.Code)
 	}
@@ -259,7 +259,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	apiserver, etcdserver, _, assert := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(apiserver.ControlPlane.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")
@@ -316,7 +316,7 @@ func TestStorageVersionHashes(t *testing.T) {
 	apiserver, etcdserver, _, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(apiserver.ControlPlane.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	c := &restclient.Config{
 		Host:          server.URL,
