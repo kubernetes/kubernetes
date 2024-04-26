@@ -223,7 +223,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 					switch decision.Action {
 					case ActionAdmit:
 						if decision.Evaluation == EvalError {
-							celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+							celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.Elapsed, definition.Name, binding.Name)
 						}
 					case ActionDeny:
 						for _, action := range binding.Spec.ValidationActions {
@@ -234,13 +234,13 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 									Binding:        binding,
 									PolicyDecision: decision,
 								})
-								celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+								celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name)
 							case admissionregistrationv1.Audit:
 								publishValidationFailureAnnotation(binding, i, decision, versionedAttr)
-								celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+								celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name)
 							case admissionregistrationv1.Warn:
 								warning.AddWarning(ctx, "", fmt.Sprintf("Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s", definition.Name, binding.Name, decision.Message))
-								celmetrics.Metrics.ObserveWarn(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
+								celmetrics.Metrics.ObserveWarn(ctx, decision.Elapsed, definition.Name, binding.Name)
 							}
 						}
 					default:
@@ -269,7 +269,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 								Elapsed:    auditAnnotation.Elapsed,
 							},
 						})
-						celmetrics.Metrics.ObserveRejection(ctx, auditAnnotation.Elapsed, definition.Name, binding.Name, "active")
+						celmetrics.Metrics.ObserveRejection(ctx, auditAnnotation.Elapsed, definition.Name, binding.Name)
 					case AuditAnnotationActionExclude: // skip it
 					default:
 						return fmt.Errorf("unsupported AuditAnnotation Action: %s", auditAnnotation.Action)
