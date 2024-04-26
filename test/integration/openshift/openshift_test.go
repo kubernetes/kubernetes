@@ -38,6 +38,8 @@ func TestApiserverExportsSymbols(t *testing.T) {
 		},
 	}
 	_ = &controlplane.Instance{
-		GenericAPIServer: &genericapiserver.GenericAPIServer{},
+		ControlPlane: &controlplaneapiserver.Server{
+			GenericAPIServer: &genericapiserver.GenericAPIServer{},
+		},
 	}
 }
