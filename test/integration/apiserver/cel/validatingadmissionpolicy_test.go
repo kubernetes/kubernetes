@@ -2363,6 +2363,39 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 			allowed:    true,
 		},
 		{
+			name: "more than 28 checks exceeds per-policy runtime cost budget",
+			rbac: &rbacv1.PolicyRule{
+				Verbs:         []string{"create"},
+				APIGroups:     []string{"apps"},
+				Resources:     []string{"deployments/status"},
+				ResourceNames: []string{"charmander"},
+			},
+			expression: "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29].all(x, authorizer.group('apps').resource('deployments').subresource('status').namespace('default').namespace('default').name('charmander').check('create').allowed())",
+			allowed:    false,
+		},
+		{
+			name: "more than 2 checks exceeds per-expression runtime cost budget",
+			rbac: &rbacv1.PolicyRule{
+				Verbs:         []string{"create"},
+				APIGroups:     []string{"apps"},
+				Resources:     []string{"deployments/status"},
+				ResourceNames: []string{"charmander"},
+			},
+			expression: "[1, 2, 3].all(x, authorizer.group('apps').resource('deployments').subresource('status').namespace('default').namespace('default').name('charmander').check('create').allowed())",
+			allowed:    false,
+		},
+		{
+			name: "fewer than 3 checks meets per-expression runtime cost budget",
+			rbac: &rbacv1.PolicyRule{
+				Verbs:         []string{"create"},
+				APIGroups:     []string{"apps"},
+				Resources:     []string{"deployments/status"},
+				ResourceNames: []string{"charmander"},
+			},
+			expression: "[1, 2].all(x, authorizer.group('apps').resource('deployments').subresource('status').namespace('default').namespace('default').name('charmander').check('create').allowed())",
+			allowed:    true,
+		},
+		{
 			name:       "principal is not allowed to create a specific deployment",
 			expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('default').name('charmander').check('create').allowed()",
 			allowed:    false,
