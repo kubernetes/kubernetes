@@ -518,7 +518,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			if admission != nil {
-				config.GenericConfig.AdmissionControl = admission
+				config.ControlPlane.Generic.AdmissionControl = admission
 			}
 		},
 	})

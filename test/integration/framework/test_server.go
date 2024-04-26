@@ -182,7 +182,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	}()
 
 	// Adjust the loopback config for external use (external server name and CA)
-	kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
+	kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.ControlPlane.Generic.LoopbackClientConfig)
 	kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
 	kubeAPIServerClientConfig.CAData = nil
 	kubeAPIServerClientConfig.ServerName = ""
