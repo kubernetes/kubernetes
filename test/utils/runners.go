@@ -1235,14 +1235,22 @@ func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1
 	return nil
 }
 
-func CreatePod(ctx context.Context, client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod) error {
+func CreatePod(ctx context.Context, client clientset.Interface, namespace string, podCount int, podTemplate PodTemplate) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
+		pod, err := podTemplate.GetPodTemplate(i, podCount)
+		if err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = err
+			return
+		}
+		pod = pod.DeepCopy()
 		// client-go writes into the object that is passed to Create,
 		// causing a data race unless we create a new copy for each
 		// parallel call.
-		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy()); err != nil {
+		if err := makeCreatePod(client, namespace, pod); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = err
@@ -1257,7 +1265,7 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 	return createError
 }
 
-func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod, count int, bindVolume bool) error {
+func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate, count int, bindVolume bool) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
@@ -1318,7 +1326,14 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		}
 
 		// pod
-		pod := podTemplate.DeepCopy()
+		pod, err := podTemplate.GetPodTemplate(i, count)
+		if err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = fmt.Errorf("error getting pod template: %s", err)
+			return
+		}
+		pod = pod.DeepCopy()
 		pod.Spec.Volumes = []v1.Volume{
 			{
 				Name: "vol",
@@ -1345,7 +1360,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 	return createError
 }
 
-func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
+func NewCustomCreatePodStrategy(podTemplate PodTemplate) TestPodCreateStrategy {
 	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
 		return CreatePod(ctx, client, namespace, podCount, podTemplate)
 	}
@@ -1354,7 +1369,32 @@ func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 // volumeFactory creates an unique PersistentVolume for given integer.
 type volumeFactory func(uniqueID int) *v1.PersistentVolume
 
-func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
+// PodTemplate is responsible for creating a v1.Pod instance that is ready
+// to be sent to the API server.
+type PodTemplate interface {
+	// GetPodTemplate returns a pod template for one out of many different pods.
+	// Pods with numbers in the range [index, index+count-1] will be created
+	// based on what GetPodTemplate returns. It gets called multiple times
+	// with a fixed index and increasing count parameters. This number can,
+	// but doesn't have to be, used to modify parts of the pod spec like
+	// for example a named reference to some other object.
+	GetPodTemplate(index, count int) (*v1.Pod, error)
+}
+
+// StaticPodTemplate returns an implementation of PodTemplate for a fixed pod that is the same regardless of the index.
+func StaticPodTemplate(pod *v1.Pod) PodTemplate {
+	return (*staticPodTemplate)(pod)
+}
+
+type staticPodTemplate v1.Pod
+
+// GetPodTemplate implements [PodTemplate.GetPodTemplate] by returning the same pod
+// for each call.
+func (s *staticPodTemplate) GetPodTemplate(index, count int) (*v1.Pod, error) {
+	return (*v1.Pod)(s), nil
+}
+
+func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate) TestPodCreateStrategy {
 	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
 		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factory, podTemplate, podCount, true /* bindVolume */)
 	}
