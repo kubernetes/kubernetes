@@ -1432,16 +1432,12 @@ func validateTestCases(testCases []*testCase) error {
 }
 
 func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {
-	basePod := makeBasePod()
+	podTemplate := testutils.StaticPodTemplate(makeBasePod())
 	if cpo.PodTemplatePath != nil {
-		var err error
-		basePod, err = getPodSpecFromFile(cpo.PodTemplatePath)
-		if err != nil {
-			return nil, err
-		}
+		podTemplate = podTemplateFromFile(*cpo.PodTemplatePath)
 	}
 	if cpo.PersistentVolumeClaimTemplatePath == nil {
-		return testutils.NewCustomCreatePodStrategy(basePod), nil
+		return testutils.NewCustomCreatePodStrategy(podTemplate), nil
 	}
 
 	pvTemplate, err := getPersistentVolumeSpecFromFile(cpo.PersistentVolumeTemplatePath)
@@ -1452,7 +1448,7 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	if err != nil {
 		return nil, err
 	}
-	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), basePod), nil
+	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
 }
 
 func getNodeSpecFromFile(path *string) (*v1.Node, error) {
@@ -1463,9 +1459,11 @@ func getNodeSpecFromFile(path *string) (*v1.Node, error) {
 	return nodeSpec, nil
 }
 
-func getPodSpecFromFile(path *string) (*v1.Pod, error) {
+type podTemplateFromFile string
+
+func (f podTemplateFromFile) GetPodTemplate(index, count int) (*v1.Pod, error) {
 	podSpec := &v1.Pod{}
-	if err := getSpecFromFile(path, podSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, podSpec); err != nil {
 		return nil, fmt.Errorf("parsing Pod: %w", err)
 	}
 	return podSpec, nil
