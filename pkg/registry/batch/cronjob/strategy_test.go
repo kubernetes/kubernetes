@@ -111,8 +111,7 @@ func TestCronJobStrategy(t *testing.T) {
 	updatedCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.CronJobSpec{
-			Schedule:    "5 5 5 * ?",
-			JobTemplate: cronJob.Spec.JobTemplate,
+			Schedule: "5 5 5 * ?",
 		},
 		Status: batch.CronJobStatus{
 			LastScheduleTime: &now,

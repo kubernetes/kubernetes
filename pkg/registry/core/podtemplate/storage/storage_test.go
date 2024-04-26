@@ -73,9 +73,7 @@ func TestCreate(t *testing.T) {
 		pod,
 		// invalid
 		&api.PodTemplate{
-			Template: api.PodTemplateSpec{
-				Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
-			},
+			Template: api.PodTemplateSpec{},
 		},
 	)
 }

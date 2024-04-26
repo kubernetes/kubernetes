@@ -79,11 +79,6 @@ func TestReplicaSetStrategy(t *testing.T) {
 
 	invalidRc := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
-		Spec: apps.ReplicaSetSpec{
-			Template: api.PodTemplateSpec{
-				Spec: podtest.MakePod("", podtest.SetContainers()).Spec,
-			},
-		},
 	}
 	Strategy.PrepareForUpdate(ctx, invalidRc, rs)
 	errs = Strategy.ValidateUpdate(ctx, invalidRc, rs)

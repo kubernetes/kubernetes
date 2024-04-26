@@ -2076,9 +2076,6 @@ func TestValidateDaemonSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-				Template: api.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
-				},
 			},
 		},
 		"invalid_label": {
@@ -2248,11 +2245,6 @@ func TestValidateDeployment(t *testing.T) {
 	errorCases["metadata.name: Required value"] = &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: apps.DeploymentSpec{
-			Template: api.PodTemplateSpec{
-				Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
-			},
 		},
 	}
 	// selector should match the labels in pod template.
@@ -3207,9 +3199,6 @@ func TestValidateReplicaSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: api.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
-				},
 			},
 		},
 		"read-write persistent disk with > 1 pod": {
@@ -3225,9 +3214,6 @@ func TestValidateReplicaSet(t *testing.T) {
 			Spec: apps.ReplicaSetSpec{
 				Replicas: -1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: api.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
-				},
 			},
 		},
 		"invalid_label": {

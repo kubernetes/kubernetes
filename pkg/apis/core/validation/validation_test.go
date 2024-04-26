@@ -55,7 +55,6 @@ const (
 	dnsSubdomainLabelErrMsg           = "a lowercase RFC 1123 subdomain"
 	envVarNameErrMsg                  = "a valid environment variable name must consist of"
 	relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
-	defaultGracePeriod                = int64(30)
 	noUserNamespace                   = false
 )
 
@@ -65,6 +64,7 @@ var (
 	containerRestartPolicyNever     = core.ContainerRestartPolicy("Never")
 	containerRestartPolicyInvalid   = core.ContainerRestartPolicy("invalid")
 	containerRestartPolicyEmpty     = core.ContainerRestartPolicy("")
+	defaultGracePeriod              = ptr.To[int64](30)
 )
 
 type topologyPair struct {
@@ -24033,7 +24033,7 @@ func TestValidateSleepAction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateSleepAction(tc.action, tc.gracePeriod, fldPath)
+			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath)
 
 			if len(tc.expectErr) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")

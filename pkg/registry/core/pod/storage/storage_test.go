@@ -105,9 +105,7 @@ func TestCreate(t *testing.T) {
 		// invalid (empty contains list)
 		&api.Pod{
 			Spec: api.PodSpec{
-				// FIX-ME
-				TerminationGracePeriodSeconds: pod.Spec.TerminationGracePeriodSeconds,
-				Containers:                    []api.Container{},
+				Containers: []api.Container{},
 			},
 		},
 		// invalid (invalid labels)

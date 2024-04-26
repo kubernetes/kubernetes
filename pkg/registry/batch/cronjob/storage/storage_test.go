@@ -83,9 +83,7 @@ func TestCreate(t *testing.T) {
 			Spec: batch.CronJobSpec{
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Template: api.PodTemplateSpec{
-							Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure, podtest.SetContainers()),
-						},
+						Template: api.PodTemplateSpec{},
 					},
 				},
 			},
