@@ -1614,8 +1614,9 @@ func (proxier *Proxier) syncProxyRules() {
 		"numEndpoints", totalEndpoints,
 	)
 
-	// FIXME
-	// klog.V(9).InfoS("Running nftables transaction", "transaction", tx.Bytes())
+	if klogV9 := klog.V(9); klogV9.Enabled() {
+		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
+	}
 
 	err = proxier.nftables.Run(context.TODO(), tx)
 	if err != nil {
