@@ -39,6 +39,9 @@ var (
 		# Updates settings relevant to the kubelet after TLS bootstrap"
 		kubeadm init phase kubelet-finalize all --config
 		`)
+	// TODO: remove with 'experimental-cert-rotation'.
+	// https://github.com/kubernetes/kubeadm/issues/3046
+	enableClientCertRotationRun = false
 )
 
 // NewKubeletFinalizePhase creates a kubeadm workflow phase that updates settings
@@ -57,19 +60,48 @@ func NewKubeletFinalizePhase() workflow.Phase {
 				RunAllSiblings: true,
 			},
 			{
-				Name:         "experimental-cert-rotation",
+				Name:         "enable-client-cert-rotation",
 				Short:        "Enable kubelet client certificate rotation",
 				InheritFlags: []string{options.CfgPath, options.CertificatesDir, options.DryRun},
-				Run:          runKubeletFinalizeCertRotation,
+				Run:          runKubeletFinalizeEnableClientCertRotation,
+			},
+			// TODO: remove this phase in 1.32.
+			// also remove the "enableClientCertRotationRun" variable.
+			// https://github.com/kubernetes/kubeadm/issues/3046
+			{
+				Name:         "experimental-cert-rotation",
+				Short:        "Enable kubelet client certificate rotation (DEPRECATED: use 'enable-client-cert-rotation' instead)",
+				InheritFlags: []string{options.CfgPath, options.CertificatesDir, options.DryRun},
+				Run:          runKubeletFinalizeEnableClientCertRotationWrapped,
 			},
 		},
 	}
 }
 
-// runKubeletFinalizeCertRotation detects if the kubelet certificate rotation is enabled
+// runKubeletFinalizeEnableClientCertRotationWrapped wraps runKubeletFinalizeEnableClientCertRotation
+// and prints a deprecation message when the phase is executed directly. If 'all' is used this
+// function should just return nil because 'enable-client-cert-rotation' sets 'enableClientCertRotationRun'.
+// TODO: remove in 1.32.
+// https://github.com/kubernetes/kubeadm/issues/3046
+func runKubeletFinalizeEnableClientCertRotationWrapped(c workflow.RunData) error {
+	if enableClientCertRotationRun {
+		return nil
+	}
+	klog.Warning("The phase 'experimental-cert-rotation' is deprecated and will be removed in a future release. " +
+		"Use 'enable-client-cert-rotation' instead")
+	return runKubeletFinalizeEnableClientCertRotation(c)
+}
+
+// runKubeletFinalizeEnableClientCertRotation detects if the kubelet certificate rotation is enabled
 // and updates the kubelet.conf file to point to a rotatable certificate and key for the
 // Node user.
-func runKubeletFinalizeCertRotation(c workflow.RunData) error {
+func runKubeletFinalizeEnableClientCertRotation(c workflow.RunData) error {
+	// Set 'enableClientCertRotationRun' to make sure that if 'all' is called,
+	// runKubeletFinalizeEnableClientCertRotationWrapped will return nil early.
+	// TODO: remove in 1.32.
+	// https://github.com/kubernetes/kubeadm/issues/3046
+	enableClientCertRotationRun = true
+
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-finalize phase invoked with an invalid data struct")
