@@ -162,10 +162,6 @@ type Extra struct {
 	PeerProxy utilpeerproxy.Interface
 	// PeerEndpointLeaseReconciler updates the peer endpoint leases
 	PeerEndpointLeaseReconciler peerreconcilers.PeerEndpointLeaseReconciler
-	// PeerCAFile is the ca bundle used by this kube-apiserver to verify peer apiservers'
-	// serving certs when routing a request to the peer in the case the request can not be served
-	// locally due to version skew.
-	PeerCAFile string
 	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
 	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
 	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
