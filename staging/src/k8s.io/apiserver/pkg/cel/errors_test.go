@@ -27,7 +27,7 @@ func TestOutOfBudgetError(t *testing.T) {
 	err := &Error{
 		Type:   ErrorTypeInvalid,
 		Detail: "expression out of budget",
-		Errors: []error{ErrOutOfBudget},
+		Cause:  ErrOutOfBudget,
 	}
 	if !errors.Is(err, ErrOutOfBudget) {
 		t.Errorf("unexpected %v is not %v", err, ErrOutOfBudget)
@@ -45,7 +45,7 @@ func TestCompilationError(t *testing.T) {
 	err := &Error{
 		Type:   ErrorTypeInvalid,
 		Detail: "fake compilation failed",
-		Errors: []error{NewCompilationError(issues)},
+		Cause:  NewCompilationError(issues),
 	}
 	if !errors.Is(err, ErrCompilation) {
 		t.Errorf("unexpected %v is not %v", err, ErrCompilation)

@@ -163,12 +163,12 @@ type variableDeclEnvs map[OptionalVariableDeclarations]*environment.EnvSet
 // CompileCELExpression returns a compiled CEL expression.
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, options OptionalVariableDeclarations, envType environment.Type) CompilationResult {
-	resultError := func(errorString string, errType apiservercel.ErrorType, errors ...error) CompilationResult {
+	resultError := func(errorString string, errType apiservercel.ErrorType, cause error) CompilationResult {
 		return CompilationResult{
 			Error: &apiservercel.Error{
 				Type:   errType,
 				Detail: errorString,
-				Errors: errors,
+				Cause:  cause,
 			},
 			ExpressionAccessor: expressionAccessor,
 		}
@@ -176,7 +176,7 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 
 	env, err := c.varEnvs[options].Env(envType)
 	if err != nil {
-		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
+		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal, nil)
 	}
 
 	ast, issues := env.Compile(expressionAccessor.GetExpression())
@@ -199,19 +199,19 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 			reason = fmt.Sprintf("must evaluate to one of %v", returnTypes)
 		}
 
-		return resultError(reason, apiservercel.ErrorTypeInvalid)
+		return resultError(reason, apiservercel.ErrorTypeInvalid, nil)
 	}
 
 	_, err = cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
-		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
+		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal, nil)
 	}
 	prog, err := env.Program(ast,
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
-		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal)
+		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal, nil)
 	}
 	return CompilationResult{
 		Program:            prog,
