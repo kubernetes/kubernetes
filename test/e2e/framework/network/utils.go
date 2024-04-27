@@ -325,6 +325,12 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 				responses.Insert(trimmed)
 			}
 		}
+		if responses.Difference(expectedResponses).Len() > 0 {
+			returnMsg := fmt.Errorf("received unexpected responses... \nAttempt %d\nCommand %v\nretrieved %v\nexpected %v", i, cmd, responses, expectedResponses)
+			framework.Logf("encountered error during dial (%v)", returnMsg)
+			return returnMsg
+		}
+
 		framework.Logf("Waiting for responses: %v", expectedResponses.Difference(responses))
 
 		// Check against i+1 so we exit if minTries == maxTries.
