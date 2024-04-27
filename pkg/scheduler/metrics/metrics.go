@@ -38,7 +38,24 @@ const (
 	Binding = "binding"
 )
 
-// Below are possible values for the extension_point label.
+// ExtentionPoints is a list of possible values for the extension_point label.
+var ExtentionPoints = []string{
+	PreFilter,
+	Filter,
+	PreFilterExtensionAddPod,
+	PreFilterExtensionRemovePod,
+	PostFilter,
+	PreScore,
+	Score,
+	ScoreExtensionNormalize,
+	PreBind,
+	Bind,
+	PostBind,
+	Reserve,
+	Unreserve,
+	Permit,
+}
+
 const (
 	PreFilter                   = "PreFilter"
 	Filter                      = "Filter"

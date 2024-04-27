@@ -247,7 +247,7 @@ type labelValues struct {
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
 // NOTE: The mapping here means only one filter is supported, either value in the list of `values` is able to be collected.
 type metricsCollectorConfig struct {
-	Metrics map[string]*labelValues
+	Metrics map[string][]*labelValues
 }
 
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
@@ -270,17 +270,15 @@ func (*metricsCollector) run(tCtx ktesting.TContext) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for metric, labelVals := range pc.Metrics {
+	for metric, labelValsSlice := range pc.Metrics {
 		// no filter is specified, aggregate all the metrics within the same metricFamily.
-		if labelVals == nil {
+		if labelValsSlice == nil {
 			dataItem := collectHistogramVec(metric, pc.labels, nil)
 			if dataItem != nil {
 				dataItems = append(dataItems, *dataItem)
 			}
 		} else {
-			// fetch the metric from metricFamily which match each of the lvMap.
-			for _, value := range labelVals.values {
-				lvMap := map[string]string{labelVals.label: value}
+			for _, lvMap := range uniqueLVCombos(labelValsSlice) {
 				dataItem := collectHistogramVec(metric, pc.labels, lvMap)
 				if dataItem != nil {
 					dataItems = append(dataItems, *dataItem)
@@ -289,6 +287,32 @@ func (pc *metricsCollector) collect() []DataItem {
 		}
 	}
 	return dataItems
+}
+
+// uniqueLVCombos lists up all possible label values combinations.
+// e.g., if there are 3 labelValues, each of which has 2 values,
+// the result would be {A: a1, B: b1, C: c1}, {A: a2, B: b1, C: c1}, {A: a1, B: b2, C: c1}, ... (2^3 = 8 combinations).
+func uniqueLVCombos(lvs []*labelValues) []map[string]string {
+	if len(lvs) == 0 {
+		return []map[string]string{{}}
+	}
+
+	remainingCombos := uniqueLVCombos(lvs[1:])
+
+	results := make([]map[string]string, 0)
+
+	current := lvs[0]
+	for _, value := range current.values {
+		for _, combo := range remainingCombos {
+			newCombo := make(map[string]string, len(combo)+1)
+			for k, v := range combo {
+				newCombo[k] = v
+			}
+			newCombo[current.label] = value
+			results = append(results, newCombo)
+		}
+	}
+	return results
 }
 
 func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
