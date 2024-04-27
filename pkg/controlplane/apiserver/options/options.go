@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -83,6 +84,8 @@ type Options struct {
 	ServiceAccountTokenMaxExpiration time.Duration
 
 	ShowHiddenMetricsForVersion string
+
+	SystemNamespaces []string
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
@@ -115,6 +118,7 @@ func NewOptions() *Options {
 		EnableLogsHandler:                   true,
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
+		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
 	}
 
 	// Overwrite the default for storage data format.

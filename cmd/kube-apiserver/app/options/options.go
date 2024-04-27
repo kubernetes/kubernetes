@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	cliflag "k8s.io/component-base/cli/flag"
 
@@ -91,6 +92,8 @@ func NewServerRunOptions() *ServerRunOptions {
 			MasterCount:          1,
 		},
 	}
+
+	s.Options.SystemNamespaces = append(s.Options.SystemNamespaces, v1.NamespaceNodeLease)
 
 	return &s
 }

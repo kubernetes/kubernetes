@@ -76,6 +76,8 @@ type Extra struct {
 	ServiceAccountJWKSURI    string
 	ServiceAccountPublicKeys []interface{}
 
+	SystemNamespaces []string
+
 	VersionedInformers clientgoinformers.SharedInformerFactory
 }
 
