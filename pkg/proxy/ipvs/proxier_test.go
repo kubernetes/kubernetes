@@ -42,6 +42,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
@@ -5615,7 +5616,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		hostname string
 	}
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPVS)
 
 	testCases := []struct {
 		name                                                string

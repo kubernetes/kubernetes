@@ -1444,7 +1444,7 @@ func (proxier *Proxier) syncProxyRules() {
 		} else {
 			proxier.logger.Error(err, "Failed to execute iptables-restore", "rules", proxier.iptablesData.Bytes())
 		}
-		metrics.IptablesRestoreFailuresTotal.Inc()
+		metrics.IPTablesRestoreFailuresTotal.Inc()
 		return
 	}
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {

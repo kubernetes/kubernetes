@@ -465,7 +465,7 @@ type serverTest struct {
 }
 
 func TestHealthzServer(t *testing.T) {
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -500,7 +500,7 @@ func TestHealthzServer(t *testing.T) {
 }
 
 func TestLivezServer(t *testing.T) {
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())

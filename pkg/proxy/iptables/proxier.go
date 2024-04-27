@@ -450,7 +450,7 @@ func CleanupLeftovers(ctx context.Context, ipt utiliptables.Interface) (encounte
 		err = ipt.Restore(utiliptables.TableNAT, natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 		if err != nil {
 			logger.Error(err, "Failed to execute iptables-restore", "table", utiliptables.TableNAT)
-			metrics.IptablesRestoreFailuresTotal.Inc()
+			metrics.IPTablesRestoreFailuresTotal.Inc()
 			encounteredError = true
 		}
 	}
@@ -477,7 +477,7 @@ func CleanupLeftovers(ctx context.Context, ipt utiliptables.Interface) (encounte
 		// Write it.
 		if err := ipt.Restore(utiliptables.TableFilter, filterLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters); err != nil {
 			logger.Error(err, "Failed to execute iptables-restore", "table", utiliptables.TableFilter)
-			metrics.IptablesRestoreFailuresTotal.Inc()
+			metrics.IPTablesRestoreFailuresTotal.Inc()
 			encounteredError = true
 		}
 	}
@@ -817,7 +817,7 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.logger.Info("Sync failed", "retryingTime", proxier.syncPeriod)
 			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
 			if tryPartialSync {
-				metrics.IptablesPartialRestoreFailuresTotal.Inc()
+				metrics.IPTablesPartialRestoreFailuresTotal.Inc()
 			}
 			// proxier.serviceChanges and proxier.endpointChanges have already
 			// been flushed, so we've lost the state needed to be able to do
@@ -1482,10 +1482,10 @@ func (proxier *Proxier) syncProxyRules() {
 		"-j", "ACCEPT",
 	)
 
-	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
-	metrics.IptablesRulesLastSync.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
-	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines() + skippedNatRules.Lines() - deletedChains))
-	metrics.IptablesRulesLastSync.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines() - deletedChains))
+	metrics.IPTablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
+	metrics.IPTablesRulesLastSync.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
+	metrics.IPTablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines() + skippedNatRules.Lines() - deletedChains))
+	metrics.IPTablesRulesLastSync.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines() - deletedChains))
 
 	// Sync rules.
 	proxier.iptablesData.Reset()
@@ -1517,7 +1517,7 @@ func (proxier *Proxier) syncProxyRules() {
 		} else {
 			proxier.logger.Error(err, "Failed to execute iptables-restore")
 		}
-		metrics.IptablesRestoreFailuresTotal.Inc()
+		metrics.IPTablesRestoreFailuresTotal.Inc()
 		return
 	}
 	success = true

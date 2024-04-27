@@ -1032,7 +1032,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// the chains still exist, they'll just get added back
 				// (with a later timestamp) at the end of the sync.
 				proxier.logger.Error(err, "Unable to delete stale chains; will retry later")
-				// FIXME: metric
+				metrics.NFTablesCleanupFailuresTotal.Inc()
 			}
 		}
 	}
@@ -1613,13 +1613,18 @@ func (proxier *Proxier) syncProxyRules() {
 		"numEndpoints", totalEndpoints,
 	)
 
-	// FIXME
-	// klog.V(9).InfoS("Running nftables transaction", "transaction", tx.Bytes())
+	if klogV9 := klog.V(9); klogV9.Enabled() {
+		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
+	}
 
 	err = proxier.nftables.Run(context.TODO(), tx)
 	if err != nil {
 		proxier.logger.Error(err, "nftables sync failed")
-		metrics.IptablesRestoreFailuresTotal.Inc()
+		metrics.NFTablesSyncFailuresTotal.Inc()
+
+		// staleChains is now incorrect since we didn't actually flush the
+		// chains in it. We can recompute it next time.
+		clear(proxier.staleChains)
 		return
 	}
 	success = true

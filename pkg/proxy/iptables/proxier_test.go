@@ -49,10 +49,10 @@ import (
 	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
-	"k8s.io/kubernetes/pkg/proxy/metrics"
-
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -408,7 +408,7 @@ func countRules(logger klog.Logger, tableName utiliptables.Table, ruleData strin
 }
 
 func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table) int {
-	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(tableName)))
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesTotal.WithLabelValues(string(tableName)))
 	if err != nil {
 		logger.Error(err, "metrics are not registered?")
 		return -1
@@ -417,7 +417,7 @@ func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table) int 
 }
 
 func countRulesFromLastSyncMetric(logger klog.Logger, tableName utiliptables.Table) int {
-	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesLastSync.WithLabelValues(string(tableName)))
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesLastSync.WithLabelValues(string(tableName)))
 	if err != nil {
 		logger.Error(err, "metrics are not registered?")
 		return -1
@@ -1543,7 +1543,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -4142,12 +4142,12 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 	}
 }
 
-func TestProxierMetricsIptablesTotalRules(t *testing.T) {
+func TestProxierMetricsIPTablesTotalRules(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 
 	svcIP := "172.30.0.41"
 	svcPort := 80
@@ -5827,7 +5827,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 	defer legacyregistry.Reset()
 
 	// Create initial state
@@ -6356,7 +6356,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if fp.needFullSync {
 		t.Fatalf("Proxier unexpectedly already needs a full sync?")
 	}
-	partialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	partialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal)
 	if err != nil {
 		t.Fatalf("Could not get partial restore failures metric: %v", err)
 	}
@@ -6390,7 +6390,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if !fp.needFullSync {
 		t.Errorf("Proxier did not fail on previous partial resync?")
 	}
-	updatedPartialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	updatedPartialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal)
 	if err != nil {
 		t.Errorf("Could not get partial restore failures metric: %v", err)
 	}
@@ -6471,7 +6471,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		hostname string
 	}
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 	testCases := []struct {
 		name                                                string
 		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicy

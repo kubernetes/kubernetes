@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
-	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -100,7 +99,6 @@ func (s *ProxyServer) platformSetup(ctx context.Context) error {
 		return err
 	}
 
-	proxymetrics.RegisterMetrics()
 	return nil
 }
 
