@@ -239,6 +239,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 				EventTTL:                opts.EventTTL,
 				EnableLogsSupport:       opts.EnableLogsHandler,
 				ProxyTransport:          proxyTransport,
+				SystemNamespaces:        opts.SystemNamespaces,
 
 				ServiceAccountIssuer:        opts.ServiceAccountIssuer,
 				ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
