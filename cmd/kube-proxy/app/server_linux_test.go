@@ -118,7 +118,7 @@ func Test_getLocalDetector(t *testing.T) {
 	}{
 		// LocalModeClusterCIDR
 		{
-			name:     "LocalModeClusterCIDR, IPv4 cluster",
+			name: "LocalModeClusterCIDR, single-stack IPv4 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "10.0.0.0/14",
@@ -127,7 +127,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected: proxyutil.NewDetectLocalByCIDR("10.0.0.0/14"),
 		},
 		{
-			name:     "LocalModeClusterCIDR, IPv6 cluster",
+			name: "LocalModeClusterCIDR, single-stack IPv6 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64",
@@ -136,7 +136,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected: proxyutil.NewDetectLocalByCIDR("2002:0:0:1234::/64"),
 		},
 		{
-			name:     "LocalModeClusterCIDR, IPv6 cluster with IPv4 config",
+			name: "LocalModeClusterCIDR, single-stack IPv6 cluster with single-stack IPv4 config",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "10.0.0.0/14",
@@ -145,7 +145,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected: proxyutil.NewNoOpLocalDetector(),
 		},
 		{
-			name:     "LocalModeClusterCIDR, IPv4 cluster with IPv6 config",
+			name: "LocalModeClusterCIDR, single-stack IPv4 cluster with single-stack IPv6 config",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64",
@@ -154,7 +154,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected: proxyutil.NewNoOpLocalDetector(),
 		},
 		{
-			name:     "LocalModeClusterCIDR, IPv4 kube-proxy in dual-stack IPv6-primary cluster",
+			name: "LocalModeClusterCIDR, IPv4-primary kube-proxy / IPv6-primary config",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64,10.0.0.0/14",
@@ -163,7 +163,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected: proxyutil.NewDetectLocalByCIDR("10.0.0.0/14"),
 		},
 		{
-			name:     "LocalModeClusterCIDR, no ClusterCIDR",
+			name: "LocalModeClusterCIDR, no ClusterCIDR",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "",
@@ -173,7 +173,7 @@ func Test_getLocalDetector(t *testing.T) {
 		},
 		// LocalModeNodeCIDR
 		{
-			name:         "LocalModeNodeCIDR, IPv4 cluster",
+			name: "LocalModeNodeCIDR, single-stack IPv4 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "10.0.0.0/14",
@@ -183,7 +183,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:     proxyutil.NewDetectLocalByCIDR("10.0.0.0/24"),
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv6 cluster",
+			name: "LocalModeNodeCIDR, single-stack IPv6 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64",
@@ -193,7 +193,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:     proxyutil.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"),
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv6 cluster with IPv4 config",
+			name: "LocalModeNodeCIDR, single-stack IPv6 cluster with single-stack IPv4 config",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "10.0.0.0/14",
@@ -203,7 +203,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:     proxyutil.NewNoOpLocalDetector(),
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv4 cluster with IPv6 config",
+			name: "LocalModeNodeCIDR, single-stack IPv4 cluster with single-stack IPv6 config",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64",
@@ -213,7 +213,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:     proxyutil.NewNoOpLocalDetector(),
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv6 kube-proxy in dual-stack IPv4-primary cluster",
+			name: "LocalModeNodeCIDR, IPv6-primary kube-proxy / IPv4-primary config",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "10.0.0.0/14,2002:0:0:1234::/64",
@@ -223,7 +223,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:     proxyutil.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"),
 		},
 		{
-			name:         "LocalModeNodeCIDR, no PodCIDRs",
+			name: "LocalModeNodeCIDR, no PodCIDRs",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "",
@@ -234,7 +234,7 @@ func Test_getLocalDetector(t *testing.T) {
 		},
 		// unknown mode
 		{
-			name:     "unknown LocalMode",
+			name: "unknown LocalMode",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalMode("abcd"),
 				ClusterCIDR:     "10.0.0.0/14",
@@ -301,7 +301,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 	}{
 		// LocalModeClusterCIDR
 		{
-			name:   "LocalModeClusterCIDR, dual-stack IPv4-primary cluster",
+			name: "LocalModeClusterCIDR, dual-stack IPv4-primary cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "10.0.0.0/14,2002:0:0:1234::/64",
@@ -312,7 +312,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeClusterCIDR, dual-stack IPv6-primary cluster",
+			name: "LocalModeClusterCIDR, dual-stack IPv6-primary cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64,10.0.0.0/14",
@@ -323,7 +323,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeClusterCIDR, single-stack IPv4 cluster",
+			name: "LocalModeClusterCIDR, single-stack IPv4 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "10.0.0.0/14",
@@ -334,7 +334,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeClusterCIDR, single-stack IPv6 cluster",
+			name: "LocalModeClusterCIDR, single-stack IPv6 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64",
@@ -345,7 +345,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeClusterCIDR, no ClusterCIDR",
+			name: "LocalModeClusterCIDR, no ClusterCIDR",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
 				ClusterCIDR:     "",
@@ -357,7 +357,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 		},
 		// LocalModeNodeCIDR
 		{
-			name:   "LocalModeNodeCIDR, dual-stack IPv4-primary cluster",
+			name: "LocalModeNodeCIDR, dual-stack IPv4-primary cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "10.0.0.0/14,2002:0:0:1234::/64",
@@ -369,7 +369,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeNodeCIDR, dual-stack IPv6-primary cluster",
+			name: "LocalModeNodeCIDR, dual-stack IPv6-primary cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64,10.0.0.0/14",
@@ -381,7 +381,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeNodeCIDR, single-stack IPv4 cluster",
+			name: "LocalModeNodeCIDR, single-stack IPv4 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "10.0.0.0/14",
@@ -393,7 +393,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeNodeCIDR, single-stack IPv6 cluster",
+			name: "LocalModeNodeCIDR, single-stack IPv6 cluster",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "2002:0:0:1234::/64",
@@ -405,7 +405,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			},
 		},
 		{
-			name:   "LocalModeNodeCIDR, no PodCIDRs",
+			name: "LocalModeNodeCIDR, no PodCIDRs",
 			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
 				ClusterCIDR:     "",
