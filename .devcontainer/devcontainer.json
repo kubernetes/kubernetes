@@ -1,0 +1,27 @@
+// For format details, see https://containers.dev
+{
+  "name": "Kubernetes environment from dev container",
+  // Image to pull when not building from scratch. See .devcontainer/build/devcontainer.json
+  // and .github/devcontainer-build-and-push.yml for the instructions on how this image is built
+  "image": "registry.k8s.io/build-image/kube-cross:v1.29.0-go1.21.3-bullseye.0",
+  // Setup the go environment and mount into the dev container at the expected location
+  "workspaceFolder": "/go/src/k8s.io/kubernetes",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/go/src/k8s.io/kubernetes,type=bind,consistency=cached",
+  // Ensure that the host machine has enough resources to build and test Kubernetes
+  // "hack/verify-typecheck.sh" test requires more CPUs, ensure you have larger machine type (e.g. 16 cores) to pass this test
+  "hostRequirements": {
+      "cpus": 4
+  },
+  // Copy over welcome message and install pyyaml
+  "onCreateCommand": "bash .devcontainer/setup.sh",
+  // for Kubernetes testing, suppress extraneous forwarding messages
+  "otherPortsAttributes": {
+      "onAutoForward": "silent"
+  },
+  "remoteUser": "root"
+  // Configure tool-specific properties.
+  // "customizations": {
+  // },
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+}

@@ -1,0 +1,20 @@
+👋 Welcome to Kubernetes contribution in a dev container!
+     Works in GitHub Codespaces, VS Code, or in docker using the devcontainer cli
+
+See https://www.kubernetes.dev/docs/onboarding/ for guidance on contributing to Kuberentes
+
+This debian dev container image satisfies https://github.com/kubernetes/community/blob/master/contributors/devel/development.md and includes:
+ - kubernetes/kubernetes repository
+ - Docker
+ - go
+ - kubectl, etcd, kubetest2, and kind
+For details about dev containers and the debian dev container base image see https://containers.dev and https://github.com/devcontainers/images/tree/main/src/base-debian.
+The configuration for the dev container is in the .github/.devcontainer folder. (will be moved to prow)
+🎵 By default in Codespaces this environment uses a 4-core machine. Some tests may require a larger machine. In Codespaces you can change the machine type.
+   See https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace
+
+⚙️ If you are working in Codespaces on your own fork, this environment is automatically configured to support the GitHub
+   workflow https://www.kubernetes.dev/docs/guide/github-workflow/ (omit the clone step)
+↪️ Otherwise Codespaces will automatically fork the repository for you when you make your first push
+
+🔍 To explore VS Code to its fullest, search using the Command Palette (Cmd/Ctrl + Shift + P or F1).
