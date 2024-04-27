@@ -456,7 +456,7 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		go systemnamespaces.NewController(client, c.ControlPlane.Extra.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
+		go systemnamespaces.NewController(c.ControlPlane.SystemNamespaces, client, c.ControlPlane.Extra.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
 		return nil
 	})
 
