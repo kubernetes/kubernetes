@@ -41,6 +41,24 @@ func WithStep(tCtx TContext, what string) TContext {
 	return WithLogger(sCtx, klog.LoggerWithName(sCtx.Logger(), what))
 }
 
+// Step is useful when the context with the step information is
+// used more than once:
+//
+//	ktesting.Step(tCtx, "step 1", func(tCtx ktesting.TContext) {
+//	 tCtx.Log(...)
+//	    if (... ) {
+//	       tCtx.Failf(...)
+//	    }
+//	)}
+//
+// Inside the callback, the tCtx variable is the one where the step
+// has been added. This avoids the need to introduce multiple different
+// context variables and risk of using the wrong one.
+func Step(tCtx TContext, what string, cb func(tCtx TContext)) {
+	tCtx.Helper()
+	cb(WithStep(tCtx, what))
+}
+
 type stepContext struct {
 	TContext
 	what string
