@@ -17,6 +17,7 @@ limitations under the License.
 package retry
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -25,12 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func TestRetryOnConflict(t *testing.T) {
+func TestRetryOnConflictWithContext(t *testing.T) {
+	ctx := context.Background()
 	opts := wait.Backoff{Factor: 1.0, Steps: 3}
 	conflictErr := errors.NewConflict(schema.GroupResource{Resource: "test"}, "other", nil)
 
 	// never returns
-	err := RetryOnConflict(opts, func() error {
+	err := RetryOnConflictWithContext(ctx, opts, func(context.Context) error {
 		return conflictErr
 	})
 	if err != conflictErr {
@@ -39,7 +41,7 @@ func TestRetryOnConflict(t *testing.T) {
 
 	// returns immediately
 	i := 0
-	err = RetryOnConflict(opts, func() error {
+	err = RetryOnConflictWithContext(ctx, opts, func(context.Context) error {
 		i++
 		return nil
 	})
@@ -49,7 +51,7 @@ func TestRetryOnConflict(t *testing.T) {
 
 	// returns immediately on error
 	testErr := fmt.Errorf("some other error")
-	err = RetryOnConflict(opts, func() error {
+	err = RetryOnConflictWithContext(ctx, opts, func(context.Context) error {
 		return testErr
 	})
 	if err != testErr {
@@ -58,7 +60,7 @@ func TestRetryOnConflict(t *testing.T) {
 
 	// keeps retrying
 	i = 0
-	err = RetryOnConflict(opts, func() error {
+	err = RetryOnConflictWithContext(ctx, opts, func(context.Context) error {
 		if i < 2 {
 			i++
 			return errors.NewConflict(schema.GroupResource{Resource: "test"}, "other", nil)
@@ -67,5 +69,23 @@ func TestRetryOnConflict(t *testing.T) {
 	})
 	if err != nil || i != 2 {
 		t.Errorf("unexpected error: %v", err)
+	}
+
+	// returns immediately because the context is canceled.
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	i = 0
+	err = RetryOnConflictWithContext(canceledCtx, opts, func(context.Context) error {
+		if i < 2 {
+			i++
+			return errors.NewConflict(schema.GroupResource{Resource: "test"}, "other", nil)
+		}
+		return nil
+	})
+	if err != context.Canceled {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if i != 0 {
+		t.Errorf("function was executed %d times, but want 0 times", i)
 	}
 }
