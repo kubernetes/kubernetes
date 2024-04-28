@@ -1266,6 +1266,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
+	genericfeatures.PerHandlerReadWriteTimeout: {Default: true, PreRelease: featuregate.Beta},
+
 	genericfeatures.RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	genericfeatures.SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},

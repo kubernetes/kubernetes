@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/warning"
@@ -473,8 +474,11 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		{"/debug/flags/"},
 		{"/version"},
 	} {
-		resp := httptest.NewRecorder()
+		// TODO: remove WithFakeResponseController once
+		//  https://github.com/golang/go/issues/60229 is fixed.
+		resp := responsewritertesting.WithFakeResponseController(httptest.NewRecorder())
 		req, _ := http.NewRequest("GET", test.route, nil)
+
 		s.Handler.ServeHTTP(resp, req)
 		if resp.Code != 200 {
 			t.Errorf("route %q expected to work: code %d", test.route, resp.Code)

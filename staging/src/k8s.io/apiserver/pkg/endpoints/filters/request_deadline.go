@@ -32,6 +32,8 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -48,14 +50,28 @@ const (
 // requestTimeoutMaximum specifies the default request timeout value.
 func WithRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEvaluator, longRunning request.LongRunningRequestCheck,
 	negotiatedSerializer runtime.NegotiatedSerializer, requestTimeoutMaximum time.Duration) http.Handler {
-	return withRequestDeadline(handler, sink, policy, longRunning, negotiatedSerializer, requestTimeoutMaximum, clock.RealClock{})
+	return withRequestDeadline(handler, sink, policy, longRunning, negotiatedSerializer, requestTimeoutMaximum, clock.RealClock{}, newTimeoutTracker())
+}
+
+type RequestData struct {
+	StartedAt      time.Time
+	DeadlineAt     time.Time
+	RequestURI     string
+	RequestAuditID string
+	HandlerDoneCh  <-chan struct{}
+}
+
+type TimeoutTracker interface {
+	Enter(key *http.Request, data *RequestData)
 }
 
 func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEvaluator, longRunning request.LongRunningRequestCheck,
-	negotiatedSerializer runtime.NegotiatedSerializer, requestTimeoutMaximum time.Duration, clock clock.PassiveClock) http.Handler {
+	negotiatedSerializer runtime.NegotiatedSerializer, requestTimeoutMaximum time.Duration, clock clock.PassiveClock, tracker TimeoutTracker) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx := req.Context()
+		handlerDoneCh := make(chan struct{})
+		defer close(handlerDoneCh)
 
+		ctx := req.Context()
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {
 			handleError(w, req, http.StatusInternalServerError, nil, "no RequestInfo found in context, handler chain must be wrong")
@@ -93,9 +109,38 @@ func withRequestDeadline(handler http.Handler, sink audit.Sink, policy audit.Pol
 			started = requestStartedTimestamp
 		}
 
-		ctx, cancel := context.WithDeadline(ctx, started.Add(timeout))
+		deadline := started.Add(timeout)
+		ctx, cancel := context.WithDeadline(ctx, deadline)
 		defer cancel()
 
+		var stopFn func() bool
+		data := &RequestData{StartedAt: started, DeadlineAt: deadline, RequestURI: req.RequestURI, RequestAuditID: "", HandlerDoneCh: handlerDoneCh}
+		if utilfeature.DefaultFeatureGate.Enabled(features.PerHandlerReadWriteTimeout) {
+			// per handler read and write timeout deadline,
+			// they are set to the overall request timeout.
+			ctrl := http.NewResponseController(w)
+			// TODO: once https://github.com/golang/go/issues/58237
+			// is fixed, we can remove the content length check
+			if req.ContentLength != 0 {
+				if err := ctrl.SetReadDeadline(deadline); err != nil {
+					handleError(w, req, http.StatusInternalServerError, nil, "failed to set request read deadline")
+					return
+				}
+			}
+			if err := ctrl.SetWriteDeadline(deadline); err != nil {
+				handleError(w, req, http.StatusInternalServerError, nil, "failed to set request write deadline")
+				return
+			}
+
+			stopFn = context.AfterFunc(ctx, func() {
+				// this executes in a separate goroutine
+				tracker.Enter(req, data)
+			})
+		}
+
+		if stopFn != nil {
+			defer stopFn()
+		}
 		req = req.WithContext(ctx)
 		handler.ServeHTTP(w, req)
 	})
@@ -174,4 +219,26 @@ func parseTimeout(req *http.Request) (time.Duration, bool, error) {
 func handleError(w http.ResponseWriter, r *http.Request, code int, innerErr error, msg string) {
 	http.Error(w, msg, code)
 	klog.ErrorSDepth(1, innerErr, msg, "method", r.Method, "URI", r.RequestURI, "auditID", audit.GetAuditIDTruncated(r.Context()))
+}
+
+func newTimeoutTracker() *tracker {
+	return &tracker{}
+}
+
+type tracker struct {
+	timedout []*RequestData
+}
+
+func (t *tracker) Enter(key *http.Request, data *RequestData) {
+	t.timedout = append(t.timedout, data)
+}
+
+func (t *tracker) Sweep() {
+	for i, data := range t.timedout {
+		select {
+		case <-data.HandlerDoneCh:
+			t.timedout = append(t.timedout[0:i], t.timedout[i+1:len(t.timedout)]...)
+		default:
+		}
+	}
 }

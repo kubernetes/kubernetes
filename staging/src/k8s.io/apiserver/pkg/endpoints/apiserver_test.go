@@ -72,8 +72,12 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 type alwaysMutatingDeny struct{}
@@ -3884,7 +3888,9 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	}
 }
 
-func TestCreateTimeout(t *testing.T) {
+func TestCreateTimeoutWithPerHandlerTimeoutDisabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, false)()
+
 	testOver := make(chan struct{})
 	defer close(testOver)
 	storage := SimpleRESTStorage{
@@ -3908,6 +3914,45 @@ func TestCreateTimeout(t *testing.T) {
 	itemOut := expectAPIStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
+	}
+}
+
+func TestCreateTimeoutWithPerHandlerTimeoutEnabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, true)()
+
+	testOver := make(chan struct{})
+	defer close(testOver)
+	storage := SimpleRESTStorage{
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+			// Eliminate flakes by ensuring the create operation takes longer than this test.
+			<-testOver
+			return obj, nil
+		},
+	}
+	handler := handle(map[string]rest.Storage{
+		"foo": &storage,
+	})
+	server := httptest.NewUnstartedServer(handler)
+	server.EnableHTTP2 = true
+	defer server.Close()
+	server.StartTLS()
+
+	simple := &genericapitesting.Simple{Other: "foo"}
+	data, err := runtime.Encode(testCodec, simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	method := "POST"
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo?timeout=4ms"
+	client := server.Client()
+	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
+	if err != nil {
+		t.Fatalf("unexpected error %#v", err)
+	}
+
+	if _, err := client.Do(request); !responsewritertesting.IsStreamReadOrWriteTimeout(err) {
+		t.Errorf("expected a stream reset error for (%s %s):, but got %v", method, url, err)
 	}
 }
 
