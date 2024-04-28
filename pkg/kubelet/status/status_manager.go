@@ -76,9 +76,9 @@ type manager struct {
 	podStatusesLock  sync.RWMutex
 	podStatusChannel chan struct{}
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
-	// apiStatusVersions must only be accessed from the sync thread.
-	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
-	podDeletionSafety PodDeletionSafetyProvider
+	apiStatusVersions     map[kubetypes.MirrorPodUID]uint64
+	apiStatusVersionsLock sync.RWMutex
+	podDeletionSafety     PodDeletionSafetyProvider
 
 	podStartupLatencyHelper PodStartupLatencyStateHelper
 	// state allows to save/restore pod resource allocation and tolerate kubelet restarts.
@@ -761,6 +761,40 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 	}
 }
 
+// deleteApiStatusVersion removes API status version associated with the specified Mirror Pod UID in a thread-safe manner.
+func (m *manager) deleteApiStatusVersion(uid kubetypes.MirrorPodUID) {
+	m.apiStatusVersionsLock.Lock()
+	defer m.apiStatusVersionsLock.Unlock()
+	delete(m.apiStatusVersions, uid)
+}
+
+// getApiStatusVersion retrieves the API status version for a given Mirror Pod UID in a thread-safe read operation.
+func (m *manager) getApiStatusVersion(uid kubetypes.MirrorPodUID) (version uint64, ok bool) {
+	m.apiStatusVersionsLock.RLock()
+	defer m.apiStatusVersionsLock.RUnlock()
+	version, ok = m.apiStatusVersions[uid]
+	if ok {
+		return version, ok
+	}
+	return 0, false
+}
+
+// setApiStatusVersion sets the version information for the specified uid
+func (m *manager) setApiStatusVersion(uid kubetypes.MirrorPodUID, version uint64) {
+	m.apiStatusVersionsLock.Lock()
+	defer m.apiStatusVersionsLock.Unlock()
+	m.apiStatusVersions[uid] = version
+}
+
+// setApiStatusVersions batch updates multiple API status versions concurrently in a thread-safe manner.
+func (m *manager) setApiStatusVersions(statusVersions map[kubetypes.MirrorPodUID]uint64) {
+	m.apiStatusVersionsLock.Lock()
+	defer m.apiStatusVersionsLock.Unlock()
+	for uid, version := range statusVersions {
+		m.apiStatusVersions[uid] = version
+	}
+}
+
 // syncBatch syncs pods statuses with the apiserver. Returns the number of syncs
 // attempted for testing.
 func (m *manager) syncBatch(all bool) int {
@@ -782,7 +816,7 @@ func (m *manager) syncBatch(all bool) int {
 				_, hasPod := m.podStatuses[types.UID(uid)]
 				_, hasMirror := mirrorToPod[uid]
 				if !hasPod && !hasMirror {
-					delete(m.apiStatusVersions, uid)
+					m.deleteApiStatusVersion(uid)
 				}
 			}
 		}
@@ -806,7 +840,8 @@ func (m *manager) syncBatch(all bool) int {
 			// if a new status update has been delivered, trigger an update, otherwise the
 			// pod can wait for the next bulk check (which performs reconciliation as well)
 			if !all {
-				if m.apiStatusVersions[uidOfStatus] >= status.version {
+				statusVersion, _ := m.getApiStatusVersion(uidOfStatus)
+				if statusVersion >= status.version {
 					continue
 				}
 				updatedStatuses = append(updatedStatuses, podSync{uid, uidOfStatus, status})
@@ -823,16 +858,22 @@ func (m *manager) syncBatch(all bool) int {
 				// In most cases the deleted apiStatusVersions here should be filled
 				// soon after the following syncPod() [If the syncPod() sync an update
 				// successfully].
-				delete(m.apiStatusVersions, uidOfStatus)
+				m.deleteApiStatusVersion(uidOfStatus)
 				updatedStatuses = append(updatedStatuses, podSync{uid, uidOfStatus, status})
 			}
 		}
 	}()
 
+	wg := sync.WaitGroup{}
+	wg.Add(len(updatedStatuses))
 	for _, update := range updatedStatuses {
 		klog.V(5).InfoS("Sync pod status", "podUID", update.podUID, "statusUID", update.statusUID, "version", update.status.version)
-		m.syncPod(update.podUID, update.status)
+		go func() {
+			defer wg.Done()
+			m.syncPod(update.podUID, update.status)
+		}()
 	}
+	wg.Wait()
 
 	return len(updatedStatuses)
 }
@@ -894,7 +935,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		metrics.PodStatusSyncDuration.Observe(duration.Seconds())
 	}
 
-	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
+	m.setApiStatusVersion(kubetypes.MirrorPodUID(pod.UID), status.version)
 
 	// We don't handle graceful deletion of mirror pods.
 	if m.canBeDeleted(pod, status.status, status.podIsFinished) {
@@ -917,7 +958,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 // needsUpdate returns whether the status is stale for the given pod UID.
 // This method is not thread safe, and must only be accessed by the sync thread.
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
-	latest, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(uid)]
+	latest, ok := m.getApiStatusVersion(kubetypes.MirrorPodUID(uid))
 	if !ok || latest < status.version {
 		return true
 	}
