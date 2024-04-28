@@ -284,3 +284,56 @@ func TestSyncTerminatingPod(t *testing.T) {
 		})
 	}
 }
+
+func TestSyncTerminatingPod_PendingPod(t *testing.T) {
+	ctx := context.Background()
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "foo1",
+					Image: "non-existing",
+				},
+				{
+					Name:  "foo2",
+					Image: "non-existing",
+				},
+			},
+			TerminationGracePeriodSeconds: ptr.To(int64(30)),
+		},
+	}
+
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	sandbox := makeFakePodSandbox(t, m, sandboxTemplate{
+		pod:       pod,
+		createdAt: fakeCreatedAt,
+		state:     runtimeapi.PodSandboxState_SANDBOX_READY,
+	})
+	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox})
+
+	stopped, err := m.SyncTerminatingPod(ctx, pod, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		// Assume the containers could not be created
+		ContainerStatuses: []*kubecontainer.Status{},
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+			&sandbox.PodSandboxStatus,
+		},
+	}, nil, []v1.Secret{}, flowcontrol.NewBackOff(time.Second, time.Minute), true)
+	assert.NoError(t, err)
+	assert.True(t, stopped)
+
+	t.Log("Check all sandboxes are stopped")
+	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
+	for _, sandbox := range fakeRuntime.Sandboxes {
+		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.State)
+	}
+}
