@@ -162,17 +162,15 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.KubeProxyConfiguration, dualStack, initOnly bool) (proxy.Provider, error) {
 	logger := klog.FromContext(ctx)
 	var proxier proxy.Provider
-	var localDetectors [2]proxyutil.LocalTrafficDetector
-	var localDetector proxyutil.LocalTrafficDetector
 	var err error
+
+	localDetectors := getLocalDetectors(logger, s.PrimaryIPFamily, config, s.podCIDRs)
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
 		logger.Info("Using iptables Proxier")
 
 		if dualStack {
 			ipt, _ := getIPTables(s.PrimaryIPFamily)
-
-			localDetectors = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewDualStackProxier(
@@ -196,7 +194,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
 			_, iptInterface := getIPTables(s.PrimaryIPFamily)
-			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
@@ -210,7 +207,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.IPTables.MasqueradeAll,
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
-				localDetector,
+				localDetectors[s.PrimaryIPFamily],
 				s.Hostname,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
@@ -234,10 +231,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		logger.Info("Using ipvs Proxier")
 		if dualStack {
 			ipt, _ := getIPTables(s.PrimaryIPFamily)
-
-			// Always ordered to match []ipt
-			localDetectors = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
-
 			proxier, err = ipvs.NewDualStackProxier(
 				ctx,
 				ipt,
@@ -265,8 +258,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			)
 		} else {
 			_, iptInterface := getIPTables(s.PrimaryIPFamily)
-			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
-
 			proxier, err = ipvs.NewProxier(
 				ctx,
 				s.PrimaryIPFamily,
@@ -284,7 +275,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.IPVS.UDPTimeout.Duration,
 				config.IPTables.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
-				localDetector,
+				localDetectors[s.PrimaryIPFamily],
 				s.Hostname,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
@@ -301,8 +292,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		logger.Info("Using nftables Proxier")
 
 		if dualStack {
-			localDetectors = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
-
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewDualStackProxier(
 				ctx,
@@ -321,8 +310,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack
-			localDetector = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
-
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewProxier(
 				ctx,
@@ -332,7 +319,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.NFTables.MinSyncPeriod.Duration,
 				config.NFTables.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
-				localDetector,
+				localDetectors[s.PrimaryIPFamily],
 				s.Hostname,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
@@ -484,48 +471,45 @@ func detectNumCPU() int {
 	return numCPU
 }
 
-func getLocalDetector(logger klog.Logger, ipFamily v1.IPFamily, mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) proxyutil.LocalTrafficDetector {
-	switch mode {
+func getLocalDetectors(logger klog.Logger, primaryIPFamily v1.IPFamily, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) map[v1.IPFamily]proxyutil.LocalTrafficDetector {
+	localDetectors := map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+		v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+		v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
+	}
+
+	switch config.DetectLocalMode {
 	case proxyconfigapi.LocalModeClusterCIDR:
-		// LocalModeClusterCIDR is the default if --detect-local-mode wasn't passed,
-		// but --cluster-cidr is optional.
-		clusterCIDRs := strings.TrimSpace(config.ClusterCIDR)
-		if len(clusterCIDRs) == 0 {
-			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR defined")
-			break
+		clusterCIDRs := strings.Split(strings.TrimSpace(config.ClusterCIDR), ",")
+		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(clusterCIDRs) {
+			localDetectors[family] = proxyutil.NewDetectLocalByCIDR(cidrs[0].String())
 		}
-
-		cidrsByFamily := proxyutil.MapCIDRsByIPFamily(strings.Split(clusterCIDRs, ","))
-		if len(cidrsByFamily[ipFamily]) != 0 {
-			return proxyutil.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0].String())
+		if !localDetectors[primaryIPFamily].IsImplemented() {
+			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR specified for primary IP family", "ipFamily", primaryIPFamily, "clusterCIDR", config.ClusterCIDR)
 		}
-
-		logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR for family", "ipFamily", ipFamily)
 
 	case proxyconfigapi.LocalModeNodeCIDR:
-		cidrsByFamily := proxyutil.MapCIDRsByIPFamily(nodePodCIDRs)
-		if len(cidrsByFamily[ipFamily]) != 0 {
-			return proxyutil.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0].String())
+		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(nodePodCIDRs) {
+			localDetectors[family] = proxyutil.NewDetectLocalByCIDR(cidrs[0].String())
+		}
+		if !localDetectors[primaryIPFamily].IsImplemented() {
+			logger.Info("Detect-local-mode set to NodeCIDR, but no PodCIDR defined at node for primary IP family", "ipFamily", primaryIPFamily, "podCIDRs", nodePodCIDRs)
 		}
 
-		logger.Info("Detect-local-mode set to NodeCIDR, but no PodCIDR defined at node for family", "ipFamily", ipFamily)
-
 	case proxyconfigapi.LocalModeBridgeInterface:
-		return proxyutil.NewDetectLocalByBridgeInterface(config.DetectLocal.BridgeInterface)
+		localDetector := proxyutil.NewDetectLocalByBridgeInterface(config.DetectLocal.BridgeInterface)
+		localDetectors[v1.IPv4Protocol] = localDetector
+		localDetectors[v1.IPv6Protocol] = localDetector
 
 	case proxyconfigapi.LocalModeInterfaceNamePrefix:
-		return proxyutil.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
+		localDetector := proxyutil.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
+		localDetectors[v1.IPv4Protocol] = localDetector
+		localDetectors[v1.IPv6Protocol] = localDetector
+
+	default:
+		logger.Info("Defaulting to no-op detect-local")
 	}
 
-	logger.Info("Defaulting to no-op detect-local")
-	return proxyutil.NewNoOpLocalDetector()
-}
-
-func getDualStackLocalDetectorTuple(logger klog.Logger, mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) [2]proxyutil.LocalTrafficDetector {
-	return [2]proxyutil.LocalTrafficDetector{
-		getLocalDetector(logger, v1.IPv4Protocol, mode, config, nodePodCIDRs),
-		getLocalDetector(logger, v1.IPv6Protocol, mode, config, nodePodCIDRs),
-	}
+	return localDetectors
 }
 
 // platformCleanup removes stale kube-proxy rules that can be safely removed. If
