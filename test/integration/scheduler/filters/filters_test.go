@@ -42,6 +42,7 @@ var (
 	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
 	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
 	createNode                   = testutils.CreateNode
+	updateNode                   = testutils.UpdateNode
 	createPausePod               = testutils.CreatePausePod
 	deletePod                    = testutils.DeletePod
 	getPod                       = testutils.GetPod
@@ -1754,6 +1755,111 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				return deletePod(cs, "pod-to-be-deleted", ns)
 			},
 			enableReadWriteOncePod: true,
+		},
+		{
+			name: "pod with pvc has node-affinity to non-existent/illegal nodes",
+			init: func(cs kubernetes.Interface, ns string) error {
+				storage := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+				volType := v1.HostPathDirectoryOrCreate
+				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+					Name("pv-has-non-existent-nodes").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(storage.Requests).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					NodeAffinityIn("kubernetes.io/hostname", []string{"node-available", "non-existing"}). // one node exist, one doesn't
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pv: %w", err)
+				}
+				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+					Name("pvc-has-non-existent-nodes").
+					Namespace(ns).
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName(pv.Name).
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(storage).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pvc: %w", err)
+				}
+				return nil
+			},
+			pod: &testutils.PausePodConfig{
+				Name: "pod-with-pvc-has-non-existent-nodes",
+				Volumes: []v1.Volume{{
+					Name: "volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-has-non-existent-nodes",
+						},
+					},
+				}},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				_, err := createNode(cs, st.MakeNode().Label("kubernetes.io/hostname", "node-available").Name("node-available").Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create node: %w", err)
+				}
+				return nil
+			},
+		},
+		{
+			name: "pod with pvc got scheduled after node updated it's label",
+			init: func(cs kubernetes.Interface, ns string) error {
+				_, err := createNode(cs, st.MakeNode().Label("foo", "foo").Name("node-foo").Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create node: %w", err)
+				}
+				storage := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+				volType := v1.HostPathDirectoryOrCreate
+				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+					Name("pv-foo").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(storage.Requests).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					NodeAffinityIn("foo", []string{"bar"}).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pv: %w", err)
+				}
+				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+					Name("pvc-foo").
+					Namespace(ns).
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName(pv.Name).
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(storage).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pvc: %w", err)
+				}
+				return nil
+			},
+			pod: &testutils.PausePodConfig{
+				Name: "pod-with-pvc-foo",
+				Volumes: []v1.Volume{{
+					Name: "volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-foo",
+						},
+					},
+				}},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				_, err := updateNode(cs, &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-foo",
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				})
+				if err != nil {
+					return fmt.Errorf("cannot update node: %w", err)
+				}
+				return nil
+			},
 		},
 	}
 	for _, tt := range tests {

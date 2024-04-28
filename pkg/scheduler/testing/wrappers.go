@@ -845,6 +845,20 @@ func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSou
 	return p
 }
 
+// NodeAffinityIn creates a HARD node affinity (with the operator In)
+// and injects into the pv.
+func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *PersistentVolumeWrapper {
+	if p.Spec.NodeAffinity == nil {
+		p.Spec.NodeAffinity = &v1.VolumeNodeAffinity{}
+	}
+	if p.Spec.NodeAffinity.Required == nil {
+		p.Spec.NodeAffinity.Required = &v1.NodeSelector{}
+	}
+	nodeSelector := MakeNodeSelector().In(key, vals).Obj()
+	p.Spec.NodeAffinity.Required.NodeSelectorTerms = append(p.Spec.NodeAffinity.Required.NodeSelectorTerms, nodeSelector.NodeSelectorTerms...)
+	return p
+}
+
 // ResourceClaimWrapper wraps a ResourceClaim inside.
 type ResourceClaimWrapper struct{ resourcev1alpha2.ResourceClaim }
 
