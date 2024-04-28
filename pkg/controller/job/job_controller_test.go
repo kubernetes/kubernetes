@@ -5214,22 +5214,22 @@ func TestAddPod(t *testing.T) {
 	jm.addPod(logger, pod1)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done := jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(job1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
 	jm.addPod(logger, pod2)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done = jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(job2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -5290,11 +5290,11 @@ func TestUpdatePod(t *testing.T) {
 	jm.updatePod(logger, &prev, pod1)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done := jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(job1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
@@ -5303,11 +5303,11 @@ func TestUpdatePod(t *testing.T) {
 	jm.updatePod(logger, &prev, pod2)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done = jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(job2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -5420,22 +5420,22 @@ func TestDeletePod(t *testing.T) {
 	jm.deletePod(logger, pod1, true)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done := jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(job1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
 	jm.deletePod(logger, pod2, true)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done = jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(job2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -5725,23 +5725,23 @@ func TestJobApiBackoffReset(t *testing.T) {
 	verifyEmptyQueue(ctx, t, manager)
 }
 
-var _ workqueue.RateLimitingInterface = &fakeRateLimitingQueue{}
+var _ workqueue.TypedRateLimitingInterface[string] = &fakeRateLimitingQueue{}
 
 type fakeRateLimitingQueue struct {
-	workqueue.Interface
+	workqueue.TypedInterface[string]
 	requeues int
-	item     interface{}
+	item     string
 	duration time.Duration
 }
 
-func (f *fakeRateLimitingQueue) AddRateLimited(item interface{}) {}
-func (f *fakeRateLimitingQueue) Forget(item interface{}) {
+func (f *fakeRateLimitingQueue) AddRateLimited(item string) {}
+func (f *fakeRateLimitingQueue) Forget(item string) {
 	f.requeues = 0
 }
-func (f *fakeRateLimitingQueue) NumRequeues(item interface{}) int {
+func (f *fakeRateLimitingQueue) NumRequeues(item string) int {
 	return f.requeues
 }
-func (f *fakeRateLimitingQueue) AddAfter(item interface{}, duration time.Duration) {
+func (f *fakeRateLimitingQueue) AddAfter(item string, duration time.Duration) {
 	f.item = item
 	f.duration = duration
 }

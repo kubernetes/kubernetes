@@ -45,14 +45,17 @@ type Controller struct {
 	pvLister       corelisters.PersistentVolumeLister
 	pvListerSynced cache.InformerSynced
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewPVProtectionController returns a new *Controller.
 func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
 		client: cl,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvprotection"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvprotection"},
+		),
 	}
 
 	e.pvLister = pvInformer.Lister()
@@ -102,7 +105,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer c.queue.Done(pvKey)
 
-	pvName := pvKey.(string)
+	pvName := pvKey
 
 	err := c.processPV(ctx, pvName)
 	if err == nil {

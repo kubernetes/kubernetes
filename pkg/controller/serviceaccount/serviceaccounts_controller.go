@@ -65,7 +65,10 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 	e := &ServiceAccountsController{
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
-		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "serviceaccount"},
+		),
 	}
 
 	saHandler, _ := saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -100,7 +103,7 @@ type ServiceAccountsController struct {
 	nsLister       corelisters.NamespaceLister
 	nsListerSynced cache.InformerSynced
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
@@ -165,7 +168,7 @@ func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) boo
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncHandler(ctx, key.(string))
+	err := c.syncHandler(ctx, key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

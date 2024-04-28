@@ -188,8 +188,8 @@ type PersistentVolumeController struct {
 	// version errors in API server and other checks in this controller),
 	// however overall speed of multi-worker controller would be lower than if
 	// it runs single thread only.
-	claimQueue  *workqueue.Type
-	volumeQueue *workqueue.Type
+	claimQueue  *workqueue.Typed[string]
+	volumeQueue *workqueue.Typed[string]
 
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap

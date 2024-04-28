@@ -198,7 +198,7 @@ func makePod(name string, nodeName string, phase v1.PodPhase) *v1.Pod {
 	}
 }
 
-func waitForAdded(q workqueue.DelayingInterface, depth int) error {
+func waitForAdded(q workqueue.TypedDelayingInterface[string], depth int) error {
 	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 		if q.Len() == depth {
 			return true, nil
@@ -380,7 +380,7 @@ func TestGCOrphaned(t *testing.T) {
 			// Overwrite queue
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			gcc.nodeQueue.ShutDown()
-			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
+			gcc.nodeQueue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{Clock: fakeClock, Name: "podgc_test_queue"})
 
 			// First GC of orphaned pods
 			gcc.gc(ctx)

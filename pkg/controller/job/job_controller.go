@@ -109,10 +109,10 @@ type Controller struct {
 	podStore corelisters.PodLister
 
 	// Jobs that need to be updated
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// Orphan deleted pods that still have a Job tracking finalizer to be removed
-	orphanQueue workqueue.RateLimitingInterface
+	orphanQueue workqueue.TypedRateLimitingInterface[string]
 
 	broadcaster record.EventBroadcaster
 	recorder    record.EventRecorder
@@ -159,8 +159,8 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 		},
 		expectations:          controller.NewControllerExpectations(),
 		finalizerExpectations: newUIDTrackingExpectations(),
-		queue:                 workqueue.NewRateLimitingQueueWithConfig(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.RateLimitingQueueConfig{Name: "job", Clock: clock}),
-		orphanQueue:           workqueue.NewRateLimitingQueueWithConfig(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.RateLimitingQueueConfig{Name: "job_orphan_pod", Clock: clock}),
+		queue:                 workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job", Clock: clock}),
+		orphanQueue:           workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job_orphan_pod", Clock: clock}),
 		broadcaster:           eventBroadcaster,
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		clock:                 clock,
@@ -590,7 +590,7 @@ func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer jm.queue.Done(key)
 
-	err := jm.syncHandler(ctx, key.(string))
+	err := jm.syncHandler(ctx, key)
 	if err == nil {
 		jm.queue.Forget(key)
 		return true
@@ -613,7 +613,7 @@ func (jm *Controller) processNextOrphanPod(ctx context.Context) bool {
 		return false
 	}
 	defer jm.orphanQueue.Done(key)
-	err := jm.syncOrphanPod(ctx, key.(string))
+	err := jm.syncOrphanPod(ctx, key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing orphan pod: %v", err))
 		jm.orphanQueue.AddRateLimited(key)

@@ -56,7 +56,7 @@ type nodeResourcesController struct {
 	kubeClient kubernetes.Interface
 	getNode    func() (*v1.Node, error)
 	wg         sync.WaitGroup
-	queue      workqueue.RateLimitingInterface
+	queue      workqueue.TypedRateLimitingInterface[string]
 	sliceStore cache.Store
 
 	mutex         sync.RWMutex
@@ -96,10 +96,13 @@ func startNodeResourcesController(ctx context.Context, kubeClient kubernetes.Int
 	ctx = klog.NewContext(ctx, logger)
 
 	c := &nodeResourcesController{
-		ctx:           ctx,
-		kubeClient:    kubeClient,
-		getNode:       getNode,
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node_resource_slices"),
+		ctx:        ctx,
+		kubeClient: kubeClient,
+		getNode:    getNode,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
+		),
 		activePlugins: make(map[string]*activePlugin),
 	}
 
@@ -347,7 +350,7 @@ func (c *nodeResourcesController) processNextWorkItem(ctx context.Context) bool 
 	}
 	defer c.queue.Done(key)
 
-	driverName := key.(string)
+	driverName := key
 
 	// Panics are caught and treated like errors.
 	var err error
