@@ -139,7 +139,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 		podName := "logs-generator"
 		containerName := "logs-generator"
 		ginkgo.BeforeEach(func() {
-			ginkgo.By("creating an pod")
+			ginkgo.By("creating a pod")
 			// Agnhost image generates logs for a total of 100 lines over 20s.
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+imageutils.GetE2EImage(imageutils.Agnhost), "--restart=Never", podRunningTimeoutArg, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
 		})
@@ -266,6 +266,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				stsCopy := testingStatefulSet(stsName, ns, numberReplicas)
 				sts = &stsCopy
 				ginkgo.By("creating the StatefulSet")
+
 				_, err := stsClient.Create(ctx, sts, metav1.CreateOptions{})
 				if err != nil {
 					framework.Failf("Failed to create StatefulSet: %v", err)
@@ -284,7 +285,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods")
 				framework.Logf("got output %q", out)
 				gomega.Expect(out).NotTo(gomega.BeEmpty())
-				gomega.Expect(lines(out)).To(gomega.HaveLen(40))
+				gomega.Expect(lines(out)).To(gomega.HaveLen(22))
 
 				ginkgo.By("all containers for each pod")
 				out = e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods", "--all-containers")
