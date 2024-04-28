@@ -1111,7 +1111,6 @@ func initPVController(t *testing.T, testCtx *testutil.TestContext, provisionDela
 		// https://github.com/kubernetes/kubernetes/issues/85320
 		SyncPeriod:                5 * time.Second,
 		VolumePlugins:             plugins,
-		Cloud:                     nil,
 		ClusterName:               "volume-test-cluster",
 		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),

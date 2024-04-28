@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	fakecloud "k8s.io/cloud-provider/fake"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -348,7 +347,6 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		Detachers:              nil,
 	}
 	plugins := []volume.VolumePlugin{plugin}
-	cloud := &fakecloud.Cloud{}
 	informers := clientgoinformers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		ctx,
@@ -360,7 +358,6 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		informers.Storage().V1().CSINodes(),
 		informers.Storage().V1().CSIDrivers(),
 		informers.Storage().V1().VolumeAttachments(),
-		cloud,
 		plugins,
 		nil, /* prober */
 		false,
@@ -379,7 +376,6 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		KubeClient:                testClient,
 		SyncPeriod:                controllerOptions.PVClaimBinderSyncPeriod,
 		VolumePlugins:             plugins,
-		Cloud:                     nil,
 		ClusterName:               "volume-test-cluster",
 		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
