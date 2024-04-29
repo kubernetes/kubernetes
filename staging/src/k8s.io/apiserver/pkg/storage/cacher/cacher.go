@@ -532,9 +532,18 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	readyGeneration, err := c.ready.waitAndReadGeneration(ctx)
-	if err != nil {
-		return nil, errors.NewServiceUnavailable(err.Error())
+	var readyGeneration int
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		var ok bool
+		readyGeneration, ok = c.ready.checkAndReadGeneration()
+		if !ok {
+			return nil, errors.NewTooManyRequests("storage is (re)initializing", 1)
+		}
+	} else {
+		readyGeneration, err = c.ready.waitAndReadGeneration(ctx)
+		if err != nil {
+			return nil, errors.NewServiceUnavailable(err.Error())
+		}
 	}
 
 	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
@@ -676,6 +685,14 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		if !c.ready.check() {
+			// If Cache is not initialized, delegate Get requests to storage
+			// as described in https://kep.k8s.io/4568
+			return c.storage.Get(ctx, key, opts, objPtr)
+		}
+	}
+
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
@@ -684,16 +701,18 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return err
 	}
 
-	if getRV == 0 && !c.ready.check() {
-		// If Cacher is not yet initialized and we don't require any specific
-		// minimal resource version, simply forward the request to storage.
-		return c.storage.Get(ctx, key, opts, objPtr)
-	}
-
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
-	if err := c.ready.wait(ctx); err != nil {
-		return errors.NewServiceUnavailable(err.Error())
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		if getRV == 0 && !c.ready.check() {
+			// If Cacher is not yet initialized and we don't require any specific
+			// minimal resource version, simply forward the request to storage.
+			return c.storage.Get(ctx, key, opts, objPtr)
+		}
+		if err := c.ready.wait(ctx); err != nil {
+			return errors.NewServiceUnavailable(err.Error())
+		}
 	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
@@ -743,6 +762,14 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	return consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
 }
 
+func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
+	pred := opts.Predicate
+	noLabelSelector := pred.Label == nil || pred.Label.Empty()
+	noFieldSelector := pred.Field == nil || pred.Field.Empty()
+	hasLimit := pred.Limit > 0
+	return noLabelSelector && noFieldSelector && hasLimit
+}
+
 func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
@@ -770,10 +797,19 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if err != nil {
 		return err
 	}
-	if listRV == 0 && !c.ready.check() {
-		// If Cacher is not yet initialized and we don't require any specific
-		// minimal resource version, simply forward the request to storage.
-		return c.storage.GetList(ctx, key, opts, listObj)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		if !c.ready.check() && shouldDelegateListOnNotReadyCache(opts) {
+			// If Cacher is not initialized, delegate List requests to storage
+			// as described in https://kep.k8s.io/4568
+			return c.storage.GetList(ctx, key, opts, listObj)
+		}
+	} else {
+		if listRV == 0 && !c.ready.check() {
+			// If Cacher is not yet initialized and we don't require any specific
+			// minimal resource version, simply forward the request to storage.
+			return c.storage.GetList(ctx, key, opts, listObj)
+		}
 	}
 	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 	if resourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported {
@@ -788,8 +824,16 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
 
-	if err := c.ready.wait(ctx); err != nil {
-		return errors.NewServiceUnavailable(err.Error())
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		if !c.ready.check() {
+			// If Cacher is not initialized, reject List requests
+			// as described in https://kep.k8s.io/4568
+			return errors.NewTooManyRequests("storage is (re)initializing", 1)
+		}
+	} else {
+		if err := c.ready.wait(ctx); err != nil {
+			return errors.NewServiceUnavailable(err.Error())
+		}
 	}
 	span.AddEvent("Ready")
 
