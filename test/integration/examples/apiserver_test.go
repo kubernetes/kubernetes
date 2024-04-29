@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -284,7 +285,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
 	go func() {
-		o := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
+		o := sampleserver.NewWardleServerOptions(utilfeature.DefaultMutableFeatureGate, os.Stdout, os.Stderr)
 		// ensure this is a SAN on the generated cert for service FQDN
 		o.AlternateDNS = []string{
 			"api.kube-wardle.svc",

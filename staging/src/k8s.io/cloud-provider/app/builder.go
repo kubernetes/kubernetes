@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"os"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider/names"
@@ -41,6 +44,7 @@ type CommandBuilder struct {
 	cmdName                        string
 	long                           string
 	defaults                       *options.ProviderDefaults
+	featureGates                   featuregate.MutableFeatureGate
 }
 
 func NewBuilder() *CommandBuilder {
@@ -48,6 +52,7 @@ func NewBuilder() *CommandBuilder {
 	cb.webhookConfigs = make(map[string]WebhookConfig)
 	cb.controllerInitFuncConstructors = make(map[string]ControllerInitFuncConstructor)
 	cb.controllerAliases = make(map[string]string)
+	cb.featureGates = utilfeature.DefaultMutableFeatureGate // this was the old default
 	return &cb
 }
 
@@ -57,6 +62,10 @@ func (cb *CommandBuilder) SetOptions(options *options.CloudControllerManagerOpti
 
 func (cb *CommandBuilder) AddFlags(additionalFlags cliflag.NamedFlagSets) {
 	cb.additionalFlags = additionalFlags
+}
+
+func (cb *CommandBuilder) WithFeatureGates(featureGates featuregate.MutableFeatureGate) {
+	cb.featureGates = featureGates
 }
 
 func (cb *CommandBuilder) RegisterController(name string, constructor ControllerInitFuncConstructor, aliases map[string]string) {
@@ -121,7 +130,7 @@ func (cb *CommandBuilder) setdefaults() {
 	}
 
 	if cb.options == nil {
-		opts, err := options.NewCloudControllerManagerOptionsWithProviderDefaults(*cb.defaults)
+		opts, err := options.NewCloudControllerManagerOptionsWithProviderDefaults(cb.featureGates, *cb.defaults)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to initialize command options: %v\n", err)
 			os.Exit(1)
