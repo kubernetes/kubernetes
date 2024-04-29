@@ -58,11 +58,7 @@ func NewDefinitionsSchemaResolver(getDefinitions common.GetOpenAPIDefinitions, s
 	}
 }
 
-func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.Schema, error) {
-	ref, ok := d.gvkToRef[gvk]
-	if !ok {
-		return nil, fmt.Errorf("cannot resolve %v: %w", gvk, ErrSchemaNotFound)
-	}
+func (d *DefinitionsSchemaResolver) LookupSchema(ref string) (*spec.Schema, error) {
 	s, err := PopulateRefs(func(ref string) (*spec.Schema, bool) {
 		// find the schema by the ref string, and return a deep copy
 		def, ok := d.defs[ref]
@@ -83,11 +79,18 @@ func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (
 				}
 				s.Extensions = extCopy
 				s.AddExtension("x-kubernetes-int-or-string", true)
+
+				// OneOf is not valid in structural schema, so better to avoid it
+				// in favor of the x-kubernetes extension
+				if len(oneOfTypes) == 2 {
+					s.OneOf = nil
+				}
 			}
 		}
 
 		// Native type schemas for now may use unsupported formats that
 		// should be strippe such as int-or-string
+		//!TODO: move this somewhere else like some sort of schema visitor
 		validation.StripUnsupportedFormatsPostProcess(&s)
 		return &s, true
 	}, ref)
@@ -95,6 +98,14 @@ func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (
 		return nil, err
 	}
 	return s, nil
+}
+
+func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.Schema, error) {
+	ref, ok := d.gvkToRef[gvk]
+	if !ok {
+		return nil, fmt.Errorf("cannot resolve %v: %w", gvk, ErrSchemaNotFound)
+	}
+	return d.LookupSchema(ref)
 }
 
 func extensionsToGVKs(extensions spec.Extensions) []schema.GroupVersionKind {
