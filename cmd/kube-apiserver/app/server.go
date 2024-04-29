@@ -56,6 +56,7 @@ import (
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -221,8 +222,29 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("failed to create generic config: %w", err)
 	}
+
+	// generic controlplane admission initializers
+	controlPlaneAdmissionConfig := &controlplaneadmission.Config{
+		ExternalInformers:    versionedInformers,
+		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
+	}
+	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+	pluginInitializers, err := controlPlaneAdmissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+	}
+
+	// additional kube admission initializers
+	kubeAdmissionConfig := &kubeapiserveradmission.Config{
+		CloudConfigFile: opts.CloudProvider.CloudConfigFile,
+	}
+	kubeInitializers, err := kubeAdmissionConfig.New()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+	}
+	pluginInitializers = append(pluginInitializers, kubeInitializers...)
 
 	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
 
@@ -298,16 +320,6 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	}
 
 	// setup admission
-	admissionConfig := &kubeapiserveradmission.Config{
-		ExternalInformers:    versionedInformers,
-		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
-		CloudConfigFile:      opts.CloudProvider.CloudConfigFile,
-	}
-	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
-	pluginInitializers, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
-	}
 	clientgoExternalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
