@@ -2189,7 +2189,7 @@ function start-kube-controller-manager {
   create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
   prepare-log-file /var/log/kube-controller-manager.log "${KUBE_CONTROLLER_MANAGER_RUNASUSER:-0}"
   # Calculate variables and assemble the command line.
-  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${KUBE_CONTROLLER_MANAGER_TEST_ARGS:-}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
+  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=4"}" "${KUBE_CONTROLLER_MANAGER_TEST_ARGS:-}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
   local config_path='/etc/srv/kubernetes/kube-controller-manager/kubeconfig'
   params+=("--use-service-account-credentials")
   params+=("--cloud-provider=${CLOUD_PROVIDER_FLAG:-external}")
