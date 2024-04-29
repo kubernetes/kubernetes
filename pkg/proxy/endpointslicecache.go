@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -113,14 +112,10 @@ func newEndpointSliceTracker() *endpointSliceTracker {
 // newEndpointSliceData generates endpointSliceData from an EndpointSlice.
 func newEndpointSliceData(endpointSlice *discovery.EndpointSlice, remove bool) *endpointSliceData {
 	esData := &endpointSliceData{
-		Ports:     make([]discovery.EndpointPort, len(endpointSlice.Ports)),
+		Ports:     endpointSlice.Ports,
 		Endpoints: []*endpointData{},
 		Remove:    remove,
 	}
-
-	// copy here to avoid mutating shared EndpointSlice object.
-	copy(esData.Ports, endpointSlice.Ports)
-	sort.Sort(byPort(esData.Ports))
 
 	if !remove {
 		for _, endpoint := range endpointSlice.Endpoints {
@@ -146,8 +141,6 @@ func newEndpointSliceData(endpointSlice *discovery.EndpointSlice, remove bool) *
 
 			esData.Endpoints = append(esData.Endpoints, epData)
 		}
-
-		sort.Sort(byAddress(esData.Endpoints))
 	}
 
 	return esData
@@ -373,19 +366,6 @@ func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.Names
 	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
 }
 
-// byAddress helps sort endpointData
-type byAddress []*endpointData
-
-func (e byAddress) Len() int {
-	return len(e)
-}
-func (e byAddress) Swap(i, j int) {
-	e[i], e[j] = e[j], e[i]
-}
-func (e byAddress) Less(i, j int) bool {
-	return strings.Join(e[i].Addresses, ",") < strings.Join(e[j].Addresses, ",")
-}
-
 // byEndpoint helps sort endpoints by endpoint string.
 type byEndpoint []Endpoint
 
@@ -397,17 +377,4 @@ func (e byEndpoint) Swap(i, j int) {
 }
 func (e byEndpoint) Less(i, j int) bool {
 	return e[i].String() < e[j].String()
-}
-
-// byPort helps sort EndpointSlice ports by port number
-type byPort []discovery.EndpointPort
-
-func (p byPort) Len() int {
-	return len(p)
-}
-func (p byPort) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-func (p byPort) Less(i, j int) bool {
-	return *p[i].Port < *p[j].Port
 }
