@@ -1986,6 +1986,7 @@ message HTTPHeader {
 // pod's hosts file.
 message HostAlias {
   // IP address of the host file entry.
+  // +required
   optional string ip = 1;
 
   // Hostnames for the above IP address.
@@ -2311,6 +2312,7 @@ message LocalObjectReference {
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   // TODO: Add other useful fields. apiVersion, kind, uid?
   // +optional
+  // +default=""
   optional string name = 1;
 }
 
