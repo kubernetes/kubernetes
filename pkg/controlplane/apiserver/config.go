@@ -95,7 +95,9 @@ type Extra struct {
 	VersionedInformers clientgoinformers.SharedInformerFactory
 }
 
-// BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
+// BuildGenericConfig takes the generic controlplane apiserver options and produces
+// the genericapiserver.Config associated with it. The genericapiserver.Config is
+// often shared between multiple delegated apiservers.
 func BuildGenericConfig(
 	s controlplaneapiserver.CompletedOptions,
 	schemes []*runtime.Scheme,
@@ -130,7 +132,7 @@ func BuildGenericConfig(
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
-		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
+		lastErr = fmt.Errorf("failed to create real external clientset: %w", err)
 		return
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
@@ -200,7 +202,7 @@ func BuildGenericConfig(
 		versionedInformers,
 	)
 	if err != nil {
-		lastErr = fmt.Errorf("invalid authorization config: %v", err)
+		lastErr = fmt.Errorf("invalid authorization config: %w", err)
 		return
 	}
 	if s.Authorization != nil && !enablesRBAC {
