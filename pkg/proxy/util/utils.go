@@ -22,10 +22,8 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -84,21 +82,6 @@ func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.Set[string]
 		}
 	}
 	return ips
-}
-
-// LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
-func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
-	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	klog.ErrorS(nil, "Incorrect IP version", "service", klog.KRef(svcNamespace, svcName), "field", fieldName, "value", fieldValue)
-	if recorder != nil {
-		recorder.Eventf(
-			&v1.ObjectReference{
-				Kind:      "Service",
-				Name:      svcName,
-				Namespace: svcNamespace,
-				UID:       svcUID,
-			}, nil, v1.EventTypeWarning, "KubeProxyIncorrectIPVersion", "GatherEndpoints", errMsg)
-	}
 }
 
 // MapIPsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)

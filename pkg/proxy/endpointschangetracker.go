@@ -29,11 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 )
 
-var supportedEndpointSliceAddressTypes = sets.New[discovery.AddressType](
-	discovery.AddressTypeIPv4,
-	discovery.AddressTypeIPv6,
-)
-
 // EndpointsChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
 type EndpointsChangeTracker struct {
@@ -44,6 +39,9 @@ type EndpointsChangeTracker struct {
 	// This function should not modify the EndpointsMaps, but just use the changes for
 	// any Proxier-specific cleanup.
 	processEndpointsMapChange processEndpointsMapChangeFunc
+
+	// addressType is the type of EndpointSlice this proxy tracks
+	addressType discovery.AddressType
 
 	// endpointSliceCache holds a simplified version of endpoint slices.
 	endpointSliceCache *EndpointSliceCache
@@ -62,12 +60,18 @@ type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName)
 type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
 // NewEndpointsChangeTracker initializes an EndpointsChangeTracker
-func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
+func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, _ events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
+	addressType := discovery.AddressTypeIPv4
+	if ipFamily == v1.IPv6Protocol {
+		addressType = discovery.AddressTypeIPv6
+	}
+
 	return &EndpointsChangeTracker{
+		addressType:               addressType,
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 		trackerStartTime:          time.Now(),
 		processEndpointsMapChange: processEndpointsMapChange,
-		endpointSliceCache:        NewEndpointSliceCache(hostname, ipFamily, recorder, makeEndpointInfo),
+		endpointSliceCache:        NewEndpointSliceCache(hostname, makeEndpointInfo),
 	}
 }
 
@@ -76,14 +80,8 @@ func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFun
 // change that needs to be synced; note that this is different from the return value of
 // ServiceChangeTracker.Update().
 func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
-	if !supportedEndpointSliceAddressTypes.Has(endpointSlice.AddressType) {
-		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "addressType", endpointSlice.AddressType)
-		return false
-	}
-
-	// This should never happen
-	if endpointSlice == nil {
-		klog.ErrorS(nil, "Nil endpointSlice passed to EndpointSliceUpdate")
+	if endpointSlice.AddressType != ect.addressType {
+		klog.V(4).InfoS("Ignoring unsupported EndpointSlice", "endpointSlice", klog.KObj(endpointSlice), "type", endpointSlice.AddressType, "expected", ect.addressType)
 		return false
 	}
 
