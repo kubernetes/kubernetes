@@ -254,6 +254,10 @@ var apiVersionPriorities = merge(controlplaneapiserver.DefaultGenericAPIServiceP
 	{Group: "", Version: "v1"}: {Group: 18000, Version: 1},
 	// to my knowledge, nothing below here collides
 	{Group: "apps", Version: "v1"}:                    {Group: 17800, Version: 15},
+	{Group: "autoscaling", Version: "v1"}:             {Group: 17500, Version: 15},
+	{Group: "autoscaling", Version: "v2"}:             {Group: 17500, Version: 30},
+	{Group: "autoscaling", Version: "v2beta1"}:        {Group: 17500, Version: 9},
+	{Group: "autoscaling", Version: "v2beta2"}:        {Group: 17500, Version: 1},
 	{Group: "batch", Version: "v1"}:                   {Group: 17400, Version: 15},
 	{Group: "batch", Version: "v1beta1"}:              {Group: 17400, Version: 9},
 	{Group: "batch", Version: "v2alpha1"}:             {Group: 17400, Version: 9},
